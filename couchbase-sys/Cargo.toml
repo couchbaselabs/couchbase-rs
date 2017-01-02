@@ -3,8 +3,8 @@ name = "couchbase-sys"
 version = "0.1.0"
 authors = ["Michael Nitschinger <michael@nitschinger.at>"]
 build = "build.rs"
-
-[dependencies]
+links = "libcouchbase"
 
 [build-dependencies]
 libbindgen = "0.1"
+pkg-config = "0.3"

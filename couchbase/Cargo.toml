@@ -4,4 +4,6 @@ version = "0.1.0"
 authors = ["Michael Nitschinger <michael@nitschinger.at>"]
 
 [dependencies]
+log = "0.3"
+libc = "0.2"
 couchbase-sys = { version = "0.1.0", path = "../couchbase-sys" }
