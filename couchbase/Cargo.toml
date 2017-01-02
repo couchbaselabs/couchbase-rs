@@ -1,0 +1,7 @@
+[package]
+name = "couchbase"
+version = "0.1.0"
+authors = ["Michael Nitschinger <michael@nitschinger.at>"]
+
+[dependencies]
+couchbase-sys = { version = "0.1.0", path = "../couchbase-sys" }
