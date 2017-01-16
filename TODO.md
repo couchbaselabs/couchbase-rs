@@ -22,3 +22,4 @@ This is the must-have list before a 0.1 I think...
 
 **Actual API**
  - Make the very basic KV ops work
+ - Run completely on futures

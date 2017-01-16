@@ -8,3 +8,6 @@ links = "libcouchbase"
 [build-dependencies]
 libbindgen = "0.1"
 pkg-config = "0.3"
+
+[lib]
+doctest = false

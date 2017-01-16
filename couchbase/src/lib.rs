@@ -2,11 +2,16 @@
 extern crate log;
 extern crate couchbase_sys;
 extern crate libc;
+extern crate futures;
 
 use couchbase_sys::*;
 use std::collections::HashMap;
 use std::ffi::CString;
 use std::ptr;
+
+use futures::{Async, Future, Poll};
+use futures::sync::oneshot::{channel, Sender, Receiver};
+use std::panic;
 
 pub type CouchbaseError = lcb_error_t;
 
@@ -94,30 +99,31 @@ impl<'a> Bucket<'a> {
         }
     }
 
-    pub fn get(&self, id: &'a str) -> Result<Document<'a>, CouchbaseError> {
+    pub fn get(&self, id: &'a str) -> CouchbaseFuture<Document, CouchbaseError> {
+        let (tx, rx) = channel();
+
         let lcb_id = CString::new(id).unwrap();
 
         let mut cmd_get: _bindgen_ty_18 = unsafe { ::std::mem::zeroed() };
         cmd_get.key.type_ = _bindgen_ty_10::LCB_KV_COPY;
-        cmd_get.key.contig.bytes = lcb_id.as_ptr() as *const std::os::raw::c_void;
+        cmd_get.key.contig.bytes = lcb_id.into_raw() as *const std::os::raw::c_void;
         cmd_get.key.contig.nbytes = id.len() as usize;
 
-        let doc = Document {
-            id: &id,
-            cas: 0,
-            expiry: 0,
-            content: String::new(),
-        };
+
+        let tx_boxed = Box::new(tx);
+
         unsafe {
             lcb_get3(self.instance,
-                     &doc as *const Document as *const std::os::raw::c_void,
+                     Box::into_raw(tx_boxed) as *const std::os::raw::c_void,
                      &cmd_get as *const lcb_CMDGET);
         }
+
+        // TODO: how to do this async non-blocking on polls?
         unsafe {
             lcb_wait(self.instance);
         }
 
-        Ok(doc)
+        CouchbaseFuture { inner: rx }
     }
 
     pub fn close(&mut self) {
@@ -134,20 +140,20 @@ impl<'a> Bucket<'a> {
 
 
 #[derive(Debug)]
-pub struct Document<'a> {
-    id: &'a str,
+pub struct Document {
+    id: String,
     cas: u64,
     content: String,
     expiry: i32,
 }
 
-impl<'a> Document<'a> {
+impl Document {
     pub fn cas(&self) -> u64 {
         self.cas
     }
 
-    pub fn id(&self) -> &'a str {
-        self.id
+    pub fn id(&self) -> &String {
+        &self.id
     }
 
     pub fn content(&self) -> &String {
@@ -159,11 +165,32 @@ impl<'a> Document<'a> {
     }
 }
 
-unsafe extern "C" fn get_callback(instance: lcb_t, cbtype: i32, resp: *const lcb_RESPBASE) {
+unsafe extern "C" fn get_callback(_: lcb_t, _: i32, resp: *const lcb_RESPBASE) {
     let response = resp as *const lcb_RESPGET;
-    let mut doc = (*response).cookie as *mut Document;
+    let tx = Box::from_raw((*response).cookie as *mut Sender<Result<Document, CouchbaseError>>);
 
-    (*doc).cas = (*response).cas;
     let content = CString::from_raw((*response).value as *mut i8);
-    (*doc).content = content.into_string().unwrap();
+    tx.complete(Ok(Document {
+        id: String::from("test"),
+        cas: (*response).cas,
+        content: content.into_string().unwrap(),
+        expiry: 0,
+    }));
+}
+
+pub struct CouchbaseFuture<T, E> {
+    inner: Receiver<Result<T, E>>,
+}
+
+impl<T: Send + 'static, E: Send + 'static> Future for CouchbaseFuture<T, E> {
+    type Item = T;
+    type Error = E;
+
+    fn poll(&mut self) -> Poll<T, E> {
+        match self.inner.poll().expect("shouldn't be canceled") {
+            Async::NotReady => Ok(Async::NotReady),
+            Async::Ready(Err(e)) => panic::resume_unwind(Box::new(e)),
+            Async::Ready(Ok(e)) => Ok(Async::Ready(e)),
+        }
+    }
 }
