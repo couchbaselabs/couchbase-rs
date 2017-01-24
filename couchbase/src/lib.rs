@@ -3,6 +3,7 @@ extern crate log;
 extern crate couchbase_sys;
 extern crate libc;
 extern crate futures;
+extern crate volatile;
 
 use couchbase_sys::*;
 use std::collections::HashMap;
@@ -12,6 +13,8 @@ use std::ptr;
 use futures::{Async, Future, Poll};
 use futures::sync::oneshot::{channel, Sender, Receiver};
 use std::panic;
+
+mod ioloop;
 
 pub type CouchbaseError = lcb_error_t;
 

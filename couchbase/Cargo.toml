@@ -7,4 +7,5 @@ authors = ["Michael Nitschinger <michael@nitschinger.at>"]
 log = "0.3"
 libc = "0.2"
 futures = "0.1"
+volatile = "0.2"
 couchbase-sys = { version = "0.1.0", path = "../couchbase-sys" }
