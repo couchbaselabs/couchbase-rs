@@ -12,7 +12,7 @@ This is the must-have list before a 0.1 I think...
 **LCB Integration**
  - Right now the FFI is generated via libbindgen on demand. pretty neat but
    the names suck (reexport?) and cargo test doesn't work since it gets hung
-   up on some docs in lcb.. make this interface/abstraction more stable and
+   up on some docs in lcb. make this interface/abstraction more stable and
    supportable while still not having to fix up everything every time we switch
    to a new version
 

@@ -82,14 +82,12 @@ impl<'a> Bucket<'a> {
             lcb_create(&mut instance as *mut lcb_t, &cropts as *const lcb_create_st);
             lcb_connect(instance);
             lcb_wait(instance);
-            lcb_install_callback3(instance,
-                                  1i32, // _bindgen_ty_17::LCB_CALLBACK_GET
-                                  Some(get_callback));
+            lcb_install_callback3(instance, LCB_CALLBACK_GET as i32, Some(get_callback));
             lcb_get_bootstrap_status(instance)
         };
 
         match res {
-            _bindgen_ty_3::LCB_SUCCESS => {
+            LCB_SUCCESS => {
                 Ok(Bucket {
                     name: name,
                     instance: instance,
@@ -104,11 +102,10 @@ impl<'a> Bucket<'a> {
 
         let lcb_id = CString::new(id).unwrap();
 
-        let mut cmd_get: _bindgen_ty_18 = unsafe { ::std::mem::zeroed() };
-        cmd_get.key.type_ = _bindgen_ty_10::LCB_KV_COPY;
+        let mut cmd_get: lcb_CMDGET = unsafe { ::std::mem::zeroed() };
+        cmd_get.key.type_ = LCB_KV_COPY;
         cmd_get.key.contig.bytes = lcb_id.into_raw() as *const std::os::raw::c_void;
         cmd_get.key.contig.nbytes = id.len() as usize;
-
 
         let tx_boxed = Box::new(tx);
 
@@ -173,7 +170,7 @@ unsafe extern "C" fn get_callback(_: lcb_t, _: i32, resp: *const lcb_RESPBASE) {
     tx.complete(Ok(Document {
         id: String::from("test"),
         cas: (*response).cas,
-        content: content.into_string().unwrap(),
+        content: content.into_string().unwrap_or(String::from("errror!!!")),
         expiry: 0,
     }));
 }

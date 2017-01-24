@@ -6,7 +6,7 @@ build = "build.rs"
 links = "libcouchbase"
 
 [build-dependencies]
-libbindgen = "0.1"
+bindgen = "0.20"
 pkg-config = "0.3"
 
 [lib]

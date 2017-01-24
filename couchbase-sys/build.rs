@@ -1,4 +1,4 @@
-extern crate libbindgen;
+extern crate bindgen;
 extern crate pkg_config;
 
 use std::env;
@@ -7,7 +7,7 @@ use std::path::Path;
 fn main() {
     let out_dir = env::var("OUT_DIR").unwrap();
 
-    let _ = libbindgen::builder()
+    let _ = bindgen::builder()
         .header("libcouchbase-2.7.0/include/libcouchbase/couchbase.h")
         .no_unstable_rust()
         .generate()
