@@ -1,18 +1,11 @@
 extern crate couchbase;
 extern crate futures;
 
-use couchbase::Cluster;
+use couchbase::Bucket;
 use futures::Future;
 
 fn main() {
-    // Open the Cluster Reference
-    let mut cluster = Cluster::new("127.0.0.1");
+    let bucket = Bucket::new("couchbase://localhost/travel-sample", "");
 
-    // Open the Bucket
-    let bucket = cluster.open_bucket("beer-sample", "").expect("Could not connect to bucket!");
-
-    println!("{:?}",
-             bucket.get("21st_amendment_brewery_cafe-21a_ipa").wait());
-
-    // when cluster goes out of scope, calls "close" on all buckets it owns.
+    println!("{:?}", bucket.get("airline_10123").wait().unwrap());
 }
