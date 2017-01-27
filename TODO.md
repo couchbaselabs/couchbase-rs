@@ -8,6 +8,7 @@ This is the must-have list before a 0.1 I think...
 
 **API**
  - add cluster abstraction with open bucket and everything
+ - Return Result for cluster and open bucket if it actually worked out
  - add all kinds of ops to the API
 
 **Perf**

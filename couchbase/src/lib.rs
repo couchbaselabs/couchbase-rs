@@ -2,10 +2,13 @@
 extern crate log;
 extern crate couchbase_sys;
 extern crate futures;
+extern crate parking_lot;
 
 pub mod bucket;
+pub mod cluster;
 
 pub use bucket::Bucket;
+pub use cluster::Cluster;
 
 use couchbase_sys::*;
 use futures::{Async, Future, Poll};

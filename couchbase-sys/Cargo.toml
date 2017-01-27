@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Michael Nitschinger <michael@nitschinger.at>"]
 build = "build.rs"
 links = "libcouchbase"
+license = "Apache-2.0"
 
 [build-dependencies]
 bindgen = "0.20"

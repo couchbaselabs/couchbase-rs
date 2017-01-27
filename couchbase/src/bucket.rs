@@ -1,7 +1,8 @@
 use std::ptr;
 use couchbase_sys::*;
 use std::ffi::CString;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use parking_lot::Mutex;
 use std::thread;
 use std::thread::{park, JoinHandle};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -18,7 +19,7 @@ pub struct Bucket {
 }
 
 impl Bucket {
-    pub fn new<'a>(cs: &'a str, pw: &'a str) -> Self {
+    pub fn new<'a>(cs: &'a str, pw: &'a str) -> Result<Self, CouchbaseError> {
         let mut instance: lcb_t = ptr::null_mut();
 
         let connstr = CString::new(cs).unwrap();
@@ -40,7 +41,8 @@ impl Bucket {
         };
 
         if boot_result != LCB_SUCCESS {
-            panic!("Couldn't connect. Result {:?}", boot_result);
+            return Err(boot_result);
+            // panic!("Couldn't connect. Result {:?}", boot_result);
         }
 
         // install the generic callback
@@ -55,31 +57,26 @@ impl Bucket {
             .name("io".into())
             .spawn(move || {
                 loop {
-                    // println!("[io] Parking");
                     park();
-                    // println!("[io] Unparked");
                     if !still_running.load(Ordering::Acquire) {
                         break;
                     }
-                    // println!("[io] before Wait before inst");
-                    let guard = io_instance.lock().unwrap();
+                    let guard = io_instance.lock();
                     let instance = guard.inner.unwrap();
-                    // println!("[io] before Wait after inst");
                     unsafe { lcb_wait(instance) };
-                    // println!("[io] Done Waiting");
                 }
             })
             .unwrap();
 
-        Bucket {
+        Ok(Bucket {
             instance: mt_instance,
             io_handle: Mutex::new(Some(handle)),
             io_running: io_running,
-        }
+        })
     }
 
     fn unpark_io(&self) {
-        let guard = self.io_handle.lock().unwrap();
+        let guard = self.io_handle.lock();
         guard.as_ref().unwrap().thread().unpark();
     }
 
@@ -95,7 +92,7 @@ impl Bucket {
         let tx_boxed = Box::new(tx);
 
         unsafe {
-            let guard = self.instance.lock().unwrap();
+            let guard = self.instance.lock();
             let instance = guard.inner.unwrap();
             lcb_get3(instance,
                      Box::into_raw(tx_boxed) as *const std::os::raw::c_void,
@@ -113,7 +110,7 @@ impl Drop for Bucket {
         self.io_running.clone().store(false, Ordering::Release);
         self.unpark_io();
 
-        let mut unlocked_handle = self.io_handle.lock().unwrap();
+        let mut unlocked_handle = self.io_handle.lock();
         unlocked_handle.take().unwrap().join().unwrap();
     }
 }

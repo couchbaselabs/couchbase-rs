@@ -1,11 +1,17 @@
 extern crate couchbase;
 extern crate futures;
 
-use couchbase::Bucket;
+use couchbase::Cluster;
 use futures::Future;
 
 fn main() {
-    let bucket = Bucket::new("couchbase://localhost/travel-sample", "");
+    // Initialize the Cluster
+    let cluster = Cluster::new("localhost").expect("Could not initialize Cluster");
 
-    println!("{:?}", bucket.get("airline_10123").wait().unwrap());
+    // Open the travel-sample bucket
+    let bucket = cluster.open_bucket("travel-sample", "").expect("Could not open Bucket");
+
+    // Load an airline, wait for it to load and print it out
+    let document = bucket.get("airline_10123").wait().expect("Could not load Document");
+    println!("{:?}", document);
 }
