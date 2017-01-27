@@ -7,52 +7,59 @@ pub struct Document {
     id: String,
     cas: u64,
     content: Vec<u8>,
-    expiry: i32,
+    expiry: u32,
 }
 
 impl Document {
     pub fn from_str<'a, S>(id: S, content: &'a str) -> Self
         where S: Into<String>
     {
+        Self::from_str_with_cas_and_expiry(id, content, 0, 0)
+    }
+
+    pub fn from_str_with_expiry<'a, S>(id: S, content: &'a str, expiry: u32) -> Self
+        where S: Into<String>
+    {
+        Self::from_str_with_cas_and_expiry(id, content, 0, expiry)
+    }
+
+    pub fn from_str_with_cas<'a, S>(id: S, content: &'a str, cas: u64) -> Self
+        where S: Into<String>
+    {
+        Self::from_str_with_cas_and_expiry(id, content, cas, 0)
+    }
+
+    pub fn from_str_with_cas_and_expiry<'a, S>(id: S,
+                                               content: &'a str,
+                                               cas: u64,
+                                               expiry: u32)
+                                               -> Self
+        where S: Into<String>
+    {
         let mut vc = Vec::with_capacity(content.len());
         vc.write_all(content.as_bytes()).expect("Could not convert content into vec");
-        Self::new(id, vc)
+        Self::from_vec_with_cas_and_expiry(id, vc, cas, expiry)
     }
 
-    pub fn new<S>(id: S, content: Vec<u8>) -> Self
+    pub fn from_vec<S>(id: S, content: Vec<u8>) -> Self
         where S: Into<String>
     {
-        Document {
-            id: id.into(),
-            cas: 0,
-            content: content,
-            expiry: 0,
-        }
+        Self::from_vec_with_cas_and_expiry(id, content, 0, 0)
     }
 
-    pub fn new_with_cas<S>(id: S, content: Vec<u8>, cas: u64) -> Self
+    pub fn from_vec_with_cas<S>(id: S, content: Vec<u8>, cas: u64) -> Self
         where S: Into<String>
     {
-        Document {
-            id: id.into(),
-            cas: cas,
-            content: content,
-            expiry: 0,
-        }
+        Self::from_vec_with_cas_and_expiry(id, content, cas, 0)
     }
 
-    pub fn new_with_expiry<S>(id: S, content: Vec<u8>, expiry: i32) -> Self
+    pub fn from_vec_with_expiry<S>(id: S, content: Vec<u8>, expiry: u32) -> Self
         where S: Into<String>
     {
-        Document {
-            id: id.into(),
-            cas: 0,
-            content: content,
-            expiry: expiry,
-        }
+        Self::from_vec_with_cas_and_expiry(id, content, 0, expiry)
     }
 
-    pub fn new_with_cas_and_expiry<S>(id: S, content: Vec<u8>, cas: u64, expiry: i32) -> Self
+    pub fn from_vec_with_cas_and_expiry<S>(id: S, content: Vec<u8>, cas: u64, expiry: u32) -> Self
         where S: Into<String>
     {
         Document {
@@ -83,7 +90,7 @@ impl Document {
         from_utf8(self.content_as_ref())
     }
 
-    pub fn expiry(&self) -> i32 {
+    pub fn expiry(&self) -> u32 {
         self.expiry
     }
 }

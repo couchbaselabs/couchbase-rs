@@ -58,6 +58,5 @@ pub use sync::CouchbaseFuture;
 
 use couchbase_sys::*;
 
-
 /// Generic error type, might change in the future.
 pub type CouchbaseError = lcb_error_t;
