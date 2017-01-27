@@ -4,6 +4,8 @@ extern crate futures;
 use couchbase::Cluster;
 use futures::Future;
 
+/// A very simple example which connects to the `travel-sample` bucket on `localhost` and
+/// loads a document.
 fn main() {
     // Initialize the Cluster
     let cluster = Cluster::new("localhost").expect("Could not initialize Cluster");

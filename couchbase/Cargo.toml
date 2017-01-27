@@ -9,3 +9,9 @@ log = "0.3"
 futures = "0.1"
 parking_lot = "0.3"
 couchbase-sys = { version = "0.1.0", path = "../couchbase-sys" }
+
+[dev-dependencies]
+# serde for the json examples
+serde = "0.9"
+serde_json = "0.9"
+serde_derive = "0.9"

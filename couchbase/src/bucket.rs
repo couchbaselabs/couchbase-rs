@@ -108,11 +108,18 @@ impl Bucket {
 
 impl Drop for Bucket {
     fn drop(&mut self) {
+        // stop the IO loop
         self.io_running.clone().store(false, Ordering::Release);
         self.unpark_io();
 
+        // wait until the IO thread is dead
         let mut unlocked_handle = self.io_handle.lock();
         unlocked_handle.take().unwrap().join().unwrap();
+
+        // finally, destroy the instance
+        let mut guard = self.instance.lock();
+        let instance = guard.inner.take().unwrap();
+        unsafe { lcb_destroy(instance) };
     }
 }
 
