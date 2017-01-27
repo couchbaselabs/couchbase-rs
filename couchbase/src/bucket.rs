@@ -81,7 +81,7 @@ impl Bucket {
         guard.as_ref().unwrap().thread().unpark();
     }
 
-    pub fn get<'a>(&self, id: &'a str) -> CouchbaseFuture<Document, CouchbaseError> {
+    pub fn get<'a>(&self, id: &'a str) -> CouchbaseFuture<Option<Document>, CouchbaseError> {
         let (tx, rx) = channel();
 
         let lcb_id = CString::new(id).unwrap();
@@ -123,17 +123,27 @@ struct SendPtr<T> {
 unsafe impl<T> Send for SendPtr<T> {}
 
 unsafe extern "C" fn get_callback(_: lcb_t, _: i32, rb: *const lcb_RESPBASE) {
-    let response = rb as *const lcb_RESPGET;
-    let tx = Box::from_raw((*response).cookie as *mut Sender<Result<Document, CouchbaseError>>);
+    let response = *(rb as *const lcb_RESPGET);
+    let tx = Box::from_raw(response.cookie as *mut Sender<Result<Option<Document>,
+                                                                 CouchbaseError>>);
+    if response.rc == LCB_SUCCESS {
+        let lcb_content = std::slice::from_raw_parts(response.value as *const u8, response.nvalue);
+        let mut content = Vec::with_capacity(lcb_content.len());
+        content.write_all(lcb_content).expect("Could not copy content from lcb into owned vec!");
 
-    let lcb_owned = std::slice::from_raw_parts((*response).value as *const u8, (*response).nvalue);
-    let mut content = Vec::with_capacity(lcb_owned.len());
-    content.write_all(lcb_owned).expect("Could not copy content from lcb into owned vec!");
+        let lcb_id = std::slice::from_raw_parts(response.key as *const u8, response.nkey);
+        let mut id_vec = Vec::with_capacity(lcb_id.len());
+        id_vec.write_all(lcb_id).expect("Could not copy document ID from lcb into owned vec!");
 
-    tx.complete(Ok(Document {
-        id: String::from("test"),
-        cas: 0,
-        content: content,
-        expiry: 0,
-    }));
+        tx.complete(Ok(Some(Document {
+            id: String::from_utf8(id_vec).expect("Document ID is not UTF8 compatible!"),
+            cas: response.cas.clone(),
+            content: content,
+            expiry: 0,
+        })));
+    } else if response.rc == LCB_KEY_ENOENT {
+        tx.complete(Ok(None));
+    } else {
+        tx.complete(Err(response.rc));
+    }
 }

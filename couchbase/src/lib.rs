@@ -15,10 +15,10 @@ use futures::{Async, Future, Poll};
 use futures::sync::oneshot::Receiver;
 use std::panic;
 use std::str::{from_utf8, Utf8Error};
+use std::fmt;
 
 pub type CouchbaseError = lcb_error_t;
 
-#[derive(Debug)]
 pub struct Document {
     id: String,
     cas: u64,
@@ -45,6 +45,18 @@ impl Document {
 
     pub fn expiry(&self) -> i32 {
         self.expiry
+    }
+}
+
+impl fmt::Debug for Document {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let content = self.content_as_str().unwrap_or("<not utf8 decodable>");
+        write!(f,
+               "Document {{ id: \"{}\", cas: {}, expiry: {}, content: {} }}",
+               self.id,
+               self.cas,
+               self.expiry,
+               content)
     }
 }
 
