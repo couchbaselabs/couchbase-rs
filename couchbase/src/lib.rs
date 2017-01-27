@@ -14,6 +14,7 @@ use couchbase_sys::*;
 use futures::{Async, Future, Poll};
 use futures::sync::oneshot::Receiver;
 use std::panic;
+use std::str::{from_utf8, Utf8Error};
 
 pub type CouchbaseError = lcb_error_t;
 
@@ -21,7 +22,7 @@ pub type CouchbaseError = lcb_error_t;
 pub struct Document {
     id: String,
     cas: u64,
-    content: String,
+    content: Vec<u8>,
     expiry: i32,
 }
 
@@ -34,8 +35,12 @@ impl Document {
         &self.id
     }
 
-    pub fn content(&self) -> &String {
-        &self.content
+    pub fn content(&self) -> &[u8] {
+        self.content.as_ref()
+    }
+
+    pub fn content_as_str(&self) -> Result<&str, Utf8Error> {
+        from_utf8(self.content())
     }
 
     pub fn expiry(&self) -> i32 {

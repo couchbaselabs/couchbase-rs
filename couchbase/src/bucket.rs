@@ -11,6 +11,7 @@ use ::CouchbaseFuture;
 use ::Document;
 use ::CouchbaseError;
 use std;
+use std::io::Write;
 
 pub struct Bucket {
     instance: Arc<Mutex<SendPtr<lcb_t>>>,
@@ -124,10 +125,15 @@ unsafe impl<T> Send for SendPtr<T> {}
 unsafe extern "C" fn get_callback(_: lcb_t, _: i32, rb: *const lcb_RESPBASE) {
     let response = rb as *const lcb_RESPGET;
     let tx = Box::from_raw((*response).cookie as *mut Sender<Result<Document, CouchbaseError>>);
+
+    let lcb_owned = std::slice::from_raw_parts((*response).value as *const u8, (*response).nvalue);
+    let mut content = Vec::with_capacity(lcb_owned.len());
+    content.write_all(lcb_owned).expect("Could not copy content from lcb into owned vec!");
+
     tx.complete(Ok(Document {
         id: String::from("test"),
         cas: 0,
-        content: String::from("test"),
+        content: content,
         expiry: 0,
     }));
 }

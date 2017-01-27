@@ -12,6 +12,10 @@ fn main() {
     let bucket = cluster.open_bucket("travel-sample", "").expect("Could not open Bucket");
 
     // Load an airline, wait for it to load and print it out
-    let document = bucket.get("airline_10123").wait().expect("Could not load Document");
-    println!("{:?}", document);
+    loop {
+        let document = bucket.get("airline_10123").wait().expect("Could not load Document");
+        let content = document.content_as_str().expect("Could not decode content as utf8");
+        println!("{:?}", content);
+    }
+
 }
