@@ -1,3 +1,4 @@
+//! Bucket-level operations and API.
 use std::ptr;
 use couchbase_sys::*;
 use std::ffi::CString;
@@ -43,7 +44,6 @@ impl Bucket {
 
         if boot_result != LCB_SUCCESS {
             return Err(boot_result);
-            // panic!("Couldn't connect. Result {:?}", boot_result);
         }
 
         // install the generic callbacks
@@ -110,7 +110,7 @@ impl Bucket {
         }
 
         self.unpark_io();
-        CouchbaseFuture { inner: rx }
+        CouchbaseFuture::new(rx)
     }
 
     /// Remove a `Document` from the `Bucket`.
@@ -138,7 +138,7 @@ impl Bucket {
         }
 
         self.unpark_io();
-        CouchbaseFuture { inner: rx }
+        CouchbaseFuture::new(rx)
     }
 
     /// Insert a `Document` into the `Bucket`.
@@ -190,7 +190,7 @@ impl Bucket {
         }
 
         self.unpark_io();
-        CouchbaseFuture { inner: rx }
+        CouchbaseFuture::new(rx)
     }
 }
 

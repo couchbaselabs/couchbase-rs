@@ -1,3 +1,4 @@
+//! Everything regarding Documents and their usage.
 use std::str::{from_utf8, Utf8Error};
 use std::fmt;
 use std::io::Write;

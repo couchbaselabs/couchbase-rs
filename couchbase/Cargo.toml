@@ -5,7 +5,6 @@ authors = ["Michael Nitschinger <michael@nitschinger.at>"]
 license = "Apache-2.0"
 
 [dependencies]
-log = "0.3"
 futures = "0.1"
 parking_lot = "0.3"
 couchbase-sys = { version = "0.1.0", path = "../couchbase-sys" }

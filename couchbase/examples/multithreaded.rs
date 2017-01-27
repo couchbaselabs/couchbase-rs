@@ -25,7 +25,7 @@ fn main() {
         let b = bucket.clone();
         threads.push(thread::spawn(move || {
             let id = format!("airport_{}", i + 1254);
-            println!("Thread {:?} found:\n\t{:?}", i, b.get(&id).wait().unwrap());
+            println!("Thread {:?} found:\n\t{:?}", i, b.get(id).wait().unwrap());
         }));
     }
 
