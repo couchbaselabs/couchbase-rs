@@ -1,9 +1,11 @@
 # Couchbase Rust SDK
 A brand new `libcouchbase`-based binding for [Rust](https://www.rust-lang.org).
 
-# Example
+# Examples
 
-Run with `cargo run --example=helloworld`.
+Note that to run all the examples you need to run at least Rust 1.15.0 since
+it supports custom derive on stable which `serde` needs. Run with
+`cargo run --example=helloworld`.
 
 ```rust
 extern crate couchbase;
