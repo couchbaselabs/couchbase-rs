@@ -230,12 +230,11 @@ unsafe extern "C" fn get_callback(_: lcb_t, _: i32, rb: *const lcb_RESPBASE) {
         let mut id_vec = Vec::with_capacity(lcb_id.len());
         id_vec.write_all(lcb_id).expect("Could not copy document ID from lcb into owned vec!");
 
-        tx.complete(Ok(Some(Document {
-            id: String::from_utf8(id_vec).expect("Document ID is not UTF8 compatible!"),
-            cas: response.cas.clone(),
-            content: content,
-            expiry: 0,
-        })));
+        tx.complete(Ok(Some(Document::new_with_cas(String::from_utf8(id_vec)
+                                                       .expect("Document ID is not UTF8 \
+                                                                compatible!"),
+                                                   content,
+                                                   response.cas.clone()))));
     } else if response.rc == LCB_KEY_ENOENT {
         tx.complete(Ok(None));
     } else {
@@ -252,12 +251,10 @@ unsafe extern "C" fn store_callback(_: lcb_t, _: i32, rb: *const lcb_RESPBASE) {
         let mut id_vec = Vec::with_capacity(lcb_id.len());
         id_vec.write_all(lcb_id).expect("Could not copy document ID from lcb into owned vec!");
 
-        tx.complete(Ok(Document {
-            id: String::from_utf8(id_vec).expect("Document ID is not UTF8 compatible!"),
-            cas: response.cas.clone(),
-            content: vec![],
-            expiry: 0,
-        }));
+        tx.complete(Ok(Document::new_with_cas(String::from_utf8(id_vec)
+                                                  .expect("Document ID is not UTF8 compatible!"),
+                                              vec![],
+                                              response.cas.clone())));
     } else {
         tx.complete(Err(response.rc));
     }
