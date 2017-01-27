@@ -46,8 +46,11 @@ impl Bucket {
             // panic!("Couldn't connect. Result {:?}", boot_result);
         }
 
-        // install the generic callback
-        unsafe { lcb_install_callback3(instance, LCB_CALLBACK_GET as i32, Some(get_callback)) };
+        // install the generic callbacks
+        unsafe {
+            lcb_install_callback3(instance, LCB_CALLBACK_GET as i32, Some(get_callback));
+            lcb_install_callback3(instance, LCB_CALLBACK_STORE as i32, Some(store_callback));
+        }
 
         let mt_instance = Arc::new(Mutex::new(SendPtr { inner: Some(instance) }));
         let io_running = Arc::new(AtomicBool::new(true));
@@ -81,14 +84,18 @@ impl Bucket {
         guard.as_ref().unwrap().thread().unpark();
     }
 
-    pub fn get<'a>(&self, id: &'a str) -> CouchbaseFuture<Option<Document>, CouchbaseError> {
+    pub fn get<S>(&self, id: S) -> CouchbaseFuture<Option<Document>, CouchbaseError>
+        where S: Into<String>
+    {
         let (tx, rx) = channel();
 
-        let lcb_id = CString::new(id).unwrap();
-        let mut cmd_get: lcb_CMDGET = unsafe { ::std::mem::zeroed() };
-        cmd_get.key.type_ = LCB_KV_COPY;
-        cmd_get.key.contig.bytes = lcb_id.into_raw() as *const std::os::raw::c_void;
-        cmd_get.key.contig.nbytes = id.len() as usize;
+        let idm = id.into();
+        let idm_len = idm.len();
+        let lcb_id = CString::new(idm).unwrap();
+        let mut cmd: lcb_CMDGET = unsafe { ::std::mem::zeroed() };
+        cmd.key.type_ = LCB_KV_COPY;
+        cmd.key.contig.bytes = lcb_id.into_raw() as *const std::os::raw::c_void;
+        cmd.key.contig.nbytes = idm_len as usize;
 
         let tx_boxed = Box::new(tx);
 
@@ -97,11 +104,59 @@ impl Bucket {
             let instance = guard.inner.unwrap();
             lcb_get3(instance,
                      Box::into_raw(tx_boxed) as *const std::os::raw::c_void,
-                     &cmd_get as *const lcb_CMDGET);
+                     &cmd as *const lcb_CMDGET);
         }
 
         self.unpark_io();
+        CouchbaseFuture { inner: rx }
+    }
 
+    pub fn insert(&self, document: Document) -> CouchbaseFuture<Document, CouchbaseError> {
+        self.store(document, LCB_ADD)
+    }
+
+    pub fn upsert(&self, document: Document) -> CouchbaseFuture<Document, CouchbaseError> {
+        self.store(document, LCB_UPSERT)
+    }
+
+    pub fn replace(&self, document: Document) -> CouchbaseFuture<Document, CouchbaseError> {
+        self.store(document, LCB_REPLACE)
+    }
+
+    fn store(&self,
+             document: Document,
+             operation: lcb_storage_t)
+             -> CouchbaseFuture<Document, CouchbaseError> {
+        let (tx, rx) = channel();
+
+        let lcb_id = CString::new(document.id()).unwrap();
+        let mut cmd: lcb_CMDSTORE = unsafe { ::std::mem::zeroed() };
+        cmd.operation = operation;
+        cmd.key.type_ = LCB_KV_COPY;
+        cmd.key.contig.bytes = lcb_id.into_raw() as *const std::os::raw::c_void;
+        cmd.key.contig.nbytes = document.id().len() as usize;
+
+        let content = document.content();
+        let content_len = content.len();
+        let lcb_content = CString::new(content).unwrap();
+        cmd.value.vtype = LCB_KV_COPY;
+        unsafe {
+            cmd.value.u_buf.contig.as_mut().bytes =
+                lcb_content.into_raw() as *const std::os::raw::c_void;
+            cmd.value.u_buf.contig.as_mut().nbytes = content_len as usize;
+        }
+        let tx_boxed = Box::new(tx);
+
+        unsafe {
+            let guard = self.instance.lock();
+            let instance = guard.inner.unwrap();
+
+            lcb_store3(instance,
+                       Box::into_raw(tx_boxed) as *const std::os::raw::c_void,
+                       &cmd as *const lcb_CMDSTORE);
+        }
+
+        self.unpark_io();
         CouchbaseFuture { inner: rx }
     }
 }
@@ -150,6 +205,26 @@ unsafe extern "C" fn get_callback(_: lcb_t, _: i32, rb: *const lcb_RESPBASE) {
         })));
     } else if response.rc == LCB_KEY_ENOENT {
         tx.complete(Ok(None));
+    } else {
+        tx.complete(Err(response.rc));
+    }
+}
+
+unsafe extern "C" fn store_callback(_: lcb_t, _: i32, rb: *const lcb_RESPBASE) {
+    let response = *rb;
+    let tx = Box::from_raw(response.cookie as *mut Sender<Result<Document, CouchbaseError>>);
+
+    if response.rc == LCB_SUCCESS {
+        let lcb_id = std::slice::from_raw_parts(response.key as *const u8, response.nkey);
+        let mut id_vec = Vec::with_capacity(lcb_id.len());
+        id_vec.write_all(lcb_id).expect("Could not copy document ID from lcb into owned vec!");
+
+        tx.complete(Ok(Document {
+            id: String::from_utf8(id_vec).expect("Document ID is not UTF8 compatible!"),
+            cas: response.cas.clone(),
+            content: vec![],
+            expiry: 0,
+        }));
     } else {
         tx.complete(Err(response.rc));
     }
