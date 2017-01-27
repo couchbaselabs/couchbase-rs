@@ -50,6 +50,7 @@ impl Bucket {
         unsafe {
             lcb_install_callback3(instance, LCB_CALLBACK_GET as i32, Some(get_callback));
             lcb_install_callback3(instance, LCB_CALLBACK_STORE as i32, Some(store_callback));
+            lcb_install_callback3(instance, LCB_CALLBACK_REMOVE as i32, Some(remove_callback));
         }
 
         let mt_instance = Arc::new(Mutex::new(SendPtr { inner: Some(instance) }));
@@ -84,6 +85,7 @@ impl Bucket {
         guard.as_ref().unwrap().thread().unpark();
     }
 
+    /// Fetch a `Document` from the `Bucket`.
     pub fn get<S>(&self, id: S) -> CouchbaseFuture<Option<Document>, CouchbaseError>
         where S: Into<String>
     {
@@ -111,14 +113,45 @@ impl Bucket {
         CouchbaseFuture { inner: rx }
     }
 
+    /// Remove a `Document` from the `Bucket`.
+    pub fn remove<S>(&self, id: S) -> CouchbaseFuture<(), CouchbaseError>
+        where S: Into<String>
+    {
+        let (tx, rx) = channel();
+
+        let idm = id.into();
+        let idm_len = idm.len();
+        let lcb_id = CString::new(idm).unwrap();
+        let mut cmd: lcb_CMDREMOVE = unsafe { ::std::mem::zeroed() };
+        cmd.key.type_ = LCB_KV_COPY;
+        cmd.key.contig.bytes = lcb_id.into_raw() as *const std::os::raw::c_void;
+        cmd.key.contig.nbytes = idm_len as usize;
+
+        let tx_boxed = Box::new(tx);
+
+        unsafe {
+            let guard = self.instance.lock();
+            let instance = guard.inner.unwrap();
+            lcb_remove3(instance,
+                        Box::into_raw(tx_boxed) as *const std::os::raw::c_void,
+                        &cmd as *const lcb_CMDREMOVE);
+        }
+
+        self.unpark_io();
+        CouchbaseFuture { inner: rx }
+    }
+
+    /// Insert a `Document` into the `Bucket`.
     pub fn insert(&self, document: Document) -> CouchbaseFuture<Document, CouchbaseError> {
         self.store(document, LCB_ADD)
     }
 
+    /// Upsert a `Document` into the `Bucket`.
     pub fn upsert(&self, document: Document) -> CouchbaseFuture<Document, CouchbaseError> {
         self.store(document, LCB_UPSERT)
     }
 
+    /// Replace a `Document` in the `Bucket`.
     pub fn replace(&self, document: Document) -> CouchbaseFuture<Document, CouchbaseError> {
         self.store(document, LCB_REPLACE)
     }
@@ -225,6 +258,17 @@ unsafe extern "C" fn store_callback(_: lcb_t, _: i32, rb: *const lcb_RESPBASE) {
             content: vec![],
             expiry: 0,
         }));
+    } else {
+        tx.complete(Err(response.rc));
+    }
+}
+
+unsafe extern "C" fn remove_callback(_: lcb_t, _: i32, rb: *const lcb_RESPBASE) {
+    let response = *rb;
+    let tx = Box::from_raw(response.cookie as *mut Sender<Result<(), CouchbaseError>>);
+
+    if response.rc == LCB_SUCCESS {
+        tx.complete(Ok(()));
     } else {
         tx.complete(Err(response.rc));
     }
