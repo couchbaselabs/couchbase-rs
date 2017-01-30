@@ -1,5 +1,7 @@
 # Couchbase Rust SDK
 A brand new `libcouchbase`-based binding for [Rust](https://www.rust-lang.org).
+[![crates.io](http://meritbadge.herokuapp.com/couchbase)](https://crates.io/crates/couchbase)
+[![docs.rs](https://docs.rs/couchbase/badge.svg)](https://docs.rs/crate/couchbase)
 
 # Building
 There are two options to build the SDK (or better, how to link the underlying)
