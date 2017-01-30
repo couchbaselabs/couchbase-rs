@@ -1,9 +1,12 @@
 # Couchbase Rust SDK
-A brand new `libcouchbase`-based binding for [Rust](https://www.rust-lang.org).
 [![crates.io](http://meritbadge.herokuapp.com/couchbase)](https://crates.io/crates/couchbase)
 [![docs.rs](https://docs.rs/couchbase/badge.svg)](https://docs.rs/crate/couchbase)
 
-# Building
+A [Couchbase Server](http://couchbase.com/) [Rust](https://www.rust-lang.org) SDK based on [libcouchbase](https://github.com/couchbase/libcouchbase).
+
+# Usage
+
+## Building
 There are two options to build the SDK (or better, how to link the underlying)
 `libcouchbase` library. If you run with all the default settings and just issue
 a `cargo build`, the build file will use [cmake](https://cmake.org/) to actually
@@ -18,7 +21,7 @@ one on your machine and make it discoverable via `pkg-config`. If you set the
 discover both the library and its header files through `pkg-config` and there is
 also no need to compile libcouchbase when doing so.
 
-# Examples
+## Examples
 
 Note that to run all the examples you need to run at least Rust 1.15.0 since
 it supports custom derive on stable which `serde` needs. Run with
