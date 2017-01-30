@@ -14,11 +14,11 @@ fn main() {
     let bucket = cluster.open_bucket("default", "").expect("Could not open Bucket");
 
     // Create a document and store it in the bucket
-    let document = Document::from_str_with_expiry("hello", "{\"world\":true}");
+    let document = Document::from_str("hello", "{\"world\":true}");
     println!("Wrote Document {:?}",
              bucket.upsert(document)
                  .wait()
-                 .unwrap());
+                 .expect("Upsert failed!"));
 
     // Load the previously written document and print it out
     match bucket.get("hello").wait().expect("Could not load Document") {
