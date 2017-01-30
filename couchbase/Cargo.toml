@@ -1,7 +1,7 @@
 [package]
 name = "couchbase"
-version = "0.1.0"
-authors = ["Michael Nitschinger <michael@nitschinger.at>"]
+version = "0.1.1"
+authors = ["Michael Nitschinger <michael.nitschinger@couchbase.com>"]
 license = "Apache-2.0"
 keywords = ["couchbase", "database", "futures", "libcouchbase", "async"]
 description = "The Couchbase Rust SDK"
@@ -11,7 +11,7 @@ homepage = "https://github.com/couchbaselabs/couchbase-rs"
 [dependencies]
 futures = "0.1"
 parking_lot = "0.3"
-couchbase-sys = { version = "0.1.0", path = "../couchbase-sys" }
+couchbase-sys = { version = "0.1.1", path = "../couchbase-sys" }
 
 [dev-dependencies]
 # serde for the json examples

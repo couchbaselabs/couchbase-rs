@@ -1,6 +1,6 @@
 [package]
 name = "couchbase-sys"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Michael Nitschinger <michael.nitschinger@couchbase.com>"]
 build = "build.rs"
 links = "libcouchbase"
@@ -9,6 +9,7 @@ keywords = ["couchbase", "database", "ffi", "libcouchbase"]
 description = "Rust bindings to the libcouchbase C Couchbase SDK."
 repository = "https://github.com/couchbaselabs/couchbase-rs"
 homepage = "https://github.com/couchbaselabs/couchbase-rs"
+documentation = "https://docs.rs/crate/couchbase-sys"
 
 [build-dependencies]
 bindgen = "0.20"
