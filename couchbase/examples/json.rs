@@ -30,7 +30,7 @@ fn main() {
     let bucket = cluster.open_bucket("travel-sample", "").expect("Could not open Bucket");
 
     let document: Airline = bucket.get("airline_10123")
-        .map(|doc| serde_json::from_str(doc.unwrap().content_as_str().unwrap()))
+        .map(|doc| serde_json::from_str(doc.content_as_str().unwrap()))
         .wait()
         .expect("Could not load Document")
         .expect("Document not found!");

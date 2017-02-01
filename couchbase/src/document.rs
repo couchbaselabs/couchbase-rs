@@ -11,29 +11,25 @@ pub struct Document {
 }
 
 impl Document {
-    pub fn from_str<'a, S>(id: S, content: &'a str) -> Self
+    pub fn from_str<S>(id: S, content: &str) -> Self
         where S: Into<String>
     {
         Self::from_str_with_cas_and_expiry(id, content, 0, 0)
     }
 
-    pub fn from_str_with_expiry<'a, S>(id: S, content: &'a str, expiry: u32) -> Self
+    pub fn from_str_with_expiry<S>(id: S, content: &str, expiry: u32) -> Self
         where S: Into<String>
     {
         Self::from_str_with_cas_and_expiry(id, content, 0, expiry)
     }
 
-    pub fn from_str_with_cas<'a, S>(id: S, content: &'a str, cas: u64) -> Self
+    pub fn from_str_with_cas<S>(id: S, content: &str, cas: u64) -> Self
         where S: Into<String>
     {
         Self::from_str_with_cas_and_expiry(id, content, cas, 0)
     }
 
-    pub fn from_str_with_cas_and_expiry<'a, S>(id: S,
-                                               content: &'a str,
-                                               cas: u64,
-                                               expiry: u32)
-                                               -> Self
+    pub fn from_str_with_cas_and_expiry<S>(id: S, content: &str, cas: u64, expiry: u32) -> Self
         where S: Into<String>
     {
         let mut vc = Vec::with_capacity(content.len());

@@ -94,7 +94,7 @@ impl Bucket {
     }
 
     /// Fetch a `Document` from the `Bucket`.
-    pub fn get<S>(&self, id: S) -> CouchbaseFuture<Option<Document>>
+    pub fn get<S>(&self, id: S) -> CouchbaseFuture<Document>
         where S: Into<String>
     {
         let (tx, rx) = channel();
@@ -225,8 +225,7 @@ unsafe impl<T> Send for SendPtr<T> {}
 
 unsafe extern "C" fn get_callback(_: lcb_t, _: i32, rb: *const lcb_RESPBASE) {
     let response = *(rb as *const lcb_RESPGET);
-    let tx = Box::from_raw(response.cookie as
-                           *mut Sender<Result<Option<Document>, CouchbaseError>>);
+    let tx = Box::from_raw(response.cookie as *mut Sender<Result<Document, CouchbaseError>>);
     if response.rc == LCB_SUCCESS {
         let lcb_content = std::slice::from_raw_parts(response.value as *const u8, response.nvalue);
         let mut content = Vec::with_capacity(lcb_content.len());
@@ -236,13 +235,11 @@ unsafe extern "C" fn get_callback(_: lcb_t, _: i32, rb: *const lcb_RESPBASE) {
         let mut id_vec = Vec::with_capacity(lcb_id.len());
         id_vec.write_all(lcb_id).expect("Could not copy document ID from lcb into owned vec!");
 
-        tx.complete(Ok(Some(Document::from_vec_with_cas(String::from_utf8(id_vec)
-                                                            .expect("Document ID is not UTF8 \
-                                                                     compatible!"),
-                                                        content,
-                                                        response.cas.clone()))));
-    } else if response.rc == LCB_KEY_ENOENT {
-        tx.complete(Ok(None));
+        tx.complete(Ok(Document::from_vec_with_cas(String::from_utf8(id_vec)
+                                                       .expect("Document ID is not UTF8 \
+                                                                compatible!"),
+                                                   content,
+                                                   response.cas)));
     } else {
         tx.complete(Err(response.rc.into()));
     }
@@ -261,7 +258,7 @@ unsafe extern "C" fn store_callback(_: lcb_t, _: i32, rb: *const lcb_RESPBASE) {
                                                        .expect("Document ID is not UTF8 \
                                                                 compatible!"),
                                                    vec![],
-                                                   response.cas.clone())));
+                                                   response.cas)));
     } else {
         tx.complete(Err(response.rc.into()));
     }

@@ -21,9 +21,6 @@ fn main() {
                  .expect("Upsert failed!"));
 
     // Load the previously written document and print it out
-    match bucket.get("hello").wait().expect("Could not load Document") {
-        Some(d) => println!("Found Document {:?}", d),
-        None => println!("Document not found!"),
-    }
-
+    println!("Found Document {:?}",
+             bucket.get("hello").wait().expect("Could not load Document"));
 }
