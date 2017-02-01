@@ -8,9 +8,9 @@ use std::thread;
 use std::thread::{park, JoinHandle};
 use std::sync::atomic::{AtomicBool, Ordering};
 use futures::sync::oneshot::{channel, Sender};
-use ::CouchbaseFuture;
-use ::Document;
-use ::CouchbaseError;
+use CouchbaseFuture;
+use Document;
+use CouchbaseError;
 use std;
 use std::io::Write;
 
@@ -37,13 +37,23 @@ impl Bucket {
             cropts.v.v3.as_mut().passwd = passstr.as_ptr();
 
             lcb_create(&mut instance, &cropts);
+
+            let mut enable = true;
+            let cntl_res = lcb_cntl(instance,
+                                    LCB_CNTL_SET as i32,
+                                    LCB_CNTL_DETAILED_ERRCODES as i32,
+                                    &mut enable as *mut bool as *mut std::os::raw::c_void);
+            if cntl_res != LCB_SUCCESS {
+                return Err(cntl_res.into());
+            }
+
             lcb_connect(instance);
             lcb_wait(instance);
             lcb_get_bootstrap_status(instance)
         };
 
         if boot_result != LCB_SUCCESS {
-            return Err(boot_result);
+            return Err(boot_result.into());
         }
 
         // install the generic callbacks
@@ -60,16 +70,14 @@ impl Bucket {
         let still_running = io_running.clone();
         let handle = thread::Builder::new()
             .name("io".into())
-            .spawn(move || {
-                loop {
-                    park();
-                    if !still_running.load(Ordering::Acquire) {
-                        break;
-                    }
-                    let guard = io_instance.lock();
-                    let instance = guard.inner.unwrap();
-                    unsafe { lcb_wait(instance) };
+            .spawn(move || loop {
+                park();
+                if !still_running.load(Ordering::Acquire) {
+                    break;
                 }
+                let guard = io_instance.lock();
+                let instance = guard.inner.unwrap();
+                unsafe { lcb_wait(instance) };
             })
             .unwrap();
 
@@ -86,7 +94,7 @@ impl Bucket {
     }
 
     /// Fetch a `Document` from the `Bucket`.
-    pub fn get<S>(&self, id: S) -> CouchbaseFuture<Option<Document>, CouchbaseError>
+    pub fn get<S>(&self, id: S) -> CouchbaseFuture<Option<Document>>
         where S: Into<String>
     {
         let (tx, rx) = channel();
@@ -114,7 +122,7 @@ impl Bucket {
     }
 
     /// Remove a `Document` from the `Bucket`.
-    pub fn remove<S>(&self, id: S) -> CouchbaseFuture<(), CouchbaseError>
+    pub fn remove<S>(&self, id: S) -> CouchbaseFuture<()>
         where S: Into<String>
     {
         let (tx, rx) = channel();
@@ -142,24 +150,21 @@ impl Bucket {
     }
 
     /// Insert a `Document` into the `Bucket`.
-    pub fn insert(&self, document: Document) -> CouchbaseFuture<Document, CouchbaseError> {
+    pub fn insert(&self, document: Document) -> CouchbaseFuture<Document> {
         self.store(document, LCB_ADD)
     }
 
     /// Upsert a `Document` into the `Bucket`.
-    pub fn upsert(&self, document: Document) -> CouchbaseFuture<Document, CouchbaseError> {
+    pub fn upsert(&self, document: Document) -> CouchbaseFuture<Document> {
         self.store(document, LCB_UPSERT)
     }
 
     /// Replace a `Document` in the `Bucket`.
-    pub fn replace(&self, document: Document) -> CouchbaseFuture<Document, CouchbaseError> {
+    pub fn replace(&self, document: Document) -> CouchbaseFuture<Document> {
         self.store(document, LCB_REPLACE)
     }
 
-    fn store(&self,
-             document: Document,
-             operation: lcb_storage_t)
-             -> CouchbaseFuture<Document, CouchbaseError> {
+    fn store(&self, document: Document, operation: lcb_storage_t) -> CouchbaseFuture<Document> {
         let (tx, rx) = channel();
 
         let lcb_id = CString::new(document.id()).unwrap();
@@ -175,8 +180,8 @@ impl Bucket {
         let lcb_content = CString::new(content).unwrap();
         cmd.value.vtype = LCB_KV_COPY;
         unsafe {
-            cmd.value.u_buf.contig.as_mut().bytes =
-                lcb_content.into_raw() as *const std::os::raw::c_void;
+            cmd.value.u_buf.contig.as_mut().bytes = lcb_content.into_raw() as
+                                                    *const std::os::raw::c_void;
             cmd.value.u_buf.contig.as_mut().nbytes = content_len as usize;
         }
         let tx_boxed = Box::new(tx);
@@ -220,8 +225,8 @@ unsafe impl<T> Send for SendPtr<T> {}
 
 unsafe extern "C" fn get_callback(_: lcb_t, _: i32, rb: *const lcb_RESPBASE) {
     let response = *(rb as *const lcb_RESPGET);
-    let tx = Box::from_raw(response.cookie as *mut Sender<Result<Option<Document>,
-                                                                 CouchbaseError>>);
+    let tx = Box::from_raw(response.cookie as
+                           *mut Sender<Result<Option<Document>, CouchbaseError>>);
     if response.rc == LCB_SUCCESS {
         let lcb_content = std::slice::from_raw_parts(response.value as *const u8, response.nvalue);
         let mut content = Vec::with_capacity(lcb_content.len());
@@ -239,7 +244,7 @@ unsafe extern "C" fn get_callback(_: lcb_t, _: i32, rb: *const lcb_RESPBASE) {
     } else if response.rc == LCB_KEY_ENOENT {
         tx.complete(Ok(None));
     } else {
-        tx.complete(Err(response.rc));
+        tx.complete(Err(response.rc.into()));
     }
 }
 
@@ -258,7 +263,7 @@ unsafe extern "C" fn store_callback(_: lcb_t, _: i32, rb: *const lcb_RESPBASE) {
                                                    vec![],
                                                    response.cas.clone())));
     } else {
-        tx.complete(Err(response.rc));
+        tx.complete(Err(response.rc.into()));
     }
 }
 
@@ -269,6 +274,6 @@ unsafe extern "C" fn remove_callback(_: lcb_t, _: i32, rb: *const lcb_RESPBASE) 
     if response.rc == LCB_SUCCESS {
         tx.complete(Ok(()));
     } else {
-        tx.complete(Err(response.rc));
+        tx.complete(Err(response.rc.into()));
     }
 }

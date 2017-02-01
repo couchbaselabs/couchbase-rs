@@ -50,13 +50,10 @@ pub mod bucket;
 pub mod cluster;
 pub mod document;
 pub mod sync;
+pub mod error;
 
 pub use document::Document;
 pub use bucket::Bucket;
 pub use cluster::Cluster;
 pub use sync::CouchbaseFuture;
-
-use couchbase_sys::*;
-
-/// Generic error type, might change in the future.
-pub type CouchbaseError = lcb_error_t;
+pub use error::CouchbaseError;

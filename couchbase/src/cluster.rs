@@ -11,8 +11,8 @@
 //! let _ = Cluster::new("localhost").expect("Could not initialize Cluster");
 //! ```
 //!
-use ::Bucket;
-use ::CouchbaseError;
+use Bucket;
+use CouchbaseError;
 
 pub struct Cluster<'a> {
     host: &'a str,
