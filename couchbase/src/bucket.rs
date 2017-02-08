@@ -9,9 +9,10 @@ use std::thread::{park, JoinHandle};
 use std::sync::atomic::{AtomicBool, Ordering};
 use futures::sync::oneshot::{channel, Sender};
 use futures::sync::mpsc::{unbounded, UnboundedSender};
-use {CouchbaseStream, CouchbaseFuture, N1qlResult, Document, CouchbaseError};
+use {CouchbaseStream, CouchbaseFuture, N1qlResult, N1qlMeta, Document, CouchbaseError};
 use std;
 use std::io::Write;
+use serde_json;
 
 pub struct Bucket {
     instance: Arc<Mutex<SendPtr<lcb_t>>>,
@@ -313,19 +314,16 @@ unsafe extern "C" fn n1ql_callback(_instance: lcb_t, _cbtype: i32, rb: *const lc
                            *mut UnboundedSender<Result<N1qlResult, CouchbaseError>>);
 
     let lcb_row = std::slice::from_raw_parts(response.row as *const u8, response.nrow);
-    let mut row_vec = Vec::with_capacity(lcb_row.len());
-    row_vec.write_all(lcb_row).expect("Could not copy N1Ql row from lcb into owned vec!");
-
     if (response.rflags as u32 & LCB_RESP_F_FINAL as u32) == 0 {
-        let row = String::from_utf8(row_vec).unwrap();
-        tx.send(Ok(N1qlResult::Row(row))).unwrap();
+        let mut row_vec = Vec::with_capacity(lcb_row.len());
+        row_vec.write_all(lcb_row).expect("Could not copy N1Ql row from lcb into owned vec!");
+        tx.send(Ok(N1qlResult::Row(String::from_utf8(row_vec).unwrap()))).unwrap();
         Box::into_raw(tx);
     } else {
-        let meta = String::from_utf8(row_vec).unwrap();
-        tx.send(Ok(N1qlResult::Meta(meta))).unwrap();
+        let deserialized: N1qlMeta = serde_json::from_slice(lcb_row).unwrap();
+        tx.send(Ok(N1qlResult::Meta(deserialized))).unwrap();
     }
 }
-
 
 #[cfg(test)]
 mod tests {

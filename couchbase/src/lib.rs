@@ -43,6 +43,9 @@
 extern crate couchbase_sys;
 extern crate futures;
 extern crate parking_lot;
+#[macro_use]
+extern crate serde_derive;
+extern crate serde_json;
 
 pub mod bucket;
 pub mod cluster;
@@ -56,4 +59,4 @@ pub use bucket::Bucket;
 pub use cluster::Cluster;
 pub use sync::{CouchbaseFuture, CouchbaseStream};
 pub use error::CouchbaseError;
-pub use query::n1ql::N1qlResult;
+pub use query::n1ql::{N1qlMeta, N1qlResult};
