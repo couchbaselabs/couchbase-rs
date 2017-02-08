@@ -29,7 +29,7 @@ fn main() {
     // Step 2: From the headers, generate the rust binding via bindgen
 
     let _ = bindgen::builder()
-        .header(format!("{}/libcouchbase/couchbase.h", bindgen_path))
+        .header("headers.h")
         .clang_arg("-I")
         .clang_arg(bindgen_path)
         .no_unstable_rust()

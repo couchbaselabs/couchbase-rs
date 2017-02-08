@@ -49,9 +49,11 @@ pub mod cluster;
 pub mod document;
 pub mod sync;
 pub mod error;
+pub mod query;
 
 pub use document::Document;
 pub use bucket::Bucket;
 pub use cluster::Cluster;
-pub use sync::CouchbaseFuture;
+pub use sync::{CouchbaseFuture, CouchbaseStream};
 pub use error::CouchbaseError;
+pub use query::n1ql::N1qlResult;

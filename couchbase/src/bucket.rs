@@ -8,9 +8,8 @@ use std::thread;
 use std::thread::{park, JoinHandle};
 use std::sync::atomic::{AtomicBool, Ordering};
 use futures::sync::oneshot::{channel, Sender};
-use CouchbaseFuture;
-use Document;
-use CouchbaseError;
+use futures::sync::mpsc::{unbounded, UnboundedSender};
+use {CouchbaseStream, CouchbaseFuture, N1qlResult, Document, CouchbaseError};
 use std;
 use std::io::Write;
 
@@ -198,6 +197,38 @@ impl Bucket {
         self.unpark_io();
         CouchbaseFuture::new(rx)
     }
+
+    pub fn query_n1ql<S>(&self, query: S) -> CouchbaseStream<N1qlResult>
+        where S: Into<String>
+    {
+        let (tx, rx) = unbounded();
+
+        let params = unsafe { lcb_n1p_new() };
+        let mut cmd: lcb_CMDN1QL = unsafe { ::std::mem::zeroed() };
+        cmd.callback = Some(n1ql_callback);
+
+        let query = query.into();
+        let query_length = query.len();
+        let cquery = CString::new(query).unwrap();
+
+        let tx_boxed = Box::new(tx);
+        unsafe {
+            lcb_n1p_setquery(params,
+                             cquery.as_ptr(),
+                             query_length,
+                             LCB_N1P_QUERY_STATEMENT as i32);
+            lcb_n1p_mkcmd(params, &mut cmd);
+
+            let guard = self.instance.lock();
+            let instance = guard.inner.unwrap();
+            lcb_n1ql_query(instance,
+                           Box::into_raw(tx_boxed) as *const std::os::raw::c_void,
+                           &cmd);
+        }
+
+        self.unpark_io();
+        CouchbaseStream::new(rx)
+    }
 }
 
 impl Drop for Bucket {
@@ -223,7 +254,7 @@ struct SendPtr<T> {
 
 unsafe impl<T> Send for SendPtr<T> {}
 
-unsafe extern "C" fn get_callback(_: lcb_t, _: i32, rb: *const lcb_RESPBASE) {
+unsafe extern "C" fn get_callback(_instance: lcb_t, _cbtype: i32, rb: *const lcb_RESPBASE) {
     let response = *(rb as *const lcb_RESPGET);
     let tx = Box::from_raw(response.cookie as *mut Sender<Result<Document, CouchbaseError>>);
     if response.rc == LCB_SUCCESS {
@@ -245,7 +276,7 @@ unsafe extern "C" fn get_callback(_: lcb_t, _: i32, rb: *const lcb_RESPBASE) {
     }
 }
 
-unsafe extern "C" fn store_callback(_: lcb_t, _: i32, rb: *const lcb_RESPBASE) {
+unsafe extern "C" fn store_callback(_instance: lcb_t, _cbtype: i32, rb: *const lcb_RESPBASE) {
     let response = *rb;
     let tx = Box::from_raw(response.cookie as *mut Sender<Result<Document, CouchbaseError>>);
 
@@ -264,7 +295,7 @@ unsafe extern "C" fn store_callback(_: lcb_t, _: i32, rb: *const lcb_RESPBASE) {
     }
 }
 
-unsafe extern "C" fn remove_callback(_: lcb_t, _: i32, rb: *const lcb_RESPBASE) {
+unsafe extern "C" fn remove_callback(_instance: lcb_t, _cbtype: i32, rb: *const lcb_RESPBASE) {
     let response = *rb;
     let tx = Box::from_raw(response.cookie as *mut Sender<Result<(), CouchbaseError>>);
 
@@ -273,4 +304,41 @@ unsafe extern "C" fn remove_callback(_: lcb_t, _: i32, rb: *const lcb_RESPBASE) 
     } else {
         tx.complete(Err(response.rc.into()));
     }
+}
+
+
+unsafe extern "C" fn n1ql_callback(_instance: lcb_t, _cbtype: i32, rb: *const lcb_RESPN1QL) {
+    let response = *rb;
+    let tx = Box::from_raw(response.cookie as
+                           *mut UnboundedSender<Result<N1qlResult, CouchbaseError>>);
+
+    let lcb_row = std::slice::from_raw_parts(response.row as *const u8, response.nrow);
+    let mut row_vec = Vec::with_capacity(lcb_row.len());
+    row_vec.write_all(lcb_row).expect("Could not copy N1Ql row from lcb into owned vec!");
+
+    if (response.rflags as u32 & LCB_RESP_F_FINAL as u32) == 0 {
+        let row = String::from_utf8(row_vec).unwrap();
+        tx.send(Ok(N1qlResult::Row(row))).unwrap();
+        Box::into_raw(tx);
+    } else {
+        let meta = String::from_utf8(row_vec).unwrap();
+        tx.send(Ok(N1qlResult::Meta(meta))).unwrap();
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+
+    #[test]
+    fn remove_callback_should_handle_success() {
+
+        // 1) create fake instance
+        // 2) create fake respbase with sender cookie
+        // 3) call remove_callback
+        // 4) assert completion is done properly
+    }
+
+    #[test]
+    fn remove_callback_should_handle_failure() {}
 }
