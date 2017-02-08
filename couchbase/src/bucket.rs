@@ -9,10 +9,13 @@ use std::thread::{park, JoinHandle};
 use std::sync::atomic::{AtomicBool, Ordering};
 use futures::sync::oneshot::{channel, Sender};
 use futures::sync::mpsc::{unbounded, UnboundedSender};
-use {CouchbaseStream, CouchbaseFuture, N1qlResult, N1qlMeta, Document, CouchbaseError};
+use {CouchbaseStream, CouchbaseFuture, N1qlResult, Document, CouchbaseError};
 use std;
-use std::io::Write;
+use std::slice;
 use serde_json;
+
+type FutureSender<T> = *mut Sender<Result<T, CouchbaseError>>;
+type StreamSender<T> = *mut UnboundedSender<Result<T, CouchbaseError>>;
 
 pub struct Bucket {
     instance: Arc<Mutex<SendPtr<lcb_t>>>,
@@ -255,73 +258,58 @@ struct SendPtr<T> {
 
 unsafe impl<T> Send for SendPtr<T> {}
 
-unsafe extern "C" fn get_callback(_instance: lcb_t, _cbtype: i32, rb: *const lcb_RESPBASE) {
-    let response = *(rb as *const lcb_RESPGET);
-    let tx = Box::from_raw(response.cookie as *mut Sender<Result<Document, CouchbaseError>>);
-    if response.rc == LCB_SUCCESS {
-        let lcb_content = std::slice::from_raw_parts(response.value as *const u8, response.nvalue);
-        let mut content = Vec::with_capacity(lcb_content.len());
-        content.write_all(lcb_content).expect("Could not copy content from lcb into owned vec!");
-
-        let lcb_id = std::slice::from_raw_parts(response.key as *const u8, response.nkey);
-        let mut id_vec = Vec::with_capacity(lcb_id.len());
-        id_vec.write_all(lcb_id).expect("Could not copy document ID from lcb into owned vec!");
-
-        tx.complete(Ok(Document::from_vec_with_cas(String::from_utf8(id_vec)
-                                                       .expect("Document ID is not UTF8 \
-                                                                compatible!"),
-                                                   content,
-                                                   response.cas)));
-    } else {
-        tx.complete(Err(response.rc.into()));
-    }
+unsafe extern "C" fn get_callback(_instance: lcb_t, _cbtype: i32, res: *const lcb_RESPBASE) {
+    let res = *(res as *const lcb_RESPGET);
+    let tx = Box::from_raw(res.cookie as FutureSender<Document>);
+    let result = match res.rc {
+        LCB_SUCCESS => {
+            let lcb_id = slice::from_raw_parts(res.key as *const u8, res.nkey).to_owned();
+            let id = String::from_utf8(lcb_id).expect("Document ID is not UTF-8 compatible!");
+            let content = slice::from_raw_parts(res.value as *const u8, res.nvalue).to_owned();
+            Ok(Document::from_vec_with_cas(id, content, res.cas))
+        }
+        rc => Err(rc.into()),
+    };
+    tx.complete(result);
 }
 
-unsafe extern "C" fn store_callback(_instance: lcb_t, _cbtype: i32, rb: *const lcb_RESPBASE) {
-    let response = *rb;
-    let tx = Box::from_raw(response.cookie as *mut Sender<Result<Document, CouchbaseError>>);
-
-    if response.rc == LCB_SUCCESS {
-        let lcb_id = std::slice::from_raw_parts(response.key as *const u8, response.nkey);
-        let mut id_vec = Vec::with_capacity(lcb_id.len());
-        id_vec.write_all(lcb_id).expect("Could not copy document ID from lcb into owned vec!");
-
-        tx.complete(Ok(Document::from_vec_with_cas(String::from_utf8(id_vec)
-                                                       .expect("Document ID is not UTF8 \
-                                                                compatible!"),
-                                                   vec![],
-                                                   response.cas)));
-    } else {
-        tx.complete(Err(response.rc.into()));
-    }
+unsafe extern "C" fn store_callback(_instance: lcb_t, _cbtype: i32, res: *const lcb_RESPBASE) {
+    let tx = Box::from_raw((*res).cookie as FutureSender<Document>);
+    let result = match (*res).rc {
+        LCB_SUCCESS => {
+            let lcb_id = slice::from_raw_parts((*res).key as *const u8, (*res).nkey).to_owned();
+            let id = String::from_utf8(lcb_id).expect("Document ID is not UTF-8 compatible!");
+            Ok(Document::from_vec_with_cas(id, vec![], (*res).cas))
+        }
+        rc => Err(rc.into()),
+    };
+    tx.complete(result);
 }
 
-unsafe extern "C" fn remove_callback(_instance: lcb_t, _cbtype: i32, rb: *const lcb_RESPBASE) {
-    let response = *rb;
-    let tx = Box::from_raw(response.cookie as *mut Sender<Result<(), CouchbaseError>>);
-
-    if response.rc == LCB_SUCCESS {
-        tx.complete(Ok(()));
-    } else {
-        tx.complete(Err(response.rc.into()));
-    }
+unsafe extern "C" fn remove_callback(_instance: lcb_t, _cbtype: i32, res: *const lcb_RESPBASE) {
+    let tx = Box::from_raw((*res).cookie as FutureSender<()>);
+    let result = match (*res).rc {
+        LCB_SUCCESS => Ok(()),
+        rc => Err(rc.into()),
+    };
+    tx.complete(result);
 }
 
+unsafe extern "C" fn n1ql_callback(_instance: lcb_t, _cbtype: i32, res: *const lcb_RESPN1QL) {
+    let tx = Box::from_raw((*res).cookie as StreamSender<N1qlResult>);
+    let lcb_row = slice::from_raw_parts((*res).row as *const u8, (*res).nrow);
 
-unsafe extern "C" fn n1ql_callback(_instance: lcb_t, _cbtype: i32, rb: *const lcb_RESPN1QL) {
-    let response = *rb;
-    let tx = Box::from_raw(response.cookie as
-                           *mut UnboundedSender<Result<N1qlResult, CouchbaseError>>);
+    let more_to_come = ((*res).rflags as u32 & LCB_RESP_F_FINAL as u32) == 0;
+    let result = if more_to_come {
+        N1qlResult::Row(String::from_utf8(lcb_row.to_owned())
+            .expect("N1QL Row failed UTF-8 validation!"))
+    } else {
+        N1qlResult::Meta(serde_json::from_slice(lcb_row).expect("N1QL Meta decoding failed!"))
+    };
 
-    let lcb_row = std::slice::from_raw_parts(response.row as *const u8, response.nrow);
-    if (response.rflags as u32 & LCB_RESP_F_FINAL as u32) == 0 {
-        let mut row_vec = Vec::with_capacity(lcb_row.len());
-        row_vec.write_all(lcb_row).expect("Could not copy N1Ql row from lcb into owned vec!");
-        tx.send(Ok(N1qlResult::Row(String::from_utf8(row_vec).unwrap()))).unwrap();
+    tx.send(Ok(result)).expect("Could not send N1qlResult into Stream!");
+    if more_to_come {
         Box::into_raw(tx);
-    } else {
-        let deserialized: N1qlMeta = serde_json::from_slice(lcb_row).unwrap();
-        tx.send(Ok(N1qlResult::Meta(deserialized))).unwrap();
     }
 }
 
