@@ -1,7 +1,25 @@
+
 #[derive(Debug)]
 pub enum N1qlResult {
-    Row(String),
+    Row(N1qlRow),
     Meta(N1qlMeta),
+}
+
+#[derive(Debug)]
+pub struct N1qlRow {
+    inner: String,
+}
+
+impl N1qlRow {
+    pub fn new(row: String) -> Self {
+        N1qlRow { inner: row }
+    }
+}
+
+impl AsRef<str> for N1qlRow {
+    fn as_ref(&self) -> &str {
+        self.inner.as_ref()
+    }
 }
 
 #[derive(Debug, Deserialize)]

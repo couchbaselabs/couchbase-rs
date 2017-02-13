@@ -9,7 +9,7 @@ use std::thread::{park, JoinHandle};
 use std::sync::atomic::{AtomicBool, Ordering};
 use futures::sync::oneshot::{channel, Sender};
 use futures::sync::mpsc::{unbounded, UnboundedSender};
-use {CouchbaseStream, CouchbaseFuture, N1qlResult, Document, CouchbaseError};
+use {CouchbaseStream, CouchbaseFuture, N1qlResult, Document, CouchbaseError, N1qlRow};
 use std;
 use std::slice;
 use serde_json;
@@ -301,8 +301,8 @@ unsafe extern "C" fn n1ql_callback(_instance: lcb_t, _cbtype: i32, res: *const l
 
     let more_to_come = ((*res).rflags as u32 & LCB_RESP_F_FINAL as u32) == 0;
     let result = if more_to_come {
-        N1qlResult::Row(String::from_utf8(lcb_row.to_owned())
-            .expect("N1QL Row failed UTF-8 validation!"))
+        N1qlResult::Row(N1qlRow::new(String::from_utf8(lcb_row.to_owned())
+            .expect("N1QL Row failed UTF-8 validation!")))
     } else {
         N1qlResult::Meta(serde_json::from_slice(lcb_row).expect("N1QL Meta decoding failed!"))
     };

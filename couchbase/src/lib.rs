@@ -59,4 +59,4 @@ pub use bucket::Bucket;
 pub use cluster::Cluster;
 pub use sync::{CouchbaseFuture, CouchbaseStream};
 pub use error::CouchbaseError;
-pub use query::n1ql::{N1qlMeta, N1qlResult};
+pub use query::n1ql::{N1qlMeta, N1qlResult, N1qlRow};

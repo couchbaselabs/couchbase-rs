@@ -1,8 +1,14 @@
-# Couchbase Rust SDK
-[![crates.io](http://meritbadge.herokuapp.com/couchbase)](https://crates.io/crates/couchbase)
-[![docs.rs](https://docs.rs/couchbase/badge.svg)](https://docs.rs/crate/couchbase)
+# Couchbase Rust Client [![crates-io][crates-io-image]][crates-io-url] [![docs][docs-image]][docs-url]
 
-A [Couchbase Server](http://couchbase.com/) [Rust](https://www.rust-lang.org) SDK based on [libcouchbase](https://github.com/couchbase/libcouchbase).
+[crates-io-image]: https://img.shields.io/crates/v/couchbase.svg
+[crates-io-url]: https://crates.io/crates/couchbase
+[docs-image]: https://docs.rs/couchbase/badge.svg
+[docs-url]: https://docs.rs/couchbase/
+
+A fully asynchronous [Couchbase Server](http://couchbase.com/) [Rust](https://www.rust-lang.org)
+Client based on [libcouchbase](https://github.com/couchbase/libcouchbase).
+
+> Important: This library is a work in progress and the API is subject to change (and it is not officially supported by Couchbase, Inc. at this point!).
 
 # Usage
 
