@@ -9,7 +9,8 @@ use std::thread::{park, JoinHandle};
 use std::sync::atomic::{AtomicBool, Ordering};
 use futures::sync::oneshot::{channel, Sender};
 use futures::sync::mpsc::{unbounded, UnboundedSender};
-use {CouchbaseStream, CouchbaseFuture, N1qlResult, Document, CouchbaseError, N1qlRow};
+use {CouchbaseStream, CouchbaseFuture, N1qlResult, Document, CouchbaseError, N1qlRow, ViewResult,
+     ViewRow, ViewMeta};
 use std;
 use std::slice;
 use serde_json;
@@ -233,6 +234,35 @@ impl Bucket {
         self.unpark_io();
         CouchbaseStream::new(rx)
     }
+
+    pub fn query_view<S>(&self, design: S, view: S, options: S) -> CouchbaseStream<ViewResult>
+        where S: Into<String>
+    {
+        let (tx, rx) = unbounded();
+
+        let cdesign = CString::new(design.into()).unwrap();
+        let cview = CString::new(view.into()).unwrap();
+        let coptions = CString::new(options.into()).unwrap();
+
+        let mut cmd: lcb_CMDVIEWQUERY = unsafe { ::std::mem::zeroed() };
+        let tx_boxed = Box::new(tx);
+        unsafe {
+            lcb_view_query_initcmd(&mut cmd,
+                                   cdesign.as_ptr(),
+                                   cview.as_ptr(),
+                                   coptions.as_ptr(),
+                                   Some(view_callback));
+
+            let guard = self.instance.lock();
+            let instance = guard.inner.unwrap();
+            lcb_view_query(instance,
+                           Box::into_raw(tx_boxed) as *const std::os::raw::c_void,
+                           &cmd);
+        }
+
+        self.unpark_io();
+        CouchbaseStream::new(rx)
+    }
 }
 
 impl Drop for Bucket {
@@ -308,6 +338,34 @@ unsafe extern "C" fn n1ql_callback(_instance: lcb_t, _cbtype: i32, res: *const l
     };
 
     tx.send(Ok(result)).expect("Could not send N1qlResult into Stream!");
+    if more_to_come {
+        Box::into_raw(tx);
+    }
+}
+
+unsafe extern "C" fn view_callback(_instance: lcb_t, _cbtype: i32, res: *const lcb_RESPVIEWQUERY) {
+    let tx = Box::from_raw((*res).cookie as StreamSender<ViewResult>);
+
+    let more_to_come = ((*res).rflags as u32 & LCB_RESP_F_FINAL as u32) == 0;
+    let lcb_value = slice::from_raw_parts((*res).value as *const u8, (*res).nvalue);
+    let result = if more_to_come {
+        let lcb_key = slice::from_raw_parts((*res).key as *const u8, (*res).nkey);
+        let lcb_docid = slice::from_raw_parts((*res).docid as *const u8, (*res).ndocid);
+        ViewResult::Row(ViewRow {
+            id: String::from_utf8(lcb_docid.to_owned())
+                .expect("View DocId failed UTF-8 validation!"),
+            value: String::from_utf8(lcb_value.to_owned())
+                .expect("View Row failed UTF-8 validation!"),
+            key: String::from_utf8(lcb_key.to_owned()).expect("View Key failed UTF-8 validation!"),
+        })
+    } else {
+        ViewResult::Meta(ViewMeta {
+            inner: String::from_utf8(lcb_value.to_owned())
+                .expect("View Row failed UTF-8 validation!"),
+        })
+    };
+
+    tx.send(Ok(result)).expect("Could not send ViewResult into Stream!");
     if more_to_come {
         Box::into_raw(tx);
     }
