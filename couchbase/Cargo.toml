@@ -1,6 +1,6 @@
 [package]
 name = "couchbase"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["Michael Nitschinger <michael.nitschinger@couchbase.com>"]
 license = "Apache-2.0"
 keywords = ["couchbase", "database", "futures", "libcouchbase", "async"]
@@ -10,7 +10,7 @@ homepage = "https://github.com/couchbaselabs/couchbase-rs"
 documentation = "https://docs.rs/crate/couchbase"
 
 [dependencies]
-couchbase-sys = { version = "0.1.1", path = "../couchbase-sys" }
+couchbase-sys = { version = "0.2.0", path = "../couchbase-sys" }
 
 url = "1.4"
 futures = "0.1"
