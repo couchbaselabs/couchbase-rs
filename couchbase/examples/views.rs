@@ -4,8 +4,7 @@ extern crate futures;
 use couchbase::{ViewResult, Cluster, ViewQuery};
 use futures::Stream;
 
-/// A very simple example which connects to the `default` bucket and writes and loads
-/// a document.
+/// Opens a bucket and then runs a view query and prints out the results.
 fn main() {
     // Initialize the Cluster
     let cluster = Cluster::new("localhost").expect("Could not initialize Cluster");

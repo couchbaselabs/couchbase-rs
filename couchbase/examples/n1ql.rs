@@ -4,8 +4,7 @@ extern crate futures;
 use couchbase::{N1qlResult, Cluster};
 use futures::Stream;
 
-/// A very simple example which connects to the `default` bucket and writes and loads
-/// a document.
+/// Opens a bucket and then runs a N1QL query and prints out the results.
 fn main() {
     // Initialize the Cluster
     let cluster = Cluster::new("localhost").expect("Could not initialize Cluster");
