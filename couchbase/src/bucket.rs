@@ -387,6 +387,7 @@ unsafe extern "C" fn view_callback(_instance: lcb_t, _cbtype: i32, res: *const l
 mod tests {
 
     #[test]
+    #[ignore]
     fn remove_callback_should_handle_success() {
 
         // 1) create fake instance
@@ -396,5 +397,6 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn remove_callback_should_handle_failure() {}
 }

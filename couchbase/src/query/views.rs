@@ -93,6 +93,10 @@ impl ViewQuery {
         self
     }
 
+    pub fn is_development(&self) -> bool {
+        self.development
+    }
+
     pub fn reduce(mut self, reduce: bool) -> ViewQuery {
         self.params[PARAM_REDUCE_OFFSET] = Some(("reduce", format!("{}", reduce)));
         self
@@ -179,4 +183,111 @@ impl ViewQuery {
                   })
             .finish()
     }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn test_empty_query() {
+        let query = ViewQuery::from("design", "view");
+        assert_eq!("design", query.design());
+        assert_eq!("view", query.view());
+        assert_eq!("", query.params());
+        assert_eq!(false, query.is_development());
+    }
+
+    #[test]
+    fn test_development_enabled() {
+        assert_eq!(true,
+                   ViewQuery::from("foo", "bar").development(true).is_development());
+    }
+
+    #[test]
+    fn test_limit() {
+        assert_eq!("limit=10", ViewQuery::from("foo", "bar").limit(10).params());
+    }
+
+    #[test]
+    fn test_skip() {
+        assert_eq!("skip=2", ViewQuery::from("foo", "bar").skip(2).params());
+    }
+
+    #[test]
+    fn test_reduce() {
+        assert_eq!("reduce=true",
+                   ViewQuery::from("foo", "bar").reduce(true).params());
+    }
+
+    #[test]
+    fn test_group() {
+        assert_eq!("group=true",
+                   ViewQuery::from("foo", "bar").group(true).params());
+    }
+
+    #[test]
+    fn test_debug() {
+        assert_eq!("debug=true",
+                   ViewQuery::from("foo", "bar").debug(true).params());
+    }
+
+    #[test]
+    fn test_descending() {
+        assert_eq!("descending=true",
+                   ViewQuery::from("foo", "bar").descending(true).params());
+    }
+
+    #[test]
+    fn test_group_level() {
+        assert_eq!("group_level=3",
+                   ViewQuery::from("foo", "bar").group_level(3).params());
+    }
+
+    #[test]
+    fn test_stale() {
+        assert_eq!("stale=ok",
+                   ViewQuery::from("foo", "bar").stale(Stale::True).params());
+        assert_eq!("stale=false",
+                   ViewQuery::from("foo", "bar").stale(Stale::False).params());
+        assert_eq!("stale=update_after",
+                   ViewQuery::from("foo", "bar").stale(Stale::UpdateAfter).params());
+    }
+
+    #[test]
+    fn test_on_error() {
+        assert_eq!("on_error=stop",
+                   ViewQuery::from("foo", "bar").on_error(OnError::Stop).params());
+        assert_eq!("on_error=continue",
+                   ViewQuery::from("foo", "bar").on_error(OnError::Continue).params());
+    }
+
+    #[test]
+    fn test_parameter_combination() {
+        assert_eq!("limit=5&skip=3",
+                   ViewQuery::from("foo", "bar").skip(3).limit(5).params());
+    }
+
+    #[test]
+    fn test_startkey_docid() {
+        assert_eq!("startkey_docid=somedoc",
+                   ViewQuery::from("foo", "bar").startkey_docid("somedoc").params());
+    }
+
+    #[test]
+    fn test_endkey_docid() {
+        assert_eq!("endkey_docid=somedoc",
+                   ViewQuery::from("foo", "bar").endkey_docid("somedoc").params());
+    }
+
+    #[test]
+    fn test_urlencoding() {
+        let query = ViewQuery::from("foo", "bar")
+            .startkey_docid("??>>what?)")
+            .endkey_docid("some!doc)");
+        assert_eq!("startkey_docid=%3F%3F%3E%3Ewhat%3F%29&endkey_docid=some%21doc%29",
+                   query.params());
+    }
+
 }
