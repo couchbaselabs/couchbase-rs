@@ -10,6 +10,7 @@ homepage = "https://github.com/couchbaselabs/couchbase-rs"
 documentation = "https://docs.rs/crate/couchbase"
 
 [dependencies]
+url = "1.4"
 futures = "0.1"
 parking_lot = "0.3"
 couchbase-sys = { version = "0.1.1", path = "../couchbase-sys" }

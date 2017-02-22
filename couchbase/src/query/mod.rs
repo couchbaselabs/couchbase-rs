@@ -1,3 +1,4 @@
+//! Contains query handling routines (n1ql, views, fts,...)
 pub mod n1ql;
 pub mod views;
 

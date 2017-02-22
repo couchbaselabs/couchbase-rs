@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use futures::sync::oneshot::{channel, Sender};
 use futures::sync::mpsc::{unbounded, UnboundedSender};
 use {CouchbaseStream, CouchbaseFuture, N1qlResult, Document, CouchbaseError, N1qlRow, ViewResult,
-     ViewRow, ViewMeta};
+     ViewRow, ViewMeta, ViewQuery};
 use std;
 use std::slice;
 use serde_json;
@@ -24,6 +24,7 @@ pub struct Bucket {
     io_running: Arc<AtomicBool>,
 }
 
+/// Contains all `Bucket`-level Couchbase operations.
 impl Bucket {
     pub fn new<'a>(cs: &'a str, pw: &'a str) -> Result<Self, CouchbaseError> {
         let mut instance: lcb_t = ptr::null_mut();
@@ -235,14 +236,12 @@ impl Bucket {
         CouchbaseStream::new(rx)
     }
 
-    pub fn query_view<S>(&self, design: S, view: S, options: S) -> CouchbaseStream<ViewResult>
-        where S: Into<String>
-    {
+    pub fn query_view(&self, query: ViewQuery) -> CouchbaseStream<ViewResult> {
         let (tx, rx) = unbounded();
 
-        let cdesign = CString::new(design.into()).unwrap();
-        let cview = CString::new(view.into()).unwrap();
-        let coptions = CString::new(options.into()).unwrap();
+        let cdesign = CString::new(query.design().to_owned()).unwrap();
+        let cview = CString::new(query.view().to_owned()).unwrap();
+        let coptions = CString::new(query.params()).unwrap();
 
         let mut cmd: lcb_CMDVIEWQUERY = unsafe { ::std::mem::zeroed() };
         let tx_boxed = Box::new(tx);
@@ -290,7 +289,6 @@ unsafe impl<T> Send for SendPtr<T> {}
 
 unsafe extern "C" fn get_callback(_instance: lcb_t, _cbtype: i32, res: *const lcb_RESPBASE) {
     let res = *(res as *const lcb_RESPGET);
-    let tx = Box::from_raw(res.cookie as FutureSender<Document>);
     let result = match res.rc {
         LCB_SUCCESS => {
             let lcb_id = slice::from_raw_parts(res.key as *const u8, res.nkey).to_owned();
@@ -300,11 +298,10 @@ unsafe extern "C" fn get_callback(_instance: lcb_t, _cbtype: i32, res: *const lc
         }
         rc => Err(rc.into()),
     };
-    tx.complete(result);
+    Box::from_raw(res.cookie as FutureSender<Document>).complete(result);
 }
 
 unsafe extern "C" fn store_callback(_instance: lcb_t, _cbtype: i32, res: *const lcb_RESPBASE) {
-    let tx = Box::from_raw((*res).cookie as FutureSender<Document>);
     let result = match (*res).rc {
         LCB_SUCCESS => {
             let lcb_id = slice::from_raw_parts((*res).key as *const u8, (*res).nkey).to_owned();
@@ -313,31 +310,36 @@ unsafe extern "C" fn store_callback(_instance: lcb_t, _cbtype: i32, res: *const 
         }
         rc => Err(rc.into()),
     };
-    tx.complete(result);
+    Box::from_raw((*res).cookie as FutureSender<Document>).complete(result);
 }
 
 unsafe extern "C" fn remove_callback(_instance: lcb_t, _cbtype: i32, res: *const lcb_RESPBASE) {
-    let tx = Box::from_raw((*res).cookie as FutureSender<()>);
     let result = match (*res).rc {
         LCB_SUCCESS => Ok(()),
         rc => Err(rc.into()),
     };
-    tx.complete(result);
+    Box::from_raw((*res).cookie as FutureSender<()>).complete(result);
 }
 
 unsafe extern "C" fn n1ql_callback(_instance: lcb_t, _cbtype: i32, res: *const lcb_RESPN1QL) {
     let tx = Box::from_raw((*res).cookie as StreamSender<N1qlResult>);
-    let lcb_row = slice::from_raw_parts((*res).row as *const u8, (*res).nrow);
-
     let more_to_come = ((*res).rflags as u32 & LCB_RESP_F_FINAL as u32) == 0;
-    let result = if more_to_come {
-        N1qlResult::Row(N1qlRow::new(String::from_utf8(lcb_row.to_owned())
-            .expect("N1QL Row failed UTF-8 validation!")))
+
+
+    let result = if (*res).rc == LCB_SUCCESS {
+        let lcb_row = slice::from_raw_parts((*res).row as *const u8, (*res).nrow);
+        let result = if more_to_come {
+            N1qlResult::Row(N1qlRow::new(String::from_utf8(lcb_row.to_owned())
+                .expect("N1QL Row failed UTF-8 validation!")))
+        } else {
+            N1qlResult::Meta(serde_json::from_slice(lcb_row).expect("N1QL Meta decoding failed!"))
+        };
+        Ok(result)
     } else {
-        N1qlResult::Meta(serde_json::from_slice(lcb_row).expect("N1QL Meta decoding failed!"))
+        Err((*res).rc.into())
     };
 
-    tx.send(Ok(result)).expect("Could not send N1qlResult into Stream!");
+    tx.send(result).expect("Could not send N1qlResult into Stream!");
     if more_to_come {
         Box::into_raw(tx);
     }
@@ -345,27 +347,31 @@ unsafe extern "C" fn n1ql_callback(_instance: lcb_t, _cbtype: i32, res: *const l
 
 unsafe extern "C" fn view_callback(_instance: lcb_t, _cbtype: i32, res: *const lcb_RESPVIEWQUERY) {
     let tx = Box::from_raw((*res).cookie as StreamSender<ViewResult>);
-
     let more_to_come = ((*res).rflags as u32 & LCB_RESP_F_FINAL as u32) == 0;
-    let lcb_value = slice::from_raw_parts((*res).value as *const u8, (*res).nvalue);
-    let result = if more_to_come {
-        let lcb_key = slice::from_raw_parts((*res).key as *const u8, (*res).nkey);
-        let lcb_docid = slice::from_raw_parts((*res).docid as *const u8, (*res).ndocid);
-        ViewResult::Row(ViewRow {
-            id: String::from_utf8(lcb_docid.to_owned())
-                .expect("View DocId failed UTF-8 validation!"),
-            value: String::from_utf8(lcb_value.to_owned())
-                .expect("View Row failed UTF-8 validation!"),
-            key: String::from_utf8(lcb_key.to_owned()).expect("View Key failed UTF-8 validation!"),
-        })
+
+    let result = if (*res).rc == LCB_SUCCESS {
+        let lcb_value = slice::from_raw_parts((*res).value as *const u8, (*res).nvalue);
+        let value = String::from_utf8(lcb_value.to_owned())
+            .expect("View Row failed UTF-8 validation!");
+        let result = if more_to_come {
+            let lcb_key = slice::from_raw_parts((*res).key as *const u8, (*res).nkey);
+            let lcb_docid = slice::from_raw_parts((*res).docid as *const u8, (*res).ndocid);
+            ViewResult::Row(ViewRow {
+                id: String::from_utf8(lcb_docid.to_owned())
+                    .expect("View DocId failed UTF-8 validation!"),
+                value: value,
+                key: String::from_utf8(lcb_key.to_owned())
+                    .expect("View Key failed UTF-8 validation!"),
+            })
+        } else {
+            ViewResult::Meta(ViewMeta { inner: value })
+        };
+        Ok(result)
     } else {
-        ViewResult::Meta(ViewMeta {
-            inner: String::from_utf8(lcb_value.to_owned())
-                .expect("View Row failed UTF-8 validation!"),
-        })
+        Err((*res).rc.into())
     };
 
-    tx.send(Ok(result)).expect("Could not send ViewResult into Stream!");
+    tx.send(result).expect("Could not send ViewResult into Stream!");
     if more_to_come {
         Box::into_raw(tx);
     }

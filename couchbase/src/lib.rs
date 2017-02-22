@@ -28,13 +28,13 @@
 //!     println!("Wrote Document {:?}",
 //!              bucket.upsert(document)
 //!                  .wait()
-//!                  .unwrap());
+//!                  .expect("Upsert failed!"));
 //!
 //!     // Load the previously written document and print it out
 //!     println!("Found Document {:?}",
-//!         bucket.get("hello").wait().expect("Could not load Document"));
-//!
+//!              bucket.get("hello").wait().expect("Could not load Document"));
 //! }
+//!
 //! ```
 //!
 //! For now, more examples can be found under `examples`. Note that for all the `serde`-based
@@ -42,6 +42,7 @@
 //!
 extern crate couchbase_sys;
 extern crate futures;
+extern crate url;
 extern crate parking_lot;
 #[macro_use]
 extern crate serde_derive;
@@ -60,4 +61,4 @@ pub use cluster::Cluster;
 pub use sync::{CouchbaseFuture, CouchbaseStream};
 pub use error::CouchbaseError;
 pub use query::n1ql::{N1qlMeta, N1qlResult, N1qlRow};
-pub use query::views::{ViewMeta, ViewResult, ViewRow};
+pub use query::views::{ViewMeta, ViewResult, ViewRow, ViewQuery};
