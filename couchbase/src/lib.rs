@@ -41,6 +41,8 @@
 //! examples you need to at least have Rust 1.15.0 installed.
 //!
 extern crate couchbase_sys;
+#[macro_use]
+extern crate log;
 extern crate futures;
 extern crate url;
 extern crate parking_lot;

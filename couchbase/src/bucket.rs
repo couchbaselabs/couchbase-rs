@@ -339,7 +339,10 @@ unsafe extern "C" fn n1ql_callback(_instance: lcb_t, _cbtype: i32, res: *const l
         Err((*res).rc.into())
     };
 
-    tx.send(result).expect("Could not send N1qlResult into Stream!");
+    match tx.send(result) {
+        Ok(_) => {}
+        Err(e) => warn!("Could not send N1qlResult into Stream! {}", e),
+    }
     if more_to_come {
         Box::into_raw(tx);
     }
@@ -371,7 +374,10 @@ unsafe extern "C" fn view_callback(_instance: lcb_t, _cbtype: i32, res: *const l
         Err((*res).rc.into())
     };
 
-    tx.send(result).expect("Could not send ViewResult into Stream!");
+    match tx.send(result) {
+        Ok(_) => {}
+        Err(e) => warn!("Could not send ViewResult into Stream! {}", e),
+    }
     if more_to_come {
         Box::into_raw(tx);
     }

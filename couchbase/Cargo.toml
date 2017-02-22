@@ -10,10 +10,13 @@ homepage = "https://github.com/couchbaselabs/couchbase-rs"
 documentation = "https://docs.rs/crate/couchbase"
 
 [dependencies]
+couchbase-sys = { version = "0.1.1", path = "../couchbase-sys" }
+
 url = "1.4"
 futures = "0.1"
 parking_lot = "0.3"
-couchbase-sys = { version = "0.1.1", path = "../couchbase-sys" }
+log = "0.3"
+
 serde = "0.9"
 serde_json = "0.9"
 serde_derive = "0.9"
