@@ -7,16 +7,17 @@ use parking_lot::Mutex;
 use std::thread;
 use std::thread::{park, JoinHandle};
 use std::sync::atomic::{AtomicBool, Ordering};
-use futures::sync::oneshot::{channel, Sender};
+use futures::sync::oneshot::channel;
 use futures::sync::mpsc::{unbounded, UnboundedSender};
 use {CouchbaseStream, CouchbaseFuture, N1qlResult, Document, CouchbaseError, N1qlRow, ViewResult,
      ViewRow, ViewMeta, ViewQuery};
 use std;
 use std::slice;
+use std::mem;
 use serde_json;
 
-type FutureSender<T> = *mut Sender<Result<T, CouchbaseError>>;
 type StreamSender<T> = *mut UnboundedSender<Result<T, CouchbaseError>>;
+
 
 pub struct Bucket {
     instance: Arc<Mutex<SendPtr<lcb_t>>>,
@@ -98,9 +99,11 @@ impl Bucket {
         guard.as_ref().unwrap().thread().unpark();
     }
 
+
     /// Fetch a `Document` from the `Bucket`.
-    pub fn get<S>(&self, id: S) -> CouchbaseFuture<Document>
-        where S: Into<String>
+    pub fn get<D, S>(&self, id: S) -> CouchbaseFuture<D>
+        where S: Into<String>,
+              D: Document
     {
         let (tx, rx) = channel();
 
@@ -112,13 +115,30 @@ impl Bucket {
         cmd.key.contig.bytes = lcb_id.into_raw() as *const std::os::raw::c_void;
         cmd.key.contig.nbytes = idm_len as usize;
 
-        let tx_boxed = Box::new(tx);
+        let mut tx_boxed = Box::new(Some(tx));
+        let callback = move |res: &lcb_RESPGET| {
+            let result = match res.rc {
+                LCB_SUCCESS => {
+                    let lcb_id =
+                        unsafe { slice::from_raw_parts(res.key as *const u8, res.nkey).to_owned() };
+                    let id = String::from_utf8(lcb_id)
+                        .expect("Document ID is not UTF-8 compatible!");
+                    let content = unsafe {
+                        slice::from_raw_parts(res.value as *const u8, res.nvalue).to_owned()
+                    };
+                    Ok(D::create(id, Some(res.cas), Some(content), None))
+                }
+                rc => Err(rc.into()),
+            };
+            tx_boxed.take().unwrap().complete(result);
+        };
 
+        let callback_boxed: Box<Box<FnMut(&lcb_RESPGET)>> = Box::new(Box::new(callback));
         unsafe {
             let guard = self.instance.lock();
             let instance = guard.inner.unwrap();
             lcb_get3(instance,
-                     Box::into_raw(tx_boxed) as *const std::os::raw::c_void,
+                     Box::into_raw(callback_boxed) as *const std::os::raw::c_void,
                      &cmd as *const lcb_CMDGET);
         }
 
@@ -126,9 +146,84 @@ impl Bucket {
         CouchbaseFuture::new(rx)
     }
 
-    /// Remove a `Document` from the `Bucket`.
-    pub fn remove<S>(&self, id: S) -> CouchbaseFuture<()>
-        where S: Into<String>
+
+    /// Insert a `Document` into the `Bucket`.
+    pub fn insert<D>(&self, document: D) -> CouchbaseFuture<D>
+        where D: Document
+    {
+        self.store(document, LCB_ADD)
+    }
+
+    /// Upsert a `Document` into the `Bucket`.
+    pub fn upsert<D>(&self, document: D) -> CouchbaseFuture<D>
+        where D: Document
+    {
+        self.store(document, LCB_UPSERT)
+    }
+
+    /// Replace a `Document` in the `Bucket`.
+    pub fn replace<D>(&self, document: D) -> CouchbaseFuture<D>
+        where D: Document
+    {
+        self.store(document, LCB_REPLACE)
+    }
+
+    fn store<D>(&self, document: D, operation: lcb_storage_t) -> CouchbaseFuture<D>
+        where D: Document
+    {
+        let (tx, rx) = channel();
+
+        let lcb_id = CString::new(document.id()).unwrap();
+        let mut cmd: lcb_CMDSTORE = unsafe { ::std::mem::zeroed() };
+        cmd.operation = operation;
+        cmd.exptime = document.expiry();
+        cmd.key.type_ = LCB_KV_COPY;
+        cmd.key.contig.bytes = lcb_id.into_raw() as *const std::os::raw::c_void;
+        cmd.key.contig.nbytes = document.id().len() as usize;
+
+        let mut tx_boxed = Box::new(Some(tx));
+        let callback = move |res: &lcb_RESPBASE| {
+            let result = match res.rc {
+                LCB_SUCCESS => {
+                    let lcb_id = unsafe {
+                        slice::from_raw_parts((*res).key as *const u8, (*res).nkey).to_owned()
+                    };
+                    let id = String::from_utf8(lcb_id)
+                        .expect("Document ID is not UTF-8 compatible!");
+                    Ok(D::create(id, Some(res.cas), None, None))
+                }
+                rc => Err(rc.into()),
+            };
+            tx_boxed.take().unwrap().complete(result);
+        };
+
+        let content: Vec<u8> = document.content().into();
+        let content_len = content.len();
+        let lcb_content = CString::new(content).unwrap();
+        cmd.value.vtype = LCB_KV_COPY;
+        unsafe {
+            cmd.value.u_buf.contig.as_mut().bytes = lcb_content.into_raw() as
+                                                    *const std::os::raw::c_void;
+            cmd.value.u_buf.contig.as_mut().nbytes = content_len as usize;
+        }
+
+        let callback_boxed: Box<Box<FnMut(&lcb_RESPBASE)>> = Box::new(Box::new(callback));
+        unsafe {
+            let guard = self.instance.lock();
+            let instance = guard.inner.unwrap();
+
+            lcb_store3(instance,
+                       Box::into_raw(callback_boxed) as *const std::os::raw::c_void,
+                       &cmd as *const lcb_CMDSTORE);
+        }
+
+        self.unpark_io();
+        CouchbaseFuture::new(rx)
+    }
+
+    pub fn remove<D, S>(&self, id: S) -> CouchbaseFuture<D>
+        where S: Into<String>,
+              D: Document
     {
         let (tx, rx) = channel();
 
@@ -140,64 +235,29 @@ impl Bucket {
         cmd.key.contig.bytes = lcb_id.into_raw() as *const std::os::raw::c_void;
         cmd.key.contig.nbytes = idm_len as usize;
 
-        let tx_boxed = Box::new(tx);
+        let mut tx_boxed = Box::new(Some(tx));
+        let callback = move |res: &lcb_RESPBASE| {
+            let result = match res.rc {
+                LCB_SUCCESS => {
+                    let lcb_id = unsafe {
+                        slice::from_raw_parts((*res).key as *const u8, (*res).nkey).to_owned()
+                    };
+                    let id = String::from_utf8(lcb_id)
+                        .expect("Document ID is not UTF-8 compatible!");
+                    Ok(D::create(id, Some(res.cas), None, None))
+                }
+                rc => Err(rc.into()),
+            };
+            tx_boxed.take().unwrap().complete(result);
+        };
 
+        let callback_boxed: Box<Box<FnMut(&lcb_RESPBASE)>> = Box::new(Box::new(callback));
         unsafe {
             let guard = self.instance.lock();
             let instance = guard.inner.unwrap();
             lcb_remove3(instance,
-                        Box::into_raw(tx_boxed) as *const std::os::raw::c_void,
+                        Box::into_raw(callback_boxed) as *const std::os::raw::c_void,
                         &cmd as *const lcb_CMDREMOVE);
-        }
-
-        self.unpark_io();
-        CouchbaseFuture::new(rx)
-    }
-
-    /// Insert a `Document` into the `Bucket`.
-    pub fn insert(&self, document: Document) -> CouchbaseFuture<Document> {
-        self.store(document, LCB_ADD)
-    }
-
-    /// Upsert a `Document` into the `Bucket`.
-    pub fn upsert(&self, document: Document) -> CouchbaseFuture<Document> {
-        self.store(document, LCB_UPSERT)
-    }
-
-    /// Replace a `Document` in the `Bucket`.
-    pub fn replace(&self, document: Document) -> CouchbaseFuture<Document> {
-        self.store(document, LCB_REPLACE)
-    }
-
-    fn store(&self, document: Document, operation: lcb_storage_t) -> CouchbaseFuture<Document> {
-        let (tx, rx) = channel();
-
-        let lcb_id = CString::new(document.id()).unwrap();
-        let mut cmd: lcb_CMDSTORE = unsafe { ::std::mem::zeroed() };
-        cmd.operation = operation;
-        cmd.exptime = document.expiry();
-        cmd.key.type_ = LCB_KV_COPY;
-        cmd.key.contig.bytes = lcb_id.into_raw() as *const std::os::raw::c_void;
-        cmd.key.contig.nbytes = document.id().len() as usize;
-
-        let content = document.content();
-        let content_len = content.len();
-        let lcb_content = CString::new(content).unwrap();
-        cmd.value.vtype = LCB_KV_COPY;
-        unsafe {
-            cmd.value.u_buf.contig.as_mut().bytes = lcb_content.into_raw() as
-                                                    *const std::os::raw::c_void;
-            cmd.value.u_buf.contig.as_mut().nbytes = content_len as usize;
-        }
-        let tx_boxed = Box::new(tx);
-
-        unsafe {
-            let guard = self.instance.lock();
-            let instance = guard.inner.unwrap();
-
-            lcb_store3(instance,
-                       Box::into_raw(tx_boxed) as *const std::os::raw::c_void,
-                       &cmd as *const lcb_CMDSTORE);
         }
 
         self.unpark_io();
@@ -288,37 +348,18 @@ struct SendPtr<T> {
 unsafe impl<T> Send for SendPtr<T> {}
 
 unsafe extern "C" fn get_callback(_instance: lcb_t, _cbtype: i32, res: *const lcb_RESPBASE) {
-    let res = *(res as *const lcb_RESPGET);
-    let result = match res.rc {
-        LCB_SUCCESS => {
-            let lcb_id = slice::from_raw_parts(res.key as *const u8, res.nkey).to_owned();
-            let id = String::from_utf8(lcb_id).expect("Document ID is not UTF-8 compatible!");
-            let content = slice::from_raw_parts(res.value as *const u8, res.nvalue).to_owned();
-            Ok(Document::from_vec_with_cas(id, content, res.cas))
-        }
-        rc => Err(rc.into()),
-    };
-    Box::from_raw(res.cookie as FutureSender<Document>).complete(result);
+    let closure: &mut Box<FnMut(&lcb_RESPGET)> = mem::transmute((*res).cookie);
+    closure(&*(res as *const lcb_RESPGET));
 }
 
 unsafe extern "C" fn store_callback(_instance: lcb_t, _cbtype: i32, res: *const lcb_RESPBASE) {
-    let result = match (*res).rc {
-        LCB_SUCCESS => {
-            let lcb_id = slice::from_raw_parts((*res).key as *const u8, (*res).nkey).to_owned();
-            let id = String::from_utf8(lcb_id).expect("Document ID is not UTF-8 compatible!");
-            Ok(Document::from_vec_with_cas(id, vec![], (*res).cas))
-        }
-        rc => Err(rc.into()),
-    };
-    Box::from_raw((*res).cookie as FutureSender<Document>).complete(result);
+    let closure: &mut Box<FnMut(&lcb_RESPBASE)> = mem::transmute((*res).cookie);
+    closure(&*res);
 }
 
 unsafe extern "C" fn remove_callback(_instance: lcb_t, _cbtype: i32, res: *const lcb_RESPBASE) {
-    let result = match (*res).rc {
-        LCB_SUCCESS => Ok(()),
-        rc => Err(rc.into()),
-    };
-    Box::from_raw((*res).cookie as FutureSender<()>).complete(result);
+    let closure: &mut Box<FnMut(&lcb_RESPBASE)> = mem::transmute((*res).cookie);
+    closure(&*res);
 }
 
 unsafe extern "C" fn n1ql_callback(_instance: lcb_t, _cbtype: i32, res: *const lcb_RESPN1QL) {
@@ -382,6 +423,7 @@ unsafe extern "C" fn view_callback(_instance: lcb_t, _cbtype: i32, res: *const l
         Box::into_raw(tx);
     }
 }
+
 
 #[cfg(test)]
 mod tests {

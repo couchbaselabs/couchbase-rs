@@ -6,6 +6,7 @@ use std::thread;
 
 use couchbase::Cluster;
 use futures::Future;
+use couchbase::document::BytesDocument;
 
 /// This example shows how to use the Bucket instance in a multithreaded context.
 ///
@@ -25,7 +26,9 @@ fn main() {
         let b = bucket.clone();
         threads.push(thread::spawn(move || {
             let id = format!("airport_{}", i + 1254);
-            println!("Thread {:?} found:\n\t{:?}", i, b.get(id).wait().unwrap());
+            println!("Thread {:?} found:\n\t{:?}",
+                     i,
+                     b.get::<BytesDocument, _>(id).wait().unwrap());
         }));
     }
 

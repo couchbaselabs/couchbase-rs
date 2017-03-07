@@ -39,6 +39,7 @@ extern crate futures;
 
 use couchbase::Cluster;
 use futures::Future;
+use couchbase::document::BytesDocument;
 
 fn main() {
     // Initialize the Cluster
@@ -48,7 +49,7 @@ fn main() {
     let bucket = cluster.open_bucket("travel-sample", "").expect("Could not open Bucket");
 
     // Load an airline, wait for it to load and print it out
-    let document = bucket.get("airline_10123").wait().expect("Could not load Document");
+    let document: BytesDocument = bucket.get("airline_10123").wait().expect("Could not load Document");
     println!("{:?}", document);
 }
 ```
