@@ -56,6 +56,7 @@ pub mod document;
 pub mod sync;
 pub mod error;
 pub mod query;
+mod connstr;
 
 pub use document::Document;
 pub use bucket::Bucket;

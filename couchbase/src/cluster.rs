@@ -13,20 +13,21 @@
 //!
 use Bucket;
 use CouchbaseError;
+use connstr::ConnectionString;
 
 pub struct Cluster<'a> {
-    host: &'a str,
+    connstr: &'a str,
 }
 
 impl<'a> Cluster<'a> {
     /// Creates a new `Cluster` instance.
-    pub fn new(host: &'a str) -> Result<Self, CouchbaseError> {
-        Ok(Cluster { host: host })
+    pub fn new(connstr: &'a str) -> Result<Self, CouchbaseError> {
+        Ok(Cluster { connstr: connstr })
     }
 
     /// Opens a `Bucket` and returns ownership of it to the caller.
     pub fn open_bucket(&self, name: &'a str, password: &'a str) -> Result<Bucket, CouchbaseError> {
-        let connstr = format!("couchbase://{}/{}", self.host, name);
-        Bucket::new(&connstr, password)
+        let connstr = ConnectionString::new(self.connstr)?;
+        Bucket::new(&connstr.export(name), password)
     }
 }
