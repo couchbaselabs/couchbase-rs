@@ -6,6 +6,7 @@ build = "build.rs"
 links = "libcouchbase"
 license = "Apache-2.0"
 keywords = ["couchbase", "database", "ffi", "libcouchbase"]
+categories = ["database", "asynchronous", "external-ffi-bindings"]
 description = "Rust bindings to the libcouchbase C Couchbase SDK."
 repository = "https://github.com/couchbaselabs/couchbase-rs"
 homepage = "https://github.com/couchbaselabs/couchbase-rs"

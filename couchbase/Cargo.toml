@@ -4,6 +4,7 @@ version = "0.2.0"
 authors = ["Michael Nitschinger <michael.nitschinger@couchbase.com>"]
 license = "Apache-2.0"
 keywords = ["couchbase", "database", "futures", "libcouchbase", "async"]
+categories = ["database", "asynchronous", "caching"]
 description = "The Couchbase Rust SDK"
 repository = "https://github.com/couchbaselabs/couchbase-rs"
 homepage = "https://github.com/couchbaselabs/couchbase-rs"
