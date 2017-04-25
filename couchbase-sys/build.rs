@@ -7,6 +7,8 @@ extern crate cmake;
 use std::env;
 use std::fs;
 
+
+
 #[cfg(feature = "build-lcb")]
 fn build_lcb(lcb_dir: &str, out_dir: &str) -> String {
     let dst = cmake::build(lcb_dir);
@@ -22,9 +24,9 @@ fn build_lcb(_lcb_dir: &str, _out_dir: &str) -> String {
 }
 
 #[cfg(feature = "generate-binding")]
-fn generate_binding(bindgen_path: &str, out_dir: &str) {
+fn generate_binding(bindgen_path: &str, out_dir: &str, version: &str) {
     let _ = bindgen::builder()
-        .header("headers.h")
+        .header(format!("headers-{}.h", version))
         .clang_arg("-I")
         .clang_arg(bindgen_path)
         .no_unstable_rust()
@@ -35,7 +37,7 @@ fn generate_binding(bindgen_path: &str, out_dir: &str) {
 }
 
 #[cfg(not(feature = "generate-binding"))]
-fn generate_binding(_bindgen_path: &str, _out_dir: &str) {
+fn generate_binding(_bindgen_path: &str, _out_dir: &str, _version: &str) {
     unreachable!();
 }
 
@@ -76,7 +78,7 @@ fn main() {
     // Step 2: From the headers, generate the rust binding via bindgen or load the pre-gen one
     if cfg!(feature = "generate-binding") {
         match bindgen_path {
-            Some(bp) => generate_binding(&bp, &out_dir),
+            Some(bp) => generate_binding(&bp, &out_dir, &version),
             None => panic!("Instructed to generate binding, but no path for headers found."),
         }
     } else {
