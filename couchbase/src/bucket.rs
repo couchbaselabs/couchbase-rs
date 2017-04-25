@@ -428,22 +428,3 @@ unsafe extern "C" fn view_callback(_instance: lcb_t, _cbtype: i32, res: *const l
         Box::into_raw(tx);
     }
 }
-
-
-#[cfg(test)]
-mod tests {
-
-    #[test]
-    #[ignore]
-    fn remove_callback_should_handle_success() {
-
-        // 1) create fake instance
-        // 2) create fake respbase with sender cookie
-        // 3) call remove_callback
-        // 4) assert completion is done properly
-    }
-
-    #[test]
-    #[ignore]
-    fn remove_callback_should_handle_failure() {}
-}

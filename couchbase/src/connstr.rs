@@ -7,7 +7,7 @@ pub struct ConnectionString {
     scheme: UrlScheme,
 }
 
-#[derive(Debug)]
+#[derive(Debug,PartialEq)]
 pub enum UrlScheme {
     Http,
     Couchbase,
@@ -81,4 +81,40 @@ impl ConnectionString {
                 bucket,
                 self.query())
     }
+}
+
+impl Default for ConnectionString {
+    fn default() -> Self {
+        ConnectionString::new("couchbase://127.0.0.1").unwrap()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn test_default() {
+        let cs = ConnectionString::default();
+        assert_eq!("127.0.0.1", cs.host());
+        assert_eq!(UrlScheme::Couchbase, *cs.scheme());
+    }
+
+    #[test]
+    fn test_bucket_removal() {
+        let cs = ConnectionString::new("couchbases://1.2.3.4,5.6.7.8/bucket").unwrap();
+        assert_eq!("1.2.3.4,5.6.7.8", cs.host());
+        assert_eq!(UrlScheme::Couchbases, *cs.scheme());
+        assert_eq!("couchbases://1.2.3.4,5.6.7.8/bla?", cs.export("bla"));
+    }
+
+    #[test]
+    fn test_with_params() {
+        let cs = ConnectionString::new("http://localhost?foo=bar").unwrap();
+        assert_eq!("localhost", cs.host());
+        assert_eq!(UrlScheme::Http, *cs.scheme());
+        assert_eq!("http://localhost/bla?foo=bar", cs.export("bla"));
+    }
+
 }
