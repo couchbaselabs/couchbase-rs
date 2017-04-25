@@ -12,6 +12,7 @@
 //! extern crate futures;
 //!
 //! use couchbase::{Document, Cluster};
+//! use couchbase::document::BytesDocument;
 //! use futures::Future;
 //!
 //! /// A very simple example which connects to the `default` bucket and writes and loads
@@ -24,15 +25,15 @@
 //!     let bucket = cluster.open_bucket("default", "").expect("Could not open Bucket");
 //!
 //!     // Create a document and store it in the bucket
-//!     let document = Document::from_str("hello", "{\"world\":true}");
+//!     let document = BytesDocument::create("hello", None, Some("{\"world\":true}".as_bytes().to_owned()), None);
 //!     println!("Wrote Document {:?}",
 //!              bucket.upsert(document)
 //!                  .wait()
 //!                  .expect("Upsert failed!"));
 //!
 //!     // Load the previously written document and print it out
-//!     println!("Found Document {:?}",
-//!              bucket.get("hello").wait().expect("Could not load Document"));
+//!     let document: BytesDocument = bucket.get("hello").wait().expect("Could not load Document");
+//!     println!("Found Document {:?}", document);
 //! }
 //!
 //! ```

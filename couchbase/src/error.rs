@@ -5,6 +5,7 @@ use std::fmt;
 use std::convert;
 use std::io;
 use couchbase_sys::*;
+use couchbase_sys::lcb_error_t::*;
 
 /// Defines all possible errors that can result as part of interacting with the SDK.
 ///
@@ -271,6 +272,12 @@ pub enum CouchbaseError {
     NoCommandsSpecified,
     /// Query execution failed. Inspect raw response object for information.
     QueryError,
+    /// Generic temporary error received from server.
+    GenericTmpError,
+    /// Generic subdocument error received from server.
+    GenericSubdocError,
+    /// Generic constraint error received from server.
+    GenericConstraintError,
 }
 
 impl CouchbaseError {
@@ -457,6 +464,11 @@ impl CouchbaseError {
             CouchbaseError::QueryError => {
                 "Query execution failed. Inspect raw response object for information"
             }
+            CouchbaseError::GenericTmpError => "Generic temporary error received from server",
+            CouchbaseError::GenericSubdocError => "Generic subdocument error received from server",
+            CouchbaseError::GenericConstraintError => {
+                "Generic constraint error received from server"
+            }
         }
     }
 }
@@ -579,6 +591,9 @@ impl convert::From<lcb_error_t> for CouchbaseError {
             LCB_UNKNOWN_SDCMD => CouchbaseError::SubdocUnknownCommand,
             LCB_ENO_COMMANDS => CouchbaseError::NoCommandsSpecified,
             LCB_QUERY_ERROR => CouchbaseError::QueryError,
+            LCB_GENERIC_TMPERR => CouchbaseError::GenericTmpError,
+            LCB_GENERIC_SUBDOCERR => CouchbaseError::GenericSubdocError,
+            LCB_GENERIC_CONSTRAINT_ERR => CouchbaseError::GenericConstraintError,
             LCB_MAX_ERROR => panic!("MAX_ERROR is internal!"),
             LCB_SUCCESS => panic!("SUCCESS is not an Error!"),
             LCB_AUTH_CONTINUE => panic!("AUTH_CONTINUE is internal and not to be exposed!"),

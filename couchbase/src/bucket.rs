@@ -1,6 +1,11 @@
 //! Bucket-level operations and API.
 use std::ptr;
 use couchbase_sys::*;
+use couchbase_sys::lcb_error_t::*;
+use couchbase_sys::lcb_CALLBACKTYPE::*;
+use couchbase_sys::lcb_KVBUFTYPE::*;
+use couchbase_sys::lcb_storage_t::*;
+use couchbase_sys::lcb_RESPFLAGS::*;
 use std::ffi::CString;
 use std::sync::Arc;
 use parking_lot::Mutex;
@@ -130,7 +135,7 @@ impl Bucket {
                 }
                 rc => Err(rc.into()),
             };
-            tx_boxed.take().unwrap().complete(result);
+            let _ = tx_boxed.take().unwrap().send(result);
         };
 
         let callback_boxed: Box<Box<FnMut(&lcb_RESPGET)>> = Box::new(Box::new(callback));
@@ -194,7 +199,7 @@ impl Bucket {
                 }
                 rc => Err(rc.into()),
             };
-            tx_boxed.take().unwrap().complete(result);
+            let _ = tx_boxed.take().unwrap().send(result);
         };
 
         let content: Vec<u8> = document.content().into();
@@ -248,7 +253,7 @@ impl Bucket {
                 }
                 rc => Err(rc.into()),
             };
-            tx_boxed.take().unwrap().complete(result);
+            let _ = tx_boxed.take().unwrap().send(result);
         };
 
         let callback_boxed: Box<Box<FnMut(&lcb_RESPBASE)>> = Box::new(Box::new(callback));
