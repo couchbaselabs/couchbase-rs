@@ -12,10 +12,14 @@ repository = "https://github.com/couchbaselabs/couchbase-rs"
 homepage = "https://github.com/couchbaselabs/couchbase-rs"
 documentation = "https://docs.rs/crate/couchbase-sys"
 
+[features]
+generate-binding = ["bindgen"]
+build-lcb = ["cmake"]
+
 [build-dependencies]
-bindgen = "0.20"
 pkg-config = "0.3"
-cmake = "0.1"
+bindgen =  { git = "https://github.com/servo/rust-bindgen.git", optional = true }
+cmake = { version  = "0.1", optional = true }
 
 [lib]
 doctest = false
