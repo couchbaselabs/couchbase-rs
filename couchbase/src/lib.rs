@@ -49,6 +49,7 @@ extern crate url;
 extern crate parking_lot;
 #[macro_use]
 extern crate serde_derive;
+#[macro_use]
 extern crate serde_json;
 
 pub mod bucket;

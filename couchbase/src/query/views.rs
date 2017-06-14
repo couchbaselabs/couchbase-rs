@@ -1,5 +1,6 @@
 use std::fmt;
 use url::form_urlencoded;
+use serde_json::value::Value;
 
 #[derive(Debug)]
 pub enum ViewResult {
@@ -61,11 +62,11 @@ const PARAM_ONERROR_OFFSET: usize = 6;
 const PARAM_DEBUG_OFFSET: usize = 7;
 const PARAM_DESCENDING_OFFSET: usize = 8;
 const PARAM_INCLUSIVEEND_OFFSET: usize = 9;
-// TODO const PARAM_STARTKEY_OFFSET: usize = 10;
+const PARAM_STARTKEY_OFFSET: usize = 10;
 const PARAM_STARTKEYDOCID_OFFSET: usize = 11;
-// TODO const PARAM_ENDKEY_OFFSET: usize = 12;
+const PARAM_ENDKEY_OFFSET: usize = 12;
 const PARAM_ENDKEYDOCID_OFFSET: usize = 13;
-// TODO const PARAM_KEY_OFFSET: usize = 14;
+const PARAM_KEY_OFFSET: usize = 14;
 
 const NUM_PARAMS: usize = 15;
 
@@ -169,6 +170,21 @@ impl ViewQuery {
 
     pub fn view(&self) -> &str {
         &self.view
+    }
+
+    pub fn key(mut self, key: Value) -> ViewQuery {
+        self.params[PARAM_KEY_OFFSET] = Some(("key", key.to_string()));
+        self
+    }
+
+    pub fn startkey(mut self, key: Value) -> ViewQuery {
+        self.params[PARAM_STARTKEY_OFFSET] = Some(("startkey", key.to_string()));
+        self
+    }
+
+    pub fn endkey(mut self, key: Value) -> ViewQuery {
+        self.params[PARAM_ENDKEY_OFFSET] = Some(("endkey", key.to_string()));
+        self
     }
 
     pub fn params(&self) -> String {
@@ -288,6 +304,17 @@ mod tests {
             .endkey_docid("some!doc)");
         assert_eq!("startkey_docid=%3F%3F%3E%3Ewhat%3F%29&endkey_docid=some%21doc%29",
                    query.params());
+    }
+
+    #[test]
+    fn test_key() {
+        assert_eq!("key=%5B1%2C2%5D", ViewQuery::from("foo", "bar").key(json!([1,2])).params());
+    }
+
+    #[test]
+    fn test_startkey_and_endkey() {
+        assert_eq!("startkey=%22a+string%22&endkey=%7B%22foo%22%3A%22bar%22%7D", 
+            ViewQuery::from("a", "b").startkey(json!("a string")).endkey(json!({"foo": "bar"})).params());
     }
 
 }
