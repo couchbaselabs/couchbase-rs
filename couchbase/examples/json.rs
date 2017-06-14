@@ -2,12 +2,11 @@ extern crate couchbase;
 extern crate futures;
 #[macro_use]
 extern crate serde_derive;
-
 extern crate serde_json;
 
 use couchbase::Cluster;
 use futures::Future;
-use couchbase::document::BytesDocument;
+use couchbase::document::{Document, JsonDocument};
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Airline {
@@ -30,10 +29,9 @@ fn main() {
     // Open the travel-sample bucket
     let bucket = cluster.open_bucket("travel-sample", "").expect("Could not open Bucket");
 
-    let document: Airline = bucket.get::<BytesDocument, _>("airline_10123")
-        .map(|doc| serde_json::from_str(doc.content_as_str().unwrap()))
+    let document: Airline = bucket.get::<JsonDocument<_>, _>("airline_10123")
+        .map(|doc| doc.content())
         .wait()
-        .expect("Could not load Document")
         .expect("Document not found!");
 
     println!("{:?}", document);

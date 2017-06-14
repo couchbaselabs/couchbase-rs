@@ -202,7 +202,7 @@ impl Bucket {
             let _ = tx_boxed.take().unwrap().send(result);
         };
 
-        let content: Vec<u8> = document.content().into();
+        let content: Vec<u8> = document.content_as_vec();
         let content_len = content.len();
         let lcb_content = CString::new(content).unwrap();
         cmd.value.vtype = LCB_KV_COPY;
