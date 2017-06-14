@@ -61,7 +61,7 @@ pub mod error;
 pub mod query;
 mod connstr;
 
-pub use document::{Document, BytesDocument, JsonDocument};
+pub use document::{Document, BinaryDocument, JsonDocument};
 pub use bucket::Bucket;
 pub use cluster::Cluster;
 pub use sync::{CouchbaseFuture, CouchbaseStream};

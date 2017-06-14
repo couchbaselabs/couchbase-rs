@@ -17,22 +17,23 @@ pub trait Document {
     fn expiry(&self) -> u32;
     fn create<S>(id: S, cas: Option<u64>, content: Option<Vec<u8>>, expiry: Option<u32>) -> Self
         where S: Into<String>;
+    fn flags(&self) -> u32;
 }
 
-pub struct BytesDocument {
+pub struct BinaryDocument {
     id: String,
     cas: u64,
     content: Option<Vec<u8>>,
     expiry: u32,
 }
 
-impl BytesDocument {
+impl BinaryDocument {
     pub fn content_as_str(&self) -> Result<&str, Utf8Error> {
         from_utf8(self.content_ref())
     }
 }
 
-impl Document for BytesDocument {
+impl Document for BinaryDocument {
     type Content = Vec<u8>;
 
     fn id(&self) -> &str {
@@ -66,20 +67,24 @@ impl Document for BytesDocument {
     fn create<S>(id: S, cas: Option<u64>, content: Option<Vec<u8>>, expiry: Option<u32>) -> Self
         where S: Into<String>
     {
-        BytesDocument {
+        Self {
             id: id.into(),
             cas: cas.unwrap_or(0),
             content: content,
             expiry: expiry.unwrap_or(0),
         }
     }
+
+    fn flags(&self) -> u32 {
+        3 << 24
+    }
 }
 
-impl fmt::Debug for BytesDocument {
+impl fmt::Debug for BinaryDocument {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let content = self.content.as_ref().map(|c| from_utf8(c).unwrap_or("<not utf8 decodable>"));
         write!(f,
-               "BytesDocument {{ id: \"{}\", cas: {}, expiry: {}, content: {:?} }}",
+               "BinaryDocument {{ id: \"{}\", cas: {}, expiry: {}, content: {:?} }}",
                self.id,
                self.cas,
                self.expiry,
@@ -129,12 +134,16 @@ impl<T> Document for JsonDocument<T> where T: Serialize + DeserializeOwned {
     fn create<S>(id: S, cas: Option<u64>, content: Option<Vec<u8>>, expiry: Option<u32>) -> Self
         where S: Into<String>
     {
-        JsonDocument {
+        Self {
             id: id.into(),
             cas: cas.unwrap_or(0),
             content: content.map(|v| from_slice(&v).unwrap()),
             expiry: expiry.unwrap_or(0),
         }
+    }
+
+    fn flags(&self) -> u32 {
+        2 << 24
     }
 }
 
