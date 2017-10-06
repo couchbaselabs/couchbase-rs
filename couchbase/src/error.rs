@@ -278,6 +278,12 @@ pub enum CouchbaseError {
     GenericSubdocError,
     /// Generic constraint error received from server.
     GenericConstraintError,
+    /// Invalid reply received from nameserver
+    NameserverError,
+    /// Not authorized for operation
+    NotAuthorized,
+    /// If the rust binding doesn't know about an error its contained here
+    UnknownLibcouchbaseError(lcb_error_t),
 }
 
 impl CouchbaseError {
@@ -468,6 +474,15 @@ impl CouchbaseError {
             CouchbaseError::GenericSubdocError => "Generic subdocument error received from server",
             CouchbaseError::GenericConstraintError => {
                 "Generic constraint error received from server"
+            },
+            CouchbaseError::NameserverError => {
+                "Invalid reply received from nameserver"
+            },
+            CouchbaseError::NotAuthorized => {
+                "Not authorized for operation"
+            },
+            CouchbaseError::UnknownLibcouchbaseError(_) => {
+                "Unknown error code from libcouchbase received"
             }
         }
     }
@@ -510,6 +525,7 @@ impl convert::From<CouchbaseError> for io::Error {
     }
 }
 
+#[allow(unreachable_patterns)] 
 impl convert::From<lcb_error_t> for CouchbaseError {
     fn from(err: lcb_error_t) -> Self {
         match err {
@@ -594,9 +610,12 @@ impl convert::From<lcb_error_t> for CouchbaseError {
             LCB_GENERIC_TMPERR => CouchbaseError::GenericTmpError,
             LCB_GENERIC_SUBDOCERR => CouchbaseError::GenericSubdocError,
             LCB_GENERIC_CONSTRAINT_ERR => CouchbaseError::GenericConstraintError,
+            LCB_NAMESERVER_ERROR => CouchbaseError::NameserverError,
+            LCB_NOT_AUTHORIZED => CouchbaseError::NotAuthorized,
             LCB_MAX_ERROR => panic!("MAX_ERROR is internal!"),
             LCB_SUCCESS => panic!("SUCCESS is not an Error!"),
             LCB_AUTH_CONTINUE => panic!("AUTH_CONTINUE is internal and not to be exposed!"),
+            e => CouchbaseError::UnknownLibcouchbaseError(e),
         }
     }
 }

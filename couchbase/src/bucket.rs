@@ -386,7 +386,7 @@ unsafe extern "C" fn n1ql_callback(_instance: lcb_t, _cbtype: i32, res: *const l
         Err((*res).rc.into())
     };
 
-    match tx.send(result) {
+    match tx.unbounded_send(result) {
         Ok(_) => {}
         Err(e) => warn!("Could not send N1qlResult into Stream! {}", e),
     }
@@ -421,7 +421,7 @@ unsafe extern "C" fn view_callback(_instance: lcb_t, _cbtype: i32, res: *const l
         Err((*res).rc.into())
     };
 
-    match tx.send(result) {
+    match tx.unbounded_send(result) {
         Ok(_) => {}
         Err(e) => warn!("Could not send ViewResult into Stream! {}", e),
     }
