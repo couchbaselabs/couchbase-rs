@@ -52,7 +52,7 @@ use futures::Future;
 /// a document.
 fn main() {
     // Initialize the Cluster
-    let cluster = Cluster::new("localhost").expect("Could not initialize Cluster");
+    let mut cluster = Cluster::new("localhost").expect("Could not initialize Cluster");
 
     // If you auth with 5.0 / RBAC, use this:
     cluster.authenticate("Administrator", "password");
