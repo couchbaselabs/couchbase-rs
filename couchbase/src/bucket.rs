@@ -14,8 +14,8 @@ use std::thread::{park, JoinHandle};
 use std::sync::atomic::{AtomicBool, Ordering};
 use futures::sync::oneshot::channel;
 use futures::sync::mpsc::{unbounded, UnboundedSender};
-use {CouchbaseStream, CouchbaseFuture, N1qlResult, Document, CouchbaseError, N1qlRow, ViewResult,
-     ViewRow, ViewMeta, ViewQuery};
+use {CouchbaseError, CouchbaseFuture, CouchbaseStream, Document, N1qlResult, N1qlRow, ViewMeta,
+     ViewQuery, ViewResult, ViewRow};
 use std;
 use std::slice;
 use std::mem;
@@ -50,10 +50,12 @@ impl Bucket {
             lcb_create(&mut instance, &cropts);
 
             let mut enable = true;
-            let cntl_res = lcb_cntl(instance,
-                                    LCB_CNTL_SET as i32,
-                                    LCB_CNTL_DETAILED_ERRCODES as i32,
-                                    &mut enable as *mut bool as *mut std::os::raw::c_void);
+            let cntl_res = lcb_cntl(
+                instance,
+                LCB_CNTL_SET as i32,
+                LCB_CNTL_DETAILED_ERRCODES as i32,
+                &mut enable as *mut bool as *mut std::os::raw::c_void,
+            );
             if cntl_res != LCB_SUCCESS {
                 return Err(cntl_res.into());
             }
@@ -74,7 +76,9 @@ impl Bucket {
             lcb_install_callback3(instance, LCB_CALLBACK_REMOVE as i32, Some(remove_callback));
         }
 
-        let mt_instance = Arc::new(Mutex::new(SendPtr { inner: Some(instance) }));
+        let mt_instance = Arc::new(Mutex::new(SendPtr {
+            inner: Some(instance),
+        }));
         let io_running = Arc::new(AtomicBool::new(true));
 
         let io_instance = mt_instance.clone();
@@ -107,8 +111,9 @@ impl Bucket {
 
     /// Fetch a `Document` from the `Bucket`.
     pub fn get<D, S>(&self, id: S) -> CouchbaseFuture<D>
-        where S: Into<String>,
-              D: Document
+    where
+        S: Into<String>,
+        D: Document,
     {
         let (tx, rx) = channel();
 
@@ -126,8 +131,8 @@ impl Bucket {
                 LCB_SUCCESS => {
                     let lcb_id =
                         unsafe { slice::from_raw_parts(res.key as *const u8, res.nkey).to_owned() };
-                    let id = String::from_utf8(lcb_id)
-                        .expect("Document ID is not UTF-8 compatible!");
+                    let id =
+                        String::from_utf8(lcb_id).expect("Document ID is not UTF-8 compatible!");
                     let content = unsafe {
                         slice::from_raw_parts(res.value as *const u8, res.nvalue).to_owned()
                     };
@@ -142,9 +147,11 @@ impl Bucket {
         unsafe {
             let guard = self.instance.lock();
             let instance = guard.inner.unwrap();
-            lcb_get3(instance,
-                     Box::into_raw(callback_boxed) as *const std::os::raw::c_void,
-                     &cmd as *const lcb_CMDGET);
+            lcb_get3(
+                instance,
+                Box::into_raw(callback_boxed) as *const std::os::raw::c_void,
+                &cmd as *const lcb_CMDGET,
+            );
         }
 
         self.unpark_io();
@@ -154,39 +161,43 @@ impl Bucket {
 
     /// Insert a `Document` into the `Bucket`.
     pub fn insert<D>(&self, document: D) -> CouchbaseFuture<D>
-        where D: Document
+    where
+        D: Document,
     {
         self.store(document, LCB_ADD)
     }
 
     /// Upsert a `Document` into the `Bucket`.
     pub fn upsert<D>(&self, document: D) -> CouchbaseFuture<D>
-        where D: Document
+    where
+        D: Document,
     {
         self.store(document, LCB_UPSERT)
     }
 
     /// Replace a `Document` in the `Bucket`.
     pub fn replace<D>(&self, document: D) -> CouchbaseFuture<D>
-        where D: Document
+    where
+        D: Document,
     {
         self.store(document, LCB_REPLACE)
     }
 
     fn store<D>(&self, document: D, operation: lcb_storage_t) -> CouchbaseFuture<D>
-        where D: Document
+    where
+        D: Document,
     {
         let (tx, rx) = channel();
 
         let lcb_id = CString::new(document.id()).unwrap();
         let mut cmd: lcb_CMDSTORE = unsafe { ::std::mem::zeroed() };
         cmd.operation = operation;
-        cmd.exptime = document.expiry();
+        cmd.exptime = document.expiry().unwrap_or(0);
         cmd.key.type_ = LCB_KV_COPY;
         cmd.key.contig.bytes = lcb_id.into_raw() as *const std::os::raw::c_void;
         cmd.key.contig.nbytes = document.id().len() as usize;
         cmd.flags = document.flags();
-        
+
         let mut tx_boxed = Box::new(Some(tx));
         let callback = move |res: &lcb_RESPBASE| {
             let result = match res.rc {
@@ -194,8 +205,8 @@ impl Bucket {
                     let lcb_id = unsafe {
                         slice::from_raw_parts((*res).key as *const u8, (*res).nkey).to_owned()
                     };
-                    let id = String::from_utf8(lcb_id)
-                        .expect("Document ID is not UTF-8 compatible!");
+                    let id =
+                        String::from_utf8(lcb_id).expect("Document ID is not UTF-8 compatible!");
                     Ok(D::create(id, Some(res.cas), None, None))
                 }
                 rc => Err(rc.into()),
@@ -203,13 +214,13 @@ impl Bucket {
             let _ = tx_boxed.take().unwrap().send(result);
         };
 
-        let content: Vec<u8> = document.content_as_vec();
+        let content: Vec<u8> = document.content_into_vec().expect("No content found");
         let content_len = content.len();
         let lcb_content = CString::new(content).unwrap();
         cmd.value.vtype = LCB_KV_COPY;
         unsafe {
-            cmd.value.u_buf.contig.as_mut().bytes = lcb_content.into_raw() as
-                                                    *const std::os::raw::c_void;
+            cmd.value.u_buf.contig.as_mut().bytes =
+                lcb_content.into_raw() as *const std::os::raw::c_void;
             cmd.value.u_buf.contig.as_mut().nbytes = content_len as usize;
         }
 
@@ -218,9 +229,11 @@ impl Bucket {
             let guard = self.instance.lock();
             let instance = guard.inner.unwrap();
 
-            lcb_store3(instance,
-                       Box::into_raw(callback_boxed) as *const std::os::raw::c_void,
-                       &cmd as *const lcb_CMDSTORE);
+            lcb_store3(
+                instance,
+                Box::into_raw(callback_boxed) as *const std::os::raw::c_void,
+                &cmd as *const lcb_CMDSTORE,
+            );
         }
 
         self.unpark_io();
@@ -228,8 +241,9 @@ impl Bucket {
     }
 
     pub fn remove<D, S>(&self, id: S) -> CouchbaseFuture<D>
-        where S: Into<String>,
-              D: Document
+    where
+        S: Into<String>,
+        D: Document,
     {
         let (tx, rx) = channel();
 
@@ -248,8 +262,8 @@ impl Bucket {
                     let lcb_id = unsafe {
                         slice::from_raw_parts((*res).key as *const u8, (*res).nkey).to_owned()
                     };
-                    let id = String::from_utf8(lcb_id)
-                        .expect("Document ID is not UTF-8 compatible!");
+                    let id =
+                        String::from_utf8(lcb_id).expect("Document ID is not UTF-8 compatible!");
                     Ok(D::create(id, Some(res.cas), None, None))
                 }
                 rc => Err(rc.into()),
@@ -261,9 +275,11 @@ impl Bucket {
         unsafe {
             let guard = self.instance.lock();
             let instance = guard.inner.unwrap();
-            lcb_remove3(instance,
-                        Box::into_raw(callback_boxed) as *const std::os::raw::c_void,
-                        &cmd as *const lcb_CMDREMOVE);
+            lcb_remove3(
+                instance,
+                Box::into_raw(callback_boxed) as *const std::os::raw::c_void,
+                &cmd as *const lcb_CMDREMOVE,
+            );
         }
 
         self.unpark_io();
@@ -271,7 +287,8 @@ impl Bucket {
     }
 
     pub fn query_n1ql<S>(&self, query: S) -> CouchbaseStream<N1qlResult>
-        where S: Into<String>
+    where
+        S: Into<String>,
     {
         let (tx, rx) = unbounded();
 
@@ -285,17 +302,21 @@ impl Bucket {
 
         let tx_boxed = Box::new(tx);
         unsafe {
-            lcb_n1p_setquery(params,
-                             cquery.as_ptr(),
-                             query_length,
-                             LCB_N1P_QUERY_STATEMENT as i32);
+            lcb_n1p_setquery(
+                params,
+                cquery.as_ptr(),
+                query_length,
+                LCB_N1P_QUERY_STATEMENT as i32,
+            );
             lcb_n1p_mkcmd(params, &mut cmd);
 
             let guard = self.instance.lock();
             let instance = guard.inner.unwrap();
-            lcb_n1ql_query(instance,
-                           Box::into_raw(tx_boxed) as *const std::os::raw::c_void,
-                           &cmd);
+            lcb_n1ql_query(
+                instance,
+                Box::into_raw(tx_boxed) as *const std::os::raw::c_void,
+                &cmd,
+            );
         }
 
         self.unpark_io();
@@ -312,17 +333,21 @@ impl Bucket {
         let mut cmd: lcb_CMDVIEWQUERY = unsafe { ::std::mem::zeroed() };
         let tx_boxed = Box::new(tx);
         unsafe {
-            lcb_view_query_initcmd(&mut cmd,
-                                   cdesign.as_ptr(),
-                                   cview.as_ptr(),
-                                   coptions.as_ptr(),
-                                   Some(view_callback));
+            lcb_view_query_initcmd(
+                &mut cmd,
+                cdesign.as_ptr(),
+                cview.as_ptr(),
+                coptions.as_ptr(),
+                Some(view_callback),
+            );
 
             let guard = self.instance.lock();
             let instance = guard.inner.unwrap();
-            lcb_view_query(instance,
-                           Box::into_raw(tx_boxed) as *const std::os::raw::c_void,
-                           &cmd);
+            lcb_view_query(
+                instance,
+                Box::into_raw(tx_boxed) as *const std::os::raw::c_void,
+                &cmd,
+            );
         }
 
         self.unpark_io();
@@ -376,8 +401,9 @@ unsafe extern "C" fn n1ql_callback(_instance: lcb_t, _cbtype: i32, res: *const l
     let result = if (*res).rc == LCB_SUCCESS {
         let lcb_row = slice::from_raw_parts((*res).row as *const u8, (*res).nrow);
         let result = if more_to_come {
-            N1qlResult::Row(N1qlRow::new(String::from_utf8(lcb_row.to_owned())
-                .expect("N1QL Row failed UTF-8 validation!")))
+            N1qlResult::Row(N1qlRow::new(
+                String::from_utf8(lcb_row.to_owned()).expect("N1QL Row failed UTF-8 validation!"),
+            ))
         } else {
             N1qlResult::Meta(serde_json::from_slice(lcb_row).expect("N1QL Meta decoding failed!"))
         };
@@ -401,8 +427,8 @@ unsafe extern "C" fn view_callback(_instance: lcb_t, _cbtype: i32, res: *const l
 
     let result = if (*res).rc == LCB_SUCCESS {
         let lcb_value = slice::from_raw_parts((*res).value as *const u8, (*res).nvalue);
-        let value = String::from_utf8(lcb_value.to_owned())
-            .expect("View Row failed UTF-8 validation!");
+        let value =
+            String::from_utf8(lcb_value.to_owned()).expect("View Row failed UTF-8 validation!");
         let result = if more_to_come {
             let lcb_key = slice::from_raw_parts((*res).key as *const u8, (*res).nkey);
             let lcb_docid = slice::from_raw_parts((*res).docid as *const u8, (*res).ndocid);

@@ -11,8 +11,7 @@ use couchbase::document::{Document, JsonDocument};
 #[derive(Serialize, Deserialize, Debug)]
 struct Airline {
     id: u32,
-    #[serde(rename = "type")]
-    _type: String,
+    #[serde(rename = "type")] _type: String,
     name: String,
     iata: String,
     icao: String,
@@ -27,10 +26,13 @@ fn main() {
     let cluster = Cluster::new("localhost").expect("Could not initialize Cluster");
 
     // Open the travel-sample bucket
-    let bucket = cluster.open_bucket("travel-sample", "").expect("Could not open Bucket");
+    let bucket = cluster
+        .open_bucket("travel-sample", "")
+        .expect("Could not open Bucket");
 
-    let document: Airline = bucket.get::<JsonDocument<_>, _>("airline_10123")
-        .map(|doc| doc.content())
+    let document: Airline = bucket
+        .get::<JsonDocument<_>, _>("airline_10123")
+        .map(|doc| doc.content().unwrap())
         .wait()
         .expect("Document not found!");
 
