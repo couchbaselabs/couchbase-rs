@@ -12,6 +12,13 @@ Client based on [libcouchbase](https://github.com/couchbase/libcouchbase).
 
 # Usage
 
+In your `Cargo.toml` use:
+
+```toml
+[dependencies]
+couchbase = "0.3"
+```
+
 ## Building
 There are two options to build the SDK (or better, how to link the underlying)
 `libcouchbase` library. If you run with all the default settings and just issue
