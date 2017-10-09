@@ -18,7 +18,7 @@ build-lcb = ["cmake"]
 
 [build-dependencies]
 pkg-config = "0.3"
-bindgen =  { git = "https://github.com/servo/rust-bindgen.git", optional = true }
+bindgen =  { version = "0.30", optional = true }
 cmake = { version  = "0.1", optional = true }
 
 [lib]
