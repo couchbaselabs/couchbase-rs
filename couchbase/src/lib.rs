@@ -21,6 +21,9 @@
 //!     // Initialize the Cluster
 //!     let cluster = Cluster::new("localhost").expect("Could not initialize Cluster");
 //! 
+//!     // If you auth with 5.0 / RBAC, use this:
+//!     // cluster.authenticate("Administrator", "password");
+//! 
 //!     // Open the travel-sample bucket
 //!     let bucket = cluster.open_bucket("default", None).expect("Could not open Bucket");
 //! 
@@ -41,6 +44,7 @@
 //! For now, more examples can be found under `examples`. Note that for all the `serde`-based
 //! examples you need to at least have Rust 1.15.0 installed.
 //!
+#![doc(html_root_url = "https://docs.rs/couchbase/0.3.0")]
 extern crate couchbase_sys;
 #[macro_use]
 extern crate log;

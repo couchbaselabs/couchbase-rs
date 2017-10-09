@@ -11,6 +11,9 @@ fn main() {
     // Initialize the Cluster
     let cluster = Cluster::new("localhost").expect("Could not initialize Cluster");
 
+    // If you auth with 5.0 / RBAC, use this:
+    cluster.authenticate("Administrator", "password");
+
     // Open the travel-sample bucket
     let bucket = cluster
         .open_bucket("default", None)

@@ -1,6 +1,6 @@
 [package]
 name = "couchbase-sys"
-version = "0.2.0"
+version = "0.3.0" # remember to update html_root_url
 authors = ["Michael Nitschinger <michael.nitschinger@couchbase.com>"]
 build = "build.rs"
 links = "libcouchbase"
@@ -10,7 +10,7 @@ categories = ["database", "asynchronous", "external-ffi-bindings"]
 description = "Rust bindings to the libcouchbase C Couchbase SDK."
 repository = "https://github.com/couchbaselabs/couchbase-rs"
 homepage = "https://github.com/couchbaselabs/couchbase-rs"
-documentation = "https://docs.rs/crate/couchbase-sys"
+documentation = "https://docs.rs/couchbase-sys"
 
 [features]
 generate-binding = ["bindgen"]
