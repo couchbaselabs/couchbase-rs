@@ -23,11 +23,14 @@ struct Airline {
 /// JSON deserialization to marshal that document into a typed struct.
 fn main() {
     // Initialize the Cluster
-    let cluster = Cluster::new("localhost").expect("Could not initialize Cluster");
+    let mut cluster = Cluster::new("localhost").expect("Could not initialize Cluster");
+
+    // Use this for RBAC / Spock 5.0
+    cluster.authenticate("Administrator", "password");
 
     // Open the travel-sample bucket
     let bucket = cluster
-        .open_bucket("travel-sample", "")
+        .open_bucket("travel-sample", None)
         .expect("Could not open Bucket");
 
     let document: Airline = bucket

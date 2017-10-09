@@ -18,7 +18,11 @@ fn main() {
     let cluster = Cluster::new("localhost").expect("Could not initialize Cluster");
 
     // Open the travel-sample bucket
-    let bucket = Arc::new(cluster.open_bucket("travel-sample", "").expect("Could not open Bucket"));
+    let bucket = Arc::new(
+        cluster
+            .open_bucket("travel-sample", None)
+            .expect("Could not open Bucket"),
+    );
 
     let thread_count = 8;
     let mut threads = vec![];
@@ -26,9 +30,11 @@ fn main() {
         let b = bucket.clone();
         threads.push(thread::spawn(move || {
             let id = format!("airport_{}", i + 1254);
-            println!("Thread {:?} found:\n\t{:?}",
-                     i,
-                     b.get::<BinaryDocument, _>(id).wait().unwrap());
+            println!(
+                "Thread {:?} found:\n\t{:?}",
+                i,
+                b.get::<BinaryDocument, _>(id).wait().unwrap()
+            );
         }));
     }
 

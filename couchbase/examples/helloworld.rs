@@ -13,7 +13,7 @@ fn main() {
 
     // Open the travel-sample bucket
     let bucket = cluster
-        .open_bucket("default", "")
+        .open_bucket("default", None)
         .expect("Could not open Bucket");
 
     // Create a document and store it in the bucket

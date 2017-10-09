@@ -22,7 +22,7 @@
 //!     let cluster = Cluster::new("localhost").expect("Could not initialize Cluster");
 //! 
 //!     // Open the travel-sample bucket
-//!     let bucket = cluster.open_bucket("default", "").expect("Could not open Bucket");
+//!     let bucket = cluster.open_bucket("default", None).expect("Could not open Bucket");
 //! 
 //!     // Create a document and store it in the bucket
 //!     let document = BinaryDocument::create("hello", None, Some("abc".as_bytes().to_owned()), None);

@@ -32,11 +32,16 @@ pub struct Bucket {
 
 /// Contains all `Bucket`-level Couchbase operations.
 impl Bucket {
-    pub fn new<'a>(cs: &'a str, pw: &'a str) -> Result<Self, CouchbaseError> {
+    pub fn new<'a>(
+        cs: &'a str,
+        pw: &'a str,
+        user: Option<&'a str>,
+    ) -> Result<Self, CouchbaseError> {
         let mut instance: lcb_t = ptr::null_mut();
 
         let connstr = CString::new(cs).unwrap();
         let passstr = CString::new(pw).unwrap();
+        let userstr = CString::new(user.unwrap_or("")).unwrap();
 
         let mut cropts = lcb_create_st {
             version: 3,
@@ -45,6 +50,9 @@ impl Bucket {
 
         let boot_result = unsafe {
             cropts.v.v3.as_mut().connstr = connstr.as_ptr();
+            if user.is_some() {
+                cropts.v.v3.as_mut().username = userstr.as_ptr();
+            }
             cropts.v.v3.as_mut().passwd = passstr.as_ptr();
 
             lcb_create(&mut instance, &cropts);
