@@ -7,8 +7,6 @@ extern crate pkg_config;
 use std::env;
 use std::fs;
 
-
-
 #[cfg(feature = "build-lcb")]
 fn build_lcb(lcb_dir: &str, out_dir: &str) -> String {
     let dst = cmake::build(lcb_dir);
