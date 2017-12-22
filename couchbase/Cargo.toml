@@ -23,6 +23,7 @@ serde_json = "1.0"
 serde_derive = "1.0"
 
 [features]
+default = ["build-lcb"]
 generate-binding = ["couchbase-sys/generate-binding"]
 build-lcb = ["couchbase-sys/build-lcb"]
 

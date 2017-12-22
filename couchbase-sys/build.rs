@@ -1,3 +1,18 @@
+//! Build script for `couchbase-sys` to bind to `libcouchbase`.
+//!
+//! The way we pick up lcb has undergone a few different approaches,
+//! but for now we settled on the following:
+//!
+//! 1) lcb is looked up via `pkg-config`
+//! 2a) if found, go to step 3.
+//! 2b) if not found, try to compile it via cmake.
+//! 3) if `generate-binding` is enabled (not by default), then
+//!    a binding will be generated via bindgen, otherwise by default
+//!    we'll pick one from the list of stored ones.
+//!
+//! Features `build-lcb` is enabled by default. If `build-lcb` and its 
+//! not found via pkg-config, building will not work (but it can be used 
+//! to make sure its only picked up via pkg-config).
 #[cfg(feature = "generate-binding")]
 extern crate bindgen;
 #[cfg(feature = "build-lcb")]
@@ -41,52 +56,35 @@ fn generate_binding(_bindgen_path: &str, _out_dir: &str, _version: &str) {
 }
 
 fn main() {
-    let mut version = String::from("2.8.4");
+    let version = String::from("2.8.4");
     let lcb_dir = format!("libcouchbase-{}", version);
     let out_dir = env::var("OUT_DIR").unwrap();
 
-    let mut bindgen_path = None;
-    let pkg_success = if cfg!(feature = "build-lcb") {
-        false
-    } else {
-        let result = pkg_config::Config::new()
-            .atleast_version(&version)
-            .probe("libcouchbase");
-        if result.is_ok() {
-            bindgen_path = Some(String::from(
-                result
-                    .as_ref()
-                    .unwrap()
-                    .include_paths
-                    .get(0)
-                    .expect("Could not find include path from pkg config")
-                    .to_str()
-                    .unwrap(),
-            ));
-            version = result.unwrap().version;
-            true
-        } else {
-            false
-        }
-    };
+    let result = pkg_config::Config::new()
+        .atleast_version(&version)
+        .probe("libcouchbase");
 
-    if !pkg_success {
-        if cfg!(feature = "build-lcb") {
-            bindgen_path = Some(build_lcb(&lcb_dir, &out_dir))
-        } else {
-            panic!(
-                "Need to build libcouchbase (none found), but the 'build-lcb' feature is not \
-                 enabled!"
-            );
-        }
-    }
+    let bindgen_path = match result {
+        Ok(_) => String::from(
+            result
+                .as_ref()
+                .unwrap()
+                .include_paths
+                .get(0)
+                .expect("Could not find include path from pkg config")
+                .to_str()
+                .unwrap(),
+        ),
+        Err(_) if cfg!(feature = "build-lcb") => build_lcb(&lcb_dir, &out_dir),
+        Err(_) => panic!(
+            "Need to build libcouchbase (none found), but the 'build-lcb' feature is not \
+             enabled!"
+        ),
+    };
 
     // Step 2: From the headers, generate the rust binding via bindgen or load the pre-gen one
     if cfg!(feature = "generate-binding") {
-        match bindgen_path {
-            Some(bp) => generate_binding(&bp, &out_dir, &version),
-            None => panic!("Instructed to generate binding, but no path for headers found."),
-        }
+        generate_binding(&bindgen_path, &out_dir, &version)
     } else {
         let src_path = format!(
             "{}/src/bindings-{}.rs",

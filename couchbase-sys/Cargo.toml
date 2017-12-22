@@ -13,6 +13,7 @@ homepage = "https://github.com/couchbaselabs/couchbase-rs"
 documentation = "https://docs.rs/couchbase-sys"
 
 [features]
+default = ["build-lcb"]
 generate-binding = ["bindgen"]
 build-lcb = ["cmake"]
 

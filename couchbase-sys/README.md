@@ -13,8 +13,10 @@ If thats not possible two features can be used together or independently:
 ## Howto: Rebuilding the bindings.rs for a new libcouchbase version
 First, make sure you have `bindgen` installed as a command line utility:
 
+Its important to use the same version as define din the `Cargo.toml` dependency, since bindgen itself changes its output from version to version leading to incompatibilities.
+
 ```
-cargo install -f bindgen
+cargo install -f bindgen -vers 0.30.0
 ```
 
 Next, you need `make` and `wget` and then the makefile will do the rest.

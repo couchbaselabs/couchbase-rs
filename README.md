@@ -20,19 +20,7 @@ couchbase = "0.3"
 ```
 
 ## Building
-There are two options to build the SDK (or better, how to link the underlying)
-`libcouchbase` library. If you run with all the default settings and just issue
-a `cargo build`, the build file will use [cmake](https://cmake.org/) to actually
-compile the library and link it out of the source tree. This has the benefit that
-the SDK can compile against a specific version, making sure to not use invalid APIs
-across versions.
-
-If you want to force using a different libcouchbase version you can either fork
-the code and plug in a different source tree, but the other option is to install
-one on your machine and make it discoverable via `pkg-config`. If you set the
-`COUCHBASE_SYS_USE_PKG_CONFIG` environment variable the build file will try to
-discover both the library and its header files through `pkg-config` and there is
-also no need to compile libcouchbase when doing so.
+Since this crate is built on the `libcouchbase` C library, we need to link (and potentially build) it. By default, the underlying `couchbase-sys` crate will use `pkg-config` to pick it up and if its not found it will try to build it via `cmake`. Once build/found, it will try to match it up to a stored binding for the used version. If none is found it will fail, but you can enable the `generate-binding` feature to build the binding on demand.
 
 ## Examples
 

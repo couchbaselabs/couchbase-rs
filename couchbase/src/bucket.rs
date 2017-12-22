@@ -49,11 +49,11 @@ impl Bucket {
         };
 
         let boot_result = unsafe {
-            cropts.v.v3.as_mut().connstr = connstr.as_ptr();
+            cropts.v.v3.connstr = connstr.as_ptr();
             if user.is_some() {
-                cropts.v.v3.as_mut().username = userstr.as_ptr();
+                cropts.v.v3.username = userstr.as_ptr();
             }
-            cropts.v.v3.as_mut().passwd = passstr.as_ptr();
+            cropts.v.v3.passwd = passstr.as_ptr();
 
             lcb_create(&mut instance, &cropts);
 
@@ -227,9 +227,8 @@ impl Bucket {
         let lcb_content = CString::new(content).unwrap();
         cmd.value.vtype = LCB_KV_COPY;
         unsafe {
-            cmd.value.u_buf.contig.as_mut().bytes =
-                lcb_content.into_raw() as *const std::os::raw::c_void;
-            cmd.value.u_buf.contig.as_mut().nbytes = content_len as usize;
+            cmd.value.u_buf.contig.bytes = lcb_content.into_raw() as *const std::os::raw::c_void;
+            cmd.value.u_buf.contig.nbytes = content_len as usize;
         }
 
         let callback_boxed: Box<Box<FnMut(&lcb_RESPBASE)>> = Box::new(Box::new(callback));
