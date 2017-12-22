@@ -20,7 +20,7 @@ cargo install -f bindgen
 Next, you need `make` and `wget` and then the makefile will do the rest.
 
 ```
-couchbase-rs/couchbase-sys$ make binding VERSION=2.7.4
+couchbase-rs/couchbase-sys$ make binding VERSION=2.8.4
 ```
 
 This will download the lcb source from github and create the binding, putting it into the `src`

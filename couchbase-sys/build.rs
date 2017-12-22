@@ -43,7 +43,7 @@ fn generate_binding(_bindgen_path: &str, _out_dir: &str, _version: &str) {
 }
 
 fn main() {
-    let mut version = String::from("2.8.1");
+    let mut version = String::from("2.8.4");
     let lcb_dir = format!("libcouchbase-{}", version);
     let out_dir = env::var("OUT_DIR").unwrap();
 
