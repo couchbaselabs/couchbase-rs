@@ -16,17 +16,17 @@ In your `Cargo.toml` use:
 
 ```toml
 [dependencies]
-couchbase = "0.3"
+couchbase = "0.4"
 ```
+
+Minimum rust version is **1.19**, since it supports unions which are needed for the `couchbase-sys` binding.
 
 ## Building
 Since this crate is built on the `libcouchbase` C library, we need to link (and potentially build) it. By default, the underlying `couchbase-sys` crate will use `pkg-config` to pick it up and if its not found it will try to build it via `cmake`. Once build/found, it will try to match it up to a stored binding for the used version. If none is found it will fail, but you can enable the `generate-binding` feature to build the binding on demand.
 
 ## Examples
 
-Note that to run all the examples you need to run at least Rust 1.15.0 since
-it supports custom derive on stable which `serde` needs. Run with
-`cargo run --example=helloworld`.
+Run with `cargo run --example=helloworld`.
 
 ```rust
 extern crate couchbase;

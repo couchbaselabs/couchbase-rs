@@ -1,6 +1,6 @@
 [package]
 name = "couchbase-sys"
-version = "0.3.0" # remember to update html_root_url
+version = "0.4.0" # remember to update html_root_url
 authors = ["Michael Nitschinger <michael.nitschinger@couchbase.com>"]
 build = "build.rs"
 links = "libcouchbase"

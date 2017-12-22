@@ -1,6 +1,6 @@
 [package]
 name = "couchbase"
-version = "0.3.0" # remember to update html_root_url
+version = "0.4.0" # remember to update html_root_url
 authors = ["Michael Nitschinger <michael.nitschinger@couchbase.com>"]
 license = "Apache-2.0"
 keywords = ["couchbase", "database", "futures", "libcouchbase", "async"]
@@ -11,11 +11,11 @@ homepage = "https://github.com/couchbaselabs/couchbase-rs"
 documentation = "https://docs.rs/couchbase"
 
 [dependencies]
-couchbase-sys = { version = "0.3.0", path = "../couchbase-sys" }
+couchbase-sys = { version = "0.4.0", path = "../couchbase-sys" }
 
-url = "1.5"
+url = "1.6"
 futures = "0.1"
-parking_lot = "0.4"
+parking_lot = "0.5"
 log = "0.3"
 
 serde = "1.0"
@@ -26,5 +26,3 @@ serde_derive = "1.0"
 default = ["build-lcb"]
 generate-binding = ["couchbase-sys/generate-binding"]
 build-lcb = ["couchbase-sys/build-lcb"]
-
-[dev-dependencies]
