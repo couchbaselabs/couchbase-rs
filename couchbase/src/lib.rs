@@ -14,6 +14,7 @@
 //! use couchbase::{Document, Cluster};
 //! use couchbase::document::BinaryDocument;
 //! use futures::Future;
+//! use futures::executor::block_on;
 //!
 //! /// A very simple example which connects to the `default` bucket and writes and loads
 //! /// a document.
@@ -30,12 +31,11 @@
 //!     // Create a document and store it in the bucket
 //!     let document = BinaryDocument::create("hello", None, Some("abc".as_bytes().to_owned()), None);
 //!    println!("Wrote Document {:?}",
-//!              bucket.upsert(document)
-//!                  .wait()
+//!              block_on(bucket.upsert(document))
 //!                  .expect("Upsert failed!"));
 //!
 //!     // Load the previously written document and print it out
-//!     let document: BinaryDocument = bucket.get("hello").wait().expect("Could not load Document");
+//!     let document: BinaryDocument = block_on(bucket.get("hello")).expect("Could not load Document");
 //!     println!("Found Document {:?}", document);
 //!
 //! }

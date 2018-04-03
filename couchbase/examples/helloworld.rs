@@ -3,7 +3,7 @@ extern crate futures;
 
 use couchbase::{Cluster, Document};
 use couchbase::document::BinaryDocument;
-use futures::Future;
+use futures::executor::block_on;
 
 /// A very simple example which connects to the `default` bucket and writes and loads
 /// a document.
@@ -23,10 +23,10 @@ fn main() {
     let document = BinaryDocument::create("hello", None, Some("abc".as_bytes().to_owned()), None);
     println!(
         "Wrote Document {:?}",
-        bucket.upsert(document).wait().expect("Upsert failed!")
+        block_on(bucket.upsert(document)).expect("Upsert failed!")
     );
 
     // Load the previously written document and print it out
-    let document: BinaryDocument = bucket.get("hello").wait().expect("Could not load Document");
+    let document: BinaryDocument = block_on(bucket.get("hello")).expect("Could not load Document");
     println!("Found Document {:?}", document);
 }

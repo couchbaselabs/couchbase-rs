@@ -8,8 +8,8 @@ use parking_lot::Mutex;
 use std::thread;
 use std::thread::{park, JoinHandle};
 use std::sync::atomic::{AtomicBool, Ordering};
-use futures::sync::oneshot::channel;
-use futures::sync::mpsc::{unbounded, UnboundedSender};
+use futures::channel::oneshot::channel;
+use futures::channel::mpsc::{unbounded, UnboundedSender};
 use {CouchbaseError, CouchbaseFuture, CouchbaseStream, Document, N1qlResult, N1qlRow, ViewMeta,
      ViewQuery, ViewResult, ViewRow};
 use std;

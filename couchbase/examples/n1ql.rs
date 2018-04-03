@@ -2,12 +2,15 @@ extern crate couchbase;
 extern crate futures;
 
 use couchbase::{Cluster, N1qlResult};
-use futures::Stream;
+use futures::StreamExt;
+use futures::executor::block_on;
 
 /// Opens a bucket and then runs a N1QL query and prints out the results.
 fn main() {
     // Initialize the Cluster
-    let cluster = Cluster::new("localhost").expect("Could not initialize Cluster");
+    let mut cluster = Cluster::new("localhost").expect("Could not initialize Cluster");
+
+    cluster.authenticate("Administrator", "password");
 
     // Open the travel-sample bucket
     let bucket = cluster
@@ -15,14 +18,11 @@ fn main() {
         .expect("Could not open Bucket");
 
     // Run the query and iterate the rows.
-    for row in bucket
-        .query_n1ql("SELECT count(*) as cnt FROM `travel-sample`")
-        .wait()
-    {
+    let stream = bucket.query_n1ql("SELECT count(*) as cnt FROM `travel-sample`");
+    for row in block_on(stream.collect::<Vec<_>>()).expect("Error!") {
         match row {
-            Ok(N1qlResult::Row(r)) => println!("Found Row {:?}", r),
-            Ok(N1qlResult::Meta(m)) => println!("Found Meta {:?}", m),
-            Err(e) => panic!("Error! {:?}", e),
+            N1qlResult::Row(r) => println!("Found Row {:?}", r),
+            N1qlResult::Meta(m) => println!("Found Meta {:?}", m),
         }
     }
 }

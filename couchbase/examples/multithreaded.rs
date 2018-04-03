@@ -5,8 +5,8 @@ use std::sync::Arc;
 use std::thread;
 
 use couchbase::Cluster;
-use futures::Future;
 use couchbase::document::BinaryDocument;
+use futures::executor::block_on;
 
 /// This example shows how to use the Bucket instance in a multithreaded context.
 ///
@@ -33,7 +33,7 @@ fn main() {
             println!(
                 "Thread {:?} found:\n\t{:?}",
                 i,
-                b.get::<BinaryDocument, _>(id).wait().unwrap()
+                block_on(b.get::<BinaryDocument, _>(id)).unwrap()
             );
         }));
     }

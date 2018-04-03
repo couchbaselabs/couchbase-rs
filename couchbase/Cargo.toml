@@ -14,7 +14,7 @@ documentation = "https://docs.rs/couchbase"
 couchbase-sys = { version = "0.4.0", path = "../couchbase-sys" }
 
 url = "1.7"
-futures = "0.1"
+futures = "0.2.0-beta"
 parking_lot = "0.5"
 log = "0.4"
 
