@@ -14,12 +14,11 @@ documentation = "https://docs.rs/couchbase-sys"
 
 [features]
 default = ["build-lcb"]
-generate-binding = ["bindgen"]
 build-lcb = ["cmake"]
 
 [build-dependencies]
 pkg-config = "0.3"
-bindgen =  { version = "0.30", optional = true }
+bindgen = "0.35"
 cmake = { version  = "0.1", optional = true }
 
 [lib]
