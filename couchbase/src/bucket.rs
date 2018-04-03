@@ -1,12 +1,8 @@
 //! Bucket-level operations and API.
+#![allow(non_upper_case_globals)]
+
 use std::ptr;
 use couchbase_sys::*;
-use couchbase_sys::lcb_error_t::*;
-use couchbase_sys::lcb_CALLBACKTYPE::*;
-use couchbase_sys::lcb_KVBUFTYPE::*;
-use couchbase_sys::lcb_storage_t::*;
-use couchbase_sys::lcb_RESPFLAGS::*;
-use std::ffi::CString;
 use std::sync::Arc;
 use parking_lot::Mutex;
 use std::thread;
@@ -20,9 +16,9 @@ use std;
 use std::slice;
 use std::mem;
 use serde_json;
+use std::ffi::CString;
 
 type StreamSender<T> = *mut UnboundedSender<Result<T, CouchbaseError>>;
-
 
 pub struct Bucket {
     instance: Arc<Mutex<SendPtr<lcb_t>>>,
@@ -64,7 +60,7 @@ impl Bucket {
                 LCB_CNTL_DETAILED_ERRCODES as i32,
                 &mut enable as *mut bool as *mut std::os::raw::c_void,
             );
-            if cntl_res != LCB_SUCCESS {
+            if cntl_res != lcb_error_t_LCB_SUCCESS {
                 return Err(cntl_res.into());
             }
 
@@ -73,15 +69,27 @@ impl Bucket {
             lcb_get_bootstrap_status(instance)
         };
 
-        if boot_result != LCB_SUCCESS {
+        if boot_result != lcb_error_t_LCB_SUCCESS {
             return Err(boot_result.into());
         }
 
         // install the generic callbacks
         unsafe {
-            lcb_install_callback3(instance, LCB_CALLBACK_GET as i32, Some(get_callback));
-            lcb_install_callback3(instance, LCB_CALLBACK_STORE as i32, Some(store_callback));
-            lcb_install_callback3(instance, LCB_CALLBACK_REMOVE as i32, Some(remove_callback));
+            lcb_install_callback3(
+                instance,
+                lcb_CALLBACKTYPE_LCB_CALLBACK_GET as i32,
+                Some(get_callback),
+            );
+            lcb_install_callback3(
+                instance,
+                lcb_CALLBACKTYPE_LCB_CALLBACK_STORE as i32,
+                Some(store_callback),
+            );
+            lcb_install_callback3(
+                instance,
+                lcb_CALLBACKTYPE_LCB_CALLBACK_REMOVE as i32,
+                Some(remove_callback),
+            );
         }
 
         let mt_instance = Arc::new(Mutex::new(SendPtr {
@@ -116,7 +124,6 @@ impl Bucket {
         guard.as_ref().unwrap().thread().unpark();
     }
 
-
     /// Fetch a `Document` from the `Bucket`.
     pub fn get<D, S>(&self, id: S) -> CouchbaseFuture<D>
     where
@@ -129,14 +136,14 @@ impl Bucket {
         let idm_len = idm.len();
         let lcb_id = CString::new(idm).unwrap();
         let mut cmd: lcb_CMDGET = unsafe { ::std::mem::zeroed() };
-        cmd.key.type_ = LCB_KV_COPY;
+        cmd.key.type_ = lcb_KVBUFTYPE_LCB_KV_COPY;
         cmd.key.contig.bytes = lcb_id.into_raw() as *const std::os::raw::c_void;
         cmd.key.contig.nbytes = idm_len as usize;
 
         let mut tx_boxed = Box::new(Some(tx));
         let callback = move |res: &lcb_RESPGET| {
             let result = match res.rc {
-                LCB_SUCCESS => {
+                lcb_error_t_LCB_SUCCESS => {
                     let lcb_id =
                         unsafe { slice::from_raw_parts(res.key as *const u8, res.nkey).to_owned() };
                     let id =
@@ -166,13 +173,12 @@ impl Bucket {
         CouchbaseFuture::new(rx)
     }
 
-
     /// Insert a `Document` into the `Bucket`.
     pub fn insert<D>(&self, document: D) -> CouchbaseFuture<D>
     where
         D: Document,
     {
-        self.store(document, LCB_ADD)
+        self.store(document, lcb_storage_t_LCB_ADD)
     }
 
     /// Upsert a `Document` into the `Bucket`.
@@ -180,7 +186,7 @@ impl Bucket {
     where
         D: Document,
     {
-        self.store(document, LCB_UPSERT)
+        self.store(document, lcb_storage_t_LCB_UPSERT)
     }
 
     /// Replace a `Document` in the `Bucket`.
@@ -188,7 +194,7 @@ impl Bucket {
     where
         D: Document,
     {
-        self.store(document, LCB_REPLACE)
+        self.store(document, lcb_storage_t_LCB_REPLACE)
     }
 
     fn store<D>(&self, document: D, operation: lcb_storage_t) -> CouchbaseFuture<D>
@@ -201,7 +207,7 @@ impl Bucket {
         let mut cmd: lcb_CMDSTORE = unsafe { ::std::mem::zeroed() };
         cmd.operation = operation;
         cmd.exptime = document.expiry().unwrap_or(0);
-        cmd.key.type_ = LCB_KV_COPY;
+        cmd.key.type_ = lcb_KVBUFTYPE_LCB_KV_COPY;
         cmd.key.contig.bytes = lcb_id.into_raw() as *const std::os::raw::c_void;
         cmd.key.contig.nbytes = document.id().len() as usize;
         cmd.flags = document.flags();
@@ -209,7 +215,7 @@ impl Bucket {
         let mut tx_boxed = Box::new(Some(tx));
         let callback = move |res: &lcb_RESPBASE| {
             let result = match res.rc {
-                LCB_SUCCESS => {
+                lcb_error_t_LCB_SUCCESS => {
                     let lcb_id = unsafe {
                         slice::from_raw_parts((*res).key as *const u8, (*res).nkey).to_owned()
                     };
@@ -225,7 +231,7 @@ impl Bucket {
         let content: Vec<u8> = document.content_into_vec().expect("No content found");
         let content_len = content.len();
         let lcb_content = CString::new(content).unwrap();
-        cmd.value.vtype = LCB_KV_COPY;
+        cmd.value.vtype = lcb_KVBUFTYPE_LCB_KV_COPY;
         unsafe {
             cmd.value.u_buf.contig.bytes = lcb_content.into_raw() as *const std::os::raw::c_void;
             cmd.value.u_buf.contig.nbytes = content_len as usize;
@@ -258,14 +264,14 @@ impl Bucket {
         let idm_len = idm.len();
         let lcb_id = CString::new(idm).unwrap();
         let mut cmd: lcb_CMDREMOVE = unsafe { ::std::mem::zeroed() };
-        cmd.key.type_ = LCB_KV_COPY;
+        cmd.key.type_ = lcb_KVBUFTYPE_LCB_KV_COPY;
         cmd.key.contig.bytes = lcb_id.into_raw() as *const std::os::raw::c_void;
         cmd.key.contig.nbytes = idm_len as usize;
 
         let mut tx_boxed = Box::new(Some(tx));
         let callback = move |res: &lcb_RESPBASE| {
             let result = match res.rc {
-                LCB_SUCCESS => {
+                lcb_error_t_LCB_SUCCESS => {
                     let lcb_id = unsafe {
                         slice::from_raw_parts((*res).key as *const u8, (*res).nkey).to_owned()
                     };
@@ -402,10 +408,9 @@ unsafe extern "C" fn remove_callback(_instance: lcb_t, _cbtype: i32, res: *const
 
 unsafe extern "C" fn n1ql_callback(_instance: lcb_t, _cbtype: i32, res: *const lcb_RESPN1QL) {
     let tx = Box::from_raw((*res).cookie as StreamSender<N1qlResult>);
-    let more_to_come = ((*res).rflags as u32 & LCB_RESP_F_FINAL as u32) == 0;
+    let more_to_come = ((*res).rflags as u32 & lcb_RESPFLAGS_LCB_RESP_F_FINAL as u32) == 0;
 
-
-    let result = if (*res).rc == LCB_SUCCESS {
+    let result = if (*res).rc == lcb_error_t_LCB_SUCCESS {
         let lcb_row = slice::from_raw_parts((*res).row as *const u8, (*res).nrow);
         let result = if more_to_come {
             N1qlResult::Row(N1qlRow::new(
@@ -430,9 +435,9 @@ unsafe extern "C" fn n1ql_callback(_instance: lcb_t, _cbtype: i32, res: *const l
 
 unsafe extern "C" fn view_callback(_instance: lcb_t, _cbtype: i32, res: *const lcb_RESPVIEWQUERY) {
     let tx = Box::from_raw((*res).cookie as StreamSender<ViewResult>);
-    let more_to_come = ((*res).rflags as u32 & LCB_RESP_F_FINAL as u32) == 0;
+    let more_to_come = ((*res).rflags as u32 & lcb_RESPFLAGS_LCB_RESP_F_FINAL as u32) == 0;
 
-    let result = if (*res).rc == LCB_SUCCESS {
+    let result = if (*res).rc == lcb_error_t_LCB_SUCCESS {
         let lcb_value = slice::from_raw_parts((*res).value as *const u8, (*res).nvalue);
         let value =
             String::from_utf8(lcb_value.to_owned()).expect("View Row failed UTF-8 validation!");

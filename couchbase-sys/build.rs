@@ -6,6 +6,8 @@ extern crate pkg_config;
 
 use std::env;
 
+static VERSION: &str = "2.8.5";
+
 #[cfg(feature = "build-lcb")]
 fn build_lcb(lcb_dir: &str, out_dir: &str) -> String {
     let dst = cmake::build(lcb_dir);
@@ -23,12 +25,11 @@ fn build_lcb(_lcb_dir: &str, _out_dir: &str) -> String {
 }
 
 fn main() {
-    let version = String::from("2.8.5");
-    let lcb_dir = format!("libcouchbase-{}", version);
+    let lcb_dir = format!("libcouchbase-{}", VERSION);
     let out_dir = env::var("OUT_DIR").unwrap();
 
     let result = pkg_config::Config::new()
-        .atleast_version(&version)
+        .atleast_version(VERSION)
         .probe("libcouchbase");
 
     let bindgen_path = match result {
@@ -51,7 +52,7 @@ fn main() {
 
     // Step 2: From the headers, generate the rust binding via bindgen or load the pre-gen one
     let _ = bindgen::builder()
-        .header(format!("headers-{}.h", &version))
+        .header(format!("headers-{}.h", VERSION))
         .clang_arg("-I")
         .clang_arg(bindgen_path)
         .generate_comments(false)
