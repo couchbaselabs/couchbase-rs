@@ -1,4 +1,3 @@
-
 #[derive(Debug)]
 pub enum N1qlResult {
     Row(N1qlRow),

@@ -108,7 +108,6 @@ pub struct JsonDocument<T> {
     expiry: Option<u32>,
 }
 
-
 impl<T> Document for JsonDocument<T>
 where
     T: Serialize + DeserializeOwned,

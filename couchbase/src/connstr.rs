@@ -1,4 +1,4 @@
-use url::{Url, ParseError};
+use url::{ParseError, Url};
 use error::CouchbaseError;
 
 #[derive(Debug)]
@@ -7,7 +7,7 @@ pub struct ConnectionString {
     scheme: UrlScheme,
 }
 
-#[derive(Debug,PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum UrlScheme {
     Http,
     Couchbase,
@@ -45,14 +45,18 @@ impl ConnectionString {
         };
 
         if u.username() != "" {
-            warn!("Username must be set on the authenticator directly, not via the connection \
-                   string!");
+            warn!(
+                "Username must be set on the authenticator directly, not via the connection \
+                 string!"
+            );
             return Err(CouchbaseError::InvalidHostFormat);
         }
 
         if u.password().is_some() {
-            warn!("Password must be set on the authenticator directly, not via the connection \
-                   string!");
+            warn!(
+                "Password must be set on the authenticator directly, not via the connection \
+                 string!"
+            );
             return Err(CouchbaseError::InvalidHostFormat);
         }
 
@@ -75,11 +79,13 @@ impl ConnectionString {
     }
 
     pub fn export(&self, bucket: &str) -> String {
-        format!("{}://{}/{}?{}",
-                self.scheme().as_str(),
-                self.host(),
-                bucket,
-                self.query())
+        format!(
+            "{}://{}/{}?{}",
+            self.scheme().as_str(),
+            self.host(),
+            bucket,
+            self.query()
+        )
     }
 }
 

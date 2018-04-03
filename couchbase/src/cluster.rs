@@ -23,8 +23,10 @@ pub struct Cluster {
 
 impl Cluster {
     /// Creates a new `Cluster` instance.
-    pub fn new<S>(connstr: S) -> Result<Self, CouchbaseError> where
-        S: Into<String>  {
+    pub fn new<S>(connstr: S) -> Result<Self, CouchbaseError>
+    where
+        S: Into<String>,
+    {
         Ok(Cluster {
             connstr: connstr.into(),
             username: None,
@@ -32,8 +34,10 @@ impl Cluster {
         })
     }
 
-    pub fn authenticate<S>(&mut self, username: S, password: S) where
-        S: Into<String> {
+    pub fn authenticate<S>(&mut self, username: S, password: S)
+    where
+        S: Into<String>,
+    {
         self.username = Some(username.into());
         self.password = Some(password.into());
     }
@@ -51,7 +55,11 @@ impl Cluster {
                 if password.is_some() {
                     panic!("Either username & password or a bucket password, but not both!");
                 }
-                Bucket::new(&connstr.export(name), self.password.as_ref().unwrap(), Some(&user))
+                Bucket::new(
+                    &connstr.export(name),
+                    self.password.as_ref().unwrap(),
+                    Some(&user),
+                )
             }
             None => {
                 // bucket auth
