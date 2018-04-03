@@ -28,10 +28,10 @@ pub struct Bucket {
 
 /// Contains all `Bucket`-level Couchbase operations.
 impl Bucket {
-    pub fn new<'a>(
-        cs: &'a str,
-        pw: &'a str,
-        user: Option<&'a str>,
+    pub fn new(
+        cs: &str,
+        pw: &str,
+        user: Option<&str>,
     ) -> Result<Self, CouchbaseError> {
         let mut instance: lcb_t = ptr::null_mut();
 

@@ -1,5 +1,5 @@
 //! Synchronization and Future/Stream abstractions.
-use futures::{Async, Future, Poll, Stream};
+use futures::{Async, Future, Stream};
 use futures::channel::oneshot::Receiver;
 use futures::channel::mpsc::UnboundedReceiver;
 use error::CouchbaseError;

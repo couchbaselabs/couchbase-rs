@@ -15,41 +15,43 @@ use Bucket;
 use CouchbaseError;
 use connstr::ConnectionString;
 
-pub struct Cluster<'a> {
-    connstr: &'a str,
-    username: Option<&'a str>,
-    password: Option<&'a str>,
+pub struct Cluster {
+    connstr: String,
+    username: Option<String>,
+    password: Option<String>,
 }
 
-impl<'a> Cluster<'a> {
+impl Cluster {
     /// Creates a new `Cluster` instance.
-    pub fn new(connstr: &'a str) -> Result<Self, CouchbaseError> {
+    pub fn new<S>(connstr: S) -> Result<Self, CouchbaseError> where
+        S: Into<String>  {
         Ok(Cluster {
-            connstr: connstr,
+            connstr: connstr.into(),
             username: None,
             password: None,
         })
     }
 
-    pub fn authenticate(&mut self, username: &'a str, password: &'a str) {
-        self.username = Some(username);
-        self.password = Some(password);
+    pub fn authenticate<S>(&mut self, username: S, password: S) where
+        S: Into<String> {
+        self.username = Some(username.into());
+        self.password = Some(password.into());
     }
 
     /// Opens a `Bucket` and returns ownership of it to the caller.
     pub fn open_bucket(
         &self,
-        name: &'a str,
-        password: Option<&'a str>,
+        name: &str,
+        password: Option<&str>,
     ) -> Result<Bucket, CouchbaseError> {
-        let connstr = ConnectionString::new(self.connstr)?;
+        let connstr = ConnectionString::new(&self.connstr)?;
         match self.username {
-            Some(user) => {
+            Some(ref user) => {
                 // rbac
                 if password.is_some() {
                     panic!("Either username & password or a bucket password, but not both!");
                 }
-                Bucket::new(&connstr.export(name), self.password.unwrap(), Some(user))
+                Bucket::new(&connstr.export(name), self.password.as_ref().unwrap(), Some(&user))
             }
             None => {
                 // bucket auth
