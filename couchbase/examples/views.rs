@@ -19,7 +19,7 @@ fn main() {
 
     // Run the query and iterate the rows.
     let stream = bucket.query_view(ViewQuery::from("beer", "brewery_beers").limit(3));
-    for row in block_on(stream.collect::<Vec<_>>()).unwrap() {
+    for row in block_on(stream.collect::<Vec<_>>()).expect("Error!") {
         match row {
             ViewResult::Row(r) => println!("Found Row {:?}", r),
             ViewResult::Meta(m) => println!("Found Meta {:?}", m),
