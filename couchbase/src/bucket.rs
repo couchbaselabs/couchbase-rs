@@ -204,6 +204,7 @@ impl Bucket {
         cmd.key.type_ = LCB_KV_COPY;
         cmd.key.contig.bytes = lcb_id.into_raw() as *const std::os::raw::c_void;
         cmd.key.contig.nbytes = document.id().len() as usize;
+        cmd.cas = document.cas().unwrap_or(0);
         cmd.flags = document.flags();
 
         let mut tx_boxed = Box::new(Some(tx));
