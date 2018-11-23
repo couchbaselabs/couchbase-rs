@@ -12,14 +12,6 @@ repository = "https://github.com/couchbaselabs/couchbase-rs"
 homepage = "https://github.com/couchbaselabs/couchbase-rs"
 documentation = "https://docs.rs/couchbase-sys"
 
-[features]
-default = ["build-lcb"]
-build-lcb = ["cmake"]
-
 [build-dependencies]
-pkg-config = "0.3"
-bindgen = "0.35"
-cmake = { version  = "0.1", optional = true }
-
-[lib]
-doctest = false
+bindgen = "0.43"
+cmake = "0.1"

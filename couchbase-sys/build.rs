@@ -1,62 +1,37 @@
 //! Build script for `couchbase-sys` to bind to `libcouchbase`.
 extern crate bindgen;
-#[cfg(feature = "build-lcb")]
 extern crate cmake;
-extern crate pkg_config;
 
 use std::env;
-
-static VERSION: &str = "2.8.5";
-
-#[cfg(feature = "build-lcb")]
-fn build_lcb(lcb_dir: &str, out_dir: &str) -> String {
-    let dst = cmake::build(lcb_dir);
-    println!(
-        "cargo:rustc-link-search=native={}",
-        dst.join("lib").display()
-    );
-    println!("cargo:rustc-link-lib=dylib=couchbase");
-    format!("{}/include", out_dir)
-}
-
-#[cfg(not(feature = "build-lcb"))]
-fn build_lcb(_lcb_dir: &str, _out_dir: &str) -> String {
-    unreachable!();
-}
+use std::path::PathBuf;
 
 fn main() {
-    let lcb_dir = format!("libcouchbase-{}", VERSION);
-    let out_dir = env::var("OUT_DIR").unwrap();
+    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
 
-    let result = pkg_config::Config::new()
-        .atleast_version(VERSION)
-        .probe("libcouchbase");
+    let mut build_cfg = cmake::Config::new("libcouchbase");
+    if env::var("PROFILE").unwrap() == "release" {
+        build_cfg.define("CMAKE_BUILD_TYPE", "RelWithDebInfo");
+    } else {
+        build_cfg.define("CMAKE_BUILD_TYPE", "DEBUG");
+    }
+    let build_dst = build_cfg.build();
 
-    let bindgen_path = match result {
-        Ok(_) => String::from(
-            result
-                .as_ref()
-                .unwrap()
-                .include_paths
-                .get(0)
-                .expect("Could not find include path from pkg config")
-                .to_str()
-                .unwrap(),
-        ),
-        Err(_) if cfg!(feature = "build-lcb") => build_lcb(&lcb_dir, &out_dir),
-        Err(_) => panic!(
-            "Need to build libcouchbase (none found), but the 'build-lcb' feature is not \
-             enabled!"
-        ),
-    };
+    println!(
+        "cargo:rustc-link-search=native={}",
+        build_dst.join("lib").display()
+    );
+    println!("cargo:rustc-link-lib=dylib=couchbase");
 
-    // Step 2: From the headers, generate the rust binding via bindgen or load the pre-gen one
-    let _ = bindgen::builder()
-        .header(format!("headers-{}.h", VERSION))
+    let bindings = bindgen::Builder::default()
+        .header("headers.h")
         .clang_arg("-I")
-        .clang_arg(bindgen_path)
+        .clang_arg(format!("{}/include", env::var("OUT_DIR").unwrap()))
+        .blacklist_type("max_align_t")
         .generate_comments(false)
         .generate()
-        .unwrap()
-        .write_to_file(std::path::Path::new(&out_dir).join("bindings.rs"));
+        .expect("Unable to generate bindings!");
+
+    bindings
+        .write_to_file(out_path.join("bindings.rs"))
+        .expect("Could not write bindings!");
 }
