@@ -44,7 +44,7 @@ extern "C" {
  * @brief Error Categories
  *
  * These error categories are assigned as a series of OR'd bits to each
- * of the error codes in lcb_error_t.
+ * of the error codes in lcb_STATUS.
  *
  * @see lcb_get_errtype
  */
@@ -82,7 +82,8 @@ typedef enum {
      * covers errors which relate to a specific operation, rather than
      * operations which prevent _any_ subdoc operation from executing.
      */
-    LCB_ERRTYPE_SUBDOC = 1 << 9
+    LCB_ERRTYPE_SUBDOC = 1 << 9,
+    LCB_ERRTYPE_DURABILITY = 1 << 10
 } lcb_errflags_t;
 
 /* PRIVATE. This is just here to instruct/inform users to use the more detailed codes */
@@ -574,7 +575,36 @@ typedef enum {
     /** According to the spec all xattr commands should come first, followed by the commands for the document body */ \
     X(LCB_SUBDOC_INVALID_XATTR_ORDER, 0x5e,                    \
       LCB_ERRTYPE_INPUT|LCB_ERRTYPE_SRVGEN|LCB_ERRTYPE_SUBDOC, \
-      "According to the spec all xattr commands should come first, followed by the commands for the document body")
+      "According to the spec all xattr commands should come first, followed by the commands for the document body") \
+    X(LCB_COLLECTION_UNKNOWN, 0x5f, LCB_ERRTYPE_INPUT, \
+      "Collection does not exists") \
+    /** Operation attempted and requires that the collections manifest is set.  */ \
+    X(LCB_COLLECTION_NO_MANIFEST, 0x60, LCB_ERRTYPE_INPUT, \
+            "No Collections Manifest") \
+    /** Bucket Manifest update could not be applied to vbucket(s) */ \
+    X(LCB_COLLECTION_CANNOT_APPLY_MANIFEST, 0x61, LCB_ERRTYPE_INPUT, \
+            "Cannot apply collections manifest") \
+    /** Client has a collection's manifest which is from the future. This means \
+     * they have a uid that is greater than ours.  */ \
+    X(LCB_COLLECTION_MANIFEST_IS_AHEAD, 0x62, LCB_ERRTYPE_INPUT, \
+            "Collections manifest of SDK is ahead of Server's") \
+    X(LCB_DURABILITY_INVALID_LEVEL, 0x63, \
+      LCB_ERRTYPE_DURABILITY|LCB_ERRTYPE_INPUT|LCB_ERRTYPE_SRVGEN, "Invalid durability level was specified") \
+    /** Valid request, but given durability requirements are impossible to
+     * achieve - because insufficient configured replicas are connected.
+     * Assuming level=majority and C=number of configured nodes, durability
+     * becomes impossible if floor((C + 1) / 2) nodes or greater are offline. */ \
+    X(LCB_DURABILITY_IMPOSSIBLE, 0x64, \
+      LCB_ERRTYPE_DURABILITY|LCB_ERRTYPE_SRVGEN, "Given durability requirements are impossible to achieve") \
+    /** Returned if an attempt is made to mutate a key which already has a
+     * SyncWrite pending. Client would typically retry (possibly with backoff).
+     * Similar to ELOCKED */ \
+    X(LCB_DURABILITY_SYNC_WRITE_IN_PROGRESS, 0x65, \
+      LCB_ERRTYPE_DURABILITY|LCB_ERRTYPE_SRVGEN|LCB_ERRTYPE_TRANSIENT, "There is a synchronous mutation pending for given key") \
+    /** The SyncWrite request has not completed in the specified time and has ambiguous result - it may Succeed or Fail; but the final value is not yet known */ \
+    X(LCB_DURABILITY_SYNC_WRITE_AMBIGUOUS, 0x66, \
+      LCB_ERRTYPE_DURABILITY|LCB_ERRTYPE_SRVGEN, "Synchronous mutation has not completed in the specified time and has ambiguous result") \
+
 
 /** Error codes returned by the library. */
 typedef enum {
@@ -591,7 +621,7 @@ typedef enum {
 
     /** The errors below this value reserved for libcouchbase usage. */
     LCB_MAX_ERROR = 0x1000
-} lcb_error_t;
+} lcb_STATUS;
 
 /** @deprecated Use new, less ambiguous identifier (@ref LCB_CLIENT_ENOCONF) */
 #define LCB_CLIENT_ETMPFAIL LCB_CLIENT_ENOCONF
@@ -624,7 +654,7 @@ typedef enum {
  * @committed
  */
 LIBCOUCHBASE_API
-int lcb_get_errtype(lcb_error_t err);
+int lcb_get_errtype(lcb_STATUS err);
 
 /**
  * Get a textual descrtiption for the given error code
@@ -636,20 +666,20 @@ int lcb_get_errtype(lcb_error_t err);
  * @committed
  */
 LIBCOUCHBASE_API
-const char *lcb_strerror(lcb_t instance, lcb_error_t error);
+const char *lcb_strerror(lcb_INSTANCE *instance, lcb_STATUS error);
 
 /**
  * Get a shorter textual description of an error message. This is the
  * constant name
  */
 LCB_INTERNAL_API
-const char *lcb_strerror_short(lcb_error_t error);
+const char *lcb_strerror_short(lcb_STATUS error);
 
 /**
  * Get a longer textual description of an error message.
  */
 LCB_INTERNAL_API
-const char *lcb_strerror_long(lcb_error_t error);
+const char *lcb_strerror_long(lcb_STATUS error);
 
 /**
  * This may be used in conjunction with the errmap callback if it wishes
@@ -657,7 +687,7 @@ const char *lcb_strerror_long(lcb_error_t error);
  * @uncommitted
  */
 LIBCOUCHBASE_API
-lcb_error_t lcb_errmap_default(lcb_t instance, lcb_U16 code);
+lcb_STATUS lcb_errmap_default(lcb_INSTANCE *instance, lcb_U16 code);
 
 /**
  * Callback for error mappings. This will be invoked when requesting whether
@@ -667,11 +697,11 @@ lcb_error_t lcb_errmap_default(lcb_t instance, lcb_U16 code);
  * use cases, or in cases where detailed response codes may be mapped to
  * more generic ones.
  */
-typedef lcb_error_t (*lcb_errmap_callback)(lcb_t instance, lcb_U16 bincode);
+typedef lcb_STATUS (*lcb_errmap_callback)(lcb_INSTANCE *instance, lcb_U16 bincode);
 
 /**@uncommitted*/
 LIBCOUCHBASE_API
-lcb_errmap_callback lcb_set_errmap_callback(lcb_t, lcb_errmap_callback);
+lcb_errmap_callback lcb_set_errmap_callback(lcb_INSTANCE *instance, lcb_errmap_callback);
 
 #ifdef __cplusplus
 }

@@ -1,3 +1,20 @@
+/* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/*
+ *     Copyright 2011-2018 Couchbase, Inc.
+ *
+ *   Licensed under the Apache License, Version 2.0 (the "License");
+ *   you may not use this file except in compliance with the License.
+ *   You may obtain a copy of the License at
+ *
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *   Unless required by applicable law or agreed to in writing, software
+ *   distributed under the License is distributed on an "AS IS" BASIS,
+ *   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *   See the License for the specific language governing permissions and
+ *   limitations under the License.
+ */
+
 #ifndef CBC_HANDLERS_H
 #define CBC_HANDLERS_H
 #include "config.h"
@@ -22,7 +39,7 @@ protected:
     virtual void run();
     cliopts::Parser parser;
     ConnParams params;
-    lcb_t instance;
+    lcb_INSTANCE * instance;
     Histogram hg;
     std::string cmdname;
 };
@@ -31,7 +48,9 @@ protected:
 class GetHandler : public Handler {
 public:
     GetHandler(const char *name = "get") :
-        Handler(name), o_replica("replica"), o_exptime("expiry") {}
+        Handler(name), o_replica("replica"), o_exptime("expiry"), o_collection_id("collection-id") {
+	  o_collection_id.description("ID of collection");
+	}
 
     const char* description() const {
         if (isLock()) {
@@ -48,6 +67,7 @@ protected:
 private:
     cliopts::StringOption o_replica;
     cliopts::UIntOption o_exptime;
+    cliopts::UIntOption o_collection_id;
     bool isLock() const { return cmdname == "lock"; }
 };
 
@@ -70,7 +90,7 @@ public:
     SetHandler(const char *name = "create") : Handler(name),
         o_flags("flags"), o_exp("expiry"), o_add("add"), o_persist("persist-to"),
         o_replicate("replicate-to"), o_value("value"), o_json("json"),
-        o_mode("mode") {
+        o_mode("mode"), o_collection_id("collection-id") {
 
         o_flags.abbrev('f').description("Flags for item");
         o_exp.abbrev('e').description("Expiry for item");
@@ -82,6 +102,7 @@ public:
         o_mode.abbrev('M').description("Mode to use when storing");
         o_mode.argdesc("upsert|insert|replace");
         o_mode.setDefault("upsert");
+        o_collection_id.description("UID of collection");
     }
 
     const char* description() const {
@@ -102,7 +123,7 @@ public:
 
     bool hasFileList() const { return cmdname == "cp"; }
 
-    virtual lcb_storage_t mode();
+    virtual lcb_STORE_OPERATION mode();
 
 protected:
     void run();
@@ -119,6 +140,7 @@ private:
     cliopts::StringOption o_value;
     cliopts::BoolOption o_json;
     cliopts::StringOption o_mode;
+    cliopts::UIntOption o_collection_id;
     std::map<std::string, lcb_cas_t> items;
 };
 
@@ -229,6 +251,24 @@ protected:
     void run();
 };
 
+class KeygenHandler : public Handler {
+public:
+    HANDLER_DESCRIPTION("Output a list of keys that equally distribute amongst every vbucket")
+    HANDLER_USAGE("[OPTIONS ...]")
+    KeygenHandler() : Handler("keygen"), o_keys_per_vbucket("keys-per-vbucket") {
+        o_keys_per_vbucket.setDefault(1).description("number of keys to generate per vbucket");
+    }
+protected:
+    void run();
+    void addOptions() {
+        Handler::addOptions();
+        parser.addOption(o_keys_per_vbucket);
+    }
+
+private:
+    cliopts::UIntOption o_keys_per_vbucket;
+};
+
 class PingHandler : public Handler {
 public:
     HANDLER_DESCRIPTION("Reach all services on every node and measure response time")
@@ -244,14 +284,6 @@ protected:
     }
 private:
     cliopts::BoolOption o_details;
-};
-
-class McFlushHandler : public Handler {
-public:
-    HANDLER_DESCRIPTION("Flush a memcached bucket")
-    McFlushHandler() : Handler("mcflush") {}
-protected:
-    void run();
 };
 
 class ArithmeticHandler : public Handler {
@@ -361,8 +393,8 @@ public:
     HttpReceiver() : statusInvoked(false) {}
     virtual ~HttpReceiver() {}
     void maybeInvokeStatus(const lcb_RESPHTTP*);
-    void install(lcb_t);
-    virtual void handleStatus(lcb_error_t, int) {}
+    void install(lcb_INSTANCE *);
+    virtual void handleStatus(lcb_STATUS, int) {}
     virtual void onDone() {}
     virtual void onChunk(const char *data, size_t size) {
         resbuf.append(data, size);
@@ -386,8 +418,8 @@ protected:
     virtual const std::string& getBody();
     virtual std::string getContentType() { return ""; }
     virtual bool isAdmin() const { return false; }
-    virtual lcb_http_method_t getMethod();
-    virtual void handleStatus(lcb_error_t err, int code);
+    virtual lcb_HTTP_METHOD getMethod();
+    virtual void handleStatus(lcb_STATUS err, int code);
     virtual void addOptions() {
         if (isAdmin()) {
             params.setAdminMode();
@@ -448,7 +480,7 @@ protected:
     }
     std::string getURI() { return "/settings/rbac/roles"; }
     const std::string& getBody() { static std::string e; return e; }
-    lcb_http_method_t getMethod() { return LCB_HTTP_METHOD_GET; }
+    lcb_HTTP_METHOD getMethod() { return LCB_HTTP_METHOD_GET; }
 };
 
 class UserListHandler : public RbacHandler {
@@ -465,7 +497,7 @@ protected:
     }
     std::string getURI() { return "/settings/rbac/users"; }
     const std::string& getBody() { static std::string e; return e; }
-    lcb_http_method_t getMethod() { return LCB_HTTP_METHOD_GET; }
+    lcb_HTTP_METHOD getMethod() { return LCB_HTTP_METHOD_GET; }
 };
 
 class UserDeleteHandler : public AdminHandler {
@@ -493,7 +525,7 @@ protected:
     }
     std::string getURI() { return std::string("/settings/rbac/users/") + domain + "/" + name; }
     const std::string& getBody() { static std::string e; return e; }
-    lcb_http_method_t getMethod() { return LCB_HTTP_METHOD_DELETE; }
+    lcb_HTTP_METHOD getMethod() { return LCB_HTTP_METHOD_DELETE; }
 
 private:
     cliopts::StringOption o_domain;
@@ -529,7 +561,7 @@ protected:
     std::string getURI() { return std::string("/settings/rbac/users/") + domain + "/" + name; }
     const std::string& getBody() { return body; }
     std::string getContentType() { return "application/x-www-form-urlencoded"; }
-    lcb_http_method_t getMethod() { return LCB_HTTP_METHOD_PUT; }
+    lcb_HTTP_METHOD getMethod() { return LCB_HTTP_METHOD_PUT; }
 
 private:
     cliopts::StringOption o_domain;
@@ -575,7 +607,7 @@ protected:
     std::string getURI() { return "/pools/default/buckets"; }
     const std::string& getBody() { return body_s; }
     std::string getContentType() { return "application/x-www-form-urlencoded"; }
-    lcb_http_method_t getMethod() { return LCB_HTTP_METHOD_POST; }
+    lcb_HTTP_METHOD getMethod() { return LCB_HTTP_METHOD_POST; }
 
 private:
     cliopts::StringOption o_btype;
@@ -599,7 +631,7 @@ protected:
         AdminHandler::run();
     }
     std::string getURI() { return std::string("/pools/default/buckets/") + bname; }
-    lcb_http_method_t getMethod() { return LCB_HTTP_METHOD_DELETE; }
+    lcb_HTTP_METHOD getMethod() { return LCB_HTTP_METHOD_DELETE; }
     const std::string& getBody() { static std::string e; return e; }
 private:
     std::string bname;
@@ -630,6 +662,39 @@ public:
     WriteConfigHandler() : Handler("write-config") {}
 protected:
     void run();
+};
+
+class CollectionGetManifestHandler : public Handler
+{
+  public:
+    HANDLER_DESCRIPTION("Get collection manifest")
+    HANDLER_USAGE("[OPTIONS ...]")
+    CollectionGetManifestHandler() : Handler("collection-manifest") {}
+
+  protected:
+    void run();
+};
+
+class CollectionGetCIDHandler : public Handler
+{
+  public:
+    HANDLER_DESCRIPTION("Get collection ID by name")
+    HANDLER_USAGE("[OPTIONS ...] COLLECTION-NAME...")
+    CollectionGetCIDHandler() : Handler("collection-id"), o_scope("scope")
+    {
+        o_scope.description("Scope name").setDefault("_default");
+    }
+
+  protected:
+    virtual void addOptions()
+    {
+        Handler::addOptions();
+        parser.addOption(o_scope);
+    }
+    void run();
+
+  private:
+    cliopts::StringOption o_scope;
 };
 
 }

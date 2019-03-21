@@ -1,6 +1,4 @@
 //! Build script for `couchbase-sys` to bind to `libcouchbase`.
-extern crate bindgen;
-extern crate cmake;
 
 use std::env;
 use std::path::PathBuf;

@@ -258,9 +258,9 @@ struct lcbio_SSLCTX {
 #define LOGARGS_S(settings, lvl) settings, "SSL", lvl, __FILE__, __LINE__
 
 lcbio_pSSLCTX lcbio_ssl_new(const char *tsfile, const char *cafile, const char *keyfile, int noverify,
-                            lcb_error_t *errp, lcb_settings *settings)
+                            lcb_STATUS *errp, lcb_settings *settings)
 {
-    lcb_error_t err_s;
+    lcb_STATUS err_s;
     lcbio_pSSLCTX ret;
 
     if (!errp) {
@@ -281,13 +281,13 @@ lcbio_pSSLCTX lcbio_ssl_new(const char *tsfile, const char *cafile, const char *
     SSL_CTX_set_cipher_list(ret->ctx, "DHE-RSA-AES256-SHA:DHE-DSS-AES256-SHA:AES256-SHA:EDH-RSA-DES-CBC3-SHA:EDH-DSS-DES-CBC3-SHA:DES-CBC3-SHA:DES-CBC3-MD5:DHE-RSA-AES128-SHA:DHE-DSS-AES128-SHA:AES128-SHA:DHE-RSA-SEED-SHA:DHE-DSS-SEED-SHA:SEED-SHA:RC2-CBC-MD5:RC4-SHA:RC4-MD5:RC4-MD5:EDH-RSA-DES-CBC-SHA:EDH-DSS-DES-CBC-SHA:DES-CBC-SHA:DES-CBC-MD5:EXP-EDH-RSA-DES-CBC-SHA:EXP-EDH-DSS-DES-CBC-SHA:EXP-DES-CBC-SHA:EXP-RC2-CBC-MD5:EXP-RC2-CBC-MD5:EXP-RC4-MD5:EXP-RC4-MD5");
 //    SSL_CTX_set_cipher_list(ret->ctx, "!NULL");
 
-    if (cafile) {
-        lcb_log(LOGARGS_S(settings, LCB_LOG_DEBUG), "Load verify locations from \"%s\"", tsfile ? tsfile : keyfile);
+    if (cafile || tsfile) {
+        lcb_log(LOGARGS_S(settings, LCB_LOG_DEBUG), "Load verify locations from \"%s\"", tsfile ? tsfile : cafile);
         if (!SSL_CTX_load_verify_locations(ret->ctx, tsfile ? tsfile : cafile, NULL)) {
             *errp = LCB_SSL_ERROR;
             goto GT_ERR;
         }
-        if (keyfile) {
+        if (cafile && keyfile) {
             lcb_log(LOGARGS_S(settings, LCB_LOG_DEBUG), "Authenticate with key \"%s\", cert \"%s\"", keyfile, cafile);
             if (!SSL_CTX_use_certificate_file(ret->ctx, cafile, SSL_FILETYPE_PEM)) {
                 *errp = LCB_SSL_ERROR;
@@ -344,7 +344,7 @@ noop_dtor(lcbio_PROTOCTX *arg) {
     free(arg);
 }
 
-lcb_error_t
+lcb_STATUS
 lcbio_ssl_apply(lcbio_SOCKET *sock, lcbio_pSSLCTX sctx)
 {
     lcbio_pTABLE old_iot = sock->io, new_iot;
@@ -378,7 +378,7 @@ lcbio_ssl_check(lcbio_SOCKET *sock)
     return lcbio_protoctx_get(sock, LCBIO_PROTOCTX_SSL) != NULL;
 }
 
-lcb_error_t
+lcb_STATUS
 lcbio_ssl_get_error(lcbio_SOCKET *sock)
 {
     lcbio_XSSL *xs = (lcbio_XSSL *)sock->io;
@@ -465,7 +465,7 @@ void lcbio_ssl_global_init(void)
     ossl_init_locks();
 }
 
-lcb_error_t
+lcb_STATUS
 lcbio_sslify_if_needed(lcbio_SOCKET *sock, lcb_settings *settings)
 {
     if (!(settings->sslopts & LCB_SSL_ENABLED)) {

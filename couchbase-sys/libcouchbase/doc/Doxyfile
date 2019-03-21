@@ -38,7 +38,7 @@ PROJECT_NAME           = "Couchbase C Client"
 # could be handy for archiving the generated documentation or if some version
 # control system is used.
 
-PROJECT_NUMBER         = 2.10.2
+PROJECT_NUMBER         = 2.10.3
 
 # Using the PROJECT_BRIEF tag one can provide an optional one line description
 # for a project that appears at the top of each page and should give viewer a
@@ -2095,8 +2095,7 @@ PREDEFINED             = LCB_CREATE_V2_FIELDS= \
                          LCB_DEPR_CTORS_VERSIONS \
                          LCB_DEPR_CTORS_FLUSH \
                          LCB_DEPR_CTORS_HTTP \
-                         LCB_DEPR_CTORS_CRST \
-                         LCB_TRACING
+                         LCB_DEPR_CTORS_CRST
 
 # If the MACRO_EXPANSION and EXPAND_ONLY_PREDEF tags are set to YES then this
 # tag can be used to specify a list of macro names that should be expanded. The

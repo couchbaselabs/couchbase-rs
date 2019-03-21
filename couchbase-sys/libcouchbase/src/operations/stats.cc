@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2011-2012 Couchbase, Inc.
+ *     Copyright 2011-2018 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -18,10 +18,10 @@
 #include "internal.h"
 
 struct BcastCookie : mc_REQDATAEX {
-    lcb_CALLBACKTYPE type;
+    lcb_CALLBACK_TYPE type;
     int remaining;
 
-    BcastCookie(lcb_CALLBACKTYPE type_,
+    BcastCookie(lcb_CALLBACK_TYPE type_,
                 const mc_REQDATAPROCS* procs_, const void *cookie_)
         : mc_REQDATAEX(cookie_, *procs_, gethrtime()),
           type(type_), remaining(0) {
@@ -46,14 +46,14 @@ make_hp_string(const lcb::Server& server, std::string& out) {
 }
 
 static void
-stats_handler(mc_PIPELINE *pl, mc_PACKET *req, lcb_error_t err, const void *arg)
+stats_handler(mc_PIPELINE *pl, mc_PACKET *req, lcb_STATUS err, const void *arg)
 {
     BcastCookie *ck = static_cast<BcastCookie *>(req->u_rdata.exdata);
     lcb::Server *server = static_cast<lcb::Server*>(pl);
     lcb_RESPSTATS *resp = reinterpret_cast<lcb_RESPSTATS*>(const_cast<void*>(arg));
 
     lcb_RESPCALLBACK callback;
-    lcb_t instance = server->get_instance();
+    lcb_INSTANCE *instance = server->get_instance();
 
     callback = lcb_find_callback(instance, LCB_CALLBACK_STATS);
 
@@ -85,8 +85,8 @@ static mc_REQDATAPROCS stats_procs = {
 };
 
 LIBCOUCHBASE_API
-lcb_error_t
-lcb_stats3(lcb_t instance, const void *cookie, const lcb_CMDSTATS * cmd)
+lcb_STATUS
+lcb_stats3(lcb_INSTANCE *instance, const void *cookie, const lcb_CMDSTATS * cmd)
 {
     unsigned ii;
     int vbid = -1;
@@ -145,8 +145,9 @@ lcb_stats3(lcb_t instance, const void *cookie, const lcb_CMDSTATS * cmd)
         hdr.request.opcode = PROTOCOL_BINARY_CMD_STAT;
         hdr.request.magic = PROTOCOL_BINARY_REQ;
 
+        pkt->flags |= MCREQ_F_NOCID;
         if (cmd->key.contig.nbytes) {
-            mcreq_reserve_key(pl, pkt, MCREQ_PKT_BASESIZE, &kbuf_out);
+            mcreq_reserve_key(pl, pkt, MCREQ_PKT_BASESIZE, &kbuf_out, 0);
             hdr.request.keylen = ntohs((lcb_U16)kbuf_out.contig.nbytes);
             hdr.request.bodylen = ntohl((lcb_U32)kbuf_out.contig.nbytes);
         } else {
@@ -172,7 +173,7 @@ lcb_stats3(lcb_t instance, const void *cookie, const lcb_CMDSTATS * cmd)
 }
 
 static void
-handle_bcast(mc_PIPELINE *pipeline, mc_PACKET *req, lcb_error_t err,
+handle_bcast(mc_PIPELINE *pipeline, mc_PACKET *req, lcb_STATUS err,
              const void *arg)
 {
     lcb::Server *server = static_cast<lcb::Server*>(pipeline);
@@ -183,7 +184,6 @@ handle_bcast(mc_PIPELINE *pipeline, mc_PACKET *req, lcb_error_t err,
         lcb_RESPSERVERBASE *base;
         lcb_RESPVERBOSITY *verbosity;
         lcb_RESPMCVERSION *version;
-        lcb_RESPFLUSH *flush;
         lcb_RESPNOOP *noop;
     } u_resp;
 
@@ -191,7 +191,6 @@ handle_bcast(mc_PIPELINE *pipeline, mc_PACKET *req, lcb_error_t err,
         lcb_RESPSERVERBASE base;
         lcb_RESPVERBOSITY verbosity;
         lcb_RESPMCVERSION version;
-        lcb_RESPFLUSH flush;
         lcb_RESPNOOP noop;
     } u_empty;
 
@@ -229,8 +228,8 @@ static mc_REQDATAPROCS bcast_procs = {
         refcnt_dtor_common
 };
 
-static lcb_error_t
-pkt_bcast_simple(lcb_t instance, const void *cookie, lcb_CALLBACKTYPE type)
+static lcb_STATUS
+pkt_bcast_simple(lcb_INSTANCE *instance, const void *cookie, lcb_CALLBACK_TYPE type)
 {
     mc_CMDQUEUE *cq = &instance->cmdq;
     unsigned ii;
@@ -256,9 +255,7 @@ pkt_bcast_simple(lcb_t instance, const void *cookie, lcb_CALLBACKTYPE type)
 
         hdr.request.magic = PROTOCOL_BINARY_REQ;
         hdr.request.opaque = pkt->opaque;
-        if (type == LCB_CALLBACK_FLUSH) {
-            hdr.request.opcode = PROTOCOL_BINARY_CMD_FLUSH;
-        } else if (type == LCB_CALLBACK_VERSIONS) {
+        if (type == LCB_CALLBACK_VERSIONS) {
             hdr.request.opcode = PROTOCOL_BINARY_CMD_VERSION;
         } else if (type == LCB_CALLBACK_NOOP) {
             hdr.request.opcode = PROTOCOL_BINARY_CMD_NOOP;
@@ -282,29 +279,22 @@ pkt_bcast_simple(lcb_t instance, const void *cookie, lcb_CALLBACKTYPE type)
 }
 
 LIBCOUCHBASE_API
-lcb_error_t
-lcb_server_versions3(lcb_t instance, const void *cookie, const lcb_CMDBASE *)
+lcb_STATUS
+lcb_server_versions3(lcb_INSTANCE *instance, const void *cookie, const lcb_CMDVERSIONS *)
 {
     return pkt_bcast_simple(instance, cookie, LCB_CALLBACK_VERSIONS);
 }
 
 LIBCOUCHBASE_API
-lcb_error_t
-lcb_noop3(lcb_t instance, const void *cookie, const lcb_CMDNOOP *)
+lcb_STATUS
+lcb_noop3(lcb_INSTANCE *instance, const void *cookie, const lcb_CMDNOOP *)
 {
     return pkt_bcast_simple(instance, cookie, LCB_CALLBACK_NOOP);
 }
 
 LIBCOUCHBASE_API
-lcb_error_t
-lcb_flush3(lcb_t instance, const void *cookie, const lcb_CMDFLUSH *)
-{
-    return pkt_bcast_simple(instance, cookie, LCB_CALLBACK_FLUSH);
-}
-
-LIBCOUCHBASE_API
-lcb_error_t
-lcb_server_verbosity3(lcb_t instance, const void *cookie,
+lcb_STATUS
+lcb_server_verbosity3(lcb_INSTANCE *instance, const void *cookie,
                       const lcb_CMDVERBOSITY *cmd)
 {
     mc_CMDQUEUE *cq = &instance->cmdq;
@@ -371,89 +361,4 @@ lcb_server_verbosity3(lcb_t instance, const void *cookie,
     }
     MAYBE_SCHEDLEAVE(instance);
     return LCB_SUCCESS;
-}
-
-LIBCOUCHBASE_API
-lcb_error_t
-lcb_server_stats(lcb_t instance, const void *cookie, lcb_size_t num,
-                 const lcb_server_stats_cmd_t * const * items)
-{
-    lcb_sched_enter(instance);
-    for (size_t ii = 0; ii < num; ii++) {
-        const lcb_server_stats_cmd_t *src = items[ii];
-        lcb_CMDSTATS dst;
-        lcb_error_t err;
-
-        memset(&dst, 0, sizeof(dst));
-        dst.key.contig.bytes = src->v.v0.name;
-        dst.key.contig.nbytes = src->v.v0.nname;
-        err = lcb_stats3(instance, cookie, &dst);
-        if (err != LCB_SUCCESS) {
-            lcb_sched_fail(instance);
-            return err;
-        }
-    }
-    lcb_sched_leave(instance);
-    SYNCMODE_INTERCEPT(instance)
-}
-
-LIBCOUCHBASE_API
-lcb_error_t
-lcb_set_verbosity(lcb_t instance, const void *cookie, lcb_size_t num,
-                  const lcb_verbosity_cmd_t * const * items)
-{
-    lcb_sched_enter(instance);
-    for (size_t ii = 0; ii < num; ii++) {
-        lcb_CMDVERBOSITY dst;
-        lcb_error_t err;
-        const lcb_verbosity_cmd_t *src = items[ii];
-
-        memset(&dst, 0, sizeof(dst));
-        dst.level = src->v.v0.level;
-        dst.server = src->v.v0.server;
-        err = lcb_server_verbosity3(instance, cookie, &dst);
-        if (err != LCB_SUCCESS) {
-            lcb_sched_fail(instance);
-            return err;
-        }
-    }
-    lcb_sched_leave(instance);
-    SYNCMODE_INTERCEPT(instance)
-}
-
-LIBCOUCHBASE_API
-lcb_error_t
-lcb_flush(lcb_t instance, const void *cookie, lcb_size_t num,
-          const lcb_flush_cmd_t * const *)
-{
-    lcb_sched_enter(instance);
-    for (size_t ii = 0; ii < num; ii++) {
-        lcb_error_t rc = lcb_flush3(instance, cookie, NULL);
-        if (rc != LCB_SUCCESS) {
-            lcb_sched_fail(instance);
-            return rc;
-        }
-    }
-    lcb_sched_leave(instance);
-    SYNCMODE_INTERCEPT(instance)
-}
-
-LIBCOUCHBASE_API
-lcb_error_t
-lcb_server_versions(lcb_t instance, const void *cookie, lcb_size_t num,
-                    const lcb_server_version_cmd_t * const *)
-{
-    lcb_sched_enter(instance);
-
-    for (size_t ii = 0; ii < num; ii++) {
-        lcb_error_t rc = lcb_server_versions3(instance, cookie, NULL);
-        if (rc != LCB_SUCCESS) {
-            lcb_sched_fail(instance);
-            return rc;
-        }
-    }
-
-
-    lcb_sched_leave(instance);
-    SYNCMODE_INTERCEPT(instance)
 }

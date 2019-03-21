@@ -1,3 +1,20 @@
+/* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/*
+ *     Copyright 2011-2018 Couchbase, Inc.
+ *
+ *   Licensed under the Apache License, Version 2.0 (the "License");
+ *   you may not use this file except in compliance with the License.
+ *   You may obtain a copy of the License at
+ *
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *   Unless required by applicable law or agreed to in writing, software
+ *   distributed under the License is distributed on an "AS IS" BASIS,
+ *   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *   See the License for the specific language governing permissions and
+ *   limitations under the License.
+ */
+
 #define NOMINMAX
 #include <map>
 #include <sstream>
@@ -5,9 +22,6 @@
 #include <iomanip>
 #include <fstream>
 #include <algorithm>
-#include <libcouchbase/vbucket.h>
-#include <libcouchbase/views.h>
-#include <libcouchbase/n1ql.h>
 #include <limits>
 #include <stddef.h>
 #include <errno.h>
@@ -15,7 +29,10 @@
 #include "common/histogram.h"
 #include "cbc-handlers.h"
 #include "connspec.h"
+#include "rnd.h"
 #include "contrib/lcb-jsoncpp/lcb-jsoncpp.h"
+#include <libcouchbase/vbucket.h>
+#include <libcouchbase/utils.h>
 
 #ifndef LCB_NO_SSL
 #include <openssl/crypto.h>
@@ -29,19 +46,9 @@ using std::map;
 using std::vector;
 using std::stringstream;
 
-string getRespKey(const lcb_RESPBASE* resp)
-{
-    if (!resp->nkey) {
-        return "";
-    }
-
-    return string((const char *)resp->key, resp->nkey);
-}
-
 static void
-printKeyError(string& key, int cbtype, const lcb_RESPBASE *resp, const char *additional = NULL)
+printEnhancedError(int cbtype, const lcb_RESPBASE *resp, const char *additional = NULL)
 {
-    fprintf(stderr, "%-20s %s (0x%x)\n", key.c_str(), lcb_strerror(NULL, resp->rc), resp->rc);
     const char *ctx = lcb_resp_get_error_context(cbtype, resp);
     if (ctx != NULL) {
         fprintf(stderr, "%-20s %s\n", "", ctx);
@@ -56,38 +63,42 @@ printKeyError(string& key, int cbtype, const lcb_RESPBASE *resp, const char *add
 }
 
 static void
-printKeyCasStatus(string& key, int cbtype, const lcb_RESPBASE *resp,
-    const char *message = NULL)
+printKeyError(string& key, lcb_STATUS rc, int cbtype, const lcb_RESPBASE *resp, const char *additional = NULL)
 {
-    fprintf(stderr, "%-20s", key.c_str());
-    if (message != NULL) {
-        fprintf(stderr, "%s ", message);
-    }
-    fprintf(stderr, "CAS=0x%" PRIx64 "\n", resp->cas);
-    const lcb_MUTATION_TOKEN *st = lcb_resp_get_mutation_token(cbtype, resp);
-    if (st != NULL) {
-        fprintf(stderr, "%-20sSYNCTOKEN=%u,%" PRIu64 ",%" PRIu64 "\n",
-            "", st->vbid_, st->uuid_, st->seqno_);
-    }
+    fprintf(stderr, "%-20s %s\n", key.c_str(), lcb_strerror_short(rc));
+    printEnhancedError(cbtype, resp, additional);
 }
 
 extern "C" {
 static void
-get_callback(lcb_t, lcb_CALLBACKTYPE cbtype, const lcb_RESPGET *resp)
+get_callback(lcb_INSTANCE *, lcb_CALLBACK_TYPE cbtype, const lcb_RESPGET *resp)
 {
-    string key = getRespKey((const lcb_RESPBASE *)resp);
-    if (resp->rc == LCB_SUCCESS) {
+    const char *p;
+    size_t n;
+    lcb_respget_key(resp, &p, &n);
+    string key(p, n);
+    lcb_STATUS rc = lcb_respget_status(resp);
+    if (rc == LCB_SUCCESS) {
+        const char *value;
+        size_t nvalue;
+        uint32_t flags;
+        uint64_t cas;
+        uint8_t datatype;
+
+        lcb_respget_value(resp, &value, &nvalue);
+        lcb_respget_flags(resp, &flags);
+        lcb_respget_cas(resp, &cas);
+        lcb_respget_datatype(resp, &datatype);
         fprintf(stderr, "%-20s CAS=0x%" PRIx64 ", Flags=0x%x, Size=%lu, Datatype=0x%02x",
-                key.c_str(), resp->cas, resp->itmflags, (unsigned long)resp->nvalue,
-                (int)resp->datatype);
-        if (resp->datatype) {
+                key.c_str(), cas, flags, (unsigned long)nvalue, (int)datatype);
+        if (datatype) {
             int nflags = 0;
             fprintf(stderr, "(");
-            if (resp->datatype & LCB_VALUE_F_JSON) {
+            if (datatype & LCB_VALUE_F_JSON) {
                 fprintf(stderr, "JSON");
                 nflags++;
             }
-            if (resp->datatype & LCB_VALUE_F_SNAPPYCOMP) {
+            if (datatype & LCB_VALUE_F_SNAPPYCOMP) {
                 fprintf(stderr, "%sSNAPPY", nflags > 0 ? "," : "");
                 nflags++;
             }
@@ -95,94 +106,218 @@ get_callback(lcb_t, lcb_CALLBACKTYPE cbtype, const lcb_RESPGET *resp)
         }
         fprintf(stderr, "\n");
         fflush(stderr);
-        fwrite(resp->value, 1, resp->nvalue, stdout);
+        fwrite(value, 1, nvalue, stdout);
         fflush(stdout);
         fprintf(stderr, "\n");
     } else {
-        printKeyError(key, cbtype, (const lcb_RESPBASE *)resp);
+        printKeyError(key, rc, cbtype, (const lcb_RESPBASE *)resp);
     }
 }
 
 static void
-store_callback(lcb_t, lcb_CALLBACKTYPE cbtype, const lcb_RESPBASE *resp)
+getreplica_callback(lcb_INSTANCE *, lcb_CALLBACK_TYPE cbtype, const lcb_RESPGETREPLICA *resp)
 {
-    string key = getRespKey((const lcb_RESPBASE*)resp);
+    const char *p;
+    size_t n;
+    lcb_respgetreplica_key(resp, &p, &n);
+    string key(p, n);
+    lcb_STATUS rc = lcb_respgetreplica_status(resp);
+    if (rc == LCB_SUCCESS) {
+        const char *value;
+        size_t nvalue;
+        uint32_t flags;
+        uint64_t cas;
+        uint8_t datatype;
 
-    if (cbtype == LCB_CALLBACK_STOREDUR) {
+        lcb_respgetreplica_value(resp, &value, &nvalue);
+        lcb_respgetreplica_flags(resp, &flags);
+        lcb_respgetreplica_cas(resp, &cas);
+        lcb_respgetreplica_datatype(resp, &datatype);
+        fprintf(stderr, "%-20s CAS=0x%" PRIx64 ", Flags=0x%x, Size=%lu, Datatype=0x%02x",
+                key.c_str(), cas, flags, (unsigned long)nvalue, (int)datatype);
+        if (datatype) {
+            int nflags = 0;
+            fprintf(stderr, "(");
+            if (datatype & LCB_VALUE_F_JSON) {
+                fprintf(stderr, "JSON");
+                nflags++;
+            }
+            if (datatype & LCB_VALUE_F_SNAPPYCOMP) {
+                fprintf(stderr, "%sSNAPPY", nflags > 0 ? "," : "");
+                nflags++;
+            }
+            fprintf(stderr, ")");
+        }
+        fprintf(stderr, "\n");
+        fflush(stderr);
+        fwrite(value, 1, nvalue, stdout);
+        fflush(stdout);
+        fprintf(stderr, "\n");
+    } else {
+        printKeyError(key, rc, cbtype, (const lcb_RESPBASE *)resp);
+    }
+}
+
+
+static void
+storePrintSuccess(const lcb_RESPSTORE *resp, const char *message = NULL)
+{
+    const char *key;
+    size_t nkey;
+
+    lcb_respstore_key(resp, &key, &nkey);
+    fprintf(stderr, "%-20.*s ", (int)nkey, key);
+    if (message != NULL) {
+        fprintf(stderr, "%s ", message);
+    }
+
+    uint64_t cas;
+    lcb_respstore_cas(resp, &cas);
+    fprintf(stderr, "CAS=0x%" PRIx64 "\n", cas);
+
+    lcb_MUTATION_TOKEN token = {0};
+    lcb_respstore_mutation_token(resp, &token);
+    if (lcb_mutation_token_is_valid(&token)) {
+        fprintf(stderr, "%-20s SYNCTOKEN=%u,%" PRIu64 ",%" PRIu64 "\n", "",
+                token.vbid_, token.uuid_, token.seqno_);
+    }
+}
+
+static void
+storePrintError(const lcb_RESPSTORE *resp, const char *message = NULL)
+{
+    size_t sz = 0;
+    const char *key;
+
+    lcb_respstore_key(resp, &key, &sz);
+    fprintf(stderr, "%-20.*s %s\n", (int)sz, key, lcb_strerror_short(lcb_respstore_status(resp)));
+
+    const char *ctx = NULL;
+    lcb_respstore_error_context(resp, &ctx, &sz);
+    if (ctx != NULL) {
+        fprintf(stderr, "%-20s %.*s\n", "", (int)sz, ctx);
+    }
+
+    const char *ref = NULL;
+    lcb_respstore_error_ref(resp, &ref, &sz);
+    if (ref != NULL) {
+        fprintf(stderr, "%-20s Ref: %.*s\n", "", (int)sz, ref);
+    }
+
+    if (message) {
+        fprintf(stderr, "%-20s %s\n", "", message);
+    }
+}
+
+static void
+store_callback(lcb_INSTANCE *, lcb_CALLBACK_TYPE, const lcb_RESPSTORE *resp)
+{
+    lcb_STATUS rc = lcb_respstore_status(resp);
+
+    if (lcb_respstore_observe_attached(resp)) {
         // Storage with durability
-        const lcb_RESPSTOREDUR *dresp =
-                reinterpret_cast<const lcb_RESPSTOREDUR *>(resp);
         char buf[4096];
-        if (resp->rc == LCB_SUCCESS) {
-            sprintf(buf, "Stored. Persisted(%u). Replicated(%u)",
-                dresp->dur_resp->npersisted, dresp->dur_resp->nreplicated);
-            printKeyCasStatus(key, cbtype, resp, buf);
+        uint16_t npersisted, nreplicated;
+        lcb_respstore_observe_num_persisted(resp, &npersisted);
+        lcb_respstore_observe_num_replicated(resp, &nreplicated);
+        if (rc == LCB_SUCCESS) {
+            sprintf(buf, "Stored. Persisted(%u). Replicated(%u)", npersisted, nreplicated);
+            storePrintSuccess(resp, buf);
         } else {
-            if (dresp->store_ok) {
-                sprintf(buf, "Store OK, but durability failed. Persisted(%u). Replicated(%u)",
-                    dresp->dur_resp->npersisted, dresp->dur_resp->nreplicated);
+            int store_ok;
+            lcb_respstore_observe_stored(resp, &store_ok);
+            if (store_ok) {
+                sprintf(buf, "Store OK, but durability failed. Persisted(%u). Replicated(%u)", npersisted, nreplicated);
             } else {
                 sprintf(buf, "%s", "Store failed");
             }
-            printKeyError(key, cbtype, resp);
+            storePrintError(resp, buf);
         }
     } else {
-        if (resp->rc == LCB_SUCCESS) {
-            printKeyCasStatus(key, cbtype, resp, "Stored.");
+        if (rc == LCB_SUCCESS) {
+            storePrintSuccess(resp, "Stored.");
         } else {
-            printKeyError(key, cbtype, resp);
+            storePrintError(resp);
         }
     }
 }
 
 static void
-common_callback(lcb_t, int type, const lcb_RESPBASE *resp)
+unlock_callback(lcb_INSTANCE *, int type, const lcb_RESPUNLOCK *resp)
 {
-    string key = getRespKey(resp);
-    if (resp->rc != LCB_SUCCESS) {
-        printKeyError(key, type, resp);
+    const char *p;
+    size_t n;
+
+    lcb_respunlock_key(resp, &p, &n);
+    string key(p, n);
+
+    lcb_STATUS rc = lcb_respunlock_status(resp);
+    if (rc != LCB_SUCCESS) {
+        printKeyError(key, rc, type, (const lcb_RESPBASE *)resp);
         return;
     }
-    switch (type) {
-    case LCB_CALLBACK_UNLOCK:
-        fprintf(stderr, "%-20s Unlocked\n", key.c_str());
-        break;
-    case LCB_CALLBACK_REMOVE:
-        printKeyCasStatus(key, type, resp, "Deleted.");
-        break;
-    case LCB_CALLBACK_TOUCH:
-        printKeyCasStatus(key, type, resp, "Touched.");
-        break;
-    default:
-        abort(); // didn't request it
-    }
+    fprintf(stderr, "%-20s Unlocked\n", key.c_str());
 }
 
 static void
-observe_callback(lcb_t, lcb_CALLBACKTYPE cbtype, const lcb_RESPOBSERVE *resp)
+remove_callback(lcb_INSTANCE *, int type, const lcb_RESPREMOVE *resp)
+{
+    const char *p;
+    size_t n;
+
+    lcb_respremove_key(resp, &p, &n);
+    string key(p, n);
+
+    lcb_STATUS rc = lcb_respremove_status(resp);
+    if (rc != LCB_SUCCESS) {
+        printKeyError(key, rc, type, (const lcb_RESPBASE *)resp);
+        return;
+    }
+    fprintf(stderr, "%-20s Deleted\n", key.c_str());
+}
+
+static void
+touch_callback(lcb_INSTANCE *, int type, const lcb_RESPTOUCH *resp)
+{
+    const char *p;
+    size_t n;
+
+    lcb_resptouch_key(resp, &p, &n);
+    string key(p, n);
+
+    lcb_STATUS rc = lcb_resptouch_status(resp);
+    if (rc != LCB_SUCCESS) {
+        printKeyError(key, rc, type, (const lcb_RESPBASE *)resp);
+        return;
+    }
+    fprintf(stderr, "%-20s Touch\n", key.c_str());
+}
+
+static void
+observe_callback(lcb_INSTANCE *, lcb_CALLBACK_TYPE cbtype, const lcb_RESPOBSERVE *resp)
 {
     if (resp->nkey == 0) {
         return;
     }
 
-    string key = getRespKey((const lcb_RESPBASE *)resp);
+    string key((const char *)resp->key, resp->nkey);
     if (resp->rc == LCB_SUCCESS) {
         fprintf(stderr,
             "%-20s [%s] Status=0x%x, CAS=0x%" PRIx64 "\n", key.c_str(),
             resp->ismaster ? "Master" : "Replica",
                     resp->status, resp->cas);
     } else {
-        printKeyError(key, cbtype, (const lcb_RESPBASE *)resp);
+        printKeyError(key, resp->rc, cbtype, (const lcb_RESPBASE *)resp);
     }
 }
 
 static void
-obseqno_callback(lcb_t, lcb_CALLBACKTYPE, const lcb_RESPOBSEQNO *resp)
+obseqno_callback(lcb_INSTANCE *, lcb_CALLBACK_TYPE, const lcb_RESPOBSEQNO *resp)
 {
     int ix = resp->server_index;
     if (resp->rc != LCB_SUCCESS) {
         fprintf(stderr,
-            "[%d] ERROR 0x%X (%s)\n", ix, resp->rc, lcb_strerror(NULL, resp->rc));
+            "[%d] ERROR %s\n", ix, lcb_strerror_long(resp->rc));
         return;
     }
     lcb_U64 uuid, seq_disk, seq_mem;
@@ -205,10 +340,10 @@ obseqno_callback(lcb_t, lcb_CALLBACKTYPE, const lcb_RESPOBSEQNO *resp)
 }
 
 static void
-stats_callback(lcb_t, lcb_CALLBACKTYPE, const lcb_RESPSTATS *resp)
+stats_callback(lcb_INSTANCE *, lcb_CALLBACK_TYPE, const lcb_RESPSTATS *resp)
 {
     if (resp->rc != LCB_SUCCESS) {
-        fprintf(stderr, "ERROR 0x%02X (%s)\n", resp->rc, lcb_strerror(NULL, resp->rc));
+        fprintf(stderr, "ERROR %s\n", lcb_strerror_long(resp->rc));
         return;
     }
     if (resp->server == NULL || resp->key == NULL) {
@@ -216,7 +351,7 @@ stats_callback(lcb_t, lcb_CALLBACKTYPE, const lcb_RESPSTATS *resp)
     }
 
     string server = resp->server;
-    string key = getRespKey((const lcb_RESPBASE *)resp);
+    string key((const char *)resp->key, resp->nkey);
     string value;
     if (resp->nvalue >  0) {
         value.assign((const char *)resp->value, resp->nvalue);
@@ -238,17 +373,17 @@ stats_callback(lcb_t, lcb_CALLBACKTYPE, const lcb_RESPSTATS *resp)
 }
 
 static void
-watch_callback(lcb_t, lcb_CALLBACKTYPE, const lcb_RESPSTATS *resp)
+watch_callback(lcb_INSTANCE *, lcb_CALLBACK_TYPE, const lcb_RESPSTATS *resp)
 {
     if (resp->rc != LCB_SUCCESS) {
-        fprintf(stderr, "ERROR 0x%02X (%s)\n", resp->rc, lcb_strerror(NULL, resp->rc));
+        fprintf(stderr, "ERROR %s\n", lcb_strerror_long(resp->rc));
         return;
     }
     if (resp->server == NULL || resp->key == NULL) {
         return;
     }
 
-    string key = getRespKey((const lcb_RESPBASE *)resp);
+    string key((const char *)resp->key, resp->nkey);
     if (resp->nvalue >  0) {
         char *nptr = NULL;
         uint64_t val =
@@ -266,13 +401,11 @@ watch_callback(lcb_t, lcb_CALLBACKTYPE, const lcb_RESPSTATS *resp)
 }
 
 static void
-common_server_callback(lcb_t, int cbtype, const lcb_RESPSERVERBASE *sbase)
+common_server_callback(lcb_INSTANCE *, int cbtype, const lcb_RESPSERVERBASE *sbase)
 {
     string msg;
     if (cbtype == LCB_CALLBACK_VERBOSITY) {
         msg = "Set verbosity";
-    } else if (cbtype == LCB_CALLBACK_FLUSH) {
-        msg = "Flush";
     } else if (cbtype == LCB_CALLBACK_VERSIONS) {
         const lcb_RESPMCVERSION *resp = (const lcb_RESPMCVERSION *)sbase;
         msg = string(resp->mcversion, resp->nversion);
@@ -284,89 +417,126 @@ common_server_callback(lcb_t, int cbtype, const lcb_RESPSERVERBASE *sbase)
     }
     if (sbase->rc != LCB_SUCCESS) {
         fprintf(stderr, "%s failed for server %s: %s\n", msg.c_str(), sbase->server,
-            lcb_strerror(NULL, sbase->rc));
+            lcb_strerror_short(sbase->rc));
     } else {
         fprintf(stderr, "%s: %s\n", msg.c_str(), sbase->server);
     }
 }
 
 static void
-ping_callback(lcb_t, int, const lcb_RESPPING *resp)
+ping_callback(lcb_INSTANCE *, int, const lcb_RESPPING *resp)
 {
-    if (resp->rc != LCB_SUCCESS) {
-        fprintf(stderr, "failed: %s\n", lcb_strerror(NULL, resp->rc));
+    lcb_STATUS rc = lcb_respping_status(resp);
+    if (rc != LCB_SUCCESS) {
+        fprintf(stderr, "failed: %s\n", lcb_strerror_short(rc));
     } else {
-        if (resp->njson) {
-            printf("%.*s", (int)resp->njson, resp->json);
+        const char *json;
+        size_t njson;
+        lcb_respping_value(resp, &json, &njson);
+        if (njson) {
+            printf("%.*s", (int)njson, json);
         }
     }
 }
 
 static void
-arithmetic_callback(lcb_t, lcb_CALLBACKTYPE type, const lcb_RESPCOUNTER *resp)
+arithmetic_callback(lcb_INSTANCE *, lcb_CALLBACK_TYPE type, const lcb_RESPCOUNTER *resp)
 {
-    string key = getRespKey((const lcb_RESPBASE *)resp);
-    if (resp->rc != LCB_SUCCESS) {
-        printKeyError(key, type, (lcb_RESPBASE *)resp);
+    const char *p;
+    size_t n;
+    lcb_respcounter_key(resp, &p, &n);
+    string key(p, n);
+    lcb_STATUS rc = lcb_respcounter_status(resp);
+    if (rc != LCB_SUCCESS) {
+        printKeyError(key, rc, type, (lcb_RESPBASE *)resp);
     } else {
-        char buf[4096] = { 0 };
-        sprintf(buf, "Current value is %" PRIu64 ".", resp->value);
-        printKeyCasStatus(key, type, (const lcb_RESPBASE *)resp, buf);
+        uint64_t value;
+        lcb_respcounter_value(resp, &value);
+        fprintf(stderr, "%-20s Current value is %" PRIu64 ".", key.c_str(), value);
+        uint64_t cas;
+        lcb_respcounter_cas(resp, &cas);
+        fprintf(stderr, "CAS=0x%" PRIx64 "\n", cas);
+        lcb_MUTATION_TOKEN token = {0};
+        lcb_respcounter_mutation_token(resp, &token);
+        if (lcb_mutation_token_is_valid(&token)) {
+            fprintf(stderr, "%-20sSYNCTOKEN=%u,%" PRIu64 ",%" PRIu64 "\n", "",
+                    token.vbid_, token.uuid_, token.seqno_);
+        }
     }
 }
 
 static void
-http_callback(lcb_t, int, const lcb_RESPHTTP *resp)
+http_callback(lcb_INSTANCE *, int, const lcb_RESPHTTP *resp)
 {
-    HttpReceiver *ctx = (HttpReceiver *)resp->cookie;
+    HttpReceiver *ctx;
+    lcb_resphttp_cookie(resp, (void **)&ctx);
     ctx->maybeInvokeStatus(resp);
-    if (resp->nbody) {
-        ctx->onChunk((const char*)resp->body, resp->nbody);
+
+    const char *body;
+    size_t nbody;
+    lcb_resphttp_body(resp, &body, &nbody);
+    if (nbody) {
+        ctx->onChunk(body, nbody);
     }
-    if (resp->rflags & LCB_RESP_F_FINAL) {
+    if (lcb_resphttp_is_final(resp)) {
         ctx->onDone();
     }
 }
 
 static void
-view_callback(lcb_t, int, const lcb_RESPVIEWQUERY *resp)
+view_callback(lcb_INSTANCE *, int, const lcb_RESPVIEW *resp)
 {
-    if (resp->rflags & LCB_RESP_F_FINAL) {
+    if (lcb_respview_is_final(resp)) {
         fprintf(stderr, "View query complete!\n");
     }
 
-    if (resp->rc != LCB_SUCCESS) {
-        fprintf(stderr, "View query failed: 0x%x (%s)\n",
-            resp->rc, lcb_strerror(NULL, resp->rc));
+    lcb_STATUS rc = lcb_respview_status(resp);
+    if (rc) {
+        fprintf(stderr, "View query failed: %s\n", lcb_strerror_short(rc));
 
-        if (resp->rc == LCB_HTTP_ERROR) {
-            if (resp->htresp != NULL) {
+        if (rc == LCB_HTTP_ERROR) {
+            const lcb_RESPHTTP *http;
+            lcb_respview_http_response(resp, &http);
+            if (http != NULL) {
                 HttpReceiver ctx;
-                ctx.maybeInvokeStatus(resp->htresp);
-                if (resp->htresp->nbody) {
-                    fprintf(stderr, "%.*s", (int)resp->htresp->nbody,
-                        static_cast<const char *>(resp->htresp->body));
+                ctx.maybeInvokeStatus(http);
+                const char *body;
+                size_t nbody;
+                lcb_resphttp_body(http, &body, &nbody);
+                if (nbody) {
+                    fprintf(stderr, "%.*s", (int)nbody, body);
                 }
             }
         }
     }
 
-    if (resp->rflags & LCB_RESP_F_FINAL) {
-        if (resp->value) {
-            fprintf(stderr, "Non-row data: %.*s\n",
-                (int)resp->nvalue, resp->value);
+    if (lcb_respview_is_final(resp)) {
+        const char *value;
+        size_t nvalue;
+        lcb_respview_row(resp, &value, &nvalue);
+        if (value) {
+            fprintf(stderr, "Non-row data: %.*s\n", (int)nvalue, value);
         }
         return;
     }
 
-    printf("KEY: %.*s\n", (int)resp->nkey, static_cast<const char*>(resp->key));
-    printf("     VALUE: %.*s\n", (int)resp->nvalue, resp->value);
-    printf("     DOCID: %.*s\n", (int)resp->ndocid, resp->docid);
-    if (resp->docresp) {
-        get_callback(NULL, LCB_CALLBACK_GET, resp->docresp);
+    const char *p;
+    size_t n;
+
+    lcb_respview_key(resp, &p, &n);
+    printf("KEY: %.*s\n", (int)n, p);
+    lcb_respview_row(resp, &p, &n);
+    printf("     VALUE: %.*s\n", (int)n, p);
+    lcb_respview_doc_id(resp, &p, &n);
+    printf("     DOCID: %.*s\n", (int)n, p);
+    lcb_respview_geometry(resp, &p, &n);
+    if (p) {
+        printf("     GEO: %.*s\n", (int)n, p);
     }
-    if (resp->geometry) {
-        printf("     GEO: %.*s\n", (int)resp->ngeometry, resp->geometry);
+    const lcb_RESPGET *doc = NULL;
+    lcb_respview_document(resp, &doc);
+    if (doc) {
+        get_callback(NULL, LCB_CALLBACK_GET, doc);
     }
 }
 }
@@ -413,9 +583,8 @@ void
 Handler::run()
 {
     lcb_create_st cropts;
-    memset(&cropts, 0, sizeof cropts);
     params.fillCropts(cropts);
-    lcb_error_t err;
+    lcb_STATUS err;
     err = lcb_create(&instance, &cropts);
     if (err != LCB_SUCCESS) {
         throw LcbError(err, "Failed to create instance");
@@ -465,6 +634,7 @@ GetHandler::addOptions()
         parser.addOption(o_replica);
     }
     parser.addOption(o_exptime);
+    parser.addOption(o_collection_id);
 }
 
 void
@@ -472,37 +642,60 @@ GetHandler::run()
 {
     Handler::run();
     lcb_install_callback3(instance, LCB_CALLBACK_GET, (lcb_RESPCALLBACK)get_callback);
-    lcb_install_callback3(instance, LCB_CALLBACK_GETREPLICA, (lcb_RESPCALLBACK)get_callback);
+    lcb_install_callback3(instance, LCB_CALLBACK_GETREPLICA, (lcb_RESPCALLBACK)getreplica_callback);
     const vector<string>& keys = parser.getRestArgs();
     std::string replica_mode = o_replica.result();
 
     lcb_sched_enter(instance);
     for (size_t ii = 0; ii < keys.size(); ++ii) {
-        lcb_error_t err;
+        lcb_STATUS err;
         if (o_replica.passed()) {
-            lcb_CMDGETREPLICA cmd = { 0 };
-            const string& key = keys[ii];
-            LCB_KREQ_SIMPLE(&cmd.key, key.c_str(), key.size());
-            if (replica_mode == "first") {
-                cmd.strategy = LCB_REPLICA_FIRST;
+            lcb_REPLICA_MODE mode;
+            if (replica_mode == "first" || replica_mode == "first") {
+                mode = LCB_REPLICA_MODE_ANY;
             } else if (replica_mode == "all") {
-                cmd.strategy = LCB_REPLICA_ALL;
+                mode = LCB_REPLICA_MODE_ALL;
             } else {
-                cmd.strategy = LCB_REPLICA_SELECT;
-                cmd.index = std::atoi(replica_mode.c_str());
+                switch (std::atoi(replica_mode.c_str())) {
+                    case 0:
+                        mode = LCB_REPLICA_MODE_IDX0;
+                        break;
+                    case 1:
+                        mode = LCB_REPLICA_MODE_IDX1;
+                        break;
+                    case 2:
+                        mode = LCB_REPLICA_MODE_IDX2;
+                        break;
+                    default:
+                        throw LcbError(err, "invalid replica mode");
+                }
             }
-            err = lcb_rget3(instance, this, &cmd);
-        } else {
-            lcb_CMDGET cmd = { 0 };
+            lcb_CMDGETREPLICA *cmd;
+            lcb_cmdgetreplica_create(&cmd, mode);
             const string& key = keys[ii];
-            LCB_KREQ_SIMPLE(&cmd.key, key.c_str(), key.size());
+            lcb_cmdgetreplica_key(cmd, key.c_str(), key.size());
+            if (o_collection_id.passed()) {
+                lcb_cmdgetreplica_collection_id(cmd, o_collection_id.result());
+            }
+            err = lcb_getreplica(instance, this, cmd);
+        } else {
+            lcb_CMDGET *cmd;
+
+            lcb_cmdget_create(&cmd);
+            const string& key = keys[ii];
+            lcb_cmdget_key(cmd, key.c_str(), key.size());
+            if (o_collection_id.passed()) {
+                lcb_cmdget_collection_id(cmd, o_collection_id.result());
+            }
             if (o_exptime.passed()) {
-                cmd.exptime = o_exptime.result();
+                if (isLock()) {
+                    lcb_cmdget_locktime(cmd, o_exptime.result());
+                } else {
+                    lcb_cmdget_expiration(cmd, o_exptime.result());
+                }
             }
-            if (isLock()) {
-                cmd.lock = 1;
-            }
-            err = lcb_get3(instance, this, &cmd);
+            err = lcb_get(instance, this, cmd);
+            lcb_cmdget_destroy(cmd);
         }
         if (err != LCB_SUCCESS) {
             throw LcbError(err);
@@ -523,16 +716,18 @@ void
 TouchHandler::run()
 {
     Handler::run();
-    lcb_install_callback3(instance, LCB_CALLBACK_TOUCH, (lcb_RESPCALLBACK)common_callback);
+    lcb_install_callback3(instance, LCB_CALLBACK_TOUCH, (lcb_RESPCALLBACK)touch_callback);
     const vector<string>& keys = parser.getRestArgs();
-    lcb_error_t err;
+    lcb_STATUS err;
     lcb_sched_enter(instance);
     for (size_t ii = 0; ii < keys.size(); ++ii) {
-        lcb_CMDTOUCH cmd = { 0 };
         const string& key = keys[ii];
-        LCB_CMD_SET_KEY(&cmd, key.c_str(), key.size());
-        cmd.exptime = o_exptime.result();
-        err = lcb_touch3(instance, this, &cmd);
+        lcb_CMDTOUCH *cmd;
+        lcb_cmdtouch_create(&cmd);
+        lcb_cmdtouch_key(cmd, key.c_str(), key.size());
+        lcb_cmdtouch_expiration(cmd, o_exptime.result());
+        err = lcb_touch(instance, this, cmd);
+        lcb_cmdtouch_destroy(cmd);
         if (err != LCB_SUCCESS) {
             throw LcbError(err);
         }
@@ -555,63 +750,66 @@ SetHandler::addOptions()
         parser.addOption(o_value);
     }
     parser.addOption(o_json);
+    parser.addOption(o_collection_id);
 }
 
-lcb_storage_t
+lcb_STORE_OPERATION
 SetHandler::mode()
 {
     if (o_add.passed()) {
-        return LCB_ADD;
+        return LCB_STORE_ADD;
     }
 
     string s = o_mode.const_result();
     std::transform(s.begin(), s.end(), s.begin(), ::tolower);
     if (s == "upsert") {
-        return LCB_SET;
+        return LCB_STORE_SET;
     } else if (s == "replace") {
-        return LCB_REPLACE;
+        return LCB_STORE_REPLACE;
     } else if (s == "insert") {
-        return LCB_ADD;
+        return LCB_STORE_ADD;
     } else if (s == "append") {
-        return LCB_APPEND;
+        return LCB_STORE_APPEND;
     } else if (s == "prepend") {
-        return LCB_PREPEND;
+        return LCB_STORE_PREPEND;
     } else {
         throw BadArg(string("Mode must be one of upsert, insert, replace. Got ") + s);
-        return LCB_SET;
+        return LCB_STORE_SET;
     }
 }
 
 void
 SetHandler::storeItem(const string& key, const char *value, size_t nvalue)
 {
-    lcb_error_t err;
-    lcb_CMDSTOREDUR cmd = { 0 };
-    LCB_CMD_SET_KEY(&cmd, key.c_str(), key.size());
-    cmd.value.vtype = LCB_KV_COPY;
-    cmd.value.u_buf.contig.bytes = value;
-    cmd.value.u_buf.contig.nbytes = nvalue;
-    cmd.operation = mode();
+    lcb_STATUS err;
+    lcb_CMDSTORE *cmd;
+
+    lcb_cmdstore_create(&cmd, mode());
+    lcb_cmdstore_key(cmd, key.c_str(), key.size());
+    if (o_collection_id.passed()) {
+        lcb_cmdstore_collection_id(cmd, o_collection_id.result());
+    }
+    lcb_cmdstore_value(cmd, value, nvalue);
 
     if (o_json.result()) {
-        cmd.datatype = LCB_VALUE_F_JSON;
+        lcb_cmdstore_datatype(cmd, LCB_VALUE_F_JSON);
     }
     if (o_exp.passed()) {
-        cmd.exptime = o_exp.result();
+        lcb_cmdstore_expiration(cmd, o_exp.result());
     }
     if (o_flags.passed()) {
-        cmd.flags = o_flags.result();
+        lcb_cmdstore_flags(cmd, o_flags.result());
     }
     if (o_persist.passed() || o_replicate.passed()) {
-        cmd.persist_to = o_persist.result();
-        cmd.replicate_to = o_replicate.result();
-        err = lcb_storedur3(instance, NULL, &cmd);
+        lcb_cmdstore_durability_observe(cmd, o_persist.result(), o_replicate.result());
     } else {
-        err = lcb_store3(instance, NULL, reinterpret_cast<lcb_CMDSTORE*>(&cmd));
+        lcb_cmdstore_durability(cmd, LCB_DURABILITYLEVEL_MAJORITY);
     }
+    err = lcb_store(instance, NULL, cmd);
     if (err != LCB_SUCCESS) {
         throw LcbError(err);
     }
+    lcb_cmdstore_destroy(cmd);
 }
 
 void
@@ -669,7 +867,7 @@ HashHandler::run()
     Handler::run();
 
     lcbvb_CONFIG *vbc;
-    lcb_error_t err;
+    lcb_STATUS err;
     err = lcb_cntl(instance, LCB_CNTL_GET, LCB_CNTL_VBCONFIG, &vbc);
     if (err != LCB_SUCCESS) {
         throw LcbError(err);
@@ -717,7 +915,7 @@ ObserveHandler::run()
         throw std::bad_alloc();
     }
 
-    lcb_error_t err;
+    lcb_STATUS err;
     for (size_t ii = 0; ii < keys.size(); ii++) {
         lcb_CMDOBSERVE cmd = { 0 };
         LCB_KREQ_SIMPLE(&cmd.key, keys[ii].c_str(), keys[ii].size());
@@ -746,7 +944,7 @@ ObserveSeqnoHandler::run()
     const vector<string>& infos = parser.getRestArgs();
     lcb_CMDOBSEQNO cmd = { 0 };
     lcbvb_CONFIG *vbc;
-    lcb_error_t rc;
+    lcb_STATUS rc;
 
     rc = lcb_cntl(instance, LCB_CNTL_GET, LCB_CNTL_VBCONFIG, &vbc);
     if (rc != LCB_SUCCESS) {
@@ -785,7 +983,7 @@ void
 UnlockHandler::run()
 {
     Handler::run();
-    lcb_install_callback3(instance, LCB_CALLBACK_UNLOCK, common_callback);
+    lcb_install_callback3(instance, LCB_CALLBACK_UNLOCK, (lcb_RESPCALLBACK)unlock_callback);
     const vector<string>& args = parser.getRestArgs();
 
     if (args.size() % 2) {
@@ -802,11 +1000,12 @@ UnlockHandler::run()
             throw BadArg("CAS must be formatted as a hex string beginning with '0x'");
         }
 
-        lcb_CMDUNLOCK cmd;
-        memset(&cmd, 0, sizeof cmd);
-        LCB_KREQ_SIMPLE(&cmd.key, key.c_str(), key.size());
-        cmd.cas = cas;
-        lcb_error_t err = lcb_unlock3(instance, NULL, &cmd);
+        lcb_CMDUNLOCK *cmd;
+        lcb_cmdunlock_create(&cmd);
+        lcb_cmdunlock_key(cmd, key.c_str(), key.size());
+        lcb_cmdunlock_cas(cmd, cas);
+        lcb_STATUS err = lcb_unlock(instance, NULL, cmd);
+        lcb_cmdunlock_destroy(cmd);
         if (err != LCB_SUCCESS) {
             throw LcbError(err);
         }
@@ -833,7 +1032,7 @@ void
 VersionHandler::run()
 {
     const char *changeset;
-    lcb_error_t err;
+    lcb_STATUS err;
     err = lcb_cntl(NULL, LCB_CNTL_GET, LCB_CNTL_CHANGESET, (void*)&changeset);
     if (err != LCB_SUCCESS) {
         changeset = "UNKNOWN";
@@ -916,13 +1115,14 @@ RemoveHandler::run()
     Handler::run();
     const vector<string> &keys = parser.getRestArgs();
     lcb_sched_enter(instance);
-    lcb_install_callback3(instance, LCB_CALLBACK_REMOVE, common_callback);
+    lcb_install_callback3(instance, LCB_CALLBACK_REMOVE, (lcb_RESPCALLBACK)remove_callback);
     for (size_t ii = 0; ii < keys.size(); ++ii) {
-        lcb_CMDREMOVE cmd;
         const string& key = keys[ii];
-        memset(&cmd, 0, sizeof cmd);
-        LCB_KREQ_SIMPLE(&cmd.key, key.c_str(), key.size());
-        lcb_error_t err = lcb_remove3(instance, NULL, &cmd);
+        lcb_CMDREMOVE *cmd;
+        lcb_cmdremove_create(&cmd);
+        lcb_cmdremove_key(cmd, key.c_str(), key.size());
+        lcb_STATUS err = lcb_remove(instance, NULL, cmd);
+        lcb_cmdremove_destroy(cmd);
         if (err != LCB_SUCCESS) {
             throw LcbError(err);
         }
@@ -951,7 +1151,7 @@ StatsHandler::run()
             }
         }
         bool is_keystats = o_keystats.result();
-        lcb_error_t err = lcb_stats3(instance, &is_keystats, &cmd);
+        lcb_STATUS err = lcb_stats3(instance, &is_keystats, &cmd);
         if (err != LCB_SUCCESS) {
             throw LcbError(err);
         }
@@ -980,7 +1180,7 @@ WatchHandler::run()
         map<string, int64_t> entry;
         lcb_sched_enter(instance);
         lcb_CMDSTATS cmd = { 0 };
-        lcb_error_t err = lcb_stats3(instance, (void *)&entry, &cmd);
+        lcb_STATUS err = lcb_stats3(instance, (void *)&entry, &cmd);
         if (err != LCB_SUCCESS) {
             throw LcbError(err);
         }
@@ -1033,7 +1233,7 @@ VerbosityHandler::run()
     lcb_install_callback3(instance, LCB_CALLBACK_VERBOSITY, (lcb_RESPCALLBACK)common_server_callback);
     lcb_CMDVERBOSITY cmd = { 0 };
     cmd.level = level;
-    lcb_error_t err;
+    lcb_STATUS err;
     lcb_sched_enter(instance);
     err = lcb_server_verbosity3(instance, NULL, &cmd);
     if (err != LCB_SUCCESS) {
@@ -1049,8 +1249,8 @@ McVersionHandler::run()
     Handler::run();
 
     lcb_install_callback3(instance, LCB_CALLBACK_VERSIONS, (lcb_RESPCALLBACK)common_server_callback);
-    lcb_CMDBASE cmd = { 0 };
-    lcb_error_t err;
+    lcb_CMDVERSIONS cmd = { 0 };
+    lcb_STATUS err;
     lcb_sched_enter(instance);
     err = lcb_server_versions3(instance, NULL, &cmd);
     if (err != LCB_SUCCESS) {
@@ -1060,54 +1260,157 @@ McVersionHandler::run()
     lcb_wait(instance);
 }
 
+static void collection_dump_manifest_callback(lcb_INSTANCE *, int, const lcb_RESPGETMANIFEST *resp)
+{
+    lcb_STATUS rc = lcb_respgetmanifest_status(resp);
+    if (rc != LCB_SUCCESS) {
+        fprintf(stderr, "Failed to get collection manifest: %s\n", lcb_strerror_short(rc));
+    } else {
+        const char *value;
+        size_t nvalue;
+        lcb_respgetmanifest_value(resp, &value, &nvalue);
+        fwrite(value, 1, nvalue, stdout);
+        fflush(stdout);
+        fprintf(stderr, "\n");
+    }
+}
+
+void CollectionGetManifestHandler::run()
+{
+    Handler::run();
+
+    lcb_install_callback3(instance, LCB_CALLBACK_COLLECTIONS_GET_MANIFEST,
+                          (lcb_RESPCALLBACK)collection_dump_manifest_callback);
+
+    lcb_STATUS err;
+    lcb_CMDGETMANIFEST *cmd;
+    lcb_cmdgetmanifest_create(&cmd);
+    lcb_sched_enter(instance);
+    err = lcb_getmanifest(instance, NULL, cmd);
+    lcb_cmdgetmanifest_destroy(cmd);
+    if (err != LCB_SUCCESS) {
+        throw LcbError(err);
+    }
+    lcb_sched_leave(instance);
+    lcb_wait(instance);
+}
+
+static void getcid_callback(lcb_INSTANCE *, int, const lcb_RESPGETCID *resp)
+{
+    lcb_STATUS rc = lcb_respgetcid_status(resp);
+    const char *key;
+    size_t nkey;
+    lcb_respgetcid_scoped_collection(resp, &key, &nkey);
+    if (rc != LCB_SUCCESS) {
+        fprintf(stderr, "%-20.*s Failed to get collection ID: %s\n", (int)nkey, (char *)key, lcb_strerror_short(rc));
+    } else {
+        uint64_t manifest_id;
+        uint32_t collection_id;
+        lcb_respgetcid_manifest_id(resp, &manifest_id);
+        lcb_respgetcid_collection_id(resp, &collection_id);
+        printf("%-20.*s ManifestId=0x%02" PRIx64 ", CollectionId=0x%02x\n", (int)nkey, (char *)key, manifest_id, collection_id);
+    }
+}
+
+void CollectionGetCIDHandler::run()
+{
+    Handler::run();
+
+    lcb_install_callback3(instance, LCB_CALLBACK_GETCID, (lcb_RESPCALLBACK)getcid_callback);
+
+    std::string scope = o_scope.result();
+
+    const vector<string>& collections = parser.getRestArgs();
+    lcb_sched_enter(instance);
+    for (size_t ii = 0; ii < collections.size(); ++ii) {
+        lcb_STATUS err;
+        lcb_CMDGETCID *cmd;
+        lcb_cmdgetcid_create(&cmd);
+        const string& collection = collections[ii];
+        lcb_cmdgetcid_scope(cmd, scope.c_str(), scope.size());
+        lcb_cmdgetcid_collection(cmd, collection.c_str(), collection.size());
+        err = lcb_getcid(instance, NULL, cmd);
+        lcb_cmdgetcid_destroy(cmd);
+        if (err != LCB_SUCCESS) {
+            throw LcbError(err);
+        }
+    }
+    lcb_sched_leave(instance);
+    lcb_wait(instance);
+}
+
+void
+KeygenHandler::run()
+{
+    Handler::run();
+
+    lcbvb_CONFIG *vbc;
+    lcb_STATUS err;
+    err = lcb_cntl(instance, LCB_CNTL_GET, LCB_CNTL_VBCONFIG, &vbc);
+    if (err != LCB_SUCCESS) {
+        throw LcbError(err);
+    }
+
+    unsigned num_vbuckets = lcbvb_get_nvbuckets(vbc);
+    if (num_vbuckets == 0) {
+        throw LcbError(LCB_EINVAL, "the configuration does not contain any vBuckets");
+    }
+    unsigned num_keys_per_vbucket = o_keys_per_vbucket.result();
+    vector < vector < string > > keys(num_vbuckets);
+#define MAX_KEY_SIZE 16
+    char buf[MAX_KEY_SIZE] = {0};
+    unsigned i = 0;
+    int left = num_keys_per_vbucket * num_vbuckets;
+    while (left > 0 && i < UINT_MAX) {
+        int nbuf = snprintf(buf, MAX_KEY_SIZE, "key_%010u", i++);
+        if (nbuf <= 0) {
+            throw LcbError(LCB_ERROR, "unable to render new key into buffer");
+        }
+        int vbid, srvix;
+        lcbvb_map_key(vbc, buf, nbuf, &vbid, &srvix);
+        if (keys[vbid].size() < num_keys_per_vbucket) {
+            keys[vbid].push_back(buf);
+            left--;
+        }
+    }
+    for (i = 0; i < num_vbuckets; i++) {
+        for (vector<string>::iterator it = keys[i].begin(); it != keys[i].end(); ++it) {
+            printf("%s %u\n", it->c_str(), i);
+        }
+    }
+    if (left > 0) {
+        fprintf(stderr, "some vBuckets don't have enough keys\n");
+    }
+}
+
 void
 PingHandler::run()
 {
     Handler::run();
 
     lcb_install_callback3(instance, LCB_CALLBACK_PING, (lcb_RESPCALLBACK)ping_callback);
-    lcb_CMDPING cmd = { 0 };
-    lcb_error_t err;
-    cmd.services = LCB_PINGSVC_F_KV | LCB_PINGSVC_F_N1QL | LCB_PINGSVC_F_VIEWS | LCB_PINGSVC_F_FTS | LCB_PINGSVC_F_ANALYTICS;
-    cmd.options = LCB_PINGOPT_F_JSON | LCB_PINGOPT_F_JSONPRETTY;
-    if (o_details.passed()) {
-        cmd.options |= LCB_PINGOPT_F_JSONDETAILS;
-    }
+    lcb_STATUS err;
+    lcb_CMDPING *cmd;
+    lcb_cmdping_create(&cmd);
+    lcb_cmdping_all(cmd);
+    lcb_cmdping_encode_json(cmd, true, true, o_details.passed());
     lcb_sched_enter(instance);
-    err = lcb_ping3(instance, NULL, &cmd);
+    err = lcb_ping(instance, NULL, cmd);
+    lcb_cmdping_destroy(cmd);
     if (err != LCB_SUCCESS) {
         throw LcbError(err);
     }
     lcb_sched_leave(instance);
     lcb_wait(instance);
 }
-
-void
-McFlushHandler::run()
-{
-    Handler::run();
-
-    lcb_CMDFLUSH cmd = { 0 };
-    lcb_error_t err;
-    lcb_install_callback3(instance, LCB_CALLBACK_FLUSH, (lcb_RESPCALLBACK)common_server_callback);
-    lcb_sched_enter(instance);
-    err = lcb_flush3(instance, NULL, &cmd);
-    if (err != LCB_SUCCESS) {
-        throw LcbError(err);
-    }
-    lcb_sched_leave(instance);
-    lcb_wait(instance);
-}
-
 
 extern "C" {
-static void cbFlushCb(lcb_t, int, const lcb_RESPBASE *resp)
+static void cbFlushCb(lcb_INSTANCE *, int, const lcb_RESPCBFLUSH *resp)
 {
     if (resp->rc == LCB_SUCCESS) {
         fprintf(stderr, "Flush OK\n");
     } else {
-        fprintf(stderr, "Flush failed: %s (0x%x)\n",
-            lcb_strerror(NULL, resp->rc), resp->rc);
+        fprintf(stderr, "Flush failed: %s\n", lcb_strerror_short(resp->rc));
     }
 }
 }
@@ -1116,8 +1419,8 @@ BucketFlushHandler::run()
 {
     Handler::run();
     lcb_CMDCBFLUSH cmd = { 0 };
-    lcb_error_t err;
-    lcb_install_callback3(instance, LCB_CALLBACK_CBFLUSH, cbFlushCb);
+    lcb_STATUS err;
+    lcb_install_callback3(instance, LCB_CALLBACK_CBFLUSH, (lcb_RESPCALLBACK)cbFlushCb);
     err = lcb_cbflush3(instance, NULL, &cmd);
     if (err != LCB_SUCCESS) {
         throw LcbError(err);
@@ -1136,22 +1439,23 @@ ArithmeticHandler::run()
     lcb_sched_enter(instance);
     for (size_t ii = 0; ii < keys.size(); ++ii) {
         const string& key = keys[ii];
-        lcb_CMDCOUNTER cmd = { 0 };
-        LCB_KREQ_SIMPLE(&cmd.key, key.c_str(), key.size());
+        lcb_CMDCOUNTER *cmd;
+        lcb_cmdcounter_create(&cmd);
+        lcb_cmdcounter_key(cmd, key.c_str(), key.size());
         if (o_initial.passed()) {
-            cmd.create = 1;
-            cmd.initial = o_initial.result();
+            lcb_cmdcounter_initial(cmd, o_initial.result());
         }
-        uint64_t delta = o_delta.result();
-        if (delta > static_cast<uint64_t>(std::numeric_limits<int64_t>::max())) {
+        if (o_delta.result() > static_cast<uint64_t>(std::numeric_limits<int64_t>::max())) {
             throw BadArg("Delta too big");
         }
-        cmd.delta = static_cast<int64_t>(delta);
+        int64_t delta = static_cast<int64_t>(o_delta.result());
         if (shouldInvert()) {
-            cmd.delta *= -1;
+            delta *= -1;
         }
-        cmd.exptime = o_expiry.result();
-        lcb_error_t err = lcb_counter3(instance, NULL, &cmd);
+        lcb_cmdcounter_delta(cmd, delta);
+        lcb_cmdcounter_expiration(cmd, o_expiry.result());
+        lcb_STATUS err = lcb_counter(instance, NULL, cmd);
+        lcb_cmdcounter_destroy(cmd);
         if (err != LCB_SUCCESS) {
             throw LcbError(err);
         }
@@ -1175,18 +1479,22 @@ ViewsHandler::run()
     string view = s.substr(pos+1);
     string opts = o_params.result();
 
-    lcb_CMDVIEWQUERY cmd = { 0 };
-    lcb_view_query_initcmd(&cmd,
-        ddoc.c_str(), view.c_str(), opts.c_str(), view_callback);
+    lcb_CMDVIEW *cmd;
+    lcb_cmdview_create(&cmd);
+    lcb_cmdview_design_document(cmd, ddoc.c_str(), ddoc.size());
+    lcb_cmdview_view_name(cmd, view.c_str(), view.size());
+    lcb_cmdview_option_string(cmd, opts.c_str(), opts.size());
+    lcb_cmdview_callback(cmd, view_callback);
     if (o_spatial) {
-        cmd.cmdflags |= LCB_CMDVIEWQUERY_F_SPATIAL;
+        lcb_cmdview_spatial(cmd, true);
     }
     if (o_incdocs) {
-        cmd.cmdflags |= LCB_CMDVIEWQUERY_F_INCLUDE_DOCS;
+        lcb_cmdview_include_docs(cmd, true);
     }
 
-    lcb_error_t rc;
-    rc = lcb_view_query(instance, NULL, &cmd);
+    lcb_STATUS rc;
+    rc = lcb_view(instance, NULL, cmd);
+    lcb_cmdview_destroy(cmd);
     if (rc != LCB_SUCCESS) {
         throw LcbError(rc);
     }
@@ -1206,22 +1514,31 @@ splitKvParam(const string& src, string& key, string& value)
 }
 
 extern "C" {
-static void n1qlCallback(lcb_t, int, const lcb_RESPN1QL *resp)
+static void n1qlCallback(lcb_INSTANCE *, int, const lcb_RESPN1QL *resp)
 {
-    if (resp->rflags & LCB_RESP_F_FINAL) {
+    const char *row;
+    size_t nrow;
+    lcb_respn1ql_row(resp, &row, &nrow);
+
+    if (lcb_respn1ql_is_final(resp)) {
+        lcb_STATUS rc = lcb_respn1ql_status(resp);
         fprintf(stderr, "---> Query response finished\n");
-        if (resp->rc != LCB_SUCCESS) {
-            fprintf(stderr, "---> Query failed with library code 0x%x (%s)\n", resp->rc, lcb_strerror(NULL, resp->rc));
-            if (resp->htresp) {
-                fprintf(stderr, "---> Inner HTTP request failed with library code 0x%x and HTTP status %d\n",
-                    resp->htresp->rc, resp->htresp->htstatus);
+        if (rc != LCB_SUCCESS) {
+            fprintf(stderr, "---> Query failed with library code %s\n", lcb_strerror_short(rc));
+            const lcb_RESPHTTP *http;
+            lcb_respn1ql_http_response(resp, &http);
+            if (http) {
+                uint16_t status;
+                lcb_resphttp_http_status(http, &status);
+                fprintf(stderr, "---> Inner HTTP request failed with library code %s and HTTP status %d\n",
+                    lcb_strerror_short(lcb_resphttp_status(http)), status);
             }
         }
-        if (resp->row) {
-            printf("%.*s\n", (int)resp->nrow, resp->row);
+        if (row) {
+            printf("%.*s\n", (int)nrow, row);
         }
     } else {
-        printf("%.*s,\n", (int)resp->nrow, resp->row);
+        printf("%.*s,\n", (int)nrow, row);
     }
 }
 }
@@ -1231,11 +1548,12 @@ N1qlHandler::run()
 {
     Handler::run();
     const string& qstr = getRequiredArg();
+    lcb_STATUS rc;
 
-    lcb_N1QLPARAMS *nparams = lcb_n1p_new();
-    lcb_error_t rc;
+    lcb_CMDN1QL *cmd;
+    lcb_cmdn1ql_create(&cmd);
 
-    rc = lcb_n1p_setquery(nparams, qstr.c_str(), -1, LCB_N1P_QUERY_STATEMENT);
+    rc = lcb_cmdn1ql_statement(cmd, qstr.c_str(), qstr.size());
     if (rc != LCB_SUCCESS) {
         throw LcbError(rc);
     }
@@ -1244,8 +1562,7 @@ N1qlHandler::run()
     for (size_t ii = 0; ii < vv_args.size(); ii++) {
         string key, value;
         splitKvParam(vv_args[ii], key, value);
-        string ktmp = "$" + key;
-        rc = lcb_n1p_namedparamz(nparams, ktmp.c_str(), value.c_str());
+        rc = lcb_cmdn1ql_named_param(cmd, key.c_str(), key.size(), value.c_str(), value.size());
         if (rc != LCB_SUCCESS) {
             throw LcbError(rc);
         }
@@ -1255,35 +1572,33 @@ N1qlHandler::run()
     for (size_t ii = 0; ii < vv_opts.size(); ii++) {
         string key, value;
         splitKvParam(vv_opts[ii], key, value);
-        rc = lcb_n1p_setoptz(nparams, key.c_str(), value.c_str());
+        rc = lcb_cmdn1ql_option(cmd, key.c_str(), key.size(), value.c_str(), value.size());
         if (rc != LCB_SUCCESS) {
             throw LcbError(rc);
         }
     }
+    lcb_cmdn1ql_adhoc(cmd, !o_prepare.passed());
+    lcb_cmdn1ql_callback(cmd, n1qlCallback);
 
-    lcb_CMDN1QL cmd = { 0 };
-    rc = lcb_n1p_mkcmd(nparams, &cmd);
+    const char *payload;
+    size_t npayload;
+    lcb_cmdn1ql_payload(cmd, &payload, &npayload);
+    fprintf(stderr, "---> Encoded query: %.*s\n", (int)npayload, payload);
+
+    // TODO: deprecate and expose in analytics
+    // if (o_analytics.passed()) {
+    //     cmd.cmdflags |= LCB_CMDN1QL_F_ANALYTICSQUERY;
+    // }
+    rc = lcb_n1ql(instance, NULL, cmd);
+    lcb_cmdn1ql_destroy(cmd);
     if (rc != LCB_SUCCESS) {
         throw LcbError(rc);
     }
-    if (o_prepare.passed()) {
-        cmd.cmdflags |= LCB_CMDN1QL_F_PREPCACHE;
-    }
-    if (o_analytics.passed()) {
-        cmd.cmdflags |= LCB_CMDN1QL_F_ANALYTICSQUERY;
-    }
-    fprintf(stderr, "---> Encoded query: %.*s\n", (int)cmd.nquery, cmd.query);
-    cmd.callback = n1qlCallback;
-    rc = lcb_n1ql_query(instance, NULL, &cmd);
-    if (rc != LCB_SUCCESS) {
-        throw LcbError(rc);
-    }
-    lcb_n1p_free(nparams);
     lcb_wait(instance);
 }
 
 void
-HttpReceiver::install(lcb_t instance)
+HttpReceiver::install(lcb_INSTANCE * instance)
 {
     lcb_install_callback3(instance, LCB_CALLBACK_HTTP,
         (lcb_RESPCALLBACK)http_callback);
@@ -1297,14 +1612,18 @@ HttpReceiver::maybeInvokeStatus(const lcb_RESPHTTP *resp)
     }
 
     statusInvoked = true;
-    if (resp->headers) {
-        for (const char * const *cur = resp->headers; *cur; cur += 2) {
+    const char * const *hdr;
+    lcb_resphttp_headers(resp, &hdr);
+    if (hdr) {
+        for (const char * const *cur = hdr; *cur; cur += 2) {
             string key = cur[0];
             string value = cur[1];
             headers[key] = value;
         }
     }
-    handleStatus(resp->rc, resp->htstatus);
+    uint16_t status;
+    lcb_resphttp_http_status(resp, &status);
+    handleStatus(lcb_resphttp_status(resp), status);
 }
 
 void
@@ -1312,29 +1631,26 @@ HttpBaseHandler::run()
 {
     Handler::run();
     install(instance);
-    lcb_http_cmd_st cmd;
-    memset(&cmd, 0, sizeof cmd);
+    lcb_CMDHTTP *cmd;
     string uri = getURI();
     const string& body = getBody();
 
-    cmd.v.v0.method = getMethod();
-    cmd.v.v0.chunked = 1;
-    cmd.v.v0.path = uri.c_str();
-    cmd.v.v0.npath = uri.size();
+    lcb_cmdhttp_create(&cmd, isAdmin() ? LCB_HTTP_TYPE_MANAGEMENT : LCB_HTTP_TYPE_VIEW);
+    lcb_cmdhttp_method(cmd, getMethod());
+    lcb_cmdhttp_path(cmd, uri.c_str(), uri.size());
     if (!body.empty()) {
-        cmd.v.v0.body = body.c_str();
-        cmd.v.v0.nbody = body.size();
+        lcb_cmdhttp_body(cmd, body.c_str(), body.size());
     }
     string ctype = getContentType();
     if (!ctype.empty()) {
-        cmd.v.v0.content_type = ctype.c_str();
+        lcb_cmdhttp_content_type(cmd, ctype.c_str(), ctype.size());
     }
+    lcb_cmdhttp_streaming(cmd, true);
 
-    lcb_http_request_t dummy;
-    lcb_error_t err;
-    err = lcb_make_http_request(instance, (HttpReceiver*)this,
-        isAdmin() ? LCB_HTTP_TYPE_MANAGEMENT : LCB_HTTP_TYPE_VIEW,
-                &cmd, &dummy);
+    lcb_STATUS err;
+    err = lcb_http(instance, this, cmd);
+    lcb_cmdhttp_destroy(cmd);
+
     if (err != LCB_SUCCESS) {
         throw LcbError(err);
     }
@@ -1342,7 +1658,7 @@ HttpBaseHandler::run()
     lcb_wait(instance);
 }
 
-lcb_http_method_t
+lcb_HTTP_METHOD
 HttpBaseHandler::getMethod()
 {
     string smeth = o_method.result();
@@ -1365,7 +1681,7 @@ HttpBaseHandler::getBody()
     if (!body_cached.empty()) {
         return body_cached;
     }
-    lcb_http_method_t meth = getMethod();
+    lcb_HTTP_METHOD meth = getMethod();
     if (meth == LCB_HTTP_METHOD_GET || meth == LCB_HTTP_METHOD_DELETE) {
         return body_cached; // empty
     }
@@ -1379,10 +1695,10 @@ HttpBaseHandler::getBody()
 }
 
 void
-HttpBaseHandler::handleStatus(lcb_error_t err, int code)
+HttpBaseHandler::handleStatus(lcb_STATUS err, int code)
 {
     if (err != LCB_SUCCESS) {
-        fprintf(stderr, "ERROR=0x%x (%s) ", err, lcb_strerror(NULL, err));
+        fprintf(stderr, "ERROR: %s ", lcb_strerror_short(err));
     }
     fprintf(stderr, "%d\n", code);
     map<string,string>::const_iterator ii = headers.begin();
@@ -1578,7 +1894,7 @@ void
 ConnstrHandler::run()
 {
     const string& connstr_s = getRequiredArg();
-    lcb_error_t err;
+    lcb_STATUS err;
     const char *errmsg;
     lcb::Connspec spec;
     err = spec.parse(connstr_s.c_str(), &errmsg);
@@ -1678,14 +1994,12 @@ static const char* optionsOrder[] = {
         "observe-seqno",
         "incr",
         "decr",
-        "mcflush",
         "hash",
         "lock",
         "unlock",
         "cp",
         "rm",
         "stats",
-        // "verify,
         "version",
         "verbosity",
         "view",
@@ -1703,6 +2017,9 @@ static const char* optionsOrder[] = {
         "strerror",
         "ping",
         "watch",
+        "keygen",
+        "collection-manifest",
+        "collection-id",
         NULL
 };
 
@@ -1717,7 +2034,7 @@ protected:
         for (const char ** cur = optionsOrder; *cur; cur++) {
             const Handler *handler = handlers[*cur];
             fprintf(stderr, "   %-20s", *cur);
-            fprintf(stderr, "%s\n", handler->description());
+            fprintf(stderr, " %s\n", handler->description());
         }
     }
 };
@@ -1753,7 +2070,7 @@ protected:
         #undef X
 
         fprintf(stderr, "-- Error code not found in header. Trying runtime..\n");
-        fprintf(stderr, "0x%x: %s\n", errcode, lcb_strerror(NULL, (lcb_error_t)errcode));
+        fprintf(stderr, "%s\n", lcb_strerror_long((lcb_STATUS)errcode));
     }
 };
 
@@ -1774,7 +2091,6 @@ setupHandlers()
     handlers_s["watch"] = new WatchHandler();
     handlers_s["verbosity"] = new VerbosityHandler();
     handlers_s["ping"] = new PingHandler();
-    handlers_s["mcflush"] = new McFlushHandler();
     handlers_s["incr"] = new IncrHandler();
     handlers_s["decr"] = new DecrHandler();
     handlers_s["admin"] = new AdminHandler();
@@ -1793,6 +2109,9 @@ setupHandlers()
     handlers_s["user-upsert"] = new UserUpsertHandler();
     handlers_s["user-delete"] = new UserDeleteHandler();
     handlers_s["mcversion"] = new McVersionHandler();
+    handlers_s["keygen"] = new KeygenHandler();
+    handlers_s["collection-manifest"] = new CollectionGetManifestHandler();
+    handlers_s["collection-id"] = new CollectionGetCIDHandler();
 
     map<string,Handler*>::iterator ii;
     for (ii = handlers_s.begin(); ii != handlers_s.end(); ++ii) {

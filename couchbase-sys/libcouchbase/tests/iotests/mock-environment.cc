@@ -17,11 +17,10 @@
 #include "config.h"
 #include <gtest/gtest.h>
 #include <libcouchbase/couchbase.h>
-#include <libcouchbase/api3.h>
 #include <mocksupport/server.h>
 #include "mock-environment.h"
 #include <sstream>
-#include "internal.h" /* settings from lcb_t for logging */
+#include "internal.h" /* settings from lcb_INSTANCE *for logging */
 
 #define LOGARGS(instance, lvl) instance->settings, "tests-ENV", LCB_LOG_##lvl, __FILE__, __LINE__
 
@@ -264,9 +263,9 @@ void MockEnvironment::getResponse(MockResponse& ret)
     }
 }
 
-void MockEnvironment::postCreate(lcb_t instance)
+void MockEnvironment::postCreate(lcb_INSTANCE *instance)
 {
-    lcb_error_t err;
+    lcb_STATUS err;
     if (!isRealCluster()) {
         lcb_HTCONFIG_URLTYPE urltype = LCB_HTCONFIG_URLTYPE_COMPAT;
         err = lcb_cntl(instance, LCB_CNTL_SET, LCB_CNTL_HTCONFIG_URLTYPE, &urltype);
@@ -278,7 +277,7 @@ void MockEnvironment::postCreate(lcb_t instance)
 
 void
 MockEnvironment::createConnection(HandleWrap &handle,
-    lcb_t& instance, const lcb_create_st &user_options)
+    lcb_INSTANCE **instance, const lcb_create_st &user_options)
 {
     lcb_io_opt_t io;
     lcb_create_st options;
@@ -290,24 +289,24 @@ MockEnvironment::createConnection(HandleWrap &handle,
     }
 
     options.v.v2.io = io;
-    lcb_error_t err = lcb_create(&instance, &options);
+    lcb_STATUS err = lcb_create(instance, &options);
     ASSERT_EQ(LCB_SUCCESS, err);
-    postCreate(instance);
+    postCreate(*instance);
 
-    (void)lcb_set_cookie(instance, io);
+    (void)lcb_set_cookie(*instance, io);
 
-    handle.instance = instance;
+    handle.instance = *instance;
     handle.iops = io;
 }
 
-void MockEnvironment::createConnection(HandleWrap &handle, lcb_t &instance)
+void MockEnvironment::createConnection(HandleWrap &handle, lcb_INSTANCE **instance)
 {
     lcb_create_st options;
     makeConnectParams(options, NULL);
     createConnection(handle, instance, options);
 }
 
-void MockEnvironment::createConnection(lcb_t &instance)
+void MockEnvironment::createConnection(lcb_INSTANCE **instance)
 {
     HandleWrap handle;
     createConnection(handle, instance);
@@ -315,33 +314,32 @@ void MockEnvironment::createConnection(lcb_t &instance)
     handle.iops->v.base.need_cleanup = 1;
     handle.instance = NULL;
     handle.iops = NULL;
-
 }
 
 #define STAT_VERSION "version"
 
 extern "C" {
-static void statsCallback(lcb_t instance, const void *cookie, lcb_error_t err, const lcb_server_stat_resp_t *resp)
+static void statsCallback(lcb_INSTANCE *instance, lcb_CALLBACK_TYPE, const lcb_RESPSTATS *resp)
 {
-    MockEnvironment *me = (MockEnvironment *)cookie;
-    ASSERT_EQ(LCB_SUCCESS, err);
+    MockEnvironment *me = (MockEnvironment *)resp->cookie;
+    ASSERT_EQ(LCB_SUCCESS, resp->rc);
 
-    if (resp->v.v0.server_endpoint == NULL) {
+    if (resp->server == NULL) {
         return;
     }
 
-    if (!resp->v.v0.nkey) {
+    if (!resp->nkey) {
         return;
     }
 
-    if (resp->v.v0.nkey != sizeof(STAT_VERSION) - 1 ||
-        memcmp(resp->v.v0.key, STAT_VERSION, sizeof(STAT_VERSION) - 1) != 0) {
+    if (resp->nkey != sizeof(STAT_VERSION) - 1 ||
+        memcmp(resp->key, STAT_VERSION, sizeof(STAT_VERSION) - 1) != 0) {
         return;
     }
     MockEnvironment::ServerVersion version = MockEnvironment::VERSION_UNKNOWN;
-    if (resp->v.v0.nbytes > 2) {
-        int major = ((const char *)resp->v.v0.bytes)[0] - '0';
-        int minor = ((const char *)resp->v.v0.bytes)[2] - '0';
+    if (resp->nvalue > 2) {
+        int major = ((const char *)resp->value)[0] - '0';
+        int minor = ((const char *)resp->value)[2] - '0';
         switch (major) {
             case 4:
                 switch (minor) {
@@ -367,12 +365,12 @@ static void statsCallback(lcb_t instance, const void *cookie, lcb_error_t err, c
     }
     if (version == MockEnvironment::VERSION_UNKNOWN) {
         lcb_log(LOGARGS(instance, ERROR), "Unable to determine version from string '%.*s', assuming 4.0",
-                (int)resp->v.v0.nbytes, (const char *)resp->v.v0.bytes);
+                (int)resp->nvalue, (const char *)resp->value);
         version = MockEnvironment::VERSION_40;
     }
     me->setServerVersion(version);
-    lcb_log(LOGARGS(instance, INFO), "Using real cluster version %.*s (id=%d)", (int)resp->v.v0.nbytes,
-            (const char *)resp->v.v0.bytes, version);
+    lcb_log(LOGARGS(instance, INFO), "Using real cluster version %.*s (id=%d)", (int)resp->nvalue,
+            (const char *)resp->value, version);
 }
 }
 
@@ -381,8 +379,8 @@ void MockEnvironment::bootstrapRealCluster()
     serverParams = ServerParams(mock->http, mock->bucket,
                                 mock->username, mock->password);
 
-    lcb_t tmphandle;
-    lcb_error_t err;
+    lcb_INSTANCE *tmphandle;
+    lcb_STATUS err;
     lcb_create_st options;
     serverParams.makeConnectParams(options, NULL);
 
@@ -391,10 +389,9 @@ void MockEnvironment::bootstrapRealCluster()
     ASSERT_EQ(LCB_SUCCESS, lcb_connect(tmphandle));
     lcb_wait(tmphandle);
 
-    lcb_set_stat_callback(tmphandle, statsCallback);
-    lcb_server_stats_cmd_t scmd, *pscmd;
-    pscmd = &scmd;
-    err = lcb_server_stats(tmphandle, this, 1, &pscmd);
+    lcb_install_callback3(tmphandle, LCB_CALLBACK_STATS, (lcb_RESPCALLBACK)statsCallback);
+    lcb_CMDSTATS scmd = {0};
+    err = lcb_stats3(tmphandle, this, &scmd);
     ASSERT_EQ(LCB_SUCCESS, err);
     lcb_wait(tmphandle);
 
@@ -415,7 +412,7 @@ void MockEnvironment::bootstrapRealCluster()
 }
 
 extern "C" {
-static void mock_flush_callback(lcb_t, int, const lcb_RESPBASE *resp) {
+static void mock_flush_callback(lcb_INSTANCE *, int, const lcb_RESPBASE *resp) {
     ASSERT_EQ(LCB_SUCCESS, resp->rc);
 }
 }
@@ -448,7 +445,7 @@ void MockEnvironment::clearAndReset()
         // Use default I/O here..
         serverParams.makeConnectParams(crParams, NULL);
         crParams.v.v2.transports = transports;
-        lcb_error_t err = lcb_create(&innerClient, &crParams);
+        lcb_STATUS err = lcb_create(&innerClient, &crParams);
         if (err != LCB_SUCCESS) {
             printf("Error on create: 0x%x\n", err);
         }
@@ -461,7 +458,7 @@ void MockEnvironment::clearAndReset()
     }
 
     lcb_CMDCBFLUSH fcmd = { 0 };
-    lcb_error_t err;
+    lcb_STATUS err;
 
     err = lcb_cbflush3(innerClient, NULL, &fcmd);
     ASSERT_EQ(LCB_SUCCESS, err);

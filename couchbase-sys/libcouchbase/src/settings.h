@@ -73,9 +73,6 @@
 /* 10ms */
 #define LCB_DEFAULT_RETRY_INTERVAL LCB_MS2US(10)
 
-/* 1.5x */
-#define LCB_DEFAULT_RETRY_BACKOFF 1.5
-
 #define LCB_DEFAULT_TOPORETRY LCB_RETRY_CMDS_ALL
 #define LCB_DEFAULT_NETRETRY LCB_RETRY_CMDS_ALL
 #define LCB_DEFAULT_NMVRETRY LCB_RETRY_CMDS_ALL
@@ -114,9 +111,7 @@
 #include <libcouchbase/metrics.h>
 #include "errmap.h"
 
-#ifdef LCB_TRACING
 #include <libcouchbase/tracing.h>
-#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -133,10 +128,8 @@ struct lcb_METRICS_st;
  * which are intended to be passed around to other objects.
  */
 typedef struct lcb_settings_st {
-    /* TODO: [SDK3] change to uint64_t as per RFC. logging API exposes it as unsigned int currently */
-    lcb_U32 iid;
+    lcb_U64 iid;
     lcb_U8 compressopts;
-    lcb_U8 syncmode;
     lcb_U32 read_chunk_size;
     lcb_U32 operation_timeout;
     lcb_U32 views_timeout;
@@ -195,12 +188,12 @@ typedef struct lcb_settings_st {
     /** Do not wait for GET_CLUSTER_CONFIG request to finish in lcb_wait(),
      * when it is the only request in retry queue */
     unsigned wait_for_config : 1;
+    unsigned synchronous_replication : 1;
 
     short max_redir;
     unsigned refcount;
 
     uint8_t retry[LCB_RETRY_ON_MAX];
-    float retry_backoff;
 
     char *bucket;
     char *sasl_mech_force;
@@ -217,14 +210,12 @@ typedef struct lcb_settings_st {
     lcb_pERRMAP errmap;
     lcb_U32 retry_nmv_interval;
     struct lcb_METRICS_st *metrics;
-#ifdef LCB_TRACING
     lcbtrace_TRACER *tracer;
     lcb_U32 tracer_orphaned_queue_flush_interval;
     lcb_U32 tracer_orphaned_queue_size;
     lcb_U32 tracer_threshold_queue_flush_interval;
     lcb_U32 tracer_threshold_queue_size;
     lcb_U32 tracer_threshold[LCBTRACE_THRESHOLD__MAX];
-#endif
     lcb_U32 compress_min_size;
     float compress_min_ratio;
     char *network; /** network resolution, AKA "Multi Network Configurations" */

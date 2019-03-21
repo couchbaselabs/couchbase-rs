@@ -24,36 +24,51 @@ class ArithmeticUnitTest : public MockUnitTest
 static lcb_uint64_t arithm_val;
 
 extern "C" {
-    static void arithmetic_incr_callback(lcb_t, const void *,
-                                         lcb_error_t error,
-                                         const lcb_arithmetic_resp_t *resp)
+    static void arithmetic_incr_callback(lcb_INSTANCE *, lcb_CALLBACK_TYPE, const lcb_RESPCOUNTER *resp)
     {
-        ASSERT_EQ(LCB_SUCCESS, error);
-        ASSERT_EQ(7, resp->v.v0.nkey);
-        ASSERT_EQ(0, memcmp(resp->v.v0.key, "counter", 7));
-        ASSERT_EQ(arithm_val + 1, resp->v.v0.value);
-        arithm_val = resp->v.v0.value;
+        ASSERT_EQ(LCB_SUCCESS, lcb_respcounter_status(resp));
+
+        const char *key;
+        size_t nkey;
+        lcb_respcounter_key(resp, &key, &nkey);
+        ASSERT_EQ(7, nkey);
+        ASSERT_EQ(0, memcmp(key, "counter", 7));
+
+        uint64_t value;
+        lcb_respcounter_value(resp, &value);
+        ASSERT_EQ(arithm_val + 1, value);
+        arithm_val = value;
     }
 
-    static void arithmetic_decr_callback(lcb_t, const void *,
-                                         lcb_error_t error,
-                                         const lcb_arithmetic_resp_t *resp)
+    static void arithmetic_decr_callback(lcb_INSTANCE *, lcb_CALLBACK_TYPE, const lcb_RESPCOUNTER *resp)
     {
-        ASSERT_EQ(LCB_SUCCESS, error);
-        ASSERT_EQ(7, resp->v.v0.nkey);
-        ASSERT_EQ(0, memcmp(resp->v.v0.key, "counter", 7));
-        ASSERT_EQ(arithm_val - 1, resp->v.v0.value);
-        arithm_val = resp->v.v0.value;
+        ASSERT_EQ(LCB_SUCCESS, lcb_respcounter_status(resp));
+
+        const char *key;
+        size_t nkey;
+        lcb_respcounter_key(resp, &key, &nkey);
+        ASSERT_EQ(7, nkey);
+        ASSERT_EQ(0, memcmp(key, "counter", 7));
+
+        uint64_t value;
+        lcb_respcounter_value(resp, &value);
+        ASSERT_EQ(arithm_val - 1, value);
+        arithm_val = value;
     }
 
-    static void arithmetic_create_callback(lcb_t, const void *,
-                                           lcb_error_t error,
-                                           const lcb_arithmetic_resp_t *resp)
+    static void arithmetic_create_callback(lcb_INSTANCE *, lcb_CALLBACK_TYPE, const lcb_RESPCOUNTER *resp)
     {
-        ASSERT_EQ(LCB_SUCCESS, error);
-        ASSERT_EQ(9, resp->v.v0.nkey);
-        ASSERT_EQ(0, memcmp(resp->v.v0.key, "mycounter", 9));
-        ASSERT_EQ(0xdeadbeef, resp->v.v0.value);
+        ASSERT_EQ(LCB_SUCCESS, lcb_respcounter_status(resp));
+
+        const char *key;
+        size_t nkey;
+        lcb_respcounter_key(resp, &key, &nkey);
+        ASSERT_EQ(9, nkey);
+        ASSERT_EQ(0, memcmp(key, "mycounter", 9));
+
+        uint64_t value;
+        lcb_respcounter_value(resp, &value);
+        ASSERT_EQ(0xdeadbeef, value);
     }
 }
 
@@ -61,7 +76,7 @@ extern "C" {
  * Common function to bootstrap an arithmetic key and set the expected/last
  * value counter.
  */
-static void initArithmeticKey(lcb_t instance, std::string key,
+static void initArithmeticKey(lcb_INSTANCE *instance, std::string key,
                               lcb_uint64_t value)
 {
     std::stringstream ss;
@@ -81,17 +96,20 @@ static void initArithmeticKey(lcb_t instance, std::string key,
  */
 TEST_F(ArithmeticUnitTest, testIncr)
 {
-    lcb_t instance;
+    lcb_INSTANCE *instance;
     HandleWrap hw;
-    createConnection(hw, instance);
-    (void)lcb_set_arithmetic_callback(instance, arithmetic_incr_callback);
+    createConnection(hw, &instance);
+    (void)lcb_install_callback3(instance, LCB_CALLBACK_COUNTER, (lcb_RESPCALLBACK)arithmetic_incr_callback);
 
     initArithmeticKey(instance, "counter", 0);
 
     for (int ii = 0; ii < 10; ++ii) {
-        lcb_arithmetic_cmd_t cmd("counter", 7, 1);
-        lcb_arithmetic_cmd_t *cmds[] = { &cmd };
-        lcb_arithmetic(instance, NULL, 1, cmds);
+        lcb_CMDCOUNTER *cmd;
+        lcb_cmdcounter_create(&cmd);
+        lcb_cmdcounter_key(cmd, "counter", 7);
+        lcb_cmdcounter_delta(cmd, 1);
+        lcb_counter(instance, NULL, cmd);
+        lcb_cmdcounter_destroy(cmd);
         lcb_wait(instance);
     }
 }
@@ -105,17 +123,20 @@ TEST_F(ArithmeticUnitTest, testIncr)
  */
 TEST_F(ArithmeticUnitTest, testDecr)
 {
-    lcb_t instance;
+    lcb_INSTANCE *instance;
     HandleWrap hw;
-    createConnection(hw, instance);
-    (void)lcb_set_arithmetic_callback(instance, arithmetic_decr_callback);
+    createConnection(hw, &instance);
+    (void)lcb_install_callback3(instance, LCB_CALLBACK_COUNTER, (lcb_RESPCALLBACK)arithmetic_decr_callback);
 
     initArithmeticKey(instance, "counter", 100);
 
     for (int ii = 0; ii < 10; ++ii) {
-        lcb_arithmetic_cmd_t cmd("counter", 7, -1);
-        lcb_arithmetic_cmd_t *cmds[] = { &cmd };
-        lcb_arithmetic(instance, NULL, 1, cmds);
+        lcb_CMDCOUNTER *cmd;
+        lcb_cmdcounter_create(&cmd);
+        lcb_cmdcounter_key(cmd, "counter", 7);
+        lcb_cmdcounter_delta(cmd, -1);
+        lcb_counter(instance, NULL, cmd);
+        lcb_cmdcounter_destroy(cmd);
         lcb_wait(instance);
     }
 
@@ -130,14 +151,18 @@ TEST_F(ArithmeticUnitTest, testDecr)
  */
 TEST_F(ArithmeticUnitTest, testArithmeticCreate)
 {
-    lcb_t instance;
+    lcb_INSTANCE *instance;
     HandleWrap hw;
-    createConnection(hw, instance);
+    createConnection(hw, &instance);
 
     removeKey(instance, "mycounter");
-    (void)lcb_set_arithmetic_callback(instance, arithmetic_create_callback);
-    lcb_arithmetic_cmd_t cmd("mycounter", 9, 0x77, 1, 0xdeadbeef);
-    lcb_arithmetic_cmd_t *cmds[] = { &cmd };
-    lcb_arithmetic(instance, NULL, 1, cmds);
+    (void)lcb_install_callback3(instance, LCB_CALLBACK_COUNTER, (lcb_RESPCALLBACK)arithmetic_create_callback);
+    lcb_CMDCOUNTER *cmd;
+    lcb_cmdcounter_create(&cmd);
+    lcb_cmdcounter_key(cmd, "mycounter", 9);
+    lcb_cmdcounter_initial(cmd, 0xdeadbeef);
+    lcb_cmdcounter_delta(cmd, 0x77);
+    lcb_counter(instance, NULL, cmd);
+    lcb_cmdcounter_destroy(cmd);
     lcb_wait(instance);
 }

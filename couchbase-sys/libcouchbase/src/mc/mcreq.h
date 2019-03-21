@@ -19,7 +19,6 @@
 #define LCB_MCREQ_H
 
 #include <libcouchbase/couchbase.h>
-#include <libcouchbase/api3.h>
 #include <libcouchbase/vbucket.h>
 #include <memcached/protocol_binary.h>
 #include <libcouchbase/metrics.h>
@@ -150,9 +149,7 @@ typedef struct mc_REQDATA {
      * Used for metrics/tracing. Might be zero, when tracing is not enabled.
      */
     hrtime_t dispatch;
-#ifdef LCB_TRACING
     lcbtrace_SPAN *span;
-#endif
 } mc_REQDATA;
 
 struct mc_packet_st;
@@ -169,7 +166,7 @@ typedef struct {
      * @param arg opaque pointer for callback
      */
     void (*handler)(struct mc_pipeline_st *pipeline,
-            struct mc_packet_st *pkt, lcb_error_t rc, const void *res);
+            struct mc_packet_st *pkt, lcb_STATUS rc, const void *res);
 
     /**
      * Destructor function called from within mcreq_sched_fail() for packets with
@@ -196,18 +193,12 @@ typedef struct mc_REQDATAEX {
      * Used for metrics/tracing. Might be zero, when tracing is not enabled.
      */
     hrtime_t dispatch;
-#ifdef LCB_TRACING
     lcbtrace_SPAN *span;
-#endif
     const mc_REQDATAPROCS *procs; /**< Common routines for the packet */
 
     #ifdef __cplusplus
     mc_REQDATAEX(const void *cookie_, const mc_REQDATAPROCS &procs_, hrtime_t start_)
-        : cookie(cookie_), start(start_), dispatch(0),
-#ifdef LCB_TRACING
-        span(NULL),
-#endif
-        procs(&procs_)
+        : cookie(cookie_), start(start_), dispatch(0), span(NULL), procs(&procs_)
     {
     }
     #endif
@@ -289,7 +280,12 @@ typedef enum {
      * };
      * @endcode
      */
-    MCREQ_F_PRIVCALLBACK = 1 << 9
+    MCREQ_F_PRIVCALLBACK = 1 << 9,
+
+    /**
+     * Do not encode collection ID for this packet
+     */
+    MCREQ_F_NOCID = 1 << 10
 } mcreq_flags;
 
 /** @brief mask of flags indicating user-allocated buffers */
@@ -565,7 +561,7 @@ mcreq_epkt_find(mc_EXPACKET *ep, const char *key);
  * @param packet the packet which should contain the header
  * @param hdrsize the total size of the header+extras+key
  */
-lcb_error_t
+lcb_STATUS
 mcreq_reserve_header(
         mc_PIPELINE *pipeline, mc_PACKET *packet, uint8_t hdrsize);
 
@@ -576,12 +572,13 @@ mcreq_reserve_header(
  * @param hdrsize the size of the header before the key. This should contain
  *        the header size (i.e. 24 bytes) PLUS any extras therein.
  * @param kreq the user-provided key structure
+ * @param cid the user-provided collection ID
  * @return LCB_SUCCESS on success, LCB_CLIENT_ENOMEM on allocation failure
  */
-lcb_error_t
+lcb_STATUS
 mcreq_reserve_key(
-        mc_PIPELINE *pipeline, mc_PACKET *packet,
-        uint8_t hdrsize, const lcb_KEYBUF *kreq);
+        mc_PIPELINE *pipeline, mc_PACKET *packet, uint8_t hdrsize,
+        const lcb_KEYBUF *kreq, uint32_t cid);
 
 
 /**
@@ -592,7 +589,7 @@ mcreq_reserve_key(
  * @param vreq the user-provided structure containing the value parameters
  * @return LCB_SUCCESS on success, LCB_CLIENT_ENOMEM on allocation failure
  */
-lcb_error_t
+lcb_STATUS
 mcreq_reserve_value(mc_PIPELINE *pipeline, mc_PACKET *packet,
                     const lcb_VALBUF *vreq);
 
@@ -602,7 +599,7 @@ mcreq_reserve_value(mc_PIPELINE *pipeline, mc_PACKET *packet,
  * @param packet the packet to host the value
  * @param n the number of bytes to reserve
  */
-lcb_error_t
+lcb_STATUS
 mcreq_reserve_value2(mc_PIPELINE *pipeline, mc_PACKET *packet, lcb_size_t n);
 
 
@@ -642,17 +639,16 @@ void
 mcreq_wipe_packet(mc_PIPELINE *pipeline, mc_PACKET *packet);
 
 /**
- * Function to extract mapping information given a key and a hashkey
+ * Function to extract mapping information given a key or precomputed vbucket id
  * @param queue The command queue
  * @param key The structure for the key
- * @param hashkey The optional hashkey structure
+ * @param vbid_in The optional precomputed vbucket id
  * @param nhdr The size of the header (for KV_CONTIG)
  * @param[out] vbid The vBucket ID
  * @param[out] srvix The master server's index
  */
 void
-mcreq_map_key(mc_CMDQUEUE *queue,
-    const lcb_KEYBUF *key, const lcb_KEYBUF *hashkey,
+mcreq_map_key(mc_CMDQUEUE *queue, const lcb_KEYBUF *key,
     unsigned nhdr, int *vbid, int *srvix);
 
 
@@ -660,6 +656,11 @@ mcreq_map_key(mc_CMDQUEUE *queue,
  * and let it be handled by the handler installed via mcreq_set_fallback_handler()
  */
 #define MCREQ_BASICPACKET_F_FALLBACKOK 0x01
+
+/**
+ * Selects random pipeline to schedule the request
+ */
+#define MCREQ_BASICPACKET_F_RANDPIPELINE 0x02
 
 /**
  * Handle the basic requirements of a packet common to all commands
@@ -678,10 +679,10 @@ mcreq_map_key(mc_CMDQUEUE *queue,
  * MCREQ_BASICPACKET_F_FALLBACKOK
  */
 
-lcb_error_t
+lcb_STATUS
 mcreq_basic_packet(
         mc_CMDQUEUE *queue, const lcb_CMDBASE *cmd,
-        protocol_binary_request_header *req, uint8_t extlen,
+        protocol_binary_request_header *req, uint8_t extlen, uint8_t ffextlen,
         mc_PACKET **packet, mc_PIPELINE **pipeline, int options);
 
 /**
@@ -821,7 +822,7 @@ mcreq_pipeline_remove(mc_PIPELINE *pipeline, uint32_t opaque);
  */
 int
 mcreq_dispatch_response(mc_PIPELINE *pipeline, mc_PACKET *request,
-                        packet_info *response, lcb_error_t immerr);
+                        packet_info *response, lcb_STATUS immerr);
 
 
 #define MCREQ_KEEP_PACKET 1
@@ -901,7 +902,7 @@ mcreq_reset_timeouts(mc_PIPELINE *pl, lcb_U64 nstime);
  * @param arg an opaque pointer
  */
 typedef void (*mcreq_pktfail_fn)
-        (mc_PIPELINE *pipeline, mc_PACKET *packet, lcb_error_t err, void *arg);
+        (mc_PIPELINE *pipeline, mc_PACKET *packet, lcb_STATUS err, void *arg);
 
 /**
  * Fail out a given pipeline. All commands in the pipeline will be removed
@@ -917,7 +918,7 @@ typedef void (*mcreq_pktfail_fn)
  */
 unsigned
 mcreq_pipeline_fail(
-        mc_PIPELINE *pipeline, lcb_error_t err,
+        mc_PIPELINE *pipeline, lcb_STATUS err,
         mcreq_pktfail_fn failcb, void *cbarg);
 
 /**
@@ -937,7 +938,7 @@ mcreq_pipeline_fail(
  */
 unsigned
 mcreq_pipeline_timeout(
-        mc_PIPELINE *pipeline, lcb_error_t err,
+        mc_PIPELINE *pipeline, lcb_STATUS err,
         mcreq_pktfail_fn failcb, void *cbarg,
         hrtime_t oldest_valid,
         hrtime_t *oldest_start);

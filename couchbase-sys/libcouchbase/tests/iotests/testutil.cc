@@ -24,38 +24,35 @@
  * Helper functions
  */
 extern "C" {
-    static void storeKvoCallback(lcb_t, const void *cookie,
-                                 lcb_storage_t operation,
-                                 lcb_error_t error,
-                                 const lcb_store_resp_t *resp)
+    static void storeKvoCallback(lcb_INSTANCE *, lcb_CALLBACK_TYPE, const lcb_RESPSTORE *resp)
     {
-
-        KVOperation *kvo = (KVOperation *)cookie;
-        kvo->cbCommon(error);
-        kvo->result.assignKC(resp, error);
-        ASSERT_EQ(LCB_SET, operation);
+        KVOperation *kvo;
+        lcb_respstore_cookie(resp, (void **)&kvo);
+        kvo->cbCommon(lcb_respstore_status(resp));
+        kvo->result.assign(resp);
+        lcb_STORE_OPERATION op;
+        lcb_respstore_operation(resp, &op);
+        ASSERT_EQ(LCB_STORE_SET, op);
     }
 
-    static void getKvoCallback(lcb_t, const void *cookie,
-                               lcb_error_t error,
-                               const lcb_get_resp_t *resp)
+    static void getKvoCallback(lcb_INSTANCE *, lcb_CALLBACK_TYPE, const lcb_RESPGET *resp)
     {
-        KVOperation *kvo = (KVOperation *)cookie;
-        kvo->cbCommon(error);
-        kvo->result.assign(resp, error);
+        KVOperation *kvo;
+        lcb_respget_cookie(resp, (void **)&kvo);
+        kvo->cbCommon(lcb_respget_status(resp));
+        kvo->result.assign(resp);
     }
 
-    static void removeKvoCallback(lcb_t, const void *cookie,
-                                  lcb_error_t error,
-                                  const lcb_remove_resp_t *resp)
+    static void removeKvoCallback(lcb_INSTANCE *, lcb_CALLBACK_TYPE, const lcb_RESPREMOVE *resp)
     {
-        KVOperation *kvo = (KVOperation *)cookie;
-        kvo->cbCommon(error);
-        kvo->result.assignKC(resp, error);
+        KVOperation *kvo;
+        lcb_respremove_cookie(resp, (void **)&kvo);
+        kvo->cbCommon(lcb_respremove_status(resp));
+        kvo->result.assign(resp);
     }
 }
 
-void KVOperation::handleInstanceError(lcb_t instance, lcb_error_t err,
+void KVOperation::handleInstanceError(lcb_INSTANCE *instance, lcb_STATUS err,
                                       const char *)
 {
     KVOperation *kvo = reinterpret_cast<KVOperation *>(
@@ -64,24 +61,24 @@ void KVOperation::handleInstanceError(lcb_t instance, lcb_error_t err,
     kvo->globalErrors.insert(err);
 }
 
-void KVOperation::enter(lcb_t instance)
+void KVOperation::enter(lcb_INSTANCE *instance)
 {
-    callbacks.get = lcb_set_get_callback(instance, getKvoCallback);
-    callbacks.rm = lcb_set_remove_callback(instance, removeKvoCallback);
-    callbacks.store = lcb_set_store_callback(instance, storeKvoCallback);
+    callbacks.get = lcb_install_callback3(instance, LCB_CALLBACK_GET, (lcb_RESPCALLBACK)getKvoCallback);
+    callbacks.rm = lcb_install_callback3(instance, LCB_CALLBACK_REMOVE, (lcb_RESPCALLBACK)removeKvoCallback);
+    callbacks.store = lcb_install_callback3(instance, LCB_CALLBACK_STORE, (lcb_RESPCALLBACK)storeKvoCallback);
     oldCookie = lcb_get_cookie(instance);
     lcb_set_cookie(instance, this);
 }
 
-void KVOperation::leave(lcb_t instance)
+void KVOperation::leave(lcb_INSTANCE *instance)
 {
-    lcb_set_get_callback(instance, callbacks.get);
-    lcb_set_remove_callback(instance, callbacks.rm);
-    lcb_set_store_callback(instance, callbacks.store);
+    lcb_install_callback3(instance, LCB_CALLBACK_GET, callbacks.get);
+    lcb_install_callback3(instance, LCB_CALLBACK_REMOVE, callbacks.rm);
+    lcb_install_callback3(instance, LCB_CALLBACK_STORE, callbacks.store);
     lcb_set_cookie(instance, oldCookie);
 }
 
-void KVOperation::assertOk(lcb_error_t err)
+void KVOperation::assertOk(lcb_STATUS err)
 {
     if (ignoreErrors) {
         return;
@@ -95,19 +92,35 @@ void KVOperation::assertOk(lcb_error_t err)
         << "Unable to find " << lcb_strerror_short(err) << " in allowable errors";
 }
 
-void KVOperation::store(lcb_t instance)
+void KVOperation::store(lcb_INSTANCE *instance)
 {
-    lcb_store_cmd_t cmd(LCB_SET,
-                        request->key.data(), request->key.length(),
-                        request->val.data(), request->val.length(),
-                        request->flags,
-                        request->exp,
-                        request->cas,
-                        request->datatype);
-    lcb_store_cmd_t *cmds[] = { &cmd };
+    lcb_CMDSTORE *cmd;
+    lcb_cmdstore_create(&cmd, LCB_STORE_SET);
+    lcb_cmdstore_key(cmd, request->key.data(), request->key.length());
+    lcb_cmdstore_value(cmd, request->val.data(), request->val.length());
+    lcb_cmdstore_flags(cmd, request->flags);
+    lcb_cmdstore_expiration(cmd, request->exp);
+    lcb_cmdstore_cas(cmd, request->cas);
+    lcb_cmdstore_datatype(cmd, request->datatype);
 
     enter(instance);
-    EXPECT_EQ(LCB_SUCCESS, lcb_store(instance, this, 1, cmds));
+    EXPECT_EQ(LCB_SUCCESS, lcb_store(instance, this, cmd));
+    lcb_cmdstore_destroy(cmd);
+    EXPECT_EQ(LCB_SUCCESS, lcb_wait(instance));
+    leave(instance);
+
+    ASSERT_EQ(1, callCount);
+}
+
+void KVOperation::remove(lcb_INSTANCE *instance)
+{
+    lcb_CMDREMOVE *cmd;
+    lcb_cmdremove_create(&cmd);
+    lcb_cmdremove_key(cmd, request->key.data(), request->key.length());
+
+    enter(instance);
+    EXPECT_EQ(LCB_SUCCESS, lcb_remove(instance, this, cmd));
+    lcb_cmdremove_destroy(cmd);
     EXPECT_EQ(LCB_SUCCESS, lcb_wait(instance));
     leave(instance);
 
@@ -115,42 +128,31 @@ void KVOperation::store(lcb_t instance)
 
 }
 
-void KVOperation::remove(lcb_t instance)
+void KVOperation::get(lcb_INSTANCE *instance)
 {
-    lcb_remove_cmd_t cmd(request->key.data(), request->key.length(),
-                         request->cas);
-    lcb_remove_cmd_t *cmds[] = { &cmd };
+    lcb_CMDGET *cmd;
+    lcb_cmdget_create(&cmd);
+    lcb_cmdget_key(cmd, request->key.data(), request->key.length());
+    lcb_cmdget_expiration(cmd, request->exp);
 
     enter(instance);
-    EXPECT_EQ(LCB_SUCCESS, lcb_remove(instance, this, 1, cmds));
+    EXPECT_EQ(LCB_SUCCESS, lcb_get(instance, this, cmd));
     EXPECT_EQ(LCB_SUCCESS, lcb_wait(instance));
     leave(instance);
 
-    ASSERT_EQ(1, callCount);
-
-}
-
-void KVOperation::get(lcb_t instance)
-{
-    lcb_get_cmd_t cmd(request->key.data(), request->key.length(), request->exp);
-    lcb_get_cmd_t *cmds[] = { &cmd };
-
-    enter(instance);
-    EXPECT_EQ(LCB_SUCCESS, lcb_get(instance, this, 1, cmds));
-    EXPECT_EQ(LCB_SUCCESS, lcb_wait(instance));
-    leave(instance);
+    lcb_cmdget_destroy(cmd);
 
     ASSERT_EQ(1, callCount);
 }
 
-void storeKey(lcb_t instance, const std::string &key, const std::string &value)
+void storeKey(lcb_INSTANCE *instance, const std::string &key, const std::string &value)
 {
     Item req = Item(key, value);
     KVOperation kvo = KVOperation(&req);
     kvo.store(instance);
 }
 
-void removeKey(lcb_t instance, const std::string &key)
+void removeKey(lcb_INSTANCE *instance, const std::string &key)
 {
     Item req = Item();
     req.key = key;
@@ -160,7 +162,7 @@ void removeKey(lcb_t instance, const std::string &key)
     kvo.remove(instance);
 }
 
-void getKey(lcb_t instance, const std::string &key, Item &item)
+void getKey(lcb_INSTANCE *instance, const std::string &key, Item &item)
 {
     Item req = Item();
     req.key = key;
@@ -195,22 +197,14 @@ void genDistKeys(lcbvb_CONFIG *vbc, std::vector<std::string> &out)
 }
 
 void genStoreCommands(const std::vector<std::string> &keys,
-                      std::vector<lcb_store_cmd_t> &cmds,
-                      std::vector<lcb_store_cmd_t*> &cmdpp)
+                      std::vector<lcb_CMDSTORE*> &cmds)
 {
     for (unsigned int ii = 0; ii < keys.size(); ii++) {
-        lcb_store_cmd_t cmd;
-        memset(&cmd, 0, sizeof(cmd));
-        cmd.v.v0.key = keys[ii].c_str();
-        cmd.v.v0.nkey = keys[ii].size();
-        cmd.v.v0.bytes = cmd.v.v0.key;
-        cmd.v.v0.nbytes = cmd.v.v0.nkey;
-        cmd.v.v0.operation = LCB_SET;
+        lcb_CMDSTORE *cmd;
+        lcb_cmdstore_create(&cmd, LCB_STORE_SET);
+        lcb_cmdstore_key(cmd, keys[ii].c_str(), keys[ii].size());
+        lcb_cmdstore_value(cmd, keys[ii].c_str(), keys[ii].size());
         cmds.push_back(cmd);
-    }
-
-    for (unsigned int ii = 0; ii < keys.size(); ii++) {
-        cmdpp.push_back(&cmds[ii]);
     }
 }
 
@@ -218,7 +212,7 @@ void genStoreCommands(const std::vector<std::string> &keys,
  * This doesn't _actually_ attempt to make sense of an operation. It simply
  * will try to keep the event loop alive.
  */
-void doDummyOp(lcb_t& instance)
+void doDummyOp(lcb_INSTANCE *instance)
 {
     Item itm("foo", "bar");
     KVOperation kvo(&itm);

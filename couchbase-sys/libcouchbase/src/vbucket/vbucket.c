@@ -463,6 +463,7 @@ build_server_2x(lcbvb_CONFIG *cfg, lcbvb_SERVER *server, cJSON *js, char **netwo
     char *tmp = NULL, *colon;
     int itmp;
     cJSON *jsports;
+    (void)network;
 
     if (!get_jstr(js, "hostname", &tmp)) {
         SET_ERRSTR(cfg, "Couldn't find hostname");
@@ -651,6 +652,8 @@ lcbvb_load_json_ex(lcbvb_CONFIG *cfg, const char *data, const char *source, char
                         cfg->caps |= LCBVB_CAP_XDCR_CHECKPOINTING;
                     } else if (strcmp(jcap->valuestring, "nodesExt") == 0) {
                         cfg->caps |= LCBVB_CAP_NODES_EXT;
+                    } else if (strcmp(jcap->valuestring, "collections") == 0) {
+                        cfg->caps |= LCBVB_CAP_COLLECTIONS;
                     }
                 }
             }
@@ -970,6 +973,9 @@ lcbvb_save_json(lcbvb_CONFIG *cfg)
         if (cfg->caps & LCBVB_CAP_NODES_EXT) {
             cJSON_AddItemToArray(jcaps, cJSON_CreateString("nodesExt"));
         }
+        if (cfg->caps & LCBVB_CAP_COLLECTIONS) {
+            cJSON_AddItemToArray(jcaps, cJSON_CreateString("collections"));
+        }
         cJSON_AddItemToObject(root, "bucketCapabilities", jcaps);
     }
 
@@ -1137,11 +1143,16 @@ lcbvb_map_key(lcbvb_CONFIG *cfg, const void *key, lcb_SIZE nkey,
 {
     if (cfg->dtype == LCBVB_DIST_KETAMA) {
         *srvix = map_ketama(cfg, key, nkey);
-        *vbid = 0;
+        if (vbid) {
+            *vbid = 0;
+        }
         return 0;
     } else {
-        *vbid = lcbvb_k2vb(cfg, key, nkey);
-        *srvix = lcbvb_vbmaster(cfg, *vbid);
+        int vb = lcbvb_k2vb(cfg, key, nkey);
+        *srvix = lcbvb_vbmaster(cfg, vb);
+        if (vbid) {
+            *vbid = vb;
+        }
     }
     return 0;
 }
@@ -1497,6 +1508,9 @@ LIBCOUCHBASE_API unsigned lcbvb_get_nservers(const lcbvb_CONFIG *cfg) {
 }
 LIBCOUCHBASE_API unsigned lcbvb_get_nreplicas(const lcbvb_CONFIG *cfg) {
     return cfg->nrepl;
+}
+LIBCOUCHBASE_API unsigned lcbvb_get_nvbuckets(const lcbvb_CONFIG *cfg) {
+    return cfg->nvb;
 }
 LIBCOUCHBASE_API lcbvb_DISTMODE lcbvb_get_distmode(const lcbvb_CONFIG *cfg) {
     return cfg->dtype;

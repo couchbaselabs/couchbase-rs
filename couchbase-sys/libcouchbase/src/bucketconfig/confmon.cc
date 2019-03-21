@@ -56,7 +56,7 @@ provider_string(Method type) {
     return "";
 }
 
-Confmon::Confmon(lcb_settings *settings_, lcbio_pTABLE iot_, lcb_t instance_)
+Confmon::Confmon(lcb_settings *settings_, lcbio_pTABLE iot_, lcb_INSTANCE *instance_)
     : cur_provider(NULL),
       config(NULL),
       settings(settings_),
@@ -181,7 +181,7 @@ int Confmon::do_set_next(ConfigInfo *new_config, bool notify_miss)
     return 1;
 }
 
-void Confmon::provider_failed(Provider *provider, lcb_error_t reason) {
+void Confmon::provider_failed(Provider *provider, lcb_STATUS reason) {
     lcb_log(LOGARGS(this, INFO), "Provider '%s' failed", provider_string(provider->type));
 
     if (provider != cur_provider) {

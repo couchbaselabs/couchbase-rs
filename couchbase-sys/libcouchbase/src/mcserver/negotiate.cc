@@ -36,7 +36,7 @@ using namespace lcb;
 
 #define LOGARGS(ctx, lvl) ctx->settings, "negotiation", LCB_LOG_##lvl, __FILE__, __LINE__
 static void cleanup_negotiated(SessionInfo* info);
-static void handle_ioerr(lcbio_CTX *ctx, lcb_error_t err);
+static void handle_ioerr(lcbio_CTX *ctx, lcb_STATUS err);
 
 #define LOGFMT CTX_LOGFMT_PRE ",SASLREQ=%p) "
 #define LOGID(s) CTX_LOGID(s->ctx), (void *)s
@@ -108,7 +108,7 @@ public:
         delete this;
     }
 
-    void fail(lcb_error_t error, const char *msg) {
+    void fail(lcb_STATUS error, const char *msg) {
         set_error(error, msg);
         fail();
     }
@@ -130,7 +130,7 @@ public:
         delete this;
     }
 
-    void set_error(lcb_error_t error, const char *msg, const lcb::MemcachedResponse *packet = NULL) {
+    void set_error(lcb_STATUS error, const char *msg, const lcb::MemcachedResponse *packet = NULL) {
         char *err_ref = NULL, *err_ctx = NULL;
         if (packet) {
             MemcachedResponse::parse_enhanced_error(packet->value(), packet->vallen(), &err_ref, &err_ctx);
@@ -172,7 +172,7 @@ public:
     lcbio_CONNDONE_cb cb;
     void *cbdata;
     lcbio_pTIMER timer;
-    lcb_error_t last_err;
+    lcb_STATUS last_err;
     cbsasl_conn_t *sasl_client;
     SessionInfo* info;
     lcb_settings *settings;
@@ -219,23 +219,10 @@ bool
 SessionRequestImpl::setup(const lcbio_NAMEINFO& nistrs, const lcb_host_t& host,
     const lcb::Authenticator& auth)
 {
-    cbsasl_callback_t sasl_callbacks[4];
-    sasl_callbacks[0].id = CBSASL_CB_USER;
-    sasl_callbacks[0].proc = (int( *)(void)) &sasl_get_username;
-
-    sasl_callbacks[1].id = CBSASL_CB_AUTHNAME;
-    sasl_callbacks[1].proc = (int( *)(void)) &sasl_get_username;
-
-    sasl_callbacks[2].id = CBSASL_CB_PASS;
-    sasl_callbacks[2].proc = (int( *)(void)) &sasl_get_password;
-
-    sasl_callbacks[3].id = CBSASL_CB_LIST_END;
-    sasl_callbacks[3].proc = NULL;
-    sasl_callbacks[3].context = NULL;
-
-    for (size_t ii = 0; ii < 3; ii++) {
-        sasl_callbacks[ii].context = this;
-    }
+    cbsasl_callbacks_t sasl_callbacks;
+    sasl_callbacks.context = this;
+    sasl_callbacks.username = sasl_get_username;
+    sasl_callbacks.password = sasl_get_password;
 
     // Get the credentials
     username = auth.username_for(host.host, host.port, settings->bucket);
@@ -254,7 +241,7 @@ SessionRequestImpl::setup(const lcbio_NAMEINFO& nistrs, const lcb_host_t& host,
 
     cbsasl_error_t saslerr = cbsasl_client_new(
             "couchbase", host.host, nistrs.local, nistrs.remote,
-            sasl_callbacks, 0, &sasl_client);
+            &sasl_callbacks, 0, &sasl_client);
     return saslerr == SASL_OK;
 }
 
@@ -361,7 +348,7 @@ SessionRequestImpl::generate_agent_json()
         client_string.resize(200);
     }
     char id[34] = {};
-    snprintf(id, sizeof(id), "%016" PRIx64 "/%016" PRIx64, (lcb_U64)settings->iid, ctx->sock->id);
+    snprintf(id, sizeof(id), "%016" PRIx64 "/%016" PRIx64, settings->iid, ctx->sock->id);
 
     Json::Value ua;
     ua["a"] = client_string;
@@ -416,11 +403,15 @@ SessionRequestImpl::send_hello()
     if (settings->fetch_mutation_tokens) {
         features[nfeatures++] = PROTOCOL_BINARY_FEATURE_MUTATION_SEQNO;
     }
+    if (settings->use_tracing) {
+        features[nfeatures++] = PROTOCOL_BINARY_FEATURE_TRACING;
+    }
     if (settings->use_collections) {
         features[nfeatures++] = PROTOCOL_BINARY_FEATURE_COLLECTIONS;
     }
-    if (settings->use_tracing) {
-        features[nfeatures++] = PROTOCOL_BINARY_FEATURE_TRACING;
+    if (settings->synchronous_replication) {
+        features[nfeatures++] = PROTOCOL_BINARY_FEATURE_ALT_REQUEST_SUPPORT;
+        features[nfeatures++] = PROTOCOL_BINARY_FEATURE_SYNC_REPLICATION;
     }
 
     std::string agent = generate_agent_json();
@@ -674,7 +665,7 @@ SessionRequestImpl::handle_read(lcbio_CTX *ioctx)
 }
 
 static void
-handle_ioerr(lcbio_CTX *ctx, lcb_error_t err)
+handle_ioerr(lcbio_CTX *ctx, lcb_STATUS err)
 {
     SessionRequestImpl* sreq = SessionRequestImpl::get(lcbio_ctx_data(ctx));
     sreq->fail(err, "IO Error");
@@ -688,7 +679,7 @@ void
 SessionRequestImpl::start(lcbio_SOCKET *sock) {
     info = new SessionInfo();
 
-    lcb_error_t err = lcbio_sslify_if_needed(sock, settings);
+    lcb_STATUS err = lcbio_sslify_if_needed(sock, settings);
     if (err != LCB_SUCCESS) {
         set_error(err, "Couldn't initialized SSL on socket");
         lcbio_async_signal(timer);

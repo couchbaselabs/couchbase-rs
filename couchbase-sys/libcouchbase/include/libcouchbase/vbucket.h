@@ -127,14 +127,15 @@ typedef enum {
 } lcbvb_DISTMODE;
 
 typedef enum {
-    LCBVB_CAP_XATTR = 0x01,
-    LCBVB_CAP_CBHELLO = 0x02,
-    LCBVB_CAP_CCCP = 0x04,
-    LCBVB_CAP_COUCHAPI = 0x08,
-    LCBVB_CAP_DCP = 0x10,
-    LCBVB_CAP_NODES_EXT = 0x20,
-    LCBVB_CAP_TOUCH = 0x40,
-    LCBVB_CAP_XDCR_CHECKPOINTING = 0x80
+    LCBVB_CAP_XATTR = 1 << 0,
+    LCBVB_CAP_CBHELLO = 1 << 1,
+    LCBVB_CAP_CCCP = 1 << 2,
+    LCBVB_CAP_COUCHAPI = 1 << 3,
+    LCBVB_CAP_DCP = 1 << 4,
+    LCBVB_CAP_NODES_EXT = 1 << 5,
+    LCBVB_CAP_TOUCH = 1 << 6,
+    LCBVB_CAP_XDCR_CHECKPOINTING = 1 << 7,
+    LCBVB_CAP_COLLECTIONS = 1 << 8
 } lcbvb_BUCKET_CAPABILITIES;
 
 /**@volatile. ABI/API compatibility not guaranteed between versions.
@@ -217,7 +218,7 @@ lcbvb_load_json(lcbvb_CONFIG *vbc, const char *data);
 
 
 /**
- * @uncommmitted
+ * @uncommitted
  */
 LIBCOUCHBASE_API
 int
@@ -394,6 +395,14 @@ lcbvb_get_nservers(const lcbvb_CONFIG *cfg);
 LIBCOUCHBASE_API
 unsigned
 lcbvb_get_nreplicas(const lcbvb_CONFIG *cfg);
+
+/**@committed
+ * @brief Get the number of vbuckets the bucket is configured with.
+ * @return the number of vbuckets, or zero if not applicable
+ */
+LIBCOUCHBASE_API
+unsigned
+lcbvb_get_nvbuckets(const lcbvb_CONFIG *cfg);
 
 /**@committed
  * @brief Get the distribution mode (AKA bucket type) of the bucket

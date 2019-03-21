@@ -34,7 +34,7 @@ extern "C" {
  *
  * This defines the API for asynchronous requests which should block calls to
  * lcb_wait() or similar. This is a replacement for the explicit hashsets used
- * in lcb_t.
+ * in lcb_INSTANCE.
  *
  * Items are added to the pending queue via lcb_aspend_add(). They may be
  * removed either explicitly via lcb_aspend_del() or implicitly when the
@@ -46,13 +46,11 @@ extern "C" {
 
 /** Pending item type */
 typedef enum {
-    LCB_PENDTYPE_TIMER = 0, /**< item is of type lcb_timer_t */
-    LCB_PENDTYPE_HTTP, /**< item is of type lcb_http_request_t */
+    LCB_PENDTYPE_HTTP = 0,   /**< item is of type lcb_http_request_t */
     LCB_PENDTYPE_DURABILITY, /**< item is of type lcb_durability_set_t */
-    LCB_PENDTYPE_COUNTER, /**< just increment/decrement the counter */
+    LCB_PENDTYPE_COUNTER,    /**< just increment/decrement the counter */
     LCB_PENDTYPE_MAX
 } lcb_ASPENDTYPE;
-
 
 /** Items for pending operations */
 typedef struct {

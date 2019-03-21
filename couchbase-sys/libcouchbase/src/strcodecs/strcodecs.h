@@ -23,7 +23,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-lcb_error_t lcb_urlencode_path(const char *path,
+lcb_STATUS lcb_urlencode_path(const char *path,
                                lcb_size_t npath,
                                char **out,
                                lcb_size_t *nout);
@@ -79,6 +79,8 @@ void lcb_base64_encode_iov(lcb_IOV *iov, unsigned niov, unsigned nb, char **dst,
  */
 size_t
 lcb_formencode(const char *s, size_t n, char *out);
+
+int lcb_leb128_encode(lcb_U32 value, lcb_U8 *buf);
 
 #ifdef __cplusplus
 }

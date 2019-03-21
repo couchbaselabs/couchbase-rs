@@ -38,7 +38,6 @@ void lcb_default_settings(lcb_settings *settings)
     settings->grace_next_provider = LCB_DEFAULT_CLCONFIG_GRACE_NEXT;
     settings->bc_http_stream_time = LCB_DEFAULT_BC_HTTP_DISCONNTMO;
     settings->retry_interval = LCB_DEFAULT_RETRY_INTERVAL;
-    settings->retry_backoff = LCB_DEFAULT_RETRY_BACKOFF;
     settings->sslopts = 0;
     settings->retry[LCB_RETRY_ON_SOCKERR] = LCB_DEFAULT_NETRETRY;
     settings->retry[LCB_RETRY_ON_TOPOCHANGE] = LCB_DEFAULT_TOPORETRY;
@@ -49,7 +48,6 @@ void lcb_default_settings(lcb_settings *settings)
     settings->compress_min_size = LCB_DEFAULT_COMPRESS_MIN_SIZE;
     settings->compress_min_ratio = LCB_DEFAULT_COMPRESS_MIN_RATIO;
     settings->allocator_factory = rdb_bigalloc_new;
-    settings->syncmode = LCB_ASYNCHRONOUS;
     settings->detailed_neterr = 0;
     settings->refresh_on_hterr = 1;
     settings->sched_implicit_flush = 1;
@@ -65,11 +63,10 @@ void lcb_default_settings(lcb_settings *settings)
     settings->send_hello = 1;
     settings->config_poll_interval = LCB_DEFAULT_CONFIG_POLL_INTERVAL;
     settings->use_errmap = 1;
-    settings->use_collections = 0;
+    settings->use_collections = 1;
     settings->log_redaction = 0;
     settings->use_tracing = 1;
     settings->network = NULL;
-#ifdef LCB_TRACING
     settings->tracer_orphaned_queue_flush_interval = LCBTRACE_DEFAULT_ORPHANED_QUEUE_FLUSH_INTERVAL;
     settings->tracer_orphaned_queue_size = LCBTRACE_DEFAULT_ORPHANED_QUEUE_SIZE;
     settings->tracer_threshold_queue_flush_interval = LCBTRACE_DEFAULT_THRESHOLD_QUEUE_FLUSH_INTERVAL;
@@ -79,8 +76,8 @@ void lcb_default_settings(lcb_settings *settings)
     settings->tracer_threshold[LCBTRACE_THRESHOLD_VIEW] =  LCBTRACE_DEFAULT_THRESHOLD_VIEW;
     settings->tracer_threshold[LCBTRACE_THRESHOLD_FTS] =  LCBTRACE_DEFAULT_THRESHOLD_FTS;
     settings->tracer_threshold[LCBTRACE_THRESHOLD_ANALYTICS] =  LCBTRACE_DEFAULT_THRESHOLD_ANALYTICS;
-#endif
     settings->wait_for_config = 0;
+    settings->synchronous_replication = 1;
 }
 
 LCB_INTERNAL_API

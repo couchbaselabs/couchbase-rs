@@ -47,7 +47,7 @@ extern "C" {
  *
  * @code{.c}
  * char something;
- * lcb_error_t rv;
+ * lcb_STATUS rv;
  * rv = lcb_cntl(instance, LCB_CNTL_GET, LCB_CNTL_FOO, &something);
  * @endcode
  *
@@ -756,7 +756,7 @@ typedef enum {
  * @code{.c}
  * for (int ii = 0; ii < LCB_RETRY_ON_MAX; ++ii) {
  *   lcb_U32 val = LCB_RETRYOPT_CREATE(ii, LCB_RETRY_CMDS_NONE);
- *   lcb_error_t err = lcb_cntl(instance, LCB_CNTL_SET, LCB_CNTL_RETRYMODE, &val);
+ *   lcb_STATUS err = lcb_cntl(instance, LCB_CNTL_SET, LCB_CNTL_RETRYMODE, &val);
  * }
  * @endcode
  *
@@ -888,21 +888,8 @@ typedef enum {
  * network traffic for operations which are not yet ready to be retried.
  *
  * @cntl_arg_both{lcb_U32* (microseconds)}
- *
- * @see LCB_CNTL_RETRY_BACKOFF
  */
 #define LCB_CNTL_RETRY_INTERVAL 0x2C
-
-/**
- *
- * When an operation has been retried more than once and it has still not
- * succeeded, the library will attempt to back off for the operation by
- * scheduling it to be retried in `LCB_CNTL_RETRY_INTEVAL * ${n}` microseconds,
- * where `${n}` is the factor controlled by this setting.
- *
- * @cntl_arg_both{float*}
- */
-#define LCB_CNTL_RETRY_BACKOFF 0x2D
 
 /**
  * Whether commands are retried immediately upon receipt of not-my-vbucket
@@ -911,9 +898,9 @@ typedef enum {
  * Since version 2.4.8, packets by default are retried immediately on a
  * different node if it had previously failed with a not-my-vbucket
  * response, and is thus not subject to the @ref LCB_CNTL_RETRY_INTERVAL
- * and @ref LCB_CNTL_RETRY_BACKOFF settings. Disabling this setting will
- * restore the older behavior. This may be used in case there are problems
- * with the default heuristic/retry algorithm.
+ * setting. Disabling this setting will restore the older behavior.
+ * This may be used in case there are problems with the default
+ * heuristic/retry algorithm.
  *
  * @volatile
  */
@@ -1401,6 +1388,13 @@ typedef enum {
  * @committed
  */
 #define LCB_CNTL_HTTP_POOL_TIMEOUT 0x5d
+
+/**
+ *
+ * @cntl_arg_both{int (as boolean)}
+ * @volatile
+ */
+#define LCB_CNTL_ENABLE_COLLECTIONS 0x4a
 
 /**
  * This is not a command, but rather an indicator of the last item.
