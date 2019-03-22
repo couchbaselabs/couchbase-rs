@@ -6,9 +6,9 @@
 
 mod request;
 
-use crate::options::GetOptions;
-use crate::result::{GetResult, MutationResult};
-use request::{GetRequest, InstanceRequest, UpsertRequest};
+use crate::options::*;
+use crate::result::*;
+use request::*;
 
 use couchbase_sys::*;
 use futures::sync::oneshot;
@@ -117,6 +117,32 @@ impl Instance {
         self.sender
             .send(Box::new(UpsertRequest::new(p, id, content, flags)))
             .expect("Could not send upsert command into io loop");
+        c.map_err(|_| ())
+    }
+
+    pub fn insert(
+        &self,
+        id: String,
+        content: Vec<u8>,
+        flags: u32,
+    ) -> impl Future<Item = MutationResult, Error = ()> {
+        let (p, c) = oneshot::channel();
+        self.sender
+            .send(Box::new(InsertRequest::new(p, id, content, flags)))
+            .expect("Could not send insert command into io loop");
+        c.map_err(|_| ())
+    }
+
+    pub fn replace(
+        &self,
+        id: String,
+        content: Vec<u8>,
+        flags: u32,
+    ) -> impl Future<Item = MutationResult, Error = ()> {
+        let (p, c) = oneshot::channel();
+        self.sender
+            .send(Box::new(ReplaceRequest::new(p, id, content, flags)))
+            .expect("Could not send replace command into io loop");
         c.map_err(|_| ())
     }
 }

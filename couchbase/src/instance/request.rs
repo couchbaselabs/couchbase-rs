@@ -89,3 +89,87 @@ impl InstanceRequest for UpsertRequest {
         }
     }
 }
+
+#[derive(Debug)]
+pub struct InsertRequest {
+    sender: Sender<MutationResult>,
+    id: String,
+    content: Vec<u8>,
+    flags: u32,
+}
+
+impl InsertRequest {
+    pub fn new(sender: Sender<MutationResult>, id: String, content: Vec<u8>, flags: u32) -> Self {
+        Self {
+            sender,
+            id,
+            content,
+            flags,
+        }
+    }
+}
+
+impl InstanceRequest for InsertRequest {
+    fn encode(self: Box<Self>, instance: *mut lcb_INSTANCE) {
+        let id_len = self.id.len();
+        let id_encoded = CString::new(self.id).expect("Could not encode ID");
+
+        let mut command: *mut lcb_CMDSTORE = ptr::null_mut();
+
+        let sender_boxed = Box::new(self.sender);
+        let cookie = Box::into_raw(sender_boxed) as *mut c_void;
+
+        let value_len = self.content.len();
+        let value = CString::new(self.content).expect("Could not turn value into lcb format");
+
+        unsafe {
+            lcb_cmdstore_create(&mut command, lcb_STORE_OPERATION_LCB_STORE_ADD);
+            lcb_cmdstore_key(command, id_encoded.as_ptr(), id_len);
+            lcb_cmdstore_flags(command, self.flags);
+            lcb_cmdstore_value(command, value.into_raw() as *const c_char, value_len);
+            lcb_store(instance, cookie, command);
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct ReplaceRequest {
+    sender: Sender<MutationResult>,
+    id: String,
+    content: Vec<u8>,
+    flags: u32,
+}
+
+impl ReplaceRequest {
+    pub fn new(sender: Sender<MutationResult>, id: String, content: Vec<u8>, flags: u32) -> Self {
+        Self {
+            sender,
+            id,
+            content,
+            flags,
+        }
+    }
+}
+
+impl InstanceRequest for ReplaceRequest {
+    fn encode(self: Box<Self>, instance: *mut lcb_INSTANCE) {
+        let id_len = self.id.len();
+        let id_encoded = CString::new(self.id).expect("Could not encode ID");
+
+        let mut command: *mut lcb_CMDSTORE = ptr::null_mut();
+
+        let sender_boxed = Box::new(self.sender);
+        let cookie = Box::into_raw(sender_boxed) as *mut c_void;
+
+        let value_len = self.content.len();
+        let value = CString::new(self.content).expect("Could not turn value into lcb format");
+
+        unsafe {
+            lcb_cmdstore_create(&mut command, lcb_STORE_OPERATION_LCB_STORE_REPLACE);
+            lcb_cmdstore_key(command, id_encoded.as_ptr(), id_len);
+            lcb_cmdstore_flags(command, self.flags);
+            lcb_cmdstore_value(command, value.into_raw() as *const c_char, value_len);
+            lcb_store(instance, cookie, command);
+        }
+    }
+}
