@@ -2,6 +2,7 @@ mod bucket;
 mod cluster;
 mod collection;
 mod instance;
+mod options;
 mod result;
 mod util;
 

@@ -13,7 +13,7 @@ fn main() {
     let collection = bucket.default_collection();
 
     let found_doc = collection
-        .get("airport_1297")
+        .get("airport_1297", None)
         .expect("Error while loading doc");
     println!("Airline Document: {:?}", found_doc);
 
@@ -24,10 +24,10 @@ fn main() {
         );
     }
 
-    println!("Airline Document: {:?}", collection.get("enoent"));
+    println!("Airline Document: {:?}", collection.get("enoent", None));
 
     println!("{:?}", collection.upsert("foo", "bar"));
-    println!("{:?}", collection.get("foo"));
+    println!("{:?}", collection.get("foo", None));
 
     std::thread::sleep(std::time::Duration::from_secs(100));
 }

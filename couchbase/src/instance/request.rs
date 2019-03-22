@@ -1,3 +1,4 @@
+use crate::options::GetOptions;
 use crate::result::{GetResult, MutationResult};
 use couchbase_sys::*;
 use futures::sync::oneshot::Sender;
@@ -13,11 +14,16 @@ pub trait InstanceRequest: Send + 'static {
 pub struct GetRequest {
     sender: Sender<Option<GetResult>>,
     id: String,
+    options: Option<GetOptions>,
 }
 
 impl GetRequest {
-    pub fn new(sender: Sender<Option<GetResult>>, id: String) -> Self {
-        Self { sender, id }
+    pub fn new(sender: Sender<Option<GetResult>>, id: String, options: Option<GetOptions>) -> Self {
+        Self {
+            sender,
+            id,
+            options,
+        }
     }
 }
 
@@ -32,6 +38,11 @@ impl InstanceRequest for GetRequest {
         unsafe {
             lcb_cmdget_create(&mut command);
             lcb_cmdget_key(command, id_encoded.as_ptr(), id_len);
+            if let Some(options) = self.options {
+                if let Some(timeout) = options.timeout() {
+                    lcb_cmdget_timeout(command, timeout.as_millis() as u32);
+                }
+            }
             lcb_get(instance, cookie, command);
         }
     }

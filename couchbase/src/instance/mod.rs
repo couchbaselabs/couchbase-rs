@@ -6,6 +6,7 @@
 
 mod request;
 
+use crate::options::GetOptions;
 use crate::result::{GetResult, MutationResult};
 use request::{GetRequest, InstanceRequest, UpsertRequest};
 
@@ -94,10 +95,14 @@ impl Instance {
         Ok(Instance { sender: tx })
     }
 
-    pub fn get(&self, id: String) -> impl Future<Item = Option<GetResult>, Error = ()> {
+    pub fn get(
+        &self,
+        id: String,
+        options: Option<GetOptions>,
+    ) -> impl Future<Item = Option<GetResult>, Error = ()> {
         let (p, c) = oneshot::channel();
         self.sender
-            .send(Box::new(GetRequest::new(p, id)))
+            .send(Box::new(GetRequest::new(p, id, options)))
             .expect("Could not send get command into io loop");
         c.map_err(|_| ())
     }

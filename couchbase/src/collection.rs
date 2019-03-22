@@ -1,4 +1,5 @@
 use crate::instance::Instance;
+use crate::options::GetOptions;
 use crate::result::{GetResult, MutationResult};
 use crate::util::JSON_COMMON_FLAG;
 use futures::Future;
@@ -16,11 +17,11 @@ impl Collection {
         Collection { instance }
     }
 
-    pub fn get<S>(&self, id: S) -> Result<Option<GetResult>, ()>
+    pub fn get<S>(&self, id: S, options: Option<GetOptions>) -> Result<Option<GetResult>, ()>
     where
         S: Into<String>,
     {
-        self.instance.get(id.into()).wait()
+        self.instance.get(id.into(), options).wait()
     }
 
     pub fn upsert<S, T>(&self, id: S, content: T) -> Result<MutationResult, ()>
