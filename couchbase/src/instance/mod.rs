@@ -112,10 +112,11 @@ impl Instance {
         id: String,
         content: Vec<u8>,
         flags: u32,
+        options: Option<UpsertOptions>,
     ) -> impl Future<Item = MutationResult, Error = ()> {
         let (p, c) = oneshot::channel();
         self.sender
-            .send(Box::new(UpsertRequest::new(p, id, content, flags)))
+            .send(Box::new(UpsertRequest::new(p, id, content, flags, options)))
             .expect("Could not send upsert command into io loop");
         c.map_err(|_| ())
     }
@@ -125,10 +126,11 @@ impl Instance {
         id: String,
         content: Vec<u8>,
         flags: u32,
+        options: Option<InsertOptions>,
     ) -> impl Future<Item = MutationResult, Error = ()> {
         let (p, c) = oneshot::channel();
         self.sender
-            .send(Box::new(InsertRequest::new(p, id, content, flags)))
+            .send(Box::new(InsertRequest::new(p, id, content, flags, options)))
             .expect("Could not send insert command into io loop");
         c.map_err(|_| ())
     }
@@ -138,10 +140,13 @@ impl Instance {
         id: String,
         content: Vec<u8>,
         flags: u32,
+        options: Option<ReplaceOptions>,
     ) -> impl Future<Item = MutationResult, Error = ()> {
         let (p, c) = oneshot::channel();
         self.sender
-            .send(Box::new(ReplaceRequest::new(p, id, content, flags)))
+            .send(Box::new(ReplaceRequest::new(
+                p, id, content, flags, options,
+            )))
             .expect("Could not send replace command into io loop");
         c.map_err(|_| ())
     }

@@ -26,7 +26,7 @@ fn main() {
 
     println!("Airline Document: {:?}", collection.get("enoent", None));
 
-    println!("{:?}", collection.upsert("foo", "bar"));
+    println!("{:?}", collection.upsert("foo", "bar", None));
     println!("{:?}", collection.get("foo", None));
 
     std::thread::sleep(std::time::Duration::from_secs(100));

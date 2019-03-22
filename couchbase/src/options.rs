@@ -7,7 +7,67 @@ pub struct GetOptions {
 
 impl GetOptions {
     pub fn new() -> Self {
-        GetOptions { timeout: None }
+        Self { timeout: None }
+    }
+
+    pub fn set_timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = Some(timeout);
+        self
+    }
+
+    pub fn timeout(&self) -> &Option<Duration> {
+        &self.timeout
+    }
+}
+
+#[derive(Debug)]
+pub struct InsertOptions {
+    timeout: Option<Duration>,
+}
+
+impl InsertOptions {
+    pub fn new() -> Self {
+        Self { timeout: None }
+    }
+
+    pub fn set_timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = Some(timeout);
+        self
+    }
+
+    pub fn timeout(&self) -> &Option<Duration> {
+        &self.timeout
+    }
+}
+
+#[derive(Debug)]
+pub struct UpsertOptions {
+    timeout: Option<Duration>,
+}
+
+impl UpsertOptions {
+    pub fn new() -> Self {
+        Self { timeout: None }
+    }
+
+    pub fn set_timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = Some(timeout);
+        self
+    }
+
+    pub fn timeout(&self) -> &Option<Duration> {
+        &self.timeout
+    }
+}
+
+#[derive(Debug)]
+pub struct ReplaceOptions {
+    timeout: Option<Duration>,
+}
+
+impl ReplaceOptions {
+    pub fn new() -> Self {
+        Self { timeout: None }
     }
 
     pub fn set_timeout(mut self, timeout: Duration) -> Self {

@@ -1,5 +1,5 @@
-use crate::options::GetOptions;
-use crate::result::{GetResult, MutationResult};
+use crate::options::*;
+use crate::result::*;
 use couchbase_sys::*;
 use futures::sync::oneshot::Sender;
 use std::ffi::{c_void, CString};
@@ -54,15 +54,23 @@ pub struct UpsertRequest {
     id: String,
     content: Vec<u8>,
     flags: u32,
+    options: Option<UpsertOptions>,
 }
 
 impl UpsertRequest {
-    pub fn new(sender: Sender<MutationResult>, id: String, content: Vec<u8>, flags: u32) -> Self {
+    pub fn new(
+        sender: Sender<MutationResult>,
+        id: String,
+        content: Vec<u8>,
+        flags: u32,
+        options: Option<UpsertOptions>,
+    ) -> Self {
         Self {
             sender,
             id,
             content,
             flags,
+            options,
         }
     }
 }
@@ -85,6 +93,11 @@ impl InstanceRequest for UpsertRequest {
             lcb_cmdstore_key(command, id_encoded.as_ptr(), id_len);
             lcb_cmdstore_flags(command, self.flags);
             lcb_cmdstore_value(command, value.into_raw() as *const c_char, value_len);
+            if let Some(options) = self.options {
+                if let Some(timeout) = options.timeout() {
+                    lcb_cmdstore_timeout(command, timeout.as_millis() as u32);
+                }
+            }
             lcb_store(instance, cookie, command);
         }
     }
@@ -96,15 +109,23 @@ pub struct InsertRequest {
     id: String,
     content: Vec<u8>,
     flags: u32,
+    options: Option<InsertOptions>,
 }
 
 impl InsertRequest {
-    pub fn new(sender: Sender<MutationResult>, id: String, content: Vec<u8>, flags: u32) -> Self {
+    pub fn new(
+        sender: Sender<MutationResult>,
+        id: String,
+        content: Vec<u8>,
+        flags: u32,
+        options: Option<InsertOptions>,
+    ) -> Self {
         Self {
             sender,
             id,
             content,
             flags,
+            options,
         }
     }
 }
@@ -127,6 +148,11 @@ impl InstanceRequest for InsertRequest {
             lcb_cmdstore_key(command, id_encoded.as_ptr(), id_len);
             lcb_cmdstore_flags(command, self.flags);
             lcb_cmdstore_value(command, value.into_raw() as *const c_char, value_len);
+            if let Some(options) = self.options {
+                if let Some(timeout) = options.timeout() {
+                    lcb_cmdstore_timeout(command, timeout.as_millis() as u32);
+                }
+            }
             lcb_store(instance, cookie, command);
         }
     }
@@ -138,15 +164,23 @@ pub struct ReplaceRequest {
     id: String,
     content: Vec<u8>,
     flags: u32,
+    options: Option<ReplaceOptions>,
 }
 
 impl ReplaceRequest {
-    pub fn new(sender: Sender<MutationResult>, id: String, content: Vec<u8>, flags: u32) -> Self {
+    pub fn new(
+        sender: Sender<MutationResult>,
+        id: String,
+        content: Vec<u8>,
+        flags: u32,
+        options: Option<ReplaceOptions>,
+    ) -> Self {
         Self {
             sender,
             id,
             content,
             flags,
+            options,
         }
     }
 }
@@ -169,6 +203,11 @@ impl InstanceRequest for ReplaceRequest {
             lcb_cmdstore_key(command, id_encoded.as_ptr(), id_len);
             lcb_cmdstore_flags(command, self.flags);
             lcb_cmdstore_value(command, value.into_raw() as *const c_char, value_len);
+            if let Some(options) = self.options {
+                if let Some(timeout) = options.timeout() {
+                    lcb_cmdstore_timeout(command, timeout.as_millis() as u32);
+                }
+            }
             lcb_store(instance, cookie, command);
         }
     }
