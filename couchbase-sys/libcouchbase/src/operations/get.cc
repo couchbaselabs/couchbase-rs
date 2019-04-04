@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2010-2018 Couchbase, Inc.
+ *     Copyright 2010-2019 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@
 
 #include "internal.h"
 #include "trace.h"
-
 
 LIBCOUCHBASE_API lcb_STATUS lcb_respget_status(const lcb_RESPGET *resp)
 {
@@ -94,9 +93,15 @@ LIBCOUCHBASE_API lcb_STATUS lcb_cmdget_create(lcb_CMDGET **cmd)
     return LCB_SUCCESS;
 }
 
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdget_clone(const lcb_CMDGET *cmd, lcb_CMDGET **copy)
+{
+    LCB_CMD_CLONE(lcb_CMDGET, cmd, copy);
+    return LCB_SUCCESS;
+}
+
 LIBCOUCHBASE_API lcb_STATUS lcb_cmdget_destroy(lcb_CMDGET *cmd)
 {
-    free(cmd);
+    LCB_CMD_DESTROY_CLONE(cmd);
     return LCB_SUCCESS;
 }
 
@@ -111,16 +116,14 @@ LIBCOUCHBASE_API lcb_STATUS lcb_cmdget_parent_span(lcb_CMDGET *cmd, lcbtrace_SPA
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdget_collection_id(lcb_CMDGET *cmd, uint32_t cid)
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdget_collection(lcb_CMDGET *cmd, const char *scope, size_t scope_len,
+                                                  const char *collection, size_t collection_len)
 {
-    cmd->cid = cid;
+    cmd->scope = scope;
+    cmd->nscope = scope_len;
+    cmd->collection = collection;
+    cmd->ncollection = collection_len;
     return LCB_SUCCESS;
-}
-
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdget_collection(lcb_CMDGET *cmd, const char *scope, size_t scope_len, const char *collection, size_t collection_len)
-{
-    /* TODO */
-    return LCB_NOT_SUPPORTED;
 }
 
 LIBCOUCHBASE_API lcb_STATUS lcb_cmdget_key(lcb_CMDGET *cmd, const char *key, size_t key_len)
@@ -148,32 +151,43 @@ LIBCOUCHBASE_API lcb_STATUS lcb_cmdget_locktime(lcb_CMDGET *cmd, uint32_t durati
 LIBCOUCHBASE_API lcb_STATUS lcb_cmdget_durability(lcb_CMDGET *cmd, lcb_DURABILITY_LEVEL level)
 {
     cmd->dur_level = level;
-    cmd->dur_timeout = 0;
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API
-lcb_STATUS
-lcb_get(lcb_INSTANCE *instance, void *cookie, const lcb_CMDGET *cmd)
+static lcb_STATUS get_validate(lcb_INSTANCE *instance, const lcb_CMDGET *cmd)
 {
-    mc_PIPELINE *pl;
-    mc_PACKET *pkt;
-    mc_REQDATA *rdata;
-    mc_CMDQUEUE *q = &instance->cmdq;
-    lcb_STATUS err;
-    lcb_uint8_t extlen = 0;
-    lcb_uint8_t opcode = PROTOCOL_BINARY_CMD_GET;
-    protocol_binary_request_gat gcmd;
-    protocol_binary_request_header *hdr = &gcmd.message.header;
-    int new_durability_supported = LCBT_SUPPORT_SYNCREPLICATION(instance);
-    lcb_U8 ffextlen = 0;
-
     if (LCB_KEYBUF_IS_EMPTY(&cmd->key)) {
         return LCB_EMPTY_KEY;
     }
     if (cmd->cas || (cmd->dur_level && !cmd->exptime && !cmd->lock)) {
         return LCB_OPTIONS_CONFLICT;
     }
+    if (cmd->dur_level && !LCBT_SUPPORT_SYNCREPLICATION(instance)) {
+        return LCB_NOT_SUPPORTED;
+    }
+
+    return LCB_SUCCESS;
+}
+
+static lcb_STATUS get_impl(uint32_t cid, lcb_INSTANCE *instance, void *cookie, const void *arg)
+{
+    const lcb_CMDGET *cmd = (const lcb_CMDGET *)arg;
+    if (cid > 0) {
+        lcb_CMDGET *mut = const_cast< lcb_CMDGET * >(cmd);
+        mut->cid = cid;
+    }
+
+    mc_PIPELINE *pl;
+    mc_PACKET *pkt;
+    mc_REQDATA *rdata;
+    mc_CMDQUEUE *q = &instance->cmdq;
+    lcb_uint8_t extlen = 0;
+    lcb_uint8_t opcode = PROTOCOL_BINARY_CMD_GET;
+    protocol_binary_request_gat gcmd;
+    protocol_binary_request_header *hdr = &gcmd.message.header;
+    int new_durability_supported = LCBT_SUPPORT_SYNCREPLICATION(instance);
+    lcb_U8 ffextlen = 0;
+    lcb_STATUS err;
 
     hdr->request.magic = PROTOCOL_BINARY_REQ;
     if (cmd->lock) {
@@ -182,18 +196,14 @@ lcb_get(lcb_INSTANCE *instance, void *cookie, const lcb_CMDGET *cmd)
     } else if (cmd->exptime || (cmd->cmdflags & LCB_CMDGET_F_CLEAREXP)) {
         extlen = 4;
         opcode = PROTOCOL_BINARY_CMD_GAT;
-        if (cmd->dur_level) {
-            if (new_durability_supported) {
-                hdr->request.magic = PROTOCOL_BINARY_AREQ;
-                ffextlen = 4;
-            } else {
-                return LCB_NOT_SUPPORTED;
-            }
+        if (cmd->dur_level && new_durability_supported) {
+            hdr->request.magic = PROTOCOL_BINARY_AREQ;
+            ffextlen = 4;
         }
     }
 
     err = mcreq_basic_packet(q, (const lcb_CMDBASE *)cmd, hdr, extlen, ffextlen, &pkt, &pl,
-        MCREQ_BASICPACKET_F_FALLBACKOK);
+                             MCREQ_BASICPACKET_F_FALLBACKOK);
     if (err != LCB_SUCCESS) {
         return err;
     }
@@ -212,7 +222,7 @@ lcb_get(lcb_INSTANCE *instance, void *cookie, const lcb_CMDGET *cmd)
         if (cmd->dur_level && new_durability_supported) {
             gcmd.message.body.alt.meta = (1 << 4) | 3;
             gcmd.message.body.alt.level = cmd->dur_level;
-            gcmd.message.body.alt.timeout = htons(cmd->dur_timeout);
+            gcmd.message.body.alt.timeout = 0;
             gcmd.message.body.alt.expiration = htonl(cmd->exptime);
         } else {
             gcmd.message.body.norm.expiration = htonl(cmd->exptime);
@@ -229,6 +239,20 @@ lcb_get(lcb_INSTANCE *instance, void *cookie, const lcb_CMDGET *cmd)
     TRACE_GET_BEGIN(instance, hdr, cmd);
 
     return LCB_SUCCESS;
+}
+
+LIBCOUCHBASE_API
+lcb_STATUS lcb_get(lcb_INSTANCE *instance, void *cookie, const lcb_CMDGET *cmd)
+{
+    lcb_STATUS err;
+
+    err = get_validate(instance, cmd);
+    if (err != LCB_SUCCESS) {
+        return err;
+    }
+
+    return collcache_exec(cmd->scope, cmd->nscope, cmd->collection, cmd->ncollection, instance, cookie, get_impl,
+                          (lcb_COLLCACHE_ARG_CLONE)lcb_cmdget_clone, (lcb_COLLCACHE_ARG_DTOR)lcb_cmdget_destroy, cmd);
 }
 
 LIBCOUCHBASE_API lcb_STATUS lcb_respunlock_status(const lcb_RESPUNLOCK *resp)
@@ -281,13 +305,21 @@ LIBCOUCHBASE_API lcb_STATUS lcb_respunlock_key(const lcb_RESPUNLOCK *resp, const
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdunlock_create(lcb_CMDUNLOCK **cmd) {
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdunlock_create(lcb_CMDUNLOCK **cmd)
+{
     *cmd = (lcb_CMDUNLOCK *)calloc(1, sizeof(lcb_CMDUNLOCK));
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdunlock_destroy(lcb_CMDUNLOCK *cmd) {
-    free(cmd);
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdunlock_clone(const lcb_CMDUNLOCK *cmd, lcb_CMDUNLOCK **copy)
+{
+    LCB_CMD_CLONE(lcb_CMDUNLOCK, cmd, copy);
+    return LCB_SUCCESS;
+}
+
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdunlock_destroy(lcb_CMDUNLOCK *cmd)
+{
+    LCB_CMD_DESTROY_CLONE(cmd);
     return LCB_SUCCESS;
 }
 
@@ -296,35 +328,51 @@ LIBCOUCHBASE_API lcb_STATUS lcb_cmdunlock_timeout(lcb_CMDUNLOCK *cmd, uint32_t t
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdunlock_parent_span(lcb_CMDUNLOCK *cmd, lcbtrace_SPAN *span) {
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdunlock_parent_span(lcb_CMDUNLOCK *cmd, lcbtrace_SPAN *span)
+{
     cmd->pspan = span;
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdunlock_collection_id(lcb_CMDUNLOCK *cmd, uint32_t cid) {
-    cmd->cid = cid;
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdunlock_collection(lcb_CMDUNLOCK *cmd, const char *scope, size_t scope_len,
+                                                     const char *collection, size_t collection_len)
+{
+    cmd->scope = scope;
+    cmd->nscope = scope_len;
+    cmd->collection = collection;
+    cmd->ncollection = collection_len;
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdunlock_collection(lcb_CMDUNLOCK *cmd, const char *scope, size_t scope_len, const char *collection, size_t collection_len) {
-    /* TODO */
-    return LCB_SUCCESS;
-}
-
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdunlock_key(lcb_CMDUNLOCK *cmd, const char *key, size_t key_len) {
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdunlock_key(lcb_CMDUNLOCK *cmd, const char *key, size_t key_len)
+{
     LCB_CMD_SET_KEY(cmd, key, key_len);
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdunlock_cas(lcb_CMDUNLOCK *cmd, uint64_t cas) {
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdunlock_cas(lcb_CMDUNLOCK *cmd, uint64_t cas)
+{
     cmd->cas = cas;
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API
-lcb_STATUS
-lcb_unlock(lcb_INSTANCE *instance, void *cookie, const lcb_CMDUNLOCK *cmd)
+static lcb_STATUS unlock_validate(lcb_INSTANCE *, const lcb_CMDUNLOCK *cmd)
 {
+    if (LCB_KEYBUF_IS_EMPTY(&cmd->key)) {
+        return LCB_EMPTY_KEY;
+    }
+
+    return LCB_SUCCESS;
+}
+
+static lcb_STATUS unlock_impl(uint32_t cid, lcb_INSTANCE *instance, void *cookie, const void *arg)
+{
+    const lcb_CMDUNLOCK *cmd = (const lcb_CMDUNLOCK *)arg;
+    if (cid > 0) {
+        lcb_CMDUNLOCK *mut = const_cast< lcb_CMDUNLOCK * >(cmd);
+        mut->cid = cid;
+    }
+
     mc_CMDQUEUE *cq = &instance->cmdq;
     mc_PIPELINE *pl;
     mc_PACKET *pkt;
@@ -332,12 +380,7 @@ lcb_unlock(lcb_INSTANCE *instance, void *cookie, const lcb_CMDUNLOCK *cmd)
     lcb_STATUS err;
     protocol_binary_request_header hdr;
 
-    if (LCB_KEYBUF_IS_EMPTY(&cmd->key)) {
-        return LCB_EMPTY_KEY;
-    }
-
-    err = mcreq_basic_packet(cq, (const lcb_CMDBASE *)cmd, &hdr, 0, 0, &pkt, &pl,
-        MCREQ_BASICPACKET_F_FALLBACKOK);
+    err = mcreq_basic_packet(cq, (const lcb_CMDBASE *)cmd, &hdr, 0, 0, &pkt, &pl, MCREQ_BASICPACKET_F_FALLBACKOK);
     if (err != LCB_SUCCESS) {
         return err;
     }
@@ -360,12 +403,27 @@ lcb_unlock(lcb_INSTANCE *instance, void *cookie, const lcb_CMDUNLOCK *cmd)
     return LCB_SUCCESS;
 }
 
+LIBCOUCHBASE_API
+lcb_STATUS lcb_unlock(lcb_INSTANCE *instance, void *cookie, const lcb_CMDUNLOCK *cmd)
+{
+    lcb_STATUS err;
+    err = unlock_validate(instance, cmd);
+    if (err != LCB_SUCCESS) {
+        return err;
+    }
+
+    return collcache_exec(cmd->scope, cmd->nscope, cmd->collection, cmd->ncollection, instance, cookie, unlock_impl,
+                          (lcb_COLLCACHE_ARG_CLONE)lcb_cmdunlock_clone, (lcb_COLLCACHE_ARG_DTOR)lcb_cmdunlock_destroy,
+                          cmd);
+}
+
 LIBCOUCHBASE_API lcb_STATUS lcb_respgetreplica_status(const lcb_RESPGETREPLICA *resp)
 {
     return resp->rc;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_respgetreplica_error_context(const lcb_RESPGETREPLICA *resp, const char **ctx, size_t *ctx_len)
+LIBCOUCHBASE_API lcb_STATUS lcb_respgetreplica_error_context(const lcb_RESPGETREPLICA *resp, const char **ctx,
+                                                             size_t *ctx_len)
 {
     if ((resp->rflags & LCB_RESP_F_ERRINFO) == 0) {
         return LCB_KEY_ENOENT;
@@ -378,7 +436,8 @@ LIBCOUCHBASE_API lcb_STATUS lcb_respgetreplica_error_context(const lcb_RESPGETRE
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_respgetreplica_error_ref(const lcb_RESPGETREPLICA *resp, const char **ref, size_t *ref_len)
+LIBCOUCHBASE_API lcb_STATUS lcb_respgetreplica_error_ref(const lcb_RESPGETREPLICA *resp, const char **ref,
+                                                         size_t *ref_len)
 {
     if ((resp->rflags & LCB_RESP_F_ERRINFO) == 0) {
         return LCB_KEY_ENOENT;
@@ -422,7 +481,8 @@ LIBCOUCHBASE_API lcb_STATUS lcb_respgetreplica_key(const lcb_RESPGETREPLICA *res
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_respgetreplica_value(const lcb_RESPGETREPLICA *resp, const char **value, size_t *value_len)
+LIBCOUCHBASE_API lcb_STATUS lcb_respgetreplica_value(const lcb_RESPGETREPLICA *resp, const char **value,
+                                                     size_t *value_len)
 {
     *value = (const char *)resp->value;
     *value_len = resp->nvalue;
@@ -453,9 +513,15 @@ LIBCOUCHBASE_API lcb_STATUS lcb_cmdgetreplica_create(lcb_CMDGETREPLICA **cmd, lc
     return LCB_SUCCESS;
 }
 
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdgetreplica_clone(const lcb_CMDGETREPLICA *cmd, lcb_CMDGETREPLICA **copy)
+{
+    LCB_CMD_CLONE(lcb_CMDGETREPLICA, cmd, copy);
+    return LCB_SUCCESS;
+}
+
 LIBCOUCHBASE_API lcb_STATUS lcb_cmdgetreplica_destroy(lcb_CMDGETREPLICA *cmd)
 {
-    free(cmd);
+    LCB_CMD_DESTROY_CLONE(cmd);
     return LCB_SUCCESS;
 }
 
@@ -470,16 +536,14 @@ LIBCOUCHBASE_API lcb_STATUS lcb_cmdgetreplica_parent_span(lcb_CMDGETREPLICA *cmd
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdgetreplica_collection_id(lcb_CMDGETREPLICA *cmd, uint32_t cid)
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdgetreplica_collection(lcb_CMDGETREPLICA *cmd, const char *scope, size_t scope_len,
+                                                         const char *collection, size_t collection_len)
 {
-    cmd->cid = cid;
+    cmd->scope = scope;
+    cmd->nscope = scope_len;
+    cmd->collection = collection;
+    cmd->ncollection = collection_len;
     return LCB_SUCCESS;
-}
-
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdgetreplica_collection(lcb_CMDGETREPLICA *cmd, const char *scope, size_t scope_len, const char *collection, size_t collection_len)
-{
-    /* TODO */
-    return LCB_NOT_SUPPORTED;
 }
 
 LIBCOUCHBASE_API lcb_STATUS lcb_cmdgetreplica_key(lcb_CMDGETREPLICA *cmd, const char *key, size_t key_len)
@@ -490,7 +554,8 @@ LIBCOUCHBASE_API lcb_STATUS lcb_cmdgetreplica_key(lcb_CMDGETREPLICA *cmd, const 
 
 struct RGetCookie : mc_REQDATAEX {
     RGetCookie(const void *cookie, lcb_INSTANCE *instance, lcb_replica_t, int vb);
-    void decref() {
+    void decref()
+    {
         if (!--remaining) {
             delete this;
         }
@@ -504,15 +569,15 @@ struct RGetCookie : mc_REQDATAEX {
     lcb_INSTANCE *instance;
 };
 
-static void rget_dtor(mc_PACKET *pkt) {
-    static_cast<RGetCookie*>(pkt->u_rdata.exdata)->decref();
+static void rget_dtor(mc_PACKET *pkt)
+{
+    static_cast< RGetCookie * >(pkt->u_rdata.exdata)->decref();
 }
 
-static void
-rget_callback(mc_PIPELINE *, mc_PACKET *pkt, lcb_STATUS err, const void *arg)
+static void rget_callback(mc_PIPELINE *, mc_PACKET *pkt, lcb_STATUS err, const void *arg)
 {
-    RGetCookie *rck = static_cast<RGetCookie*>(pkt->u_rdata.exdata);
-    lcb_RESPGETREPLICA *resp = reinterpret_cast<lcb_RESPGETREPLICA*>(const_cast<void*>(arg));
+    RGetCookie *rck = static_cast< RGetCookie * >(pkt->u_rdata.exdata);
+    lcb_RESPGETREPLICA *resp = reinterpret_cast< lcb_RESPGETREPLICA * >(const_cast< void * >(arg));
     lcb_RESPCALLBACK callback;
     lcb_INSTANCE *instance = rck->instance;
 
@@ -560,22 +625,36 @@ rget_callback(mc_PIPELINE *, mc_PACKET *pkt, lcb_STATUS err, const void *arg)
     rck->decref();
 }
 
-static mc_REQDATAPROCS rget_procs = {
-        rget_callback,
-        rget_dtor
-};
+static mc_REQDATAPROCS rget_procs = {rget_callback, rget_dtor};
 
-RGetCookie::RGetCookie(const void *cookie_, lcb_INSTANCE *instance_,
-    lcb_replica_t strategy_, int vbucket_)
-    : mc_REQDATAEX(cookie_, rget_procs, gethrtime()),
-      r_cur(0), r_max(LCBT_NREPLICAS(instance_)), remaining(0),
-      vbucket(vbucket_), strategy(strategy_), instance(instance_) {
+RGetCookie::RGetCookie(const void *cookie_, lcb_INSTANCE *instance_, lcb_replica_t strategy_, int vbucket_)
+    : mc_REQDATAEX(cookie_, rget_procs, gethrtime()), r_cur(0), r_max(LCBT_NREPLICAS(instance_)), remaining(0),
+      vbucket(vbucket_), strategy(strategy_), instance(instance_)
+{
 }
 
-LIBCOUCHBASE_API
-lcb_STATUS
-lcb_getreplica(lcb_INSTANCE *instance, void *cookie, const lcb_CMDGETREPLICA *cmd)
+static lcb_STATUS getreplica_validate(lcb_INSTANCE *instance, const lcb_CMDGETREPLICA *cmd)
 {
+    if (LCB_KEYBUF_IS_EMPTY(&cmd->key)) {
+        return LCB_EMPTY_KEY;
+    }
+    if (!instance->cmdq.config) {
+        return LCB_CLIENT_ETMPFAIL;
+    }
+    if (!LCBT_NREPLICAS(instance)) {
+        return LCB_NO_MATCHING_SERVER;
+    }
+    return LCB_SUCCESS;
+}
+
+static lcb_STATUS getreplica_impl(uint32_t cid, lcb_INSTANCE *instance, void *cookie, const void *arg)
+{
+    const lcb_CMDGETREPLICA *cmd = (const lcb_CMDGETREPLICA *)arg;
+    if (cid > 0) {
+        lcb_CMDGETREPLICA *mut = const_cast< lcb_CMDGETREPLICA * >(cmd);
+        mut->cid = cid;
+    }
+
     /**
      * Because we need to direct these commands to specific servers, we can't
      * just use the 'basic_packet()' function.
@@ -584,16 +663,6 @@ lcb_getreplica(lcb_INSTANCE *instance, void *cookie, const lcb_CMDGETREPLICA *cm
     int vbid, ixtmp;
     protocol_binary_request_header req;
     unsigned r0, r1 = 0;
-
-    if (LCB_KEYBUF_IS_EMPTY(&cmd->key)) {
-        return LCB_EMPTY_KEY;
-    }
-    if (!cq->config) {
-        return LCB_CLIENT_ETMPFAIL;
-    }
-    if (!LCBT_NREPLICAS(instance)) {
-        return LCB_NO_MATCHING_SERVER;
-    }
 
     mcreq_map_key(cq, &cmd->key, MCREQ_PKT_BASESIZE, &vbid, &ixtmp);
 
@@ -675,5 +744,21 @@ lcb_getreplica(lcb_INSTANCE *instance, void *cookie, const lcb_CMDGETREPLICA *cm
     } while (++r0 < r1);
 
     MAYBE_SCHEDLEAVE(instance);
+
     return LCB_SUCCESS;
+}
+
+LIBCOUCHBASE_API
+lcb_STATUS lcb_getreplica(lcb_INSTANCE *instance, void *cookie, const lcb_CMDGETREPLICA *cmd)
+{
+    lcb_STATUS err;
+
+    err = getreplica_validate(instance, cmd);
+    if (err != LCB_SUCCESS) {
+        return err;
+    }
+
+    return collcache_exec(cmd->scope, cmd->nscope, cmd->collection, cmd->ncollection, instance, cookie, getreplica_impl,
+                          (lcb_COLLCACHE_ARG_CLONE)lcb_cmdgetreplica_clone,
+                          (lcb_COLLCACHE_ARG_DTOR)lcb_cmdgetreplica_destroy, cmd);
 }

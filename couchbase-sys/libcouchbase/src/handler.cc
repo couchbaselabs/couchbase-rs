@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2014 Couchbase, Inc.
+ *     Copyright 2014-2019 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -278,7 +278,7 @@ void init_resp(lcb_INSTANCE *instance, const MemcachedResponse* mc_resp,
     make_error(instance, resp, mc_resp, immerr);
     resp->cas = mc_resp->cas();
     resp->cookie = const_cast<void*>(MCREQ_PKT_COOKIE(req));
-    mcreq_get_key(req, &resp->key, &resp->nkey);
+    mcreq_get_key(instance, req, &resp->key, &resp->nkey);
 }
 
 /**
@@ -885,7 +885,11 @@ H_collections_get_cid(mc_PIPELINE *pipeline, mc_PACKET *request,
     memcpy(&resp.collection_id, ptr, sizeof(uint32_t));
     resp.collection_id = ntohl(resp.collection_id);
 
-    invoke_callback(request, root, &resp, LCB_CALLBACK_GETCID);
+    if (request->flags & MCREQ_F_REQEXT) {
+        request->u_rdata.exdata->procs->handler(pipeline, request, immerr, &resp);
+    } else {
+        invoke_callback(request, root, &resp, LCB_CALLBACK_GETCID);
+    }
 }
 
 static void

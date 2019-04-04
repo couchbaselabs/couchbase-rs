@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2010-2018 Couchbase, Inc.
+ *     Copyright 2010-2019 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -22,7 +22,8 @@ LIBCOUCHBASE_API lcb_STATUS lcb_respcounter_status(const lcb_RESPCOUNTER *resp)
     return resp->rc;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_respcounter_error_context(const lcb_RESPCOUNTER *resp, const char **ctx, size_t *ctx_len)
+LIBCOUCHBASE_API lcb_STATUS lcb_respcounter_error_context(const lcb_RESPCOUNTER *resp, const char **ctx,
+                                                          size_t *ctx_len)
 {
     if ((resp->rflags & LCB_RESP_F_ERRINFO) == 0) {
         return LCB_KEY_ENOENT;
@@ -83,16 +84,21 @@ LIBCOUCHBASE_API lcb_STATUS lcb_respcounter_value(const lcb_RESPCOUNTER *resp, u
     return LCB_SUCCESS;
 }
 
-
 LIBCOUCHBASE_API lcb_STATUS lcb_cmdcounter_create(lcb_CMDCOUNTER **cmd)
 {
     *cmd = (lcb_CMDCOUNTER *)calloc(1, sizeof(lcb_CMDCOUNTER));
     return LCB_SUCCESS;
 }
 
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdcounter_clone(const lcb_CMDCOUNTER *cmd, lcb_CMDCOUNTER **copy)
+{
+    LCB_CMD_CLONE(lcb_CMDCOUNTER, cmd, copy);
+    return LCB_SUCCESS;
+}
+
 LIBCOUCHBASE_API lcb_STATUS lcb_cmdcounter_destroy(lcb_CMDCOUNTER *cmd)
 {
-    free(cmd);
+    LCB_CMD_DESTROY_CLONE(cmd);
     return LCB_SUCCESS;
 }
 
@@ -107,15 +113,13 @@ LIBCOUCHBASE_API lcb_STATUS lcb_cmdcounter_parent_span(lcb_CMDCOUNTER *cmd, lcbt
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdcounter_collection_id(lcb_CMDCOUNTER *cmd, uint32_t cid)
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdcounter_collection(lcb_CMDCOUNTER *cmd, const char *scope, size_t scope_len,
+                                                      const char *collection, size_t collection_len)
 {
-    cmd->cid = cid;
-    return LCB_SUCCESS;
-}
-
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdcounter_collection(lcb_CMDCOUNTER *cmd, const char *scope, size_t scope_len, const char *collection, size_t collection_len)
-{
-    /* TODO */
+    cmd->scope = scope;
+    cmd->nscope = scope_len;
+    cmd->collection = collection;
+    cmd->ncollection = collection_len;
     return LCB_SUCCESS;
 }
 
@@ -147,13 +151,32 @@ LIBCOUCHBASE_API lcb_STATUS lcb_cmdcounter_initial(lcb_CMDCOUNTER *cmd, uint64_t
 LIBCOUCHBASE_API lcb_STATUS lcb_cmdcounter_durability(lcb_CMDCOUNTER *cmd, lcb_DURABILITY_LEVEL level)
 {
     cmd->dur_level = level;
-    cmd->dur_timeout = 0;
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API
-lcb_STATUS lcb_counter(lcb_INSTANCE *instance, void *cookie, const lcb_CMDCOUNTER *cmd)
+static lcb_STATUS counter_validate(lcb_INSTANCE *instance, const lcb_CMDCOUNTER *cmd)
 {
+    if (LCB_KEYBUF_IS_EMPTY(&cmd->key)) {
+        return LCB_EMPTY_KEY;
+    }
+    if (cmd->cas || (cmd->create == 0 && cmd->exptime != 0)) {
+        return LCB_OPTIONS_CONFLICT;
+    }
+    if (cmd->dur_level && !LCBT_SUPPORT_SYNCREPLICATION(instance)) {
+        return LCB_NOT_SUPPORTED;
+    }
+
+    return LCB_SUCCESS;
+}
+
+static lcb_STATUS counter_impl(uint32_t cid, lcb_INSTANCE *instance, void *cookie, const void *arg)
+{
+    const lcb_CMDCOUNTER *cmd = (const lcb_CMDCOUNTER *)arg;
+    if (cid > 0) {
+        lcb_CMDCOUNTER *mut = const_cast< lcb_CMDCOUNTER * >(cmd);
+        mut->cid = cid;
+    }
+
     mc_CMDQUEUE *q = &instance->cmdq;
     mc_PIPELINE *pipeline;
     mc_PACKET *packet;
@@ -166,20 +189,9 @@ lcb_STATUS lcb_counter(lcb_INSTANCE *instance, void *cookie, const lcb_CMDCOUNTE
     protocol_binary_request_incr acmd;
     protocol_binary_request_header *hdr = &acmd.message.header;
 
-    if (LCB_KEYBUF_IS_EMPTY(&cmd->key)) {
-        return LCB_EMPTY_KEY;
-    }
-    if (cmd->cas || (cmd->create == 0 && cmd->exptime != 0)) {
-        return LCB_OPTIONS_CONFLICT;
-    }
-
-    if (cmd->dur_level) {
-        if (new_durability_supported) {
-            hdr->request.magic = PROTOCOL_BINARY_AREQ;
-            ffextlen = 4;
-        } else {
-            return LCB_NOT_SUPPORTED;
-        }
+    if (cmd->dur_level && new_durability_supported) {
+        hdr->request.magic = PROTOCOL_BINARY_AREQ;
+        ffextlen = 4;
     }
 
     err = mcreq_basic_packet(q, (const lcb_CMDBASE *)cmd, hdr, 20, ffextlen, &packet, &pipeline,
@@ -203,7 +215,7 @@ lcb_STATUS lcb_counter(lcb_INSTANCE *instance, void *cookie, const lcb_CMDCOUNTE
     if (cmd->dur_level && new_durability_supported) {
         acmd.message.body.alt.meta = (1 << 4) | 3;
         acmd.message.body.alt.level = cmd->dur_level;
-        acmd.message.body.alt.timeout = htons(cmd->dur_timeout);
+        acmd.message.body.alt.timeout = 0;
         acmd.message.body.alt.initial = lcb_htonll(cmd->initial);
         exp = &acmd.message.body.alt.expiration;
         delta = &acmd.message.body.alt.delta;
@@ -231,4 +243,19 @@ lcb_STATUS lcb_counter(lcb_INSTANCE *instance, void *cookie, const lcb_CMDCOUNTE
     TRACE_ARITHMETIC_BEGIN(instance, hdr, cmd);
     LCB_SCHED_ADD(instance, pipeline, packet);
     return LCB_SUCCESS;
+}
+
+LIBCOUCHBASE_API
+lcb_STATUS lcb_counter(lcb_INSTANCE *instance, void *cookie, const lcb_CMDCOUNTER *cmd)
+{
+    lcb_STATUS err;
+
+    err = counter_validate(instance, cmd);
+    if (err != LCB_SUCCESS) {
+        return err;
+    }
+
+    return collcache_exec(cmd->scope, cmd->nscope, cmd->collection, cmd->ncollection, instance, cookie, counter_impl,
+                          (lcb_COLLCACHE_ARG_CLONE)lcb_cmdcounter_clone, (lcb_COLLCACHE_ARG_DTOR)lcb_cmdcounter_destroy,
+                          cmd);
 }

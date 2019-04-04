@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2010-2017 Couchbase, Inc.
+ *     Copyright 2010-2019 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -492,7 +492,18 @@ HANDLER(client_string_handler) {
         free(LCBT_SETTING(instance, client_string));
         LCBT_SETTING(instance, client_string) = NULL;
         if (val) {
-            LCBT_SETTING(instance, client_string) = strdup(val);
+            char *p, *buf = strdup(val);
+            for (p = buf; *p != '\0'; p++) {
+                switch (*p) {
+                    case '\n':
+                    case '\r':
+                        *p = ' ';
+                        break;
+                    default:
+                        break;
+                }
+            }
+            LCBT_SETTING(instance, client_string) = buf;
         }
     } else {
         *(const char **)arg = LCBT_SETTING(instance, client_string);
@@ -638,6 +649,10 @@ HANDLER(network_handler) {
     return LCB_SUCCESS;
 }
 
+HANDLER(durable_write_handler) {
+    RETURN_GET_SET(int, LCBT_SETTING(instance, enable_durable_write));
+}
+
 static ctl_handler handlers[] = {
     timeout_common,                       /* LCB_CNTL_OP_TIMEOUT */
     timeout_common,                       /* LCB_CNTL_VIEW_TIMEOUT */
@@ -732,7 +747,9 @@ static ctl_handler handlers[] = {
     vb_noremap_handler,                   /* LCB_CNTL_VB_NOREMAP */
     network_handler,                      /* LCB_CNTL_NETWORK */
     wait_for_config_handler,              /* LCB_CNTL_WAIT_FOR_CONFIG */
-    http_pooltmo_handler                  /* LCB_CNTL_HTTP_POOL_TIMEOUT */
+    http_pooltmo_handler,                 /* LCB_CNTL_HTTP_POOL_TIMEOUT */
+    durable_write_handler,                /* LCB_CNTL_ENABLE_DURABLE_WRITE */
+    NULL
 };
 
 /* Union used for conversion to/from string functions */
@@ -926,6 +943,7 @@ static cntl_OPCODESTRS stropcode_map[] = {
     {"wait_for_config", LCB_CNTL_WAIT_FOR_CONFIG, convert_intbool},
     {"http_pool_timeout", LCB_CNTL_HTTP_POOL_TIMEOUT, convert_timevalue},
     {"enable_collections", LCB_CNTL_ENABLE_COLLECTIONS, convert_intbool},
+    {"enable_durable_write", LCB_CNTL_ENABLE_DURABLE_WRITE, convert_intbool},
     {NULL, -1}};
 
 #define CNTL_NUM_HANDLERS (sizeof(handlers) / sizeof(handlers[0]))

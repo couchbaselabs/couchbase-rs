@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2010-2018 Couchbase, Inc.
+ *     Copyright 2010-2019 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -77,16 +77,21 @@ LIBCOUCHBASE_API lcb_STATUS lcb_resptouch_mutation_token(const lcb_RESPTOUCH *re
     return LCB_SUCCESS;
 }
 
-
 LIBCOUCHBASE_API lcb_STATUS lcb_cmdtouch_create(lcb_CMDTOUCH **cmd)
 {
     *cmd = (lcb_CMDTOUCH *)calloc(1, sizeof(lcb_CMDTOUCH));
     return LCB_SUCCESS;
 }
 
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdtouch_clone(const lcb_CMDTOUCH *cmd, lcb_CMDTOUCH **copy)
+{
+    LCB_CMD_CLONE(lcb_CMDTOUCH, cmd, copy);
+    return LCB_SUCCESS;
+}
+
 LIBCOUCHBASE_API lcb_STATUS lcb_cmdtouch_destroy(lcb_CMDTOUCH *cmd)
 {
-    free(cmd);
+    LCB_CMD_DESTROY_CLONE(cmd);
     return LCB_SUCCESS;
 }
 
@@ -101,15 +106,13 @@ LIBCOUCHBASE_API lcb_STATUS lcb_cmdtouch_parent_span(lcb_CMDTOUCH *cmd, lcbtrace
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdtouch_collection_id(lcb_CMDTOUCH *cmd, uint32_t cid)
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdtouch_collection(lcb_CMDTOUCH *cmd, const char *scope, size_t scope_len,
+                                                    const char *collection, size_t collection_len)
 {
-    cmd->cid = cid;
-    return LCB_SUCCESS;
-}
-
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdtouch_collection(lcb_CMDTOUCH *cmd, const char *scope, size_t scope_len, const char *collection, size_t collection_len)
-{
-    /* TODO */
+    cmd->scope = scope;
+    cmd->nscope = scope_len;
+    cmd->collection = collection;
+    cmd->ncollection = collection_len;
     return LCB_SUCCESS;
 }
 
@@ -128,13 +131,28 @@ LIBCOUCHBASE_API lcb_STATUS lcb_cmdtouch_expiration(lcb_CMDTOUCH *cmd, uint32_t 
 LIBCOUCHBASE_API lcb_STATUS lcb_cmdtouch_durability(lcb_CMDTOUCH *cmd, lcb_DURABILITY_LEVEL level)
 {
     cmd->dur_level = level;
-    cmd->dur_timeout = 0;
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API
-lcb_STATUS lcb_touch(lcb_INSTANCE *instance, void *cookie, const lcb_CMDTOUCH *cmd)
+static lcb_STATUS touch_validate(lcb_INSTANCE *instance, const lcb_CMDTOUCH *cmd)
 {
+    if (LCB_KEYBUF_IS_EMPTY(&cmd->key)) {
+        return LCB_EMPTY_KEY;
+    }
+    if (cmd->dur_level && !LCBT_SUPPORT_SYNCREPLICATION(instance)) {
+        return LCB_NOT_SUPPORTED;
+    }
+    return LCB_SUCCESS;
+}
+
+static lcb_STATUS touch_impl(uint32_t cid, lcb_INSTANCE *instance, void *cookie, const void *arg)
+{
+    const lcb_CMDTOUCH *cmd = (const lcb_CMDTOUCH *)arg;
+    if (cid > 0) {
+        lcb_CMDTOUCH *mut = const_cast< lcb_CMDTOUCH * >(cmd);
+        mut->cid = cid;
+    }
+
     protocol_binary_request_touch tcmd;
     protocol_binary_request_header *hdr = &tcmd.message.header;
     int new_durability_supported = LCBT_SUPPORT_SYNCREPLICATION(instance);
@@ -144,17 +162,9 @@ lcb_STATUS lcb_touch(lcb_INSTANCE *instance, void *cookie, const lcb_CMDTOUCH *c
     lcb_U8 ffextlen = 0;
     size_t hsize;
 
-    if (LCB_KEYBUF_IS_EMPTY(&cmd->key)) {
-        return LCB_EMPTY_KEY;
-    }
-
-    if (cmd->dur_level) {
-        if (new_durability_supported) {
-            hdr->request.magic = PROTOCOL_BINARY_AREQ;
-            ffextlen = 4;
-        } else {
-            return LCB_NOT_SUPPORTED;
-        }
+    if (cmd->dur_level && new_durability_supported) {
+        hdr->request.magic = PROTOCOL_BINARY_AREQ;
+        ffextlen = 4;
     }
 
     err = mcreq_basic_packet(&instance->cmdq, (const lcb_CMDBASE *)cmd, hdr, 4, ffextlen, &pkt, &pl,
@@ -173,7 +183,7 @@ lcb_STATUS lcb_touch(lcb_INSTANCE *instance, void *cookie, const lcb_CMDTOUCH *c
     if (cmd->dur_level && new_durability_supported) {
         tcmd.message.body.alt.meta = (1 << 4) | 3;
         tcmd.message.body.alt.level = cmd->dur_level;
-        tcmd.message.body.alt.timeout = htons(cmd->dur_timeout);
+        tcmd.message.body.alt.timeout = 0;
         tcmd.message.body.alt.expiration = htonl(cmd->exptime);
     } else {
         tcmd.message.body.norm.expiration = htonl(cmd->exptime);
@@ -186,4 +196,19 @@ lcb_STATUS lcb_touch(lcb_INSTANCE *instance, void *cookie, const lcb_CMDTOUCH *c
     LCBTRACE_KV_START(instance->settings, cmd, LCBTRACE_OP_TOUCH, pkt->opaque, pkt->u_rdata.reqdata.span);
     TRACE_TOUCH_BEGIN(instance, hdr, cmd);
     return LCB_SUCCESS;
+}
+
+LIBCOUCHBASE_API
+lcb_STATUS lcb_touch(lcb_INSTANCE *instance, void *cookie, const lcb_CMDTOUCH *cmd)
+{
+    lcb_STATUS err;
+
+    err = touch_validate(instance, cmd);
+    if (err != LCB_SUCCESS) {
+        return err;
+    }
+
+    return collcache_exec(cmd->scope, cmd->nscope, cmd->collection, cmd->ncollection, instance, cookie, touch_impl,
+                          (lcb_COLLCACHE_ARG_CLONE)lcb_cmdtouch_clone, (lcb_COLLCACHE_ARG_DTOR)lcb_cmdtouch_destroy,
+                          cmd);
 }

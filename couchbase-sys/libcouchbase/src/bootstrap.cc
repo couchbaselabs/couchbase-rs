@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2014 Couchbase, Inc.
+ *     Copyright 2014-2019 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -101,6 +101,12 @@ void Bootstrap::config_callback(EventType event, ConfigInfo *info) {
                 LCBT_SETTING(parent, use_collections) = 1;
             } else {
                 LCBT_SETTING(parent, use_collections) = 0;
+            }
+
+            if (LCBVB_CAPS(LCBT_VBCONFIG(instance)) & LCBVB_CAP_DURABLE_WRITE) {
+                LCBT_SETTING(parent, enable_durable_write) = 1;
+            } else {
+                LCBT_SETTING(parent, enable_durable_write) = 0;
             }
 
             /* infer bucket type using distribution and capabilities set */

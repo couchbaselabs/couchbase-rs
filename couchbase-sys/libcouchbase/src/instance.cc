@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2010-2013 Couchbase, Inc.
+ *     Copyright 2010-2019 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -501,6 +501,7 @@ lcb_STATUS lcb_create(lcb_INSTANCE **instance,
     obj->n1ql_cache = lcb_n1qlcache_create();
     lcb_initialize_packet_handlers(obj);
     lcb_aspend_init(&obj->pendops);
+    obj->collcache = new lcb::CollectionCache();
 
     if ((err = setup_ssl(obj, spec)) != LCB_SUCCESS) {
         goto GT_DONE;
@@ -582,6 +583,7 @@ void lcb_destroy(lcb_INSTANCE *instance)
     DESTROY(delete, bs_state);
     DESTROY(delete, ht_nodes);
     DESTROY(delete, mc_nodes);
+    DESTROY(delete, collcache);
 
     if ((pendq = po->items[LCB_PENDTYPE_DURABILITY])) {
         std::vector<void*> dsets(pendq->begin(), pendq->end());

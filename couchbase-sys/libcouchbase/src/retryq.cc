@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2014 Couchbase, Inc.
+ *     Copyright 2014-2019 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -411,6 +411,12 @@ RetryQueue::nmvadd(mc_EXPACKET *detchpkt)
         flags = RETRY_SCHED_IMM;
     }
     add(detchpkt, LCB_NOT_MY_VBUCKET, NULL, flags);
+}
+
+void
+RetryQueue::ucadd(mc_EXPACKET *pkt)
+{
+    add(pkt, LCB_COLLECTION_UNKNOWN, NULL, RETRY_SCHED_IMM);
 }
 
 static void

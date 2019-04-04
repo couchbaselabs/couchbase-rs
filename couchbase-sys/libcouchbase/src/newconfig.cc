@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2011-2013 Couchbase, Inc.
+ *     Copyright 2011-2019 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -198,6 +198,7 @@ iterwipe_cb(mc_CMDQUEUE *cq, mc_PIPELINE *oldpl, mc_PACKET *oldpkt, void *)
     protocol_binary_request_header hdr;
     lcb::Server *srv = static_cast<lcb::Server *>(oldpl);
     int newix;
+    lcb_INSTANCE *instance = (lcb_INSTANCE *)cq->cqdata;
 
     mcreq_read_hdr(oldpkt, &hdr);
 
@@ -215,7 +216,7 @@ iterwipe_cb(mc_CMDQUEUE *cq, mc_PIPELINE *oldpl, mc_PACKET *oldpkt, void *)
 
         /* XXX: We ignore hashkey. This is going away soon, and is probably
          * better than simply failing the items. */
-        mcreq_get_key(oldpkt, &key, &nkey);
+        mcreq_get_key(instance, oldpkt, &key, &nkey);
         lcbvb_map_key(cq->config, key, nkey, &tmpid, &newix);
     }
 
@@ -229,7 +230,7 @@ iterwipe_cb(mc_CMDQUEUE *cq, mc_PIPELINE *oldpl, mc_PACKET *oldpkt, void *)
         return MCREQ_KEEP_PACKET;
     }
 
-    lcb_log(LOGARGS((lcb_INSTANCE *)cq->cqdata, DEBUG), "Remapped packet %p (SEQ=%u) from " SERVER_FMT " to " SERVER_FMT,
+    lcb_log(LOGARGS(instance, DEBUG), "Remapped packet %p (SEQ=%u) from " SERVER_FMT " to " SERVER_FMT,
         (void*)oldpkt, oldpkt->opaque, SERVER_ARGS((lcb::Server*)oldpl), SERVER_ARGS((lcb::Server*)newpl));
 
     /** Otherwise, copy over the packet and find the new vBucket to map to */

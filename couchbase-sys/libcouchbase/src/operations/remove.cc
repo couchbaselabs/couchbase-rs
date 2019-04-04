@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2010-2018 Couchbase, Inc.
+ *     Copyright 2010-2019 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -83,9 +83,15 @@ LIBCOUCHBASE_API lcb_STATUS lcb_cmdremove_create(lcb_CMDREMOVE **cmd)
     return LCB_SUCCESS;
 }
 
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdremove_clone(const lcb_CMDREMOVE *cmd, lcb_CMDREMOVE **copy)
+{
+    LCB_CMD_CLONE(lcb_CMDREMOVE, cmd, copy);
+    return LCB_SUCCESS;
+}
+
 LIBCOUCHBASE_API lcb_STATUS lcb_cmdremove_destroy(lcb_CMDREMOVE *cmd)
 {
-    free(cmd);
+    LCB_CMD_DESTROY_CLONE(cmd);
     return LCB_SUCCESS;
 }
 
@@ -100,15 +106,13 @@ LIBCOUCHBASE_API lcb_STATUS lcb_cmdremove_parent_span(lcb_CMDREMOVE *cmd, lcbtra
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdremove_collection_id(lcb_CMDREMOVE *cmd, uint32_t cid)
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdremove_collection(lcb_CMDREMOVE *cmd, const char *scope, size_t scope_len,
+                                                     const char *collection, size_t collection_len)
 {
-    cmd->cid = cid;
-    return LCB_SUCCESS;
-}
-
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdremove_collection(lcb_CMDREMOVE *cmd, const char *scope, size_t scope_len, const char *collection, size_t collection_len)
-{
-    /* TODO */
+    cmd->scope = scope;
+    cmd->nscope = scope_len;
+    cmd->collection = collection;
+    cmd->ncollection = collection_len;
     return LCB_SUCCESS;
 }
 
@@ -127,34 +131,41 @@ LIBCOUCHBASE_API lcb_STATUS lcb_cmdremove_cas(lcb_CMDREMOVE *cmd, uint64_t cas)
 LIBCOUCHBASE_API lcb_STATUS lcb_cmdremove_durability(lcb_CMDREMOVE *cmd, lcb_DURABILITY_LEVEL level)
 {
     cmd->dur_level = level;
-    cmd->dur_timeout = 0;
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API
-lcb_STATUS lcb_remove(lcb_INSTANCE *instance, void *cookie, const lcb_CMDREMOVE *cmd)
+static lcb_STATUS remove_validate(lcb_INSTANCE *instance, const lcb_CMDREMOVE *cmd)
 {
+    if (LCB_KEYBUF_IS_EMPTY(&cmd->key)) {
+        return LCB_EMPTY_KEY;
+    }
+    if (cmd->dur_level && !LCBT_SUPPORT_SYNCREPLICATION(instance)) {
+        return LCB_NOT_SUPPORTED;
+    }
+    return LCB_SUCCESS;
+}
+
+static lcb_STATUS remove_impl(uint32_t cid, lcb_INSTANCE *instance, void *cookie, const void *arg)
+{
+    const lcb_CMDREMOVE *cmd = (const lcb_CMDREMOVE *)arg;
+    if (cid > 0) {
+        lcb_CMDREMOVE *mut = const_cast< lcb_CMDREMOVE * >(cmd);
+        mut->cid = cid;
+    }
+
     mc_CMDQUEUE *cq = &instance->cmdq;
     mc_PIPELINE *pl;
     mc_PACKET *pkt;
-    lcb_STATUS err;
     protocol_binary_request_delete req = {0};
     protocol_binary_request_header *hdr = &req.message.header;
     int new_durability_supported = LCBT_SUPPORT_SYNCREPLICATION(instance);
     lcb_U8 ffextlen = 0;
     size_t hsize;
+    lcb_STATUS err;
 
-    if (LCB_KEYBUF_IS_EMPTY(&cmd->key)) {
-        return LCB_EMPTY_KEY;
-    }
-
-    if (cmd->dur_level) {
-        if (new_durability_supported) {
-            hdr->request.magic = PROTOCOL_BINARY_AREQ;
-            ffextlen = 4;
-        } else {
-            return LCB_NOT_SUPPORTED;
-        }
+    if (cmd->dur_level && new_durability_supported) {
+        hdr->request.magic = PROTOCOL_BINARY_AREQ;
+        ffextlen = 4;
     }
 
     err = mcreq_basic_packet(cq, (const lcb_CMDBASE *)cmd, hdr, 0, ffextlen, &pkt, &pl, MCREQ_BASICPACKET_F_FALLBACKOK);
@@ -172,7 +183,7 @@ lcb_STATUS lcb_remove(lcb_INSTANCE *instance, void *cookie, const lcb_CMDREMOVE 
     if (cmd->dur_level && new_durability_supported) {
         req.message.body.alt.meta = (1 << 4) | 3;
         req.message.body.alt.level = cmd->dur_level;
-        req.message.body.alt.timeout = htons(cmd->dur_timeout);
+        req.message.body.alt.timeout = 0;
     }
 
     pkt->u_rdata.reqdata.cookie = cookie;
@@ -182,4 +193,19 @@ lcb_STATUS lcb_remove(lcb_INSTANCE *instance, void *cookie, const lcb_CMDREMOVE 
     TRACE_REMOVE_BEGIN(instance, hdr, cmd);
     LCB_SCHED_ADD(instance, pl, pkt);
     return LCB_SUCCESS;
+}
+
+LIBCOUCHBASE_API
+lcb_STATUS lcb_remove(lcb_INSTANCE *instance, void *cookie, const lcb_CMDREMOVE *cmd)
+{
+    lcb_STATUS err;
+
+    err = remove_validate(instance, cmd);
+    if (err != LCB_SUCCESS) {
+        return err;
+    }
+
+    return collcache_exec(cmd->scope, cmd->nscope, cmd->collection, cmd->ncollection, instance, cookie, remove_impl,
+                          (lcb_COLLCACHE_ARG_CLONE)lcb_cmdremove_clone, (lcb_COLLCACHE_ARG_DTOR)lcb_cmdremove_destroy,
+                          cmd);
 }
