@@ -8,7 +8,7 @@ struct Airport {
 }
 
 fn main() {
-    let cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
+    let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
     let bucket = cluster.bucket("travel-sample");
     let collection = bucket.default_collection();
 
@@ -31,6 +31,8 @@ fn main() {
 
     println!("{:?}", collection.remove("foo", None));
     println!("{:?}", collection.get("foo", None));
+
+    // cluster.disconnect();
 
     std::thread::sleep(std::time::Duration::from_secs(100));
 }

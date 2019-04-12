@@ -17,4 +17,8 @@ impl Bucket {
     pub fn default_collection(&self) -> Collection {
         Collection::new(self.instance.clone())
     }
+
+    pub(crate) fn close(&self) {
+        self.instance.shutdown();
+    }
 }

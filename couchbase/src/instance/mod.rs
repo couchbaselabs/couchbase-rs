@@ -95,6 +95,10 @@ impl Instance {
         Ok(Instance { sender: tx })
     }
 
+    pub fn shutdown(&self) {
+        unimplemented!("shutdown is not implemented yet");
+    }
+
     pub fn get(
         &self,
         id: String,
