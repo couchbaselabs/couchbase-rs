@@ -212,3 +212,41 @@ impl InstanceRequest for ReplaceRequest {
         }
     }
 }
+
+#[derive(Debug)]
+pub struct RemoveRequest {
+    sender: Sender<MutationResult>,
+    id: String,
+    options: Option<RemoveOptions>,
+}
+
+impl RemoveRequest {
+    pub fn new(sender: Sender<MutationResult>, id: String, options: Option<RemoveOptions>) -> Self {
+        Self {
+            sender,
+            id,
+            options,
+        }
+    }
+}
+
+impl InstanceRequest for RemoveRequest {
+    fn encode(self: Box<Self>, instance: *mut lcb_INSTANCE) {
+        let id_len = self.id.len();
+        let id_encoded = CString::new(self.id).expect("Could not encode ID");
+        let mut command: *mut lcb_CMDREMOVE = ptr::null_mut();
+
+        let sender_boxed = Box::new(self.sender);
+        let cookie = Box::into_raw(sender_boxed) as *mut c_void;
+        unsafe {
+            lcb_cmdremove_create(&mut command);
+            lcb_cmdremove_key(command, id_encoded.as_ptr(), id_len);
+            if let Some(options) = self.options {
+                if let Some(timeout) = options.timeout() {
+                    lcb_cmdremove_timeout(command, timeout.as_millis() as u32);
+                }
+            }
+            lcb_remove(instance, cookie, command);
+        }
+    }
+}

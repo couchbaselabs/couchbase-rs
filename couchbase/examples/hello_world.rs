@@ -29,5 +29,8 @@ fn main() {
     println!("{:?}", collection.upsert("foo", "bar", None));
     println!("{:?}", collection.get("foo", None));
 
+    println!("{:?}", collection.remove("foo", None));
+    println!("{:?}", collection.get("foo", None));
+
     std::thread::sleep(std::time::Duration::from_secs(100));
 }

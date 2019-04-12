@@ -74,4 +74,12 @@ impl Collection {
             .replace(id.into(), serialized, flags, options)
             .wait()
     }
+
+    pub fn remove<S>(&self, id: S, options: Option<RemoveOptions>) -> Result<MutationResult, ()> 
+        where S: Into<String>
+    {
+        self.instance
+            .remove(id.into(), options)
+            .wait()
+    }
 }

@@ -150,6 +150,18 @@ impl Instance {
             .expect("Could not send replace command into io loop");
         c.map_err(|_| ())
     }
+
+    pub fn remove(
+        &self,
+        id: String,
+        options: Option<RemoveOptions>,
+    ) -> impl Future<Item = MutationResult, Error = ()> {
+        let (p, c) = oneshot::channel();
+        self.sender
+            .send(Box::new(RemoveRequest::new(p, id, options)))
+            .expect("Could not send remove command into io loop");
+        c.map_err(|_| ())
+    }
 }
 
 #[derive(Debug)]
@@ -175,6 +187,11 @@ unsafe fn install_instance_callbacks(instance: *mut lcb_INSTANCE) {
         instance,
         lcb_CALLBACK_TYPE_LCB_CALLBACK_STORE as i32,
         Some(store_callback),
+    );
+    lcb_install_callback3(
+        instance,
+        lcb_CALLBACK_TYPE_LCB_CALLBACK_REMOVE as i32,
+        Some(remove_callback),
     );
 }
 
@@ -227,3 +244,24 @@ unsafe extern "C" fn store_callback(
         .send(MutationResult::new(cas))
         .expect("Could not complete Future!");
 }
+
+unsafe extern "C" fn remove_callback(
+    _instance: *mut lcb_INSTANCE,
+    _cbtype: i32,
+    res: *const lcb_RESPBASE,
+) {
+    let remove_res = res as *const lcb_RESPREMOVE;
+
+    let mut cookie_ptr: *mut c_void = ptr::null_mut();
+    lcb_respremove_cookie(remove_res, &mut cookie_ptr);
+    let sender = Box::from_raw(cookie_ptr as *mut oneshot::Sender<MutationResult>);
+
+    let mut cas: u64 = 0;
+    lcb_respremove_cas(remove_res, &mut cas);
+
+    // TODO: ERROR HANDLING
+    sender
+        .send(MutationResult::new(cas))
+        .expect("Could not complete Future!");
+}
+
