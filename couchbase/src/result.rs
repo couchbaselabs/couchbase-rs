@@ -4,8 +4,8 @@ use std::str;
 use futures::sync::{mpsc, oneshot};
 use futures::Future;
 use futures::Stream;
-use serde::Deserialize;
 use serde::de::DeserializeOwned;
+use serde::Deserialize;
 use serde_derive::Deserialize;
 use serde_json::from_slice;
 

@@ -12,7 +12,10 @@ fn main() {
     let _bucket = cluster.bucket("travel-sample");
 
     let mut result = cluster
-        .query("select airportname, icao from `travel-sample` where type = \"airport\" limit 2", None)
+        .query(
+            "select airportname, icao from `travel-sample` where type = \"airport\" limit 2",
+            None,
+        )
         .expect("Could not perform query");
 
     println!("---> rows {:?}", result.rows_as().collect::<Vec<Airport>>());
