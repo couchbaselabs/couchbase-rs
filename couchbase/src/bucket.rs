@@ -1,5 +1,8 @@
 use crate::collection::Collection;
 use crate::instance::Instance;
+use crate::options::QueryOptions;
+use crate::result::QueryResult;
+use futures::Future;
 use std::sync::Arc;
 
 pub struct Bucket {
@@ -16,6 +19,17 @@ impl Bucket {
 
     pub fn default_collection(&self) -> Collection {
         Collection::new(self.instance.clone())
+    }
+
+    pub(crate) fn query<S>(
+        &self,
+        statement: S,
+        options: Option<QueryOptions>,
+    ) -> Result<QueryResult, ()>
+    where
+        S: Into<String>,
+    {
+        self.instance.query(statement.into(), options).wait()
     }
 
     pub(crate) fn close(&self) {

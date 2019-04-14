@@ -166,6 +166,18 @@ impl Instance {
             .expect("Could not send remove command into io loop");
         c.map_err(|_| ())
     }
+
+    pub fn query(
+        &self,
+        statement: String,
+        options: Option<QueryOptions>,
+    ) -> impl Future<Item = QueryResult, Error = ()> {
+        let (p, c) = oneshot::channel();
+        self.sender
+            .send(Box::new(QueryRequest::new(p, statement, options)))
+            .expect("Could not send query command into io loop");
+        c.map_err(|_| ())
+    }
 }
 
 #[derive(Debug)]
@@ -268,4 +280,3 @@ unsafe extern "C" fn remove_callback(
         .send(MutationResult::new(cas))
         .expect("Could not complete Future!");
 }
-

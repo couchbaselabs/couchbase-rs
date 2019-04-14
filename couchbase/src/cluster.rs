@@ -1,5 +1,7 @@
 use crate::bucket::Bucket;
 
+use crate::options::QueryOptions;
+use crate::result::QueryResult;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -36,6 +38,18 @@ impl Cluster {
 
         self.buckets.insert(name.clone(), bucket.clone());
         bucket.clone()
+    }
+
+    pub fn query<S>(&self, statement: S, options: Option<QueryOptions>) -> Result<QueryResult, ()>
+    where
+        S: Into<String>,
+    {
+        let bucket = match self.buckets.values().nth(0) {
+            Some(b) => b,
+            None => panic!("At least one bucket needs to be open to perform a query for now!"),
+        };
+
+        bucket.query(statement, options)
     }
 
     pub fn disconnect(&mut self) {

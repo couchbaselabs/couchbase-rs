@@ -75,11 +75,10 @@ impl Collection {
             .wait()
     }
 
-    pub fn remove<S>(&self, id: S, options: Option<RemoveOptions>) -> Result<MutationResult, ()> 
-        where S: Into<String>
+    pub fn remove<S>(&self, id: S, options: Option<RemoveOptions>) -> Result<MutationResult, ()>
+    where
+        S: Into<String>,
     {
-        self.instance
-            .remove(id.into(), options)
-            .wait()
+        self.instance.remove(id.into(), options).wait()
     }
 }

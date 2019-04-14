@@ -1,10 +1,11 @@
 use crate::options::*;
 use crate::result::*;
 use couchbase_sys::*;
-use futures::sync::oneshot::Sender;
+use futures::sync::{mpsc, oneshot};
 use std::ffi::{c_void, CString};
 use std::os::raw::c_char;
 use std::ptr;
+use std::slice::from_raw_parts;
 
 pub trait InstanceRequest: Send + 'static {
     fn encode(self: Box<Self>, instance: *mut lcb_INSTANCE);
@@ -12,13 +13,17 @@ pub trait InstanceRequest: Send + 'static {
 
 #[derive(Debug)]
 pub struct GetRequest {
-    sender: Sender<Option<GetResult>>,
+    sender: oneshot::Sender<Option<GetResult>>,
     id: String,
     options: Option<GetOptions>,
 }
 
 impl GetRequest {
-    pub fn new(sender: Sender<Option<GetResult>>, id: String, options: Option<GetOptions>) -> Self {
+    pub fn new(
+        sender: oneshot::Sender<Option<GetResult>>,
+        id: String,
+        options: Option<GetOptions>,
+    ) -> Self {
         Self {
             sender,
             id,
@@ -50,7 +55,7 @@ impl InstanceRequest for GetRequest {
 
 #[derive(Debug)]
 pub struct UpsertRequest {
-    sender: Sender<MutationResult>,
+    sender: oneshot::Sender<MutationResult>,
     id: String,
     content: Vec<u8>,
     flags: u32,
@@ -59,7 +64,7 @@ pub struct UpsertRequest {
 
 impl UpsertRequest {
     pub fn new(
-        sender: Sender<MutationResult>,
+        sender: oneshot::Sender<MutationResult>,
         id: String,
         content: Vec<u8>,
         flags: u32,
@@ -105,7 +110,7 @@ impl InstanceRequest for UpsertRequest {
 
 #[derive(Debug)]
 pub struct InsertRequest {
-    sender: Sender<MutationResult>,
+    sender: oneshot::Sender<MutationResult>,
     id: String,
     content: Vec<u8>,
     flags: u32,
@@ -114,7 +119,7 @@ pub struct InsertRequest {
 
 impl InsertRequest {
     pub fn new(
-        sender: Sender<MutationResult>,
+        sender: oneshot::Sender<MutationResult>,
         id: String,
         content: Vec<u8>,
         flags: u32,
@@ -160,7 +165,7 @@ impl InstanceRequest for InsertRequest {
 
 #[derive(Debug)]
 pub struct ReplaceRequest {
-    sender: Sender<MutationResult>,
+    sender: oneshot::Sender<MutationResult>,
     id: String,
     content: Vec<u8>,
     flags: u32,
@@ -169,7 +174,7 @@ pub struct ReplaceRequest {
 
 impl ReplaceRequest {
     pub fn new(
-        sender: Sender<MutationResult>,
+        sender: oneshot::Sender<MutationResult>,
         id: String,
         content: Vec<u8>,
         flags: u32,
@@ -215,13 +220,17 @@ impl InstanceRequest for ReplaceRequest {
 
 #[derive(Debug)]
 pub struct RemoveRequest {
-    sender: Sender<MutationResult>,
+    sender: oneshot::Sender<MutationResult>,
     id: String,
     options: Option<RemoveOptions>,
 }
 
 impl RemoveRequest {
-    pub fn new(sender: Sender<MutationResult>, id: String, options: Option<RemoveOptions>) -> Self {
+    pub fn new(
+        sender: oneshot::Sender<MutationResult>,
+        id: String,
+        options: Option<RemoveOptions>,
+    ) -> Self {
         Self {
             sender,
             id,
@@ -248,5 +257,107 @@ impl InstanceRequest for RemoveRequest {
             }
             lcb_remove(instance, cookie, command);
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct QueryRequest {
+    sender: oneshot::Sender<QueryResult>,
+    rows_sender: mpsc::UnboundedSender<Vec<u8>>,
+    rows_receiver: mpsc::UnboundedReceiver<Vec<u8>>,
+    meta_sender: oneshot::Sender<Vec<u8>>,
+    meta_receiver: oneshot::Receiver<Vec<u8>>,
+    statement: String,
+    options: Option<QueryOptions>,
+}
+
+impl QueryRequest {
+    pub fn new(
+        sender: oneshot::Sender<QueryResult>,
+        statement: String,
+        options: Option<QueryOptions>,
+    ) -> Self {
+        let (meta_sender, meta_receiver) = oneshot::channel();
+        let (rows_sender, rows_receiver) = mpsc::unbounded();
+        Self {
+            sender,
+            rows_sender,
+            rows_receiver,
+            meta_sender,
+            meta_receiver,
+            statement,
+            options,
+        }
+    }
+}
+
+impl InstanceRequest for QueryRequest {
+    fn encode(self: Box<Self>, instance: *mut lcb_INSTANCE) {
+        let statement_len = self.statement.len();
+        let statement_encoded = CString::new(self.statement).expect("Could not encode Statement");
+        let mut command: *mut lcb_CMDN1QL = ptr::null_mut();
+
+        let sender_boxed = Box::new(QueryCookie {
+            result: Some(self.sender),
+            rows_sender: self.rows_sender,
+            rows_receiver: Some(self.rows_receiver),
+            meta_sender: self.meta_sender,
+            meta_receiver: Some(self.meta_receiver),
+        });
+        let cookie = Box::into_raw(sender_boxed) as *mut c_void;
+        unsafe {
+            lcb_cmdn1ql_create(&mut command);
+            lcb_cmdn1ql_statement(command, statement_encoded.as_ptr(), statement_len);
+            lcb_cmdn1ql_callback(command, Some(n1ql_callback));
+            lcb_n1ql(instance, cookie, command);
+        }
+    }
+}
+
+struct QueryCookie {
+    result: Option<oneshot::Sender<QueryResult>>,
+    rows_sender: mpsc::UnboundedSender<Vec<u8>>,
+    rows_receiver: Option<mpsc::UnboundedReceiver<Vec<u8>>>,
+    meta_sender: oneshot::Sender<Vec<u8>>,
+    meta_receiver: Option<oneshot::Receiver<Vec<u8>>>,
+}
+
+unsafe extern "C" fn n1ql_callback(
+    _instance: *mut lcb_INSTANCE,
+    _cbtype: i32,
+    res: *const lcb_RESPN1QL,
+) {
+    let mut row_len: usize = 0;
+    let mut row_ptr: *const c_char = ptr::null();
+    lcb_respn1ql_row(res, &mut row_ptr, &mut row_len);
+    let row = from_raw_parts(row_ptr as *const u8, row_len);
+
+    let mut cookie_ptr: *mut c_void = ptr::null_mut();
+    lcb_respn1ql_cookie(res, &mut cookie_ptr);
+    let mut cookie = Box::from_raw(cookie_ptr as *mut QueryCookie);
+
+    if cookie.result.is_some() {
+        cookie
+            .result
+            .take()
+            .expect("Could not take result!")
+            .send(QueryResult::new(
+                cookie.rows_receiver.take().unwrap(),
+                cookie.meta_receiver.take().unwrap(),
+            ))
+            .expect("Could not complete Future!");
+    }
+
+    if lcb_respn1ql_is_final(res) == 1 {
+        cookie
+            .meta_sender
+            .send(row.to_vec())
+            .expect("Could not send meta");
+    } else {
+        cookie
+            .rows_sender
+            .unbounded_send(row.to_vec())
+            .expect("Could not send row");
+        Box::into_raw(cookie);
     }
 }
