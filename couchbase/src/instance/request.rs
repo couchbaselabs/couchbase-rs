@@ -49,6 +49,7 @@ impl InstanceRequest for GetRequest {
                 }
             }
             lcb_get(instance, cookie, command);
+            lcb_cmdget_destroy(command);
         }
     }
 }
@@ -104,6 +105,7 @@ impl InstanceRequest for UpsertRequest {
                 }
             }
             lcb_store(instance, cookie, command);
+            lcb_cmdstore_destroy(command);
         }
     }
 }
@@ -159,6 +161,7 @@ impl InstanceRequest for InsertRequest {
                 }
             }
             lcb_store(instance, cookie, command);
+            lcb_cmdstore_destroy(command);
         }
     }
 }
@@ -214,6 +217,7 @@ impl InstanceRequest for ReplaceRequest {
                 }
             }
             lcb_store(instance, cookie, command);
+            lcb_cmdstore_destroy(command);
         }
     }
 }
@@ -256,6 +260,7 @@ impl InstanceRequest for RemoveRequest {
                 }
             }
             lcb_remove(instance, cookie, command);
+            lcb_cmdremove_destroy(command);
         }
     }
 }
@@ -310,6 +315,7 @@ impl InstanceRequest for QueryRequest {
             lcb_cmdn1ql_statement(command, statement_encoded.as_ptr(), statement_len);
             lcb_cmdn1ql_callback(command, Some(n1ql_callback));
             lcb_n1ql(instance, cookie, command);
+            lcb_cmdn1ql_destroy(command);
         }
     }
 }
