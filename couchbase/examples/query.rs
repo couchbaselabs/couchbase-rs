@@ -1,6 +1,5 @@
 use couchbase::Cluster;
 use serde_derive::Deserialize;
-use serde_json::Value;
 
 #[derive(Debug, Deserialize)]
 struct Airport {
