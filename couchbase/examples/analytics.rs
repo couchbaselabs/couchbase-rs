@@ -13,10 +13,7 @@ fn main() {
     let _bucket = cluster.bucket("travel-sample");
 
     let mut result = cluster
-        .analytics_query(
-            "SELECT DataverseName FROM Metadata.`Dataverse`",
-            None,
-        )
+        .analytics_query("SELECT DataverseName FROM Metadata.`Dataverse`", None)
         .expect("Could not perform analytics query");
 
     println!("---> rows {:?}", result.rows_as().collect::<Vec<Value>>());

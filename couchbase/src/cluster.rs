@@ -52,19 +52,23 @@ impl Cluster {
         bucket.query(statement, options)
     }
 
-
-    pub fn analytics_query<S>(&self, statement: S, options: Option<AnalyticsOptions>) -> Result<AnalyticsResult, ()>
+    pub fn analytics_query<S>(
+        &self,
+        statement: S,
+        options: Option<AnalyticsOptions>,
+    ) -> Result<AnalyticsResult, ()>
     where
         S: Into<String>,
     {
         let bucket = match self.buckets.values().nth(0) {
             Some(b) => b,
-            None => panic!("At least one bucket needs to be open to perform an analytics query for now!"),
+            None => panic!(
+                "At least one bucket needs to be open to perform an analytics query for now!"
+            ),
         };
 
         bucket.analytics_query(statement, options)
     }
-
 
     pub fn disconnect(&mut self) {
         for bucket in self.buckets.values() {

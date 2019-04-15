@@ -32,7 +32,7 @@ impl Bucket {
         self.instance.query(statement.into(), options).wait()
     }
 
-        pub(crate) fn analytics_query<S>(
+    pub(crate) fn analytics_query<S>(
         &self,
         statement: S,
         options: Option<AnalyticsOptions>,
@@ -40,7 +40,9 @@ impl Bucket {
     where
         S: Into<String>,
     {
-        self.instance.analytics_query(statement.into(), options).wait()
+        self.instance
+            .analytics_query(statement.into(), options)
+            .wait()
     }
 
     pub(crate) fn close(&self) {

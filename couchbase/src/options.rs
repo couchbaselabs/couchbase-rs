@@ -121,7 +121,10 @@ pub struct ReplaceOptions {
 
 impl ReplaceOptions {
     pub fn new() -> Self {
-        Self { timeout: None, cas: None }
+        Self {
+            timeout: None,
+            cas: None,
+        }
     }
 
     pub fn set_timeout(mut self, timeout: Duration) -> Self {

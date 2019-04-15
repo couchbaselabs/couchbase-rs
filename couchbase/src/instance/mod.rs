@@ -112,7 +112,7 @@ impl Instance {
         c.map_err(|_| ())
     }
 
-        pub fn get_and_lock(
+    pub fn get_and_lock(
         &self,
         id: String,
         options: Option<GetAndLockOptions>,
@@ -124,7 +124,7 @@ impl Instance {
         c.map_err(|_| ())
     }
 
-        pub fn get_and_touch(
+    pub fn get_and_touch(
         &self,
         id: String,
         expiration: Duration,
@@ -132,7 +132,9 @@ impl Instance {
     ) -> impl Future<Item = Option<GetResult>, Error = ()> {
         let (p, c) = oneshot::channel();
         self.sender
-            .send(Box::new(GetAndTouchRequest::new(p, id, expiration, options)))
+            .send(Box::new(GetAndTouchRequest::new(
+                p, id, expiration, options,
+            )))
             .expect("Could not send getAndTouch command into io loop");
         c.map_err(|_| ())
     }
@@ -205,7 +207,7 @@ impl Instance {
         c.map_err(|_| ())
     }
 
-        pub fn analytics_query(
+    pub fn analytics_query(
         &self,
         statement: String,
         options: Option<AnalyticsOptions>,

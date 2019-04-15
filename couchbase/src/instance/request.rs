@@ -151,7 +151,6 @@ impl InstanceRequest for GetAndTouchRequest {
     }
 }
 
-
 #[derive(Debug)]
 pub struct UpsertRequest {
     sender: oneshot::Sender<MutationResult>,
