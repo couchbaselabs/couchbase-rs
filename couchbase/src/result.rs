@@ -17,7 +17,7 @@ pub struct GetResult {
 
 impl GetResult {
     pub fn new(cas: u64, encoded: Vec<u8>, flags: u32) -> Self {
-        GetResult {
+        Self {
             cas,
             encoded,
             flags,
@@ -54,7 +54,7 @@ pub struct MutationResult {
 
 impl MutationResult {
     pub fn new(cas: u64) -> Self {
-        MutationResult { cas }
+        Self { cas }
     }
 
     pub fn cas(&self) -> u64 {
@@ -96,7 +96,63 @@ pub struct QueryMetrics {
 
 impl QueryResult {
     pub fn new(rows: mpsc::UnboundedReceiver<Vec<u8>>, meta: oneshot::Receiver<Vec<u8>>) -> Self {
-        QueryResult {
+        Self {
+            rows: Some(rows),
+            meta: Some(meta),
+        }
+    }
+
+    pub fn rows_as<T>(&mut self) -> impl Iterator<Item = T>
+    where
+        T: DeserializeOwned,
+    {
+        self.rows
+            .take()
+            .expect("Rows already consumed!")
+            .map(|v| from_slice::<T>(v.as_slice()).expect("Could not convert type"))
+            .wait()
+            .map(|v| v.expect("could not unwrap row"))
+    }
+
+    pub fn meta(&mut self) -> QueryMeta {
+        self.meta
+            .take()
+            .expect("Meta already consumed!")
+            .map(|v| from_slice::<QueryMeta>(v.as_slice()).expect("Could not convert type"))
+            .wait()
+            .expect("could not unwrap meta")
+    }
+}
+
+#[derive(Debug)]
+pub struct AnalyticsResult {
+    rows: Option<mpsc::UnboundedReceiver<Vec<u8>>>,
+    meta: Option<oneshot::Receiver<Vec<u8>>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AnalyticsMeta {
+    #[serde(rename = "requestID")]
+    request_id: String,
+    status: String,
+    metrics: AnalyticsMetrics,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AnalyticsMetrics {
+    #[serde(rename = "elapsedTime")]
+    elapsed_time: String,
+    #[serde(rename = "executionTime")]
+    execution_time: String,
+    #[serde(rename = "resultCount")]
+    result_count: usize,
+    #[serde(rename = "resultSize")]
+    result_size: usize,
+}
+
+impl AnalyticsResult {
+    pub fn new(rows: mpsc::UnboundedReceiver<Vec<u8>>, meta: oneshot::Receiver<Vec<u8>>) -> Self {
+        Self {
             rows: Some(rows),
             meta: Some(meta),
         }

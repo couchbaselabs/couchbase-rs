@@ -204,6 +204,18 @@ impl Instance {
             .expect("Could not send query command into io loop");
         c.map_err(|_| ())
     }
+
+        pub fn analytics_query(
+        &self,
+        statement: String,
+        options: Option<AnalyticsOptions>,
+    ) -> impl Future<Item = AnalyticsResult, Error = ()> {
+        let (p, c) = oneshot::channel();
+        self.sender
+            .send(Box::new(AnalyticsRequest::new(p, statement, options)))
+            .expect("Could not send analytics query command into io loop");
+        c.map_err(|_| ())
+    }
 }
 
 #[derive(Debug)]

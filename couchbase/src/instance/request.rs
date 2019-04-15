@@ -465,3 +465,106 @@ unsafe extern "C" fn n1ql_callback(
         Box::into_raw(cookie);
     }
 }
+
+#[derive(Debug)]
+pub struct AnalyticsRequest {
+    sender: oneshot::Sender<AnalyticsResult>,
+    rows_sender: mpsc::UnboundedSender<Vec<u8>>,
+    rows_receiver: mpsc::UnboundedReceiver<Vec<u8>>,
+    meta_sender: oneshot::Sender<Vec<u8>>,
+    meta_receiver: oneshot::Receiver<Vec<u8>>,
+    statement: String,
+    options: Option<AnalyticsOptions>,
+}
+
+impl AnalyticsRequest {
+    pub fn new(
+        sender: oneshot::Sender<AnalyticsResult>,
+        statement: String,
+        options: Option<AnalyticsOptions>,
+    ) -> Self {
+        let (meta_sender, meta_receiver) = oneshot::channel();
+        let (rows_sender, rows_receiver) = mpsc::unbounded();
+        Self {
+            sender,
+            rows_sender,
+            rows_receiver,
+            meta_sender,
+            meta_receiver,
+            statement,
+            options,
+        }
+    }
+}
+
+impl InstanceRequest for AnalyticsRequest {
+    fn encode(self: Box<Self>, instance: *mut lcb_INSTANCE) {
+        let statement_len = self.statement.len();
+        let statement_encoded = CString::new(self.statement).expect("Could not encode Statement");
+        let mut command: *mut lcb_CMDANALYTICS = ptr::null_mut();
+
+        let sender_boxed = Box::new(AnalyticsCookie {
+            result: Some(self.sender),
+            rows_sender: self.rows_sender,
+            rows_receiver: Some(self.rows_receiver),
+            meta_sender: self.meta_sender,
+            meta_receiver: Some(self.meta_receiver),
+        });
+        let cookie = Box::into_raw(sender_boxed) as *mut c_void;
+        unsafe {
+            lcb_cmdanalytics_create(&mut command);
+            lcb_cmdanalytics_statement(command, statement_encoded.as_ptr(), statement_len);
+            lcb_cmdanalytics_callback(command, Some(analytics_callback));
+            lcb_analytics(instance, cookie, command);
+            lcb_cmdanalytics_destroy(command);
+        }
+    }
+}
+
+struct AnalyticsCookie {
+    result: Option<oneshot::Sender<AnalyticsResult>>,
+    rows_sender: mpsc::UnboundedSender<Vec<u8>>,
+    rows_receiver: Option<mpsc::UnboundedReceiver<Vec<u8>>>,
+    meta_sender: oneshot::Sender<Vec<u8>>,
+    meta_receiver: Option<oneshot::Receiver<Vec<u8>>>,
+}
+
+unsafe extern "C" fn analytics_callback(
+    _instance: *mut lcb_INSTANCE,
+    _cbtype: i32,
+    res: *const lcb_RESPANALYTICS,
+) {
+    let mut row_len: usize = 0;
+    let mut row_ptr: *const c_char = ptr::null();
+    lcb_respanalytics_row(res, &mut row_ptr, &mut row_len);
+    let row = from_raw_parts(row_ptr as *const u8, row_len);
+
+    let mut cookie_ptr: *mut c_void = ptr::null_mut();
+    lcb_respanalytics_cookie(res, &mut cookie_ptr);
+    let mut cookie = Box::from_raw(cookie_ptr as *mut AnalyticsCookie);
+
+    if cookie.result.is_some() {
+        cookie
+            .result
+            .take()
+            .expect("Could not take result!")
+            .send(AnalyticsResult::new(
+                cookie.rows_receiver.take().unwrap(),
+                cookie.meta_receiver.take().unwrap(),
+            ))
+            .expect("Could not complete Future!");
+    }
+
+    if lcb_respanalytics_is_final(res) == 1 {
+        cookie
+            .meta_sender
+            .send(row.to_vec())
+            .expect("Could not send meta");
+    } else {
+        cookie
+            .rows_sender
+            .unbounded_send(row.to_vec())
+            .expect("Could not send row");
+        Box::into_raw(cookie);
+    }
+}

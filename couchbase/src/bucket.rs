@@ -1,7 +1,7 @@
 use crate::collection::Collection;
 use crate::instance::Instance;
-use crate::options::QueryOptions;
-use crate::result::QueryResult;
+use crate::options::{AnalyticsOptions, QueryOptions};
+use crate::result::{AnalyticsResult, QueryResult};
 use futures::Future;
 use std::sync::Arc;
 
@@ -30,6 +30,17 @@ impl Bucket {
         S: Into<String>,
     {
         self.instance.query(statement.into(), options).wait()
+    }
+
+        pub(crate) fn analytics_query<S>(
+        &self,
+        statement: S,
+        options: Option<AnalyticsOptions>,
+    ) -> Result<AnalyticsResult, ()>
+    where
+        S: Into<String>,
+    {
+        self.instance.analytics_query(statement.into(), options).wait()
     }
 
     pub(crate) fn close(&self) {
