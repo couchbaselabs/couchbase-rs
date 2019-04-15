@@ -116,11 +116,12 @@ impl UpsertOptions {
 #[derive(Debug)]
 pub struct ReplaceOptions {
     timeout: Option<Duration>,
+    cas: Option<u64>,
 }
 
 impl ReplaceOptions {
     pub fn new() -> Self {
-        Self { timeout: None }
+        Self { timeout: None, cas: None }
     }
 
     pub fn set_timeout(mut self, timeout: Duration) -> Self {
@@ -130,6 +131,15 @@ impl ReplaceOptions {
 
     pub fn timeout(&self) -> &Option<Duration> {
         &self.timeout
+    }
+
+    pub fn set_cas(mut self, cas: u64) -> Self {
+        self.cas = Some(cas);
+        self
+    }
+
+    pub fn cas(&self) -> &Option<u64> {
+        &self.cas
     }
 }
 

@@ -313,6 +313,9 @@ impl InstanceRequest for ReplaceRequest {
                 if let Some(timeout) = options.timeout() {
                     lcb_cmdstore_timeout(command, timeout.as_millis() as u32);
                 }
+                if let Some(cas) = options.cas() {
+                    lcb_cmdstore_cas(command, *cas);
+                }
             }
             lcb_store(instance, cookie, command);
             lcb_cmdstore_destroy(command);
