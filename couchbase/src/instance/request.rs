@@ -6,6 +6,7 @@ use std::ffi::{c_void, CString};
 use std::os::raw::c_char;
 use std::ptr;
 use std::slice::from_raw_parts;
+use std::time::Duration;
 
 pub trait InstanceRequest: Send + 'static {
     fn encode(self: Box<Self>, instance: *mut lcb_INSTANCE);
@@ -53,6 +54,103 @@ impl InstanceRequest for GetRequest {
         }
     }
 }
+
+#[derive(Debug)]
+pub struct GetAndLockRequest {
+    sender: oneshot::Sender<Option<GetResult>>,
+    id: String,
+    options: Option<GetAndLockOptions>,
+}
+
+impl GetAndLockRequest {
+    pub fn new(
+        sender: oneshot::Sender<Option<GetResult>>,
+        id: String,
+        options: Option<GetAndLockOptions>,
+    ) -> Self {
+        Self {
+            sender,
+            id,
+            options,
+        }
+    }
+}
+
+impl InstanceRequest for GetAndLockRequest {
+    fn encode(self: Box<Self>, instance: *mut lcb_INSTANCE) {
+        let id_len = self.id.len();
+        let id_encoded = CString::new(self.id).expect("Could not encode ID");
+        let mut command: *mut lcb_CMDGET = ptr::null_mut();
+
+        let sender_boxed = Box::new(self.sender);
+        let cookie = Box::into_raw(sender_boxed) as *mut c_void;
+        unsafe {
+            lcb_cmdget_create(&mut command);
+            lcb_cmdget_key(command, id_encoded.as_ptr(), id_len);
+
+            let mut locktime = 30;
+            if let Some(options) = self.options {
+                if let Some(timeout) = options.timeout() {
+                    lcb_cmdget_timeout(command, timeout.as_millis() as u32);
+                }
+                if let Some(lt) = options.lock_for() {
+                    locktime = lt.as_secs() as u32;
+                }
+            }
+            lcb_cmdget_expiration(command, locktime);
+            lcb_get(instance, cookie, command);
+            lcb_cmdget_destroy(command);
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct GetAndTouchRequest {
+    sender: oneshot::Sender<Option<GetResult>>,
+    id: String,
+    expiration: Duration,
+    options: Option<GetAndTouchOptions>,
+}
+
+impl GetAndTouchRequest {
+    pub fn new(
+        sender: oneshot::Sender<Option<GetResult>>,
+        id: String,
+        expiration: Duration,
+        options: Option<GetAndTouchOptions>,
+    ) -> Self {
+        Self {
+            sender,
+            id,
+            expiration,
+            options,
+        }
+    }
+}
+
+impl InstanceRequest for GetAndTouchRequest {
+    fn encode(self: Box<Self>, instance: *mut lcb_INSTANCE) {
+        let id_len = self.id.len();
+        let id_encoded = CString::new(self.id).expect("Could not encode ID");
+        let mut command: *mut lcb_CMDGET = ptr::null_mut();
+
+        let sender_boxed = Box::new(self.sender);
+        let cookie = Box::into_raw(sender_boxed) as *mut c_void;
+        unsafe {
+            lcb_cmdget_create(&mut command);
+            lcb_cmdget_key(command, id_encoded.as_ptr(), id_len);
+            lcb_cmdget_expiration(command, self.expiration.as_secs() as u32);
+            if let Some(options) = self.options {
+                if let Some(timeout) = options.timeout() {
+                    lcb_cmdget_timeout(command, timeout.as_millis() as u32);
+                }
+            }
+            lcb_get(instance, cookie, command);
+            lcb_cmdget_destroy(command);
+        }
+    }
+}
+
 
 #[derive(Debug)]
 pub struct UpsertRequest {

@@ -20,6 +20,7 @@ use std::ptr;
 use std::slice::from_raw_parts;
 use std::sync::mpsc::{channel, Sender};
 use std::thread;
+use std::time::Duration;
 
 /// The `Instance` provides safe APIs around the inherently unsafe access
 /// to the underlying libcouchbase instance.
@@ -108,6 +109,31 @@ impl Instance {
         self.sender
             .send(Box::new(GetRequest::new(p, id, options)))
             .expect("Could not send get command into io loop");
+        c.map_err(|_| ())
+    }
+
+        pub fn get_and_lock(
+        &self,
+        id: String,
+        options: Option<GetAndLockOptions>,
+    ) -> impl Future<Item = Option<GetResult>, Error = ()> {
+        let (p, c) = oneshot::channel();
+        self.sender
+            .send(Box::new(GetAndLockRequest::new(p, id, options)))
+            .expect("Could not send getAndLock command into io loop");
+        c.map_err(|_| ())
+    }
+
+        pub fn get_and_touch(
+        &self,
+        id: String,
+        expiration: Duration,
+        options: Option<GetAndTouchOptions>,
+    ) -> impl Future<Item = Option<GetResult>, Error = ()> {
+        let (p, c) = oneshot::channel();
+        self.sender
+            .send(Box::new(GetAndTouchRequest::new(p, id, expiration, options)))
+            .expect("Could not send getAndTouch command into io loop");
         c.map_err(|_| ())
     }
 

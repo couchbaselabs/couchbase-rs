@@ -4,6 +4,7 @@ use crate::result::*;
 use crate::util::JSON_COMMON_FLAG;
 use futures::Future;
 use std::sync::Arc;
+use std::time::Duration;
 
 use serde::Serialize;
 use serde_json::to_vec;
@@ -22,6 +23,31 @@ impl Collection {
         S: Into<String>,
     {
         self.instance.get(id.into(), options).wait()
+    }
+
+    pub fn get_and_lock<S>(
+        &self,
+        id: S,
+        options: Option<GetAndLockOptions>,
+    ) -> Result<Option<GetResult>, ()>
+    where
+        S: Into<String>,
+    {
+        self.instance.get_and_lock(id.into(), options).wait()
+    }
+
+    pub fn get_and_touch<S>(
+        &self,
+        id: S,
+        expiration: Duration,
+        options: Option<GetAndTouchOptions>,
+    ) -> Result<Option<GetResult>, ()>
+    where
+        S: Into<String>,
+    {
+        self.instance
+            .get_and_touch(id.into(), expiration, options)
+            .wait()
     }
 
     pub fn upsert<S, T>(
