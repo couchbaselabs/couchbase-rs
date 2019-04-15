@@ -10,4 +10,6 @@ We haven't shipped the alpha yet, so you can depend on the repository directly f
 
 For now, the [examples](https://github.com/couchbaselabs/couchbase-rs/tree/master/couchbase/examples) section is the best place to get started until we provide more documentation.
 
-Stay tuned!
+The examples contain sample code for KeyValue, N1QL queries and Analytics - enjoy!
+
+Stay tuned for more!
