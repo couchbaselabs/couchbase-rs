@@ -75,9 +75,10 @@ impl Cluster {
         bucket.analytics_query(statement, options)
     }
 
-    pub fn disconnect(&mut self) {
+    pub fn disconnect(&mut self) -> Result<(), CouchbaseError> {
         for bucket in self.buckets.values() {
-            bucket.close();
+            bucket.close()?;
         }
+        Ok(())
     }
 }

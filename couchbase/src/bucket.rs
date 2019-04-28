@@ -46,7 +46,7 @@ impl Bucket {
             .wait()
     }
 
-    pub(crate) fn close(&self) {
-        self.instance.shutdown();
+    pub(crate) fn close(&self) -> Result<(), CouchbaseError> {
+        self.instance.shutdown()
     }
 }

@@ -1,4 +1,6 @@
 use crate::error::CouchbaseError;
+use crate::instance::decrement_outstanding_requests;
+use crate::instance::InstanceCookie;
 use crate::options::*;
 use crate::result::*;
 use couchbase_sys::*;
@@ -8,12 +10,31 @@ use std::os::raw::c_char;
 use std::ptr;
 use std::slice::from_raw_parts;
 use std::time::Duration;
-use crate::instance::decrement_outstanding_requests;
 
 type CouchbaseResult<T> = Result<T, CouchbaseError>;
 
 pub trait InstanceRequest: Send + 'static {
     fn encode(self: Box<Self>, instance: *mut lcb_INSTANCE);
+}
+
+/// Special, internal request instructing the instance event loop to shutdown.
+#[derive(Debug)]
+pub struct ShutdownRequest {}
+
+impl ShutdownRequest {
+    pub fn new() -> Self {
+        ShutdownRequest {}
+    }
+}
+
+impl InstanceRequest for ShutdownRequest {
+    fn encode(self: Box<Self>, instance: *mut lcb_INSTANCE) {
+        let instance_cookie_ptr: *const c_void = unsafe { lcb_get_cookie(instance) };
+        let mut instance_cookie =
+            unsafe { Box::from_raw(instance_cookie_ptr as *mut Box<InstanceCookie>) };
+        instance_cookie.set_shutdown();
+        Box::into_raw(instance_cookie);
+    }
 }
 
 #[derive(Debug)]

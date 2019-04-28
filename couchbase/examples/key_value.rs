@@ -37,7 +37,5 @@ fn main() {
     println!("First Insert: {:?}", collection.insert("bla", "bla", None));
     println!("Second Insert: {:?}", collection.insert("bla", "bla", None));
 
-    // cluster.disconnect();
-
-    std::thread::sleep(std::time::Duration::from_secs(10));
+    cluster.disconnect().expect("Could not shutdown properly");
 }

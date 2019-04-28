@@ -19,5 +19,5 @@ fn main() {
     println!("---> rows {:?}", result.rows_as().collect::<Vec<Value>>());
     println!("---> meta {:?}", result.meta());
 
-    std::thread::sleep(std::time::Duration::from_secs(100));
+    cluster.disconnect().expect("Could not shutdown properly");
 }

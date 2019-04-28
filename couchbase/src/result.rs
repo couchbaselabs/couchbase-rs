@@ -1,6 +1,7 @@
 use std::fmt;
 use std::str;
 
+use crate::error::CouchbaseError;
 use futures::sync::{mpsc, oneshot};
 use futures::Future;
 use futures::Stream;
@@ -8,7 +9,6 @@ use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde_derive::Deserialize;
 use serde_json::from_slice;
-use crate::error::CouchbaseError;
 
 pub struct GetResult {
     cas: u64,

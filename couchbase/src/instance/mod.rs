@@ -14,6 +14,7 @@ use crate::error::CouchbaseError;
 use couchbase_sys::*;
 use futures::sync::oneshot;
 use futures::Future;
+use std::cell::RefCell;
 use std::ffi::c_void;
 use std::ffi::CString;
 use std::os::raw::c_char;
@@ -26,12 +27,15 @@ use std::time::Duration;
 /// Keeps track of per-instance state.
 struct InstanceCookie {
     outstanding: usize,
+    shutdown: bool,
 }
 
 impl InstanceCookie {
-
     pub fn new() -> Self {
-        InstanceCookie { outstanding: 0 }
+        InstanceCookie {
+            outstanding: 0,
+            shutdown: false,
+        }
     }
 
     pub fn increment_outstanding(&mut self) {
@@ -46,6 +50,13 @@ impl InstanceCookie {
         self.outstanding > 0
     }
 
+    pub fn shutdown(&self) -> bool {
+        self.shutdown
+    }
+
+    pub fn set_shutdown(&mut self) {
+        self.shutdown = true;
+    }
 }
 
 /// The `Instance` provides safe APIs around the inherently unsafe access
@@ -58,6 +69,7 @@ impl InstanceCookie {
 /// An `Instance` is always bound to a bucket, since this is how lcb works.
 pub struct Instance {
     sender: Sender<Box<InstanceRequest>>,
+    handle: RefCell<Option<thread::JoinHandle<()>>>,
 }
 
 impl Instance {
@@ -78,7 +90,7 @@ impl Instance {
 
         let (tx, rx) = channel::<Box<InstanceRequest>>();
 
-        let _handle = thread::Builder::new()
+        let handle = thread::Builder::new()
             .spawn(move || {
                 let mut cropts = lcb_create_st {
                     version: 3,
@@ -110,10 +122,12 @@ impl Instance {
                     }
 
                     let mut instance_cookie = Box::new(InstanceCookie::new());
-                    lcb_set_cookie(instance, &instance_cookie as *const Box<InstanceCookie> as *const c_void);
+                    lcb_set_cookie(
+                        instance,
+                        &instance_cookie as *const Box<InstanceCookie> as *const c_void,
+                    );
 
                     loop {
-                        // println!("has outstanding: {} ", instance_cookie.has_outstanding());
                         if instance_cookie.has_outstanding() {
                             while let Ok(v) = rx.try_recv() {
                                 v.encode(instance);
@@ -127,25 +141,38 @@ impl Instance {
                             }
                         }
 
+                        if instance_cookie.shutdown() {
+                            break;
+                        }
+
                         lcb_tick_nowait(instance);
                     }
 
-
-                    // drop instance cookie
-                    // drop lcb, clean everything up
+                    // instance cookie is in scope and will be dropped automatically
+                    lcb_destroy(instance);
                 }
             })
             .expect("Could not create IO thread");
 
-        Ok(Instance { sender: tx })
+        Ok(Instance {
+            sender: tx,
+            handle: RefCell::new(Some(handle)),
+        })
     }
 
-    pub fn shutdown(&self) {
-        unimplemented!("shutdown is not implemented yet");
-
-        // only do if not already shutdown
-        // stop lcb
-        // stop thread
+    pub fn shutdown(&self) -> Result<(), CouchbaseError> {
+        match self.handle.borrow_mut().take() {
+            Some(h) => {
+                match self.sender.send(Box::new(ShutdownRequest::new())) {
+                    Ok(_) => (),
+                    Err(_e) => return Err(CouchbaseError::FutureError),
+                };
+                h.join()
+                    .expect("failed while waiting for io thread to join");
+                Ok(())
+            }
+            None => Ok(()),
+        }
     }
 
     pub fn get(
