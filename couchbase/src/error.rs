@@ -14,6 +14,8 @@ use std::{convert, error, fmt, io};
 /// the application context.
 #[derive(Debug)]
 pub enum CouchbaseError {
+    /// Raised when there has been a problem with dispatching the rust future.
+    FutureError,
     /// This error is received when connecting or reconnecting to the cluster.
     ///
     /// If received during initial bootstrap then it should be considered a fatal errror.
@@ -327,6 +329,9 @@ pub enum CouchbaseError {
 impl CouchbaseError {
     fn as_str(&self) -> &'static str {
         match *self {
+            CouchbaseError::FutureError => {
+                "Could not dispatch the rust future"
+            }
             CouchbaseError::AuthFailed => {
                 "Authentication failed. You may have provided an invalid username/password \
                  combination"
@@ -633,7 +638,9 @@ impl convert::From<lcb_STATUS> for CouchbaseError {
             lcb_STATUS_LCB_CLIENT_FEATURE_UNAVAILABLE => CouchbaseError::ClientFeatureUnavailable,
             lcb_STATUS_LCB_OPTIONS_CONFLICT => CouchbaseError::OptionsConflict,
             lcb_STATUS_LCB_HTTP_ERROR => CouchbaseError::HttpError,
-            lcb_STATUS_LCB_DURABILITY_NO_MUTATION_TOKENS => CouchbaseError::DurabilityNoMutationTokens,
+            lcb_STATUS_LCB_DURABILITY_NO_MUTATION_TOKENS => {
+                CouchbaseError::DurabilityNoMutationTokens
+            }
             lcb_STATUS_LCB_UNKNOWN_MEMCACHED_ERROR => CouchbaseError::UnknownStatusCode,
             lcb_STATUS_LCB_MUTATION_LOST => CouchbaseError::MutationLost,
             lcb_STATUS_LCB_SUBDOC_PATH_ENOENT => CouchbaseError::SubdocPathDoesNotExist,
@@ -660,25 +667,43 @@ impl convert::From<lcb_STATUS> for CouchbaseError {
             lcb_STATUS_LCB_NOT_AUTHORIZED => CouchbaseError::NotAuthorized,
             lcb_STATUS_LCB_MAX_ERROR => panic!("MAX_ERROR is internal!"),
             lcb_STATUS_LCB_SUCCESS => panic!("SUCCESS is not an Error!"),
-            lcb_STATUS_LCB_AUTH_CONTINUE => panic!("AUTH_CONTINUE is internal and not to be exposed!"),
+            lcb_STATUS_LCB_AUTH_CONTINUE => {
+                panic!("AUTH_CONTINUE is internal and not to be exposed!")
+            }
             lcb_STATUS_LCB_SUBDOC_INVALID_COMBO => CouchbaseError::SubdocInvalidCombo,
             lcb_STATUS_LCB_SUBDOC_MULTI_PATH_FAILURE => CouchbaseError::SubdocMultiPathFailure,
             lcb_STATUS_LCB_SUBDOC_SUCCESS_DELETED => CouchbaseError::SubdocSuccessDeleted,
-            lcb_STATUS_LCB_SUBDOC_XATTR_INVALID_FLAG_COMBO => CouchbaseError::SubdocXattrInvalidFlagCombo,
-            lcb_STATUS_LCB_SUBDOC_XATTR_INVALID_KEY_COMBO => CouchbaseError::SubdocXattrInvalidKeyCombo,
+            lcb_STATUS_LCB_SUBDOC_XATTR_INVALID_FLAG_COMBO => {
+                CouchbaseError::SubdocXattrInvalidFlagCombo
+            }
+            lcb_STATUS_LCB_SUBDOC_XATTR_INVALID_KEY_COMBO => {
+                CouchbaseError::SubdocXattrInvalidKeyCombo
+            }
             lcb_STATUS_LCB_SUBDOC_XATTR_UNKNOWN_MACRO => CouchbaseError::SubdocXattrUnknownMacro,
             lcb_STATUS_LCB_SUBDOC_XATTR_UNKNOWN_VATTR => CouchbaseError::SubdocXattrUnknownVattr,
-            lcb_STATUS_LCB_SUBDOC_XATTR_CANT_MODIFY_VATTR => CouchbaseError::SubdocXattrCantModifyVattr,
-            lcb_STATUS_LCB_SUBDOC_MULTI_PATH_FAILURE_DELETED => CouchbaseError::SubdocMultiPathFailureDeleted,
+            lcb_STATUS_LCB_SUBDOC_XATTR_CANT_MODIFY_VATTR => {
+                CouchbaseError::SubdocXattrCantModifyVattr
+            }
+            lcb_STATUS_LCB_SUBDOC_MULTI_PATH_FAILURE_DELETED => {
+                CouchbaseError::SubdocMultiPathFailureDeleted
+            }
             lcb_STATUS_LCB_SUBDOC_INVALID_XATTR_ORDER => CouchbaseError::SubdocInvalidXattrOrder,
             lcb_STATUS_LCB_COLLECTION_UNKNOWN => CouchbaseError::CollectionUnknown,
             lcb_STATUS_LCB_COLLECTION_NO_MANIFEST => CouchbaseError::CollectionNoManifest,
-            lcb_STATUS_LCB_COLLECTION_CANNOT_APPLY_MANIFEST => CouchbaseError::CollectionCannotApplyManifest,
-            lcb_STATUS_LCB_COLLECTION_MANIFEST_IS_AHEAD => CouchbaseError::CollectionManifestIsAhead,
+            lcb_STATUS_LCB_COLLECTION_CANNOT_APPLY_MANIFEST => {
+                CouchbaseError::CollectionCannotApplyManifest
+            }
+            lcb_STATUS_LCB_COLLECTION_MANIFEST_IS_AHEAD => {
+                CouchbaseError::CollectionManifestIsAhead
+            }
             lcb_STATUS_LCB_DURABILITY_INVALID_LEVEL => CouchbaseError::DurabilityInvalidLevel,
             lcb_STATUS_LCB_DURABILITY_IMPOSSIBLE => CouchbaseError::DurabilityImpossible,
-            lcb_STATUS_LCB_DURABILITY_SYNC_WRITE_IN_PROGRESS => CouchbaseError::DurabilitySyncWriteInProgress,
-            lcb_STATUS_LCB_DURABILITY_SYNC_WRITE_AMBIGUOUS => CouchbaseError::DurabilitySyncWriteAmbiguous,
+            lcb_STATUS_LCB_DURABILITY_SYNC_WRITE_IN_PROGRESS => {
+                CouchbaseError::DurabilitySyncWriteInProgress
+            }
+            lcb_STATUS_LCB_DURABILITY_SYNC_WRITE_AMBIGUOUS => {
+                CouchbaseError::DurabilitySyncWriteAmbiguous
+            }
             e => CouchbaseError::UnknownLibcouchbaseError(e),
         }
     }

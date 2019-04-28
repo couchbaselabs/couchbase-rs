@@ -10,6 +10,7 @@ use crate::options::*;
 use crate::result::*;
 use request::*;
 
+use crate::error::CouchbaseError;
 use couchbase_sys::*;
 use futures::sync::oneshot;
 use futures::Future;
@@ -21,7 +22,6 @@ use std::slice::from_raw_parts;
 use std::sync::mpsc::{channel, Sender};
 use std::thread;
 use std::time::Duration;
-use crate::error::CouchbaseError;
 
 /// The `Instance` provides safe APIs around the inherently unsafe access
 /// to the underlying libcouchbase instance.
@@ -105,24 +105,24 @@ impl Instance {
         &self,
         id: String,
         options: Option<GetOptions>,
-    ) -> impl Future<Item = Option<GetResult>, Error = ()> {
+    ) -> impl Future<Item = Option<GetResult>, Error = CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
             .send(Box::new(GetRequest::new(p, id, options)))
             .expect("Could not send get command into io loop");
-        c.map_err(|_| ())
+        map_oneshot_error(c)
     }
 
     pub fn get_and_lock(
         &self,
         id: String,
         options: Option<GetAndLockOptions>,
-    ) -> impl Future<Item = Option<GetResult>, Error = ()> {
+    ) -> impl Future<Item = Option<GetResult>, Error = CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
             .send(Box::new(GetAndLockRequest::new(p, id, options)))
             .expect("Could not send getAndLock command into io loop");
-        c.map_err(|_| ())
+        map_oneshot_error(c)
     }
 
     pub fn get_and_touch(
@@ -130,14 +130,14 @@ impl Instance {
         id: String,
         expiration: Duration,
         options: Option<GetAndTouchOptions>,
-    ) -> impl Future<Item = Option<GetResult>, Error = ()> {
+    ) -> impl Future<Item = Option<GetResult>, Error = CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
             .send(Box::new(GetAndTouchRequest::new(
                 p, id, expiration, options,
             )))
             .expect("Could not send getAndTouch command into io loop");
-        c.map_err(|_| ())
+        map_oneshot_error(c)
     }
 
     pub fn upsert(
@@ -146,12 +146,12 @@ impl Instance {
         content: Vec<u8>,
         flags: u32,
         options: Option<UpsertOptions>,
-    ) -> impl Future<Item = MutationResult, Error = ()> {
+    ) -> impl Future<Item = MutationResult, Error = CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
             .send(Box::new(UpsertRequest::new(p, id, content, flags, options)))
             .expect("Could not send upsert command into io loop");
-        c.map_err(|_| ())
+        map_oneshot_error(c)
     }
 
     pub fn insert(
@@ -160,12 +160,12 @@ impl Instance {
         content: Vec<u8>,
         flags: u32,
         options: Option<InsertOptions>,
-    ) -> impl Future<Item = MutationResult, Error = ()> {
+    ) -> impl Future<Item = MutationResult, Error = CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
             .send(Box::new(InsertRequest::new(p, id, content, flags, options)))
             .expect("Could not send insert command into io loop");
-        c.map_err(|_| ())
+        map_oneshot_error(c)
     }
 
     pub fn replace(
@@ -174,26 +174,26 @@ impl Instance {
         content: Vec<u8>,
         flags: u32,
         options: Option<ReplaceOptions>,
-    ) -> impl Future<Item = MutationResult, Error = ()> {
+    ) -> impl Future<Item = MutationResult, Error = CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
             .send(Box::new(ReplaceRequest::new(
                 p, id, content, flags, options,
             )))
             .expect("Could not send replace command into io loop");
-        c.map_err(|_| ())
+        map_oneshot_error(c)
     }
 
     pub fn remove(
         &self,
         id: String,
         options: Option<RemoveOptions>,
-    ) -> impl Future<Item = MutationResult, Error = ()> {
+    ) -> impl Future<Item = MutationResult, Error = CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
             .send(Box::new(RemoveRequest::new(p, id, options)))
             .expect("Could not send remove command into io loop");
-        c.map_err(|_| ())
+        map_oneshot_error(c)
     }
 
     pub fn query(
@@ -205,7 +205,7 @@ impl Instance {
         self.sender
             .send(Box::new(QueryRequest::new(p, statement, options)))
             .expect("Could not send query command into io loop");
-        c.map_err(|_| CouchbaseError::UnknownLibcouchbaseError(0))
+        map_oneshot_error(c)
     }
 
     pub fn analytics_query(
@@ -217,8 +217,20 @@ impl Instance {
         self.sender
             .send(Box::new(AnalyticsRequest::new(p, statement, options)))
             .expect("Could not send analytics query command into io loop");
-        c.map_err(|_| CouchbaseError::UnknownLibcouchbaseError(1))
+        map_oneshot_error(c)
     }
+}
+
+fn map_oneshot_error<T>(
+    receiver: oneshot::Receiver<Result<T, CouchbaseError>>,
+) -> impl Future<Item = T, Error = CouchbaseError> {
+    receiver.then(|value| match value {
+        Ok(v) => match v {
+            Ok(i) => Ok(i),
+            Err(e) => Err(e),
+        },
+        Err(_) => Err(CouchbaseError::FutureError),
+    })
 }
 
 /// Installs the libcouchbase callbacks at the bucket level.
@@ -253,7 +265,9 @@ unsafe extern "C" fn get_callback(
 
     let mut cookie_ptr: *mut c_void = ptr::null_mut();
     lcb_respget_cookie(get_res, &mut cookie_ptr);
-    let sender = Box::from_raw(cookie_ptr as *mut oneshot::Sender<Option<GetResult>>);
+    let sender = Box::from_raw(
+        cookie_ptr as *mut oneshot::Sender<Result<Option<GetResult>, CouchbaseError>>,
+    );
 
     let status = lcb_respget_status(get_res);
     let result = if status == lcb_STATUS_LCB_SUCCESS {
@@ -265,10 +279,11 @@ unsafe extern "C" fn get_callback(
         lcb_respget_flags(get_res, &mut flags);
         lcb_respget_value(get_res, &mut value_ptr, &mut value_len);
         let value = from_raw_parts(value_ptr as *const u8, value_len);
-        Some(GetResult::new(cas, value.to_vec(), flags))
+        Ok(Some(GetResult::new(cas, value.to_vec(), flags)))
+    } else if status == lcb_STATUS_LCB_KEY_ENOENT {
+        Ok(None)
     } else {
-        // TODO: proper error handling and stuffs.
-        None
+        Err(CouchbaseError::from(status))
     };
     sender.send(result).expect("Could not complete Future!");
 }
@@ -282,15 +297,19 @@ unsafe extern "C" fn store_callback(
 
     let mut cookie_ptr: *mut c_void = ptr::null_mut();
     lcb_respstore_cookie(store_res, &mut cookie_ptr);
-    let sender = Box::from_raw(cookie_ptr as *mut oneshot::Sender<MutationResult>);
+    let sender =
+        Box::from_raw(cookie_ptr as *mut oneshot::Sender<Result<MutationResult, CouchbaseError>>);
 
     let mut cas: u64 = 0;
     lcb_respstore_cas(store_res, &mut cas);
 
-    // TODO: ERROR HANDLING
-    sender
-        .send(MutationResult::new(cas))
-        .expect("Could not complete Future!");
+    let status = lcb_respstore_status(store_res);
+    let result = if status == lcb_STATUS_LCB_SUCCESS {
+        Ok(MutationResult::new(cas))
+    } else {
+        Err(CouchbaseError::from(status))
+    };
+    sender.send(result).expect("Could not complete Future!");
 }
 
 unsafe extern "C" fn remove_callback(
@@ -302,13 +321,17 @@ unsafe extern "C" fn remove_callback(
 
     let mut cookie_ptr: *mut c_void = ptr::null_mut();
     lcb_respremove_cookie(remove_res, &mut cookie_ptr);
-    let sender = Box::from_raw(cookie_ptr as *mut oneshot::Sender<MutationResult>);
+    let sender =
+        Box::from_raw(cookie_ptr as *mut oneshot::Sender<Result<MutationResult, CouchbaseError>>);
 
     let mut cas: u64 = 0;
     lcb_respremove_cas(remove_res, &mut cas);
 
-    // TODO: ERROR HANDLING
-    sender
-        .send(MutationResult::new(cas))
-        .expect("Could not complete Future!");
+    let status = lcb_respremove_status(remove_res);
+    let result = if status == lcb_STATUS_LCB_SUCCESS {
+        Ok(MutationResult::new(cas))
+    } else {
+        Err(CouchbaseError::from(status))
+    };
+    sender.send(result).expect("Could not complete Future!");
 }

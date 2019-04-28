@@ -1,10 +1,10 @@
 use crate::bucket::Bucket;
 
+use crate::error::CouchbaseError;
 use crate::options::{AnalyticsOptions, QueryOptions};
 use crate::result::{AnalyticsResult, QueryResult};
 use std::collections::HashMap;
 use std::sync::Arc;
-use crate::error::CouchbaseError;
 
 pub struct Cluster {
     connection_string: String,
@@ -41,7 +41,11 @@ impl Cluster {
         Ok(bucket.clone())
     }
 
-    pub fn query<S>(&self, statement: S, options: Option<QueryOptions>) -> Result<QueryResult, CouchbaseError>
+    pub fn query<S>(
+        &self,
+        statement: S,
+        options: Option<QueryOptions>,
+    ) -> Result<QueryResult, CouchbaseError>
     where
         S: Into<String>,
     {

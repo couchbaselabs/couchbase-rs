@@ -1,10 +1,10 @@
 use crate::collection::Collection;
+use crate::error::CouchbaseError;
 use crate::instance::Instance;
 use crate::options::{AnalyticsOptions, QueryOptions};
 use crate::result::{AnalyticsResult, QueryResult};
 use futures::Future;
 use std::sync::Arc;
-use crate::error::CouchbaseError;
 
 pub struct Bucket {
     instance: Arc<Instance>,

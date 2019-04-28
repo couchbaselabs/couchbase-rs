@@ -1,3 +1,4 @@
+use crate::error::CouchbaseError;
 use crate::options::*;
 use crate::result::*;
 use couchbase_sys::*;
@@ -8,20 +9,22 @@ use std::ptr;
 use std::slice::from_raw_parts;
 use std::time::Duration;
 
+type CouchbaseResult<T> = Result<T, CouchbaseError>;
+
 pub trait InstanceRequest: Send + 'static {
     fn encode(self: Box<Self>, instance: *mut lcb_INSTANCE);
 }
 
 #[derive(Debug)]
 pub struct GetRequest {
-    sender: oneshot::Sender<Option<GetResult>>,
+    sender: oneshot::Sender<CouchbaseResult<Option<GetResult>>>,
     id: String,
     options: Option<GetOptions>,
 }
 
 impl GetRequest {
     pub fn new(
-        sender: oneshot::Sender<Option<GetResult>>,
+        sender: oneshot::Sender<CouchbaseResult<Option<GetResult>>>,
         id: String,
         options: Option<GetOptions>,
     ) -> Self {
@@ -57,14 +60,14 @@ impl InstanceRequest for GetRequest {
 
 #[derive(Debug)]
 pub struct GetAndLockRequest {
-    sender: oneshot::Sender<Option<GetResult>>,
+    sender: oneshot::Sender<CouchbaseResult<Option<GetResult>>>,
     id: String,
     options: Option<GetAndLockOptions>,
 }
 
 impl GetAndLockRequest {
     pub fn new(
-        sender: oneshot::Sender<Option<GetResult>>,
+        sender: oneshot::Sender<CouchbaseResult<Option<GetResult>>>,
         id: String,
         options: Option<GetAndLockOptions>,
     ) -> Self {
@@ -106,7 +109,7 @@ impl InstanceRequest for GetAndLockRequest {
 
 #[derive(Debug)]
 pub struct GetAndTouchRequest {
-    sender: oneshot::Sender<Option<GetResult>>,
+    sender: oneshot::Sender<CouchbaseResult<Option<GetResult>>>,
     id: String,
     expiration: Duration,
     options: Option<GetAndTouchOptions>,
@@ -114,7 +117,7 @@ pub struct GetAndTouchRequest {
 
 impl GetAndTouchRequest {
     pub fn new(
-        sender: oneshot::Sender<Option<GetResult>>,
+        sender: oneshot::Sender<CouchbaseResult<Option<GetResult>>>,
         id: String,
         expiration: Duration,
         options: Option<GetAndTouchOptions>,
@@ -153,7 +156,7 @@ impl InstanceRequest for GetAndTouchRequest {
 
 #[derive(Debug)]
 pub struct UpsertRequest {
-    sender: oneshot::Sender<MutationResult>,
+    sender: oneshot::Sender<CouchbaseResult<MutationResult>>,
     id: String,
     content: Vec<u8>,
     flags: u32,
@@ -162,7 +165,7 @@ pub struct UpsertRequest {
 
 impl UpsertRequest {
     pub fn new(
-        sender: oneshot::Sender<MutationResult>,
+        sender: oneshot::Sender<CouchbaseResult<MutationResult>>,
         id: String,
         content: Vec<u8>,
         flags: u32,
@@ -209,7 +212,7 @@ impl InstanceRequest for UpsertRequest {
 
 #[derive(Debug)]
 pub struct InsertRequest {
-    sender: oneshot::Sender<MutationResult>,
+    sender: oneshot::Sender<CouchbaseResult<MutationResult>>,
     id: String,
     content: Vec<u8>,
     flags: u32,
@@ -218,7 +221,7 @@ pub struct InsertRequest {
 
 impl InsertRequest {
     pub fn new(
-        sender: oneshot::Sender<MutationResult>,
+        sender: oneshot::Sender<CouchbaseResult<MutationResult>>,
         id: String,
         content: Vec<u8>,
         flags: u32,
@@ -265,7 +268,7 @@ impl InstanceRequest for InsertRequest {
 
 #[derive(Debug)]
 pub struct ReplaceRequest {
-    sender: oneshot::Sender<MutationResult>,
+    sender: oneshot::Sender<CouchbaseResult<MutationResult>>,
     id: String,
     content: Vec<u8>,
     flags: u32,
@@ -274,7 +277,7 @@ pub struct ReplaceRequest {
 
 impl ReplaceRequest {
     pub fn new(
-        sender: oneshot::Sender<MutationResult>,
+        sender: oneshot::Sender<CouchbaseResult<MutationResult>>,
         id: String,
         content: Vec<u8>,
         flags: u32,
@@ -324,14 +327,14 @@ impl InstanceRequest for ReplaceRequest {
 
 #[derive(Debug)]
 pub struct RemoveRequest {
-    sender: oneshot::Sender<MutationResult>,
+    sender: oneshot::Sender<CouchbaseResult<MutationResult>>,
     id: String,
     options: Option<RemoveOptions>,
 }
 
 impl RemoveRequest {
     pub fn new(
-        sender: oneshot::Sender<MutationResult>,
+        sender: oneshot::Sender<CouchbaseResult<MutationResult>>,
         id: String,
         options: Option<RemoveOptions>,
     ) -> Self {
@@ -367,7 +370,7 @@ impl InstanceRequest for RemoveRequest {
 
 #[derive(Debug)]
 pub struct QueryRequest {
-    sender: oneshot::Sender<QueryResult>,
+    sender: oneshot::Sender<CouchbaseResult<QueryResult>>,
     rows_sender: mpsc::UnboundedSender<Vec<u8>>,
     rows_receiver: mpsc::UnboundedReceiver<Vec<u8>>,
     meta_sender: oneshot::Sender<Vec<u8>>,
@@ -378,7 +381,7 @@ pub struct QueryRequest {
 
 impl QueryRequest {
     pub fn new(
-        sender: oneshot::Sender<QueryResult>,
+        sender: oneshot::Sender<CouchbaseResult<QueryResult>>,
         statement: String,
         options: Option<QueryOptions>,
     ) -> Self {
@@ -421,7 +424,7 @@ impl InstanceRequest for QueryRequest {
 }
 
 struct QueryCookie {
-    result: Option<oneshot::Sender<QueryResult>>,
+    result: Option<oneshot::Sender<CouchbaseResult<QueryResult>>>,
     rows_sender: mpsc::UnboundedSender<Vec<u8>>,
     rows_receiver: Option<mpsc::UnboundedReceiver<Vec<u8>>>,
     meta_sender: oneshot::Sender<Vec<u8>>,
@@ -447,10 +450,10 @@ unsafe extern "C" fn n1ql_callback(
             .result
             .take()
             .expect("Could not take result!")
-            .send(QueryResult::new(
+            .send(Ok(QueryResult::new(
                 cookie.rows_receiver.take().unwrap(),
                 cookie.meta_receiver.take().unwrap(),
-            ))
+            )))
             .expect("Could not complete Future!");
     }
 
@@ -470,7 +473,7 @@ unsafe extern "C" fn n1ql_callback(
 
 #[derive(Debug)]
 pub struct AnalyticsRequest {
-    sender: oneshot::Sender<AnalyticsResult>,
+    sender: oneshot::Sender<CouchbaseResult<AnalyticsResult>>,
     rows_sender: mpsc::UnboundedSender<Vec<u8>>,
     rows_receiver: mpsc::UnboundedReceiver<Vec<u8>>,
     meta_sender: oneshot::Sender<Vec<u8>>,
@@ -481,7 +484,7 @@ pub struct AnalyticsRequest {
 
 impl AnalyticsRequest {
     pub fn new(
-        sender: oneshot::Sender<AnalyticsResult>,
+        sender: oneshot::Sender<CouchbaseResult<AnalyticsResult>>,
         statement: String,
         options: Option<AnalyticsOptions>,
     ) -> Self {
@@ -524,7 +527,7 @@ impl InstanceRequest for AnalyticsRequest {
 }
 
 struct AnalyticsCookie {
-    result: Option<oneshot::Sender<AnalyticsResult>>,
+    result: Option<oneshot::Sender<CouchbaseResult<AnalyticsResult>>>,
     rows_sender: mpsc::UnboundedSender<Vec<u8>>,
     rows_receiver: Option<mpsc::UnboundedReceiver<Vec<u8>>>,
     meta_sender: oneshot::Sender<Vec<u8>>,
@@ -550,10 +553,10 @@ unsafe extern "C" fn analytics_callback(
             .result
             .take()
             .expect("Could not take result!")
-            .send(AnalyticsResult::new(
+            .send(Ok(AnalyticsResult::new(
                 cookie.rows_receiver.take().unwrap(),
                 cookie.meta_receiver.take().unwrap(),
-            ))
+            )))
             .expect("Could not complete Future!");
     }
 

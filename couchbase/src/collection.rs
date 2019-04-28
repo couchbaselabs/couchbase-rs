@@ -1,13 +1,13 @@
+use crate::error::CouchbaseError;
 use crate::instance::Instance;
 use crate::options::*;
 use crate::result::*;
 use crate::util::JSON_COMMON_FLAG;
 use futures::Future;
-use std::sync::Arc;
-use std::time::Duration;
-
 use serde::Serialize;
 use serde_json::to_vec;
+use std::sync::Arc;
+use std::time::Duration;
 
 pub struct Collection {
     instance: Arc<Instance>,
@@ -18,7 +18,11 @@ impl Collection {
         Collection { instance }
     }
 
-    pub fn get<S>(&self, id: S, options: Option<GetOptions>) -> Result<Option<GetResult>, ()>
+    pub fn get<S>(
+        &self,
+        id: S,
+        options: Option<GetOptions>,
+    ) -> Result<Option<GetResult>, CouchbaseError>
     where
         S: Into<String>,
     {
@@ -29,7 +33,7 @@ impl Collection {
         &self,
         id: S,
         options: Option<GetAndLockOptions>,
-    ) -> Result<Option<GetResult>, ()>
+    ) -> Result<Option<GetResult>, CouchbaseError>
     where
         S: Into<String>,
     {
@@ -41,7 +45,7 @@ impl Collection {
         id: S,
         expiration: Duration,
         options: Option<GetAndTouchOptions>,
-    ) -> Result<Option<GetResult>, ()>
+    ) -> Result<Option<GetResult>, CouchbaseError>
     where
         S: Into<String>,
     {
@@ -55,7 +59,7 @@ impl Collection {
         id: S,
         content: T,
         options: Option<UpsertOptions>,
-    ) -> Result<MutationResult, ()>
+    ) -> Result<MutationResult, CouchbaseError>
     where
         S: Into<String>,
         T: Serialize,
@@ -72,7 +76,7 @@ impl Collection {
         id: S,
         content: T,
         options: Option<InsertOptions>,
-    ) -> Result<MutationResult, ()>
+    ) -> Result<MutationResult, CouchbaseError>
     where
         S: Into<String>,
         T: Serialize,
@@ -89,7 +93,7 @@ impl Collection {
         id: S,
         content: T,
         options: Option<ReplaceOptions>,
-    ) -> Result<MutationResult, ()>
+    ) -> Result<MutationResult, CouchbaseError>
     where
         S: Into<String>,
         T: Serialize,
@@ -101,7 +105,11 @@ impl Collection {
             .wait()
     }
 
-    pub fn remove<S>(&self, id: S, options: Option<RemoveOptions>) -> Result<MutationResult, ()>
+    pub fn remove<S>(
+        &self,
+        id: S,
+        options: Option<RemoveOptions>,
+    ) -> Result<MutationResult, CouchbaseError>
     where
         S: Into<String>,
     {

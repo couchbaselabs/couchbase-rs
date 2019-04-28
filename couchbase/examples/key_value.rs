@@ -9,7 +9,9 @@ struct Airport {
 
 fn main() {
     let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
-    let bucket = cluster.bucket("travel-sample").expect("Could not open bucket");
+    let bucket = cluster
+        .bucket("travel-sample")
+        .expect("Could not open bucket");
     let collection = bucket.default_collection();
 
     let found_doc = collection
@@ -26,11 +28,14 @@ fn main() {
 
     println!("Airline Document: {:?}", collection.get("enoent", None));
 
-    println!("{:?}", collection.upsert("foo", "bar", None));
-    println!("{:?}", collection.get("foo", None));
+    println!("Upsert: {:?}", collection.upsert("foo", "bar", None));
+    println!("Get: {:?}", collection.get("foo", None));
 
-    println!("{:?}", collection.remove("foo", None));
-    println!("{:?}", collection.get("foo", None));
+    println!("Remove: {:?}", collection.remove("foo", None));
+    println!("Get: {:?}", collection.get("foo", None));
+
+    println!("First Insert: {:?}", collection.insert("bla", "bla", None));
+    println!("Second Insert: {:?}", collection.insert("bla", "bla", None));
 
     // cluster.disconnect();
 
