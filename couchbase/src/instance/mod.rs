@@ -23,6 +23,31 @@ use std::sync::mpsc::{channel, Sender};
 use std::thread;
 use std::time::Duration;
 
+/// Keeps track of per-instance state.
+struct InstanceCookie {
+    outstanding: usize,
+}
+
+impl InstanceCookie {
+
+    pub fn new() -> Self {
+        InstanceCookie { outstanding: 0 }
+    }
+
+    pub fn increment_outstanding(&mut self) {
+        self.outstanding += 1
+    }
+
+    pub fn decrement_outstanding(&mut self) {
+        self.outstanding -= 1
+    }
+
+    pub fn has_outstanding(&self) -> bool {
+        self.outstanding > 0
+    }
+
+}
+
 /// The `Instance` provides safe APIs around the inherently unsafe access
 /// to the underlying libcouchbase instance.
 ///
@@ -84,12 +109,30 @@ impl Instance {
                         return;
                     }
 
+                    let mut instance_cookie = Box::new(InstanceCookie::new());
+                    lcb_set_cookie(instance, &instance_cookie as *const Box<InstanceCookie> as *const c_void);
+
                     loop {
-                        while let Ok(v) = rx.try_recv() {
-                            v.encode(instance);
+                        // println!("has outstanding: {} ", instance_cookie.has_outstanding());
+                        if instance_cookie.has_outstanding() {
+                            while let Ok(v) = rx.try_recv() {
+                                v.encode(instance);
+                                instance_cookie.increment_outstanding();
+                            }
+                        } else {
+                            while let Ok(v) = rx.recv() {
+                                v.encode(instance);
+                                instance_cookie.increment_outstanding();
+                                break; // once we have one request, get out there to avoid blocking
+                            }
                         }
+
                         lcb_tick_nowait(instance);
                     }
+
+
+                    // drop instance cookie
+                    // drop lcb, clean everything up
                 }
             })
             .expect("Could not create IO thread");
@@ -99,6 +142,10 @@ impl Instance {
 
     pub fn shutdown(&self) {
         unimplemented!("shutdown is not implemented yet");
+
+        // only do if not already shutdown
+        // stop lcb
+        // stop thread
     }
 
     pub fn get(
@@ -255,12 +302,21 @@ unsafe fn install_instance_callbacks(instance: *mut lcb_INSTANCE) {
     );
 }
 
+/// Helper method to grab the instance cookiea and decrement the outstanding requests.
+unsafe fn decrement_outstanding_requests(instance: *mut lcb_INSTANCE) {
+    let instance_cookie_ptr: *const c_void = lcb_get_cookie(instance);
+    let mut instance_cookie = Box::from_raw(instance_cookie_ptr as *mut Box<InstanceCookie>);
+    instance_cookie.decrement_outstanding();
+    Box::into_raw(instance_cookie);
+}
+
 /// Holds the callback used for all get operations.
 unsafe extern "C" fn get_callback(
-    _instance: *mut lcb_INSTANCE,
+    instance: *mut lcb_INSTANCE,
     _cbtype: i32,
     res: *const lcb_RESPBASE,
 ) {
+    decrement_outstanding_requests(instance);
     let get_res = res as *const lcb_RESPGET;
 
     let mut cookie_ptr: *mut c_void = ptr::null_mut();
@@ -289,10 +345,11 @@ unsafe extern "C" fn get_callback(
 }
 
 unsafe extern "C" fn store_callback(
-    _instance: *mut lcb_INSTANCE,
+    instance: *mut lcb_INSTANCE,
     _cbtype: i32,
     res: *const lcb_RESPBASE,
 ) {
+    decrement_outstanding_requests(instance);
     let store_res = res as *const lcb_RESPSTORE;
 
     let mut cookie_ptr: *mut c_void = ptr::null_mut();
@@ -313,10 +370,11 @@ unsafe extern "C" fn store_callback(
 }
 
 unsafe extern "C" fn remove_callback(
-    _instance: *mut lcb_INSTANCE,
+    instance: *mut lcb_INSTANCE,
     _cbtype: i32,
     res: *const lcb_RESPBASE,
 ) {
+    decrement_outstanding_requests(instance);
     let remove_res = res as *const lcb_RESPREMOVE;
 
     let mut cookie_ptr: *mut c_void = ptr::null_mut();

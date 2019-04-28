@@ -8,6 +8,7 @@ use std::os::raw::c_char;
 use std::ptr;
 use std::slice::from_raw_parts;
 use std::time::Duration;
+use crate::instance::decrement_outstanding_requests;
 
 type CouchbaseResult<T> = Result<T, CouchbaseError>;
 
@@ -432,7 +433,7 @@ struct QueryCookie {
 }
 
 unsafe extern "C" fn n1ql_callback(
-    _instance: *mut lcb_INSTANCE,
+    instance: *mut lcb_INSTANCE,
     _cbtype: i32,
     res: *const lcb_RESPN1QL,
 ) {
@@ -446,6 +447,7 @@ unsafe extern "C" fn n1ql_callback(
     let mut cookie = Box::from_raw(cookie_ptr as *mut QueryCookie);
 
     if cookie.result.is_some() {
+        decrement_outstanding_requests(instance);
         cookie
             .result
             .take()
@@ -535,7 +537,7 @@ struct AnalyticsCookie {
 }
 
 unsafe extern "C" fn analytics_callback(
-    _instance: *mut lcb_INSTANCE,
+    instance: *mut lcb_INSTANCE,
     _cbtype: i32,
     res: *const lcb_RESPANALYTICS,
 ) {
@@ -549,6 +551,7 @@ unsafe extern "C" fn analytics_callback(
     let mut cookie = Box::from_raw(cookie_ptr as *mut AnalyticsCookie);
 
     if cookie.result.is_some() {
+        decrement_outstanding_requests(instance);
         cookie
             .result
             .take()
