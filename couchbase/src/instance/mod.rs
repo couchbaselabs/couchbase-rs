@@ -21,6 +21,7 @@ use std::slice::from_raw_parts;
 use std::sync::mpsc::{channel, Sender};
 use std::thread;
 use std::time::Duration;
+use crate::error::CouchbaseError;
 
 /// The `Instance` provides safe APIs around the inherently unsafe access
 /// to the underlying libcouchbase instance.
@@ -36,18 +37,18 @@ pub struct Instance {
 
 impl Instance {
     /// Creates a new `Instance` and runs it.
-    pub fn new(connstr: &str, username: &str, password: &str) -> Result<Self, InstanceError> {
+    pub fn new(connstr: &str, username: &str, password: &str) -> Result<Self, CouchbaseError> {
         let connstr = match CString::new(connstr) {
             Ok(c) => c,
-            Err(_) => return Err(InstanceError::InvalidArgument),
+            Err(_) => return Err(CouchbaseError::InvalidValue),
         };
         let username = match CString::new(username) {
             Ok(c) => c,
-            Err(_) => return Err(InstanceError::InvalidArgument),
+            Err(_) => return Err(CouchbaseError::InvalidValue),
         };
         let password = match CString::new(password) {
             Ok(c) => c,
-            Err(_) => return Err(InstanceError::InvalidArgument),
+            Err(_) => return Err(CouchbaseError::InvalidValue),
         };
 
         let (tx, rx) = channel::<Box<InstanceRequest>>();
@@ -199,34 +200,25 @@ impl Instance {
         &self,
         statement: String,
         options: Option<QueryOptions>,
-    ) -> impl Future<Item = QueryResult, Error = ()> {
+    ) -> impl Future<Item = QueryResult, Error = CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
             .send(Box::new(QueryRequest::new(p, statement, options)))
             .expect("Could not send query command into io loop");
-        c.map_err(|_| ())
+        c.map_err(|_| CouchbaseError::UnknownLibcouchbaseError(0))
     }
 
     pub fn analytics_query(
         &self,
         statement: String,
         options: Option<AnalyticsOptions>,
-    ) -> impl Future<Item = AnalyticsResult, Error = ()> {
+    ) -> impl Future<Item = AnalyticsResult, Error = CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
             .send(Box::new(AnalyticsRequest::new(p, statement, options)))
             .expect("Could not send analytics query command into io loop");
-        c.map_err(|_| ())
+        c.map_err(|_| CouchbaseError::UnknownLibcouchbaseError(1))
     }
-}
-
-#[derive(Debug)]
-pub enum InstanceError {
-    InvalidArgument,
-    CreateFailed,
-    ConnectFailed,
-    WaitFailed,
-    Other,
 }
 
 /// Installs the libcouchbase callbacks at the bucket level.

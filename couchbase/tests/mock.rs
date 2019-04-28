@@ -1,8 +1,8 @@
 use std::fs::File;
 use std::io::copy;
 use std::path::Path;
-use std::process::Command;
 use std::process::Child;
+use std::process::Command;
 
 const MOCK_FILENAME: &str = "CouchbaseMock.jar";
 const MOCK_DOWNLOADPATH: &str =
@@ -13,7 +13,6 @@ pub struct MockServer {
 }
 
 impl MockServer {
-
     pub fn start() -> Self {
         let tests_dir = format!("{}/tests", env!("CARGO_MANIFEST_DIR"));
 
@@ -28,7 +27,7 @@ impl MockServer {
             .arg(format!("{}/{}", tests_dir, MOCK_FILENAME))
             .spawn()
             .expect("Could not spawn mock!");
-        
+
         println!(">> Spawned Mock");
 
         Self { server_handle }
@@ -37,7 +36,9 @@ impl MockServer {
     pub fn stop(&mut self) {
         // todo: this should probably use the admin port top stop and then wait instead
         // of kill
-        self.server_handle.kill().expect("Error while killing the server handle");
+        self.server_handle
+            .kill()
+            .expect("Error while killing the server handle");
         println!(">> Stopped Mock");
     }
 }

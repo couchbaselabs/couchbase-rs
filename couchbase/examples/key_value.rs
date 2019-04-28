@@ -9,7 +9,7 @@ struct Airport {
 
 fn main() {
     let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
-    let bucket = cluster.bucket("travel-sample");
+    let bucket = cluster.bucket("travel-sample").expect("Could not open bucket");
     let collection = bucket.default_collection();
 
     let found_doc = collection

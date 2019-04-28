@@ -4,6 +4,7 @@ use crate::options::{AnalyticsOptions, QueryOptions};
 use crate::result::{AnalyticsResult, QueryResult};
 use std::collections::HashMap;
 use std::sync::Arc;
+use crate::error::CouchbaseError;
 
 pub struct Cluster {
     connection_string: String,
@@ -25,7 +26,7 @@ impl Cluster {
         }
     }
 
-    pub fn bucket<S>(&mut self, name: S) -> Arc<Bucket>
+    pub fn bucket<S>(&mut self, name: S) -> Result<Arc<Bucket>, CouchbaseError>
     where
         S: Into<String>,
     {
@@ -34,13 +35,13 @@ impl Cluster {
             &format!("{}/{}", self.connection_string, name.clone()),
             &self.username,
             &self.password,
-        ));
+        )?);
 
         self.buckets.insert(name.clone(), bucket.clone());
-        bucket.clone()
+        Ok(bucket.clone())
     }
 
-    pub fn query<S>(&self, statement: S, options: Option<QueryOptions>) -> Result<QueryResult, ()>
+    pub fn query<S>(&self, statement: S, options: Option<QueryOptions>) -> Result<QueryResult, CouchbaseError>
     where
         S: Into<String>,
     {
@@ -56,7 +57,7 @@ impl Cluster {
         &self,
         statement: S,
         options: Option<AnalyticsOptions>,
-    ) -> Result<AnalyticsResult, ()>
+    ) -> Result<AnalyticsResult, CouchbaseError>
     where
         S: Into<String>,
     {

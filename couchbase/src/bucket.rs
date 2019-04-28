@@ -4,17 +4,18 @@ use crate::options::{AnalyticsOptions, QueryOptions};
 use crate::result::{AnalyticsResult, QueryResult};
 use futures::Future;
 use std::sync::Arc;
+use crate::error::CouchbaseError;
 
 pub struct Bucket {
     instance: Arc<Instance>,
 }
 
 impl Bucket {
-    pub fn new(cs: &str, user: &str, pw: &str) -> Self {
-        let instance = Instance::new(cs, user, pw).expect("Could not init instance");
-        Bucket {
+    pub fn new(cs: &str, user: &str, pw: &str) -> Result<Self, CouchbaseError> {
+        let instance = Instance::new(cs, user, pw)?;
+        Ok(Bucket {
             instance: Arc::new(instance),
-        }
+        })
     }
 
     pub fn default_collection(&self) -> Collection {
@@ -25,7 +26,7 @@ impl Bucket {
         &self,
         statement: S,
         options: Option<QueryOptions>,
-    ) -> Result<QueryResult, ()>
+    ) -> Result<QueryResult, CouchbaseError>
     where
         S: Into<String>,
     {
@@ -36,7 +37,7 @@ impl Bucket {
         &self,
         statement: S,
         options: Option<AnalyticsOptions>,
-    ) -> Result<AnalyticsResult, ()>
+    ) -> Result<AnalyticsResult, CouchbaseError>
     where
         S: Into<String>,
     {
