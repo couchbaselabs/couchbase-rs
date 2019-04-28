@@ -16,6 +16,10 @@ use std::{convert, error, fmt, io};
 pub enum CouchbaseError {
     /// Raised when there has been a problem with dispatching the rust future.
     FutureError,
+    /// Decoding from json or another type failed.
+    DecodingError,
+    /// Encoding into json failed.
+    EncodingError,
     /// This error is received when connecting or reconnecting to the cluster.
     ///
     /// If received during initial bootstrap then it should be considered a fatal errror.
@@ -331,7 +335,9 @@ impl CouchbaseError {
         match *self {
             CouchbaseError::FutureError => {
                 "Could not dispatch the rust future"
-            }
+            },
+            CouchbaseError::DecodingError => "Decoding failed",
+            CouchbaseError::EncodingError => "Encoding failed",
             CouchbaseError::AuthFailed => {
                 "Authentication failed. You may have provided an invalid username/password \
                  combination"

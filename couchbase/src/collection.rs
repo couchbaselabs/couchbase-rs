@@ -64,7 +64,10 @@ impl Collection {
         S: Into<String>,
         T: Serialize,
     {
-        let serialized = to_vec(&content).expect("Could not encode content for upsert");
+        let serialized = match to_vec(&content) {
+            Ok(v) => v,
+            Err(_e) => return Err(CouchbaseError::EncodingError),
+        };
         let flags = JSON_COMMON_FLAG;
         self.instance
             .upsert(id.into(), serialized, flags, options)
@@ -81,8 +84,10 @@ impl Collection {
         S: Into<String>,
         T: Serialize,
     {
-        let serialized = to_vec(&content).expect("Could not encode content for insert");
-        let flags = JSON_COMMON_FLAG;
+        let serialized = match to_vec(&content) {
+            Ok(v) => v,
+            Err(_e) => return Err(CouchbaseError::EncodingError),
+        };        let flags = JSON_COMMON_FLAG;
         self.instance
             .insert(id.into(), serialized, flags, options)
             .wait()
@@ -98,8 +103,10 @@ impl Collection {
         S: Into<String>,
         T: Serialize,
     {
-        let serialized = to_vec(&content).expect("Could not encode content for replace");
-        let flags = JSON_COMMON_FLAG;
+        let serialized = match to_vec(&content) {
+            Ok(v) => v,
+            Err(_e) => return Err(CouchbaseError::EncodingError),
+        };        let flags = JSON_COMMON_FLAG;
         self.instance
             .replace(id.into(), serialized, flags, options)
             .wait()

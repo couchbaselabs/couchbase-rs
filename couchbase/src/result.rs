@@ -8,6 +8,7 @@ use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde_derive::Deserialize;
 use serde_json::from_slice;
+use crate::error::CouchbaseError;
 
 pub struct GetResult {
     cas: u64,
@@ -28,11 +29,14 @@ impl GetResult {
         self.cas
     }
 
-    pub fn content_as<'a, T>(&'a self) -> T
+    pub fn content_as<'a, T>(&'a self) -> Result<T, CouchbaseError>
     where
         T: Deserialize<'a>,
     {
-        from_slice(&self.encoded.as_slice()).expect("Could not convert type")
+        match from_slice(&self.encoded.as_slice()) {
+            Ok(v) => Ok(v),
+            Err(_e) => Err(CouchbaseError::DecodingError),
+        }
     }
 }
 
