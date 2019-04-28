@@ -2,10 +2,6 @@
     - remove all expect from code and turn it into errors
     - add logging infrastructure
 
-# Instance
-    - handle shutdown (signal thread shutdown, watch handle)
-     .. make sure when instance is destroyed the cookie is too
-
 # KV
     - implement options for get and the 3 mutation options
     - remaining commands plus options:
