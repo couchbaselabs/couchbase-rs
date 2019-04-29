@@ -8,7 +8,8 @@ struct Airport {
 }
 
 fn main() {
-    let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
+    let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
+        .expect("Could not create Cluster reference!");
     let bucket = cluster
         .bucket("travel-sample")
         .expect("Could not open bucket");

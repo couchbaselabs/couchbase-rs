@@ -8,8 +8,9 @@ struct Airport {
 }
 
 fn main() {
-    let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
-    let _bucket = cluster.bucket("travel-sample");
+    let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
+        .expect("Could not create cluster reference");
+    let _ = cluster.bucket("travel-sample");
 
     let mut result = cluster
         .query(
