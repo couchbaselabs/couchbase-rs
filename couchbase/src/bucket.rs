@@ -6,6 +6,7 @@ use crate::result::{AnalyticsResult, QueryResult};
 use futures::Future;
 use std::sync::Arc;
 
+/// Provides access to `Bucket` level operations and `Collections`.
 pub struct Bucket {
     instance: Arc<Instance>,
 }

@@ -1,3 +1,5 @@
+//! Results returned from operations.
+
 use std::fmt;
 use std::str;
 

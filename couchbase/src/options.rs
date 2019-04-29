@@ -1,3 +1,5 @@
+//! Option arguments for all operations.
+
 use std::time::Duration;
 
 #[derive(Debug)]

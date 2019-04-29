@@ -9,6 +9,7 @@ use serde_json::to_vec;
 use std::sync::Arc;
 use std::time::Duration;
 
+/// `Collection` level access to operations.
 pub struct Collection {
     instance: Arc<Instance>,
 }

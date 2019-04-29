@@ -1,3 +1,5 @@
+//! Error handling structures and functionality.
+
 use couchbase_sys::*;
 use std::{convert, error, fmt, io};
 
