@@ -12,7 +12,8 @@ pub struct Bucket {
 }
 
 impl Bucket {
-    pub fn new(cs: &str, user: &str, pw: &str) -> Result<Self, CouchbaseError> {
+
+    pub(crate) fn new(cs: &str, user: &str, pw: &str) -> Result<Self, CouchbaseError> {
         let instance = Instance::new(cs, user, pw)?;
         Ok(Bucket {
             instance: Arc::new(instance),

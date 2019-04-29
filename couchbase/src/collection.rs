@@ -15,10 +15,47 @@ pub struct Collection {
 }
 
 impl Collection {
-    pub fn new(instance: Arc<Instance>) -> Self {
+
+    /// Creates a new `Collection`.
+    /// 
+    /// This function is not intended to be called directly, but rather a new
+    /// `Collection` should be retrieved through the `Bucket`.
+    ///
+    pub(crate) fn new(instance: Arc<Instance>) -> Self {
         Collection { instance }
     }
 
+    /// Fetches a document from the collection.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - The ID of the document.
+    /// * `options` - Options to customize the default behavior.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # use couchbase::Cluster;
+    ///
+    /// use serde_json::Value;
+    /// # let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
+    /// #   .expect("Could not create Cluster reference!");
+    /// # let bucket = cluster
+    /// #   .bucket("travel-sample")
+    /// #   .expect("Could not open bucket");
+    /// # let collection = bucket.default_collection();
+    /// # 
+    /// let found_doc = collection
+    ///     .get("airport_1297", None)
+    ///     .expect("Error while loading doc");
+    /// 
+    /// if found_doc.is_some() {
+    ///     println!(
+    ///         "Content Decoded {:?}",
+    ///         found_doc.unwrap().content_as::<Value>()
+    ///     );
+    /// }
+    /// ```
     pub fn get<S>(
         &self,
         id: S,
@@ -30,6 +67,17 @@ impl Collection {
         self.instance.get(id.into(), options).wait()
     }
 
+    /// Fetches a document from the collection and write locks it.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - The ID of the document.
+    /// * `options` - Options to customize the default behavior.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// ```
     pub fn get_and_lock<S>(
         &self,
         id: S,
@@ -41,6 +89,18 @@ impl Collection {
         self.instance.get_and_lock(id.into(), options).wait()
     }
 
+    /// Fetches a document from the collection and modifies its expiry.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - The ID of the document.
+    /// * `expiration` - The new expiration of the document.
+    /// * `options` - Options to customize the default behavior.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// ```
     pub fn get_and_touch<S>(
         &self,
         id: S,
@@ -55,6 +115,7 @@ impl Collection {
             .wait()
     }
 
+    /// Inserts or replaces a new document into the collection.
     pub fn upsert<S, T>(
         &self,
         id: S,
@@ -75,6 +136,7 @@ impl Collection {
             .wait()
     }
 
+    /// Inserts a document into the collection.
     pub fn insert<S, T>(
         &self,
         id: S,
@@ -95,6 +157,7 @@ impl Collection {
             .wait()
     }
 
+    /// Replaces an existing document in the collection.
     pub fn replace<S, T>(
         &self,
         id: S,
@@ -115,6 +178,7 @@ impl Collection {
             .wait()
     }
 
+    /// Removes a document from the collection.
     pub fn remove<S>(
         &self,
         id: S,

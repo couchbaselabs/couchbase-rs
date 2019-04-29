@@ -71,10 +71,10 @@ impl Cluster {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use couchbase::Cluster;
-    /// 
-    /// let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
-    ///     .expect("Could not create cluster reference");
+    /// # use couchbase::Cluster;
+    /// #
+    /// # let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
+    /// #     .expect("Could not create cluster reference");
     /// let bucket = cluster.bucket("travel-sample")
     ///     .expect("Could not open bucket");
     /// ```
@@ -108,10 +108,12 @@ impl Cluster {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
-    ///     .expect("Could not create cluster reference");
-    /// let _ = cluster.bucket("travel-sample");
-    ///
+    /// # use couchbase::Cluster;
+    /// use serde_json::Value;
+    /// # let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
+    /// #    .expect("Could not create cluster reference");
+    /// # let _ = cluster.bucket("travel-sample");
+    /// #
     /// let mut result = cluster.query("select name, type from `travel-sample` limit 5", None)
     ///     .expect("Could not perform query");
     ///
@@ -149,13 +151,13 @@ impl Cluster {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use couchbase::Cluster;
+    /// # use couchbase::Cluster;
     /// use serde_json::Value;
-    /// 
-    /// let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
-    ///     .expect("Could not create cluster reference!");
-    /// let _ = cluster.bucket("travel-sample");
-    /// 
+    /// #
+    /// # let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
+    /// #     .expect("Could not create cluster reference!");
+    /// # let _ = cluster.bucket("travel-sample");
+    /// #
     /// let mut result = cluster
     ///     .analytics_query("SELECT DataverseName FROM Metadata.`Dataverse`", None)
     ///     .expect("Could not perform analytics query");
@@ -187,11 +189,11 @@ impl Cluster {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use couchbase::Cluster;
-    /// 
-    /// let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
-    ///     .expect("Could not create cluster reference!");
-    /// 
+    /// # use couchbase::Cluster;
+    /// #
+    /// # let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
+    /// #    .expect("Could not create cluster reference!");
+    /// #
     /// cluster.disconnect().expect("Could not shutdown properly");
     /// ```
     /// 
