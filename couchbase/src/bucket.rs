@@ -12,7 +12,6 @@ pub struct Bucket {
 }
 
 impl Bucket {
-
     pub(crate) fn new(cs: &str, user: &str, pw: &str) -> Result<Self, CouchbaseError> {
         let instance = Instance::new(cs, user, pw)?;
         Ok(Bucket {

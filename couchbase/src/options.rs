@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct GetOptions {
     timeout: Option<Duration>,
 }
@@ -22,7 +22,7 @@ impl GetOptions {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct GetAndLockOptions {
     timeout: Option<Duration>,
     lock_for: Option<Duration>,
@@ -55,7 +55,7 @@ impl GetAndLockOptions {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct GetAndTouchOptions {
     timeout: Option<Duration>,
 }
@@ -75,7 +75,7 @@ impl GetAndTouchOptions {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct InsertOptions {
     timeout: Option<Duration>,
 }
@@ -95,7 +95,7 @@ impl InsertOptions {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct UpsertOptions {
     timeout: Option<Duration>,
 }
@@ -115,7 +115,7 @@ impl UpsertOptions {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ReplaceOptions {
     timeout: Option<Duration>,
     cas: Option<u64>,
@@ -148,7 +148,7 @@ impl ReplaceOptions {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct RemoveOptions {
     timeout: Option<Duration>,
 }
@@ -168,7 +168,7 @@ impl RemoveOptions {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct QueryOptions {
     timeout: Option<Duration>,
 }
@@ -188,7 +188,7 @@ impl QueryOptions {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct AnalyticsOptions {
     timeout: Option<Duration>,
 }

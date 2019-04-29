@@ -16,11 +16,11 @@ pub struct Cluster {
 
 impl Cluster {
     /// Creates a new connection reference to the Couchbase cluster.
-    /// 
+    ///
     /// Keep in mind that only Role-Based access control (RBAC) is supported, so you need to configure
     /// a username and password on the cluster. This implies that only Couchbase Server versions
     /// 5.0 and later are supported.
-    /// 
+    ///
     /// # Arguments
     ///
     /// * `connection_string` - Holds the bootstrap hostnames and optionally config settings.
@@ -31,7 +31,7 @@ impl Cluster {
     ///
     /// ```rust,no_run
     /// use couchbase::Cluster;
-    /// 
+    ///
     /// let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
     ///   .expect("Could not create cluster reference");
     /// ```
@@ -53,17 +53,17 @@ impl Cluster {
     }
 
     /// Opens a Couchbase bucket.
-    /// 
+    ///
     /// If you wonder why this returns an `Arc`, the reason is that we also need to keep track
-    /// of the `Bucket` internally so if you call `disconnect` on the `Cluster` all opened 
+    /// of the `Bucket` internally so if you call `disconnect` on the `Cluster` all opened
     /// buckets are closed. Also, we make sure that if this method is called more than once on
     /// the same bucket, it is only opened once since buckets are expensive resources with state
-    /// attached (for those familiar with libcouchbase: the bucket internally holds the lcb 
+    /// attached (for those familiar with libcouchbase: the bucket internally holds the lcb
     /// instance).
-    /// 
+    ///
     /// We recommend only ever opening a bucket once and then reusing it across the lifetime of
     /// your application for maximum performance and resource efficiency.
-    /// 
+    ///
     /// # Arguments
     ///
     /// * `name` - The name of the bucket.
@@ -95,7 +95,7 @@ impl Cluster {
     }
 
     /// Performs a query against the N1QL query service.
-    /// 
+    ///
     /// For now, please make sure to open one bucket (doesn't matter which one) before performing
     /// a cluster-level query. This limiation will be lifted in the future, but for now the client
     /// needs an open bucket so it knows where internally to route the query.
@@ -138,9 +138,9 @@ impl Cluster {
     }
 
     /// Performs a query against the analytics service.
-    /// 
+    ///
     /// For now, please make sure to open one bucket (doesn't matter which one) before performing
-    /// a cluster-level analytics query. This limiation will be lifted in the future, but for now 
+    /// a cluster-level analytics query. This limiation will be lifted in the future, but for now
     /// the client needs an open bucket so it knows where internally to route the query.
     ///
     /// # Arguments
@@ -161,7 +161,7 @@ impl Cluster {
     /// let mut result = cluster
     ///     .analytics_query("SELECT DataverseName FROM Metadata.`Dataverse`", None)
     ///     .expect("Could not perform analytics query");
-    /// 
+    ///
     /// println!("---> rows {:?}", result.rows_as().collect::<Vec<Value>>());
     /// println!("---> meta {:?}", result.meta());
     /// ```
@@ -185,7 +185,7 @@ impl Cluster {
     }
 
     /// Disconnects this cluster and all associated open buckets.
-    /// 
+    ///
     /// # Examples
     ///
     /// ```rust,no_run
@@ -196,7 +196,7 @@ impl Cluster {
     /// #
     /// cluster.disconnect().expect("Could not shutdown properly");
     /// ```
-    /// 
+    ///
     pub fn disconnect(&mut self) -> Result<(), CouchbaseError> {
         for bucket in self.buckets.values() {
             bucket.close()?;

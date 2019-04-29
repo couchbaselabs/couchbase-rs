@@ -6,7 +6,8 @@ fn main() {
         .expect("Could not create cluster reference");
     let _ = cluster.bucket("travel-sample");
 
-    let mut result = cluster.query("select name, type from `travel-sample` limit 5", None)
+    let mut result = cluster
+        .query("select name, type from `travel-sample` limit 5", None)
         .expect("Could not perform query");
 
     println!("Rows:\n{:?}", result.rows_as().collect::<Vec<Value>>());

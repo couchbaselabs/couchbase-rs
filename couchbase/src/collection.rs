@@ -15,9 +15,8 @@ pub struct Collection {
 }
 
 impl Collection {
-
     /// Creates a new `Collection`.
-    /// 
+    ///
     /// This function is not intended to be called directly, but rather a new
     /// `Collection` should be retrieved through the `Bucket`.
     ///
@@ -44,11 +43,11 @@ impl Collection {
     /// #   .bucket("travel-sample")
     /// #   .expect("Could not open bucket");
     /// # let collection = bucket.default_collection();
-    /// # 
+    /// #
     /// let found_doc = collection
     ///     .get("airport_1297", None)
     ///     .expect("Error while loading doc");
-    /// 
+    ///
     /// if found_doc.is_some() {
     ///     println!(
     ///         "Content Decoded {:?}",

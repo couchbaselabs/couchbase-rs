@@ -133,12 +133,9 @@ impl Instance {
                                 v.encode(instance);
                                 instance_cookie.increment_outstanding();
                             }
-                        } else {
-                            while let Ok(v) = rx.recv() {
-                                v.encode(instance);
-                                instance_cookie.increment_outstanding();
-                                break; // once we have one request, get out there to avoid blocking
-                            }
+                        } else if let Ok(v) = rx.recv() {
+                            v.encode(instance);
+                            instance_cookie.increment_outstanding();
                         }
 
                         if instance_cookie.shutdown() {
