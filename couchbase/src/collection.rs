@@ -181,7 +181,7 @@ impl Collection {
     /// #     .bucket("travel-sample")
     /// #     .expect("Could not open bucket");
     /// # let collection = bucket.default_collection();
-    /// 
+    ///
     /// let airport = Airport {
     ///     airportname: "Vienna Airport".into(),
     ///     icao: "LOWW".into(),
@@ -238,7 +238,7 @@ impl Collection {
     /// #     .bucket("travel-sample")
     /// #     .expect("Could not open bucket");
     /// # let collection = bucket.default_collection();
-    /// 
+    ///
     /// let airport = Airport {
     ///     airportname: "Vienna Airport".into(),
     ///     icao: "LOWW".into(),
@@ -295,7 +295,7 @@ impl Collection {
     /// #     .bucket("travel-sample")
     /// #     .expect("Could not open bucket");
     /// # let collection = bucket.default_collection();
-    /// 
+    ///
     /// let airport = Airport {
     ///     airportname: "Vienna Airport".into(),
     ///     icao: "LOWW".into(),
