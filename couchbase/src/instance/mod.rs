@@ -25,6 +25,7 @@ use std::thread;
 use std::time::Duration;
 
 /// Keeps track of per-instance state.
+#[derive(Debug)]
 struct InstanceCookie {
     outstanding: usize,
     shutdown: bool,

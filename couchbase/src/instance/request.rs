@@ -468,7 +468,6 @@ unsafe extern "C" fn n1ql_callback(
     let mut cookie = Box::from_raw(cookie_ptr as *mut QueryCookie);
 
     if cookie.result.is_some() {
-        decrement_outstanding_requests(instance);
         cookie
             .result
             .take()
@@ -481,6 +480,7 @@ unsafe extern "C" fn n1ql_callback(
     }
 
     if lcb_respn1ql_is_final(res) != 0 {
+        decrement_outstanding_requests(instance);
         cookie
             .meta_sender
             .send(row.to_vec())
@@ -572,7 +572,6 @@ unsafe extern "C" fn analytics_callback(
     let mut cookie = Box::from_raw(cookie_ptr as *mut AnalyticsCookie);
 
     if cookie.result.is_some() {
-        decrement_outstanding_requests(instance);
         cookie
             .result
             .take()
@@ -585,6 +584,7 @@ unsafe extern "C" fn analytics_callback(
     }
 
     if lcb_respanalytics_is_final(res) != 0 {
+        decrement_outstanding_requests(instance);
         cookie
             .meta_sender
             .send(row.to_vec())
