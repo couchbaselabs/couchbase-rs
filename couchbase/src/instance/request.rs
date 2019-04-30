@@ -480,7 +480,7 @@ unsafe extern "C" fn n1ql_callback(
             .expect("Could not complete Future!");
     }
 
-    if lcb_respn1ql_is_final(res) == 1 {
+    if lcb_respn1ql_is_final(res) != 0 {
         cookie
             .meta_sender
             .send(row.to_vec())
@@ -584,7 +584,7 @@ unsafe extern "C" fn analytics_callback(
             .expect("Could not complete Future!");
     }
 
-    if lcb_respanalytics_is_final(res) == 1 {
+    if lcb_respanalytics_is_final(res) != 0 {
         cookie
             .meta_sender
             .send(row.to_vec())
