@@ -16,6 +16,7 @@ fn main() {
 
     build_cfg.define("LCB_NO_TESTS", "ON");
     build_cfg.define("LCB_NO_TOOLS", "ON");
+    build_cfg.define("LCB_NO_MOCK", "ON");
     build_cfg.define("LCB_BUILD_LIBEV", "OFF");
     build_cfg.define("LCB_BUILD_LIBUV", "OFF");
 
