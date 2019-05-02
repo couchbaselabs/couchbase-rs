@@ -387,4 +387,37 @@ impl Collection {
     {
         self.instance.touch(id.into(), expiration, options).wait()
     }
+
+    /// Unlocks a write-locked document.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - The ID of the document.
+    /// * `cas` - The cas needed to remove the write lock.
+    /// * `options` - Options to customize the default behavior.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # use couchbase::Cluster;
+    /// # let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
+    /// #   .expect("Could not create Cluster reference!");
+    /// # let bucket = cluster
+    /// #   .bucket("travel-sample")
+    /// #   .expect("Could not open bucket");
+    /// # let collection = bucket.default_collection();
+    /// let cas = 1234; // retrieved from a `getAndLock`
+    /// let result = collection.unlock("document_id", cas, None);
+    /// ```
+    pub fn unlock<S>(
+        &self,
+        id: S,
+        cas: u64,
+        options: Option<UnlockOptions>,
+    ) -> Result<MutationResult, CouchbaseError>
+    where
+        S: Into<String>,
+    {
+        self.instance.unlock(id.into(), cas, options).wait()
+    }
 }

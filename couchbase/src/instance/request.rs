@@ -438,6 +438,53 @@ impl InstanceRequest for TouchRequest {
 }
 
 #[derive(Debug)]
+pub struct UnlockRequest {
+    sender: oneshot::Sender<CouchbaseResult<MutationResult>>,
+    id: String,
+    cas: u64,
+    options: Option<UnlockOptions>,
+}
+
+impl UnlockRequest {
+    pub fn new(
+        sender: oneshot::Sender<CouchbaseResult<MutationResult>>,
+        id: String,
+        cas: u64,
+        options: Option<UnlockOptions>,
+    ) -> Self {
+        Self {
+            sender,
+            id,
+            cas,
+            options,
+        }
+    }
+}
+
+impl InstanceRequest for UnlockRequest {
+    fn encode(self: Box<Self>, instance: *mut lcb_INSTANCE) {
+        let id_len = self.id.len();
+        let id_encoded = CString::new(self.id).expect("Could not encode ID");
+        let mut command: *mut lcb_CMDUNLOCK = ptr::null_mut();
+
+        let sender_boxed = Box::new(self.sender);
+        let cookie = Box::into_raw(sender_boxed) as *mut c_void;
+        unsafe {
+            lcb_cmdunlock_create(&mut command);
+            lcb_cmdunlock_key(command, id_encoded.as_ptr(), id_len);
+            lcb_cmdunlock_cas(command, self.cas);
+            if let Some(options) = self.options {
+                if let Some(timeout) = options.timeout() {
+                    lcb_cmdunlock_timeout(command, timeout.as_millis() as u32);
+                }
+            }
+            lcb_unlock(instance, cookie, command);
+            lcb_cmdunlock_destroy(command);
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct QueryRequest {
     sender: oneshot::Sender<CouchbaseResult<QueryResult>>,
     rows_sender: mpsc::UnboundedSender<Vec<u8>>,
