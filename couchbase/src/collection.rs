@@ -355,4 +355,36 @@ impl Collection {
     {
         self.instance.remove(id.into(), options).wait()
     }
+
+    /// Changes the expiration time on a document.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - The ID of the document.
+    /// * `expiration` - The new expiration of the document.
+    /// * `options` - Options to customize the default behavior.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # use couchbase::Cluster;
+    /// # let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
+    /// #   .expect("Could not create Cluster reference!");
+    /// # let bucket = cluster
+    /// #   .bucket("travel-sample")
+    /// #   .expect("Could not open bucket");
+    /// # let collection = bucket.default_collection();
+    /// let result = collection.touch("document_id", Duration::from_secs(5), None);
+    /// ```
+    pub fn touch<S>(
+        &self,
+        id: S,
+        expiration: Duration,
+        options: Option<TouchOptions>,
+    ) -> Result<MutationResult, CouchbaseError>
+    where
+        S: Into<String>,
+    {
+        self.instance.touch(id.into(), expiration, options).wait()
+    }
 }

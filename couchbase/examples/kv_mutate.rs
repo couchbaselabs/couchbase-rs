@@ -1,5 +1,6 @@
 use couchbase::Cluster;
 use serde_derive::Serialize;
+use std::time::Duration;
 
 #[derive(Debug, Serialize)]
 struct Airport {
@@ -24,6 +25,10 @@ fn main() {
     collection
         .upsert("airport_999", airport, None)
         .expect("could not upsert airport!");
+
+    collection
+        .touch("airport_999", Duration::from_secs(5), None)
+        .expect("Can't touch this!");
 
     cluster.disconnect().expect("Failure while disconnecting!");
 }

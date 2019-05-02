@@ -268,6 +268,19 @@ impl Instance {
         map_oneshot_error(c)
     }
 
+    pub fn touch(
+        &self,
+        id: String,
+        expiration: Duration,
+        options: Option<TouchOptions>,
+    ) -> impl Future<Item = MutationResult, Error = CouchbaseError> {
+        let (p, c) = oneshot::channel();
+        self.sender
+            .send(Box::new(TouchRequest::new(p, id, expiration, options)))
+            .expect("Could not send touch command into io loop");
+        map_oneshot_error(c)
+    }
+
     pub fn query(
         &self,
         statement: String,
@@ -324,6 +337,11 @@ unsafe fn install_instance_callbacks(instance: *mut lcb_INSTANCE) {
         instance,
         lcb_CALLBACK_TYPE_LCB_CALLBACK_REMOVE as i32,
         Some(remove_callback),
+    );
+    lcb_install_callback3(
+        instance,
+        lcb_CALLBACK_TYPE_LCB_CALLBACK_TOUCH as i32,
+        Some(touch_callback),
     );
 }
 
@@ -411,6 +429,31 @@ unsafe extern "C" fn remove_callback(
     lcb_respremove_cas(remove_res, &mut cas);
 
     let status = lcb_respremove_status(remove_res);
+    let result = if status == lcb_STATUS_LCB_SUCCESS {
+        Ok(MutationResult::new(cas))
+    } else {
+        Err(CouchbaseError::from(status))
+    };
+    sender.send(result).expect("Could not complete Future!");
+}
+
+unsafe extern "C" fn touch_callback(
+    instance: *mut lcb_INSTANCE,
+    _cbtype: i32,
+    res: *const lcb_RESPBASE,
+) {
+    decrement_outstanding_requests(instance);
+    let touch_res = res as *const lcb_RESPTOUCH;
+
+    let mut cookie_ptr: *mut c_void = ptr::null_mut();
+    lcb_resptouch_cookie(touch_res, &mut cookie_ptr);
+    let sender =
+        Box::from_raw(cookie_ptr as *mut oneshot::Sender<Result<MutationResult, CouchbaseError>>);
+
+    let mut cas: u64 = 0;
+    lcb_resptouch_cas(touch_res, &mut cas);
+
+    let status = lcb_resptouch_status(touch_res);
     let result = if status == lcb_STATUS_LCB_SUCCESS {
         Ok(MutationResult::new(cas))
     } else {

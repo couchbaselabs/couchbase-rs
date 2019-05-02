@@ -207,3 +207,23 @@ impl AnalyticsOptions {
         &self.timeout
     }
 }
+
+#[derive(Debug, Default)]
+pub struct TouchOptions {
+    timeout: Option<Duration>,
+}
+
+impl TouchOptions {
+    pub fn new() -> Self {
+        Self { timeout: None }
+    }
+
+    pub fn set_timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = Some(timeout);
+        self
+    }
+
+    pub fn timeout(&self) -> &Option<Duration> {
+        &self.timeout
+    }
+}
