@@ -6,9 +6,6 @@
     - implement options for get and the 3 mutation options
     - remaining commands plus options:
         - replica get
-        - exists
-        - touch
-        - unlock
         - lookupIn
         - mutateIn
     - Binary collection

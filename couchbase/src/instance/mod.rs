@@ -212,6 +212,16 @@ impl Instance {
         map_oneshot_error(c)
     }
 
+    pub fn exists(&self, id: String, options: Option<ExistsOptions>) -> impl Future<Item = Option<ExistsResult>, Error = CouchbaseError> {
+        let (p, c) = oneshot::channel();
+        self.sender
+            .send(Box::new(ExistsRequest::new(
+                p, id, options,
+            )))
+            .expect("Could not send exists command into io loop");
+        map_oneshot_error(c)
+    }
+
     pub fn upsert(
         &self,
         id: String,
@@ -361,6 +371,11 @@ unsafe fn install_instance_callbacks(instance: *mut lcb_INSTANCE) {
         lcb_CALLBACK_TYPE_LCB_CALLBACK_UNLOCK as i32,
         Some(unlock_callback),
     );
+    lcb_install_callback3(
+        instance,
+        lcb_CALLBACK_TYPE_LCB_CALLBACK_EXISTS as i32,
+        Some(exists_callback),
+    );
 }
 
 /// Helper method to grab the instance cookiea and decrement the outstanding requests.
@@ -499,6 +514,35 @@ unsafe extern "C" fn unlock_callback(
     let status = lcb_respunlock_status(unlock_res);
     let result = if status == lcb_STATUS_LCB_SUCCESS {
         Ok(MutationResult::new(cas))
+    } else {
+        Err(CouchbaseError::from(status))
+    };
+    sender.send(result).expect("Could not complete Future!");
+}
+
+unsafe extern "C" fn exists_callback(
+    instance: *mut lcb_INSTANCE,
+    _cbtype: i32,
+    res: *const lcb_RESPBASE,
+) {
+    decrement_outstanding_requests(instance);
+    let exists_res = res as *const lcb_RESPEXISTS;
+
+    let mut cookie_ptr: *mut c_void = ptr::null_mut();
+    lcb_respexists_cookie(exists_res, &mut cookie_ptr);
+    let sender =
+        Box::from_raw(cookie_ptr as *mut oneshot::Sender<Result<Option<ExistsResult>, CouchbaseError>>);
+
+    let mut cas: u64 = 0;
+    lcb_respexists_cas(exists_res, &mut cas);
+
+    let status = lcb_respexists_status(exists_res);
+    let result = if status == lcb_STATUS_LCB_SUCCESS {
+        if lcb_respexists_is_found(exists_res) != 0 {
+            Ok(Some(ExistsResult::new(cas)))
+        } else {
+            Ok(None)
+        }
     } else {
         Err(CouchbaseError::from(status))
     };

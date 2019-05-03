@@ -26,6 +26,7 @@ fn main() {
             found_doc.unwrap().content_as::<Airport>()
         );
     }
+    println!("Document does exist?: {:?}", collection.exists("airport_1297", None));
 
     println!("Airline Document: {:?}", collection.get("enoent", None));
 

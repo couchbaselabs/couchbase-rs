@@ -74,6 +74,26 @@ impl fmt::Debug for MutationResult {
     }
 }
 
+pub struct ExistsResult {
+    cas: u64,
+}
+
+impl ExistsResult {
+    pub fn new(cas: u64) -> Self {
+        Self { cas }
+    }
+
+    pub fn cas(&self) -> u64 {
+        self.cas
+    }
+}
+
+impl fmt::Debug for ExistsResult {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "ExistsResult {{ cas: 0x{:x} }}", self.cas)
+    }
+}
+
 #[derive(Debug)]
 pub struct QueryResult {
     rows: Option<mpsc::UnboundedReceiver<Vec<u8>>>,

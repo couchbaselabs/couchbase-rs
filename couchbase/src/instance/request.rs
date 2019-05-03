@@ -485,6 +485,49 @@ impl InstanceRequest for UnlockRequest {
 }
 
 #[derive(Debug)]
+pub struct ExistsRequest {
+    sender: oneshot::Sender<CouchbaseResult<Option<ExistsResult>>>,
+    id: String,
+    options: Option<ExistsOptions>,
+}
+
+impl ExistsRequest {
+    pub fn new(
+        sender: oneshot::Sender<CouchbaseResult<Option<ExistsResult>>>,
+        id: String,
+        options: Option<ExistsOptions>,
+    ) -> Self {
+        Self {
+            sender,
+            id,
+            options,
+        }
+    }
+}
+
+impl InstanceRequest for ExistsRequest {
+    fn encode(self: Box<Self>, instance: *mut lcb_INSTANCE) {
+        let id_len = self.id.len();
+        let id_encoded = CString::new(self.id).expect("Could not encode ID");
+        let mut command: *mut lcb_CMDEXISTS = ptr::null_mut();
+
+        let sender_boxed = Box::new(self.sender);
+        let cookie = Box::into_raw(sender_boxed) as *mut c_void;
+        unsafe {
+            lcb_cmdexists_create(&mut command);
+            lcb_cmdexists_key(command, id_encoded.as_ptr(), id_len);
+            if let Some(options) = self.options {
+                if let Some(timeout) = options.timeout() {
+                    lcb_cmdexists_timeout(command, timeout.as_millis() as u32);
+                }
+            }
+            lcb_exists(instance, cookie, command);
+            lcb_cmdexists_destroy(command);
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct QueryRequest {
     sender: oneshot::Sender<CouchbaseResult<QueryResult>>,
     rows_sender: mpsc::UnboundedSender<Vec<u8>>,

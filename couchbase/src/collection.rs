@@ -420,4 +420,34 @@ impl Collection {
     {
         self.instance.unlock(id.into(), cas, options).wait()
     }
+
+    /// Checks if a document exists and if so returns a cas value with it.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - The ID of the document.
+    /// * `options` - Options to customize the default behavior.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # use couchbase::Cluster;
+    /// # let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
+    /// #   .expect("Could not create Cluster reference!");
+    /// # let bucket = cluster
+    /// #   .bucket("travel-sample")
+    /// #   .expect("Could not open bucket");
+    /// # let collection = bucket.default_collection();
+    /// let result = collection.exists("document_id", None);
+    /// ```
+    pub fn exists<S>(
+        &self,
+        id: S,
+        options: Option<ExistsOptions>,
+    ) -> Result<Option<ExistsResult>, CouchbaseError>
+    where
+        S: Into<String>,
+    {
+        self.instance.exists(id.into(), options).wait()
+    }
 }
