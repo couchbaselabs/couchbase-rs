@@ -1,5 +1,6 @@
 use couchbase::Cluster;
 use serde_derive::Deserialize;
+use futures::Future;
 
 #[derive(Debug, Deserialize)]
 struct Airport {
@@ -17,6 +18,7 @@ fn main() {
 
     let found_doc = collection
         .get("airport_1297", None)
+        .wait()
         .expect("Error while loading doc");
     println!("Airline Document: {:?}", found_doc);
 
@@ -26,18 +28,18 @@ fn main() {
             found_doc.unwrap().content_as::<Airport>()
         );
     }
-    println!("Document does exist?: {:?}", collection.exists("airport_1297", None));
+    println!("Document does exist?: {:?}", collection.exists("airport_1297", None).wait());
 
-    println!("Airline Document: {:?}", collection.get("enoent", None));
+    println!("Airline Document: {:?}", collection.get("enoent", None).wait());
 
-    println!("Upsert: {:?}", collection.upsert("foo", "bar", None));
-    println!("Get: {:?}", collection.get("foo", None));
+    println!("Upsert: {:?}", collection.upsert("foo", "bar", None).wait());
+    println!("Get: {:?}", collection.get("foo", None).wait());
 
-    println!("Remove: {:?}", collection.remove("foo", None));
-    println!("Get: {:?}", collection.get("foo", None));
+    println!("Remove: {:?}", collection.remove("foo", None).wait());
+    println!("Get: {:?}", collection.get("foo", None).wait());
 
-    println!("First Insert: {:?}", collection.insert("bla", "bla", None));
-    println!("Second Insert: {:?}", collection.insert("bla", "bla", None));
+    println!("First Insert: {:?}", collection.insert("bla", "bla", None).wait());
+    println!("Second Insert: {:?}", collection.insert("bla", "bla", None).wait());
 
     cluster.disconnect().expect("Could not shutdown properly");
 }

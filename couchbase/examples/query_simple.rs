@@ -1,5 +1,6 @@
 use couchbase::Cluster;
 use serde_json::Value;
+use futures::Future;
 
 fn main() {
     let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
@@ -8,6 +9,7 @@ fn main() {
 
     let mut result = cluster
         .query("select name, type from `travel-sample` limit 5", None)
+        .wait()
         .expect("Could not perform query");
 
     println!("Rows:\n{:?}", result.rows_as().collect::<Vec<Value>>());

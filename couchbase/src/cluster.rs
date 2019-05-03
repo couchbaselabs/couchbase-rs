@@ -5,6 +5,7 @@ use crate::options::{AnalyticsOptions, QueryOptions};
 use crate::result::{AnalyticsResult, QueryResult};
 use std::collections::HashMap;
 use std::sync::Arc;
+use futures::Future;
 
 /// The `Cluster` is the main entry point when working with the client.
 pub struct Cluster {
@@ -109,12 +110,14 @@ impl Cluster {
     ///
     /// ```rust,no_run
     /// # use couchbase::Cluster;
+    /// use futures::Future;
     /// use serde_json::Value;
     /// # let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
     /// #    .expect("Could not create cluster reference");
     /// # let _ = cluster.bucket("travel-sample");
     /// #
     /// let mut result = cluster.query("select name, type from `travel-sample` limit 5", None)
+    ///     .wait()
     ///     .expect("Could not perform query");
     ///
     /// println!("Rows:\n{:?}", result.rows_as().collect::<Vec<Value>>());
@@ -125,7 +128,7 @@ impl Cluster {
         &self,
         statement: S,
         options: Option<QueryOptions>,
-    ) -> Result<QueryResult, CouchbaseError>
+    ) -> impl Future<Item = QueryResult, Error = CouchbaseError> 
     where
         S: Into<String>,
     {
@@ -152,6 +155,7 @@ impl Cluster {
     ///
     /// ```rust,no_run
     /// # use couchbase::Cluster;
+    /// use futures::Future;
     /// use serde_json::Value;
     /// #
     /// # let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
@@ -160,6 +164,7 @@ impl Cluster {
     /// #
     /// let mut result = cluster
     ///     .analytics_query("SELECT DataverseName FROM Metadata.`Dataverse`", None)
+    ///     .wait()
     ///     .expect("Could not perform analytics query");
     ///
     /// println!("---> rows {:?}", result.rows_as().collect::<Vec<Value>>());
@@ -170,7 +175,7 @@ impl Cluster {
         &self,
         statement: S,
         options: Option<AnalyticsOptions>,
-    ) -> Result<AnalyticsResult, CouchbaseError>
+    ) -> impl Future<Item = AnalyticsResult, Error = CouchbaseError> 
     where
         S: Into<String>,
     {

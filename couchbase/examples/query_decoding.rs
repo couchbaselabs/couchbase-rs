@@ -1,5 +1,6 @@
 use couchbase::Cluster;
 use serde_derive::Deserialize;
+use futures::Future;
 
 #[derive(Debug, Deserialize)]
 struct Airport {
@@ -17,6 +18,7 @@ fn main() {
             "select airportname, icao from `travel-sample` where type = \"airport\" limit 2",
             None,
         )
+        .wait()
         .expect("Could not perform query");
 
     println!("---> rows {:?}", result.rows_as().collect::<Vec<Airport>>());

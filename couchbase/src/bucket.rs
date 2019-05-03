@@ -36,11 +36,11 @@ impl Bucket {
         &self,
         statement: S,
         options: Option<QueryOptions>,
-    ) -> Result<QueryResult, CouchbaseError>
+    ) -> impl Future<Item = QueryResult, Error = CouchbaseError> 
     where
         S: Into<String>,
     {
-        self.instance.query(statement.into(), options).wait()
+        self.instance.query(statement.into(), options)
     }
 
     /// Internal proxy method that gets called from the cluster so we can send it into the
@@ -49,13 +49,12 @@ impl Bucket {
         &self,
         statement: S,
         options: Option<AnalyticsOptions>,
-    ) -> Result<AnalyticsResult, CouchbaseError>
+    ) -> impl Future<Item = AnalyticsResult, Error = CouchbaseError> 
     where
         S: Into<String>,
     {
         self.instance
             .analytics_query(statement.into(), options)
-            .wait()
     }
 
     /// Internal proxy method that gets called from the cluster so we can send it into the
