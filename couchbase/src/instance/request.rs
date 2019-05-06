@@ -3,6 +3,7 @@ use crate::instance::decrement_outstanding_requests;
 use crate::instance::InstanceCookie;
 use crate::options::*;
 use crate::result::*;
+use crate::subdoc::*;
 use couchbase_sys::*;
 use futures::sync::{mpsc, oneshot};
 use std::ffi::{c_void, CString};
@@ -732,5 +733,87 @@ unsafe extern "C" fn analytics_callback(
             .unbounded_send(row.to_vec())
             .expect("Could not send row");
         Box::into_raw(cookie);
+    }
+}
+
+#[derive(Debug)]
+pub struct LookupInRequest {
+    sender: oneshot::Sender<CouchbaseResult<Option<LookupInResult>>>,
+    id: String,
+    specs: Vec<LookupInSpec>,
+    options: Option<LookupInOptions>,
+}
+
+impl LookupInRequest {
+    pub fn new(
+        sender: oneshot::Sender<CouchbaseResult<Option<LookupInResult>>>,
+        id: String,
+        specs: Vec<LookupInSpec>,
+        options: Option<LookupInOptions>,
+    ) -> Self {
+        Self {
+            sender,
+            id,
+            specs,
+            options,
+        }
+    }
+}
+
+impl InstanceRequest for LookupInRequest {
+    fn encode(self: Box<Self>, instance: *mut lcb_INSTANCE) {
+        let id_len = self.id.len();
+        let id_encoded = CString::new(self.id).expect("Could not encode ID");
+        let mut command: *mut lcb_CMDSUBDOC = ptr::null_mut();
+        let mut ops: *mut lcb_SUBDOCOPS = ptr::null_mut();
+
+        let sender_boxed = Box::new(self.sender);
+        let cookie = Box::into_raw(sender_boxed) as *mut c_void;
+        unsafe {
+            lcb_cmdsubdoc_create(&mut command);
+            lcb_cmdsubdoc_key(command, id_encoded.as_ptr(), id_len);
+            if let Some(options) = self.options {
+                if let Some(timeout) = options.timeout() {
+                    lcb_cmdsubdoc_timeout(command, timeout.as_millis() as u32);
+                }
+            }
+
+            lcb_subdocops_create(&mut ops, self.specs.len());
+            let mut idx = 0;
+            for spec in &self.specs {
+                let flags = 0;
+                match spec.command_type() {
+                    SubdocLookupCommandType::Get => {
+                        lcb_subdocops_get(ops, idx, flags, spec.path().as_ptr(), spec.path_len());
+                    }
+                    SubdocLookupCommandType::Count => {
+                        lcb_subdocops_get_count(
+                            ops,
+                            idx,
+                            flags,
+                            spec.path().as_ptr(),
+                            spec.path_len(),
+                        );
+                    }
+                    SubdocLookupCommandType::Exists => {
+                        lcb_subdocops_exists(
+                            ops,
+                            idx,
+                            flags,
+                            spec.path().as_ptr(),
+                            spec.path_len(),
+                        );
+                    }
+                    SubdocLookupCommandType::GetDoc => {
+                        lcb_subdocops_fulldoc_get(ops, idx, flags);
+                    }
+                }
+                idx += 1;
+            }
+            lcb_cmdsubdoc_operations(command, ops);
+            lcb_subdoc(instance, cookie, command);
+            lcb_subdocops_destroy(ops);
+            lcb_cmdsubdoc_destroy(command);
+        }
     }
 }

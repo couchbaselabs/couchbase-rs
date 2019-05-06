@@ -16,6 +16,8 @@ use std::{convert, error, fmt, io};
 /// the application context.
 #[derive(Debug)]
 pub enum CouchbaseError {
+    /// Call succeded.
+    Success,
     /// Raised when there has been a problem with dispatching the rust future.
     FutureError,
     /// Decoding from json or another type failed.
@@ -335,6 +337,7 @@ pub enum CouchbaseError {
 impl CouchbaseError {
     fn as_str(&self) -> &'static str {
         match *self {
+            CouchbaseError::Success => { "Success" }
             CouchbaseError::FutureError => {
                 "Could not dispatch the rust future"
             },
@@ -674,7 +677,7 @@ impl convert::From<lcb_STATUS> for CouchbaseError {
             lcb_STATUS_LCB_NAMESERVER_ERROR => CouchbaseError::NameserverError,
             lcb_STATUS_LCB_NOT_AUTHORIZED => CouchbaseError::NotAuthorized,
             lcb_STATUS_LCB_MAX_ERROR => panic!("MAX_ERROR is internal!"),
-            lcb_STATUS_LCB_SUCCESS => panic!("SUCCESS is not an Error!"),
+            lcb_STATUS_LCB_SUCCESS => CouchbaseError::Success,
             lcb_STATUS_LCB_AUTH_CONTINUE => {
                 panic!("AUTH_CONTINUE is internal and not to be exposed!")
             }

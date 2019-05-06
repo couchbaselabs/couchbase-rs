@@ -2,14 +2,15 @@ use crate::error::CouchbaseError;
 use crate::instance::Instance;
 use crate::options::*;
 use crate::result::*;
+use crate::subdoc::*;
 use crate::util::JSON_COMMON_FLAG;
+use futures::future::err;
+use futures::future::Either;
 use futures::Future;
 use serde::Serialize;
 use serde_json::to_vec;
 use std::sync::Arc;
 use std::time::Duration;
-use futures::future::err;
-use futures::future::Either;
 
 /// `Collection` level access to operations.
 pub struct Collection {
@@ -158,8 +159,7 @@ impl Collection {
     where
         S: Into<String>,
     {
-        self.instance
-            .get_and_touch(id.into(), expiration, options)
+        self.instance.get_and_touch(id.into(), expiration, options)
     }
 
     /// Inserts or replaces a new document into the collection.
@@ -273,8 +273,7 @@ impl Collection {
             Err(_e) => return Either::A(err(CouchbaseError::EncodingError)),
         };
         let flags = JSON_COMMON_FLAG;
-        Either::B(self.instance
-            .insert(id.into(), serialized, flags, options))
+        Either::B(self.instance.insert(id.into(), serialized, flags, options))
     }
 
     /// Replaces an existing document in the collection.
@@ -331,8 +330,7 @@ impl Collection {
             Err(_e) => return Either::A(err(CouchbaseError::EncodingError)),
         };
         let flags = JSON_COMMON_FLAG;
-        Either::B(self.instance
-            .replace(id.into(), serialized, flags, options))
+        Either::B(self.instance.replace(id.into(), serialized, flags, options))
     }
 
     /// Removes a document from the collection.
@@ -463,5 +461,17 @@ impl Collection {
         S: Into<String>,
     {
         self.instance.exists(id.into(), options)
+    }
+
+    pub fn lookup_in<S>(
+        &self,
+        id: S,
+        specs: Vec<LookupInSpec>,
+        options: Option<LookupInOptions>,
+    ) -> impl Future<Item = Option<LookupInResult>, Error = CouchbaseError>
+    where
+        S: Into<String>,
+    {
+        self.instance.lookup_in(id.into(), specs, options)
     }
 }

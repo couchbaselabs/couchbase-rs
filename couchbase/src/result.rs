@@ -205,3 +205,27 @@ impl AnalyticsResult {
             .expect("could not unwrap meta")
     }
 }
+
+#[derive(Debug)]
+pub struct LookupInResult {
+    cas: u64,
+    fields: Vec<LookupInField>,
+}
+
+impl LookupInResult {
+    pub(crate) fn new(cas: u64, fields: Vec<LookupInField>) -> Self {
+        LookupInResult { cas, fields }
+    }
+}
+
+#[derive(Debug)]
+pub struct LookupInField {
+    status: CouchbaseError,
+    value: Vec<u8>,
+}
+
+impl LookupInField {
+    pub fn new(status: CouchbaseError, value: Vec<u8>) -> Self {
+        LookupInField { status, value }
+    }
+}

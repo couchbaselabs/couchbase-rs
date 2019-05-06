@@ -1,6 +1,6 @@
 use couchbase::Cluster;
-use serde_derive::Deserialize;
 use futures::Future;
+use serde_derive::Deserialize;
 
 #[derive(Debug, Deserialize)]
 struct Airport {
@@ -28,9 +28,15 @@ fn main() {
             found_doc.unwrap().content_as::<Airport>()
         );
     }
-    println!("Document does exist?: {:?}", collection.exists("airport_1297", None).wait());
+    println!(
+        "Document does exist?: {:?}",
+        collection.exists("airport_1297", None).wait()
+    );
 
-    println!("Airline Document: {:?}", collection.get("enoent", None).wait());
+    println!(
+        "Airline Document: {:?}",
+        collection.get("enoent", None).wait()
+    );
 
     println!("Upsert: {:?}", collection.upsert("foo", "bar", None).wait());
     println!("Get: {:?}", collection.get("foo", None).wait());
@@ -38,8 +44,14 @@ fn main() {
     println!("Remove: {:?}", collection.remove("foo", None).wait());
     println!("Get: {:?}", collection.get("foo", None).wait());
 
-    println!("First Insert: {:?}", collection.insert("bla", "bla", None).wait());
-    println!("Second Insert: {:?}", collection.insert("bla", "bla", None).wait());
+    println!(
+        "First Insert: {:?}",
+        collection.insert("bla", "bla", None).wait()
+    );
+    println!(
+        "Second Insert: {:?}",
+        collection.insert("bla", "bla", None).wait()
+    );
 
     cluster.disconnect().expect("Could not shutdown properly");
 }

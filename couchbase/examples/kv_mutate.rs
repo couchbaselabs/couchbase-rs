@@ -1,7 +1,7 @@
 use couchbase::Cluster;
+use futures::Future;
 use serde_derive::Serialize;
 use std::time::Duration;
-use futures::Future;
 
 #[derive(Debug, Serialize)]
 struct Airport {

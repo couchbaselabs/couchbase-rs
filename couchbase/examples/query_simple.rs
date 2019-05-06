@@ -1,6 +1,6 @@
 use couchbase::Cluster;
-use serde_json::Value;
 use futures::Future;
+use serde_json::Value;
 
 fn main() {
     let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")

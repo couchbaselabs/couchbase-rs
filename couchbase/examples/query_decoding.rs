@@ -1,6 +1,6 @@
 use couchbase::Cluster;
-use serde_derive::Deserialize;
 use futures::Future;
+use serde_derive::Deserialize;
 
 #[derive(Debug, Deserialize)]
 struct Airport {

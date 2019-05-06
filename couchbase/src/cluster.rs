@@ -3,9 +3,9 @@ use crate::bucket::Bucket;
 use crate::error::CouchbaseError;
 use crate::options::{AnalyticsOptions, QueryOptions};
 use crate::result::{AnalyticsResult, QueryResult};
+use futures::Future;
 use std::collections::HashMap;
 use std::sync::Arc;
-use futures::Future;
 
 /// The `Cluster` is the main entry point when working with the client.
 pub struct Cluster {
@@ -128,7 +128,7 @@ impl Cluster {
         &self,
         statement: S,
         options: Option<QueryOptions>,
-    ) -> impl Future<Item = QueryResult, Error = CouchbaseError> 
+    ) -> impl Future<Item = QueryResult, Error = CouchbaseError>
     where
         S: Into<String>,
     {
@@ -175,7 +175,7 @@ impl Cluster {
         &self,
         statement: S,
         options: Option<AnalyticsOptions>,
-    ) -> impl Future<Item = AnalyticsResult, Error = CouchbaseError> 
+    ) -> impl Future<Item = AnalyticsResult, Error = CouchbaseError>
     where
         S: Into<String>,
     {
