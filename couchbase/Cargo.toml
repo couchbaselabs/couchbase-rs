@@ -6,7 +6,7 @@ edition = "2018"
 build = "build.rs"
 
 [dependencies]
-couchbase-sys = { path = "../couchbase-sys" }
+couchbase-sys = "1.0.0-alpha.1"
 futures = "0.1"
 serde = "1.0"
 serde_json = "1.0"
