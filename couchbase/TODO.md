@@ -9,6 +9,13 @@
     - remaining commands plus options:
         - replica get
         - mutateIn
+            fullDocument
+            arrayAppend
+            arrayPrepend
+            arrayInsert
+            arrayAddUnique
+            increment
+            decrement
     - Binary collection
         - append
         - prepend

@@ -225,3 +225,27 @@ impl LookupInField {
         LookupInField { status, value }
     }
 }
+
+#[derive(Debug)]
+pub struct MutateInResult {
+    cas: u64,
+    fields: Vec<MutateInField>,
+}
+
+impl MutateInResult {
+    pub(crate) fn new(cas: u64, fields: Vec<MutateInField>) -> Self {
+        MutateInResult { cas, fields }
+    }
+}
+
+#[derive(Debug)]
+pub struct MutateInField {
+    status: CouchbaseError,
+    value: Vec<u8>,
+}
+
+impl MutateInField {
+    pub fn new(status: CouchbaseError, value: Vec<u8>) -> Self {
+        MutateInField { status, value }
+    }
+}

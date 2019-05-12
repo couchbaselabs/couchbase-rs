@@ -329,6 +329,19 @@ impl Instance {
         map_oneshot_error(c)
     }
 
+    pub fn mutate_in(
+        &self,
+        id: String,
+        specs: Vec<MutateInSpec>,
+        options: Option<MutateInOptions>,
+    ) -> impl Future<Item = MutateInResult, Error = CouchbaseError> {
+        let (p, c) = oneshot::channel();
+        self.sender
+            .send(Box::new(MutateInRequest::new(p, id, specs, options)))
+            .expect("Could not send mutateIn command into io loop");
+        map_oneshot_error(c)
+    }
+
     pub fn query(
         &self,
         statement: String,
@@ -405,6 +418,11 @@ unsafe fn install_instance_callbacks(instance: *mut lcb_INSTANCE) {
         instance,
         lcb_CALLBACK_TYPE_LCB_CALLBACK_SDLOOKUP as i32,
         Some(lookup_in_callback),
+    );
+    lcb_install_callback3(
+        instance,
+        lcb_CALLBACK_TYPE_LCB_CALLBACK_SDMUTATE as i32,
+        Some(mutate_in_callback),
     );
 }
 
@@ -616,6 +634,45 @@ unsafe extern "C" fn lookup_in_callback(
         Ok(Some(LookupInResult::new(cas, fields)))
     } else if status == lcb_STATUS_LCB_KEY_ENOENT {
         Ok(None)
+    } else {
+        Err(CouchbaseError::from(status))
+    };
+    sender.send(result).expect("Could not complete Future!");
+}
+
+unsafe extern "C" fn mutate_in_callback(
+    instance: *mut lcb_INSTANCE,
+    _cbtype: i32,
+    res: *const lcb_RESPBASE,
+) {
+    decrement_outstanding_requests(instance);
+    let lookup_res = res as *const lcb_RESPSUBDOC;
+
+    let mut cookie_ptr: *mut c_void = ptr::null_mut();
+    lcb_respsubdoc_cookie(lookup_res, &mut cookie_ptr);
+    let sender =
+        Box::from_raw(cookie_ptr as *mut oneshot::Sender<Result<MutateInResult, CouchbaseError>>);
+
+    let status = lcb_respsubdoc_status(lookup_res);
+    let result = if status == lcb_STATUS_LCB_SUCCESS {
+        let mut cas: u64 = 0;
+        lcb_respsubdoc_cas(lookup_res, &mut cas);
+
+        let num_fields = lcb_respsubdoc_result_size(lookup_res);
+        let mut fields = Vec::with_capacity(num_fields);
+        for idx in 0..num_fields {
+            let mut value_len: usize = 0;
+            let mut value_ptr: *const c_char = ptr::null();
+            lcb_respsubdoc_result_value(lookup_res, idx, &mut value_ptr, &mut value_len);
+            let value = from_raw_parts(value_ptr as *const u8, value_len);
+            let field_status = lcb_respsubdoc_result_status(lookup_res, idx);
+            fields.push(MutateInField::new(
+                CouchbaseError::from(field_status),
+                value.to_vec(),
+            ));
+        }
+
+        Ok(MutateInResult::new(cas, fields))
     } else {
         Err(CouchbaseError::from(status))
     };

@@ -474,4 +474,16 @@ impl Collection {
     {
         self.instance.lookup_in(id.into(), specs, options)
     }
+
+    pub fn mutate_in<S>(
+        &self,
+        id: S,
+        specs: Vec<MutateInSpec>,
+        options: Option<MutateInOptions>,
+    ) -> impl Future<Item = MutateInResult, Error = CouchbaseError>
+    where
+        S: Into<String>,
+    {
+        self.instance.mutate_in(id.into(), specs, options)
+    }
 }

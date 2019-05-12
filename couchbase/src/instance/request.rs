@@ -817,3 +817,108 @@ impl InstanceRequest for LookupInRequest {
         }
     }
 }
+
+#[derive(Debug)]
+pub struct MutateInRequest {
+    sender: oneshot::Sender<CouchbaseResult<MutateInResult>>,
+    id: String,
+    specs: Vec<MutateInSpec>,
+    options: Option<MutateInOptions>,
+}
+
+impl MutateInRequest {
+    pub fn new(
+        sender: oneshot::Sender<CouchbaseResult<MutateInResult>>,
+        id: String,
+        specs: Vec<MutateInSpec>,
+        options: Option<MutateInOptions>,
+    ) -> Self {
+        Self {
+            sender,
+            id,
+            specs,
+            options,
+        }
+    }
+}
+
+impl InstanceRequest for MutateInRequest {
+    fn encode(self: Box<Self>, instance: *mut lcb_INSTANCE) {
+        let id_len = self.id.len();
+        let id_encoded = CString::new(self.id).expect("Could not encode ID");
+        let mut command: *mut lcb_CMDSUBDOC = ptr::null_mut();
+        let mut ops: *mut lcb_SUBDOCOPS = ptr::null_mut();
+
+        let sender_boxed = Box::new(self.sender);
+        let cookie = Box::into_raw(sender_boxed) as *mut c_void;
+        unsafe {
+            lcb_cmdsubdoc_create(&mut command);
+            lcb_cmdsubdoc_key(command, id_encoded.as_ptr(), id_len);
+            if let Some(options) = self.options {
+                if let Some(timeout) = options.timeout() {
+                    lcb_cmdsubdoc_timeout(command, timeout.as_millis() as u32);
+                }
+                if let Some(cas) = options.cas() {
+                    lcb_cmdsubdoc_cas(command, *cas);
+                }
+            }
+
+            lcb_subdocops_create(&mut ops, self.specs.len());
+
+            let mut idx = 0;
+            for spec in &self.specs {
+                let flags = 0;
+                match spec.command_type() {
+                    SubdocMutationCommandType::Insert => {
+                        lcb_subdocops_dict_add(
+                            ops,
+                            idx,
+                            flags,
+                            spec.path().as_ptr(),
+                            spec.path_len(),
+                            spec.content().as_ptr(),
+                            spec.content_len(),
+                        );
+                    }
+                    SubdocMutationCommandType::Upsert => {
+                        lcb_subdocops_dict_upsert(
+                            ops,
+                            idx,
+                            flags,
+                            spec.path().as_ptr(),
+                            spec.path_len(),
+                            spec.content().as_ptr(),
+                            spec.content_len(),
+                        );
+                    }
+                    SubdocMutationCommandType::Replace => {
+                        lcb_subdocops_replace(
+                            ops,
+                            idx,
+                            flags,
+                            spec.path().as_ptr(),
+                            spec.path_len(),
+                            spec.content().as_ptr(),
+                            spec.content_len(),
+                        );
+                    }
+                    SubdocMutationCommandType::Remove => {
+                        lcb_subdocops_remove(
+                            ops,
+                            idx,
+                            flags,
+                            spec.path().as_ptr(),
+                            spec.path_len(),
+                        );
+                    }
+                }
+                idx += 1;
+            }
+
+            lcb_cmdsubdoc_operations(command, ops);
+            lcb_subdoc(instance, cookie, command);
+            lcb_subdocops_destroy(ops);
+            lcb_cmdsubdoc_destroy(command);
+        }
+    }
+}
