@@ -463,6 +463,30 @@ impl Collection {
         self.instance.exists(id.into(), options)
     }
 
+    /// Extracts fragments of a document.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - The ID of the document.
+    /// * `specs` - The vector of specs that define what to fetch.
+    /// * `options` - Options to customize the default behavior.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # use couchbase::Cluster;
+    /// use futures::Future;
+    /// use couchbase::subdoc::LookupInSpec;
+    /// # let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
+    /// #   .expect("Could not create Cluster reference!");
+    /// # let bucket = cluster
+    /// #   .bucket("travel-sample")
+    /// #   .expect("Could not open bucket");
+    /// # let collection = bucket.default_collection();
+    /// let partial_result = collection
+    ///   .lookup_in("airport_1285", vec![LookupInSpec::get("geo")], None)
+    ///   .wait();
+    /// ```
     pub fn lookup_in<S>(
         &self,
         id: S,
@@ -475,6 +499,34 @@ impl Collection {
         self.instance.lookup_in(id.into(), specs, options)
     }
 
+    /// Changes fragments of a document.
+    /// 
+    /// # Arguments
+    ///
+    /// * `id` - The ID of the document.
+    /// * `specs` - The vector of specs that define what to mutate.
+    /// * `options` - Options to customize the default behavior.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # use couchbase::Cluster;
+    /// use futures::Future;
+    /// use couchbase::subdoc::MutateInSpec;
+    /// # let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
+    /// #   .expect("Could not create Cluster reference!");
+    /// # let bucket = cluster
+    /// #   .bucket("travel-sample")
+    /// #   .expect("Could not open bucket");
+    /// # let collection = bucket.default_collection();
+    /// let insert_result = collection
+    ///     .mutate_in(
+    ///         "airport_1285",
+    ///         vec![MutateInSpec::upsert("updated", true).expect("could not encode value")],
+    ///         None,
+    ///     )
+    ///     .wait();
+    /// ```
     pub fn mutate_in<S>(
         &self,
         id: S,
