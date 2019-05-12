@@ -193,7 +193,7 @@ impl AnalyticsResult {
             .map_err(|_| CouchbaseError::FutureError) // todo: something is wrong here, wants () ?
     }
 
-    pub fn meta(&mut self) -> impl Future<Item = AnalyticsMeta, Error = CouchbaseError>  {
+    pub fn meta(&mut self) -> impl Future<Item = AnalyticsMeta, Error = CouchbaseError> {
         self.meta
             .take()
             .expect("Meta already consumed!")

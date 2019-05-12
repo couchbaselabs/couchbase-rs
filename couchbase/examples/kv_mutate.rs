@@ -11,6 +11,8 @@ struct Airport {
 }
 
 fn main() {
+    env_logger::init();
+
     let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
         .expect("Could not create Cluster reference!");
     let bucket = cluster

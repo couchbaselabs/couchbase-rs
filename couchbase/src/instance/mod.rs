@@ -16,13 +16,15 @@ use futures::Future;
 use request::*;
 use std::cell::RefCell;
 use std::ffi::c_void;
-use std::ffi::CString;
-use std::os::raw::c_char;
+use std::ffi::{CStr, CString};
+use std::os::raw::{c_char, c_int, c_uint};
 use std::ptr;
 use std::slice::from_raw_parts;
 use std::sync::mpsc::{channel, Sender};
 use std::thread;
 use std::time::Duration;
+
+const LOG_MSG_LENGTH: usize = 1024;
 
 /// Keeps track of per-instance state.
 #[derive(Debug)]
@@ -100,10 +102,18 @@ impl Instance {
 
                 let mut instance: *mut lcb_INSTANCE = ptr::null_mut();
 
+                let mut logger = lcb_logprocs_st {
+                    version: 0,
+                    v: unsafe { ::std::mem::zeroed() },
+                };
+
                 unsafe {
+                    logger.v.v0.callback = Some(logging_callback);
+
                     cropts.v.v4.connstr = connstr.as_ptr();
                     cropts.v.v4.username = username.as_ptr();
                     cropts.v.v4.passwd = password.as_ptr();
+                    cropts.v.v4.logger = &mut logger;
 
                     if lcb_create(&mut instance, &cropts) != lcb_STATUS_LCB_SUCCESS {
                         // TODO: Log Err(InstanceError::CreateFailed);
@@ -610,4 +620,34 @@ unsafe extern "C" fn lookup_in_callback(
         Err(CouchbaseError::from(status))
     };
     sender.send(result).expect("Could not complete Future!");
+}
+
+unsafe extern "C" fn logging_callback(
+    _procs: *mut lcb_logprocs_st,
+    _iid: c_uint,
+    _subsys: *const c_char,
+    severity: c_int,
+    _srcfile: *const c_char,
+    _srcline: c_int,
+    fmt: *const c_char,
+    ap: *mut __va_list_tag,
+) {
+    let level = match severity {
+        0 => log::Level::Trace,
+        1 => log::Level::Debug,
+        2 => log::Level::Info,
+        3 => log::Level::Warn,
+        _ => log::Level::Error,
+    };
+
+    let mut target_buffer = [0u8; LOG_MSG_LENGTH];
+    let result = wrapped_vsnprintf(&mut target_buffer[0] as *mut u8 as *mut i8, LOG_MSG_LENGTH as c_uint, fmt, ap) as usize;
+    let decoded = CStr::from_bytes_with_nul(&target_buffer[0..=result]).unwrap();
+
+    log::log!(level, "{}", decoded.to_str().unwrap());
+}
+
+extern "C" { 
+    /// Wrapper function defined in `utils.c` to wrap vsnprintf for logging purposes.
+    fn wrapped_vsnprintf(buf: *mut c_char, size: c_uint, format: *const c_char, ap: *mut __va_list_tag) -> c_int;
 }
