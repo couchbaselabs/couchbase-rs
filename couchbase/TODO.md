@@ -1,12 +1,13 @@
 # Overall
-    - remove all expect from code and turn it into errors
+    - Move to sdk3 error handling structure
+    - Remove all expect code and turn into errors based on the structure
     - add logging infrastructure
 
 # KV
     - implement options for get and the 3 mutation options
+    - add durability requirement options (+ sync durability)
     - remaining commands plus options:
         - replica get
-        - lookupIn
         - mutateIn
     - Binary collection
         - append

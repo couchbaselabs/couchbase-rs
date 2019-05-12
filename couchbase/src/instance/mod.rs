@@ -94,16 +94,16 @@ impl Instance {
         let handle = thread::Builder::new()
             .spawn(move || {
                 let mut cropts = lcb_create_st {
-                    version: 3,
+                    version: 4,
                     v: unsafe { ::std::mem::zeroed() },
                 };
 
                 let mut instance: *mut lcb_INSTANCE = ptr::null_mut();
 
                 unsafe {
-                    cropts.v.v3.connstr = connstr.as_ptr();
-                    cropts.v.v3.username = username.as_ptr();
-                    cropts.v.v3.passwd = password.as_ptr();
+                    cropts.v.v4.connstr = connstr.as_ptr();
+                    cropts.v.v4.username = username.as_ptr();
+                    cropts.v.v4.passwd = password.as_ptr();
 
                     if lcb_create(&mut instance, &cropts) != lcb_STATUS_LCB_SUCCESS {
                         // TODO: Log Err(InstanceError::CreateFailed);
