@@ -641,13 +641,23 @@ unsafe extern "C" fn logging_callback(
     };
 
     let mut target_buffer = [0u8; LOG_MSG_LENGTH];
-    let result = wrapped_vsnprintf(&mut target_buffer[0] as *mut u8 as *mut i8, LOG_MSG_LENGTH as c_uint, fmt, ap) as usize;
+    let result = wrapped_vsnprintf(
+        &mut target_buffer[0] as *mut u8 as *mut i8,
+        LOG_MSG_LENGTH as c_uint,
+        fmt,
+        ap,
+    ) as usize;
     let decoded = CStr::from_bytes_with_nul(&target_buffer[0..=result]).unwrap();
 
     log::log!(level, "{}", decoded.to_str().unwrap());
 }
 
-extern "C" { 
+extern "C" {
     /// Wrapper function defined in `utils.c` to wrap vsnprintf for logging purposes.
-    fn wrapped_vsnprintf(buf: *mut c_char, size: c_uint, format: *const c_char, ap: *mut __va_list_tag) -> c_int;
+    fn wrapped_vsnprintf(
+        buf: *mut c_char,
+        size: c_uint,
+        format: *const c_char,
+        ap: *mut __va_list_tag,
+    ) -> c_int;
 }
