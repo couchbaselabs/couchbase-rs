@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/couchbase/1.0.0-alpha.1")]
+#![doc(html_root_url = "https://docs.rs/couchbase/1.0.0-alpha.2")]
 
 mod bucket;
 mod cluster;
