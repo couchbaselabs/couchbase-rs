@@ -1,5 +1,5 @@
-use couchbase::Cluster;
-use futures::Future;
+use couchbase::{CouchbaseError, Cluster};
+use futures::{Stream, Future};
 use serde_json::Value;
 
 fn main() {
@@ -12,8 +12,8 @@ fn main() {
         .wait()
         .expect("Could not perform query");
 
-    println!("Rows:\n{:?}", result.rows_as().collect::<Vec<Value>>());
-    println!("Meta:\n{:?}", result.meta());
+    println!("Rows:\n{:?}", result.rows_as().wait().collect::<Vec<Result<Value, CouchbaseError>>>());
+    println!("Meta:\n{:?}", result.meta().wait().expect("Could not get query meta"));
 
     cluster.disconnect().expect("Could not shutdown properly");
 }

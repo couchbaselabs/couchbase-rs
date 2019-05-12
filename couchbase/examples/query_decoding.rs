@@ -1,5 +1,5 @@
-use couchbase::Cluster;
-use futures::Future;
+use couchbase::{CouchbaseError, Cluster};
+use futures::{Stream, Future};
 use serde_derive::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -21,8 +21,8 @@ fn main() {
         .wait()
         .expect("Could not perform query");
 
-    println!("---> rows {:?}", result.rows_as().collect::<Vec<Airport>>());
-    println!("---> meta {:?}", result.meta());
+    println!("---> rows {:?}", result.rows_as().wait().collect::<Vec<Result<Airport, CouchbaseError>>>());
+    println!("---> meta {:?}", result.meta().wait().expect("Could not get query meta"));
 
     cluster.disconnect().expect("Could not shutdown properly");
 }

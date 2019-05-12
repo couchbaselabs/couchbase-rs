@@ -128,7 +128,7 @@ impl QueryResult {
         }
     }
 
-    pub fn rows_as<T>(&mut self) -> impl Iterator<Item = T>
+    pub fn rows_as<T>(&mut self) -> impl Stream<Item = T, Error = CouchbaseError>
     where
         T: DeserializeOwned,
     {
@@ -136,17 +136,15 @@ impl QueryResult {
             .take()
             .expect("Rows already consumed!")
             .map(|v| from_slice::<T>(v.as_slice()).expect("Could not convert type"))
-            .wait()
-            .map(|v| v.expect("could not unwrap row"))
+            .map_err(|_| CouchbaseError::FutureError) // todo: something is wrong here, wants () ?
     }
 
-    pub fn meta(&mut self) -> QueryMeta {
+    pub fn meta(&mut self) -> impl Future<Item = QueryMeta, Error = CouchbaseError> {
         self.meta
             .take()
             .expect("Meta already consumed!")
             .map(|v| from_slice::<QueryMeta>(v.as_slice()).expect("Could not convert type"))
-            .wait()
-            .expect("could not unwrap meta")
+            .map_err(|_| CouchbaseError::FutureError) // cancelled
     }
 }
 
@@ -184,7 +182,7 @@ impl AnalyticsResult {
         }
     }
 
-    pub fn rows_as<T>(&mut self) -> impl Iterator<Item = T>
+    pub fn rows_as<T>(&mut self) -> impl Stream<Item = T, Error = CouchbaseError>
     where
         T: DeserializeOwned,
     {
@@ -192,17 +190,15 @@ impl AnalyticsResult {
             .take()
             .expect("Rows already consumed!")
             .map(|v| from_slice::<T>(v.as_slice()).expect("Could not convert type"))
-            .wait()
-            .map(|v| v.expect("could not unwrap row"))
+            .map_err(|_| CouchbaseError::FutureError) // todo: something is wrong here, wants () ?
     }
 
-    pub fn meta(&mut self) -> QueryMeta {
+    pub fn meta(&mut self) -> impl Future<Item = AnalyticsMeta, Error = CouchbaseError>  {
         self.meta
             .take()
             .expect("Meta already consumed!")
-            .map(|v| from_slice::<QueryMeta>(v.as_slice()).expect("Could not convert type"))
-            .wait()
-            .expect("could not unwrap meta")
+            .map(|v| from_slice::<AnalyticsMeta>(v.as_slice()).expect("Could not convert type"))
+            .map_err(|_| CouchbaseError::FutureError) // cancelled
     }
 }
 

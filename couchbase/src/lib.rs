@@ -12,3 +12,4 @@ pub mod subdoc;
 pub use crate::bucket::Bucket;
 pub use crate::cluster::Cluster;
 pub use crate::collection::Collection;
+pub use crate::error::CouchbaseError;

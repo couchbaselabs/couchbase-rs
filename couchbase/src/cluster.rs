@@ -109,8 +109,8 @@ impl Cluster {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// # use couchbase::Cluster;
-    /// use futures::Future;
+    /// use couchbase::{CouchbaseError, Cluster};
+    /// use futures::{Stream, Future};
     /// use serde_json::Value;
     /// # let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
     /// #    .expect("Could not create cluster reference");
@@ -120,8 +120,8 @@ impl Cluster {
     ///     .wait()
     ///     .expect("Could not perform query");
     ///
-    /// println!("Rows:\n{:?}", result.rows_as().collect::<Vec<Value>>());
-    /// println!("Meta:\n{:?}", result.meta());
+    /// println!("Rows:\n{:?}", result.rows_as().wait().collect::<Vec<Result<Value, CouchbaseError>>>());
+    /// println!("Meta:\n{:?}", result.meta().wait().expect("Could not get query meta"));
     /// ```
     ///
     pub fn query<S>(
@@ -154,8 +154,8 @@ impl Cluster {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// # use couchbase::Cluster;
-    /// use futures::Future;
+    /// use couchbase::{CouchbaseError, Cluster};
+    /// use futures::{Stream, Future};
     /// use serde_json::Value;
     /// #
     /// # let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
@@ -167,8 +167,8 @@ impl Cluster {
     ///     .wait()
     ///     .expect("Could not perform analytics query");
     ///
-    /// println!("---> rows {:?}", result.rows_as().collect::<Vec<Value>>());
-    /// println!("---> meta {:?}", result.meta());
+    /// println!("---> rows {:?}", result.rows_as().wait().collect::<Vec<Result<Value, CouchbaseError>>>());
+    /// println!("---> meta {:?}", result.meta().wait().expect("Could not get analytics meta"));
     /// ```
     ///
     pub fn analytics_query<S>(
