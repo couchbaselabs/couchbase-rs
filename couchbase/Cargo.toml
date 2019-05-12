@@ -4,6 +4,13 @@ version = "1.0.0-alpha.1"
 authors = ["Michael Nitschinger <michael@nitschinger.at>"]
 edition = "2018"
 build = "build.rs"
+license = "Apache-2.0"
+keywords = ["couchbase", "database", "libcouchbase"]
+categories = ["database", "asynchronous"]
+description = "The official Couchbase Rust SDK."
+repository = "https://github.com/couchbaselabs/couchbase-rs"
+homepage = "https://github.com/couchbaselabs/couchbase-rs"
+documentation = "https://docs.rs/couchbase"
 
 [dependencies]
 couchbase-sys = { path = "../couchbase-sys", version = "=1.0.0-alpha.1" }
