@@ -8,7 +8,6 @@ use futures::sync::{mpsc, oneshot};
 use futures::Future;
 use futures::Stream;
 use serde::de::DeserializeOwned;
-use serde::Deserialize;
 use serde_derive::Deserialize;
 use serde_json::from_slice;
 
@@ -33,7 +32,7 @@ impl GetResult {
 
     pub fn content_as<'a, T>(&'a self) -> Result<T, CouchbaseError>
     where
-        T: Deserialize<'a>,
+        T: serde::Deserialize<'a>,
     {
         match from_slice(&self.encoded.as_slice()) {
             Ok(v) => Ok(v),
