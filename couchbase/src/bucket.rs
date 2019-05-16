@@ -5,10 +5,11 @@ use crate::options::{AnalyticsOptions, QueryOptions};
 use crate::result::{AnalyticsResult, QueryResult};
 use futures::Future;
 use std::sync::Arc;
+use std::sync::Mutex;
 
 /// Provides access to `Bucket` level operations and `Collections`.
 pub struct Bucket {
-    instance: Arc<Instance>,
+    instance: Arc<Mutex<Instance>>,
 }
 
 impl Bucket {
@@ -17,7 +18,7 @@ impl Bucket {
     pub(crate) fn new(cs: &str, user: &str, pw: &str) -> Result<Self, CouchbaseError> {
         let instance = Instance::new(cs, user, pw)?;
         Ok(Bucket {
-            instance: Arc::new(instance),
+            instance: Arc::new(Mutex::new(instance)),
         })
     }
 
@@ -40,7 +41,7 @@ impl Bucket {
     where
         S: Into<String>,
     {
-        self.instance.query(statement.into(), options)
+        self.instance.lock().expect("uuuh could not take mutex lock").query(statement.into(), options)
     }
 
     /// Internal proxy method that gets called from the cluster so we can send it into the
@@ -53,12 +54,12 @@ impl Bucket {
     where
         S: Into<String>,
     {
-        self.instance.analytics_query(statement.into(), options)
+        self.instance.lock().expect("uuuh could not take mutex lock").analytics_query(statement.into(), options)
     }
 
     /// Internal proxy method that gets called from the cluster so we can send it into the
     /// instance.
     pub(crate) fn close(&self) -> Result<(), CouchbaseError> {
-        self.instance.shutdown()
+        self.instance.lock().expect("uuuh could not take mutex lock").shutdown()
     }
 }

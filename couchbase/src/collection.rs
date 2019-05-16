@@ -11,10 +11,11 @@ use serde::Serialize;
 use serde_json::to_vec;
 use std::sync::Arc;
 use std::time::Duration;
+use std::sync::Mutex;
 
 /// `Collection` level access to operations.
 pub struct Collection {
-    instance: Arc<Instance>,
+    instance: Arc<Mutex<Instance>>,
 }
 
 impl Collection {
@@ -23,7 +24,7 @@ impl Collection {
     /// This function is not intended to be called directly, but rather a new
     /// `Collection` should be retrieved through the `Bucket`.
     ///
-    pub(crate) fn new(instance: Arc<Instance>) -> Self {
+    pub(crate) fn new(instance: Arc<Mutex<Instance>>) -> Self {
         Collection { instance }
     }
 
@@ -67,7 +68,7 @@ impl Collection {
     where
         S: Into<String>,
     {
-        self.instance.get(id.into(), options)
+        self.instance.lock().expect("uuuh could not take mutex lock").get(id.into(), options)
     }
 
     /// Fetches a document from the collection and write locks it.
@@ -113,7 +114,7 @@ impl Collection {
     where
         S: Into<String>,
     {
-        self.instance.get_and_lock(id.into(), options)
+        self.instance.lock().expect("uuuh could not take mutex lock").get_and_lock(id.into(), options)
     }
 
     /// Fetches a document from the collection and modifies its expiry.
@@ -159,7 +160,7 @@ impl Collection {
     where
         S: Into<String>,
     {
-        self.instance.get_and_touch(id.into(), expiration, options)
+        self.instance.lock().expect("uuuh could not take mutex lock").get_and_touch(id.into(), expiration, options)
     }
 
     /// Inserts or replaces a new document into the collection.
@@ -216,7 +217,7 @@ impl Collection {
             Err(_e) => return Either::A(err(CouchbaseError::EncodingError)),
         };
         let flags = JSON_COMMON_FLAG;
-        Either::B(self.instance.upsert(id.into(), serialized, flags, options))
+        Either::B(self.instance.lock().expect("uuuh could not take mutex lock").upsert(id.into(), serialized, flags, options))
     }
 
     /// Inserts a document into the collection.
@@ -273,7 +274,7 @@ impl Collection {
             Err(_e) => return Either::A(err(CouchbaseError::EncodingError)),
         };
         let flags = JSON_COMMON_FLAG;
-        Either::B(self.instance.insert(id.into(), serialized, flags, options))
+        Either::B(self.instance.lock().expect("uuuh could not take mutex lock").insert(id.into(), serialized, flags, options))
     }
 
     /// Replaces an existing document in the collection.
@@ -330,7 +331,7 @@ impl Collection {
             Err(_e) => return Either::A(err(CouchbaseError::EncodingError)),
         };
         let flags = JSON_COMMON_FLAG;
-        Either::B(self.instance.replace(id.into(), serialized, flags, options))
+        Either::B(self.instance.lock().expect("uuuh could not take mutex lock").replace(id.into(), serialized, flags, options))
     }
 
     /// Removes a document from the collection.
@@ -361,7 +362,7 @@ impl Collection {
     where
         S: Into<String>,
     {
-        self.instance.remove(id.into(), options)
+        self.instance.lock().expect("uuuh could not take mutex lock").remove(id.into(), options)
     }
 
     /// Changes the expiration time on a document.
@@ -395,7 +396,7 @@ impl Collection {
     where
         S: Into<String>,
     {
-        self.instance.touch(id.into(), expiration, options)
+        self.instance.lock().expect("uuuh could not take mutex lock").touch(id.into(), expiration, options)
     }
 
     /// Unlocks a write-locked document.
@@ -429,7 +430,7 @@ impl Collection {
     where
         S: Into<String>,
     {
-        self.instance.unlock(id.into(), cas, options)
+        self.instance.lock().expect("uuuh could not take mutex lock").unlock(id.into(), cas, options)
     }
 
     /// Checks if a document exists and if so returns a cas value with it.
@@ -460,7 +461,7 @@ impl Collection {
     where
         S: Into<String>,
     {
-        self.instance.exists(id.into(), options)
+        self.instance.lock().expect("uuuh could not take mutex lock").exists(id.into(), options)
     }
 
     /// Extracts fragments of a document.
@@ -496,7 +497,7 @@ impl Collection {
     where
         S: Into<String>,
     {
-        self.instance.lookup_in(id.into(), specs, options)
+        self.instance.lock().expect("uuuh could not take mutex lock").lookup_in(id.into(), specs, options)
     }
 
     /// Changes fragments of a document.
@@ -536,6 +537,6 @@ impl Collection {
     where
         S: Into<String>,
     {
-        self.instance.mutate_in(id.into(), specs, options)
+        self.instance.lock().expect("uuuh could not take mutex lock").mutate_in(id.into(), specs, options)
     }
 }
