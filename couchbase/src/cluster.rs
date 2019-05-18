@@ -5,14 +5,14 @@ use crate::options::{AnalyticsOptions, QueryOptions};
 use crate::result::{AnalyticsResult, QueryResult};
 use futures::Future;
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::rc::Rc;
 
 /// The `Cluster` is the main entry point when working with the client.
 pub struct Cluster {
     connection_string: String,
     username: String,
     password: String,
-    buckets: HashMap<String, Arc<Bucket>>,
+    buckets: HashMap<String, Rc<Bucket>>,
 }
 
 impl Cluster {
@@ -55,7 +55,7 @@ impl Cluster {
 
     /// Opens a Couchbase bucket.
     ///
-    /// If you wonder why this returns an `Arc`, the reason is that we also need to keep track
+    /// If you wonder why this returns an `Rc`, the reason is that we also need to keep track
     /// of the `Bucket` internally so if you call `disconnect` on the `Cluster` all opened
     /// buckets are closed. Also, we make sure that if this method is called more than once on
     /// the same bucket, it is only opened once since buckets are expensive resources with state
@@ -80,12 +80,12 @@ impl Cluster {
     ///     .expect("Could not open bucket");
     /// ```
     ///
-    pub fn bucket<S>(&mut self, name: S) -> Result<Arc<Bucket>, CouchbaseError>
+    pub fn bucket<S>(&mut self, name: S) -> Result<Rc<Bucket>, CouchbaseError>
     where
         S: Into<String>,
     {
         let name = name.into();
-        let bucket = Arc::new(Bucket::new(
+        let bucket = Rc::new(Bucket::new(
             &format!("{}/{}", self.connection_string, name.clone()),
             &self.username,
             &self.password,

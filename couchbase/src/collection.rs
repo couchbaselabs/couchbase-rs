@@ -9,12 +9,12 @@ use futures::future::Either;
 use futures::Future;
 use serde::Serialize;
 use serde_json::to_vec;
-use std::sync::Arc;
+use std::rc::Rc;
 use std::time::Duration;
 
 /// `Collection` level access to operations.
 pub struct Collection {
-    instance: Arc<Instance>,
+    instance: Rc<Instance>,
 }
 
 impl Collection {
@@ -23,7 +23,7 @@ impl Collection {
     /// This function is not intended to be called directly, but rather a new
     /// `Collection` should be retrieved through the `Bucket`.
     ///
-    pub(crate) fn new(instance: Arc<Instance>) -> Self {
+    pub(crate) fn new(instance: Rc<Instance>) -> Self {
         Collection { instance }
     }
 

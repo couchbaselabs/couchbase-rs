@@ -4,11 +4,11 @@ use crate::instance::Instance;
 use crate::options::{AnalyticsOptions, QueryOptions};
 use crate::result::{AnalyticsResult, QueryResult};
 use futures::Future;
-use std::sync::Arc;
+use std::rc::Rc;
 
 /// Provides access to `Bucket` level operations and `Collections`.
 pub struct Bucket {
-    instance: Arc<Instance>,
+    instance: Rc<Instance>,
 }
 
 impl Bucket {
@@ -17,7 +17,7 @@ impl Bucket {
     pub(crate) fn new(cs: &str, user: &str, pw: &str) -> Result<Self, CouchbaseError> {
         let instance = Instance::new(cs, user, pw)?;
         Ok(Bucket {
-            instance: Arc::new(instance),
+            instance: Rc::new(instance),
         })
     }
 
