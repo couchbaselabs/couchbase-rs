@@ -46,7 +46,7 @@ impl Cluster {
     where
         S: Into<String>,
     {
-        Ok(Cluster {
+        Ok(Self {
             connection_string: connection_string.into(),
             username: username.into(),
             password: password.into(),
@@ -236,9 +236,9 @@ impl SharedCluster {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use couchbase::Cluster;
+    /// use couchbase::SharedCluster;
     ///
-    /// let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
+    /// let mut cluster = SharedCluster::connect("couchbase://127.0.0.1", "Administrator", "password")
     ///   .expect("Could not create cluster reference");
     /// ```
     ///
@@ -250,7 +250,7 @@ impl SharedCluster {
     where
         S: Into<String>,
     {
-        Ok(SharedCluster {
+        Ok(Self {
             connection_string: connection_string.into(),
             username: username.into(),
             password: password.into(),
@@ -261,7 +261,7 @@ impl SharedCluster {
     /// Opens a Couchbase bucket.
     ///
     /// If you wonder why this returns an `Rc`, the reason is that we also need to keep track
-    /// of the `Bucket` internally so if you call `disconnect` on the `Cluster` all opened
+    /// of the `Bucket` internally so if you call `disconnect` on the `SharedCluster` all opened
     /// buckets are closed. Also, we make sure that if this method is called more than once on
     /// the same bucket, it is only opened once since buckets are expensive resources with state
     /// attached (for those familiar with libcouchbase: the bucket internally holds the lcb
@@ -277,9 +277,9 @@ impl SharedCluster {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// # use couchbase::Cluster;
+    /// # use couchbase::SharedCluster;
     /// #
-    /// # let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
+    /// # let mut cluster = SharedCluster::connect("couchbase://127.0.0.1", "Administrator", "password")
     /// #     .expect("Could not create cluster reference");
     /// let bucket = cluster.bucket("travel-sample")
     ///     .expect("Could not open bucket");
@@ -314,10 +314,10 @@ impl SharedCluster {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use couchbase::{CouchbaseError, Cluster};
+    /// use couchbase::{CouchbaseError, SharedCluster};
     /// use futures::{Stream, Future};
     /// use serde_json::Value;
-    /// # let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
+    /// # let mut cluster = SharedCluster::connect("couchbase://127.0.0.1", "Administrator", "password")
     /// #    .expect("Could not create cluster reference");
     /// # let _ = cluster.bucket("travel-sample");
     /// #
@@ -359,11 +359,11 @@ impl SharedCluster {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use couchbase::{CouchbaseError, Cluster};
+    /// use couchbase::{CouchbaseError, SharedCluster};
     /// use futures::{Stream, Future};
     /// use serde_json::Value;
     /// #
-    /// # let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
+    /// # let mut cluster = SharedCluster::connect("couchbase://127.0.0.1", "Administrator", "password")
     /// #     .expect("Could not create cluster reference!");
     /// # let _ = cluster.bucket("travel-sample");
     /// #
@@ -399,9 +399,9 @@ impl SharedCluster {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// # use couchbase::Cluster;
+    /// # use couchbase::SharedCluster;
     /// #
-    /// # let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
+    /// # let mut cluster = SharedCluster::connect("couchbase://127.0.0.1", "Administrator", "password")
     /// #    .expect("Could not create cluster reference!");
     /// #
     /// cluster.disconnect().expect("Could not shutdown properly");

@@ -25,7 +25,7 @@ impl Collection {
     /// `Collection` should be retrieved through the `Bucket`.
     ///
     pub(crate) fn new(instance: Rc<Instance>) -> Self {
-        Collection { instance }
+        Self { instance }
     }
 
     /// Fetches a document from the collection.
@@ -541,19 +541,19 @@ impl Collection {
     }
 }
 
-/// `Collection` level access to operations.
+/// `SharedCollection` level access to operations.
 pub struct SharedCollection {
     instance: Arc<SharedInstance>,
 }
 
 impl SharedCollection {
-    /// Creates a new `Collection`.
+    /// Creates a new `SharedCollection`.
     ///
     /// This function is not intended to be called directly, but rather a new
-    /// `Collection` should be retrieved through the `Bucket`.
+    /// `SharedCollection` should be retrieved through the `Bucket`.
     ///
     pub(crate) fn new(instance: Arc<SharedInstance>) -> Self {
-        SharedCollection { instance }
+        Self { instance }
     }
 
     /// Fetches a document from the collection.
@@ -566,10 +566,10 @@ impl SharedCollection {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// # use couchbase::Cluster;
+    /// # use couchbase::SharedCluster;
     /// use serde_json::Value;
     /// use futures::Future;
-    /// # let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
+    /// # let mut cluster = SharedCluster::connect("couchbase://127.0.0.1", "Administrator", "password")
     /// #   .expect("Could not create Cluster reference!");
     /// # let bucket = cluster
     /// #   .bucket("travel-sample")
@@ -612,10 +612,10 @@ impl SharedCollection {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// # use couchbase::Cluster;
+    /// # use couchbase::SharedCluster;
     /// use futures::Future;
     /// use serde_json::Value;
-    /// # let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
+    /// # let mut cluster = SharedCluster::connect("couchbase://127.0.0.1", "Administrator", "password")
     /// #   .expect("Could not create Cluster reference!");
     /// # let bucket = cluster
     /// #   .bucket("travel-sample")
@@ -656,11 +656,11 @@ impl SharedCollection {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// # use couchbase::Cluster;
+    /// # use couchbase::SharedCluster;
     /// use std::time::Duration;
     /// use serde_json::Value;
     /// use futures::Future;
-    /// # let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
+    /// # let mut cluster = SharedCluster::connect("couchbase://127.0.0.1", "Administrator", "password")
     /// #   .expect("Could not create Cluster reference!");
     /// # let bucket = cluster
     /// #   .bucket("travel-sample")
@@ -702,7 +702,7 @@ impl SharedCollection {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// # use couchbase::Cluster;
+    /// # use couchbase::SharedCluster;
     /// use serde_derive::Serialize;
     /// use futures::Future;
     ///
@@ -712,7 +712,7 @@ impl SharedCollection {
     ///     icao: String,
     ///     iata: String,
     /// }
-    /// # let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
+    /// # let mut cluster = SharedCluster::connect("couchbase://127.0.0.1", "Administrator", "password")
     /// #     .expect("Could not create Cluster reference!");
     /// # let bucket = cluster
     /// #     .bucket("travel-sample")
@@ -759,7 +759,7 @@ impl SharedCollection {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// # use couchbase::Cluster;
+    /// # use couchbase::SharedCluster;
     /// use serde_derive::Serialize;
     /// use futures::Future;
     ///
@@ -769,7 +769,7 @@ impl SharedCollection {
     ///     icao: String,
     ///     iata: String,
     /// }
-    /// # let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
+    /// # let mut cluster = SharedCluster::connect("couchbase://127.0.0.1", "Administrator", "password")
     /// #     .expect("Could not create Cluster reference!");
     /// # let bucket = cluster
     /// #     .bucket("travel-sample")
@@ -816,7 +816,7 @@ impl SharedCollection {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// # use couchbase::Cluster;
+    /// # use couchbase::SharedCluster;
     /// use serde_derive::Serialize;
     /// use futures::Future;
     ///
@@ -826,7 +826,7 @@ impl SharedCollection {
     ///     icao: String,
     ///     iata: String,
     /// }
-    /// # let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
+    /// # let mut cluster = SharedCluster::connect("couchbase://127.0.0.1", "Administrator", "password")
     /// #     .expect("Could not create Cluster reference!");
     /// # let bucket = cluster
     /// #     .bucket("travel-sample")
@@ -873,8 +873,8 @@ impl SharedCollection {
     ///
     /// ```rust,no_run
     /// use futures::Future;
-    /// # use couchbase::Cluster;
-    /// # let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
+    /// # use couchbase::SharedCluster;
+    /// # let mut cluster = SharedCluster::connect("couchbase://127.0.0.1", "Administrator", "password")
     /// #   .expect("Could not create Cluster reference!");
     /// # let bucket = cluster
     /// #   .bucket("travel-sample")
@@ -906,8 +906,8 @@ impl SharedCollection {
     /// ```rust,no_run
     /// use std::time::Duration;
     /// use futures::Future;
-    /// # use couchbase::Cluster;
-    /// # let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
+    /// # use couchbase::SharedCluster;
+    /// # let mut cluster = SharedCluster::connect("couchbase://127.0.0.1", "Administrator", "password")
     /// #   .expect("Could not create Cluster reference!");
     /// # let bucket = cluster
     /// #   .bucket("travel-sample")
@@ -938,9 +938,9 @@ impl SharedCollection {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// # use couchbase::Cluster;
+    /// # use couchbase::SharedCluster;
     /// use futures::Future;
-    /// # let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
+    /// # let mut cluster = SharedCluster::connect("couchbase://127.0.0.1", "Administrator", "password")
     /// #   .expect("Could not create Cluster reference!");
     /// # let bucket = cluster
     /// #   .bucket("travel-sample")
@@ -971,9 +971,9 @@ impl SharedCollection {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// # use couchbase::Cluster;
+    /// # use couchbase::SharedCluster;
     /// use futures::Future;
-    /// # let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
+    /// # let mut cluster = SharedCluster::connect("couchbase://127.0.0.1", "Administrator", "password")
     /// #   .expect("Could not create Cluster reference!");
     /// # let bucket = cluster
     /// #   .bucket("travel-sample")
@@ -1003,10 +1003,10 @@ impl SharedCollection {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// # use couchbase::Cluster;
+    /// # use couchbase::SharedCluster;
     /// use futures::Future;
     /// use couchbase::subdoc::LookupInSpec;
-    /// # let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
+    /// # let mut cluster = SharedCluster::connect("couchbase://127.0.0.1", "Administrator", "password")
     /// #   .expect("Could not create Cluster reference!");
     /// # let bucket = cluster
     /// #   .bucket("travel-sample")
@@ -1039,10 +1039,10 @@ impl SharedCollection {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// # use couchbase::Cluster;
+    /// # use couchbase::SharedCluster;
     /// use futures::Future;
     /// use couchbase::subdoc::MutateInSpec;
-    /// # let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
+    /// # let mut cluster = SharedCluster::connect("couchbase://127.0.0.1", "Administrator", "password")
     /// #   .expect("Could not create Cluster reference!");
     /// # let bucket = cluster
     /// #   .bucket("travel-sample")

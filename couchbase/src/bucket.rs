@@ -17,7 +17,7 @@ impl Bucket {
     /// attached to this bucket.
     pub(crate) fn new(cs: &str, user: &str, pw: &str) -> Result<Self, CouchbaseError> {
         let instance = Instance::new(cs, user, pw)?;
-        Ok(Bucket {
+        Ok(Self {
             instance: Rc::new(instance),
         })
     }
@@ -64,7 +64,7 @@ impl Bucket {
     }
 }
 
-/// Provides access to `Bucket` level operations and `Collections`.
+/// Provides access to `SharedBucket` level operations and `SharedCollections`.
 pub struct SharedBucket {
     instance: Arc<SharedInstance>,
 }
@@ -74,12 +74,12 @@ impl SharedBucket {
     /// attached to this bucket.
     pub(crate) fn new(cs: &str, user: &str, pw: &str) -> Result<Self, CouchbaseError> {
         let instance = SharedInstance::new(cs, user, pw)?;
-        Ok(SharedBucket {
+        Ok(Self {
             instance: Arc::new(instance),
         })
     }
 
-    /// Opens the default `Collection`.
+    /// Opens the default `SharedCollection`.
     ///
     /// This method provides access to the default collection, which is present if you do
     /// not have any collections (upgrading from an older cluster) or if you are on a
