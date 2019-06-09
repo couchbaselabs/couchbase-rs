@@ -1,7 +1,6 @@
 # Overall
     - Move to sdk3 error handling structure
     - Remove all expect code and turn into errors based on the structure
-    - add logging infrastructure
 
 # KV
     - implement options for get and the 3 mutation options
