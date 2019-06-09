@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.0-alpha.2
+
+### Fixes
+
+ - Fixed a double import bug that slipped into 1.0.0-alpha.1
+ 
+### Enhancements
+
+ - Added SharedCluster and SharedBucket so it can be used in a multithreaded environment.
+ - Added support for N1QL positional and named arguments.
+
 ## 1.0.0-alpha.1
 
 This is the first pre-release of the Couchbase Rust SDK 1.0.0, rendering the previous 0.x releases obsolete.
