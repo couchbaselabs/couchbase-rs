@@ -10,6 +10,7 @@
 
  - Added SharedCluster and SharedBucket so it can be used in a multithreaded environment.
  - Added support for N1QL positional and named arguments.
+ - Added support for Analytics positional and named arguments.
 
 ## 1.0.0-alpha.1
 
