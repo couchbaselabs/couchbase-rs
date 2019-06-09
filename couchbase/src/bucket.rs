@@ -1,6 +1,6 @@
-use crate::collection::{SharedCollection, Collection};
+use crate::collection::{Collection, SharedCollection};
 use crate::error::CouchbaseError;
-use crate::instance::{SharedInstance, Instance};
+use crate::instance::{Instance, SharedInstance};
 use crate::options::{AnalyticsOptions, QueryOptions};
 use crate::result::{AnalyticsResult, QueryResult};
 use futures::Future;

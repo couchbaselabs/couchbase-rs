@@ -11,7 +11,7 @@ pub mod options;
 pub mod result;
 pub mod subdoc;
 
-pub use crate::bucket::{SharedBucket, Bucket};
-pub use crate::cluster::{SharedCluster, Cluster};
-pub use crate::collection::{SharedCollection, Collection};
+pub use crate::bucket::{Bucket, SharedBucket};
+pub use crate::cluster::{Cluster, SharedCluster};
+pub use crate::collection::{Collection, SharedCollection};
 pub use crate::error::CouchbaseError;

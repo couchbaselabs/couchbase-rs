@@ -1,5 +1,9 @@
 //! Option arguments for all operations.
 
+use serde_json::to_vec;
+use serde_json::Value;
+use std::collections::HashMap;
+use std::ffi::CString;
 use std::time::Duration;
 
 #[derive(Debug, Default)]
@@ -171,11 +175,17 @@ impl RemoveOptions {
 #[derive(Debug, Default)]
 pub struct QueryOptions {
     timeout: Option<Duration>,
+    positional_parameters: Option<Vec<(CString, usize)>>,
+    named_parameters: Option<HashMap<(CString, usize), (CString, usize)>>,
 }
 
 impl QueryOptions {
     pub fn new() -> Self {
-        Self { timeout: None }
+        Self {
+            timeout: None,
+            positional_parameters: None,
+            named_parameters: None,
+        }
     }
 
     pub fn set_timeout(mut self, timeout: Duration) -> Self {
@@ -185,6 +195,46 @@ impl QueryOptions {
 
     pub fn timeout(&self) -> &Option<Duration> {
         &self.timeout
+    }
+
+    pub fn set_positional_parameters(mut self, params: Vec<Value>) -> Self {
+        let mut positional = vec![];
+        for param in params {
+            let serialized = match to_vec(&param) {
+                Ok(v) => v,
+                Err(_e) => panic!("Could not encode n1ql positional param"),
+            };
+            let len = serialized.len();
+            positional.push((CString::new(serialized).unwrap(), len));
+        }
+        self.positional_parameters = Some(positional);
+        self
+    }
+
+    pub(crate) fn positional_parameters(&self) -> &Option<Vec<(CString, usize)>> {
+        &self.positional_parameters
+    }
+
+    pub fn set_named_parameters(mut self, params: HashMap<String, Value>) -> Self {
+        let mut named = HashMap::new();
+        for param in params {
+            let serialized = match to_vec(&param.1) {
+                Ok(v) => v,
+                Err(_e) => panic!("Could not encode n1ql positional param"),
+            };
+            let len = serialized.len();
+            let key_len = param.0.len();
+            named.insert(
+                (CString::new(param.0).unwrap(), key_len),
+                (CString::new(serialized).unwrap(), len),
+            );
+        }
+        self.named_parameters = Some(named);
+        self
+    }
+
+    pub(crate) fn named_parameters(&self) -> &Option<HashMap<(CString, usize), (CString, usize)>> {
+        &self.named_parameters
     }
 }
 

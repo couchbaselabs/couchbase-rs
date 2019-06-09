@@ -1,4 +1,4 @@
-use crate::bucket::{SharedBucket, Bucket};
+use crate::bucket::{Bucket, SharedBucket};
 
 use crate::error::CouchbaseError;
 use crate::options::{AnalyticsOptions, QueryOptions};

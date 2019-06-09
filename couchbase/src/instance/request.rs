@@ -576,6 +576,29 @@ impl InstanceRequest for QueryRequest {
         unsafe {
             lcb_cmdn1ql_create(&mut command);
             lcb_cmdn1ql_statement(command, statement_encoded.as_ptr(), statement_len);
+            if let Some(options) = self.options {
+                if let Some(timeout) = options.timeout() {
+                    lcb_cmdn1ql_timeout(command, timeout.as_millis() as u32);
+                }
+                if let Some(params) = options.positional_parameters() {
+                    for param in params {
+                        lcb_cmdn1ql_positional_param(command, param.0.as_ptr(), param.1);
+                    }
+                }
+                if let Some(params) = options.named_parameters() {
+                    for param in params {
+                        let key = param.0;
+                        let value = param.1;
+                        lcb_cmdn1ql_named_param(
+                            command,
+                            key.0.as_ptr(),
+                            key.1,
+                            value.0.as_ptr(),
+                            value.1,
+                        );
+                    }
+                }
+            }
             lcb_cmdn1ql_callback(command, Some(n1ql_callback));
             lcb_n1ql(instance, cookie, command);
             lcb_cmdn1ql_destroy(command);

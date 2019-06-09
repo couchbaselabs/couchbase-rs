@@ -9,7 +9,7 @@ use futures::Future;
 use futures::Stream;
 use serde::de::DeserializeOwned;
 use serde_derive::Deserialize;
-use serde_json::from_slice;
+use serde_json::{from_slice, Value};
 
 pub struct GetResult {
     cas: u64,
@@ -105,6 +105,7 @@ pub struct QueryMeta {
     request_id: String,
     status: String,
     metrics: QueryMetrics,
+    errors: Option<Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -159,6 +160,7 @@ pub struct AnalyticsMeta {
     request_id: String,
     status: String,
     metrics: AnalyticsMetrics,
+    errors: Option<Value>,
 }
 
 #[derive(Debug, Deserialize)]

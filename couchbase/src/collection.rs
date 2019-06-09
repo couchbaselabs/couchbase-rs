@@ -1,5 +1,5 @@
 use crate::error::CouchbaseError;
-use crate::instance::{SharedInstance, Instance};
+use crate::instance::{Instance, SharedInstance};
 use crate::options::*;
 use crate::result::*;
 use crate::subdoc::*;
@@ -10,8 +10,8 @@ use futures::Future;
 use serde::Serialize;
 use serde_json::to_vec;
 use std::rc::Rc;
-use std::time::Duration;
 use std::sync::Arc;
+use std::time::Duration;
 
 /// `Collection` level access to operations.
 pub struct Collection {
@@ -501,7 +501,7 @@ impl Collection {
     }
 
     /// Changes fragments of a document.
-    /// 
+    ///
     /// # Arguments
     ///
     /// * `id` - The ID of the document.
@@ -1029,7 +1029,7 @@ impl SharedCollection {
     }
 
     /// Changes fragments of a document.
-    /// 
+    ///
     /// # Arguments
     ///
     /// * `id` - The ID of the document.
