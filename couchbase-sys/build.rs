@@ -20,6 +20,16 @@ fn main() {
     build_cfg.define("LCB_BUILD_LIBEV", "OFF");
     build_cfg.define("LCB_BUILD_LIBUV", "OFF");
 
+    // list of environment flags that control libcouchbase compilation
+    let env_flags = vec!["LIBUV_ROOT", "LIBEV_ROOT", "LIBEVENT_ROOT","OPENSSL_ROOT_DIR",
+        "CMAKE_CXX_COMPILER", "CMAKE_C_COMPILER", "LCB_BUILD_STATIC", "BUILD_SHARED_LIBS",
+        "LCB_NO_PLUGINS", "LCB_USE_ASAN", "LCB_USE_COVERAGE", "LCB_NO_SSL", "LCB_BUILD_LIBEVENT"];
+
+    // Pass any of the above set environment variables to libcouchbase build system
+    for flag in env_flags.iter().filter(|flag| env::var(flag).is_ok()) {
+        build_cfg.define(flag, env::var(flag).unwrap());
+    }
+
     let build_dst = build_cfg.build();
 
     println!(
