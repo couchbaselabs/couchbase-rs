@@ -11,6 +11,7 @@ use std::os::raw::c_char;
 use std::ptr;
 use std::slice::from_raw_parts;
 use std::time::Duration;
+use uuid::Uuid;
 
 type CouchbaseResult<T> = Result<T, CouchbaseError>;
 
@@ -557,6 +558,14 @@ impl QueryRequest {
             options,
         }
     }
+
+    unsafe fn add_default_client_context_id(command: *mut lcb_CMDN1QL) {
+        let uuid = format!("{}", Uuid::new_v4());
+        let len = uuid.len();
+        let client_context_id = CString::new(uuid).unwrap();
+        println!("writing internal ccid");
+        lcb_cmdn1ql_client_context_id(command, client_context_id.as_ptr(), len);   
+    }
 }
 
 impl InstanceRequest for QueryRequest {
@@ -598,7 +607,17 @@ impl InstanceRequest for QueryRequest {
                         );
                     }
                 }
+
+                if let Some(client_context_id) = options.client_context_id() {
+                    println!("Writing custom ccid");
+                    lcb_cmdn1ql_client_context_id(command, client_context_id.0.as_ptr(), client_context_id.1);
+                } else {
+                    QueryRequest::add_default_client_context_id(command);
+                }
+            } else {
+                QueryRequest::add_default_client_context_id(command);
             }
+
             lcb_cmdn1ql_callback(command, Some(n1ql_callback));
             lcb_n1ql(instance, cookie, command);
             lcb_cmdn1ql_destroy(command);

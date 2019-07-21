@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.0-alpha.3
+
+### Enhancements
+
+ - Added support for automatic and custom Query `client_context_id` option.
+ - Updated libcouchbase to `3.0.0-alpha.4`
+
 ## 1.0.0-alpha.2
 
 ### Fixes

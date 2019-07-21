@@ -177,6 +177,7 @@ pub struct QueryOptions {
     timeout: Option<Duration>,
     positional_parameters: Option<Vec<(CString, usize)>>,
     named_parameters: Option<HashMap<(CString, usize), (CString, usize)>>,
+    client_context_id: Option<(CString, usize)>,
 }
 
 impl QueryOptions {
@@ -185,6 +186,7 @@ impl QueryOptions {
             timeout: None,
             positional_parameters: None,
             named_parameters: None,
+            client_context_id: None,
         }
     }
 
@@ -235,6 +237,16 @@ impl QueryOptions {
 
     pub(crate) fn named_parameters(&self) -> &Option<HashMap<(CString, usize), (CString, usize)>> {
         &self.named_parameters
+    }
+
+    pub fn set_client_context_id(mut self, client_context_id: String) -> Self {
+        let client_context_id_len = client_context_id.len();
+        self.client_context_id = Some((CString::new(client_context_id).unwrap(), client_context_id_len));
+        self
+    }
+
+    pub(crate) fn client_context_id(&self) -> &Option<(CString, usize)> {
+        &self.client_context_id
     }
 }
 

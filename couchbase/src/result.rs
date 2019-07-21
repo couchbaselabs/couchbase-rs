@@ -106,6 +106,8 @@ pub struct QueryMeta {
     status: String,
     metrics: QueryMetrics,
     errors: Option<Value>,
+    #[serde(rename = "clientContextID")]
+    client_context_id: String,
 }
 
 #[derive(Debug, Deserialize)]
