@@ -7,12 +7,8 @@ static ENV_FLAG_PREFIX: &'static str = "CB_";
 
 // Simple Environment Vairable filter
 fn environment_variable_filter(env_flag:&str) -> bool {
-    if env_flag.len() > ENV_FLAG_PREFIX.len() &&
-       &env_flag[0..ENV_FLAG_PREFIX.len()] == ENV_FLAG_PREFIX {
-        true
-    } else {
-        false
-    }
+    env_flag.len() > ENV_FLAG_PREFIX.len() &&
+    &env_flag[0..ENV_FLAG_PREFIX.len()] == ENV_FLAG_PREFIX
 }
 
 fn main() {
