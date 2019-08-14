@@ -41,14 +41,14 @@ impl InstanceRequest for ShutdownRequest {
 
 #[derive(Debug)]
 pub struct GetRequest {
-    sender: oneshot::Sender<CouchbaseResult<Option<GetResult>>>,
+    sender: oneshot::Sender<CouchbaseResult<GetResult>>,
     id: String,
     options: Option<GetOptions>,
 }
 
 impl GetRequest {
     pub fn new(
-        sender: oneshot::Sender<CouchbaseResult<Option<GetResult>>>,
+        sender: oneshot::Sender<CouchbaseResult<GetResult>>,
         id: String,
         options: Option<GetOptions>,
     ) -> Self {
@@ -84,14 +84,14 @@ impl InstanceRequest for GetRequest {
 
 #[derive(Debug)]
 pub struct GetAndLockRequest {
-    sender: oneshot::Sender<CouchbaseResult<Option<GetResult>>>,
+    sender: oneshot::Sender<CouchbaseResult<GetResult>>,
     id: String,
     options: Option<GetAndLockOptions>,
 }
 
 impl GetAndLockRequest {
     pub fn new(
-        sender: oneshot::Sender<CouchbaseResult<Option<GetResult>>>,
+        sender: oneshot::Sender<CouchbaseResult<GetResult>>,
         id: String,
         options: Option<GetAndLockOptions>,
     ) -> Self {
@@ -133,7 +133,7 @@ impl InstanceRequest for GetAndLockRequest {
 
 #[derive(Debug)]
 pub struct GetAndTouchRequest {
-    sender: oneshot::Sender<CouchbaseResult<Option<GetResult>>>,
+    sender: oneshot::Sender<CouchbaseResult<GetResult>>,
     id: String,
     expiration: Duration,
     options: Option<GetAndTouchOptions>,
@@ -141,7 +141,7 @@ pub struct GetAndTouchRequest {
 
 impl GetAndTouchRequest {
     pub fn new(
-        sender: oneshot::Sender<CouchbaseResult<Option<GetResult>>>,
+        sender: oneshot::Sender<CouchbaseResult<GetResult>>,
         id: String,
         expiration: Duration,
         options: Option<GetAndTouchOptions>,
@@ -488,14 +488,14 @@ impl InstanceRequest for UnlockRequest {
 
 #[derive(Debug)]
 pub struct ExistsRequest {
-    sender: oneshot::Sender<CouchbaseResult<Option<ExistsResult>>>,
+    sender: oneshot::Sender<CouchbaseResult<ExistsResult>>,
     id: String,
     options: Option<ExistsOptions>,
 }
 
 impl ExistsRequest {
     pub fn new(
-        sender: oneshot::Sender<CouchbaseResult<Option<ExistsResult>>>,
+        sender: oneshot::Sender<CouchbaseResult<ExistsResult>>,
         id: String,
         options: Option<ExistsOptions>,
     ) -> Self {
@@ -803,7 +803,7 @@ unsafe extern "C" fn analytics_callback(
 
 #[derive(Debug)]
 pub struct LookupInRequest {
-    sender: oneshot::Sender<CouchbaseResult<Option<LookupInResult>>>,
+    sender: oneshot::Sender<CouchbaseResult<LookupInResult>>,
     id: String,
     specs: Vec<LookupInSpec>,
     options: Option<LookupInOptions>,
@@ -811,7 +811,7 @@ pub struct LookupInRequest {
 
 impl LookupInRequest {
     pub fn new(
-        sender: oneshot::Sender<CouchbaseResult<Option<LookupInResult>>>,
+        sender: oneshot::Sender<CouchbaseResult<LookupInResult>>,
         id: String,
         specs: Vec<LookupInSpec>,
         options: Option<LookupInOptions>,

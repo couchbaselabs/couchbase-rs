@@ -53,18 +53,17 @@ impl Collection {
     ///     .wait()
     ///     .expect("Error while loading doc");
     ///
-    /// if found_doc.is_some() {
     ///     println!(
     ///         "Content Decoded {:?}",
-    ///         found_doc.unwrap().content_as::<Value>()
+    ///         found_doc.content_as::<Value>()
     ///     );
-    /// }
+    ///
     /// ```
     pub fn get<S>(
         &self,
         id: S,
         options: Option<GetOptions>,
-    ) -> impl Future<Item = Option<GetResult>, Error = CouchbaseError>
+    ) -> impl Future<Item = GetResult, Error = CouchbaseError>
     where
         S: Into<String>,
     {
@@ -99,18 +98,16 @@ impl Collection {
     ///     .wait()
     ///     .expect("Error while loading and locking doc");
     ///
-    /// if found_doc.is_some() {
     ///     println!(
     ///         "Content Decoded {:?}",
-    ///         found_doc.unwrap().content_as::<Value>()
-    ///     );
-    /// }
+    ///         found_doc.content_as::<Value>()
+    ///    );
     /// ```
     pub fn get_and_lock<S>(
         &self,
         id: S,
         options: Option<GetAndLockOptions>,
-    ) -> impl Future<Item = Option<GetResult>, Error = CouchbaseError>
+    ) -> impl Future<Item = GetResult, Error = CouchbaseError>
     where
         S: Into<String>,
     {
@@ -144,19 +141,17 @@ impl Collection {
     ///     .wait()
     ///     .expect("Error while loading and touching doc");
     ///
-    /// if found_doc.is_some() {
     ///     println!(
     ///         "Content Decoded {:?}",
-    ///         found_doc.unwrap().content_as::<Value>()
+    ///         found_doc.content_as::<Value>()
     ///     );
-    /// }
     /// ```
     pub fn get_and_touch<S>(
         &self,
         id: S,
         expiration: Duration,
         options: Option<GetAndTouchOptions>,
-    ) -> impl Future<Item = Option<GetResult>, Error = CouchbaseError>
+    ) -> impl Future<Item = GetResult, Error = CouchbaseError>
     where
         S: Into<String>,
     {
@@ -457,7 +452,7 @@ impl Collection {
         &self,
         id: S,
         options: Option<ExistsOptions>,
-    ) -> impl Future<Item = Option<ExistsResult>, Error = CouchbaseError>
+    ) -> impl Future<Item = ExistsResult, Error = CouchbaseError>
     where
         S: Into<String>,
     {
@@ -493,7 +488,7 @@ impl Collection {
         id: S,
         specs: Vec<LookupInSpec>,
         options: Option<LookupInOptions>,
-    ) -> impl Future<Item = Option<LookupInResult>, Error = CouchbaseError>
+    ) -> impl Future<Item = LookupInResult, Error = CouchbaseError>
     where
         S: Into<String>,
     {
@@ -581,18 +576,16 @@ impl SharedCollection {
     ///     .wait()
     ///     .expect("Error while loading doc");
     ///
-    /// if found_doc.is_some() {
     ///     println!(
     ///         "Content Decoded {:?}",
-    ///         found_doc.unwrap().content_as::<Value>()
+    ///         found_doc.content_as::<Value>()
     ///     );
-    /// }
     /// ```
     pub fn get<S>(
         &self,
         id: S,
         options: Option<GetOptions>,
-    ) -> impl Future<Item = Option<GetResult>, Error = CouchbaseError>
+    ) -> impl Future<Item = GetResult, Error = CouchbaseError>
     where
         S: Into<String>,
     {
@@ -627,18 +620,16 @@ impl SharedCollection {
     ///     .wait()
     ///     .expect("Error while loading and locking doc");
     ///
-    /// if found_doc.is_some() {
     ///     println!(
     ///         "Content Decoded {:?}",
-    ///         found_doc.unwrap().content_as::<Value>()
+    ///         found_doc.content_as::<Value>()
     ///     );
-    /// }
     /// ```
     pub fn get_and_lock<S>(
         &self,
         id: S,
         options: Option<GetAndLockOptions>,
-    ) -> impl Future<Item = Option<GetResult>, Error = CouchbaseError>
+    ) -> impl Future<Item = GetResult, Error = CouchbaseError>
     where
         S: Into<String>,
     {
@@ -672,19 +663,17 @@ impl SharedCollection {
     ///     .wait()
     ///     .expect("Error while loading and touching doc");
     ///
-    /// if found_doc.is_some() {
     ///     println!(
     ///         "Content Decoded {:?}",
-    ///         found_doc.unwrap().content_as::<Value>()
+    ///         found_doc.content_as::<Value>()
     ///     );
-    /// }
     /// ```
     pub fn get_and_touch<S>(
         &self,
         id: S,
         expiration: Duration,
         options: Option<GetAndTouchOptions>,
-    ) -> impl Future<Item = Option<GetResult>, Error = CouchbaseError>
+    ) -> impl Future<Item = GetResult, Error = CouchbaseError>
     where
         S: Into<String>,
     {
@@ -985,7 +974,7 @@ impl SharedCollection {
         &self,
         id: S,
         options: Option<ExistsOptions>,
-    ) -> impl Future<Item = Option<ExistsResult>, Error = CouchbaseError>
+    ) -> impl Future<Item = ExistsResult, Error = CouchbaseError>
     where
         S: Into<String>,
     {
@@ -1021,7 +1010,7 @@ impl SharedCollection {
         id: S,
         specs: Vec<LookupInSpec>,
         options: Option<LookupInOptions>,
-    ) -> impl Future<Item = Option<LookupInResult>, Error = CouchbaseError>
+    ) -> impl Future<Item = LookupInResult, Error = CouchbaseError>
     where
         S: Into<String>,
     {

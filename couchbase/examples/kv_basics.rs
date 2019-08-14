@@ -23,13 +23,11 @@ fn main() {
         .wait()
         .expect("Error while loading doc");
     println!("Airline Document: {:?}", found_doc);
+    println!(
+        "Content Decoded {:?}",
+        found_doc.content_as::<Airport>()
+    );
 
-    if found_doc.is_some() {
-        println!(
-            "Content Decoded {:?}",
-            found_doc.unwrap().content_as::<Airport>()
-        );
-    }
     println!(
         "Document does exist?: {:?}",
         collection.exists("airport_1297", None).wait()

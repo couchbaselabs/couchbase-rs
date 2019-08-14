@@ -188,7 +188,7 @@ impl Instance {
         &self,
         id: String,
         options: Option<GetOptions>,
-    ) -> impl Future<Item = Option<GetResult>, Error = CouchbaseError> {
+    ) -> impl Future<Item = GetResult, Error = CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
             .send(Box::new(GetRequest::new(p, id, options)))
@@ -200,7 +200,7 @@ impl Instance {
         &self,
         id: String,
         options: Option<GetAndLockOptions>,
-    ) -> impl Future<Item = Option<GetResult>, Error = CouchbaseError> {
+    ) -> impl Future<Item = GetResult, Error = CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
             .send(Box::new(GetAndLockRequest::new(p, id, options)))
@@ -213,7 +213,7 @@ impl Instance {
         id: String,
         expiration: Duration,
         options: Option<GetAndTouchOptions>,
-    ) -> impl Future<Item = Option<GetResult>, Error = CouchbaseError> {
+    ) -> impl Future<Item = GetResult, Error = CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
             .send(Box::new(GetAndTouchRequest::new(
@@ -227,7 +227,7 @@ impl Instance {
         &self,
         id: String,
         options: Option<ExistsOptions>,
-    ) -> impl Future<Item = Option<ExistsResult>, Error = CouchbaseError> {
+    ) -> impl Future<Item = ExistsResult, Error = CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
             .send(Box::new(ExistsRequest::new(p, id, options)))
@@ -322,7 +322,7 @@ impl Instance {
         id: String,
         specs: Vec<LookupInSpec>,
         options: Option<LookupInOptions>,
-    ) -> impl Future<Item = Option<LookupInResult>, Error = CouchbaseError> {
+    ) -> impl Future<Item = LookupInResult, Error = CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
             .send(Box::new(LookupInRequest::new(p, id, specs, options)))
@@ -510,7 +510,7 @@ impl SharedInstance {
         &self,
         id: String,
         options: Option<GetOptions>,
-    ) -> impl Future<Item = Option<GetResult>, Error = CouchbaseError> {
+    ) -> impl Future<Item = GetResult, Error = CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
             .lock()
@@ -524,7 +524,7 @@ impl SharedInstance {
         &self,
         id: String,
         options: Option<GetAndLockOptions>,
-    ) -> impl Future<Item = Option<GetResult>, Error = CouchbaseError> {
+    ) -> impl Future<Item = GetResult, Error = CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
             .lock()
@@ -539,7 +539,7 @@ impl SharedInstance {
         id: String,
         expiration: Duration,
         options: Option<GetAndTouchOptions>,
-    ) -> impl Future<Item = Option<GetResult>, Error = CouchbaseError> {
+    ) -> impl Future<Item = GetResult, Error = CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
             .lock()
@@ -555,7 +555,7 @@ impl SharedInstance {
         &self,
         id: String,
         options: Option<ExistsOptions>,
-    ) -> impl Future<Item = Option<ExistsResult>, Error = CouchbaseError> {
+    ) -> impl Future<Item = ExistsResult, Error = CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
             .lock()
@@ -664,7 +664,7 @@ impl SharedInstance {
         id: String,
         specs: Vec<LookupInSpec>,
         options: Option<LookupInOptions>,
-    ) -> impl Future<Item = Option<LookupInResult>, Error = CouchbaseError> {
+    ) -> impl Future<Item = LookupInResult, Error = CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
             .lock()
@@ -785,7 +785,7 @@ unsafe extern "C" fn get_callback(
     let mut cookie_ptr: *mut c_void = ptr::null_mut();
     lcb_respget_cookie(get_res, &mut cookie_ptr);
     let sender = Box::from_raw(
-        cookie_ptr as *mut oneshot::Sender<Result<Option<GetResult>, CouchbaseError>>,
+        cookie_ptr as *mut oneshot::Sender<Result<GetResult, CouchbaseError>>,
     );
 
     let status = lcb_respget_status(get_res);
@@ -798,9 +798,7 @@ unsafe extern "C" fn get_callback(
         lcb_respget_flags(get_res, &mut flags);
         lcb_respget_value(get_res, &mut value_ptr, &mut value_len);
         let value = from_raw_parts(value_ptr as *const u8, value_len);
-        Ok(Some(GetResult::new(cas, value.to_vec(), flags)))
-    } else if status == lcb_STATUS_LCB_KEY_ENOENT {
-        Ok(None)
+        Ok(GetResult::new(cas, value.to_vec(), flags))
     } else {
         Err(CouchbaseError::from(status))
     };
@@ -918,19 +916,15 @@ unsafe extern "C" fn exists_callback(
     let mut cookie_ptr: *mut c_void = ptr::null_mut();
     lcb_respexists_cookie(exists_res, &mut cookie_ptr);
     let sender = Box::from_raw(
-        cookie_ptr as *mut oneshot::Sender<Result<Option<ExistsResult>, CouchbaseError>>,
+        cookie_ptr as *mut oneshot::Sender<Result<ExistsResult, CouchbaseError>>,
     );
 
     let mut cas: u64 = 0;
     lcb_respexists_cas(exists_res, &mut cas);
 
     let status = lcb_respexists_status(exists_res);
-    let result = if status == lcb_STATUS_LCB_SUCCESS {
-        if lcb_respexists_is_found(exists_res) != 0 {
-            Ok(Some(ExistsResult::new(cas)))
-        } else {
-            Ok(None)
-        }
+    let result = if status == lcb_STATUS_LCB_SUCCESS && lcb_respexists_is_found(exists_res) != 0 {
+        Ok(ExistsResult::new(cas))
     } else {
         Err(CouchbaseError::from(status))
     };
@@ -948,7 +942,7 @@ unsafe extern "C" fn lookup_in_callback(
     let mut cookie_ptr: *mut c_void = ptr::null_mut();
     lcb_respsubdoc_cookie(lookup_res, &mut cookie_ptr);
     let sender = Box::from_raw(
-        cookie_ptr as *mut oneshot::Sender<Result<Option<LookupInResult>, CouchbaseError>>,
+        cookie_ptr as *mut oneshot::Sender<Result<LookupInResult, CouchbaseError>>,
     );
 
     let status = lcb_respsubdoc_status(lookup_res);
@@ -970,9 +964,7 @@ unsafe extern "C" fn lookup_in_callback(
             ));
         }
 
-        Ok(Some(LookupInResult::new(cas, fields)))
-    } else if status == lcb_STATUS_LCB_KEY_ENOENT {
-        Ok(None)
+        Ok(LookupInResult::new(cas, fields))
     } else {
         Err(CouchbaseError::from(status))
     };
