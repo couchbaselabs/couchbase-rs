@@ -3,7 +3,6 @@ use crate::error::CouchbaseError;
 use crate::instance::{Instance, SharedInstance};
 use crate::options::{AnalyticsOptions, QueryOptions};
 use crate::result::{AnalyticsResult, QueryResult};
-use futures::Future;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -33,28 +32,28 @@ impl Bucket {
 
     /// Internal proxy method that gets called from the cluster so we can send it into the
     /// instance.
-    pub(crate) fn query<S>(
+    pub(crate) async fn query<S>(
         &self,
         statement: S,
         options: Option<QueryOptions>,
-    ) -> impl Future<Item = QueryResult, Error = CouchbaseError>
+    ) -> Result<QueryResult, CouchbaseError>
     where
         S: Into<String>,
     {
-        self.instance.query(statement.into(), options)
+        self.instance.query(statement.into(), options).await
     }
 
     /// Internal proxy method that gets called from the cluster so we can send it into the
     /// instance.
-    pub(crate) fn analytics_query<S>(
+    pub(crate) async fn analytics_query<S>(
         &self,
         statement: S,
         options: Option<AnalyticsOptions>,
-    ) -> impl Future<Item = AnalyticsResult, Error = CouchbaseError>
+    ) -> Result<AnalyticsResult, CouchbaseError>
     where
         S: Into<String>,
     {
-        self.instance.analytics_query(statement.into(), options)
+        self.instance.analytics_query(statement.into(), options).await
     }
 
     /// Internal proxy method that gets called from the cluster so we can send it into the
@@ -90,33 +89,33 @@ impl SharedBucket {
 
     /// Internal proxy method that gets called from the cluster so we can send it into the
     /// instance.
-    pub(crate) fn query<S>(
+    pub(crate) async fn query<S>(
         &self,
         statement: S,
         options: Option<QueryOptions>,
-    ) -> impl Future<Item = QueryResult, Error = CouchbaseError>
+    ) -> Result<QueryResult, CouchbaseError>
     where
         S: Into<String>,
     {
-        self.instance.query(statement.into(), options)
+        self.instance.query(statement.into(), options).await.await
     }
 
     /// Internal proxy method that gets called from the cluster so we can send it into the
     /// instance.
-    pub(crate) fn analytics_query<S>(
+    pub(crate) async fn analytics_query<S>(
         &self,
         statement: S,
         options: Option<AnalyticsOptions>,
-    ) -> impl Future<Item = AnalyticsResult, Error = CouchbaseError>
+    ) -> Result<AnalyticsResult, CouchbaseError>
     where
         S: Into<String>,
     {
-        self.instance.analytics_query(statement.into(), options)
+        self.instance.analytics_query(statement.into(), options).await.await
     }
 
     /// Internal proxy method that gets called from the cluster so we can send it into the
     /// instance.
-    pub(crate) fn close(&self) -> Result<(), CouchbaseError> {
-        self.instance.shutdown()
+    pub(crate) async fn close(&self) -> Result<(), CouchbaseError> {
+        self.instance.shutdown().await
     }
 }

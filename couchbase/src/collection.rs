@@ -4,9 +4,6 @@ use crate::options::*;
 use crate::result::*;
 use crate::subdoc::*;
 use crate::util::JSON_COMMON_FLAG;
-use futures::future::err;
-use futures::future::Either;
-use futures::Future;
 use serde::Serialize;
 use serde_json::to_vec;
 use std::rc::Rc;
@@ -48,26 +45,27 @@ impl Collection {
     /// #   .expect("Could not open bucket");
     /// # let collection = bucket.default_collection();
     /// #
+    /// # async {
     /// let found_doc = collection
     ///     .get("airport_1297", None)
-    ///     .wait()
+    ///     .await
     ///     .expect("Error while loading doc");
     ///
     ///     println!(
     ///         "Content Decoded {:?}",
     ///         found_doc.content_as::<Value>()
     ///     );
-    ///
+    /// # };
     /// ```
-    pub fn get<S>(
+    pub async fn get<S>(
         &self,
         id: S,
         options: Option<GetOptions>,
-    ) -> impl Future<Item = GetResult, Error = CouchbaseError>
+    ) -> Result<GetResult, CouchbaseError>
     where
         S: Into<String>,
     {
-        self.instance.get(id.into(), options)
+        self.instance.get(id.into(), options).await
     }
 
     /// Fetches a document from the collection and write locks it.
@@ -93,25 +91,27 @@ impl Collection {
     /// #   .expect("Could not open bucket");
     /// # let collection = bucket.default_collection();
     /// #
+    /// # async {
     /// let found_doc = collection
     ///     .get_and_lock("airport_1297", None)
-    ///     .wait()
+    ///     .await
     ///     .expect("Error while loading and locking doc");
     ///
     ///     println!(
     ///         "Content Decoded {:?}",
     ///         found_doc.content_as::<Value>()
     ///    );
+    /// # };
     /// ```
-    pub fn get_and_lock<S>(
+    pub async fn get_and_lock<S>(
         &self,
         id: S,
         options: Option<GetAndLockOptions>,
-    ) -> impl Future<Item = GetResult, Error = CouchbaseError>
+    ) -> Result<GetResult, CouchbaseError>
     where
         S: Into<String>,
     {
-        self.instance.get_and_lock(id.into(), options)
+        self.instance.get_and_lock(id.into(), options).await
     }
 
     /// Fetches a document from the collection and modifies its expiry.
@@ -136,26 +136,28 @@ impl Collection {
     /// #   .expect("Could not open bucket");
     /// # let collection = bucket.default_collection();
     /// #
+    /// # async {
     /// let found_doc = collection
     ///     .get_and_touch("airport_1297", Duration::from_secs(5), None)
-    ///     .wait()
+    ///     .await
     ///     .expect("Error while loading and touching doc");
     ///
     ///     println!(
     ///         "Content Decoded {:?}",
     ///         found_doc.content_as::<Value>()
     ///     );
+    /// # };
     /// ```
-    pub fn get_and_touch<S>(
+    pub async fn get_and_touch<S>(
         &self,
         id: S,
         expiration: Duration,
         options: Option<GetAndTouchOptions>,
-    ) -> impl Future<Item = GetResult, Error = CouchbaseError>
+    ) -> Result<GetResult, CouchbaseError>
     where
         S: Into<String>,
     {
-        self.instance.get_and_touch(id.into(), expiration, options)
+        self.instance.get_and_touch(id.into(), expiration, options).await
     }
 
     /// Inserts or replaces a new document into the collection.
@@ -192,27 +194,29 @@ impl Collection {
     ///     iata: "VIE".into(),
     /// };
     ///
+    /// # async {
     /// collection
     ///     .upsert("airport_999", airport, None)
-    ///     .wait()
+    ///     .await
     ///     .expect("could not upsert airport!");
+    /// # };
     /// ```
-    pub fn upsert<S, T>(
+    pub async fn upsert<S, T>(
         &self,
         id: S,
         content: T,
         options: Option<UpsertOptions>,
-    ) -> impl Future<Item = MutationResult, Error = CouchbaseError>
+    ) -> Result<MutationResult, CouchbaseError>
     where
         S: Into<String>,
         T: Serialize,
     {
         let serialized = match to_vec(&content) {
             Ok(v) => v,
-            Err(_e) => return Either::A(err(CouchbaseError::EncodingError)),
+            Err(_e) => return Err(CouchbaseError::EncodingError),
         };
         let flags = JSON_COMMON_FLAG;
-        Either::B(self.instance.upsert(id.into(), serialized, flags, options))
+        self.instance.upsert(id.into(), serialized, flags, options).await
     }
 
     /// Inserts a document into the collection.
@@ -249,27 +253,29 @@ impl Collection {
     ///     iata: "VIE".into(),
     /// };
     ///
+    /// # async {
     /// collection
     ///     .insert("airport_999", airport, None)
-    ///     .wait()
+    ///     .await
     ///     .expect("could not insert airport!");
+    /// # };
     /// ```
-    pub fn insert<S, T>(
+    pub async fn insert<S, T>(
         &self,
         id: S,
         content: T,
         options: Option<InsertOptions>,
-    ) -> impl Future<Item = MutationResult, Error = CouchbaseError>
+    ) -> Result<MutationResult, CouchbaseError>
     where
         S: Into<String>,
         T: Serialize,
     {
         let serialized = match to_vec(&content) {
             Ok(v) => v,
-            Err(_e) => return Either::A(err(CouchbaseError::EncodingError)),
+            Err(_e) => return Err(CouchbaseError::EncodingError),
         };
         let flags = JSON_COMMON_FLAG;
-        Either::B(self.instance.insert(id.into(), serialized, flags, options))
+        self.instance.insert(id.into(), serialized, flags, options).await
     }
 
     /// Replaces an existing document in the collection.
@@ -306,27 +312,29 @@ impl Collection {
     ///     iata: "VIE".into(),
     /// };
     ///
+    /// # async {
     /// collection
     ///     .replace("airport_999", airport, None)
-    ///     .wait()
+    ///     .await
     ///     .expect("could not replace airport!");
+    /// # };
     /// ```
-    pub fn replace<S, T>(
+    pub async fn replace<S, T>(
         &self,
         id: S,
         content: T,
         options: Option<ReplaceOptions>,
-    ) -> impl Future<Item = MutationResult, Error = CouchbaseError>
+    ) -> Result<MutationResult, CouchbaseError>
     where
         S: Into<String>,
         T: Serialize,
     {
         let serialized = match to_vec(&content) {
             Ok(v) => v,
-            Err(_e) => return Either::A(err(CouchbaseError::EncodingError)),
+            Err(_e) => return Err(CouchbaseError::EncodingError),
         };
         let flags = JSON_COMMON_FLAG;
-        Either::B(self.instance.replace(id.into(), serialized, flags, options))
+        self.instance.replace(id.into(), serialized, flags, options).await
     }
 
     /// Removes a document from the collection.
@@ -347,17 +355,19 @@ impl Collection {
     /// #   .bucket("travel-sample")
     /// #   .expect("Could not open bucket");
     /// # let collection = bucket.default_collection();
-    /// let result = collection.remove("document_id", None).wait();
+    /// # async {
+    /// let result = collection.remove("document_id", None).await;
+    /// # };
     /// ```
-    pub fn remove<S>(
+    pub async fn remove<S>(
         &self,
         id: S,
         options: Option<RemoveOptions>,
-    ) -> impl Future<Item = MutationResult, Error = CouchbaseError>
+    ) -> Result<MutationResult, CouchbaseError>
     where
         S: Into<String>,
     {
-        self.instance.remove(id.into(), options)
+        self.instance.remove(id.into(), options).await
     }
 
     /// Changes the expiration time on a document.
@@ -380,18 +390,20 @@ impl Collection {
     /// #   .bucket("travel-sample")
     /// #   .expect("Could not open bucket");
     /// # let collection = bucket.default_collection();
-    /// let result = collection.touch("document_id", Duration::from_secs(5), None).wait();
+    /// # async {
+    /// let result = collection.touch("document_id", Duration::from_secs(5), None).await;
+    /// # };
     /// ```
-    pub fn touch<S>(
+    pub async fn touch<S>(
         &self,
         id: S,
         expiration: Duration,
         options: Option<TouchOptions>,
-    ) -> impl Future<Item = MutationResult, Error = CouchbaseError>
+    ) -> Result<MutationResult, CouchbaseError>
     where
         S: Into<String>,
     {
-        self.instance.touch(id.into(), expiration, options)
+        self.instance.touch(id.into(), expiration, options).await
     }
 
     /// Unlocks a write-locked document.
@@ -414,18 +426,20 @@ impl Collection {
     /// #   .expect("Could not open bucket");
     /// # let collection = bucket.default_collection();
     /// let cas = 1234; // retrieved from a `getAndLock`
-    /// let result = collection.unlock("document_id", cas, None).wait();
+    /// # async {
+    /// let result = collection.unlock("document_id", cas, None).await;
+    /// # };
     /// ```
-    pub fn unlock<S>(
+    pub async fn unlock<S>(
         &self,
         id: S,
         cas: u64,
         options: Option<UnlockOptions>,
-    ) -> impl Future<Item = MutationResult, Error = CouchbaseError>
+    ) -> Result<MutationResult, CouchbaseError>
     where
         S: Into<String>,
     {
-        self.instance.unlock(id.into(), cas, options)
+        self.instance.unlock(id.into(), cas, options).await
     }
 
     /// Checks if a document exists and if so returns a cas value with it.
@@ -446,17 +460,19 @@ impl Collection {
     /// #   .bucket("travel-sample")
     /// #   .expect("Could not open bucket");
     /// # let collection = bucket.default_collection();
-    /// let result = collection.exists("document_id", None).wait();
+    /// # async {
+    /// let result = collection.exists("document_id", None).await;
+    /// # };
     /// ```
-    pub fn exists<S>(
+    pub async fn exists<S>(
         &self,
         id: S,
         options: Option<ExistsOptions>,
-    ) -> impl Future<Item = ExistsResult, Error = CouchbaseError>
+    ) -> Result<ExistsResult, CouchbaseError>
     where
         S: Into<String>,
     {
-        self.instance.exists(id.into(), options)
+        self.instance.exists(id.into(), options).await
     }
 
     /// Extracts fragments of a document.
@@ -479,20 +495,22 @@ impl Collection {
     /// #   .bucket("travel-sample")
     /// #   .expect("Could not open bucket");
     /// # let collection = bucket.default_collection();
+    /// # async {
     /// let partial_result = collection
     ///   .lookup_in("airport_1285", vec![LookupInSpec::get("geo")], None)
-    ///   .wait();
+    ///   .await;
+    /// # };
     /// ```
-    pub fn lookup_in<S>(
+    pub async fn lookup_in<S>(
         &self,
         id: S,
         specs: Vec<LookupInSpec>,
         options: Option<LookupInOptions>,
-    ) -> impl Future<Item = LookupInResult, Error = CouchbaseError>
+    ) -> Result<LookupInResult, CouchbaseError>
     where
         S: Into<String>,
     {
-        self.instance.lookup_in(id.into(), specs, options)
+        self.instance.lookup_in(id.into(), specs, options).await
     }
 
     /// Changes fragments of a document.
@@ -515,24 +533,26 @@ impl Collection {
     /// #   .bucket("travel-sample")
     /// #   .expect("Could not open bucket");
     /// # let collection = bucket.default_collection();
+    /// # async {
     /// let insert_result = collection
     ///     .mutate_in(
     ///         "airport_1285",
     ///         vec![MutateInSpec::upsert("updated", true).expect("could not encode value")],
     ///         None,
     ///     )
-    ///     .wait();
+    ///     .await;
+    /// # };
     /// ```
-    pub fn mutate_in<S>(
+    pub async fn mutate_in<S>(
         &self,
         id: S,
         specs: Vec<MutateInSpec>,
         options: Option<MutateInOptions>,
-    ) -> impl Future<Item = MutateInResult, Error = CouchbaseError>
+    ) -> Result<MutateInResult, CouchbaseError>
     where
         S: Into<String>,
     {
-        self.instance.mutate_in(id.into(), specs, options)
+        self.instance.mutate_in(id.into(), specs, options).await
     }
 }
 
@@ -571,25 +591,27 @@ impl SharedCollection {
     /// #   .expect("Could not open bucket");
     /// # let collection = bucket.default_collection();
     /// #
+    /// # async {
     /// let found_doc = collection
     ///     .get("airport_1297", None)
-    ///     .wait()
+    ///     .await
     ///     .expect("Error while loading doc");
     ///
     ///     println!(
     ///         "Content Decoded {:?}",
     ///         found_doc.content_as::<Value>()
     ///     );
+    /// # };
     /// ```
-    pub fn get<S>(
+    pub async fn get<S>(
         &self,
         id: S,
         options: Option<GetOptions>,
-    ) -> impl Future<Item = GetResult, Error = CouchbaseError>
+    ) -> Result<GetResult, CouchbaseError>
     where
         S: Into<String>,
     {
-        self.instance.get(id.into(), options)
+        self.instance.get(id.into(), options).await.await
     }
 
     /// Fetches a document from the collection and write locks it.
@@ -615,25 +637,27 @@ impl SharedCollection {
     /// #   .expect("Could not open bucket");
     /// # let collection = bucket.default_collection();
     /// #
+    /// # async {
     /// let found_doc = collection
     ///     .get_and_lock("airport_1297", None)
-    ///     .wait()
+    ///     .await
     ///     .expect("Error while loading and locking doc");
     ///
     ///     println!(
     ///         "Content Decoded {:?}",
     ///         found_doc.content_as::<Value>()
     ///     );
+    /// # };
     /// ```
-    pub fn get_and_lock<S>(
+    pub async fn get_and_lock<S>(
         &self,
         id: S,
         options: Option<GetAndLockOptions>,
-    ) -> impl Future<Item = GetResult, Error = CouchbaseError>
+    ) -> Result<GetResult, CouchbaseError>
     where
         S: Into<String>,
     {
-        self.instance.get_and_lock(id.into(), options)
+        self.instance.get_and_lock(id.into(), options).await.await
     }
 
     /// Fetches a document from the collection and modifies its expiry.
@@ -658,26 +682,28 @@ impl SharedCollection {
     /// #   .expect("Could not open bucket");
     /// # let collection = bucket.default_collection();
     /// #
+    /// # async {
     /// let found_doc = collection
     ///     .get_and_touch("airport_1297", Duration::from_secs(5), None)
-    ///     .wait()
+    ///     .await
     ///     .expect("Error while loading and touching doc");
     ///
     ///     println!(
     ///         "Content Decoded {:?}",
     ///         found_doc.content_as::<Value>()
     ///     );
+    /// # };
     /// ```
-    pub fn get_and_touch<S>(
+    pub async fn get_and_touch<S>(
         &self,
         id: S,
         expiration: Duration,
         options: Option<GetAndTouchOptions>,
-    ) -> impl Future<Item = GetResult, Error = CouchbaseError>
+    ) -> Result<GetResult, CouchbaseError>
     where
         S: Into<String>,
     {
-        self.instance.get_and_touch(id.into(), expiration, options)
+        self.instance.get_and_touch(id.into(), expiration, options).await.await
     }
 
     /// Inserts or replaces a new document into the collection.
@@ -714,27 +740,29 @@ impl SharedCollection {
     ///     iata: "VIE".into(),
     /// };
     ///
+    /// # async {
     /// collection
     ///     .upsert("airport_999", airport, None)
-    ///     .wait()
+    ///     .await
     ///     .expect("could not upsert airport!");
+    /// # };
     /// ```
-    pub fn upsert<S, T>(
+    pub async fn upsert<S, T>(
         &self,
         id: S,
         content: T,
         options: Option<UpsertOptions>,
-    ) -> impl Future<Item = MutationResult, Error = CouchbaseError>
+    ) -> Result<MutationResult, CouchbaseError>
     where
         S: Into<String>,
         T: Serialize,
     {
         let serialized = match to_vec(&content) {
             Ok(v) => v,
-            Err(_e) => return Either::A(err(CouchbaseError::EncodingError)),
+            Err(_e) => return Err(CouchbaseError::EncodingError),
         };
         let flags = JSON_COMMON_FLAG;
-        Either::B(self.instance.upsert(id.into(), serialized, flags, options))
+        self.instance.upsert(id.into(), serialized, flags, options).await.await
     }
 
     /// Inserts a document into the collection.
@@ -770,28 +798,29 @@ impl SharedCollection {
     ///     icao: "LOWW".into(),
     ///     iata: "VIE".into(),
     /// };
-    ///
+    /// # async {
     /// collection
     ///     .insert("airport_999", airport, None)
-    ///     .wait()
+    ///     .await
     ///     .expect("could not insert airport!");
+    /// # };
     /// ```
-    pub fn insert<S, T>(
+    pub async fn insert<S, T>(
         &self,
         id: S,
         content: T,
         options: Option<InsertOptions>,
-    ) -> impl Future<Item = MutationResult, Error = CouchbaseError>
+    ) -> Result<MutationResult, CouchbaseError>
     where
         S: Into<String>,
         T: Serialize,
     {
         let serialized = match to_vec(&content) {
             Ok(v) => v,
-            Err(_e) => return Either::A(err(CouchbaseError::EncodingError)),
+            Err(_e) => return Err(CouchbaseError::EncodingError),
         };
         let flags = JSON_COMMON_FLAG;
-        Either::B(self.instance.insert(id.into(), serialized, flags, options))
+        self.instance.insert(id.into(), serialized, flags, options).await.await
     }
 
     /// Replaces an existing document in the collection.
@@ -828,27 +857,29 @@ impl SharedCollection {
     ///     iata: "VIE".into(),
     /// };
     ///
+    /// # async {
     /// collection
     ///     .replace("airport_999", airport, None)
-    ///     .wait()
+    ///     .await
     ///     .expect("could not replace airport!");
+    /// # };
     /// ```
-    pub fn replace<S, T>(
+    pub async fn replace<S, T>(
         &self,
         id: S,
         content: T,
         options: Option<ReplaceOptions>,
-    ) -> impl Future<Item = MutationResult, Error = CouchbaseError>
+    ) -> Result<MutationResult, CouchbaseError>
     where
         S: Into<String>,
         T: Serialize,
     {
         let serialized = match to_vec(&content) {
             Ok(v) => v,
-            Err(_e) => return Either::A(err(CouchbaseError::EncodingError)),
+            Err(_e) => return Err(CouchbaseError::EncodingError),
         };
         let flags = JSON_COMMON_FLAG;
-        Either::B(self.instance.replace(id.into(), serialized, flags, options))
+        self.instance.replace(id.into(), serialized, flags, options).await.await
     }
 
     /// Removes a document from the collection.
@@ -869,17 +900,19 @@ impl SharedCollection {
     /// #   .bucket("travel-sample")
     /// #   .expect("Could not open bucket");
     /// # let collection = bucket.default_collection();
-    /// let result = collection.remove("document_id", None).wait();
+    /// # async {
+    /// let result = collection.remove("document_id", None).await;
+    /// # };
     /// ```
-    pub fn remove<S>(
+    pub async fn remove<S>(
         &self,
         id: S,
         options: Option<RemoveOptions>,
-    ) -> impl Future<Item = MutationResult, Error = CouchbaseError>
+    ) -> Result<MutationResult, CouchbaseError>
     where
         S: Into<String>,
     {
-        self.instance.remove(id.into(), options)
+        self.instance.remove(id.into(), options).await.await
     }
 
     /// Changes the expiration time on a document.
@@ -902,18 +935,20 @@ impl SharedCollection {
     /// #   .bucket("travel-sample")
     /// #   .expect("Could not open bucket");
     /// # let collection = bucket.default_collection();
-    /// let result = collection.touch("document_id", Duration::from_secs(5), None).wait();
+    /// # async { 
+    /// let result = collection.touch("document_id", Duration::from_secs(5), None).await;
+    /// # };
     /// ```
-    pub fn touch<S>(
+    pub async fn touch<S>(
         &self,
         id: S,
         expiration: Duration,
         options: Option<TouchOptions>,
-    ) -> impl Future<Item = MutationResult, Error = CouchbaseError>
+    ) -> Result<MutationResult, CouchbaseError>
     where
         S: Into<String>,
     {
-        self.instance.touch(id.into(), expiration, options)
+        self.instance.touch(id.into(), expiration, options).await.await
     }
 
     /// Unlocks a write-locked document.
@@ -936,18 +971,20 @@ impl SharedCollection {
     /// #   .expect("Could not open bucket");
     /// # let collection = bucket.default_collection();
     /// let cas = 1234; // retrieved from a `getAndLock`
-    /// let result = collection.unlock("document_id", cas, None).wait();
+    /// # async {
+    /// let result = collection.unlock("document_id", cas, None).await;
+    /// # };
     /// ```
-    pub fn unlock<S>(
+    pub async fn unlock<S>(
         &self,
         id: S,
         cas: u64,
         options: Option<UnlockOptions>,
-    ) -> impl Future<Item = MutationResult, Error = CouchbaseError>
+    ) -> Result<MutationResult, CouchbaseError>
     where
         S: Into<String>,
     {
-        self.instance.unlock(id.into(), cas, options)
+        self.instance.unlock(id.into(), cas, options).await.await
     }
 
     /// Checks if a document exists and if so returns a cas value with it.
@@ -968,17 +1005,19 @@ impl SharedCollection {
     /// #   .bucket("travel-sample")
     /// #   .expect("Could not open bucket");
     /// # let collection = bucket.default_collection();
-    /// let result = collection.exists("document_id", None).wait();
+    /// # async {
+    /// let result = collection.exists("document_id", None).await;
+    /// # };
     /// ```
-    pub fn exists<S>(
+    pub async fn exists<S>(
         &self,
         id: S,
         options: Option<ExistsOptions>,
-    ) -> impl Future<Item = ExistsResult, Error = CouchbaseError>
+    ) -> Result<ExistsResult, CouchbaseError>
     where
         S: Into<String>,
     {
-        self.instance.exists(id.into(), options)
+        self.instance.exists(id.into(), options).await.await
     }
 
     /// Extracts fragments of a document.
@@ -1001,20 +1040,22 @@ impl SharedCollection {
     /// #   .bucket("travel-sample")
     /// #   .expect("Could not open bucket");
     /// # let collection = bucket.default_collection();
+    /// # async {
     /// let partial_result = collection
     ///   .lookup_in("airport_1285", vec![LookupInSpec::get("geo")], None)
-    ///   .wait();
+    ///   .await;
+    /// # };
     /// ```
-    pub fn lookup_in<S>(
+    pub async fn lookup_in<S>(
         &self,
         id: S,
         specs: Vec<LookupInSpec>,
         options: Option<LookupInOptions>,
-    ) -> impl Future<Item = LookupInResult, Error = CouchbaseError>
+    ) -> Result<LookupInResult, CouchbaseError>
     where
         S: Into<String>,
     {
-        self.instance.lookup_in(id.into(), specs, options)
+        self.instance.lookup_in(id.into(), specs, options).await.await
     }
 
     /// Changes fragments of a document.
@@ -1037,23 +1078,25 @@ impl SharedCollection {
     /// #   .bucket("travel-sample")
     /// #   .expect("Could not open bucket");
     /// # let collection = bucket.default_collection();
+    /// # async {
     /// let insert_result = collection
     ///     .mutate_in(
     ///         "airport_1285",
     ///         vec![MutateInSpec::upsert("updated", true).expect("could not encode value")],
     ///         None,
     ///     )
-    ///     .wait();
+    ///     .await;
+    /// # };
     /// ```
-    pub fn mutate_in<S>(
+    pub async fn mutate_in<S>(
         &self,
         id: S,
         specs: Vec<MutateInSpec>,
         options: Option<MutateInOptions>,
-    ) -> impl Future<Item = MutateInResult, Error = CouchbaseError>
+    ) -> Result<MutateInResult, CouchbaseError>
     where
         S: Into<String>,
     {
-        self.instance.mutate_in(id.into(), specs, options)
+        self.instance.mutate_in(id.into(), specs, options).await.await
     }
 }
