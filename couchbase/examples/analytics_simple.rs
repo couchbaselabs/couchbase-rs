@@ -19,7 +19,7 @@ fn main() {
         println!(
             "---> rows {:?}",
             result
-                .rows_as()
+                .rows_as().expect("Rows already consumed")
                 .collect::<Vec<Result<Value, CouchbaseError>>>().await
         );
         println!(

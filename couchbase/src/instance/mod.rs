@@ -4,7 +4,7 @@
 //! of them in the other files as as a result. If something segfaults, this is
 //! likely the place to look.
 
-mod request;
+pub mod request;
 
 use crate::error::CouchbaseError;
 use crate::options::*;
@@ -72,6 +72,7 @@ impl InstanceCookie {
 /// are sent in and out through channels and queues.
 ///
 /// An `Instance` is always bound to a bucket, since this is how lcb works.
+#[derive(Debug)]
 pub struct Instance {
     sender: Sender<Box<dyn InstanceRequest>>,
     handle: RefCell<Option<thread::JoinHandle<()>>>,
@@ -161,8 +162,7 @@ impl Instance {
                     // instance cookie is in scope and will be dropped automatically
                     lcb_destroy(instance);
                 }
-            })
-            .expect("Could not create IO thread");
+            })?;
 
         Ok(Instance {
             sender: tx,
@@ -175,7 +175,7 @@ impl Instance {
             Some(h) => {
                 match self.sender.send(Box::new(ShutdownRequest::new())) {
                     Ok(_) => (),
-                    Err(_e) => return Err(CouchbaseError::FutureError),
+                    Err(e) => return Err(CouchbaseError::FutureError(e.to_string())),
                 };
                 h.join()
                     .expect("failed while waiting for io thread to join");
@@ -192,8 +192,7 @@ impl Instance {
     ) -> Result<GetResult, CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
-            .send(Box::new(GetRequest::new(p, id, options)))
-            .expect("Could not send get command into io loop");
+            .send(Box::new(GetRequest::new(p, id, options)))?;
         map_oneshot_error(c).await
     }
 
@@ -204,8 +203,7 @@ impl Instance {
     ) -> Result<GetResult, CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
-            .send(Box::new(GetAndLockRequest::new(p, id, options)))
-            .expect("Could not send getAndLock command into io loop");
+            .send(Box::new(GetAndLockRequest::new(p, id, options)))?;
         map_oneshot_error(c).await
     }
 
@@ -219,8 +217,7 @@ impl Instance {
         self.sender
             .send(Box::new(GetAndTouchRequest::new(
                 p, id, expiration, options,
-            )))
-            .expect("Could not send getAndTouch command into io loop");
+            )))?;
         map_oneshot_error(c).await
     }
 
@@ -231,8 +228,7 @@ impl Instance {
     ) -> Result<ExistsResult, CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
-            .send(Box::new(ExistsRequest::new(p, id, options)))
-            .expect("Could not send exists command into io loop");
+            .send(Box::new(ExistsRequest::new(p, id, options)))?;
         map_oneshot_error(c).await
     }
 
@@ -245,8 +241,7 @@ impl Instance {
     ) -> Result<MutationResult, CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
-            .send(Box::new(UpsertRequest::new(p, id, content, flags, options)))
-            .expect("Could not send upsert command into io loop");
+            .send(Box::new(UpsertRequest::new(p, id, content, flags, options)))?;
         map_oneshot_error(c).await
     }
 
@@ -259,8 +254,7 @@ impl Instance {
     ) -> Result<MutationResult, CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
-            .send(Box::new(InsertRequest::new(p, id, content, flags, options)))
-            .expect("Could not send insert command into io loop");
+            .send(Box::new(InsertRequest::new(p, id, content, flags, options)))?;
         map_oneshot_error(c).await
     }
 
@@ -275,8 +269,7 @@ impl Instance {
         self.sender
             .send(Box::new(ReplaceRequest::new(
                 p, id, content, flags, options,
-            )))
-            .expect("Could not send replace command into io loop");
+            )))?;
         map_oneshot_error(c).await
     }
 
@@ -287,8 +280,7 @@ impl Instance {
     ) -> Result<MutationResult, CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
-            .send(Box::new(RemoveRequest::new(p, id, options)))
-            .expect("Could not send remove command into io loop");
+            .send(Box::new(RemoveRequest::new(p, id, options)))?;
         map_oneshot_error(c).await
     }
 
@@ -300,8 +292,7 @@ impl Instance {
     ) -> Result<MutationResult, CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
-            .send(Box::new(TouchRequest::new(p, id, expiration, options)))
-            .expect("Could not send touch command into io loop");
+            .send(Box::new(TouchRequest::new(p, id, expiration, options)))?;
         map_oneshot_error(c).await
     }
 
@@ -313,8 +304,7 @@ impl Instance {
     ) -> Result<MutationResult, CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
-            .send(Box::new(UnlockRequest::new(p, id, cas, options)))
-            .expect("Could not send unlock command into io loop");
+            .send(Box::new(UnlockRequest::new(p, id, cas, options)))?;
         map_oneshot_error(c).await
     }
 
@@ -326,8 +316,7 @@ impl Instance {
     ) -> Result<LookupInResult, CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
-            .send(Box::new(LookupInRequest::new(p, id, specs, options)))
-            .expect("Could not send lookupIn command into io loop");
+            .send(Box::new(LookupInRequest::new(p, id, specs, options)))?;
         map_oneshot_error(c).await
     }
 
@@ -339,8 +328,7 @@ impl Instance {
     ) -> Result<MutateInResult, CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
-            .send(Box::new(MutateInRequest::new(p, id, specs, options)))
-            .expect("Could not send mutateIn command into io loop");
+            .send(Box::new(MutateInRequest::new(p, id, specs, options)))?;
         map_oneshot_error(c).await
     }
 
@@ -351,8 +339,7 @@ impl Instance {
     ) -> Result<QueryResult, CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
-            .send(Box::new(QueryRequest::new(p, statement, options)))
-            .expect("Could not send query command into io loop");
+            .send(Box::new(QueryRequest::new(p, statement, options)))?;
         map_oneshot_error(c).await
     }
 
@@ -363,8 +350,7 @@ impl Instance {
     ) -> Result<AnalyticsResult, CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
-            .send(Box::new(AnalyticsRequest::new(p, statement, options)))
-            .expect("Could not send analytics query command into io loop");
+            .send(Box::new(AnalyticsRequest::new(p, statement, options)))?;
         map_oneshot_error(c).await
     }
 }
@@ -377,7 +363,7 @@ async fn map_oneshot_error<T>(
             Ok(i) => Ok(i),
             Err(e) => Err(e),
         },
-        Err(_) => Err(CouchbaseError::FutureError),
+        Err(e) => Err(CouchbaseError::FutureError(e.to_string())),
     }).await
 }
 
@@ -389,6 +375,7 @@ async fn map_oneshot_error<T>(
 /// are sent in and out through channels and queues.
 ///
 /// An `Instance` is always bound to a bucket, since this is how lcb works.
+#[derive(Debug)]
 pub struct SharedInstance {
     sender: Mutex<Sender<Box<dyn InstanceRequest>>>,
     handle: Mutex<Option<thread::JoinHandle<()>>>,
@@ -497,7 +484,7 @@ impl SharedInstance {
                     .send(Box::new(ShutdownRequest::new()))
                 {
                     Ok(_) => (),
-                    Err(_e) => return Err(CouchbaseError::FutureError),
+                    Err(e) => return Err(CouchbaseError::FutureError(e.to_string())),
                 };
                 h.join()
                     .expect("failed while waiting for io thread to join");
@@ -511,28 +498,26 @@ impl SharedInstance {
         &self,
         id: String,
         options: Option<GetOptions>,
-    ) -> impl Future<Output = Result<GetResult, CouchbaseError>> {
+    ) -> Result<GetResult, CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
             .lock()
             .await
-            .send(Box::new(GetRequest::new(p, id, options)))
-            .expect("Could not send get command into io loop");
-        map_oneshot_error(c)
+            .send(Box::new(GetRequest::new(p, id, options)))?;
+        map_oneshot_error(c).await
     }
 
     pub async fn get_and_lock(
         &self,
         id: String,
         options: Option<GetAndLockOptions>,
-    ) -> impl Future<Output = Result<GetResult, CouchbaseError>> {
+    ) -> Result<GetResult, CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
             .lock()
             .await
-            .send(Box::new(GetAndLockRequest::new(p, id, options)))
-            .expect("Could not send getAndLock command into io loop");
-        map_oneshot_error(c)
+            .send(Box::new(GetAndLockRequest::new(p, id, options)))?;
+        map_oneshot_error(c).await
     }
 
     pub async fn get_and_touch(
@@ -540,30 +525,28 @@ impl SharedInstance {
         id: String,
         expiration: Duration,
         options: Option<GetAndTouchOptions>,
-    ) -> impl Future<Output = Result<GetResult, CouchbaseError>> {
+    ) -> Result<GetResult, CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
             .lock()
             .await
             .send(Box::new(GetAndTouchRequest::new(
                 p, id, expiration, options,
-            )))
-            .expect("Could not send getAndTouch command into io loop");
-        map_oneshot_error(c)
+            )))?;
+        map_oneshot_error(c).await
     }
 
     pub async fn exists(
         &self,
         id: String,
         options: Option<ExistsOptions>,
-    ) -> impl Future<Output = Result<ExistsResult, CouchbaseError>> {
+    ) -> Result<ExistsResult, CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
             .lock()
             .await
-            .send(Box::new(ExistsRequest::new(p, id, options)))
-            .expect("Could not send exists command into io loop");
-        map_oneshot_error(c)
+            .send(Box::new(ExistsRequest::new(p, id, options)))?;
+        map_oneshot_error(c).await
     }
 
     pub async fn upsert(
@@ -572,14 +555,13 @@ impl SharedInstance {
         content: Vec<u8>,
         flags: u32,
         options: Option<UpsertOptions>,
-    ) -> impl Future<Output = Result<MutationResult, CouchbaseError>> {
+    ) -> Result<MutationResult, CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
             .lock()
             .await
-            .send(Box::new(UpsertRequest::new(p, id, content, flags, options)))
-            .expect("Could not send upsert command into io loop");
-        map_oneshot_error(c)
+            .send(Box::new(UpsertRequest::new(p, id, content, flags, options)))?;
+        map_oneshot_error(c).await
     }
 
     pub async fn insert(
@@ -588,14 +570,13 @@ impl SharedInstance {
         content: Vec<u8>,
         flags: u32,
         options: Option<InsertOptions>,
-    ) -> impl Future<Output = Result<MutationResult, CouchbaseError>> {
+    ) -> Result<MutationResult, CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
             .lock()
             .await
-            .send(Box::new(InsertRequest::new(p, id, content, flags, options)))
-            .expect("Could not send insert command into io loop");
-        map_oneshot_error(c)
+            .send(Box::new(InsertRequest::new(p, id, content, flags, options)))?;
+        map_oneshot_error(c).await
     }
 
     pub async fn replace(
@@ -604,30 +585,28 @@ impl SharedInstance {
         content: Vec<u8>,
         flags: u32,
         options: Option<ReplaceOptions>,
-    ) -> impl Future<Output = Result<MutationResult, CouchbaseError>> {
+    ) -> Result<MutationResult, CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
             .lock()
             .await
             .send(Box::new(ReplaceRequest::new(
                 p, id, content, flags, options,
-            )))
-            .expect("Could not send replace command into io loop");
-        map_oneshot_error(c)
+            )))?;
+        map_oneshot_error(c).await
     }
 
     pub async fn remove(
         &self,
         id: String,
         options: Option<RemoveOptions>,
-    ) -> impl Future<Output = Result<MutationResult, CouchbaseError>> {
+    ) -> Result<MutationResult, CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
             .lock()
             .await
-            .send(Box::new(RemoveRequest::new(p, id, options)))
-            .expect("Could not send remove command into io loop");
-        map_oneshot_error(c)
+            .send(Box::new(RemoveRequest::new(p, id, options)))?;
+        map_oneshot_error(c).await
     }
 
     pub async fn touch(
@@ -635,14 +614,13 @@ impl SharedInstance {
         id: String,
         expiration: Duration,
         options: Option<TouchOptions>,
-    ) -> impl Future<Output = Result<MutationResult, CouchbaseError>> {
+    ) -> Result<MutationResult, CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
             .lock()
             .await
-            .send(Box::new(TouchRequest::new(p, id, expiration, options)))
-            .expect("Could not send touch command into io loop");
-        map_oneshot_error(c)
+            .send(Box::new(TouchRequest::new(p, id, expiration, options)))?;
+        map_oneshot_error(c).await
     }
 
     pub async fn unlock(
@@ -650,14 +628,13 @@ impl SharedInstance {
         id: String,
         cas: u64,
         options: Option<UnlockOptions>,
-    ) -> impl Future<Output = Result<MutationResult, CouchbaseError>> {
+    ) -> Result<MutationResult, CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
             .lock()
             .await
-            .send(Box::new(UnlockRequest::new(p, id, cas, options)))
-            .expect("Could not send unlock command into io loop");
-        map_oneshot_error(c)
+            .send(Box::new(UnlockRequest::new(p, id, cas, options)))?;
+        map_oneshot_error(c).await
     }
 
     pub async fn lookup_in(
@@ -665,14 +642,13 @@ impl SharedInstance {
         id: String,
         specs: Vec<LookupInSpec>,
         options: Option<LookupInOptions>,
-    ) -> impl Future<Output = Result<LookupInResult, CouchbaseError>> {
+    ) -> Result<LookupInResult, CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
             .lock()
             .await
-            .send(Box::new(LookupInRequest::new(p, id, specs, options)))
-            .expect("Could not send lookupIn command into io loop");
-        map_oneshot_error(c)
+            .send(Box::new(LookupInRequest::new(p, id, specs, options)))?;
+        map_oneshot_error(c).await
     }
 
     pub async fn mutate_in(
@@ -680,42 +656,39 @@ impl SharedInstance {
         id: String,
         specs: Vec<MutateInSpec>,
         options: Option<MutateInOptions>,
-    ) -> impl Future<Output = Result<MutateInResult, CouchbaseError>> {
+    ) -> Result<MutateInResult, CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
             .lock()
             .await
-            .send(Box::new(MutateInRequest::new(p, id, specs, options)))
-            .expect("Could not send mutateIn command into io loop");
-        map_oneshot_error(c)
+            .send(Box::new(MutateInRequest::new(p, id, specs, options)))?;
+        map_oneshot_error(c).await
     }
 
     pub async fn query(
         &self,
         statement: String,
         options: Option<QueryOptions>,
-    ) -> impl Future<Output = Result<QueryResult, CouchbaseError>> {
+    ) -> Result<QueryResult, CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
             .lock()
             .await
-            .send(Box::new(QueryRequest::new(p, statement, options)))
-            .expect("Could not send query command into io loop");
-        map_oneshot_error(c)
+            .send(Box::new(QueryRequest::new(p, statement, options)))?;
+        map_oneshot_error(c).await
     }
 
     pub async fn analytics_query(
         &self,
         statement: String,
         options: Option<AnalyticsOptions>,
-    ) -> impl Future<Output = Result<AnalyticsResult, CouchbaseError>> {
+    ) -> Result<AnalyticsResult, CouchbaseError> {
         let (p, c) = oneshot::channel();
         self.sender
             .lock()
             .await
-            .send(Box::new(AnalyticsRequest::new(p, statement, options)))
-            .expect("Could not send analytics query command into io loop");
-        map_oneshot_error(c)
+            .send(Box::new(AnalyticsRequest::new(p, statement, options)))?;
+        map_oneshot_error(c).await
     }
 }
 

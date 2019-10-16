@@ -8,6 +8,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 /// The `Cluster` is the main entry point when working with the client.
+#[derive(Debug)]
 pub struct Cluster {
     connection_string: String,
     username: String,
@@ -121,7 +122,7 @@ impl Cluster {
     ///     .await
     ///     .expect("Could not perform query");
     ///
-    /// println!("Rows:\n{:?}", result.rows_as().collect::<Vec<Result<Value, CouchbaseError>>>().await);
+    /// println!("Rows:\n{:?}", result.rows_as().expect("already consumed").collect::<Vec<Result<Value, CouchbaseError>>>().await);
     /// println!("Meta:\n{:?}", result.meta().await.expect("Could not get query meta"));
     /// # };
     /// ```
@@ -170,7 +171,7 @@ impl Cluster {
     ///     .await
     ///     .expect("Could not perform analytics query");
     ///
-    /// println!("---> rows {:?}", result.rows_as().collect::<Vec<Result<Value, CouchbaseError>>>().await);
+    /// println!("---> rows {:?}", result.rows_as().expect("Rows consumed").collect::<Vec<Result<Value, CouchbaseError>>>().await);
     /// println!("---> meta {:?}", result.meta().await.expect("Could not get analytics meta"));
     /// # };
     /// ```
@@ -216,6 +217,7 @@ impl Cluster {
 }
 
 /// The `Cluster` is the main entry point when working with the client.
+#[derive(Debug)]
 pub struct SharedCluster {
     connection_string: String,
     username: String,
@@ -329,7 +331,7 @@ impl SharedCluster {
     ///     .await
     ///     .expect("Could not perform query");
     ///
-    /// println!("Rows:\n{:?}", result.rows_as().collect::<Vec<Result<Value, CouchbaseError>>>().await);
+    /// println!("Rows:\n{:?}", result.rows_as().expect("Rows already consumed").collect::<Vec<Result<Value, CouchbaseError>>>().await);
     /// println!("Meta:\n{:?}", result.meta().await.expect("Could not get query meta"));
     /// # };
     /// ```
@@ -378,7 +380,7 @@ impl SharedCluster {
     ///     .await
     ///     .expect("Could not perform analytics query");
     ///
-    /// println!("---> rows {:?}", result.rows_as().collect::<Vec<Result<Value, CouchbaseError>>>().await);
+    /// println!("---> rows {:?}", result.rows_as().expect("Rows consumed").collect::<Vec<Result<Value, CouchbaseError>>>().await);
     /// println!("---> meta {:?}", result.meta().await.expect("Could not get analytics meta"));
     /// # };
     /// ```

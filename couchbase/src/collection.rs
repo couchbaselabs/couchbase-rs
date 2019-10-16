@@ -611,7 +611,7 @@ impl SharedCollection {
     where
         S: Into<String>,
     {
-        self.instance.get(id.into(), options).await.await
+        self.instance.get(id.into(), options).await
     }
 
     /// Fetches a document from the collection and write locks it.
@@ -657,7 +657,7 @@ impl SharedCollection {
     where
         S: Into<String>,
     {
-        self.instance.get_and_lock(id.into(), options).await.await
+        self.instance.get_and_lock(id.into(), options).await
     }
 
     /// Fetches a document from the collection and modifies its expiry.
@@ -703,7 +703,7 @@ impl SharedCollection {
     where
         S: Into<String>,
     {
-        self.instance.get_and_touch(id.into(), expiration, options).await.await
+        self.instance.get_and_touch(id.into(), expiration, options).await
     }
 
     /// Inserts or replaces a new document into the collection.
@@ -762,7 +762,7 @@ impl SharedCollection {
             Err(_e) => return Err(CouchbaseError::EncodingError),
         };
         let flags = JSON_COMMON_FLAG;
-        self.instance.upsert(id.into(), serialized, flags, options).await.await
+        self.instance.upsert(id.into(), serialized, flags, options).await
     }
 
     /// Inserts a document into the collection.
@@ -820,7 +820,7 @@ impl SharedCollection {
             Err(_e) => return Err(CouchbaseError::EncodingError),
         };
         let flags = JSON_COMMON_FLAG;
-        self.instance.insert(id.into(), serialized, flags, options).await.await
+        self.instance.insert(id.into(), serialized, flags, options).await
     }
 
     /// Replaces an existing document in the collection.
@@ -879,7 +879,7 @@ impl SharedCollection {
             Err(_e) => return Err(CouchbaseError::EncodingError),
         };
         let flags = JSON_COMMON_FLAG;
-        self.instance.replace(id.into(), serialized, flags, options).await.await
+        self.instance.replace(id.into(), serialized, flags, options).await
     }
 
     /// Removes a document from the collection.
@@ -912,7 +912,7 @@ impl SharedCollection {
     where
         S: Into<String>,
     {
-        self.instance.remove(id.into(), options).await.await
+        self.instance.remove(id.into(), options).await
     }
 
     /// Changes the expiration time on a document.
@@ -948,7 +948,7 @@ impl SharedCollection {
     where
         S: Into<String>,
     {
-        self.instance.touch(id.into(), expiration, options).await.await
+        self.instance.touch(id.into(), expiration, options).await
     }
 
     /// Unlocks a write-locked document.
@@ -984,7 +984,7 @@ impl SharedCollection {
     where
         S: Into<String>,
     {
-        self.instance.unlock(id.into(), cas, options).await.await
+        self.instance.unlock(id.into(), cas, options).await
     }
 
     /// Checks if a document exists and if so returns a cas value with it.
@@ -1017,7 +1017,7 @@ impl SharedCollection {
     where
         S: Into<String>,
     {
-        self.instance.exists(id.into(), options).await.await
+        self.instance.exists(id.into(), options).await
     }
 
     /// Extracts fragments of a document.
@@ -1055,7 +1055,7 @@ impl SharedCollection {
     where
         S: Into<String>,
     {
-        self.instance.lookup_in(id.into(), specs, options).await.await
+        self.instance.lookup_in(id.into(), specs, options).await
     }
 
     /// Changes fragments of a document.
@@ -1097,6 +1097,6 @@ impl SharedCollection {
     where
         S: Into<String>,
     {
-        self.instance.mutate_in(id.into(), specs, options).await.await
+        self.instance.mutate_in(id.into(), specs, options).await
     }
 }

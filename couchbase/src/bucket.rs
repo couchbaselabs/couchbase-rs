@@ -7,6 +7,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 /// Provides access to `Bucket` level operations and `Collections`.
+#[derive(Debug)]
 pub struct Bucket {
     instance: Rc<Instance>,
 }
@@ -64,6 +65,7 @@ impl Bucket {
 }
 
 /// Provides access to `SharedBucket` level operations and `SharedCollections`.
+#[derive(Debug)]
 pub struct SharedBucket {
     instance: Arc<SharedInstance>,
 }
@@ -97,7 +99,7 @@ impl SharedBucket {
     where
         S: Into<String>,
     {
-        self.instance.query(statement.into(), options).await.await
+        self.instance.query(statement.into(), options).await
     }
 
     /// Internal proxy method that gets called from the cluster so we can send it into the
@@ -110,7 +112,7 @@ impl SharedBucket {
     where
         S: Into<String>,
     {
-        self.instance.analytics_query(statement.into(), options).await.await
+        self.instance.analytics_query(statement.into(), options).await
     }
 
     /// Internal proxy method that gets called from the cluster so we can send it into the

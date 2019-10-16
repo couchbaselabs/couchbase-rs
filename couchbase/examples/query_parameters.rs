@@ -6,11 +6,10 @@ use serde_json::{json, Value};
 
 use std::collections::HashMap;
 
-fn main() {
+fn main() -> Result<(), CouchbaseError> {
     env_logger::init();
 
-    let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
-        .expect("Could not create cluster reference");
+    let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")?;
     let _ = cluster.bucket("travel-sample");
 
     let f = async {
@@ -21,13 +20,12 @@ fn main() {
                 "select name, type from `travel-sample` where name = ?",
                 Some(positional_options),
             )
-            .await
-            .expect("Could not perform query");
+            .await.expect("Had some data");
 
         println!(
             "Rows:\n{:?}",
             positional_result
-                .rows_as()
+                .rows_as().expect("rows consumed")
                 .collect::<Vec<Result<Value, CouchbaseError>>>().await
         );
 
@@ -45,11 +43,12 @@ fn main() {
         println!(
             "Rows:\n{:?}",
             named_result
-                .rows_as()
+                .rows_as().expect("Failed because rows were consumed")
                 .collect::<Vec<Result<Value, CouchbaseError>>>().await
         );
 
         cluster.disconnect().expect("Could not shutdown properly");
     };
     block_on(f);
+    Ok(())
 }
