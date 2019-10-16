@@ -5,10 +5,9 @@ use std::str;
 
 use crate::error::CouchbaseError;
 use futures::channel::{mpsc, oneshot};
-use futures::stream::{self, StreamExt};
+use futures::stream::StreamExt;
 use futures::Stream;
-use futures::TryFutureExt;
-use futures::{self, Future};
+use futures;
 use serde::de::DeserializeOwned;
 use serde_derive::Deserialize;
 use serde_json::{from_slice, Value};

@@ -563,7 +563,6 @@ impl QueryRequest {
         let uuid = format!("{}", Uuid::new_v4());
         let len = uuid.len();
         let client_context_id = CString::new(uuid).unwrap();
-        println!("writing internal ccid");
         lcb_cmdn1ql_client_context_id(command, client_context_id.as_ptr(), len);
     }
 }
@@ -609,7 +608,6 @@ impl InstanceRequest for QueryRequest {
                 }
 
                 if let Some(client_context_id) = options.client_context_id() {
-                    println!("Writing custom ccid");
                     lcb_cmdn1ql_client_context_id(
                         command,
                         client_context_id.0.as_ptr(),

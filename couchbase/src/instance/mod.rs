@@ -13,7 +13,6 @@ use crate::subdoc::*;
 use couchbase_sys::*;
 use futures::channel::oneshot;
 use futures::lock::Mutex;
-use futures::Future;
 use futures::FutureExt;
 use request::*;
 use std::cell::RefCell;
