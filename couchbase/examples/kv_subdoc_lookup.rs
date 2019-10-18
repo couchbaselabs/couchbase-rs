@@ -1,6 +1,6 @@
 use couchbase::subdoc::LookupInSpec;
 use couchbase::Cluster;
-use futures::Future;
+use futures::executor::block_on;
 
 fn main() {
     env_logger::init();
@@ -12,19 +12,22 @@ fn main() {
         .expect("Could not open bucket");
     let collection = bucket.default_collection();
 
-    // Fetch only a partial list of fields
-    let partial_result = collection
-        .lookup_in("airport_1285", vec![LookupInSpec::get("geo")], None)
-        .wait();
-    println!("Partial Result: {:?}", partial_result);
+    let f = async {
+        // Fetch only a partial list of fields
+        let partial_result = collection
+            .lookup_in("airport_1285", vec![LookupInSpec::get("geo")], None)
+            .await;
+        println!("Partial Result: {:?}", partial_result);
 
-    // Fetch the full document (might be needed in combination with xattrs or macros)
-    let full_result = collection
-        .lookup_in(
-            "airline_10123",
-            vec![LookupInSpec::get_full_document()],
-            None,
-        )
-        .wait();
-    println!("Full Result: {:?}", full_result);
+        // Fetch the full document (might be needed in combination with xattrs or macros)
+        let full_result = collection
+            .lookup_in(
+                "airline_10123",
+                vec![LookupInSpec::get_full_document()],
+                None,
+            )
+            .await;
+        println!("Full Result: {:?}", full_result);
+    };
+    block_on(f);
 }

@@ -1,7 +1,12 @@
 //! Error handling structures and functionality.
 
+use crate::instance;
+
 use couchbase_sys::*;
 use std::{convert, error, fmt, io};
+
+use futures;
+use serde_json;
 
 /// Defines all possible errors that can result as part of interacting with the SDK.
 ///
@@ -18,10 +23,12 @@ use std::{convert, error, fmt, io};
 pub enum CouchbaseError {
     /// Call succeded.
     Success,
+    IoError(std::io::Error),
     /// Raised when there has been a problem with dispatching the rust future.
-    FutureError,
+    FutureError(String),
     /// Decoding from json or another type failed.
-    DecodingError,
+    DecodingError(serde_json::Error),
+    InternalChannelSendError(String),
     /// Encoding into json failed.
     EncodingError,
     /// This error is received when connecting or reconnecting to the cluster.
@@ -332,16 +339,24 @@ pub enum CouchbaseError {
     DurabilitySyncWriteAmbiguous,
     /// If the rust binding doesn't know about an error its contained here.
     UnknownLibcouchbaseError(u32),
+    RowsConsumed,
+    MetaConsumed,
+    FutureCanceled(futures::channel::oneshot::Canceled),
 }
 
 impl CouchbaseError {
     fn as_str(&self) -> &'static str {
         match *self {
-            CouchbaseError::Success => { "Success" }
-            CouchbaseError::FutureError => {
+            CouchbaseError::RowsConsumed => { "Rows already consumed in result" },
+            CouchbaseError::MetaConsumed => { "Meta already consumed in result" },
+            CouchbaseError::FutureCanceled(_) => { "Future is canceled" },
+            CouchbaseError::IoError(_) => { "IO Error" },
+            CouchbaseError::Success => { "Success" },
+            CouchbaseError::InternalChannelSendError(_) => { "Error sending to internal instance channel" },
+            CouchbaseError::FutureError(_) => {
                 "Could not dispatch the rust future"
             },
-            CouchbaseError::DecodingError => "Decoding failed",
+            CouchbaseError::DecodingError(_) => "Decoding failed",
             CouchbaseError::EncodingError => "Encoding failed",
             CouchbaseError::AuthFailed => {
                 "Authentication failed. You may have provided an invalid username/password \
@@ -561,14 +576,50 @@ impl error::Error for CouchbaseError {
         self.as_str()
     }
 
-    fn cause(&self) -> Option<&error::Error> {
+    fn cause(&self) -> Option<&dyn error::Error> {
         None
     }
 }
 
 impl fmt::Display for CouchbaseError {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(fmt, "{}", self.as_str())
+        let msg = match &*self {
+            CouchbaseError::FutureError(e) => format!("Future Error: {}", e),
+            CouchbaseError::DecodingError(e) => format!("Decoding Error: {}", e),
+            CouchbaseError::FutureCanceled(e) => format!("Future Canceled Error: {}", e),
+            CouchbaseError::IoError(e) => format!("IO Error: {}", e),
+            CouchbaseError::InternalChannelSendError(e) => format!("Channel Send Error: {}", e),
+            err => format!("{}", err.as_str()),
+        };
+        write!(fmt, "{}", msg)
+    }
+}
+
+impl convert::From<std::sync::mpsc::SendError<Box<dyn instance::request::InstanceRequest>>>
+    for CouchbaseError
+{
+    fn from(
+        err: std::sync::mpsc::SendError<Box<dyn instance::request::InstanceRequest>>,
+    ) -> CouchbaseError {
+        CouchbaseError::InternalChannelSendError(format!("{}", err))
+    }
+}
+
+impl convert::From<std::io::Error> for CouchbaseError {
+    fn from(err: std::io::Error) -> CouchbaseError {
+        CouchbaseError::IoError(err)
+    }
+}
+
+impl convert::From<serde_json::Error> for CouchbaseError {
+    fn from(err: serde_json::Error) -> CouchbaseError {
+        CouchbaseError::DecodingError(err)
+    }
+}
+
+impl convert::From<futures::channel::oneshot::Canceled> for CouchbaseError {
+    fn from(err: futures::channel::oneshot::Canceled) -> CouchbaseError {
+        CouchbaseError::FutureCanceled(err)
     }
 }
 

@@ -1,5 +1,5 @@
 use couchbase::Cluster;
-use futures::Future;
+use futures::executor::block_on;
 use serde_derive::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -18,40 +18,42 @@ fn main() {
         .expect("Could not open bucket");
     let collection = bucket.default_collection();
 
-    let found_doc = collection
-        .get("airport_1297", None)
-        .wait()
-        .expect("Error while loading doc");
-    println!("Airline Document: {:?}", found_doc);
-    println!(
-        "Content Decoded {:?}",
-        found_doc.content_as::<Airport>()
-    );
+    let f = async {
+        let found_doc = collection
+            .get("airport_1297", None)
+            .await
+            .expect("Error while loading doc");
+        println!("Airline Document: {:?}", found_doc);
+        println!(
+            "Content Decoded {:?}",
+            found_doc.content_as::<Airport>()
+        );
 
-    println!(
-        "Document does exist?: {:?}",
-        collection.exists("airport_1297", None).wait()
-    );
+        println!(
+            "Document does exist?: {:?}",
+            collection.exists("airport_1297", None).await
+        );
 
-    println!(
-        "Airline Document: {:?}",
-        collection.get("enoent", None).wait()
-    );
+        println!(
+            "Airline Document: {:?}",
+            collection.get("enoent", None).await
+        );
 
-    println!("Upsert: {:?}", collection.upsert("foo", "bar", None).wait());
-    println!("Get: {:?}", collection.get("foo", None).wait());
+        println!("Upsert: {:?}", collection.upsert("foo", "bar", None).await);
+        println!("Get: {:?}", collection.get("foo", None).await);
 
-    println!("Remove: {:?}", collection.remove("foo", None).wait());
-    println!("Get: {:?}", collection.get("foo", None).wait());
+        println!("Remove: {:?}", collection.remove("foo", None).await);
+        println!("Get: {:?}", collection.get("foo", None).await);
 
-    println!(
-        "First Insert: {:?}",
-        collection.insert("bla", "bla", None).wait()
-    );
-    println!(
-        "Second Insert: {:?}",
-        collection.insert("bla", "bla", None).wait()
-    );
-
-    cluster.disconnect().expect("Could not shutdown properly");
+        println!(
+            "First Insert: {:?}",
+            collection.insert("bla", "bla", None).await
+        );
+        println!(
+            "Second Insert: {:?}",
+            collection.insert("bla", "bla", None).await
+        );
+        cluster.disconnect().expect("Could not shutdown properly");
+    };
+    block_on(f);
 }

@@ -1,5 +1,5 @@
 use couchbase::Cluster;
-use futures::Future;
+use futures::executor::block_on;
 use serde_derive::Serialize;
 use std::time::Duration;
 
@@ -25,15 +25,18 @@ fn main() {
         icao: "LOWW".into(),
         iata: "VIE".into(),
     };
-    collection
-        .upsert("airport_999", airport, None)
-        .wait()
-        .expect("could not upsert airport!");
+    let f = async {
+        collection
+            .upsert("airport_999", airport, None)
+            .await
+            .expect("could not upsert airport!");
 
-    collection
-        .touch("airport_999", Duration::from_secs(5), None)
-        .wait()
-        .expect("Can't touch this!");
+        collection
+            .touch("airport_999", Duration::from_secs(5), None)
+            .await
+            .expect("Can't touch this!");
 
-    cluster.disconnect().expect("Failure while disconnecting!");
+        cluster.disconnect().expect("Failure while disconnecting!");
+    };
+    block_on(f);
 }

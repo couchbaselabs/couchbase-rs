@@ -3,12 +3,12 @@ use crate::bucket::{Bucket, SharedBucket};
 use crate::error::CouchbaseError;
 use crate::options::{AnalyticsOptions, QueryOptions};
 use crate::result::{AnalyticsResult, QueryResult};
-use futures::Future;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
 
 /// The `Cluster` is the main entry point when working with the client.
+#[derive(Debug)]
 pub struct Cluster {
     connection_string: String,
     username: String,
@@ -111,25 +111,27 @@ impl Cluster {
     ///
     /// ```rust,no_run
     /// use couchbase::{CouchbaseError, Cluster};
-    /// use futures::{Stream, Future};
+    /// use futures::{Stream, StreamExt, Future};
     /// use serde_json::Value;
     /// # let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
     /// #    .expect("Could not create cluster reference");
     /// # let _ = cluster.bucket("travel-sample");
     /// #
+    /// # async {
     /// let mut result = cluster.query("select name, type from `travel-sample` limit 5", None)
-    ///     .wait()
+    ///     .await
     ///     .expect("Could not perform query");
     ///
-    /// println!("Rows:\n{:?}", result.rows_as().wait().collect::<Vec<Result<Value, CouchbaseError>>>());
-    /// println!("Meta:\n{:?}", result.meta().wait().expect("Could not get query meta"));
+    /// println!("Rows:\n{:?}", result.rows_as().expect("already consumed").collect::<Vec<Result<Value, CouchbaseError>>>().await);
+    /// println!("Meta:\n{:?}", result.meta().await.expect("Could not get query meta"));
+    /// # };
     /// ```
     ///
-    pub fn query<S>(
+    pub async fn query<S>(
         &self,
         statement: S,
         options: Option<QueryOptions>,
-    ) -> impl Future<Item = QueryResult, Error = CouchbaseError>
+    ) -> Result<QueryResult, CouchbaseError>
     where
         S: Into<String>,
     {
@@ -138,7 +140,7 @@ impl Cluster {
             None => panic!("At least one bucket needs to be open to perform a query for now!"),
         };
 
-        bucket.query(statement, options)
+        bucket.query(statement, options).await
     }
 
     /// Performs a query against the analytics service.
@@ -156,27 +158,29 @@ impl Cluster {
     ///
     /// ```rust,no_run
     /// use couchbase::{CouchbaseError, Cluster};
-    /// use futures::{Stream, Future};
+    /// use futures::{Stream, StreamExt, Future};
     /// use serde_json::Value;
     /// #
     /// # let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
     /// #     .expect("Could not create cluster reference!");
     /// # let _ = cluster.bucket("travel-sample");
     /// #
+    /// # async {
     /// let mut result = cluster
     ///     .analytics_query("SELECT DataverseName FROM Metadata.`Dataverse`", None)
-    ///     .wait()
+    ///     .await
     ///     .expect("Could not perform analytics query");
     ///
-    /// println!("---> rows {:?}", result.rows_as().wait().collect::<Vec<Result<Value, CouchbaseError>>>());
-    /// println!("---> meta {:?}", result.meta().wait().expect("Could not get analytics meta"));
+    /// println!("---> rows {:?}", result.rows_as().expect("Rows consumed").collect::<Vec<Result<Value, CouchbaseError>>>().await);
+    /// println!("---> meta {:?}", result.meta().await.expect("Could not get analytics meta"));
+    /// # };
     /// ```
     ///
-    pub fn analytics_query<S>(
+    pub async fn analytics_query<S>(
         &self,
         statement: S,
         options: Option<AnalyticsOptions>,
-    ) -> impl Future<Item = AnalyticsResult, Error = CouchbaseError>
+    ) -> Result<AnalyticsResult, CouchbaseError>
     where
         S: Into<String>,
     {
@@ -187,7 +191,7 @@ impl Cluster {
             ),
         };
 
-        bucket.analytics_query(statement, options)
+        bucket.analytics_query(statement, options).await
     }
 
     /// Disconnects this cluster and all associated open buckets.
@@ -213,6 +217,7 @@ impl Cluster {
 }
 
 /// The `Cluster` is the main entry point when working with the client.
+#[derive(Debug)]
 pub struct SharedCluster {
     connection_string: String,
     username: String,
@@ -315,25 +320,27 @@ impl SharedCluster {
     ///
     /// ```rust,no_run
     /// use couchbase::{CouchbaseError, SharedCluster};
-    /// use futures::{Stream, Future};
+    /// use futures::{Stream, StreamExt, Future};
     /// use serde_json::Value;
     /// # let mut cluster = SharedCluster::connect("couchbase://127.0.0.1", "Administrator", "password")
     /// #    .expect("Could not create cluster reference");
     /// # let _ = cluster.bucket("travel-sample");
     /// #
+    /// # async {
     /// let mut result = cluster.query("select name, type from `travel-sample` limit 5", None)
-    ///     .wait()
+    ///     .await
     ///     .expect("Could not perform query");
     ///
-    /// println!("Rows:\n{:?}", result.rows_as().wait().collect::<Vec<Result<Value, CouchbaseError>>>());
-    /// println!("Meta:\n{:?}", result.meta().wait().expect("Could not get query meta"));
+    /// println!("Rows:\n{:?}", result.rows_as().expect("Rows already consumed").collect::<Vec<Result<Value, CouchbaseError>>>().await);
+    /// println!("Meta:\n{:?}", result.meta().await.expect("Could not get query meta"));
+    /// # };
     /// ```
     ///
-    pub fn query<S>(
+    pub async fn query<S>(
         &self,
         statement: S,
         options: Option<QueryOptions>,
-    ) -> impl Future<Item = QueryResult, Error = CouchbaseError>
+    ) -> Result<QueryResult, CouchbaseError>
     where
         S: Into<String>,
     {
@@ -342,7 +349,7 @@ impl SharedCluster {
             None => panic!("At least one bucket needs to be open to perform a query for now!"),
         };
 
-        bucket.query(statement, options)
+        bucket.query(statement, options).await
     }
 
     /// Performs a query against the analytics service.
@@ -360,27 +367,29 @@ impl SharedCluster {
     ///
     /// ```rust,no_run
     /// use couchbase::{CouchbaseError, SharedCluster};
-    /// use futures::{Stream, Future};
+    /// use futures::{Stream, StreamExt, Future};
     /// use serde_json::Value;
     /// #
     /// # let mut cluster = SharedCluster::connect("couchbase://127.0.0.1", "Administrator", "password")
     /// #     .expect("Could not create cluster reference!");
     /// # let _ = cluster.bucket("travel-sample");
-    /// #
+    /// # 
+    /// # async {
     /// let mut result = cluster
     ///     .analytics_query("SELECT DataverseName FROM Metadata.`Dataverse`", None)
-    ///     .wait()
+    ///     .await
     ///     .expect("Could not perform analytics query");
     ///
-    /// println!("---> rows {:?}", result.rows_as().wait().collect::<Vec<Result<Value, CouchbaseError>>>());
-    /// println!("---> meta {:?}", result.meta().wait().expect("Could not get analytics meta"));
+    /// println!("---> rows {:?}", result.rows_as().expect("Rows consumed").collect::<Vec<Result<Value, CouchbaseError>>>().await);
+    /// println!("---> meta {:?}", result.meta().await.expect("Could not get analytics meta"));
+    /// # };
     /// ```
     ///
-    pub fn analytics_query<S>(
+    pub async fn analytics_query<S>(
         &self,
         statement: S,
         options: Option<AnalyticsOptions>,
-    ) -> impl Future<Item = AnalyticsResult, Error = CouchbaseError>
+    ) -> Result<AnalyticsResult, CouchbaseError>
     where
         S: Into<String>,
     {
@@ -391,7 +400,7 @@ impl SharedCluster {
             ),
         };
 
-        bucket.analytics_query(statement, options)
+        bucket.analytics_query(statement, options).await
     }
 
     /// Disconnects this cluster and all associated open buckets.
@@ -404,12 +413,14 @@ impl SharedCluster {
     /// # let mut cluster = SharedCluster::connect("couchbase://127.0.0.1", "Administrator", "password")
     /// #    .expect("Could not create cluster reference!");
     /// #
-    /// cluster.disconnect().expect("Could not shutdown properly");
+    /// # async {
+    /// cluster.disconnect().await.expect("Could not shutdown properly");
+    /// # };
     /// ```
     ///
-    pub fn disconnect(&mut self) -> Result<(), CouchbaseError> {
+    pub async fn disconnect(&mut self) -> Result<(), CouchbaseError> {
         for bucket in self.buckets.values() {
-            bucket.close()?;
+            bucket.close().await?;
         }
         self.buckets.clear();
         Ok(())

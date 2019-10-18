@@ -1,5 +1,6 @@
 use couchbase::{Cluster, CouchbaseError};
-use futures::{Future, Stream};
+use futures::stream::StreamExt;
+use futures::executor::block_on;
 use serde_json::Value;
 
 fn main() {
@@ -9,22 +10,24 @@ fn main() {
         .expect("Could not create cluster reference!");
     let _ = cluster.bucket("travel-sample");
 
-    let mut result = cluster
-        .analytics_query("SELECT DataverseName FROM Metadata.`Dataverse`", None)
-        .wait()
-        .expect("Could not perform analytics query");
+    let f = async {
+        let mut result = cluster
+            .analytics_query("SELECT DataverseName FROM Metadata.`Dataverse`", None)
+            .await
+            .expect("Could not perform analytics query");
 
-    println!(
-        "---> rows {:?}",
-        result
-            .rows_as()
-            .wait()
-            .collect::<Vec<Result<Value, CouchbaseError>>>()
-    );
-    println!(
-        "---> meta {:?}",
-        result.meta().wait().expect("Could not get analytics meta")
-    );
+        println!(
+            "---> rows {:?}",
+            result
+                .rows_as().expect("Rows already consumed")
+                .collect::<Vec<Result<Value, CouchbaseError>>>().await
+        );
+        println!(
+            "---> meta {:?}",
+            result.meta().await.expect("Could not get analytics meta")
+        );
 
-    cluster.disconnect().expect("Could not shutdown properly");
+        cluster.disconnect().expect("Could not shutdown properly");
+    };
+    block_on(f);
 }

@@ -5,7 +5,7 @@ use crate::options::*;
 use crate::result::*;
 use crate::subdoc::*;
 use couchbase_sys::*;
-use futures::sync::{mpsc, oneshot};
+use futures::channel::{mpsc, oneshot};
 use std::ffi::{c_void, CString};
 use std::os::raw::c_char;
 use std::ptr;
@@ -563,8 +563,7 @@ impl QueryRequest {
         let uuid = format!("{}", Uuid::new_v4());
         let len = uuid.len();
         let client_context_id = CString::new(uuid).unwrap();
-        println!("writing internal ccid");
-        lcb_cmdn1ql_client_context_id(command, client_context_id.as_ptr(), len);   
+        lcb_cmdn1ql_client_context_id(command, client_context_id.as_ptr(), len);
     }
 }
 
@@ -609,8 +608,11 @@ impl InstanceRequest for QueryRequest {
                 }
 
                 if let Some(client_context_id) = options.client_context_id() {
-                    println!("Writing custom ccid");
-                    lcb_cmdn1ql_client_context_id(command, client_context_id.0.as_ptr(), client_context_id.1);
+                    lcb_cmdn1ql_client_context_id(
+                        command,
+                        client_context_id.0.as_ptr(),
+                        client_context_id.1,
+                    );
                 } else {
                     QueryRequest::add_default_client_context_id(command);
                 }

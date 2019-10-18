@@ -4,9 +4,10 @@ use std::fmt;
 use std::str;
 
 use crate::error::CouchbaseError;
-use futures::sync::{mpsc, oneshot};
-use futures::Future;
+use futures::channel::{mpsc, oneshot};
+use futures::stream::StreamExt;
 use futures::Stream;
+use futures;
 use serde::de::DeserializeOwned;
 use serde_derive::Deserialize;
 use serde_json::{from_slice, Value};
@@ -36,7 +37,7 @@ impl GetResult {
     {
         match from_slice(&self.encoded.as_slice()) {
             Ok(v) => Ok(v),
-            Err(_e) => Err(CouchbaseError::DecodingError),
+            Err(e) => Err(CouchbaseError::DecodingError(e)),
         }
     }
 }
@@ -130,23 +131,33 @@ impl QueryResult {
         }
     }
 
-    pub fn rows_as<T>(&mut self) -> impl Stream<Item = T, Error = CouchbaseError>
+    pub fn rows_as<T>(
+        &mut self,
+    ) -> Result<impl Stream<Item = Result<T, CouchbaseError>>, CouchbaseError>
     where
         T: DeserializeOwned,
     {
-        self.rows
-            .take()
-            .expect("Rows already consumed!")
-            .map(|v| from_slice::<T>(v.as_slice()).expect("Could not convert type"))
-            .map_err(|_| CouchbaseError::FutureError) // todo: something is wrong here, wants () ?
+        if let Some(stream) = self.rows.take() {
+            return Ok(stream.map(|v| {
+                let f = from_slice::<T>(v.as_slice());
+                match f {
+                    Ok(r) => Ok(r),
+                    Err(e) => Err(CouchbaseError::DecodingError(e)),
+                }
+            }));
+        } else {
+            return Err(CouchbaseError::RowsConsumed);
+        }
     }
 
-    pub fn meta(&mut self) -> impl Future<Item = QueryMeta, Error = CouchbaseError> {
-        self.meta
-            .take()
-            .expect("Meta already consumed!")
-            .map(|v| from_slice::<QueryMeta>(v.as_slice()).expect("Could not convert type"))
-            .map_err(|_| CouchbaseError::FutureError) // cancelled
+    pub async fn meta(&mut self) -> Result<QueryMeta, CouchbaseError> {
+        match self.meta.take() {
+            Some(mv) => {
+                let rmv = mv.await?;
+                from_slice::<QueryMeta>(rmv.as_slice()).map_err(CouchbaseError::DecodingError)
+            },
+            None => Err(CouchbaseError::MetaConsumed)
+        }
     }
 }
 
@@ -185,23 +196,34 @@ impl AnalyticsResult {
         }
     }
 
-    pub fn rows_as<T>(&mut self) -> impl Stream<Item = T, Error = CouchbaseError>
+    pub fn rows_as<T>(
+        &mut self,
+    ) -> Result<impl Stream<Item = Result<T, CouchbaseError>>, CouchbaseError>
     where
         T: DeserializeOwned,
     {
-        self.rows
-            .take()
-            .expect("Rows already consumed!")
-            .map(|v| from_slice::<T>(v.as_slice()).expect("Could not convert type"))
-            .map_err(|_| CouchbaseError::FutureError) // todo: something is wrong here, wants () ?
+        if let Some(stream) = self.rows.take() {
+            return Ok(stream.map(|v| {
+                let f = from_slice::<T>(v.as_slice());
+                match f {
+                    Ok(r) => Ok(r),
+                    Err(e) => Err(CouchbaseError::DecodingError(e)),
+                }
+            }));
+        } else {
+            return Err(CouchbaseError::RowsConsumed);
+        }
     }
 
-    pub fn meta(&mut self) -> impl Future<Item = AnalyticsMeta, Error = CouchbaseError> {
-        self.meta
-            .take()
-            .expect("Meta already consumed!")
-            .map(|v| from_slice::<AnalyticsMeta>(v.as_slice()).expect("Could not convert type"))
-            .map_err(|_| CouchbaseError::FutureError) // cancelled
+    pub async fn meta(&mut self) -> Result<AnalyticsMeta, CouchbaseError> {
+        match self.meta.take() {
+            Some(mv) => {
+                let rmv = mv.await?;
+                from_slice::<AnalyticsMeta>(rmv.as_slice()).map_err(CouchbaseError::DecodingError)
+
+            },
+            None => Err(CouchbaseError::MetaConsumed)
+        }
     }
 }
 

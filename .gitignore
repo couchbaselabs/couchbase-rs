@@ -4,3 +4,4 @@ Cargo.lock
 *.iml
 .vscode/
 CouchbaseMock.jar
+tags
