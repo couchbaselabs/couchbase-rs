@@ -18,7 +18,7 @@ use request::*;
 use std::cell::RefCell;
 use std::ffi::c_void;
 use std::ffi::{CStr, CString};
-use std::os::raw::{c_char, c_int, c_uint};
+use std::os::raw::{c_char, c_int, c_uint, c_ulong};
 use std::ptr;
 use std::slice::from_raw_parts;
 use std::sync::mpsc::{channel, Sender};
@@ -80,14 +80,17 @@ pub struct Instance {
 impl Instance {
     /// Creates a new `Instance` and runs it.
     pub fn new(connstr: &str, username: &str, password: &str) -> Result<Self, CouchbaseError> {
+        let connstr_len = connstr.len();
         let connstr = match CString::new(connstr) {
             Ok(c) => c,
             Err(_) => return Err(CouchbaseError::InvalidValue),
         };
+        let username_len = username.len();
         let username = match CString::new(username) {
             Ok(c) => c,
             Err(_) => return Err(CouchbaseError::InvalidValue),
         };
+        let password_len = password.len();
         let password = match CString::new(password) {
             Ok(c) => c,
             Err(_) => return Err(CouchbaseError::InvalidValue),
@@ -97,30 +100,23 @@ impl Instance {
 
         let handle = thread::Builder::new()
             .spawn(move || {
-                let mut cropts = lcb_create_st {
-                    version: 4,
-                    v: unsafe { ::std::mem::zeroed() },
-                };
-
+                let mut logger: *mut lcb_LOGGER = ptr::null_mut();
                 let mut instance: *mut lcb_INSTANCE = ptr::null_mut();
-
-                let mut logger = lcb_logprocs_st {
-                    version: 0,
-                    v: unsafe { ::std::mem::zeroed() },
-                };
-
                 unsafe {
-                    logger.v.v0.callback = Some(logging_callback);
+                    let mut create_options: *mut lcb_CREATEOPTS = ptr::null_mut();
+                    lcb_createopts_create(&mut create_options, lcb_INSTANCE_TYPE_LCB_TYPE_BUCKET);
+                    lcb_createopts_connstr(create_options, connstr.as_ptr(), connstr_len);
+                    lcb_createopts_credentials(create_options, username.as_ptr(), username_len, password.as_ptr(), password_len);
 
-                    cropts.v.v4.connstr = connstr.as_ptr();
-                    cropts.v.v4.username = username.as_ptr();
-                    cropts.v.v4.passwd = password.as_ptr();
-                    cropts.v.v4.logger = &mut logger;
+                    lcb_logger_create(&mut logger, ptr::null_mut());
+                    lcb_logger_callback(logger, Some(logging_callback));
+                    lcb_createopts_logger(create_options, logger);
 
-                    if lcb_create(&mut instance, &cropts) != lcb_STATUS_LCB_SUCCESS {
+                    if lcb_create(&mut instance, create_options) != lcb_STATUS_LCB_SUCCESS {
                         // TODO: Log Err(InstanceError::CreateFailed);
                         return;
                     }
+                    lcb_createopts_destroy(create_options);
 
                     install_instance_callbacks(instance);
 
@@ -160,6 +156,7 @@ impl Instance {
 
                     // instance cookie is in scope and will be dropped automatically
                     lcb_destroy(instance);
+                    lcb_logger_destroy(logger);
                 }
             })?;
 
@@ -383,14 +380,17 @@ pub struct SharedInstance {
 impl SharedInstance {
     /// Creates a new `Instance` and runs it.
     pub fn new(connstr: &str, username: &str, password: &str) -> Result<Self, CouchbaseError> {
+        let connstr_len = connstr.len();
         let connstr = match CString::new(connstr) {
             Ok(c) => c,
             Err(_) => return Err(CouchbaseError::InvalidValue),
         };
+        let username_len = username.len();
         let username = match CString::new(username) {
             Ok(c) => c,
             Err(_) => return Err(CouchbaseError::InvalidValue),
         };
+        let password_len = password.len();
         let password = match CString::new(password) {
             Ok(c) => c,
             Err(_) => return Err(CouchbaseError::InvalidValue),
@@ -400,30 +400,24 @@ impl SharedInstance {
 
         let handle = thread::Builder::new()
             .spawn(move || {
-                let mut cropts = lcb_create_st {
-                    version: 4,
-                    v: unsafe { ::std::mem::zeroed() },
-                };
-
+                let mut logger: *mut lcb_LOGGER = ptr::null_mut();
                 let mut instance: *mut lcb_INSTANCE = ptr::null_mut();
 
-                let mut logger = lcb_logprocs_st {
-                    version: 0,
-                    v: unsafe { ::std::mem::zeroed() },
-                };
-
                 unsafe {
-                    logger.v.v0.callback = Some(logging_callback);
+                    let mut create_options: *mut lcb_CREATEOPTS = ptr::null_mut();
+                    lcb_createopts_create(&mut create_options, lcb_INSTANCE_TYPE_LCB_TYPE_BUCKET);
+                    lcb_createopts_connstr(create_options, connstr.as_ptr(), connstr_len);
+                    lcb_createopts_credentials(create_options, username.as_ptr(), username_len, password.as_ptr(), password_len);
 
-                    cropts.v.v4.connstr = connstr.as_ptr();
-                    cropts.v.v4.username = username.as_ptr();
-                    cropts.v.v4.passwd = password.as_ptr();
-                    cropts.v.v4.logger = &mut logger;
+                    lcb_logger_create(&mut logger, ptr::null_mut());
+                    lcb_logger_callback(logger, Some(logging_callback));
+                    lcb_createopts_logger(create_options, logger);
 
-                    if lcb_create(&mut instance, &cropts) != lcb_STATUS_LCB_SUCCESS {
+                    if lcb_create(&mut instance, create_options) != lcb_STATUS_LCB_SUCCESS {
                         // TODO: Log Err(InstanceError::CreateFailed);
                         return;
                     }
+                    lcb_createopts_destroy(create_options);
 
                     install_instance_callbacks(instance);
 
@@ -463,6 +457,7 @@ impl SharedInstance {
 
                     // instance cookie is in scope and will be dropped automatically
                     lcb_destroy(instance);
+                    lcb_logger_destroy(logger);
                 }
             })
             .expect("Could not create IO thread");
@@ -696,42 +691,42 @@ impl SharedInstance {
 /// Since these callbacks go into the FFI layer they are by definition unsafe and
 /// as a result put into their own method for easier auditing.
 unsafe fn install_instance_callbacks(instance: *mut lcb_INSTANCE) {
-    lcb_install_callback3(
+    lcb_install_callback(
         instance,
         lcb_CALLBACK_TYPE_LCB_CALLBACK_GET as i32,
         Some(get_callback),
     );
-    lcb_install_callback3(
+    lcb_install_callback(
         instance,
         lcb_CALLBACK_TYPE_LCB_CALLBACK_STORE as i32,
         Some(store_callback),
     );
-    lcb_install_callback3(
+    lcb_install_callback(
         instance,
         lcb_CALLBACK_TYPE_LCB_CALLBACK_REMOVE as i32,
         Some(remove_callback),
     );
-    lcb_install_callback3(
+    lcb_install_callback(
         instance,
         lcb_CALLBACK_TYPE_LCB_CALLBACK_TOUCH as i32,
         Some(touch_callback),
     );
-    lcb_install_callback3(
+    lcb_install_callback(
         instance,
         lcb_CALLBACK_TYPE_LCB_CALLBACK_UNLOCK as i32,
         Some(unlock_callback),
     );
-    lcb_install_callback3(
+    lcb_install_callback(
         instance,
         lcb_CALLBACK_TYPE_LCB_CALLBACK_EXISTS as i32,
         Some(exists_callback),
     );
-    lcb_install_callback3(
+    lcb_install_callback(
         instance,
         lcb_CALLBACK_TYPE_LCB_CALLBACK_SDLOOKUP as i32,
         Some(lookup_in_callback),
     );
-    lcb_install_callback3(
+    lcb_install_callback(
         instance,
         lcb_CALLBACK_TYPE_LCB_CALLBACK_SDMUTATE as i32,
         Some(mutate_in_callback),
@@ -981,10 +976,10 @@ unsafe extern "C" fn mutate_in_callback(
 }
 
 unsafe extern "C" fn logging_callback(
-    _procs: *mut lcb_logprocs_st,
-    _iid: c_uint,
+    _logger: *mut lcb_LOGGER,
+    _iid: c_ulong,
     _subsys: *const c_char,
-    severity: c_int,
+    severity: c_uint,
     _srcfile: *const c_char,
     _srcline: c_int,
     fmt: *const c_char,

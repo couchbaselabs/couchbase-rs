@@ -124,7 +124,7 @@ impl InstanceRequest for GetAndLockRequest {
                     locktime = lt.as_secs() as u32;
                 }
             }
-            lcb_cmdget_expiration(command, locktime);
+            lcb_cmdget_expiry(command, locktime);
             lcb_get(instance, cookie, command);
             lcb_cmdget_destroy(command);
         }
@@ -166,7 +166,7 @@ impl InstanceRequest for GetAndTouchRequest {
         unsafe {
             lcb_cmdget_create(&mut command);
             lcb_cmdget_key(command, id_encoded.as_ptr(), id_len);
-            lcb_cmdget_expiration(command, self.expiration.as_secs() as u32);
+            lcb_cmdget_expiry(command, self.expiration.as_secs() as u32);
             if let Some(options) = self.options {
                 if let Some(timeout) = options.timeout() {
                     lcb_cmdget_timeout(command, timeout.as_millis() as u32);
@@ -275,7 +275,7 @@ impl InstanceRequest for InsertRequest {
         let value = CString::new(self.content).expect("Could not turn value into lcb format");
 
         unsafe {
-            lcb_cmdstore_create(&mut command, lcb_STORE_OPERATION_LCB_STORE_ADD);
+            lcb_cmdstore_create(&mut command, lcb_STORE_OPERATION_LCB_STORE_INSERT);
             lcb_cmdstore_key(command, id_encoded.as_ptr(), id_len);
             lcb_cmdstore_flags(command, self.flags);
             lcb_cmdstore_value(command, value.into_raw() as *const c_char, value_len);
@@ -427,7 +427,7 @@ impl InstanceRequest for TouchRequest {
         unsafe {
             lcb_cmdtouch_create(&mut command);
             lcb_cmdtouch_key(command, id_encoded.as_ptr(), id_len);
-            lcb_cmdtouch_expiration(command, self.expiration.as_secs() as u32);
+            lcb_cmdtouch_expiry(command, self.expiration.as_secs() as u32);
             if let Some(options) = self.options {
                 if let Some(timeout) = options.timeout() {
                     lcb_cmdtouch_timeout(command, timeout.as_millis() as u32);
@@ -832,7 +832,7 @@ impl InstanceRequest for LookupInRequest {
         let id_len = self.id.len();
         let id_encoded = CString::new(self.id).expect("Could not encode ID");
         let mut command: *mut lcb_CMDSUBDOC = ptr::null_mut();
-        let mut ops: *mut lcb_SUBDOCOPS = ptr::null_mut();
+        let mut ops: *mut lcb_SUBDOCSPECS = ptr::null_mut();
 
         let sender_boxed = Box::new(self.sender);
         let cookie = Box::into_raw(sender_boxed) as *mut c_void;
@@ -845,16 +845,17 @@ impl InstanceRequest for LookupInRequest {
                 }
             }
 
-            lcb_subdocops_create(&mut ops, self.specs.len());
+            let empty_path = CString::new("").unwrap();
+            lcb_subdocspecs_create(&mut ops, self.specs.len());
             let mut idx = 0;
             for spec in &self.specs {
                 let flags = 0;
                 match spec.command_type() {
                     SubdocLookupCommandType::Get => {
-                        lcb_subdocops_get(ops, idx, flags, spec.path().as_ptr(), spec.path_len());
+                        lcb_subdocspecs_get(ops, idx, flags, spec.path().as_ptr(), spec.path_len());
                     }
                     SubdocLookupCommandType::Count => {
-                        lcb_subdocops_get_count(
+                        lcb_subdocspecs_get_count(
                             ops,
                             idx,
                             flags,
@@ -863,7 +864,7 @@ impl InstanceRequest for LookupInRequest {
                         );
                     }
                     SubdocLookupCommandType::Exists => {
-                        lcb_subdocops_exists(
+                        lcb_subdocspecs_exists(
                             ops,
                             idx,
                             flags,
@@ -872,14 +873,14 @@ impl InstanceRequest for LookupInRequest {
                         );
                     }
                     SubdocLookupCommandType::GetDoc => {
-                        lcb_subdocops_fulldoc_get(ops, idx, flags);
+                        lcb_subdocspecs_get(ops, idx, flags, empty_path.as_ptr(), 0);
                     }
                 }
                 idx += 1;
             }
-            lcb_cmdsubdoc_operations(command, ops);
+            lcb_cmdsubdoc_specs(command, ops);
             lcb_subdoc(instance, cookie, command);
-            lcb_subdocops_destroy(ops);
+            lcb_subdocspecs_destroy(ops);
             lcb_cmdsubdoc_destroy(command);
         }
     }
@@ -914,7 +915,7 @@ impl InstanceRequest for MutateInRequest {
         let id_len = self.id.len();
         let id_encoded = CString::new(self.id).expect("Could not encode ID");
         let mut command: *mut lcb_CMDSUBDOC = ptr::null_mut();
-        let mut ops: *mut lcb_SUBDOCOPS = ptr::null_mut();
+        let mut ops: *mut lcb_SUBDOCSPECS = ptr::null_mut();
 
         let sender_boxed = Box::new(self.sender);
         let cookie = Box::into_raw(sender_boxed) as *mut c_void;
@@ -930,14 +931,14 @@ impl InstanceRequest for MutateInRequest {
                 }
             }
 
-            lcb_subdocops_create(&mut ops, self.specs.len());
+            lcb_subdocspecs_create(&mut ops, self.specs.len());
 
             let mut idx = 0;
             for spec in &self.specs {
                 let flags = 0;
                 match spec.command_type() {
                     SubdocMutationCommandType::Insert => {
-                        lcb_subdocops_dict_add(
+                        lcb_subdocspecs_dict_add(
                             ops,
                             idx,
                             flags,
@@ -948,7 +949,7 @@ impl InstanceRequest for MutateInRequest {
                         );
                     }
                     SubdocMutationCommandType::Upsert => {
-                        lcb_subdocops_dict_upsert(
+                        lcb_subdocspecs_dict_upsert(
                             ops,
                             idx,
                             flags,
@@ -959,7 +960,7 @@ impl InstanceRequest for MutateInRequest {
                         );
                     }
                     SubdocMutationCommandType::Replace => {
-                        lcb_subdocops_replace(
+                        lcb_subdocspecs_replace(
                             ops,
                             idx,
                             flags,
@@ -970,7 +971,7 @@ impl InstanceRequest for MutateInRequest {
                         );
                     }
                     SubdocMutationCommandType::Remove => {
-                        lcb_subdocops_remove(
+                        lcb_subdocspecs_remove(
                             ops,
                             idx,
                             flags,
@@ -982,9 +983,9 @@ impl InstanceRequest for MutateInRequest {
                 idx += 1;
             }
 
-            lcb_cmdsubdoc_operations(command, ops);
+            lcb_cmdsubdoc_specs(command, ops);
             lcb_subdoc(instance, cookie, command);
-            lcb_subdocops_destroy(ops);
+            lcb_subdocspecs_destroy(ops);
             lcb_cmdsubdoc_destroy(command);
         }
     }

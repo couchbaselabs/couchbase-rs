@@ -16,6 +16,7 @@
  */
 #include "config.h"
 #include <libcouchbase/couchbase.h>
+#include <libcouchbase/utils.h>
 #include <map>
 #include "iotests.h"
 
@@ -58,7 +59,7 @@ TEST_F(GetUnitTest, testGetMiss)
     lcb_INSTANCE *instance;
     createConnection(hw, &instance);
 
-    (void)lcb_install_callback3(instance, LCB_CALLBACK_GET, (lcb_RESPCALLBACK)testGetMissGetCallback);
+    (void)lcb_install_callback(instance, LCB_CALLBACK_GET, (lcb_RESPCALLBACK)testGetMissGetCallback);
     int numcallbacks = 0;
     std::string key1("testGetMiss1"), key2("testGetMiss2");
 
@@ -105,7 +106,7 @@ TEST_F(GetUnitTest, testGetHit)
     lcb_INSTANCE *instance;
     createConnection(hw, &instance);
 
-    (void)lcb_install_callback3(instance, LCB_CALLBACK_GET, (lcb_RESPCALLBACK)testGetHitGetCallback);
+    (void)lcb_install_callback(instance, LCB_CALLBACK_GET, (lcb_RESPCALLBACK)testGetHitGetCallback);
     int numcallbacks = 0;
     std::string key1("testGetKey1"), key2("testGetKey2");
 
@@ -148,7 +149,7 @@ TEST_F(GetUnitTest, testTouchMiss)
     lcb_INSTANCE *instance;
     createConnection(hw, &instance);
 
-    (void)lcb_install_callback3(instance, LCB_CALLBACK_TOUCH, (lcb_RESPCALLBACK)testTouchMissCallback);
+    (void)lcb_install_callback(instance, LCB_CALLBACK_TOUCH, (lcb_RESPCALLBACK)testTouchMissCallback);
     removeKey(instance, key);
 
     int numcallbacks = 0;
@@ -156,7 +157,7 @@ TEST_F(GetUnitTest, testTouchMiss)
     lcb_CMDTOUCH *cmd;
     lcb_cmdtouch_create(&cmd);
     lcb_cmdtouch_key(cmd, key.c_str(), key.size());
-    lcb_cmdtouch_expiration(cmd, 666);
+    lcb_cmdtouch_expiry(cmd, 666);
     lcb_touch(instance, &numcallbacks, cmd);
     lcb_cmdtouch_destroy(cmd);
     lcb_wait(instance);
@@ -185,14 +186,14 @@ TEST_F(GetUnitTest, testTouchHit)
     lcb_INSTANCE *instance;
     createConnection(hw, &instance);
 
-    (void)lcb_install_callback3(instance, LCB_CALLBACK_TOUCH, (lcb_RESPCALLBACK)testTouchHitCallback);
+    (void)lcb_install_callback(instance, LCB_CALLBACK_TOUCH, (lcb_RESPCALLBACK)testTouchHitCallback);
     storeKey(instance, key, "foo");
 
     int numcallbacks = 0;
     lcb_CMDTOUCH *cmd;
     lcb_cmdtouch_create(&cmd);
     lcb_cmdtouch_key(cmd, key.c_str(), key.size());
-    lcb_cmdtouch_expiration(cmd, 666);
+    lcb_cmdtouch_expiry(cmd, 666);
     lcb_touch(instance, &numcallbacks, cmd);
     lcb_cmdtouch_destroy(cmd);
 
@@ -215,7 +216,7 @@ static void flags_store_callback(lcb_INSTANCE *, lcb_CALLBACK_TYPE, const lcb_RE
 
     lcb_STORE_OPERATION op;
     lcb_respstore_operation(resp, &op);
-    ASSERT_EQ(LCB_STORE_SET, op);
+    ASSERT_EQ(LCB_STORE_UPSERT, op);
     ++(*counter);
 }
 
@@ -251,13 +252,13 @@ TEST_F(GetUnitTest, testFlags)
 
     createConnection(hw, &instance);
 
-    (void)lcb_install_callback3(instance, LCB_CALLBACK_GET, (lcb_RESPCALLBACK)flags_get_callback);
-    (void)lcb_install_callback3(instance, LCB_CALLBACK_STORE, (lcb_RESPCALLBACK)flags_store_callback);
+    (void)lcb_install_callback(instance, LCB_CALLBACK_GET, (lcb_RESPCALLBACK)flags_get_callback);
+    (void)lcb_install_callback(instance, LCB_CALLBACK_STORE, (lcb_RESPCALLBACK)flags_store_callback);
 
     int numcallbacks = 0;
 
     lcb_CMDSTORE *scmd;
-    lcb_cmdstore_create(&scmd, LCB_STORE_SET);
+    lcb_cmdstore_create(&scmd, LCB_STORE_UPSERT);
     lcb_cmdstore_key(scmd, "flags", 5);
     lcb_cmdstore_value(scmd, "x", 1);
     lcb_cmdstore_flags(scmd, 0xdeadbeef);
@@ -324,7 +325,7 @@ TEST_F(GetUnitTest, testGetReplica)
 
     lcb_CMDGETREPLICA *rcmd;
 
-    lcb_install_callback3(instance, LCB_CALLBACK_GETREPLICA, (lcb_RESPCALLBACK)rget_callback);
+    lcb_install_callback(instance, LCB_CALLBACK_GETREPLICA, (lcb_RESPCALLBACK)rget_callback);
     RGetCookie rck;
     rck.remaining = 1;
     rck.expectrc = LCB_SUCCESS;
@@ -473,7 +474,7 @@ TEST_F(GetUnitTest, testGetReplica)
     }
 
     // Test rget with a missing key. Fixes a potential bug
-    lcb_install_callback3(instance, LCB_CALLBACK_GETREPLICA, (lcb_RESPCALLBACK)rget_noop_callback);
+    lcb_install_callback(instance, LCB_CALLBACK_GETREPLICA, (lcb_RESPCALLBACK)rget_noop_callback);
     removeKey(instance, key);
     lcb_cmdgetreplica_create(&rcmd, LCB_REPLICA_MODE_ANY);
     lcb_cmdgetreplica_key(rcmd, key.c_str(), key.size());
