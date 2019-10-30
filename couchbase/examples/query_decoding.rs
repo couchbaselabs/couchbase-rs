@@ -17,7 +17,6 @@ fn main() {
     let _ = cluster.bucket("travel-sample");
 
     let f = async {
-
         let mut result = cluster
             .query(
                 "select airportname, icao from `travel-sample` where type = \"airport\" limit 2",
@@ -29,8 +28,10 @@ fn main() {
         println!(
             "---> rows {:?}",
             result
-                .rows_as().expect("Rows already consumed")
-                .collect::<Vec<Result<Airport, CouchbaseError>>>().await
+                .rows_as()
+                .expect("Rows already consumed")
+                .collect::<Vec<Result<Airport, CouchbaseError>>>()
+                .await
         );
         println!(
             "---> meta {:?}",

@@ -157,7 +157,9 @@ impl Collection {
     where
         S: Into<String>,
     {
-        self.instance.get_and_touch(id.into(), expiration, options).await
+        self.instance
+            .get_and_touch(id.into(), expiration, options)
+            .await
     }
 
     /// Inserts or replaces a new document into the collection.
@@ -216,7 +218,9 @@ impl Collection {
             Err(_e) => return Err(CouchbaseError::EncodingError),
         };
         let flags = JSON_COMMON_FLAG;
-        self.instance.upsert(id.into(), serialized, flags, options).await
+        self.instance
+            .upsert(id.into(), serialized, flags, options)
+            .await
     }
 
     /// Inserts a document into the collection.
@@ -275,7 +279,9 @@ impl Collection {
             Err(_e) => return Err(CouchbaseError::EncodingError),
         };
         let flags = JSON_COMMON_FLAG;
-        self.instance.insert(id.into(), serialized, flags, options).await
+        self.instance
+            .insert(id.into(), serialized, flags, options)
+            .await
     }
 
     /// Replaces an existing document in the collection.
@@ -334,7 +340,9 @@ impl Collection {
             Err(_e) => return Err(CouchbaseError::EncodingError),
         };
         let flags = JSON_COMMON_FLAG;
-        self.instance.replace(id.into(), serialized, flags, options).await
+        self.instance
+            .replace(id.into(), serialized, flags, options)
+            .await
     }
 
     /// Removes a document from the collection.
@@ -703,7 +711,9 @@ impl SharedCollection {
     where
         S: Into<String>,
     {
-        self.instance.get_and_touch(id.into(), expiration, options).await
+        self.instance
+            .get_and_touch(id.into(), expiration, options)
+            .await
     }
 
     /// Inserts or replaces a new document into the collection.
@@ -762,7 +772,9 @@ impl SharedCollection {
             Err(_e) => return Err(CouchbaseError::EncodingError),
         };
         let flags = JSON_COMMON_FLAG;
-        self.instance.upsert(id.into(), serialized, flags, options).await
+        self.instance
+            .upsert(id.into(), serialized, flags, options)
+            .await
     }
 
     /// Inserts a document into the collection.
@@ -820,7 +832,9 @@ impl SharedCollection {
             Err(_e) => return Err(CouchbaseError::EncodingError),
         };
         let flags = JSON_COMMON_FLAG;
-        self.instance.insert(id.into(), serialized, flags, options).await
+        self.instance
+            .insert(id.into(), serialized, flags, options)
+            .await
     }
 
     /// Replaces an existing document in the collection.
@@ -879,7 +893,9 @@ impl SharedCollection {
             Err(_e) => return Err(CouchbaseError::EncodingError),
         };
         let flags = JSON_COMMON_FLAG;
-        self.instance.replace(id.into(), serialized, flags, options).await
+        self.instance
+            .replace(id.into(), serialized, flags, options)
+            .await
     }
 
     /// Removes a document from the collection.
@@ -935,7 +951,7 @@ impl SharedCollection {
     /// #   .bucket("travel-sample")
     /// #   .expect("Could not open bucket");
     /// # let collection = bucket.default_collection();
-    /// # async { 
+    /// # async {
     /// let result = collection.touch("document_id", Duration::from_secs(5), None).await;
     /// # };
     /// ```

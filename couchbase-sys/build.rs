@@ -36,7 +36,7 @@ fn main() {
         "LCB_NO_SSL",
         "LCB_BUILD_LIBEVENT",
         "LCB_BUILD_LIBEV",
-        "LCB_BUILD_LIBUV"
+        "LCB_BUILD_LIBUV",
     ];
 
     for flag in env_flags.iter().filter(|flag| env::var(flag).is_ok()) {

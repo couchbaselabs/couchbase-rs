@@ -4,10 +4,10 @@ use std::fmt;
 use std::str;
 
 use crate::error::CouchbaseError;
+use futures;
 use futures::channel::{mpsc, oneshot};
 use futures::stream::StreamExt;
 use futures::Stream;
-use futures;
 use serde::de::DeserializeOwned;
 use serde_derive::Deserialize;
 use serde_json::{from_slice, Value};
@@ -155,8 +155,8 @@ impl QueryResult {
             Some(mv) => {
                 let rmv = mv.await?;
                 from_slice::<QueryMeta>(rmv.as_slice()).map_err(CouchbaseError::DecodingError)
-            },
-            None => Err(CouchbaseError::MetaConsumed)
+            }
+            None => Err(CouchbaseError::MetaConsumed),
         }
     }
 }
@@ -220,9 +220,8 @@ impl AnalyticsResult {
             Some(mv) => {
                 let rmv = mv.await?;
                 from_slice::<AnalyticsMeta>(rmv.as_slice()).map_err(CouchbaseError::DecodingError)
-
-            },
-            None => Err(CouchbaseError::MetaConsumed)
+            }
+            None => Err(CouchbaseError::MetaConsumed),
         }
     }
 }

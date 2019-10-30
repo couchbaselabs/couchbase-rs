@@ -373,7 +373,7 @@ impl SharedCluster {
     /// # let mut cluster = SharedCluster::connect("couchbase://127.0.0.1", "Administrator", "password")
     /// #     .expect("Could not create cluster reference!");
     /// # let _ = cluster.bucket("travel-sample");
-    /// # 
+    /// #
     /// # async {
     /// let mut result = cluster
     ///     .analytics_query("SELECT DataverseName FROM Metadata.`Dataverse`", None)

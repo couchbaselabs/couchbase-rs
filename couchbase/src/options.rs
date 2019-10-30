@@ -241,7 +241,10 @@ impl QueryOptions {
 
     pub fn set_client_context_id(mut self, client_context_id: String) -> Self {
         let client_context_id_len = client_context_id.len();
-        self.client_context_id = Some((CString::new(client_context_id).unwrap(), client_context_id_len));
+        self.client_context_id = Some((
+            CString::new(client_context_id).unwrap(),
+            client_context_id_len,
+        ));
         self
     }
 
@@ -263,7 +266,7 @@ impl AnalyticsOptions {
             timeout: None,
             positional_parameters: None,
             named_parameters: None,
-        }    
+        }
     }
 
     pub fn set_timeout(mut self, timeout: Duration) -> Self {

@@ -19,8 +19,10 @@ fn main() {
         println!(
             "Rows:\n{:?}",
             result
-                .rows_as().expect("Rows already consumed")
-                .collect::<Vec<Result<Value, CouchbaseError>>>().await
+                .rows_as()
+                .expect("Rows already consumed")
+                .collect::<Vec<Result<Value, CouchbaseError>>>()
+                .await
         );
         println!(
             "Meta:\n{:?}",

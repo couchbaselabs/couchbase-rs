@@ -54,7 +54,9 @@ impl Bucket {
     where
         S: Into<String>,
     {
-        self.instance.analytics_query(statement.into(), options).await
+        self.instance
+            .analytics_query(statement.into(), options)
+            .await
     }
 
     /// Internal proxy method that gets called from the cluster so we can send it into the
@@ -112,7 +114,9 @@ impl SharedBucket {
     where
         S: Into<String>,
     {
-        self.instance.analytics_query(statement.into(), options).await
+        self.instance
+            .analytics_query(statement.into(), options)
+            .await
     }
 
     /// Internal proxy method that gets called from the cluster so we can send it into the

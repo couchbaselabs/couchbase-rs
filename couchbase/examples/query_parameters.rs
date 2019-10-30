@@ -20,13 +20,16 @@ fn main() -> Result<(), CouchbaseError> {
                 "select name, type from `travel-sample` where name = ?",
                 Some(positional_options),
             )
-            .await.expect("Had some data");
+            .await
+            .expect("Had some data");
 
         println!(
             "Rows:\n{:?}",
             positional_result
-                .rows_as().expect("rows consumed")
-                .collect::<Vec<Result<Value, CouchbaseError>>>().await
+                .rows_as()
+                .expect("rows consumed")
+                .collect::<Vec<Result<Value, CouchbaseError>>>()
+                .await
         );
 
         let mut named_params = HashMap::new();
@@ -43,8 +46,10 @@ fn main() -> Result<(), CouchbaseError> {
         println!(
             "Rows:\n{:?}",
             named_result
-                .rows_as().expect("Failed because rows were consumed")
-                .collect::<Vec<Result<Value, CouchbaseError>>>().await
+                .rows_as()
+                .expect("Failed because rows were consumed")
+                .collect::<Vec<Result<Value, CouchbaseError>>>()
+                .await
         );
 
         cluster.disconnect().expect("Could not shutdown properly");

@@ -24,10 +24,7 @@ fn main() {
             .await
             .expect("Error while loading doc");
         println!("Airline Document: {:?}", found_doc);
-        println!(
-            "Content Decoded {:?}",
-            found_doc.content_as::<Airport>()
-        );
+        println!("Content Decoded {:?}", found_doc.content_as::<Airport>());
 
         println!(
             "Document does exist?: {:?}",

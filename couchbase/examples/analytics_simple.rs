@@ -1,6 +1,6 @@
 use couchbase::{Cluster, CouchbaseError};
-use futures::stream::StreamExt;
 use futures::executor::block_on;
+use futures::stream::StreamExt;
 use serde_json::Value;
 
 fn main() {
@@ -19,8 +19,10 @@ fn main() {
         println!(
             "---> rows {:?}",
             result
-                .rows_as().expect("Rows already consumed")
-                .collect::<Vec<Result<Value, CouchbaseError>>>().await
+                .rows_as()
+                .expect("Rows already consumed")
+                .collect::<Vec<Result<Value, CouchbaseError>>>()
+                .await
         );
         println!(
             "---> meta {:?}",

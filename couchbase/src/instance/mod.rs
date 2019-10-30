@@ -98,67 +98,72 @@ impl Instance {
 
         let (tx, rx) = channel::<Box<dyn InstanceRequest>>();
 
-        let handle = thread::Builder::new()
-            .spawn(move || {
-                let mut logger: *mut lcb_LOGGER = ptr::null_mut();
-                let mut instance: *mut lcb_INSTANCE = ptr::null_mut();
-                unsafe {
-                    let mut create_options: *mut lcb_CREATEOPTS = ptr::null_mut();
-                    lcb_createopts_create(&mut create_options, lcb_INSTANCE_TYPE_LCB_TYPE_BUCKET);
-                    lcb_createopts_connstr(create_options, connstr.as_ptr(), connstr_len);
-                    lcb_createopts_credentials(create_options, username.as_ptr(), username_len, password.as_ptr(), password_len);
+        let handle = thread::Builder::new().spawn(move || {
+            let mut logger: *mut lcb_LOGGER = ptr::null_mut();
+            let mut instance: *mut lcb_INSTANCE = ptr::null_mut();
+            unsafe {
+                let mut create_options: *mut lcb_CREATEOPTS = ptr::null_mut();
+                lcb_createopts_create(&mut create_options, lcb_INSTANCE_TYPE_LCB_TYPE_BUCKET);
+                lcb_createopts_connstr(create_options, connstr.as_ptr(), connstr_len);
+                lcb_createopts_credentials(
+                    create_options,
+                    username.as_ptr(),
+                    username_len,
+                    password.as_ptr(),
+                    password_len,
+                );
 
-                    lcb_logger_create(&mut logger, ptr::null_mut());
-                    lcb_logger_callback(logger, Some(logging_callback));
-                    lcb_createopts_logger(create_options, logger);
+                lcb_logger_create(&mut logger, ptr::null_mut());
+                lcb_logger_callback(logger, Some(logging_callback));
+                lcb_createopts_logger(create_options, logger);
 
-                    if lcb_create(&mut instance, create_options) != lcb_STATUS_LCB_SUCCESS {
-                        // TODO: Log Err(InstanceError::CreateFailed);
-                        return;
-                    }
-                    lcb_createopts_destroy(create_options);
+                if lcb_create(&mut instance, create_options) != lcb_STATUS_LCB_SUCCESS {
+                    // TODO: Log Err(InstanceError::CreateFailed);
+                    return;
+                }
+                lcb_createopts_destroy(create_options);
 
-                    install_instance_callbacks(instance);
+                install_instance_callbacks(instance);
 
-                    if lcb_connect(instance) != lcb_STATUS_LCB_SUCCESS {
-                        // TODO: Log Err(InstanceError::ConnectFailed);
-                        return;
-                    }
+                if lcb_connect(instance) != lcb_STATUS_LCB_SUCCESS {
+                    // TODO: Log Err(InstanceError::ConnectFailed);
+                    return;
+                }
 
-                    if lcb_wait(instance) != lcb_STATUS_LCB_SUCCESS {
-                        // TODO:  Err(InstanceError::WaitFailed);
-                        return;
-                    }
+                if lcb_wait(instance) != lcb_STATUS_LCB_SUCCESS {
+                    // TODO:  Err(InstanceError::WaitFailed);
+                    return;
+                }
 
-                    let mut instance_cookie = Box::new(InstanceCookie::new());
-                    lcb_set_cookie(
-                        instance,
-                        &instance_cookie as *const Box<InstanceCookie> as *const c_void,
-                    );
+                let mut instance_cookie = Box::new(InstanceCookie::new());
+                lcb_set_cookie(
+                    instance,
+                    &instance_cookie as *const Box<InstanceCookie> as *const c_void,
+                );
 
-                    loop {
-                        if instance_cookie.has_outstanding() {
-                            while let Ok(v) = rx.try_recv() {
-                                v.encode(instance);
-                                instance_cookie.increment_outstanding();
-                            }
-                        } else if let Ok(v) = rx.recv() {
+                loop {
+                    if instance_cookie.has_outstanding() {
+                        while let Ok(v) = rx.try_recv() {
                             v.encode(instance);
                             instance_cookie.increment_outstanding();
                         }
-
-                        if instance_cookie.shutdown() {
-                            break;
-                        }
-
-                        lcb_tick_nowait(instance);
+                    } else if let Ok(v) = rx.recv() {
+                        v.encode(instance);
+                        instance_cookie.increment_outstanding();
                     }
 
-                    // instance cookie is in scope and will be dropped automatically
-                    lcb_destroy(instance);
-                    lcb_logger_destroy(logger);
+                    if instance_cookie.shutdown() {
+                        break;
+                    }
+
+                    lcb_tick_nowait(instance);
                 }
-            })?;
+
+                // instance cookie is in scope and will be dropped automatically
+                lcb_destroy(instance);
+                lcb_logger_destroy(logger);
+            }
+        })?;
 
         Ok(Instance {
             sender: tx,
@@ -210,10 +215,9 @@ impl Instance {
         options: Option<GetAndTouchOptions>,
     ) -> Result<GetResult, CouchbaseError> {
         let (p, c) = oneshot::channel();
-        self.sender
-            .send(Box::new(GetAndTouchRequest::new(
-                p, id, expiration, options,
-            )))?;
+        self.sender.send(Box::new(GetAndTouchRequest::new(
+            p, id, expiration, options,
+        )))?;
         map_oneshot_error(c).await
     }
 
@@ -262,10 +266,9 @@ impl Instance {
         options: Option<ReplaceOptions>,
     ) -> Result<MutationResult, CouchbaseError> {
         let (p, c) = oneshot::channel();
-        self.sender
-            .send(Box::new(ReplaceRequest::new(
-                p, id, content, flags, options,
-            )))?;
+        self.sender.send(Box::new(ReplaceRequest::new(
+            p, id, content, flags, options,
+        )))?;
         map_oneshot_error(c).await
     }
 
@@ -354,13 +357,15 @@ impl Instance {
 async fn map_oneshot_error<T>(
     receiver: oneshot::Receiver<Result<T, CouchbaseError>>,
 ) -> Result<T, CouchbaseError> {
-    receiver.map(|value| match value {
-        Ok(v) => match v {
-            Ok(i) => Ok(i),
-            Err(e) => Err(e),
-        },
-        Err(e) => Err(CouchbaseError::FutureError(e.to_string())),
-    }).await
+    receiver
+        .map(|value| match value {
+            Ok(v) => match v {
+                Ok(i) => Ok(i),
+                Err(e) => Err(e),
+            },
+            Err(e) => Err(CouchbaseError::FutureError(e.to_string())),
+        })
+        .await
 }
 
 /// The `Instance` provides safe APIs around the inherently unsafe access
@@ -407,7 +412,13 @@ impl SharedInstance {
                     let mut create_options: *mut lcb_CREATEOPTS = ptr::null_mut();
                     lcb_createopts_create(&mut create_options, lcb_INSTANCE_TYPE_LCB_TYPE_BUCKET);
                     lcb_createopts_connstr(create_options, connstr.as_ptr(), connstr_len);
-                    lcb_createopts_credentials(create_options, username.as_ptr(), username_len, password.as_ptr(), password_len);
+                    lcb_createopts_credentials(
+                        create_options,
+                        username.as_ptr(),
+                        username_len,
+                        password.as_ptr(),
+                        password_len,
+                    );
 
                     lcb_logger_create(&mut logger, ptr::null_mut());
                     lcb_logger_callback(logger, Some(logging_callback));
@@ -581,12 +592,9 @@ impl SharedInstance {
         options: Option<ReplaceOptions>,
     ) -> Result<MutationResult, CouchbaseError> {
         let (p, c) = oneshot::channel();
-        self.sender
-            .lock()
-            .await
-            .send(Box::new(ReplaceRequest::new(
-                p, id, content, flags, options,
-            )))?;
+        self.sender.lock().await.send(Box::new(ReplaceRequest::new(
+            p, id, content, flags, options,
+        )))?;
         map_oneshot_error(c).await
     }
 
