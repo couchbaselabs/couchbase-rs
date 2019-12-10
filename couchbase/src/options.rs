@@ -172,22 +172,45 @@ impl RemoveOptions {
     }
 }
 
+// This maps to LCB_N1QL_CONSISTENCY enum in couchbase.h
+#[repr(u32)]
+#[derive(Debug, Clone, Copy)]
+pub enum ScanConsistency {
+    // LCB_N1QL_CONSISTENCY_NONE
+    NotBounded = 0,
+    // LCB_N1QL_CONSISTENCY_REQUEST
+    RequestPlus = 2,
+}
+
+impl Default for ScanConsistency {
+    fn default() -> Self {
+        ScanConsistency::NotBounded
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct QueryOptions {
     timeout: Option<Duration>,
     positional_parameters: Option<Vec<(CString, usize)>>,
     named_parameters: Option<HashMap<(CString, usize), (CString, usize)>>,
     client_context_id: Option<(CString, usize)>,
+    scan_consistency: ScanConsistency,
 }
 
 impl QueryOptions {
     pub fn new() -> Self {
         Self {
-            timeout: None,
-            positional_parameters: None,
-            named_parameters: None,
-            client_context_id: None,
+            ..Default::default()
         }
+    }
+
+    pub fn set_scan_consistency(mut self, scan_consistency: ScanConsistency) -> Self {
+        self.scan_consistency = scan_consistency;
+        self
+    }
+
+    pub fn scan_consistency(&self) -> ScanConsistency {
+        self.scan_consistency
     }
 
     pub fn set_timeout(mut self, timeout: Duration) -> Self {
@@ -241,7 +264,10 @@ impl QueryOptions {
 
     pub fn set_client_context_id(mut self, client_context_id: String) -> Self {
         let client_context_id_len = client_context_id.len();
-        self.client_context_id = Some((CString::new(client_context_id).unwrap(), client_context_id_len));
+        self.client_context_id = Some((
+            CString::new(client_context_id).unwrap(),
+            client_context_id_len,
+        ));
         self
     }
 
@@ -263,7 +289,7 @@ impl AnalyticsOptions {
             timeout: None,
             positional_parameters: None,
             named_parameters: None,
-        }    
+        }
     }
 
     pub fn set_timeout(mut self, timeout: Duration) -> Self {

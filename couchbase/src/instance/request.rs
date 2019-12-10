@@ -583,9 +583,13 @@ impl InstanceRequest for QueryRequest {
         let cookie = Box::into_raw(sender_boxed) as *mut c_void;
         unsafe {
             lcb_cmdn1ql_create(&mut command);
-            lcb_cmdn1ql_consistency(command, 2);
             lcb_cmdn1ql_statement(command, statement_encoded.as_ptr(), statement_len);
             if let Some(options) = self.options {
+                // NOTE: When the rest of SDK 3.0 is implemented, this will need to have a check
+                // for the `consistentWith(MutationState)`. For now, we aren't implmenting that
+                // feature.
+                lcb_cmdn1ql_consistency(command, options.scan_consistency() as u32);
+
                 if let Some(timeout) = options.timeout() {
                     lcb_cmdn1ql_timeout(command, timeout.as_millis() as u32);
                 }
