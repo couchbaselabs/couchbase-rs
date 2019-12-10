@@ -103,24 +103,24 @@ pub struct QueryResult {
 #[derive(Debug, Deserialize)]
 pub struct QueryMeta {
     #[serde(rename = "requestID")]
-    request_id: String,
-    status: String,
-    metrics: QueryMetrics,
-    errors: Option<Value>,
+    pub request_id: String,
+    pub status: String,
+    pub metrics: QueryMetrics,
+    pub errors: Option<Value>,
     #[serde(rename = "clientContextID")]
-    client_context_id: String,
+    pub client_context_id: String,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct QueryMetrics {
     #[serde(rename = "elapsedTime")]
-    elapsed_time: String,
+    pub elapsed_time: String,
     #[serde(rename = "executionTime")]
-    execution_time: String,
+    pub execution_time: String,
     #[serde(rename = "resultCount")]
-    result_count: usize,
+    pub result_count: usize,
     #[serde(rename = "resultSize")]
-    result_size: usize,
+    pub result_size: usize,
 }
 
 impl QueryResult {

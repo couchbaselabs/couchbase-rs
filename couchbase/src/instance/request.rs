@@ -583,6 +583,7 @@ impl InstanceRequest for QueryRequest {
         let cookie = Box::into_raw(sender_boxed) as *mut c_void;
         unsafe {
             lcb_cmdn1ql_create(&mut command);
+            lcb_cmdn1ql_consistency(command, 2);
             lcb_cmdn1ql_statement(command, statement_encoded.as_ptr(), statement_len);
             if let Some(options) = self.options {
                 if let Some(timeout) = options.timeout() {
