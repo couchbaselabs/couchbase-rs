@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2014-2019 Couchbase, Inc.
+ *     Copyright 2014-2020 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -191,6 +191,7 @@ typedef struct lcb_settings_st {
     unsigned wait_for_config : 1;
     unsigned enable_durable_write : 1;
 
+    lcb_RETRY_STRATEGY retry_strategy;
     short max_redir;
     unsigned refcount;
 

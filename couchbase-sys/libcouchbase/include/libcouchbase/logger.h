@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2012-2019 Couchbase, Inc.
+ *     Copyright 2012-2020 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -106,8 +106,9 @@ typedef struct lcb_LOGGER_ lcb_LOGGER;
  * @param fmt a printf format string
  * @param ap a va_list for vprintf
  */
-typedef void (*lcb_LOGGER_CALLBACK)(lcb_LOGGER *procs, uint64_t iid, const char *subsys, lcb_LOG_SEVERITY severity,
-                                    const char *srcfile, int srcline, const char *fmt, va_list ap);
+typedef void (*lcb_LOGGER_CALLBACK)(const lcb_LOGGER *procs, uint64_t iid, const char *subsys,
+                                    lcb_LOG_SEVERITY severity, const char *srcfile, int srcline, const char *fmt,
+                                    va_list ap);
 
 /**
  * Create logger object.
@@ -148,7 +149,7 @@ LIBCOUCHBASE_API lcb_STATUS lcb_logger_callback(lcb_LOGGER *logger, lcb_LOGGER_C
  * @param cookie pointer to location where to store the result
  * @return LCB_SUCCESS if no error occurred
  */
-LIBCOUCHBASE_API lcb_STATUS lcb_logger_cookie(lcb_LOGGER *logger, void **cookie);
+LIBCOUCHBASE_API lcb_STATUS lcb_logger_cookie(const lcb_LOGGER *logger, void **cookie);
 
 #ifdef __cplusplus
 }

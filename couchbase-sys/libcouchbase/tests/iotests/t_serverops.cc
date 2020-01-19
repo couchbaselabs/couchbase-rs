@@ -1,6 +1,6 @@
 /* -*- Mode: C++; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2012-2019 Couchbase, Inc.
+ *     Copyright 2012-2020 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@
 #include "iotests.h"
 #include <map>
 #include <libcouchbase/utils.h>
+#include "internalstructs.h"
 
 class ServeropsUnitTest : public MockUnitTest
 {
@@ -27,7 +28,7 @@ extern "C" {
 static void testServerStatsCallback(lcb_INSTANCE *, lcb_CALLBACK_TYPE, const lcb_RESPSTATS *resp)
 {
     int *counter = (int *)resp->cookie;
-    EXPECT_EQ(LCB_SUCCESS, resp->rc);
+    EXPECT_EQ(LCB_SUCCESS, resp->ctx.rc);
     ++(*counter);
 }
 
@@ -37,7 +38,7 @@ static void statKey_callback(lcb_INSTANCE *, int, const lcb_RESPBASE *resp_base)
     if (!resp->server) {
         return;
     }
-    EXPECT_EQ(LCB_SUCCESS, resp->rc);
+    EXPECT_EQ(LCB_SUCCESS, resp->ctx.rc);
     std::map< std::string, bool > &mm = *(std::map< std::string, bool > *)resp->cookie;
     mm[resp->server] = true;
 }
@@ -61,7 +62,7 @@ TEST_F(ServeropsUnitTest, testServerStats)
     int numcallbacks = 0;
     lcb_CMDSTATS cmd = {0};
     EXPECT_EQ(LCB_SUCCESS, lcb_stats3(instance, &numcallbacks, &cmd));
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     EXPECT_LT(1, numcallbacks);
 }
 
@@ -85,7 +86,7 @@ TEST_F(ServeropsUnitTest, testKeyStats)
     ASSERT_EQ(LCB_SUCCESS, err);
     lcb_sched_leave(instance);
 
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     ASSERT_EQ(lcb_get_num_replicas(instance) + 1, mm.size());
 
     // Ensure that a key with an embedded space fails
@@ -99,7 +100,7 @@ extern "C" {
 static void testServerVersionsCallback(lcb_INSTANCE *, lcb_CALLBACK_TYPE, const lcb_RESPMCVERSION *resp)
 {
     int *counter = (int *)resp->cookie;
-    EXPECT_EQ(LCB_SUCCESS, resp->rc);
+    EXPECT_EQ(LCB_SUCCESS, resp->ctx.rc);
     ++(*counter);
 }
 }
@@ -120,7 +121,7 @@ TEST_F(ServeropsUnitTest, testServerVersion)
     int numcallbacks = 0;
     lcb_CMDVERSIONS cmd = {0};
     EXPECT_EQ(LCB_SUCCESS, lcb_server_versions3(instance, &numcallbacks, &cmd));
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     EXPECT_LT(1, numcallbacks);
 }
 
@@ -130,7 +131,7 @@ static char *verbosity_endpoint;
 static void verbosity_all_callback(lcb_INSTANCE *instance, lcb_CALLBACK_TYPE, const lcb_RESPVERBOSITY *resp)
 {
     int *counter = (int *)resp->cookie;
-    ASSERT_EQ(LCB_SUCCESS, resp->rc);
+    ASSERT_EQ(LCB_SUCCESS, resp->ctx.rc);
     if (resp->server == NULL) {
         EXPECT_EQ(MockEnvironment::getInstance()->getNumNodes(), *counter);
         return;
@@ -142,7 +143,7 @@ static void verbosity_all_callback(lcb_INSTANCE *instance, lcb_CALLBACK_TYPE, co
 
 static void verbosity_single_callback(lcb_INSTANCE *instance, lcb_CALLBACK_TYPE, const lcb_RESPVERBOSITY *resp)
 {
-    ASSERT_EQ(LCB_SUCCESS, resp->rc);
+    ASSERT_EQ(LCB_SUCCESS, resp->ctx.rc);
     if (resp->server == NULL) {
         return;
     } else {
@@ -168,7 +169,7 @@ TEST_F(ServeropsUnitTest, testVerbosity)
     lcb_CMDVERBOSITY cmd = {0};
     cmd.level = LCB_VERBOSITY_DEBUG;
     EXPECT_EQ(LCB_SUCCESS, lcb_server_verbosity3(instance, &counter, &cmd));
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
 
     EXPECT_EQ(MockEnvironment::getInstance()->getNumNodes(), counter);
     EXPECT_NE((char *)NULL, verbosity_endpoint);
@@ -178,7 +179,7 @@ TEST_F(ServeropsUnitTest, testVerbosity)
     cmd.server = verbosity_endpoint;
     cmd.level = LCB_VERBOSITY_DEBUG;
     EXPECT_EQ(LCB_SUCCESS, lcb_server_verbosity3(instance, &counter, &cmd));
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     free((void *)verbosity_endpoint);
     verbosity_endpoint = NULL;
 }

@@ -1,6 +1,6 @@
 /* -*- Mode: C++; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2012-2019 Couchbase, Inc.
+ *     Copyright 2012-2020 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -76,7 +76,7 @@ TEST_F(MutateUnitTest, testSimpleSet)
     EXPECT_EQ(LCB_SUCCESS, lcb_store(instance, &numcallbacks, cmd));
     lcb_cmdstore_destroy(cmd);
 
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     EXPECT_EQ(2, numcallbacks);
 }
 
@@ -96,7 +96,7 @@ TEST_F(MutateUnitTest, testStoreZeroLengthKey)
     lcb_cmdstore_create(&cmd, LCB_STORE_UPSERT);
     lcb_cmdstore_key(cmd, NULL, 0);
     lcb_cmdstore_value(cmd, "bar", 3);
-    EXPECT_EQ(LCB_EMPTY_KEY, lcb_store(instance, NULL, cmd));
+    EXPECT_EQ(LCB_ERR_EMPTY_KEY, lcb_store(instance, NULL, cmd));
     lcb_cmdstore_destroy(cmd);
     lcb_sched_leave(instance);
 }
@@ -135,7 +135,7 @@ TEST_F(MutateUnitTest, testStoreZeroLengthValue)
     EXPECT_EQ(LCB_SUCCESS, lcb_store(instance, &numcallbacks, cmd));
     lcb_cmdstore_destroy(cmd);
     lcb_sched_leave(instance);
-    lcb_wait3(instance, LCB_WAIT_NOCHECK);
+    lcb_wait(instance, LCB_WAIT_NOCHECK);
     EXPECT_EQ(1, numcallbacks);
 
     Item itm;
@@ -183,7 +183,7 @@ TEST_F(MutateUnitTest, testRemove)
 
     lcb_cmdremove_destroy(cmd);
 
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     EXPECT_EQ(2, numcallbacks);
 }
 
@@ -192,7 +192,7 @@ static void testRemoveMissCallback(lcb_INSTANCE *, lcb_CALLBACK_TYPE, const lcb_
 {
     int *counter;
     lcb_respremove_cookie(resp, (void **)&counter);
-    EXPECT_EQ(LCB_KEY_ENOENT, lcb_respremove_status(resp));
+    EXPECT_EQ(LCB_ERR_DOCUMENT_NOT_FOUND, lcb_respremove_status(resp));
     ++(*counter);
 }
 }
@@ -224,7 +224,7 @@ TEST_F(MutateUnitTest, testRemoveMiss)
     EXPECT_EQ(LCB_SUCCESS, lcb_remove(instance, &numcallbacks, cmd));
 
     lcb_cmdremove_destroy(cmd);
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     EXPECT_EQ(2, numcallbacks);
 }
 
@@ -251,7 +251,7 @@ static void testSimpleAddStoreCallback(lcb_INSTANCE *, lcb_CALLBACK_TYPE, const 
         lcb_respstore_cas(resp, &cas);
         EXPECT_NE(0, cas);
     } else {
-        EXPECT_EQ(LCB_KEY_EEXISTS, rc);
+        EXPECT_EQ(LCB_ERR_DOCUMENT_EXISTS, rc);
     }
     ++(*counter);
 }
@@ -282,7 +282,7 @@ TEST_F(MutateUnitTest, testSimpleAdd)
     lcb_cmdstore_value(cmd, val2.c_str(), val2.size());
     EXPECT_EQ(LCB_SUCCESS, lcb_store(instance, &numcallbacks, cmd));
 
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     EXPECT_EQ(2, numcallbacks);
     lcb_cmdstore_destroy(cmd);
 }
@@ -328,7 +328,7 @@ TEST_F(MutateUnitTest, testSimpleAppend)
     lcb_cmdstore_value(cmd, val.c_str(), val.size());
     EXPECT_EQ(LCB_SUCCESS, lcb_store(instance, &numcallbacks, cmd));
     lcb_cmdstore_destroy(cmd);
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     EXPECT_EQ(1, numcallbacks);
 
     Item itm;
@@ -344,7 +344,7 @@ static void testAppendNonExistingKeyCallback(lcb_INSTANCE *, int, const lcb_RESP
     lcb_STORE_OPERATION op;
     lcb_respstore_operation(resp, &op);
     ASSERT_EQ(LCB_STORE_APPEND, op);
-    EXPECT_EQ(LCB_NOT_STORED, lcb_respstore_status(resp));
+    EXPECT_EQ(LCB_ERR_NOT_STORED, lcb_respstore_status(resp));
     ++(*counter);
 }
 }
@@ -371,7 +371,7 @@ TEST_F(MutateUnitTest, testAppendNonExistingKey)
     EXPECT_EQ(LCB_SUCCESS, lcb_store(instance, &numcallbacks, cmd));
     lcb_cmdstore_destroy(cmd);
     lcb_sched_leave(instance);
-    lcb_wait3(instance, LCB_WAIT_NOCHECK);
+    lcb_wait(instance, LCB_WAIT_NOCHECK);
     EXPECT_EQ(1, numcallbacks);
 }
 
@@ -416,7 +416,7 @@ TEST_F(MutateUnitTest, testSimplePrepend)
     lcb_cmdstore_value(cmd, "bar", 3);
     EXPECT_EQ(LCB_SUCCESS, lcb_store(instance, &numcallbacks, cmd));
     lcb_cmdstore_destroy(cmd);
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     EXPECT_EQ(1, numcallbacks);
 
     Item itm;
@@ -432,7 +432,7 @@ static void testPrependNonExistingKeyCallback(lcb_INSTANCE *, int, const lcb_RES
     lcb_STORE_OPERATION op;
     lcb_respstore_operation(resp, &op);
     ASSERT_EQ(LCB_STORE_PREPEND, op);
-    EXPECT_EQ(LCB_NOT_STORED, lcb_respstore_status(resp));
+    EXPECT_EQ(LCB_ERR_NOT_STORED, lcb_respstore_status(resp));
     ++(*counter);
 }
 }
@@ -459,7 +459,7 @@ TEST_F(MutateUnitTest, testPrependNonExistingKey)
     EXPECT_EQ(LCB_SUCCESS, lcb_store(instance, &numcallbacks, cmd));
     lcb_cmdstore_destroy(cmd);
     lcb_sched_leave(instance);
-    lcb_wait3(instance, LCB_WAIT_NOCHECK);
+    lcb_wait(instance, LCB_WAIT_NOCHECK);
     EXPECT_EQ(1, numcallbacks);
 }
 
@@ -471,7 +471,7 @@ static void testSimpleReplaceNonexistingStoreCallback(lcb_INSTANCE *, lcb_CALLBA
     lcb_STORE_OPERATION op;
     lcb_respstore_operation(resp, &op);
     ASSERT_EQ(LCB_STORE_REPLACE, op);
-    EXPECT_EQ(LCB_KEY_ENOENT, lcb_respstore_status(resp));
+    EXPECT_EQ(LCB_ERR_DOCUMENT_NOT_FOUND, lcb_respstore_status(resp));
     ++(*counter);
 }
 }
@@ -499,7 +499,7 @@ TEST_F(MutateUnitTest, testSimpleReplaceNonexisting)
     lcb_cmdstore_value(cmd, "bar", 3);
     EXPECT_EQ(LCB_SUCCESS, lcb_store(instance, &numcallbacks, cmd));
     lcb_cmdstore_destroy(cmd);
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     EXPECT_EQ(1, numcallbacks);
 }
 
@@ -543,7 +543,7 @@ TEST_F(MutateUnitTest, testSimpleReplace)
     lcb_cmdstore_value(cmd, "bar", 3);
     EXPECT_EQ(LCB_SUCCESS, lcb_store(instance, &numcallbacks, cmd));
     lcb_cmdstore_destroy(cmd);
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     EXPECT_EQ(1, numcallbacks);
     Item itm;
     getKey(instance, key, itm);
@@ -558,7 +558,7 @@ static void testIncorrectCasReplaceStoreCallback(lcb_INSTANCE *, lcb_CALLBACK_TY
     lcb_STORE_OPERATION op;
     lcb_respstore_operation(resp, &op);
     ASSERT_EQ(LCB_STORE_REPLACE, op);
-    EXPECT_EQ(LCB_KEY_EEXISTS, lcb_respstore_status(resp));
+    EXPECT_EQ(LCB_ERR_DOCUMENT_EXISTS, lcb_respstore_status(resp));
     ++(*counter);
 }
 }
@@ -592,7 +592,7 @@ TEST_F(MutateUnitTest, testIncorrectCasReplace)
 
     EXPECT_EQ(LCB_SUCCESS, lcb_store(instance, &numcallbacks, cmd));
     lcb_cmdstore_destroy(cmd);
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     EXPECT_EQ(1, numcallbacks);
 }
 
@@ -637,7 +637,7 @@ TEST_F(MutateUnitTest, testCasReplace)
     lcb_cmdstore_cas(cmd, itm.cas);
     EXPECT_EQ(LCB_SUCCESS, lcb_store(instance, &numcallbacks, cmd));
     lcb_cmdstore_destroy(cmd);
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     EXPECT_EQ(1, numcallbacks);
     getKey(instance, key, itm);
     EXPECT_STREQ("bar", itm.val.c_str());
@@ -668,5 +668,5 @@ TEST_F(MutateUnitTest, testSetDefault)
     bool cookie = false;
     ASSERT_EQ(LCB_SUCCESS, lcb_store(instance, &cookie, cmd));
     lcb_cmdstore_destroy(cmd);
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
 }

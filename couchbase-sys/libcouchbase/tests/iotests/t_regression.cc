@@ -1,6 +1,6 @@
 /* -*- Mode: C++; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2012-2019 Couchbase, Inc.
+ *     Copyright 2012-2020 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ static bool callbackInvoked = false;
 extern "C" {
 static void get_callback(lcb_INSTANCE *, lcb_CALLBACK_TYPE, const lcb_RESPGET *resp)
 {
-    EXPECT_EQ(LCB_KEY_ENOENT, lcb_respget_status(resp));
+    EXPECT_EQ(LCB_ERR_DOCUMENT_NOT_FOUND, lcb_respget_status(resp));
     int *counter_p;
     lcb_respget_cookie(resp, (void **)&counter_p);
     EXPECT_TRUE(counter_p != NULL);
@@ -38,8 +38,8 @@ static void get_callback(lcb_INSTANCE *, lcb_CALLBACK_TYPE, const lcb_RESPGET *r
 
 static void stats_callback(lcb_INSTANCE *, lcb_CALLBACK_TYPE, const lcb_RESPSTATS *resp)
 {
-    EXPECT_EQ(resp->rc, LCB_SUCCESS);
-    if (resp->nkey == 0) {
+    EXPECT_EQ(resp->ctx.rc, LCB_SUCCESS);
+    if (resp->ctx.key_len == 0) {
         int *counter_p = reinterpret_cast< int * >(const_cast< void * >(resp->cookie));
         *counter_p -= 1;
     }
@@ -91,7 +91,7 @@ TEST_F(RegressionUnitTest, CCBC_150)
     callbackCounter++;
     EXPECT_EQ(LCB_SUCCESS, lcb_stats3(instance, ptr, &statCmd));
 
-    EXPECT_EQ(LCB_SUCCESS, lcb_wait(instance));
+    EXPECT_EQ(LCB_SUCCESS, lcb_wait(instance, LCB_WAIT_DEFAULT));
     ASSERT_TRUE(callbackInvoked);
     ASSERT_EQ(0, callbackCounter);
 }
@@ -134,7 +134,7 @@ TEST_F(RegressionUnitTest, CCBC_275)
     err = lcb_connect(instance);
     ASSERT_EQ(LCB_SUCCESS, err);
 
-    err = lcb_wait(instance);
+    err = lcb_wait(instance, LCB_WAIT_DEFAULT);
     ASSERT_EQ(LCB_SUCCESS, err);
 
     std::string key = "key_CCBC_275";
@@ -155,10 +155,10 @@ TEST_F(RegressionUnitTest, CCBC_275)
     lcb_install_callback(instance, LCB_CALLBACK_GET, (lcb_RESPCALLBACK)get_callback_275);
 
     ASSERT_EQ(LCB_SUCCESS, lcb_get(instance, &info, cmd));
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     ASSERT_EQ(1, info.call_count);
 
-    ASSERT_ERRISA(info.last_err, LCB_ERRTYPE_NETWORK);
+    ASSERT_NE(0, LCB_ERROR_IS_NETWORK(info.last_err));
 
     // Make sure we've fully purged and disconnected the server
     struct lcb_cntl_vbinfo_st vbi;
@@ -178,10 +178,10 @@ TEST_F(RegressionUnitTest, CCBC_275)
     mock->hiccupNodes(0, 0);
     info.call_count = 0;
     ASSERT_EQ(LCB_SUCCESS, lcb_get(instance, &info, cmd));
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     ASSERT_EQ(1, info.call_count);
 
-    ASSERT_EQ(LCB_KEY_ENOENT, info.last_err);
+    ASSERT_EQ(LCB_ERR_DOCUMENT_NOT_FOUND, info.last_err);
     lcb_cmdget_destroy(cmd);
 
     lcb_destroy(instance);
@@ -194,21 +194,21 @@ TEST_F(MockUnitTest, testIssue59)
     HandleWrap hw;
     createConnection(hw, &instance);
 
-    lcb_wait(instance);
-    lcb_wait(instance);
-    lcb_wait(instance);
-    lcb_wait(instance);
-    lcb_wait(instance);
-    lcb_wait(instance);
-    lcb_wait(instance);
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
 }
 
 extern "C" {
 struct rvbuf {
     lcb_STATUS error;
-    lcb_cas_t cas1;
-    lcb_cas_t cas2;
+    uint64_t cas1;
+    uint64_t cas2;
     char *bytes;
     lcb_size_t nbytes;
     lcb_int32_t counter;

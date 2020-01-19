@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2011-2019 Couchbase, Inc.
+ *     Copyright 2011-2020 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
  */
 
 #include "internal.h"
-#include "durability_internal.h"
+#include "collections.h"
 #include "trace.h"
 #include "mctx-helper.h"
 #include "sllist-inl.h"
@@ -39,11 +39,11 @@ struct ObserveCtx : lcb::MultiCmdContext {
     size_t remaining;
     unsigned oflags;
 
-    typedef std::vector< uint8_t > ServerBuf;
+    typedef std::vector<uint8_t> ServerBuf;
     /* requests array contains one buffer per server. nrequest essentially
      * says how many elements (and thus how many servers) */
-    std::vector< ServerBuf > requests;
-    std::vector< size_t > num_requests;
+    std::vector<ServerBuf> requests;
+    std::vector<size_t> num_requests;
     lcbtrace_SPAN *span;
 };
 
@@ -57,17 +57,18 @@ struct OperationCtx : mc_REQDATAEX {
 typedef enum { F_DURABILITY = 0x01, F_DESTROY = 0x02, F_SCHEDFAILED = 0x04 } obs_flags;
 
 // TODO: Move this to a common file
-template < typename ContainerType, typename ValueType > void add_to_buf(ContainerType &c, ValueType v)
+template <typename ContainerType, typename ValueType>
+void add_to_buf(ContainerType &c, ValueType v)
 {
-    typename ContainerType::value_type *p = reinterpret_cast< typename ContainerType::value_type * >(&v);
+    typename ContainerType::value_type *p = reinterpret_cast<typename ContainerType::value_type *>(&v);
     c.insert(c.end(), p, p + sizeof(ValueType));
 }
 
 static void handle_observe_callback(mc_PIPELINE *pl, mc_PACKET *pkt, lcb_STATUS err, const void *arg)
 {
-    OperationCtx *opc = static_cast< OperationCtx * >(pkt->u_rdata.exdata);
+    OperationCtx *opc = static_cast<OperationCtx *>(pkt->u_rdata.exdata);
     ObserveCtx *oc = opc->parent;
-    lcb_RESPOBSERVE *resp = reinterpret_cast< lcb_RESPOBSERVE * >(const_cast< void * >(arg));
+    lcb_RESPOBSERVE *resp = reinterpret_cast<lcb_RESPOBSERVE *>(const_cast<void *>(arg));
     lcb_INSTANCE *instance = oc->instance;
 
     if (resp == NULL) {
@@ -77,7 +78,7 @@ static void handle_observe_callback(mc_PIPELINE *pl, mc_PACKET *pkt, lcb_STATUS 
         const char *end = ptr + pkt->u_value.single.size;
         while (ptr < end) {
             lcb_uint16_t nkey;
-            lcb_RESPOBSERVE cur = {0};
+            lcb_RESPOBSERVE cur{};
             cur.rflags = LCB_RESP_F_CLIENTGEN;
 
             ptr += 2;
@@ -86,10 +87,10 @@ static void handle_observe_callback(mc_PIPELINE *pl, mc_PACKET *pkt, lcb_STATUS 
             ptr += 2;
 
             memset(&cur, 0, sizeof(cur));
-            cur.key = ptr;
-            cur.nkey = nkey;
+            cur.ctx.key = ptr;
+            cur.ctx.key_len = nkey;
             cur.cookie = (void *)opc->cookie;
-            cur.rc = err;
+            cur.ctx.rc = err;
             handle_observe_callback(NULL, pkt, err, &cur);
             ptr += nkey;
             nfailed++;
@@ -99,7 +100,7 @@ static void handle_observe_callback(mc_PIPELINE *pl, mc_PACKET *pkt, lcb_STATUS 
     }
 
     resp->cookie = (void *)opc->cookie;
-    resp->rc = err;
+    resp->ctx.rc = err;
     oc->remaining--;
     if (oc->remaining == 0 && oc->span) {
         lcbtrace_span_finish(oc->span, LCBTRACE_NOW);
@@ -116,8 +117,8 @@ static void handle_observe_callback(mc_PIPELINE *pl, mc_PACKET *pkt, lcb_STATUS 
         return;
     }
     if (oc->remaining == 0) {
-        lcb_RESPOBSERVE resp2 = {0};
-        resp2.rc = err;
+        lcb_RESPOBSERVE resp2{};
+        resp2.ctx.rc = err;
         resp2.rflags = LCB_RESP_F_CLIENTGEN | LCB_RESP_F_FINAL;
         oc->oflags |= F_DESTROY;
         handle_observe_callback(NULL, pkt, err, &resp2);
@@ -132,10 +133,10 @@ static void handle_observe_callback(mc_PIPELINE *pl, mc_PACKET *pkt, lcb_STATUS 
 
 static void handle_schedfail(mc_PACKET *pkt)
 {
-    OperationCtx *opc = static_cast< OperationCtx * >(pkt->u_rdata.exdata);
+    OperationCtx *opc = static_cast<OperationCtx *>(pkt->u_rdata.exdata);
     ObserveCtx *oc = opc->parent;
     oc->oflags |= F_SCHEDFAILED;
-    handle_observe_callback(NULL, pkt, LCB_SCHEDFAIL_INTERNAL, NULL);
+    handle_observe_callback(NULL, pkt, LCB_ERR_SHEDULE_FAILURE, NULL);
 }
 
 void ObserveCtx::MCTX_setspan(lcbtrace_SPAN *span_)
@@ -154,15 +155,15 @@ lcb_STATUS ObserveCtx::MCTX_addcmd(const lcb_CMDBASE *cmdbase)
     size_t nservers;
 
     if (LCB_KEYBUF_IS_EMPTY(&cmd->key)) {
-        return LCB_EMPTY_KEY;
+        return LCB_ERR_EMPTY_KEY;
     }
 
     if (cq->config == NULL) {
-        return LCB_CLIENT_ETMPFAIL;
+        return LCB_ERR_NO_CONFIGURATION;
     }
 
     if (LCBVB_DISTTYPE(LCBT_VBCONFIG(instance)) != LCBVB_DIST_VBUCKET) {
-        return LCB_NOT_SUPPORTED;
+        return LCB_ERR_UNSUPPORTED_OPERATION;
     }
 
     mcreq_map_key(cq, &cmd->key, 24, &vbid, &srvix_dummy);
@@ -178,7 +179,7 @@ lcb_STATUS ObserveCtx::MCTX_addcmd(const lcb_CMDBASE *cmdbase)
             int ix = lcbvb_vbserver(cq->config, vbid, ii);
             if (ix < 0) {
                 if (ii == 0) {
-                    return LCB_NO_MATCHING_SERVER;
+                    return LCB_ERR_NO_MATCHING_SERVER;
                 } else {
                     continue;
                 }
@@ -191,7 +192,7 @@ lcb_STATUS ObserveCtx::MCTX_addcmd(const lcb_CMDBASE *cmdbase)
     }
 
     if (nservers == 0) {
-        return LCB_NO_MATCHING_SERVER;
+        return LCB_ERR_NO_MATCHING_SERVER;
     }
 
     uint32_t cid = 0;
@@ -199,7 +200,8 @@ lcb_STATUS ObserveCtx::MCTX_addcmd(const lcb_CMDBASE *cmdbase)
     uint8_t ecid[5] = {0}; /* encoded */
 
     if (LCBT_SETTING(instance, use_collections)) {
-        std::string path = std::string(cmdbase->scope, cmdbase->nscope) + "." + std::string(cmdbase->collection, cmdbase->ncollection);
+        std::string path =
+            collcache_build_spec(cmdbase->scope, cmdbase->nscope, cmdbase->collection, cmdbase->ncollection);
         instance->collcache->get(path, &cid);
         ncid = leb128_encode(cid, ecid);
     }
@@ -215,8 +217,8 @@ lcb_STATUS ObserveCtx::MCTX_addcmd(const lcb_CMDBASE *cmdbase)
         if (ncid) {
             rr.insert(rr.end(), ecid, ecid + ncid);
         }
-        rr.insert(rr.end(), reinterpret_cast< const uint8_t * >(cmd->key.contig.bytes),
-                  reinterpret_cast< const uint8_t * >(cmd->key.contig.bytes) + cmd->key.contig.nbytes);
+        rr.insert(rr.end(), reinterpret_cast<const uint8_t *>(cmd->key.contig.bytes),
+                  reinterpret_cast<const uint8_t *>(cmd->key.contig.bytes) + cmd->key.contig.nbytes);
         remaining++;
         num_requests[ix]++;
     }
@@ -285,7 +287,7 @@ lcb_STATUS ObserveCtx::MCTX_done(const void *cookie_)
 
     if (requests.size() == 0 || remaining == 0) {
         delete this;
-        return LCB_EINVAL;
+        return LCB_ERR_INVALID_ARGUMENT;
     } else {
         MAYBE_SCHEDLEAVE(instance);
         return LCB_SUCCESS;
@@ -317,4 +319,3 @@ lcb_MULTICMD_CTX *lcb_observe3_ctxnew(lcb_INSTANCE *instance)
 {
     return new ObserveCtx(instance);
 }
-

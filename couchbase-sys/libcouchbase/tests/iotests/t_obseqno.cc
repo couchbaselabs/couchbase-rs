@@ -1,6 +1,6 @@
 /* -*- Mode: C++; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2011-2019 Couchbase, Inc.
+ *     Copyright 2011-2020 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -48,7 +48,7 @@ static void storeGetStok(lcb_INSTANCE *instance, const string &k, const string &
     EXPECT_EQ(LCB_SUCCESS, rc);
     lcb_cmdstore_destroy(cmd);
     lcb_sched_leave(instance);
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     lcb_install_callback(instance, LCB_CALLBACK_STORE, oldcb);
 }
 
@@ -94,7 +94,7 @@ static void doObserveSeqno(lcb_INSTANCE *instance, lcb_MUTATION_TOKEN *ss, int s
     lcb_sched_enter(instance);
     rc = lcb_observe_seqno3(instance, &resp, &cmd);
     if (rc != LCB_SUCCESS) {
-        resp.rc = rc;
+        resp.ctx.rc = rc;
         resp.rflags |= LCB_RESP_F_CLIENTGEN;
         return;
     }
@@ -102,7 +102,7 @@ static void doObserveSeqno(lcb_INSTANCE *instance, lcb_MUTATION_TOKEN *ss, int s
     lcb_RESPCALLBACK oldcb = lcb_get_callback(instance, LCB_CALLBACK_OBSEQNO);
     lcb_install_callback(instance, LCB_CALLBACK_OBSEQNO, (lcb_RESPCALLBACK)obseqCallback);
     lcb_sched_leave(instance);
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     lcb_install_callback(instance, LCB_CALLBACK_OBSEQNO, oldcb);
 }
 
@@ -129,9 +129,9 @@ TEST_F(ObseqnoTest, testObserve)
 
     for (size_t ii = 0; ii < lcbvb_get_nreplicas(vbc) + 1; ii++) {
         int ix = lcbvb_vbserver(vbc, st_fetched.vbid_, ii);
-        lcb_RESPOBSEQNO resp = {0};
+        lcb_RESPOBSEQNO resp{};
         doObserveSeqno(instance, &st_fetched, ix, resp);
-        ASSERT_EQ(LCB_SUCCESS, resp.rc);
+        ASSERT_EQ(LCB_SUCCESS, resp.ctx.rc);
         ASSERT_EQ(st_fetched.uuid_, resp.cur_uuid);
         ASSERT_EQ(0, resp.old_uuid);
         //        printf("SEQ_MEM: %lu. SEQ_DISK: %lu\n", resp.mem_seqno, resp.persisted_seqno);
@@ -161,7 +161,7 @@ TEST_F(ObseqnoTest, testFailoverFormat)
     // Now we should get a different sequence number
     lcb_RESPOBSEQNO rr;
     doObserveSeqno(instance, &st_fetched, lcbvb_vbmaster(vbc, st_fetched.vbid_), rr);
-    ASSERT_EQ(LCB_SUCCESS, rr.rc);
+    ASSERT_EQ(LCB_SUCCESS, rr.ctx.rc);
     //    printf("Old UUID: %llu\n", rr.old_uuid);
     //    printf("Cur UUID: %llu\n", rr.cur_uuid);
     ASSERT_GT(rr.old_uuid, 0);

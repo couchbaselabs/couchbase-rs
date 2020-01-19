@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2013-2019 Couchbase, Inc.
+ *     Copyright 2013-2020 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -46,7 +46,7 @@ Provider *Confmon::first_active()
     }
 }
 
-static const char *provider_string(Method type)
+const char *provider_string(Method type)
 {
     if (type == CLCONFIG_HTTP) {
         return "HTTP";
@@ -207,13 +207,13 @@ void Confmon::provider_failed(Provider *provider, lcb_STATUS reason)
     if (reason != LCB_SUCCESS) {
         if (settings->detailed_neterr && last_error != LCB_SUCCESS) {
             /* Filter out any artificial 'connect error' or 'network error' codes */
-            if (reason != LCB_CONNECT_ERROR && reason != LCB_NETWORK_ERROR) {
+            if (reason != LCB_ERR_CONNECT_ERROR && reason != LCB_ERR_NETWORK) {
                 last_error = reason;
             }
         } else {
             last_error = reason;
         }
-        if (reason == LCB_AUTH_ERROR) {
+        if (reason == LCB_ERR_AUTHENTICATION_FAILURE) {
             goto GT_ERROR;
         }
     }

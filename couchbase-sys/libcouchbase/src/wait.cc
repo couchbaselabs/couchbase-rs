@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2010-2019 Couchbase, Inc.
+ *     Copyright 2010-2020 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -78,23 +78,29 @@ int lcb_is_waiting(lcb_INSTANCE *instance)
     return instance->wait != 0;
 }
 
-/**
- * Run the event loop until we've got a response for all of our spooled
- * commands. You should not call this function from within your callbacks.
- *
- * @param instance the instance to run the event loop for.
- *
- * @author Trond Norbye
- */
 LIBCOUCHBASE_API
-lcb_STATUS lcb_wait(lcb_INSTANCE *instance)
+lcb_STATUS lcb_tick_nowait(lcb_INSTANCE *instance)
 {
-    if (instance->wait != 0) {
-        return instance->last_error;
-    }
-
-    if (!has_pending(instance)) {
+    lcb_io_tick_fn tick = instance->iotable->loop.tick;
+    if (!tick) {
+        return LCB_ERR_SDK_FEATURE_UNAVAILABLE;
+    } else {
+        maybe_reset_timeouts(instance);
+        tick(IOT_ARG(instance->iotable));
         return LCB_SUCCESS;
+    }
+}
+
+LIBCOUCHBASE_API
+lcb_STATUS lcb_wait(lcb_INSTANCE *instance, lcb_WAITFLAGS flags)
+{
+    if (flags == LCB_WAIT_DEFAULT) {
+        if (instance->wait != 0) {
+            return instance->last_error;
+        }
+        if (!has_pending(instance)) {
+            return LCB_SUCCESS;
+        }
     }
 
     maybe_reset_timeouts(instance);
@@ -106,39 +112,7 @@ lcb_STATUS lcb_wait(lcb_INSTANCE *instance)
     if (LCBT_VBCONFIG(instance)) {
         return LCB_SUCCESS;
     }
-
     return instance->last_error;
-}
-
-LIBCOUCHBASE_API
-lcb_STATUS lcb_tick_nowait(lcb_INSTANCE *instance)
-{
-    lcb_io_tick_fn tick = instance->iotable->loop.tick;
-    if (!tick) {
-        return LCB_CLIENT_FEATURE_UNAVAILABLE;
-    } else {
-        maybe_reset_timeouts(instance);
-        tick(IOT_ARG(instance->iotable));
-        return LCB_SUCCESS;
-    }
-}
-
-LIBCOUCHBASE_API
-void lcb_wait3(lcb_INSTANCE *instance, lcb_WAITFLAGS flags)
-{
-    if (flags == LCB_WAIT_DEFAULT) {
-        if (instance->wait) {
-            return;
-        }
-        if (has_pending(instance)) {
-            return;
-        }
-    }
-
-    maybe_reset_timeouts(instance);
-    instance->wait = 1;
-    IOT_START(instance->iotable);
-    instance->wait = 0;
 }
 
 /**

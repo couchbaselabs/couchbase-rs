@@ -1,6 +1,6 @@
 /* -*- Mode: C++; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2011-2019 Couchbase, Inc.
+ *     Copyright 2011-2020 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ class SSLTest : public SockTest
         loop->settings->sslopts = LCB_SSL_ENABLED | LCB_SSL_NOVERIFY;
         loop->settings->ssl_ctx = lcbio_ssl_new(NULL, NULL, NULL, 1, &errp, loop->settings);
         loop->server->factory = TestServer::sslSocketFactory;
-        EXPECT_FALSE(loop->settings->ssl_ctx == NULL) << lcb_strerror(NULL, errp);
+        EXPECT_FALSE(loop->settings->ssl_ctx == NULL) << lcb_strerror_short(errp);
     }
 
     void TearDown()

@@ -1,6 +1,6 @@
 /* -*- Mode: C++; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2011-2019 Couchbase, Inc.
+ *     Copyright 2011-2020 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -68,7 +68,7 @@ TEST_F(McContext, testBasicContext)
         mc_PIPELINE *pl = cq.pipelines[ii];
         cookie.plLength = 0;
 
-        nFail = mcreq_pipeline_fail(pl, LCB_ERROR, failcb, NULL);
+        nFail = mcreq_pipeline_fail(pl, LCB_ERR_GENERIC, failcb, NULL);
         if (!nFail) {
             continue;
         }

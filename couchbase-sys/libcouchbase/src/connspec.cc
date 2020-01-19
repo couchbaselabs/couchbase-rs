@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2014-2019 Couchbase, Inc.
+ *     Copyright 2014-2020 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -23,9 +23,9 @@
 #include <ctype.h>
 #include <stdlib.h>
 
-#define SET_ERROR(msg) \
-    *errmsg = msg; \
-    return LCB_EINVAL;
+#define SET_ERROR(msg)                                                                                                 \
+    *errmsg = msg;                                                                                                     \
+    return LCB_ERR_INVALID_ARGUMENT;
 
 #define F_HASBUCKET (1u << 0u)
 #define F_HASPASSWD (1u << 1u)

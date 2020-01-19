@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2014-2019 Couchbase, Inc.
+ *     Copyright 2014-2020 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -157,7 +157,7 @@ typedef struct {
  * @param cmd the command structure containing the buffer mappings for this
  * packet.
  *
- * @return LCB_SUCCESS on success, LCB_INCOMPLETE_PACKET if the packet passed
+ * @return LCB_SUCCESS on success, LCB_ERR_INCOMPLETE_PACKET if the packet passed
  * does not contain the full body. Other error codes may be returned as well
  *
  * @see lcb_set_pktfwd_callback lcb_set_pktflushed_callback, mc_forward_packet

@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2016-2019 Couchbase, Inc.
+ *     Copyright 2016-2020 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -155,7 +155,9 @@ typedef struct {
  * Response structure for index management operations
  */
 typedef struct lcb_RESPN1XMGMT_st {
-    LCB_RESP_BASE
+    lcb_STATUS rc;
+    void *cookie;
+    lcb_U16 rflags;
 
     /**
      * A list of pointers to specs. This isn't a simple array of specs because
@@ -166,7 +168,7 @@ typedef struct lcb_RESPN1XMGMT_st {
     size_t nspecs;
 
     /** Inner N1QL response. Examine on error */
-    const lcb_RESPN1QL *inner;
+    const lcb_RESPQUERY *inner;
 } lcb_RESPN1XMGMT;
 
 /**

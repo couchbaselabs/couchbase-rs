@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2014-2019 Couchbase, Inc.
+ *     Copyright 2014-2020 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -82,6 +82,12 @@ struct lcb_VIEW_HANDLE_ : lcb::jsparse::Parser::Actions {
     lcb::docreq::Queue *docq;
     lcb_VIEW_CALLBACK callback;
     lcb_INSTANCE *instance;
+
+    std::string design_document;
+    std::string view;
+    std::string query_params;
+    std::string first_error_code;
+    std::string first_error_message;
 
     unsigned refcount;
     uint32_t cmdflags;

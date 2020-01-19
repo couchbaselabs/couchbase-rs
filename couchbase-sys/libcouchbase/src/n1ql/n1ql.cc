@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2018-2019 Couchbase, Inc.
+ *     Copyright 2018-2020 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@
 #include <map>
 #include <string>
 #include <list>
+#include <regex>
 
 #define LOGFMT "(NR=%p) "
 #define LOGID(req) static_cast< const void * >(req)
@@ -37,7 +38,7 @@
  * The #callback field must be specified, and indicates the function the
  * library should call when more response data has arrived.
  */
-struct lcb_CMDN1QL_ {
+struct lcb_CMDQUERY_ {
     LCB_CMD_BASE;
     Json::Value root;
     /**Query to be placed in the POST request. The library will not perform
@@ -55,60 +56,66 @@ struct lcb_CMDN1QL_ {
     std::string query;
 
     /** Callback to be invoked for each row */
-    lcb_N1QL_CALLBACK callback;
+    lcb_QUERY_CALLBACK callback;
 
     /**Request handle. Will be set to the handle which may be passed to
-     * lcb_n1ql_cancel() */
-    lcb_N1QL_HANDLE **handle;
+     * lcb_query_cancel() */
+    lcb_QUERY_HANDLE **handle;
 
-    lcb_CMDN1QL_() : callback(NULL), handle(NULL)
+    lcb_CMDQUERY_() : callback(NULL), handle(NULL)
     {
         RESET_CMD_BASE(this);
     }
 };
 
-LIBCOUCHBASE_API lcb_STATUS lcb_respn1ql_status(const lcb_RESPN1QL *resp)
+LIBCOUCHBASE_API lcb_STATUS lcb_respquery_status(const lcb_RESPQUERY *resp)
 {
-    return resp->rc;
+    return resp->ctx.rc;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_respn1ql_cookie(const lcb_RESPN1QL *resp, void **cookie)
+LIBCOUCHBASE_API lcb_STATUS lcb_respquery_cookie(const lcb_RESPQUERY *resp, void **cookie)
 {
     *cookie = resp->cookie;
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_respn1ql_row(const lcb_RESPN1QL *resp, const char **row, size_t *row_len)
+LIBCOUCHBASE_API lcb_STATUS lcb_respquery_row(const lcb_RESPQUERY *resp, const char **row, size_t *row_len)
 {
     *row = resp->row;
     *row_len = resp->nrow;
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_respn1ql_http_response(const lcb_RESPN1QL *resp, const lcb_RESPHTTP **http)
+LIBCOUCHBASE_API lcb_STATUS lcb_respquery_http_response(const lcb_RESPQUERY *resp, const lcb_RESPHTTP **http)
 {
     *http = resp->htresp;
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_respn1ql_handle(const lcb_RESPN1QL *resp, lcb_N1QL_HANDLE **handle)
+LIBCOUCHBASE_API lcb_STATUS lcb_respquery_handle(const lcb_RESPQUERY *resp, lcb_QUERY_HANDLE **handle)
 {
     *handle = resp->handle;
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API int lcb_respn1ql_is_final(const lcb_RESPN1QL *resp)
+LIBCOUCHBASE_API lcb_STATUS lcb_respquery_error_context(const lcb_RESPQUERY *resp, const lcb_QUERY_ERROR_CONTEXT **ctx)
+{
+    *ctx = &resp->ctx;
+    return LCB_SUCCESS;
+}
+
+LIBCOUCHBASE_API int lcb_respquery_is_final(const lcb_RESPQUERY *resp)
 {
     return resp->rflags & LCB_RESP_F_FINAL;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdn1ql_create(lcb_CMDN1QL **cmd)
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdquery_create(lcb_CMDQUERY **cmd)
 {
-    *cmd = new lcb_CMDN1QL();
+    *cmd = new lcb_CMDQUERY();
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdn1ql_destroy(lcb_CMDN1QL *cmd)
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdquery_destroy(lcb_CMDQUERY *cmd)
 {
     if (cmd) {
         delete cmd;
@@ -116,13 +123,13 @@ LIBCOUCHBASE_API lcb_STATUS lcb_cmdn1ql_destroy(lcb_CMDN1QL *cmd)
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdn1ql_timeout(lcb_CMDN1QL *cmd, uint32_t timeout)
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdquery_timeout(lcb_CMDQUERY *cmd, uint32_t timeout)
 {
     cmd->timeout = timeout;
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdn1ql_reset(lcb_CMDN1QL *cmd)
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdquery_reset(lcb_CMDQUERY *cmd)
 {
     RESET_CMD_BASE(cmd);
     cmd->root = Json::Value();
@@ -132,13 +139,13 @@ LIBCOUCHBASE_API lcb_STATUS lcb_cmdn1ql_reset(lcb_CMDN1QL *cmd)
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdn1ql_parent_span(lcb_CMDN1QL *cmd, lcbtrace_SPAN *span)
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdquery_parent_span(lcb_CMDQUERY *cmd, lcbtrace_SPAN *span)
 {
     cmd->pspan = span;
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdn1ql_callback(lcb_CMDN1QL *cmd, lcb_N1QL_CALLBACK callback)
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdquery_callback(lcb_CMDQUERY *cmd, lcb_QUERY_CALLBACK callback)
 {
     cmd->callback = callback;
     return LCB_SUCCESS;
@@ -149,7 +156,7 @@ LIBCOUCHBASE_API lcb_STATUS lcb_cmdn1ql_callback(lcb_CMDN1QL *cmd, lcb_N1QL_CALL
         n = strlen(s);                                                                                                 \
     }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdn1ql_payload(lcb_CMDN1QL *cmd, const char **payload, size_t *payload_len)
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdquery_encoded_payload(lcb_CMDQUERY *cmd, const char **payload, size_t *payload_len)
 {
     cmd->query = Json::FastWriter().write(cmd->root);
     *payload = cmd->query.c_str();
@@ -157,43 +164,43 @@ LIBCOUCHBASE_API lcb_STATUS lcb_cmdn1ql_payload(lcb_CMDN1QL *cmd, const char **p
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdn1ql_query(lcb_CMDN1QL *cmd, const char *query, size_t query_len)
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdquery_payload(lcb_CMDQUERY *cmd, const char *query, size_t query_len)
 {
     fix_strlen(query, query_len);
     Json::Value value;
     if (!Json::Reader().parse(query, query + query_len, value)) {
-        return LCB_EINVAL;
+        return LCB_ERR_INVALID_ARGUMENT;
     }
     cmd->root = value;
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdn1ql_statement(lcb_CMDN1QL *cmd, const char *statement, size_t statement_len)
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdquery_statement(lcb_CMDQUERY *cmd, const char *statement, size_t statement_len)
 {
     fix_strlen(statement, statement_len);
     cmd->root["statement"] = std::string(statement, statement_len);
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdn1ql_named_param(lcb_CMDN1QL *cmd, const char *name, size_t name_len,
-                                                    const char *value, size_t value_len)
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdquery_named_param(lcb_CMDQUERY *cmd, const char *name, size_t name_len,
+                                                     const char *value, size_t value_len)
 {
     std::string key = "$" + std::string(name, name_len);
-    return lcb_cmdn1ql_option(cmd, key.c_str(), key.size(), value, value_len);
+    return lcb_cmdquery_option(cmd, key.c_str(), key.size(), value, value_len);
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdn1ql_positional_param(lcb_CMDN1QL *cmd, const char *value, size_t value_len)
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdquery_positional_param(lcb_CMDQUERY *cmd, const char *value, size_t value_len)
 {
     fix_strlen(value, value_len);
     Json::Value jval;
     if (!Json::Reader().parse(value, value + value_len, jval)) {
-        return LCB_EINVAL;
+        return LCB_ERR_INVALID_ARGUMENT;
     }
     cmd->root["args"].append(jval);
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdn1ql_adhoc(lcb_CMDN1QL *cmd, int adhoc)
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdquery_adhoc(lcb_CMDQUERY *cmd, int adhoc)
 {
     if (adhoc) {
         cmd->cmdflags &= ~LCB_CMDN1QL_F_PREPCACHE;
@@ -203,49 +210,55 @@ LIBCOUCHBASE_API lcb_STATUS lcb_cmdn1ql_adhoc(lcb_CMDN1QL *cmd, int adhoc)
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdn1ql_client_context_id(lcb_CMDN1QL *cmd, const char* value, size_t value_len)
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdquery_client_context_id(lcb_CMDQUERY *cmd, const char *value, size_t value_len)
 {
     cmd->root["client_context_id"] = std::string(value, value_len);
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdn1ql_pretty(lcb_CMDN1QL *cmd, int pretty)
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdquery_pretty(lcb_CMDQUERY *cmd, int pretty)
 {
     cmd->root["pretty"] = pretty != 0;
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdn1ql_readonly(lcb_CMDN1QL *cmd, int readonly)
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdquery_readonly(lcb_CMDQUERY *cmd, int readonly)
 {
     cmd->root["readonly"] = readonly ? true : false;
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdn1ql_scan_cap(lcb_CMDN1QL *cmd, int value)
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdquery_metrics(lcb_CMDQUERY *cmd, int metrics)
+{
+    cmd->root["metrics"] = metrics ? true : false;
+    return LCB_SUCCESS;
+}
+
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdquery_scan_cap(lcb_CMDQUERY *cmd, int value)
 {
     cmd->root["scan_cap"] = Json::valueToString(value);
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdn1ql_pipeline_cap(lcb_CMDN1QL *cmd, int value)
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdquery_pipeline_cap(lcb_CMDQUERY *cmd, int value)
 {
     cmd->root["pipeline_cap"] = Json::valueToString(value);
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdn1ql_pipeline_batch(lcb_CMDN1QL *cmd, int value)
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdquery_pipeline_batch(lcb_CMDQUERY *cmd, int value)
 {
     cmd->root["pipeline_batch"] = Json::valueToString(value);
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdn1ql_consistency(lcb_CMDN1QL *cmd, lcb_N1QL_CONSISTENCY mode)
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdquery_consistency(lcb_CMDQUERY *cmd, lcb_QUERY_CONSISTENCY mode)
 {
-    if (mode == LCB_N1QL_CONSISTENCY_NONE) {
+    if (mode == LCB_QUERY_CONSISTENCY_NONE) {
         cmd->root.removeMember("scan_consistency");
-    } else if (mode == LCB_N1QL_CONSISTENCY_REQUEST) {
+    } else if (mode == LCB_QUERY_CONSISTENCY_REQUEST) {
         cmd->root["scan_consistency"] = "request_plus";
-    } else if (mode == LCB_N1QL_CONSISTENCY_STATEMENT) {
+    } else if (mode == LCB_QUERY_CONSISTENCY_STATEMENT) {
         cmd->root["scan_consistency"] = "statement_plus";
     }
     return LCB_SUCCESS;
@@ -262,12 +275,12 @@ static void encode_mutation_token(Json::Value &sparse, const lcb_MUTATION_TOKEN 
     cur_sv[1] = buf;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdn1ql_consistency_token_for_keyspace(lcb_CMDN1QL *cmd, const char *keyspace,
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdn1ql_consistency_token_for_keyspace(lcb_CMDQUERY *cmd, const char *keyspace,
                                                                        size_t keyspace_len,
                                                                        const lcb_MUTATION_TOKEN *token)
 {
     if (!LCB_MUTATION_TOKEN_ISVALID(token)) {
-        return LCB_EINVAL;
+        return LCB_ERR_INVALID_ARGUMENT;
     }
 
     cmd->root["scan_consistency"] = "at_plus";
@@ -275,7 +288,7 @@ LIBCOUCHBASE_API lcb_STATUS lcb_cmdn1ql_consistency_token_for_keyspace(lcb_CMDN1
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdn1ql_consistency_tokens(lcb_CMDN1QL *cmd, lcb_INSTANCE *instance)
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdquery_consistency_tokens(lcb_CMDQUERY *cmd, lcb_INSTANCE *instance)
 {
     lcbvb_CONFIG *vbc;
     lcb_STATUS rc = lcb_cntl(instance, LCB_CNTL_GET, LCB_CNTL_VBCONFIG, &vbc);
@@ -307,14 +320,14 @@ LIBCOUCHBASE_API lcb_STATUS lcb_cmdn1ql_consistency_tokens(lcb_CMDN1QL *cmd, lcb
     }
 
     if (!sv_json) {
-        return LCB_KEY_ENOENT;
+        return LCB_ERR_DOCUMENT_NOT_FOUND;
     }
 
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdn1ql_option(lcb_CMDN1QL *cmd, const char *name, size_t name_len, const char *value,
-                                               size_t value_len)
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdquery_option(lcb_CMDQUERY *cmd, const char *name, size_t name_len, const char *value,
+                                                size_t value_len)
 {
     fix_strlen(name, name_len);
     fix_strlen(value, value_len);
@@ -322,21 +335,21 @@ LIBCOUCHBASE_API lcb_STATUS lcb_cmdn1ql_option(lcb_CMDN1QL *cmd, const char *nam
     Json::Value jsonValue;
     bool rv = rdr.parse(value, value + value_len, jsonValue);
     if (!rv) {
-        return LCB_EINVAL;
+        return LCB_ERR_INVALID_ARGUMENT;
     }
 
     cmd->root[std::string(name, name_len)] = jsonValue;
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_cmdn1ql_handle(lcb_CMDN1QL *cmd, lcb_N1QL_HANDLE **handle)
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdquery_handle(lcb_CMDQUERY *cmd, lcb_QUERY_HANDLE **handle)
 {
     cmd->handle = handle;
     return LCB_SUCCESS;
 }
 
 // Indicate that the 'creds' field is to be used.
-#define F_CMDN1QL_CREDSAUTH 1 << 15
+#define F_CMDN1QL_CREDSAUTH (1u << 15u)
 
 class Plan
 {
@@ -475,12 +488,12 @@ struct lcb_N1QLCACHE_st {
     }
 };
 
-typedef struct lcb_N1QL_HANDLE_ : lcb::jsparse::Parser::Actions {
+typedef struct lcb_QUERY_HANDLE_ : lcb::jsparse::Parser::Actions {
     const lcb_RESPHTTP *cur_htresp;
     lcb_HTTP_HANDLE *htreq;
     lcb::jsparse::Parser *parser;
     const void *cookie;
-    lcb_N1QL_CALLBACK callback;
+    lcb_QUERY_CALLBACK callback;
     lcb_INSTANCE *instance;
     lcb_STATUS lasterr;
     lcb_U32 flags;
@@ -489,7 +502,7 @@ typedef struct lcb_N1QL_HANDLE_ : lcb::jsparse::Parser::Actions {
     size_t nrows;
 
     /** The PREPARE query itself */
-    struct lcb_N1QL_HANDLE_ *prepare_req;
+    struct lcb_QUERY_HANDLE_ *prepare_req;
 
     /** Request body as received from the application */
     Json::Value json;
@@ -500,6 +513,9 @@ typedef struct lcb_N1QL_HANDLE_ : lcb::jsparse::Parser::Actions {
 
     /** String of the original statement. Cached here to avoid jsoncpp lookups */
     std::string statement;
+    std::string client_context_id;
+    std::string first_error_message;
+    uint32_t first_error_code;
 
     /** Whether we're retrying this */
     bool was_retried;
@@ -571,22 +587,22 @@ typedef struct lcb_N1QL_HANDLE_ : lcb::jsparse::Parser::Actions {
      * @param is_last Whether this is the last row. If this is the last, then
      *  the RESP_F_FINAL flag is set, and no further callbacks will be invoked
      */
-    inline void invoke_row(lcb_RESPN1QL *resp, bool is_last);
+    inline void invoke_row(lcb_RESPQUERY *resp, bool is_last);
 
     /**
      * Fail an application-level query because the prepared statement failed
      * @param orig The response from the PREPARE request
      * @param err The error code
      */
-    inline void fail_prepared(const lcb_RESPN1QL *orig, lcb_STATUS err);
+    inline void fail_prepared(const lcb_RESPQUERY *orig, lcb_STATUS err);
 
-    inline lcb_N1QL_HANDLE_(lcb_INSTANCE *obj, const void *user_cookie, const lcb_CMDN1QL *cmd);
-    inline ~lcb_N1QL_HANDLE_();
+    inline lcb_QUERY_HANDLE_(lcb_INSTANCE *obj, const void *user_cookie, const lcb_CMDQUERY *cmd);
+    inline ~lcb_QUERY_HANDLE_();
 
     // Parser overrides:
     void JSPARSE_on_row(const lcb::jsparse::Row &row)
     {
-        lcb_RESPN1QL resp = {0};
+        lcb_RESPQUERY resp{};
         resp.row = static_cast< const char * >(row.row.iov_base);
         resp.nrow = row.row.iov_len;
         nrows++;
@@ -594,7 +610,7 @@ typedef struct lcb_N1QL_HANDLE_ : lcb::jsparse::Parser::Actions {
     }
     void JSPARSE_on_error(const std::string &)
     {
-        lasterr = LCB_PROTOCOL_ERROR;
+        lasterr = LCB_ERR_PROTOCOL_ERROR;
     }
     void JSPARSE_on_complete(const std::string &)
     {
@@ -737,38 +753,112 @@ bool N1QLREQ::maybe_retry()
     return false;
 }
 
-void N1QLREQ::invoke_row(lcb_RESPN1QL *resp, bool is_last)
+void N1QLREQ::invoke_row(lcb_RESPQUERY *resp, bool is_last)
 {
     resp->cookie = const_cast< void * >(cookie);
     resp->htresp = cur_htresp;
     resp->handle = this;
 
+    resp->ctx.http_response_code = cur_htresp->ctx.response_code;
+    resp->ctx.endpoint = resp->htresp->ctx.endpoint;
+    resp->ctx.endpoint_len = resp->htresp->ctx.endpoint_len;
+    resp->ctx.client_context_id = client_context_id.c_str();
+    resp->ctx.client_context_id_len = client_context_id.size();
+    resp->ctx.statement = statement.c_str();
+    resp->ctx.statement_len = statement.size();
+
     if (is_last) {
-        lcb_IOV meta;
+        lcb_IOV meta_buf;
         resp->rflags |= LCB_RESP_F_FINAL;
-        resp->rc = lasterr;
-        parser->get_postmortem(meta);
-        resp->row = static_cast< const char * >(meta.iov_base);
-        resp->nrow = meta.iov_len;
+        resp->ctx.rc = lasterr;
+        parser->get_postmortem(meta_buf);
+        resp->row = static_cast< const char * >(meta_buf.iov_base);
+        resp->nrow = meta_buf.iov_len;
+        Json::Value meta;
+        if (parse_json(resp->row, resp->nrow, meta)) {
+            const Json::Value &errors = meta["errors"];
+            if (errors.isArray() && !errors.empty()) {
+                const Json::Value &err = errors[0];
+                const Json::Value &msg = err["msg"];
+                if (msg.isString()) {
+                    first_error_message = msg.asString();
+                    resp->ctx.first_error_message = first_error_message.c_str();
+                    resp->ctx.first_error_message_len = first_error_message.size();
+                }
+                const Json::Value &code = err["code"];
+                if (code.isNumeric()) {
+                    first_error_code = code.asUInt();
+                    resp->ctx.first_error_code = first_error_code;
+                    switch (first_error_code) {
+                        case 3000:
+                            resp->ctx.rc = LCB_ERR_PARSING_FAILURE;
+                            break;
+                        case 12009:
+                            resp->ctx.rc = LCB_ERR_CAS_MISMATCH;
+                            break;
+                        case 4040:
+                        case 4050:
+                        case 4060:
+                        case 4070:
+                        case 4080:
+                        case 4090:
+                            resp->ctx.rc = LCB_ERR_PREPARED_STATEMENT_FAILURE;
+                            break;
+                        case 4300:
+                            if (!first_error_message.empty()) {
+                                std::regex already_exists("index.+already exists");
+                                if (std::regex_search(first_error_message, already_exists)) {
+                                    resp->ctx.rc = LCB_ERR_INDEX_EXISTS;
+                                }
+                            }
+                            break;
+                        case 5000:
+                            if (!first_error_message.empty()) {
+                                std::regex already_exists("Index.+already exists"); /* NOTE: case sensitive */
+                                if (std::regex_search(first_error_message, already_exists)) {
+                                    resp->ctx.rc = LCB_ERR_INDEX_EXISTS;
+                                } else {
+                                    std::regex not_found("index.+not found");
+                                    if (std::regex_search(first_error_message, not_found)) {
+                                        resp->ctx.rc = LCB_ERR_INDEX_NOT_FOUND;
+                                    }
+                                }
+                            }
+                            break;
+                        case 12004:
+                        case 12016:
+                            resp->ctx.rc = LCB_ERR_INDEX_NOT_FOUND;
+                            break;
+                        default:
+                            if (first_error_code >= 4000 && first_error_code < 5000) {
+                                resp->ctx.rc = LCB_ERR_PLANNING_FAILURE;
+                            } else if (first_error_code >= 5000 && first_error_code < 6000) {
+                                resp->ctx.rc = LCB_ERR_INTERNAL_SERVER_FAILURE;
+                            } else if (first_error_code >= 10000 && first_error_code < 11000) {
+                                resp->ctx.rc = LCB_ERR_AUTHENTICATION_FAILURE;
+                            } else if ((first_error_code >= 12000 && first_error_code < 13000) ||
+                                       (first_error_code >= 14000 && first_error_code < 15000)) {
+                                resp->ctx.rc = LCB_ERR_INDEX_FAILURE;
+                            }
+                            break;
+                    }
+                }
+            }
+        }
     }
 
     if (callback) {
-        callback(instance, LCB_CALLBACK_N1QL, resp);
+        callback(instance, LCB_CALLBACK_QUERY, resp);
     }
     if (is_last) {
         callback = NULL;
     }
 }
 
-lcb_N1QL_HANDLE_::~lcb_N1QL_HANDLE_()
+lcb_QUERY_HANDLE_::~lcb_QUERY_HANDLE_()
 {
-    if (htreq) {
-        lcb_http_cancel(instance, htreq);
-        htreq = NULL;
-    }
-
     if (callback) {
-        lcb_RESPN1QL resp = {0};
+        lcb_RESPQUERY resp{};
         invoke_row(&resp, 1);
     }
 
@@ -784,11 +874,16 @@ lcb_N1QL_HANDLE_::~lcb_N1QL_HANDLE_()
         span = NULL;
     }
 
+    if (htreq) {
+        lcb_http_cancel(instance, htreq);
+        htreq = NULL;
+    }
+
     if (parser) {
         delete parser;
     }
     if (prepare_req) {
-        lcb_n1ql_cancel(instance, prepare_req);
+        lcb_query_cancel(instance, prepare_req);
     }
 }
 
@@ -801,9 +896,9 @@ static void chunk_callback(lcb_INSTANCE *instance, int ign, const lcb_RESPBASE *
     (void)instance;
 
     req->cur_htresp = rh;
-    if (rh->rc != LCB_SUCCESS || rh->htstatus != 200) {
-        if (req->lasterr == LCB_SUCCESS || rh->htstatus != 200) {
-            req->lasterr = rh->rc ? rh->rc : LCB_HTTP_ERROR;
+    if (rh->ctx.rc != LCB_SUCCESS || rh->ctx.response_code != 200) {
+        if (req->lasterr == LCB_SUCCESS || rh->ctx.response_code != 200) {
+            req->lasterr = rh->ctx.rc ? rh->ctx.rc : LCB_ERR_HTTP;
         }
     }
 
@@ -819,51 +914,51 @@ static void chunk_callback(lcb_INSTANCE *instance, int ign, const lcb_RESPBASE *
         delete req;
         return;
     }
-    req->parser->feed(static_cast< const char * >(rh->body), rh->nbody);
+    req->parser->feed(static_cast< const char * >(rh->ctx.body), rh->ctx.body_len);
 }
 
-void N1QLREQ::fail_prepared(const lcb_RESPN1QL *orig, lcb_STATUS err)
+void N1QLREQ::fail_prepared(const lcb_RESPQUERY *orig, lcb_STATUS err)
 {
     lcb_log(LOGARGS(this, ERROR), LOGFMT "Prepare failed!", LOGID(this));
 
-    lcb_RESPN1QL newresp = *orig;
+    lcb_RESPQUERY newresp = *orig;
     newresp.rflags = LCB_RESP_F_FINAL;
     newresp.cookie = const_cast< void * >(cookie);
-    newresp.rc = err;
+    newresp.ctx.rc = err;
     if (err == LCB_SUCCESS) {
-        newresp.rc = LCB_ERROR;
+        newresp.ctx.rc = LCB_ERR_GENERIC;
     }
 
     if (callback != NULL) {
-        callback(instance, LCB_CALLBACK_N1QL, &newresp);
+        callback(instance, LCB_CALLBACK_QUERY, &newresp);
         callback = NULL;
     }
     delete this;
 }
 
 // Received internally for PREPARE
-static void prepare_rowcb(lcb_INSTANCE *instance, int, const lcb_RESPN1QL *row)
+static void prepare_rowcb(lcb_INSTANCE *instance, int, const lcb_RESPQUERY *row)
 {
-    lcb_N1QL_HANDLE_ *origreq = reinterpret_cast< lcb_N1QL_HANDLE_ * >(row->cookie);
+    lcb_QUERY_HANDLE_ *origreq = reinterpret_cast<lcb_QUERY_HANDLE_ *>(row->cookie);
 
-    lcb_n1ql_cancel(instance, origreq->prepare_req);
+    lcb_query_cancel(instance, origreq->prepare_req);
     origreq->prepare_req = NULL;
 
-    if (row->rc != LCB_SUCCESS || (row->rflags & LCB_RESP_F_FINAL)) {
-        origreq->fail_prepared(row, row->rc);
+    if (row->ctx.rc != LCB_SUCCESS || (row->rflags & LCB_RESP_F_FINAL)) {
+        origreq->fail_prepared(row, row->ctx.rc);
     } else {
         // Insert into cache
         Json::Value prepared;
         if (!parse_json(row->row, row->nrow, prepared)) {
             lcb_log(LOGARGS(origreq, ERROR), LOGFMT "Invalid JSON returned from PREPARE", LOGID(origreq));
-            origreq->fail_prepared(row, LCB_PROTOCOL_ERROR);
+            origreq->fail_prepared(row, LCB_ERR_PROTOCOL_ERROR);
             return;
         }
 
         bool eps = LCBVB_CCAPS(LCBT_VBCONFIG(instance)) & LCBVB_CCAP_N1QL_ENHANCED_PREPARED_STATEMENTS;
         // Insert plan into cache
         lcb_log(LOGARGS(origreq, DEBUG), LOGFMT "Got %sprepared statement. Inserting into cache and reissuing",
-            LOGID(origreq), eps ? "(enhanced) " : "");
+                LOGID(origreq), eps ? "(enhanced) " : "");
         const Plan &ent = origreq->cache().add_entry(origreq->statement, prepared, !eps);
 
         // Issue the query with the newly prepared plan
@@ -882,7 +977,7 @@ lcb_STATUS N1QLREQ::issue_htreq(const std::string &body)
     if (is_cbas) {
         lcb_cmdhttp_create(&htcmd, LCB_HTTP_TYPE_CBAS);
     } else {
-        lcb_cmdhttp_create(&htcmd, LCB_HTTP_TYPE_N1QL);
+        lcb_cmdhttp_create(&htcmd, LCB_HTTP_TYPE_QUERY);
     }
     lcb_cmdhttp_body(htcmd, body.c_str(), body.size());
     lcb_cmdhttp_content_type(htcmd, content_type.c_str(), content_type.size());
@@ -906,7 +1001,7 @@ lcb_STATUS N1QLREQ::request_plan()
 {
     Json::Value newbody(Json::objectValue);
     newbody["statement"] = "PREPARE " + statement;
-    lcb_CMDN1QL newcmd;
+    lcb_CMDQUERY newcmd;
     newcmd.callback = prepare_rowcb;
     newcmd.cmdflags = LCB_CMDN1QL_F_JSONQUERY;
     newcmd.handle = &prepare_req;
@@ -915,7 +1010,7 @@ lcb_STATUS N1QLREQ::request_plan()
         newcmd.cmdflags |= LCB_CMD_F_MULTIAUTH;
     }
 
-    return lcb_n1ql(instance, this, &newcmd);
+    return lcb_query(instance, this, &newcmd);
 }
 
 lcb_STATUS N1QLREQ::apply_plan(const Plan &plan)
@@ -956,7 +1051,7 @@ lcb_U32 lcb_n1qlreq_parsetmo(const std::string &s)
     }
 }
 
-lcb_N1QL_HANDLE_::lcb_N1QL_HANDLE_(lcb_INSTANCE *obj, const void *user_cookie, const lcb_CMDN1QL *cmd)
+lcb_QUERY_HANDLE_::lcb_QUERY_HANDLE_(lcb_INSTANCE *obj, const void *user_cookie, const lcb_CMDQUERY *cmd)
     : cur_htresp(NULL), htreq(NULL), parser(new lcb::jsparse::Parser(lcb::jsparse::Parser::MODE_N1QL, this)),
       cookie(user_cookie), callback(cmd->callback), instance(obj), lasterr(LCB_SUCCESS), flags(cmd->cmdflags),
       timeout(0), nrows(0), prepare_req(NULL), was_retried(false), is_cbas(false), span(NULL)
@@ -970,7 +1065,7 @@ lcb_N1QL_HANDLE_::lcb_N1QL_HANDLE_(lcb_INSTANCE *obj, const void *user_cookie, c
     } else {
         std::string encoded = Json::FastWriter().write(cmd->root);
         if (!parse_json(encoded.c_str(), encoded.size(), json)) {
-            lasterr = LCB_EINVAL;
+            lasterr = LCB_ERR_INVALID_ARGUMENT;
             return;
         }
     }
@@ -979,7 +1074,7 @@ lcb_N1QL_HANDLE_::lcb_N1QL_HANDLE_(lcb_INSTANCE *obj, const void *user_cookie, c
         is_cbas = true;
     }
     if (is_cbas && (flags & LCB_CMDN1QL_F_PREPCACHE)) {
-        lasterr = LCB_OPTIONS_CONFLICT;
+        lasterr = LCB_ERR_OPTIONS_CONFLICT;
         return;
     }
 
@@ -987,7 +1082,7 @@ lcb_N1QL_HANDLE_::lcb_N1QL_HANDLE_(lcb_INSTANCE *obj, const void *user_cookie, c
     if (j_statement.isString()) {
         statement = j_statement.asString();
     } else if (!j_statement.isNull()) {
-        lasterr = LCB_EINVAL;
+        lasterr = LCB_ERR_INVALID_ARGUMENT;
         return;
     }
 
@@ -1004,8 +1099,17 @@ lcb_N1QL_HANDLE_::lcb_N1QL_HANDLE_(lcb_INSTANCE *obj, const void *user_cookie, c
         timeout = lcb_n1qlreq_parsetmo(tmoval.asString());
     } else {
         // Timeout is not a string!
-        lasterr = LCB_EINVAL;
+        lasterr = LCB_ERR_INVALID_ARGUMENT;
         return;
+    }
+    Json::Value &ccid = json["client_context_id"];
+    if (ccid.isNull()) {
+        char buf[32];
+        size_t nbuf = snprintf(buf, sizeof(buf), "%016" PRIx64, lcb_next_rand64());
+        client_context_id.assign(buf, nbuf);
+        json["client_context_id"] = client_context_id;
+    } else {
+        client_context_id = ccid.asString();
     }
 
     // Determine if we need to add more credentials.
@@ -1018,7 +1122,7 @@ lcb_N1QL_HANDLE_::lcb_N1QL_HANDLE_(lcb_INSTANCE *obj, const void *user_cookie, c
         Json::Value &creds = json["creds"];
         lcb::Authenticator::Map::const_iterator ii = auth.buckets().begin();
         if (!(creds.isNull() || creds.isArray())) {
-            lasterr = LCB_EINVAL;
+            lasterr = LCB_ERR_INVALID_ARGUMENT;
             return;
         }
         for (; ii != auth.buckets().end(); ++ii) {
@@ -1041,17 +1145,17 @@ lcb_N1QL_HANDLE_::lcb_N1QL_HANDLE_(lcb_INSTANCE *obj, const void *user_cookie, c
 }
 
 LIBCOUCHBASE_API
-lcb_STATUS lcb_n1ql(lcb_INSTANCE *instance, void *cookie, const lcb_CMDN1QL *cmd)
+lcb_STATUS lcb_query(lcb_INSTANCE *instance, void *cookie, const lcb_CMDQUERY *cmd)
 {
     lcb_STATUS err;
     N1QLREQ *req = NULL;
 
     if ((cmd->query.empty() && cmd->root.empty()) || cmd->callback == NULL) {
-        return LCB_EINVAL;
+        return LCB_ERR_INVALID_ARGUMENT;
     }
-    req = new lcb_N1QL_HANDLE_(instance, cookie, cmd);
+    req = new lcb_QUERY_HANDLE_(instance, cookie, cmd);
     if (!req) {
-        err = LCB_CLIENT_ENOMEM;
+        err = LCB_ERR_NO_MEMORY;
         goto GT_DESTROY;
     }
     if ((err = req->lasterr) != LCB_SUCCESS) {
@@ -1060,7 +1164,7 @@ lcb_STATUS lcb_n1ql(lcb_INSTANCE *instance, void *cookie, const lcb_CMDN1QL *cmd
 
     if (cmd->cmdflags & LCB_CMDN1QL_F_PREPCACHE) {
         if (req->statement.empty()) {
-            err = LCB_EINVAL;
+            err = LCB_ERR_INVALID_ARGUMENT;
             goto GT_DESTROY;
         }
 
@@ -1096,7 +1200,7 @@ GT_DESTROY:
     return err;
 }
 
-LIBCOUCHBASE_API lcb_STATUS lcb_n1ql_cancel(lcb_INSTANCE *instance, lcb_N1QL_HANDLE *handle)
+LIBCOUCHBASE_API lcb_STATUS lcb_query_cancel(lcb_INSTANCE *instance, lcb_QUERY_HANDLE *handle)
 {
     // Note that this function is just an elaborate way to nullify the
     // callback. We are very particular about _not_ cancelling the underlying
@@ -1107,10 +1211,12 @@ LIBCOUCHBASE_API lcb_STATUS lcb_n1ql_cancel(lcb_INSTANCE *instance, lcb_N1QL_HAN
     // extra network reads; whereas this function itself is intended as a
     // bailout for unexpected destruction.
 
-    if (handle->prepare_req) {
-        lcb_n1ql_cancel(instance, handle->prepare_req);
-        handle->prepare_req = NULL;
+    if (handle) {
+        if (handle->prepare_req) {
+            lcb_query_cancel(instance, handle->prepare_req);
+            handle->prepare_req = NULL;
+        }
+        handle->callback = NULL;
     }
-    handle->callback = NULL;
     return LCB_SUCCESS;
 }

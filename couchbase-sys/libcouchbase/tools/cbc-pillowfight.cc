@@ -1,6 +1,6 @@
 /* -*- Mode: C++; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2011-2019 Couchbase, Inc.
+ *     Copyright 2011-2020 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -41,10 +41,10 @@
 #include <stdexcept>
 #include "common/options.h"
 #include "common/histogram.h"
-#include "contrib/lcb-jsoncpp/lcb-jsoncpp.h"
 
 #include "docgen/seqgen.h"
 #include "docgen/docgen.h"
+#include "internalstructs.h"
 
 using namespace std;
 using namespace cbc;
@@ -775,7 +775,7 @@ class ThreadContext
         if (hasItems) {
             error = LCB_SUCCESS;
             lcb_sched_leave(instance);
-            lcb_wait(instance);
+            lcb_wait(instance, LCB_WAIT_DEFAULT);
         } else {
             lcb_sched_fail(instance);
         }
@@ -811,7 +811,7 @@ class ThreadContext
                 cookie->stats.retried++;
             }
             lcb_sched_leave(instance);
-            lcb_wait(instance);
+            lcb_wait(instance, LCB_WAIT_DEFAULT);
             if (error != LCB_SUCCESS) {
                 log("Operation(s) failed: %s", lcb_strerror_long(error));
             }
@@ -1018,13 +1018,13 @@ static void updateStats(InstanceCookie *cookie, lcb_STATUS rc)
 {
     cookie->stats.total++;
     switch (rc) {
-        case LCB_ETMPFAIL:
+        case LCB_ERR_TEMPORARY_FAILURE:
             cookie->stats.etmpfail++;
             break;
-        case LCB_KEY_EEXISTS:
+        case LCB_ERR_DOCUMENT_EXISTS:
             cookie->stats.eexist++;
             break;
-        case LCB_ETIMEDOUT:
+        case LCB_ERR_TIMEOUT:
             cookie->stats.etimeout++;
             break;
         default:
@@ -1036,8 +1036,8 @@ static void noopCallback(lcb_INSTANCE *instance, int, const lcb_RESPNOOP *resp)
 {
     InstanceCookie *cookie = InstanceCookie::get(instance);
     ThreadContext *tc = cookie->getContext();
-    tc->setError(resp->rc);
-    updateStats(cookie, resp->rc);
+    tc->setError(resp->ctx.rc);
+    updateStats(cookie, resp->ctx.rc);
     updateOpsPerSecDisplay();
 }
 
@@ -1098,7 +1098,7 @@ static void getCallback(lcb_INSTANCE *instance, int, const lcb_RESPGET *resp)
             lcb_cmdstore_destroy(scmd);
 
             done = false;
-        } else if (rc == LCB_ETMPFAIL) {
+        } else if (rc == LCB_ERR_TEMPORARY_FAILURE) {
             NextOp op;
             op.m_mode = NextOp::STORE;
             op.m_key = key;
@@ -1350,7 +1350,7 @@ int main(int argc, char **argv)
         InstanceCookie *cookie = new InstanceCookie(instance);
 
         lcb_connect(instance);
-        lcb_wait(instance);
+        lcb_wait(instance, LCB_WAIT_DEFAULT);
         error = lcb_get_bootstrap_status(instance);
 
         if (error != LCB_SUCCESS) {

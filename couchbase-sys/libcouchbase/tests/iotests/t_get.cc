@@ -1,6 +1,6 @@
 /* -*- Mode: C++; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2012-2019 Couchbase, Inc.
+ *     Copyright 2012-2020 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ static void testGetMissGetCallback(lcb_INSTANCE *, lcb_CALLBACK_TYPE, const lcb_
 {
     int *counter;
     lcb_respget_cookie(resp, (void **)&counter);
-    EXPECT_EQ(LCB_KEY_ENOENT, lcb_respget_status(resp));
+    EXPECT_EQ(LCB_ERR_DOCUMENT_NOT_FOUND, lcb_respget_status(resp));
     const char *key;
     size_t nkey;
     lcb_respget_key(resp, &key, &nkey);
@@ -76,7 +76,7 @@ TEST_F(GetUnitTest, testGetMiss)
     EXPECT_EQ(LCB_SUCCESS, lcb_get(instance, &numcallbacks, cmd));
     lcb_cmdget_destroy(cmd);
 
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     EXPECT_EQ(2, numcallbacks);
 }
 
@@ -123,7 +123,7 @@ TEST_F(GetUnitTest, testGetHit)
     EXPECT_EQ(LCB_SUCCESS, lcb_get(instance, &numcallbacks, cmd));
     lcb_cmdget_destroy(cmd);
 
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     EXPECT_EQ(2, numcallbacks);
 }
 
@@ -132,7 +132,7 @@ static void testTouchMissCallback(lcb_INSTANCE *, lcb_CALLBACK_TYPE, const lcb_R
 {
     int *counter;
     lcb_resptouch_cookie(resp, (void **)&counter);
-    EXPECT_EQ(LCB_KEY_ENOENT, lcb_resptouch_status(resp));
+    EXPECT_EQ(LCB_ERR_DOCUMENT_NOT_FOUND, lcb_resptouch_status(resp));
     ++(*counter);
 }
 }
@@ -160,7 +160,7 @@ TEST_F(GetUnitTest, testTouchMiss)
     lcb_cmdtouch_expiry(cmd, 666);
     lcb_touch(instance, &numcallbacks, cmd);
     lcb_cmdtouch_destroy(cmd);
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     EXPECT_EQ(1, numcallbacks);
 }
 
@@ -197,7 +197,7 @@ TEST_F(GetUnitTest, testTouchHit)
     lcb_touch(instance, &numcallbacks, cmd);
     lcb_cmdtouch_destroy(cmd);
 
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     EXPECT_EQ(1, numcallbacks);
 }
 
@@ -267,7 +267,7 @@ TEST_F(GetUnitTest, testFlags)
     lcb_cmdstore_destroy(scmd);
 
     // Wait for it to be persisted
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
 
     lcb_CMDGET *gcmd;
     lcb_cmdget_create(&gcmd);
@@ -276,7 +276,7 @@ TEST_F(GetUnitTest, testFlags)
     lcb_cmdget_destroy(gcmd);
 
     /* Wait for it to be received */
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     EXPECT_EQ(2, numcallbacks);
 }
 
@@ -367,7 +367,7 @@ TEST_F(GetUnitTest, testGetReplica)
         lcb_cmdgetreplica_destroy(rcmd);
 
         lcb_sched_leave(instance);
-        lcb_wait(instance);
+        lcb_wait(instance, LCB_WAIT_DEFAULT);
         ASSERT_EQ(0, rck.remaining);
     }
 
@@ -391,7 +391,7 @@ TEST_F(GetUnitTest, testGetReplica)
     ASSERT_EQ(LCB_SUCCESS, err);
     lcb_sched_leave(instance);
 
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     ASSERT_EQ(0, rck.remaining);
 
     MockMutationCommand purgeCmd(MockCommand::PURGE, key);
@@ -425,12 +425,12 @@ TEST_F(GetUnitTest, testGetReplica)
     lcb_cmdgetreplica_destroy(rcmd);
     ASSERT_EQ(LCB_SUCCESS, err);
     lcb_sched_leave(instance);
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     ASSERT_EQ(0, rck.remaining);
 
     // Test with an invalid index
     rcmd = NULL;
-    ASSERT_EQ(LCB_EINVAL, lcb_cmdgetreplica_create(&rcmd, (lcb_REPLICA_MODE)42));
+    ASSERT_EQ(LCB_ERR_INVALID_ARGUMENT, lcb_cmdgetreplica_create(&rcmd, (lcb_REPLICA_MODE)42));
     ASSERT_EQ((lcb_CMDGETREPLICA *)NULL, rcmd);
 
     // If no crash, it's good.
@@ -447,7 +447,7 @@ TEST_F(GetUnitTest, testGetReplica)
         oldix = vb->servers[2];
         vb->servers[2] = -1;
 
-        rck.expectrc = LCB_KEY_ENOENT;
+        rck.expectrc = LCB_ERR_DOCUMENT_NOT_FOUND;
         rck.remaining = 1;
         lcb_sched_enter(instance);
         lcb_cmdgetreplica_create(&rcmd, LCB_REPLICA_MODE_ANY);
@@ -456,7 +456,7 @@ TEST_F(GetUnitTest, testGetReplica)
         lcb_cmdgetreplica_destroy(rcmd);
         ASSERT_EQ(LCB_SUCCESS, err);
         lcb_sched_leave(instance);
-        lcb_wait(instance);
+        lcb_wait(instance, LCB_WAIT_DEFAULT);
         ASSERT_EQ(0, rck.remaining);
 
         // Try with ALL again (should give an error)
@@ -465,7 +465,7 @@ TEST_F(GetUnitTest, testGetReplica)
         lcb_sched_enter(instance);
         err = lcb_getreplica(instance, NULL, rcmd);
         lcb_cmdgetreplica_destroy(rcmd);
-        ASSERT_EQ(LCB_NO_MATCHING_SERVER, err);
+        ASSERT_EQ(LCB_ERR_NO_MATCHING_SERVER, err);
         lcb_sched_leave(instance);
 
         vb->servers[2] = oldix;
@@ -482,5 +482,5 @@ TEST_F(GetUnitTest, testGetReplica)
     err = lcb_getreplica(instance, NULL, rcmd);
     lcb_cmdgetreplica_destroy(rcmd);
     lcb_sched_leave(instance);
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
 }

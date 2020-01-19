@@ -1,6 +1,6 @@
 /* -*- Mode: C++; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2011-2019 Couchbase, Inc.
+ *     Copyright 2011-2020 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -77,10 +77,10 @@ TEST_F(CredsTest, testRbacCreds)
     ASSERT_EQ("", auth.password_for(NULL, NULL, "jane"));
 
     // Try adding a new bucket, it should fail
-    ASSERT_EQ(LCB_OPTIONS_CONFLICT, auth.add("users", "secret", LCBAUTH_F_BUCKET));
+    ASSERT_EQ(LCB_ERR_OPTIONS_CONFLICT, auth.add("users", "secret", LCBAUTH_F_BUCKET));
 
     // Try using "old-style" auth. It should fail:
-    ASSERT_EQ(LCB_OPTIONS_CONFLICT, auth.add("users", "secret", LCBAUTH_F_BUCKET | LCBAUTH_F_CLUSTER));
+    ASSERT_EQ(LCB_ERR_OPTIONS_CONFLICT, auth.add("users", "secret", LCBAUTH_F_BUCKET | LCBAUTH_F_CLUSTER));
     // Username/password should remain unchanged:
     ASSERT_EQ("mark", auth.username());
     ASSERT_EQ("", auth.password());

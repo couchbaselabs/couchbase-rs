@@ -1,5 +1,49 @@
 # Release Notes
 
+## 3.0.0 (2020-01-17)
+
+* CCBC-1152: Enable `SCRAM-SHA*` SASL by default.
+* CCBC-1153: Renamed `lcb_wait3` to `lcb_wait`.
+* CCBC-1147: Return `LCB_SUCCESS` for `lcb_exists` when the document is missing. `lcb_respexists_is_found` should be used on its response object to check the presense of the document.
+* CCBC-1152: Do not allow to use SASL PLAIN on non-TLS connections. Compiling libcouchbase with OpenSSL is strongly recommended.
+* CCBC-1032: Use operation node to resolve collection and return timeout when collection cannot be resolved
+* Added shortcut for query options to request metrics
+* Do not fallback to single subdocument API when only one specification passed to `lcb_subdoc`.
+* CCBC-1137: Allow to retrieve error context for HTTP response (`lcb_http` API)
+* CCBC-1145: Expose endpoints in error context.
+* CCBC-1146: Expose user-cookie in retry handler.
+* CCBC-1148: Added NULL checks for enhanced error info.
+* CCBC-1075: Renamed "FTS" to "SEARCH" in the APIs.
+* CCBC-1073: Renamed "N1QL" to "QUERY" in the APIs.
+* Fixed bucketless bootstrap for Server 6.0.
+* Fixed various memory leaks. Improved build, testing and packaging systems.
+
+## 3.0.0-beta.2 (2019-12-23)
+
+* CCBC-1066: Update retry framework to retry handling RFC
+* Reorganize error handing according to RFC. Expose error context object.
+* CCBC-1123: migrate exists function to `GET_META(0xa0)`
+* CCBC-1141: Map `MULTI_PATH_FAILURE` to success code for subdocument
+* CCBC-1126: Ensure KV connection select bucket when needed
+* CCBC-1127: Fix extlen for subdocument
+* CCBC-1101: Fix location of plugins for debian systems
+* Use per-operation timeout when deriving durability timeout
+* Remove durability support from GET operation
+* Rename payload setters/getters for queries
+* Fix setting empty path to subdoc mutation
+* Remove old flush command
+* Do not use classic authenticator for cluster instances
+* Allow to set CAS value for counter operations
+* Views: extend lifetime for content type string object
+* CCBC-1112: Send durability timeout in network byte ordering. This was being sent in host byte ordering before, which failed on some platforms.
+* Validate getreplica options before collection resolving. It allows to fail faster if the options are not correct for the command.
+* CCBC-1136: use `uint64_t` instead of type aliases for CAS
+* Fix const access specifier for logger API
+* Fix warnings reported by compiler and static analyzer
+* Fix leaks reported by memory sanitizer tools
+* Add cbc commands for search and analytics queries
+* Do not insert date in generated lexer (`cbc-gen`)
+
 ## 3.0.0-beta.1 (2019-10-01)
 
 * Renamed FTS function `lcb_cmdfts_query` to `lcb_cmdfts_payload`. This is done because in next beta release, the first

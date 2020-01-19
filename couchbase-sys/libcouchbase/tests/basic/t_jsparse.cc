@@ -1,6 +1,6 @@
 /* -*- Mode: C++; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2011-2019 Couchbase, Inc.
+ *     Copyright 2011-2020 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -60,7 +60,7 @@ struct Context : Parser::Actions {
     }
     void JSPARSE_on_error(const std::string &)
     {
-        rc = LCB_PROTOCOL_ERROR;
+        rc = LCB_ERR_PROTOCOL_ERROR;
         received_done = true;
     }
 };
@@ -88,7 +88,7 @@ static bool validateBadParse(const char *txt, size_t ntxt, Parser::Mode mode)
     Context cx;
     Parser p(mode, &cx);
     p.feed(txt, ntxt);
-    EXPECT_EQ(LCB_PROTOCOL_ERROR, cx.rc);
+    EXPECT_EQ(LCB_ERR_PROTOCOL_ERROR, cx.rc);
     return true;
 }
 

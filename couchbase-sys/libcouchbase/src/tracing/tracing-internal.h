@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2018-2019 Couchbase, Inc.
+ *     Copyright 2018-2020 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -144,27 +144,18 @@ void lcbtrace_span_add_tag_str_nocopy(lcbtrace_SPAN *span, const char *name, con
         lcbtrace_span_add_system_tags(outspan, (settings), LCBTRACE_TAG_SERVICE_KV);                                   \
     }
 
-#define LCBTRACE_KV_COMPLETE(pipeline, request, response)                                                              \
+#define LCBTRACE_KV_COMPLETE(pipeline, request, resp, response)                                                        \
     do {                                                                                                               \
         lcbtrace_SPAN *span = MCREQ_PKT_RDATA(request)->span;                                                          \
         if (span) {                                                                                                    \
             lcbtrace_span_add_tag_uint64(span, LCBTRACE_TAG_PEER_LATENCY, (response)->duration());                     \
             lcb::Server *server = static_cast< lcb::Server * >(pipeline);                                              \
-            const lcb_host_t *remote = server->curhost;                                                                \
-            if (remote) {                                                                                              \
-                std::string hh;                                                                                        \
-                if (remote->ipv6) {                                                                                    \
-                    hh.append("[").append(remote->host).append("]:").append(remote->port);                             \
-                } else {                                                                                               \
-                    hh.append(remote->host).append(":").append(remote->port);                                          \
-                }                                                                                                      \
-                lcbtrace_span_add_tag_str(span, LCBTRACE_TAG_PEER_ADDRESS, hh.c_str());                                \
-            }                                                                                                          \
+            lcbtrace_span_add_tag_str_nocopy(span, LCBTRACE_TAG_PEER_ADDRESS, resp.ctx.endpoint);                      \
             lcbio_CTX *ctx = server->connctx;                                                                          \
             if (ctx) {                                                                                                 \
                 char local_id[34] = {};                                                                                \
                 snprintf(local_id, sizeof(local_id), "%016" PRIx64 "/%016" PRIx64,                                     \
-                         (lcb_U64)server->get_settings()->iid, ctx->sock->id);                                         \
+                         (uint64_t)server->get_settings()->iid, (uint64_t)ctx->sock->id);                              \
                 lcbtrace_span_add_tag_str(span, LCBTRACE_TAG_LOCAL_ID, local_id);                                      \
                 lcbtrace_span_add_tag_str_nocopy(span, LCBTRACE_TAG_LOCAL_ADDRESS, ctx->sock->info->ep_local);         \
             }                                                                                                          \
@@ -173,15 +164,15 @@ void lcbtrace_span_add_tag_str_nocopy(lcbtrace_SPAN *span, const char *name, con
 
 #define LCBTRACE_KV_CLOSE(request)                                                                                     \
     do {                                                                                                               \
-        lcbtrace_SPAN *span = MCREQ_PKT_RDATA(request)->span;                                                          \
-        if (span) {                                                                                                    \
-            lcbtrace_span_finish(span, LCBTRACE_NOW);                                                                  \
+        lcbtrace_SPAN *span__ = MCREQ_PKT_RDATA(request)->span;                                                        \
+        if (span__) {                                                                                                  \
+            lcbtrace_span_finish(span__, LCBTRACE_NOW);                                                                \
             MCREQ_PKT_RDATA(request)->span = NULL;                                                                     \
         }                                                                                                              \
     } while (0);
 
-#define LCBTRACE_KV_FINISH(pipeline, request, response)                                                                \
-    LCBTRACE_KV_COMPLETE(pipeline, request, response)                                                                  \
+#define LCBTRACE_KV_FINISH(pipeline, request, resp, response)                                                          \
+    LCBTRACE_KV_COMPLETE(pipeline, request, resp, response)                                                            \
     LCBTRACE_KV_CLOSE(request)
 
 #ifdef __cplusplus

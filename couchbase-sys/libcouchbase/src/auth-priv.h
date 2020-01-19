@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2017-2019 Couchbase, Inc.
+ *     Copyright 2017-2020 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -69,10 +69,10 @@ class Authenticator
     lcb_STATUS set_mode(lcbauth_MODE mode_)
     {
         if (mode_ == LCBAUTH_MODE_DYNAMIC && (m_usercb == NULL || m_passcb == NULL)) {
-            return LCB_EINVAL;
+            return LCB_ERR_INVALID_ARGUMENT;
         }
         if (m_buckets.size() || m_username.size() || m_password.size()) {
-            return LCB_ERROR;
+            return LCB_ERR_INVALID_ARGUMENT;
         } else {
             m_mode = mode_;
             return LCB_SUCCESS;

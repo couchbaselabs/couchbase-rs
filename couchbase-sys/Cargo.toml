@@ -14,5 +14,9 @@ documentation = "https://docs.rs/couchbase-sys"
 edition = "2018"
 
 [build-dependencies]
-bindgen = "0.48"
 cmake = "0.1"
+
+[build-dependencies.bindgen]
+version = "0.52"
+default-features = false
+features = ["logging", "runtime", "which-rustfmt"]

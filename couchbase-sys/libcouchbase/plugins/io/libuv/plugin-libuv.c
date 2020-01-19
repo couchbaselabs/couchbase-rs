@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2013-2019 Couchbase, Inc.
+ *     Copyright 2013-2020 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -123,7 +123,7 @@ lcb_STATUS lcb_create_libuv_io_opts(int version, lcb_io_opt_t *io, lcbuv_options
     my_iops_t *ret;
 
     if (version != 0) {
-        return LCB_PLUGIN_VERSION_MISMATCH;
+        return LCB_ERR_PLUGIN_VERSION_MISMATCH;
     }
 
 #ifdef _WIN32
@@ -136,7 +136,7 @@ lcb_STATUS lcb_create_libuv_io_opts(int version, lcb_io_opt_t *io, lcbuv_options
         result = GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
                                    (LPCSTR)&dummy, &module);
         if (!result) {
-            return LCB_EINTERNAL;
+            return LCB_ERR_SDK_INTERNAL;
         }
     }
 #endif
@@ -144,7 +144,7 @@ lcb_STATUS lcb_create_libuv_io_opts(int version, lcb_io_opt_t *io, lcbuv_options
     ret = (my_iops_t *)calloc(1, sizeof(*ret));
 
     if (!ret) {
-        return LCB_CLIENT_ENOMEM;
+        return LCB_ERR_NO_MEMORY;
     }
 
     iop = &ret->base;

@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2014-2019 Couchbase, Inc.
+ *     Copyright 2014-2020 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -114,6 +114,7 @@ class SessionInfo : public lcbio_PROTOCTX
      * @return true if supported, false otherwise
      */
     bool has_feature(uint16_t feature) const;
+    bool selected_bucket() const;
 
   private:
     SessionInfo();
@@ -121,6 +122,7 @@ class SessionInfo : public lcbio_PROTOCTX
 
     std::string mech;
     std::vector< uint16_t > server_features;
+    bool selected;
 };
 
 } // namespace lcb

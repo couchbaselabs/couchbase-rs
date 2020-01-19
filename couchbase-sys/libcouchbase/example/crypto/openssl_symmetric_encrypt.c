@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2018-2019 Couchbase, Inc.
+ *     Copyright 2018-2020 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@
 
 static void die(lcb_INSTANCE *instance, const char *msg, lcb_STATUS err)
 {
-    fprintf(stderr, "%s. Received code 0x%X (%s)\n", msg, err, lcb_strerror(instance, err));
+    fprintf(stderr, "%s. Received code 0x%X (%s)\n", msg, err, lcb_strerror_short(err));
     exit(EXIT_FAILURE);
 }
 
@@ -84,7 +84,7 @@ static void store_encrypted(lcb_INSTANCE *instance, const char *key, const char 
     if (err != LCB_SUCCESS) {
         die(instance, "Couldn't schedule storage operation", err);
     }
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
 }
 
 int main(int argc, char *argv[])
@@ -119,7 +119,7 @@ int main(int argc, char *argv[])
             die(instance, "Couldn't schedule connection", err);
         }
 
-        lcb_wait(instance);
+        lcb_wait(instance, LCB_WAIT_DEFAULT);
 
         err = lcb_get_bootstrap_status(instance);
         if (err != LCB_SUCCESS) {

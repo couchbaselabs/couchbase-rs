@@ -1,12 +1,28 @@
-#include <libcouchbase/couchbase.h>
+/* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/*
+ *     Copyright 2014-2020 Couchbase, Inc.
+ *
+ *   Licensed under the Apache License, Version 2.0 (the "License");
+ *   you may not use this file except in compliance with the License.
+ *   You may obtain a copy of the License at
+ *
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *   Unless required by applicable law or agreed to in writing, software
+ *   distributed under the License is distributed on an "AS IS" BASIS,
+ *   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *   See the License for the specific language governing permissions and
+ *   limitations under the License.
+ */
+
 #include <libcouchbase/vbucket.h>
 #include <gtest/gtest.h>
-#include <sstream>
 #include <iostream>
 #include <fstream>
 #include <vector>
 #include <map>
 #include "contrib/lcb-jsoncpp/lcb-jsoncpp.h"
+#include "check_config.h"
 
 using std::map;
 using std::string;
@@ -24,7 +40,7 @@ static string getConfigFile(const char *fname)
     } else if ((prefix = getenv("srcdir"))) {
         base = prefix;
     } else {
-        base = "./../";
+        base = TEST_SRC_DIR;
     }
     base += "/tests/vbucket/confdata/";
     base += fname;
@@ -389,4 +405,5 @@ TEST_F(ConfigTest, testPresentNodesextMissingNodesKetama)
     ASSERT_NE((const char *)NULL, lcbvb_get_hostport(vbc, 1, LCBVB_SVCTYPE_DATA, LCBVB_SVCMODE_PLAIN));
     ASSERT_NE((const char *)NULL, lcbvb_get_hostport(vbc, 2, LCBVB_SVCTYPE_DATA, LCBVB_SVCMODE_PLAIN));
     ASSERT_EQ((const char *)NULL, lcbvb_get_hostport(vbc, 3, LCBVB_SVCTYPE_DATA, LCBVB_SVCMODE_PLAIN));
+    lcbvb_destroy(vbc);
 }

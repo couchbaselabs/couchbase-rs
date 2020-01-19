@@ -1,6 +1,6 @@
 /* -*- Mode: C++; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2011-2019 Couchbase, Inc.
+ *     Copyright 2011-2020 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -143,8 +143,8 @@ TEST_F(McAlloc, testKeyAlloc)
     lcb_VALBUF vreq;
     memset(&vreq, 0, sizeof(vreq));
 
-    const void *key;
-    lcb_size_t nkey;
+    const char *key;
+    size_t nkey;
     // Get back the key we just placed inside the header
     mcreq_get_key(NULL, packet, &key, &nkey);
     ASSERT_EQ(5, nkey);

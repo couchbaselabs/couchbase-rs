@@ -1,6 +1,6 @@
 /* -*- Mode: C++; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2013-2019 Couchbase, Inc.
+ *     Copyright 2013-2020 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -94,7 +94,7 @@ class MultiClusterClient
     {
         lcb_STATUS err;
         if ((err = lcb_create_io_ops(&iops, NULL)) != LCB_SUCCESS) {
-            std::cerr << "Failed to create io ops: " << lcb_strerror(NULL, err) << std::endl;
+            std::cerr << "Failed to create io ops: " << lcb_strerror_short(err) << std::endl;
             exit(1);
         }
 
@@ -108,7 +108,7 @@ class MultiClusterClient
 
             lcb_INSTANCE *instance;
             if ((err = lcb_create(&instance, options)) != LCB_SUCCESS) {
-                std::cerr << "Failed to create instance: " << lcb_strerror(NULL, err) << std::endl;
+                std::cerr << "Failed to create instance: " << lcb_strerror_short(err) << std::endl;
                 exit(1);
             }
             lcb_createopts_destroy(options);
@@ -116,9 +116,9 @@ class MultiClusterClient
             lcb_install_callback(instance, LCB_CALLBACK_STORE, (lcb_RESPCALLBACK)store_callback);
 
             lcb_connect(instance);
-            lcb_wait(instance);
+            lcb_wait(instance, LCB_WAIT_DEFAULT);
             if ((err = lcb_get_bootstrap_status(instance)) != LCB_SUCCESS) {
-                std::cerr << "Failed to bootstrap: " << lcb_strerror(instance, err) << std::endl;
+                std::cerr << "Failed to bootstrap: " << lcb_strerror_short(err) << std::endl;
                 exit(1);
             }
             std::cout << " done" << std::endl;
@@ -251,12 +251,12 @@ int main(int argc, char **argv)
     MultiClusterClient client(clusters);
     std::cout << "Storing kv-pair: [\"" << key << "\", \"" << value << "\"]: ";
     std::cout.flush();
-    std::cout << lcb_strerror(NULL, client.store(key, value)) << std::endl;
+    std::cout << lcb_strerror_short(client.store(key, value)) << std::endl;
 
     std::cout << "Retrieving key \"" << key << "\": ";
     std::cout.flush();
     lcb_STATUS err = client.get(key, value);
-    std::cout << lcb_strerror(NULL, err) << std::endl;
+    std::cout << lcb_strerror_short(err) << std::endl;
     if (err == LCB_SUCCESS) {
         std::cout << "\tValue: \"" << value << "\"" << std::endl;
     }

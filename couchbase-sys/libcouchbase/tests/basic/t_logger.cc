@@ -1,6 +1,6 @@
 /* -*- Mode: C++; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2011-2019 Couchbase, Inc.
+ *     Copyright 2011-2020 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ struct MyLogprocs {
 };
 
 extern "C" {
-static void fallback_logger(lcb_LOGGER *logger, uint64_t, const char *, lcb_LOG_SEVERITY, const char *, int,
+static void fallback_logger(const lcb_LOGGER *logger, uint64_t, const char *, lcb_LOG_SEVERITY, const char *, int,
                             const char *fmt, va_list ap)
 {
     char buf[2048];

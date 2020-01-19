@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2014-2019 Couchbase, Inc.
+ *     Copyright 2014-2020 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -38,7 +38,7 @@ void Bootstrap::config_callback(EventType event, ConfigInfo *info) {
     if (event != CLCONFIG_EVENT_GOT_NEW_CONFIG) {
         if (event == CLCONFIG_EVENT_PROVIDERS_CYCLED) {
             if (!LCBT_VBCONFIG(instance)) {
-                initial_error(LCB_ERROR, "No more bootstrap providers remain");
+                initial_error(LCB_ERR_NO_MATCHING_SERVER, "No more bootstrap providers remain");
             }
         }
         return;
@@ -144,11 +144,14 @@ void Bootstrap::config_callback(EventType event, ConfigInfo *info) {
     lcb_maybe_breakout(instance);
 }
 
+const char *provider_string(clconfig::Method type);
+
 void Bootstrap::clconfig_lsn(EventType e, ConfigInfo *i) {
     if (state == S_INITIAL_PRE) {
         config_callback(e, i);
     } else if (e == clconfig::CLCONFIG_EVENT_GOT_NEW_CONFIG) {
-        lcb_log(LOGARGS(parent, INFO), "Got new config. Will refresh asynchronously");
+        lcb_log(LOGARGS(parent, INFO), "Got new config (source=%s, bucket=%.*s, rev=%d). Will refresh asynchronously",
+                provider_string(i->get_origin()), (int)i->vbc->bname_len, i->vbc->bname, i->vbc->revid);
         tm.signal();
     }
 }
@@ -180,7 +183,7 @@ void Bootstrap::timer_dispatch() {
             parent->confmon->get_config());
     } else {
         // Not yet bootstrapped!
-        initial_error(LCB_ETIMEDOUT, "Failed to bootstrap in time");
+        initial_error(LCB_ERR_TIMEOUT, "Failed to bootstrap in time");
     }
 }
 
@@ -223,6 +226,8 @@ lcb_STATUS Bootstrap::bootstrap(unsigned options) {
     }
 
     if (options == BS_REFRESH_OPEN_BUCKET) {
+        parent->confmon->active_provider_list_id = 0;
+        parent->confmon->prepare();
         state = S_INITIAL_PRE;
         tm.rearm(LCBT_SETTING(parent, config_timeout));
         lcb_aspend_add(&parent->pendops, LCB_PENDTYPE_COUNTER, NULL);
@@ -264,12 +269,16 @@ lcb_STATUS Bootstrap::bootstrap(unsigned options) {
     if (options != BS_REFRESH_INITIAL) {
         last_refresh = now;
     }
-    parent->confmon->start(options & BS_REFRESH_OPEN_BUCKET);
+    if (parent->settings->bucket) {
+        options &= BS_REFRESH_OPEN_BUCKET;
+    }
+    parent->confmon->start(options);
     return LCB_SUCCESS;
 }
 
 Bootstrap::~Bootstrap() {
     tm.release();
+    tmpoll.release();
     parent->confmon->remove_listener(this);
 }
 
@@ -287,7 +296,7 @@ lcb_get_bootstrap_status(lcb_INSTANCE *instance)
                 }
                 /* fall through */
             default:
-                return LCB_ERROR;
+                return LCB_ERR_SDK_INTERNAL;
         }
     }
     if (instance->last_error != LCB_SUCCESS) {
@@ -298,7 +307,7 @@ lcb_get_bootstrap_status(lcb_INSTANCE *instance)
             return LCB_SUCCESS;
         }
     }
-    return LCB_ERROR;
+    return LCB_ERR_GENERIC;
 }
 
 LIBCOUCHBASE_API

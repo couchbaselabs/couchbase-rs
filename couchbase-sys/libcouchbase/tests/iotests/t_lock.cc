@@ -1,6 +1,6 @@
 /* -*- Mode: C++; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2012-2019 Couchbase, Inc.
+ *     Copyright 2012-2020 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -75,7 +75,7 @@ TEST_F(LockUnitTest, testSimpleLockAndUnlock)
     lcb_install_callback(instance, LCB_CALLBACK_GET, (lcb_RESPCALLBACK)getLockedCallback);
 
     ASSERT_EQ(LCB_SUCCESS, lcb_get(instance, &itm, cmd));
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     ASSERT_EQ(LCB_SUCCESS, itm.err);
     lcb_cmdget_destroy(cmd);
 
@@ -84,11 +84,11 @@ TEST_F(LockUnitTest, testSimpleLockAndUnlock)
     lcb_cmdunlock_key(ucmd, key.c_str(), key.size());
     lcb_cmdunlock_cas(ucmd, itm.cas);
 
-    lcb_STATUS reserr = LCB_ERROR;
+    lcb_STATUS reserr = LCB_ERR_GENERIC;
     lcb_install_callback(instance, LCB_CALLBACK_UNLOCK, (lcb_RESPCALLBACK)unlockCallback);
     ASSERT_EQ(LCB_SUCCESS, lcb_unlock(instance, &reserr, ucmd));
     lcb_cmdunlock_destroy(ucmd);
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     ASSERT_EQ(LCB_SUCCESS, reserr);
 }
 
@@ -109,7 +109,7 @@ TEST_F(LockUnitTest, testUnlockMissingCas)
     HandleWrap hw;
     createConnection(hw, &instance);
 
-    lcb_STATUS reserr = LCB_ERROR;
+    lcb_STATUS reserr = LCB_ERR_GENERIC;
     std::string key = "lockKey2";
     std::string value = "lockValue";
 
@@ -124,11 +124,11 @@ TEST_F(LockUnitTest, testUnlockMissingCas)
 
     ASSERT_EQ(LCB_SUCCESS, lcb_unlock(instance, &reserr, cmd));
     lcb_cmdunlock_destroy(cmd);
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     if (CLUSTER_VERSION_IS_HIGHER_THAN(MockEnvironment::VERSION_50)) {
-        ASSERT_EQ(LCB_EINVAL_MCD, reserr);
+        ASSERT_EQ(LCB_ERR_KVENGINE_INVALID_PACKET, reserr);
     } else {
-        ASSERT_EQ(LCB_ETMPFAIL, reserr);
+        ASSERT_EQ(LCB_ERR_TEMPORARY_FAILURE, reserr);
     }
 }
 
@@ -181,7 +181,7 @@ TEST_F(LockUnitTest, testStorageLockContention)
     lcb_cmdget_key(gcmd, key.c_str(), key.size());
     lcb_cmdget_locktime(gcmd, 10);
     ASSERT_EQ(LCB_SUCCESS, lcb_get(instance, &itm, gcmd));
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     ASSERT_EQ(LCB_SUCCESS, itm.err);
     ASSERT_GT(itm.cas, 0);
     lcb_cmdget_destroy(gcmd);
@@ -193,8 +193,8 @@ TEST_F(LockUnitTest, testStorageLockContention)
     lcb_cmdstore_value(scmd, newvalue.c_str(), newvalue.size());
     Item s_itm;
     ASSERT_EQ(LCB_SUCCESS, lcb_store(instance, &s_itm, scmd));
-    lcb_wait(instance);
-    ASSERT_EQ(LCB_KEY_EEXISTS, s_itm.err);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
+    ASSERT_EQ(LCB_ERR_DOCUMENT_EXISTS, s_itm.err);
 
     /* verify the value is still the old value */
     Item ritem;
@@ -204,7 +204,7 @@ TEST_F(LockUnitTest, testStorageLockContention)
     /* now try to set it with the correct cas, implicitly unlocking the key */
     lcb_cmdstore_cas(scmd, itm.cas);
     ASSERT_EQ(LCB_SUCCESS, lcb_store(instance, &s_itm, scmd));
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     ASSERT_EQ(LCB_SUCCESS, itm.err);
 
     /* verify the value is now the new value */
@@ -236,7 +236,7 @@ TEST_F(LockUnitTest, testUnlLockContention)
 
     lcb_INSTANCE *instance;
     HandleWrap hw;
-    lcb_STATUS err, reserr = LCB_ERROR;
+    lcb_STATUS err, reserr = LCB_ERR_GENERIC;
     createConnection(hw, &instance);
 
     std::string key = "lockedKey2", value = "lockedValue2";
@@ -253,13 +253,13 @@ TEST_F(LockUnitTest, testUnlLockContention)
     lcb_cmdget_locktime(gcmd, 10);
 
     ASSERT_EQ(LCB_SUCCESS, lcb_get(instance, &gitm, gcmd));
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     ASSERT_EQ(LCB_SUCCESS, gitm.err);
 
-    lcb_cas_t validCas = gitm.cas;
+    uint64_t validCas = gitm.cas;
     ASSERT_EQ(LCB_SUCCESS, lcb_get(instance, &gitm, gcmd));
-    lcb_wait(instance);
-    ASSERT_EQ(LCB_ETMPFAIL, gitm.err);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
+    ASSERT_EQ(LCB_ERR_TEMPORARY_FAILURE, gitm.err);
     lcb_cmdget_destroy(gcmd);
 
     lcb_CMDUNLOCK *ucmd;
@@ -269,7 +269,7 @@ TEST_F(LockUnitTest, testUnlLockContention)
 
     ASSERT_EQ(LCB_SUCCESS, lcb_unlock(instance, &reserr, ucmd));
     lcb_cmdunlock_destroy(ucmd);
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     ASSERT_EQ(reserr, LCB_SUCCESS);
 
     std::string newval = "lockedValueNew2";

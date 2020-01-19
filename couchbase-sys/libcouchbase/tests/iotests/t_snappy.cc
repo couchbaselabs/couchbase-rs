@@ -1,6 +1,6 @@
 /* -*- Mode: C++; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2011-2019 Couchbase, Inc.
+ *     Copyright 2011-2020 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -63,7 +63,7 @@ static void storecb(lcb_INSTANCE *, int, const lcb_RESPBASE *rb)
 {
     SnappyCookie *cookie = reinterpret_cast< SnappyCookie * >(rb->cookie);
     cookie->called = true;
-    cookie->rc = rb->rc;
+    cookie->rc = rb->ctx.rc;
 }
 static void getcb(lcb_INSTANCE *, int, const lcb_RESPGET *resp)
 {
@@ -103,13 +103,13 @@ TEST_F(SnappyUnitTest, testSpec)
     lcb_cmdstore_value(scmd, value.c_str(), value.size());
     cookie = SnappyCookie();
     lcb_store(instance, &cookie, scmd);
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     ASSERT_TRUE(cookie.called);
     ASSERT_EQ(LCB_SUCCESS, cookie.rc);
     /* now we have negotiated snappy feature */
     cookie = SnappyCookie();
     lcb_store(instance, &cookie, scmd);
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     ASSERT_TRUE(cookie.called);
     ASSERT_EQ(LCB_SUCCESS, cookie.rc);
 
@@ -117,7 +117,7 @@ TEST_F(SnappyUnitTest, testSpec)
     lcb_cmdget_create(&gcmd);
     lcb_cmdget_key(gcmd, key.c_str(), key.size());
     lcb_get(instance, &cookie, gcmd);
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     ASSERT_TRUE(cookie.called);
     ASSERT_EQ(LCB_SUCCESS, cookie.rc);
     ASSERT_STREQ(value.c_str(), cookie.value.c_str());
@@ -129,13 +129,14 @@ TEST_F(SnappyUnitTest, testSpec)
     lcb_cmdget_create(&gcmd);
     lcb_cmdget_key(gcmd, key.c_str(), key.size());
     lcb_get(instance, &cookie, gcmd);
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     ASSERT_TRUE(cookie.called);
     ASSERT_EQ(LCB_SUCCESS, cookie.rc);
     ASSERT_STREQ(compressed.c_str(), cookie.value.c_str());
     lcb_cmdget_destroy(gcmd);
 
     setCompression("off");
+    hw.destroy();
     createConnection(hw, &instance);
     lcb_cntl_setu32(instance, LCB_CNTL_COMPRESSION_OPTS, LCB_COMPRESS_INOUT);
     lcb_install_callback(instance, LCB_CALLBACK_GET, (lcb_RESPCALLBACK)getcb);
@@ -145,7 +146,7 @@ TEST_F(SnappyUnitTest, testSpec)
     lcb_cmdget_create(&gcmd);
     lcb_cmdget_key(gcmd, key.c_str(), key.size());
     lcb_get(instance, &cookie, gcmd);
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     ASSERT_TRUE(cookie.called);
     ASSERT_EQ(LCB_SUCCESS, cookie.rc);
     ASSERT_STREQ(value.c_str(), cookie.value.c_str());
@@ -153,7 +154,7 @@ TEST_F(SnappyUnitTest, testSpec)
 
     cookie = SnappyCookie();
     lcb_store(instance, &cookie, scmd);
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     ASSERT_TRUE(cookie.called);
     ASSERT_EQ(LCB_SUCCESS, cookie.rc);
     ASSERT_FALSE(isCompressed(key));
@@ -201,13 +202,13 @@ TEST_F(SnappyUnitTest, testIOV)
     lcb_cmdstore_value_iov(scmd, iov, niov);
     cookie = SnappyCookie();
     lcb_store(instance, &cookie, scmd);
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     ASSERT_TRUE(cookie.called);
     ASSERT_EQ(LCB_SUCCESS, cookie.rc);
     /* now we have negotiated snappy feature */
     cookie = SnappyCookie();
     lcb_store(instance, &cookie, scmd);
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     ASSERT_TRUE(cookie.called);
     ASSERT_EQ(LCB_SUCCESS, cookie.rc);
     lcb_cmdstore_destroy(scmd);
@@ -216,7 +217,7 @@ TEST_F(SnappyUnitTest, testIOV)
     lcb_cmdget_create(&gcmd);
     lcb_cmdget_key(gcmd, key.c_str(), key.size());
     lcb_get(instance, &cookie, gcmd);
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     ASSERT_TRUE(cookie.called);
     ASSERT_EQ(LCB_SUCCESS, cookie.rc);
     ASSERT_STREQ(value.c_str(), cookie.value.c_str());
@@ -228,7 +229,7 @@ TEST_F(SnappyUnitTest, testIOV)
     lcb_cmdget_create(&gcmd);
     lcb_cmdget_key(gcmd, key.c_str(), key.size());
     lcb_get(instance, &cookie, gcmd);
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     ASSERT_TRUE(cookie.called);
     ASSERT_EQ(LCB_SUCCESS, cookie.rc);
     ASSERT_STREQ(compressed.c_str(), cookie.value.c_str());
@@ -261,13 +262,13 @@ TEST_F(SnappyUnitTest, testSettings)
     lcb_cmdstore_value(scmd, value.c_str(), value.size());
     cookie = SnappyCookie();
     lcb_store(instance, &cookie, scmd);
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     ASSERT_TRUE(cookie.called);
     ASSERT_EQ(LCB_SUCCESS, cookie.rc);
     /* now we have negotiated snappy feature */
     cookie = SnappyCookie();
     lcb_store(instance, &cookie, scmd);
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     ASSERT_TRUE(cookie.called);
     ASSERT_EQ(LCB_SUCCESS, cookie.rc);
     lcb_cmdstore_destroy(scmd);
@@ -279,7 +280,7 @@ TEST_F(SnappyUnitTest, testSettings)
     lcb_cmdstore_value(scmd, value.c_str(), value.size());
     cookie = SnappyCookie();
     lcb_store(instance, &cookie, scmd);
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     ASSERT_TRUE(cookie.called);
     ASSERT_EQ(LCB_SUCCESS, cookie.rc);
     lcb_cmdstore_destroy(scmd);
@@ -288,7 +289,7 @@ TEST_F(SnappyUnitTest, testSettings)
     lcb_cmdget_create(&gcmd);
     lcb_cmdget_key(gcmd, key.c_str(), key.size());
     lcb_get(instance, &cookie, gcmd);
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     ASSERT_TRUE(cookie.called);
     ASSERT_EQ(LCB_SUCCESS, cookie.rc);
     ASSERT_STREQ(compressed.c_str(), cookie.value.c_str());
@@ -302,7 +303,7 @@ TEST_F(SnappyUnitTest, testSettings)
     lcb_cmdstore_value(scmd, value.c_str(), value.size());
     cookie = SnappyCookie();
     lcb_store(instance, &cookie, scmd);
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     ASSERT_TRUE(cookie.called);
     ASSERT_EQ(LCB_SUCCESS, cookie.rc);
     lcb_cmdstore_destroy(scmd);
@@ -311,7 +312,7 @@ TEST_F(SnappyUnitTest, testSettings)
     lcb_cmdget_create(&gcmd);
     lcb_cmdget_key(gcmd, key.c_str(), key.size());
     lcb_get(instance, &cookie, gcmd);
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     ASSERT_TRUE(cookie.called);
     ASSERT_EQ(LCB_SUCCESS, cookie.rc);
     ASSERT_STREQ(compressed.c_str(), cookie.value.c_str());
@@ -326,7 +327,7 @@ TEST_F(SnappyUnitTest, testSettings)
     lcb_cmdstore_value(scmd, value.c_str(), value.size());
     cookie = SnappyCookie();
     lcb_store(instance, &cookie, scmd);
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     ASSERT_TRUE(cookie.called);
     ASSERT_EQ(LCB_SUCCESS, cookie.rc);
     lcb_cmdstore_destroy(scmd);
@@ -335,7 +336,7 @@ TEST_F(SnappyUnitTest, testSettings)
     lcb_cmdget_create(&gcmd);
     lcb_cmdget_key(gcmd, key.c_str(), key.size());
     lcb_get(instance, &cookie, gcmd);
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     ASSERT_TRUE(cookie.called);
     ASSERT_EQ(LCB_SUCCESS, cookie.rc);
     ASSERT_STREQ(compressed.c_str(), cookie.value.c_str());

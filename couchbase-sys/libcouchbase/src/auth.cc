@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2017-2019 Couchbase, Inc.
+ *     Copyright 2017-2020 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -36,15 +36,15 @@ lcb_STATUS
 Authenticator::add(const char *u, const char *p, int flags)
 {
     if (!u) {
-        return LCB_EINVAL;
+        return LCB_ERR_INVALID_ARGUMENT;
     }
 
     if (!(flags & (LCBAUTH_F_BUCKET|LCBAUTH_F_CLUSTER))) {
-        return LCB_EINVAL;
+        return LCB_ERR_INVALID_ARGUMENT;
     }
 
     if (m_mode == LCBAUTH_MODE_RBAC && (flags & LCBAUTH_F_BUCKET)) {
-        return LCB_OPTIONS_CONFLICT;
+        return LCB_ERR_OPTIONS_CONFLICT;
     }
 
     if (flags & LCBAUTH_F_CLUSTER) {

@@ -1,6 +1,6 @@
 /* -*- Mode: C++; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2011-2019 Couchbase, Inc.
+ *     Copyright 2011-2020 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -50,7 +50,7 @@ struct CQWrap : mc_CMDQUEUE {
             EXPECT_NE(0, netbuf_is_clean(&pipeline->nbmgr));
             EXPECT_NE(0, netbuf_is_clean(&pipeline->reqpool));
             mcreq_pipeline_cleanup(pipeline);
-            free(pipeline);
+            delete pipeline;
         }
         mcreq_queue_cleanup(this);
         lcbvb_destroy(config);

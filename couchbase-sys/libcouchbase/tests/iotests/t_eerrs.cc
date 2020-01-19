@@ -1,6 +1,6 @@
 /* -*- Mode: C++; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2011-2019 Couchbase, Inc.
+ *     Copyright 2011-2020 Couchbase, Inc.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ class EerrsUnitTest : public MockUnitTest
     {
         MockEnvironment::getInstance()->createConnection(hw, instance);
         ASSERT_EQ(LCB_SUCCESS, lcb_connect(*instance));
-        lcb_wait(*instance);
+        lcb_wait(*instance, LCB_WAIT_DEFAULT);
         ASSERT_EQ(LCB_SUCCESS, lcb_get_bootstrap_status(*instance));
     }
 
@@ -81,7 +81,7 @@ static void opcb(lcb_INSTANCE *, int cbtype, const lcb_RESPBASE *rb)
 {
     EerrsCookie *cookie = reinterpret_cast< EerrsCookie * >(rb->cookie);
     cookie->called = true;
-    cookie->rc = rb->rc;
+    cookie->rc = rb->ctx.rc;
 
     const char *ref = lcb_resp_get_error_ref(cbtype, rb);
     if (ref != NULL) {
@@ -115,9 +115,9 @@ TEST_F(EerrsUnitTest, testInCallbackWhenEnabled)
     lcb_get(instance, &cookie, cmd);
     lcb_cmdget_destroy(cmd);
 
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     ASSERT_TRUE(cookie.called);
-    ASSERT_EQ(LCB_KEY_ENOENT, cookie.rc);
+    ASSERT_EQ(LCB_ERR_DOCUMENT_NOT_FOUND, cookie.rc);
     ASSERT_NE((char *)NULL, cookie.err_ref);
     ASSERT_EQ(36, strlen(cookie.err_ref)); // java.util.UUID generates 36-bytes long strings
     ASSERT_STREQ("Failed to lookup item", cookie.err_ctx);
@@ -143,7 +143,7 @@ TEST_F(EerrsUnitTest, testInCallbackWhenDisabled)
     lcb_get(instance, &cookie, cmd);
     lcb_cmdget_destroy(cmd);
 
-    lcb_wait(instance);
+    lcb_wait(instance, LCB_WAIT_DEFAULT);
     ASSERT_TRUE(cookie.called);
     ASSERT_EQ((char *)NULL, cookie.err_ref);
     ASSERT_EQ((char *)NULL, cookie.err_ctx);
