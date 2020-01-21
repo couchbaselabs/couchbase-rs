@@ -1,3 +1,5 @@
 fn main() {
-    cc::Build::new().file("src/utils.c").compile("utils")
+    if cfg!(feature = "libcouchbase") {
+        cc::Build::new().file("src/io/utils.c").compile("utils")
+    }
 }
