@@ -328,7 +328,7 @@ fn encode_get(instance: *mut lcb_INSTANCE, request: GetRequest) {
     let id_encoded = CString::new(request.id().clone()).expect("Could not encode ID");
     let mut command: *mut lcb_CMDGET = ptr::null_mut();
 
-    let timeout = request.options().timeout().map(|t| t.as_micros() as u32);
+    let timeout = request.options().timeout.map(|t| t.as_micros() as u32);
     let sender_boxed = Box::new(request.sender());
     let cookie = Box::into_raw(sender_boxed) as *mut c_void;
     unsafe {
@@ -350,7 +350,7 @@ fn encode_upsert(instance: *mut lcb_INSTANCE, request: UpsertRequest) {
     let value_len = request.content().len();
     let value = CString::new(request.content()).expect("Could not turn value into lcb format");
 
-    let timeout = request.options().timeout().map(|t| t.as_micros() as u32);
+    let timeout = request.options().timeout.map(|t| t.as_micros() as u32);
     let sender_boxed = Box::new(request.sender());
     let cookie = Box::into_raw(sender_boxed) as *mut c_void;
 
@@ -380,11 +380,11 @@ fn encode_query(instance: *mut lcb_INSTANCE, request: QueryRequest) {
         CString::new(request.statement().clone()).expect("Could not encode Statement");
     let mut command: *mut lcb_CMDQUERY = ptr::null_mut();
 
-    let timeout = request.options().timeout().map(|t| t.as_micros() as u32);
-    let scan_consistency = match request.options().scan_consistency {
+    let timeout = request.options().timeout.map(|t| t.as_micros() as u32);
+    let scan_consistency = request.options().scan_consistency.as_ref().map(|s| match s {
         QueryScanConsistency::NotBounded => lcb_QUERY_CONSISTENCY_LCB_QUERY_CONSISTENCY_NONE,
         QueryScanConsistency::RequestPlus => lcb_QUERY_CONSISTENCY_LCB_QUERY_CONSISTENCY_REQUEST,
-    };
+    });
 
     let (meta_sender, meta_receiver) = futures::channel::oneshot::channel();
     let (rows_sender, rows_receiver) = futures::channel::mpsc::unbounded();
@@ -402,7 +402,9 @@ fn encode_query(instance: *mut lcb_INSTANCE, request: QueryRequest) {
         if let Some(timeout) = timeout {
             lcb_cmdquery_timeout(command, timeout);
         }
-        lcb_cmdquery_consistency(command, scan_consistency);
+        if let Some(sc) = scan_consistency {
+            lcb_cmdquery_consistency(command, sc);
+        }
         lcb_cmdquery_callback(command, Some(query_callback));
         lcb_query(instance, cookie, command);
         lcb_cmdquery_destroy(command);
