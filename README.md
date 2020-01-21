@@ -59,3 +59,6 @@ fn main() {
 
 ## Examples
 More examples can be found in the `examples` folder. Please open a ticket if something is not present or does not showcase what you need.
+
+## Unsafe Code
+This code contains **unsafe {}** code blocks. Breathe slowly and calm down, it's going to be okay. The reason why we use unsafe code is so that we can call into `libcouchbase` which is a C library. The only unsafe code is found in the lcb part of the IO module. So if you experience a segfault, it will likely come from there. We are trying to even keep unsafe in there minimal, but by the nature of it, it is all over the place. We are also working on a pure Rust SDK with no unsafe code (hoepfully), but until this ships and is mature we have to live with it.
