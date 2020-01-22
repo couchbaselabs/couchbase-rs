@@ -12,7 +12,8 @@ pub fn main() {
         "select * from `travel-sample` limit 2",
         QueryOptions::default().scan_consistency(QueryScanConsistency::RequestPlus),
     ))
-    .unwrap();
+    .expect("Failed query");
+
     println!("result: {:?}", result);
 
     let meta = block_on(result.meta_data());

@@ -29,7 +29,10 @@ pub enum CouchbaseError {
     CasMismatch { ctx: ErrorContext },
     #[snafu(display("The request has been canceled: {}", ctx))]
     RequestCanceled { ctx: ErrorContext },
-    #[snafu(display("The service for this request is not available on the cluster: {}", ctx))]
+    #[snafu(display(
+        "The service for this request is not available on the cluster: {}",
+        ctx
+    ))]
     ServiceNotAvailable { ctx: ErrorContext },
     #[snafu(display("The server experienced an internal error: {}", ctx))]
     InternalServerFailure { ctx: ErrorContext },
@@ -151,7 +154,6 @@ pub enum CouchbaseError {
 
 pub type CouchbaseResult<T, E = CouchbaseError> = std::result::Result<T, E>;
 
-#[derive(Debug)]
 pub struct ErrorContext {
     inner: HashMap<String, Value>,
 }
@@ -170,7 +172,17 @@ impl Default for ErrorContext {
     }
 }
 
-impl Display for &ErrorContext {
+impl Display for ErrorContext {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        write!(
+            f,
+            "{}",
+            serde_json::to_string(&self.inner).unwrap_or_else(|_| "".into())
+        )
+    }
+}
+
+impl Debug for ErrorContext {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(
             f,

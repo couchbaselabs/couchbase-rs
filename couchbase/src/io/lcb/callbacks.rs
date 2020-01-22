@@ -3,11 +3,11 @@ use crate::api::results::{GetResult, MutationResult, QueryResult};
 use crate::api::MutationToken;
 use couchbase_sys::*;
 use log::debug;
-use std::ffi::{CStr};
+use serde_json::Value;
+use std::ffi::CStr;
 use std::os::raw::{c_char, c_int, c_uint, c_void};
 use std::ptr;
 use std::slice::from_raw_parts;
-use serde_json::Value;
 
 use crate::io::lcb::{decrement_outstanding_requests, wrapped_vsnprintf, QueryCookie};
 
@@ -98,8 +98,8 @@ fn build_kv_error_context(lcb_ctx: *const lcb_KEY_VALUE_ERROR_CONTEXT) -> ErrorC
 
     let mut key_len: usize = 0;
     let mut key_ptr: *const c_char = ptr::null();
-    let key = unsafe { 
-        lcb_errctx_kv_key(lcb_ctx, &mut key_ptr, &mut key_len); 
+    let key = unsafe {
+        lcb_errctx_kv_key(lcb_ctx, &mut key_ptr, &mut key_len);
         CStr::from_ptr(key_ptr).to_str().unwrap().into()
     };
     ctx.insert("key", Value::String(key));
@@ -110,7 +110,21 @@ fn build_kv_error_context(lcb_ctx: *const lcb_KEY_VALUE_ERROR_CONTEXT) -> ErrorC
         o
     };
     ctx.insert("opaque", Value::Number(opaque.into()));
-    
+
+    ctx
+}
+
+fn build_query_error_context(lcb_ctx: *const lcb_QUERY_ERROR_CONTEXT) -> ErrorContext {
+    let mut ctx = ErrorContext::default();
+
+    let mut statement_len: usize = 0;
+    let mut statement_ptr: *const c_char = ptr::null();
+    let key = unsafe {
+        lcb_errctx_query_statement(lcb_ctx, &mut statement_ptr, &mut statement_len);
+        CStr::from_ptr(statement_ptr).to_str().unwrap().into()
+    };
+    ctx.insert("statement", Value::String(key));
+
     ctx
 }
 
@@ -128,24 +142,41 @@ pub unsafe extern "C" fn query_callback(
     lcb_respquery_cookie(res, &mut cookie_ptr);
     let mut cookie = Box::from_raw(cookie_ptr as *mut QueryCookie);
 
+    let status = lcb_respquery_status(res);
+
     if cookie.sender.is_some() {
+        let response = if status != 0 {
+            let mut lcb_ctx: *const lcb_QUERY_ERROR_CONTEXT = ptr::null();
+            lcb_respquery_error_context(res, &mut lcb_ctx);
+            Err(couchbase_error_from_lcb_status(
+                status,
+                build_query_error_context(lcb_ctx),
+            ))
+        } else {
+            Ok(QueryResult::new(
+                cookie.rows_receiver.take().unwrap(),
+                cookie.meta_receiver.take().unwrap(),
+            ))
+        };
+
         cookie
             .sender
             .take()
             .expect("Could not take result!")
-            .send(Ok(QueryResult::new(
-                cookie.rows_receiver.take().unwrap(),
-                cookie.meta_receiver.take().unwrap(),
-            )))
+            .send(response)
             .expect("Could not complete query future");
     }
 
     if lcb_respquery_is_final(res) != 0 {
         cookie.rows_sender.close_channel();
-        cookie
-            .meta_sender
-            .send(serde_json::from_slice(row).unwrap())
-            .expect("Could not send meta");
+
+        if status == 0 {
+            cookie
+                .meta_sender
+                .send(serde_json::from_slice(row).unwrap())
+                .expect("Could not send meta");
+        }
+
         decrement_outstanding_requests(instance);
     } else {
         cookie
@@ -160,8 +191,16 @@ pub unsafe extern "C" fn query_callback(
 fn couchbase_error_from_lcb_status(status: lcb_STATUS, ctx: ErrorContext) -> CouchbaseError {
     match status {
         lcb_STATUS_LCB_ERR_DOCUMENT_NOT_FOUND => CouchbaseError::DocumentNotFound { ctx },
-        lcb_STATUS_LCB_ERR_TIMEOUT | lcb_STATUS_LCB_ERR_AMBIGUOUS_TIMEOUT => CouchbaseError::Timeout { ambiguous: true, ctx },
-        lcb_STATUS_LCB_ERR_UNAMBIGUOUS_TIMEOUT => CouchbaseError::Timeout { ambiguous: false, ctx },
+        lcb_STATUS_LCB_ERR_TIMEOUT | lcb_STATUS_LCB_ERR_AMBIGUOUS_TIMEOUT => {
+            CouchbaseError::Timeout {
+                ambiguous: true,
+                ctx,
+            }
+        }
+        lcb_STATUS_LCB_ERR_UNAMBIGUOUS_TIMEOUT => CouchbaseError::Timeout {
+            ambiguous: false,
+            ctx,
+        },
         lcb_STATUS_LCB_ERR_INVALID_ARGUMENT => CouchbaseError::InvalidArgument { ctx },
         lcb_STATUS_LCB_ERR_CAS_MISMATCH => CouchbaseError::CasMismatch { ctx },
         lcb_STATUS_LCB_ERR_REQUEST_CANCELED => CouchbaseError::RequestCanceled { ctx },
@@ -172,8 +211,14 @@ fn couchbase_error_from_lcb_status(status: lcb_STATUS, ctx: ErrorContext) -> Cou
         lcb_STATUS_LCB_ERR_PARSING_FAILURE => CouchbaseError::ParsingFailure { ctx },
         lcb_STATUS_LCB_ERR_BUCKET_NOT_FOUND => CouchbaseError::BucketNotFound { ctx },
         lcb_STATUS_LCB_ERR_COLLECTION_NOT_FOUND => CouchbaseError::CollectionNotFound { ctx },
-        lcb_STATUS_LCB_ERR_ENCODING_FAILURE => CouchbaseError::EncodingFailure { ctx, source: gen_lcb_io_error() },
-        lcb_STATUS_LCB_ERR_DECODING_FAILURE => CouchbaseError::DecodingFailure { ctx, source: gen_lcb_io_error() },
+        lcb_STATUS_LCB_ERR_ENCODING_FAILURE => CouchbaseError::EncodingFailure {
+            ctx,
+            source: gen_lcb_io_error(),
+        },
+        lcb_STATUS_LCB_ERR_DECODING_FAILURE => CouchbaseError::DecodingFailure {
+            ctx,
+            source: gen_lcb_io_error(),
+        },
         lcb_STATUS_LCB_ERR_UNSUPPORTED_OPERATION => CouchbaseError::UnsupportedOperation { ctx },
         lcb_STATUS_LCB_ERR_SCOPE_NOT_FOUND => CouchbaseError::ScopeNotFound { ctx },
         lcb_STATUS_LCB_ERR_INDEX_NOT_FOUND => CouchbaseError::IndexNotFound { ctx },
@@ -183,11 +228,17 @@ fn couchbase_error_from_lcb_status(status: lcb_STATUS, ctx: ErrorContext) -> Cou
         lcb_STATUS_LCB_ERR_VALUE_TOO_LARGE => CouchbaseError::ValueTooLarge { ctx },
         lcb_STATUS_LCB_ERR_DOCUMENT_EXISTS => CouchbaseError::DocumentExists { ctx },
         lcb_STATUS_LCB_ERR_VALUE_NOT_JSON => CouchbaseError::ValueNotJson { ctx },
-        lcb_STATUS_LCB_ERR_DURABILITY_LEVEL_NOT_AVAILABLE => CouchbaseError::DurabilityLevelNotAvailable { ctx },
+        lcb_STATUS_LCB_ERR_DURABILITY_LEVEL_NOT_AVAILABLE => {
+            CouchbaseError::DurabilityLevelNotAvailable { ctx }
+        }
         lcb_STATUS_LCB_ERR_DURABILITY_IMPOSSIBLE => CouchbaseError::DurabilityImpossible { ctx },
         lcb_STATUS_LCB_ERR_DURABILITY_AMBIGUOUS => CouchbaseError::DurabilityAmbiguous { ctx },
-        lcb_STATUS_LCB_ERR_DURABLE_WRITE_IN_PROGRESS => CouchbaseError::DurableWriteInProgress { ctx },
-        lcb_STATUS_LCB_ERR_DURABLE_WRITE_RE_COMMIT_IN_PROGRESS => CouchbaseError::DurableWriteReCommitInProgress { ctx },
+        lcb_STATUS_LCB_ERR_DURABLE_WRITE_IN_PROGRESS => {
+            CouchbaseError::DurableWriteInProgress { ctx }
+        }
+        lcb_STATUS_LCB_ERR_DURABLE_WRITE_RE_COMMIT_IN_PROGRESS => {
+            CouchbaseError::DurableWriteReCommitInProgress { ctx }
+        }
         lcb_STATUS_LCB_ERR_MUTATION_LOST => CouchbaseError::MutationLost { ctx },
         lcb_STATUS_LCB_ERR_SUBDOC_PATH_NOT_FOUND => CouchbaseError::PathNotFound { ctx },
         lcb_STATUS_LCB_ERR_SUBDOC_PATH_MISMATCH => CouchbaseError::PathMismatch { ctx },
@@ -201,14 +252,24 @@ fn couchbase_error_from_lcb_status(status: lcb_STATUS, ctx: ErrorContext) -> Cou
         lcb_STATUS_LCB_ERR_SUBDOC_DELTA_INVALID => CouchbaseError::DeltaInvalid { ctx },
         lcb_STATUS_LCB_ERR_SUBDOC_PATH_EXISTS => CouchbaseError::PathExists { ctx },
         lcb_STATUS_LCB_ERR_SUBDOC_XATTR_UNKNOWN_MACRO => CouchbaseError::XattrUnknownMacro { ctx },
-        lcb_STATUS_LCB_ERR_SUBDOC_XATTR_INVALID_FLAG_COMBO => CouchbaseError::XattrInvalidFlagCombo { ctx },
-        lcb_STATUS_LCB_ERR_SUBDOC_XATTR_INVALID_KEY_COMBO => CouchbaseError::XattrInvalidKeyCombo { ctx },
-        lcb_STATUS_LCB_ERR_SUBDOC_XATTR_UNKNOWN_VIRTUAL_ATTRIBUTE => CouchbaseError::XattrUnknownVirtualAttribute { ctx },
-        lcb_STATUS_LCB_ERR_SUBDOC_XATTR_CANNOT_MODIFY_VIRTUAL_ATTRIBUTE => CouchbaseError::XattrCannotModifyVirtualAttribute { ctx },
+        lcb_STATUS_LCB_ERR_SUBDOC_XATTR_INVALID_FLAG_COMBO => {
+            CouchbaseError::XattrInvalidFlagCombo { ctx }
+        }
+        lcb_STATUS_LCB_ERR_SUBDOC_XATTR_INVALID_KEY_COMBO => {
+            CouchbaseError::XattrInvalidKeyCombo { ctx }
+        }
+        lcb_STATUS_LCB_ERR_SUBDOC_XATTR_UNKNOWN_VIRTUAL_ATTRIBUTE => {
+            CouchbaseError::XattrUnknownVirtualAttribute { ctx }
+        }
+        lcb_STATUS_LCB_ERR_SUBDOC_XATTR_CANNOT_MODIFY_VIRTUAL_ATTRIBUTE => {
+            CouchbaseError::XattrCannotModifyVirtualAttribute { ctx }
+        }
         lcb_STATUS_LCB_ERR_SUBDOC_XATTR_INVALID_ORDER => CouchbaseError::XattrInvalidOrder { ctx },
         lcb_STATUS_LCB_ERR_PLANNING_FAILURE => CouchbaseError::PlanningFailure { ctx },
         lcb_STATUS_LCB_ERR_INDEX_FAILURE => CouchbaseError::IndexFailure { ctx },
-        lcb_STATUS_LCB_ERR_PREPARED_STATEMENT_FAILURE => CouchbaseError::PreparedStatementFailure { ctx },
+        lcb_STATUS_LCB_ERR_PREPARED_STATEMENT_FAILURE => {
+            CouchbaseError::PreparedStatementFailure { ctx }
+        }
         lcb_STATUS_LCB_ERR_COMPILATION_FAILED => CouchbaseError::CompilationFailure { ctx },
         lcb_STATUS_LCB_ERR_JOB_QUEUE_FULL => CouchbaseError::JobQueueFull { ctx },
         lcb_STATUS_LCB_ERR_DATASET_NOT_FOUND => CouchbaseError::DatasetNotFound { ctx },
@@ -217,7 +278,9 @@ fn couchbase_error_from_lcb_status(status: lcb_STATUS, ctx: ErrorContext) -> Cou
         lcb_STATUS_LCB_ERR_DATAVERSE_EXISTS => CouchbaseError::DataverseExists { ctx },
         lcb_STATUS_LCB_ERR_ANALYTICS_LINK_NOT_FOUND => CouchbaseError::LinkNotFound { ctx },
         lcb_STATUS_LCB_ERR_VIEW_NOT_FOUND => CouchbaseError::ViewNotFound { ctx },
-        lcb_STATUS_LCB_ERR_DESIGN_DOCUMENT_NOT_FOUND => CouchbaseError::DesignDocumentNotFound { ctx },
+        lcb_STATUS_LCB_ERR_DESIGN_DOCUMENT_NOT_FOUND => {
+            CouchbaseError::DesignDocumentNotFound { ctx }
+        }
         lcb_STATUS_LCB_ERR_COLLECTION_ALREADY_EXISTS => CouchbaseError::CollectionExists { ctx },
         lcb_STATUS_LCB_ERR_SCOPE_EXISTS => CouchbaseError::ScopeExists { ctx },
         lcb_STATUS_LCB_ERR_USER_NOT_FOUND => CouchbaseError::UserNotFound { ctx },
