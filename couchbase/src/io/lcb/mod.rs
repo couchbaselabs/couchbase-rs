@@ -1,15 +1,15 @@
 mod callbacks;
 mod encode;
 
-use crate::api::error::{CouchbaseResult};
+use crate::api::error::CouchbaseResult;
 use crate::api::results::{QueryMetaData, QueryResult};
-use crate::io::request::{Request};
+use crate::io::request::Request;
 
-use callbacks::{logger_callback, get_callback, store_callback, open_callback};
+use callbacks::{get_callback, logger_callback, open_callback, store_callback};
 
 use couchbase_sys::*;
 use log::debug;
-use std::ffi::{CString};
+use std::ffi::CString;
 use std::os::raw::{c_char, c_int, c_uint, c_void};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread::JoinHandle;
@@ -131,7 +131,7 @@ fn run_lcb_loop(
 fn handle_io_request(
     req: IoRequest,
     instance: *mut lcb_INSTANCE,
-    instance_cookie: &mut Box<InstanceCookie>,
+    instance_cookie: &mut InstanceCookie,
 ) -> bool {
     match req {
         IoRequest::Data(r) => {
@@ -146,8 +146,8 @@ fn handle_io_request(
             lcb_open(instance, name.as_ptr(), name_len);
             lcb_wait(instance, lcb_WAITFLAGS_LCB_WAIT_DEFAULT);
         },
-    }
-    return false;
+    };
+    false
 }
 
 unsafe fn install_instance_callbacks(instance: *mut lcb_INSTANCE) {
@@ -226,7 +226,3 @@ struct QueryCookie {
     meta_sender: futures::channel::oneshot::Sender<QueryMetaData>,
     meta_receiver: Option<futures::channel::oneshot::Receiver<QueryMetaData>>,
 }
-
-
-
-

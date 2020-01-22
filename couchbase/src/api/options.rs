@@ -7,7 +7,6 @@ pub struct QueryOptions {
 }
 
 impl QueryOptions {
-
     pub fn scan_consistency(mut self, scan_consistency: QueryScanConsistency) -> Self {
         self.scan_consistency = Some(scan_consistency);
         self
@@ -27,7 +26,10 @@ pub enum QueryScanConsistency {
 
 impl Default for QueryOptions {
     fn default() -> Self {
-        Self { timeout: None, scan_consistency: None }
+        Self {
+            timeout: None,
+            scan_consistency: None,
+        }
     }
 }
 

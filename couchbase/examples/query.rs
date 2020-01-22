@@ -1,5 +1,5 @@
 use couchbase::{Cluster, QueryOptions, QueryScanConsistency};
-use futures::executor::{block_on_stream, block_on};
+use futures::executor::{block_on, block_on_stream};
 
 pub fn main() {
     env_logger::init();
@@ -11,7 +11,8 @@ pub fn main() {
     let mut result = block_on(cluster.query(
         "select * from `travel-sample` limit 2",
         QueryOptions::default().scan_consistency(QueryScanConsistency::RequestPlus),
-    )).unwrap();
+    ))
+    .unwrap();
     println!("result: {:?}", result);
 
     let meta = block_on(result.meta_data());
@@ -20,5 +21,4 @@ pub fn main() {
     for row in block_on_stream(result.rows::<serde_json::Value>()) {
         println!("row: {:?}", row);
     }
-
-} 
+}

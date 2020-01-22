@@ -1,13 +1,13 @@
-use crate::api::options::{QueryScanConsistency};
-use crate::io::request::{UpsertRequest, GetRequest, QueryRequest};
-use crate::io::lcb::{QueryCookie};
+use crate::api::options::QueryScanConsistency;
+use crate::io::lcb::QueryCookie;
+use crate::io::request::{GetRequest, QueryRequest, UpsertRequest};
 
 use crate::io::lcb::callbacks::query_callback;
 
 use couchbase_sys::*;
-use std::ffi::{CString};
+use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
-use std::{ptr};
+use std::ptr;
 
 pub fn encode_get(instance: *mut lcb_INSTANCE, request: GetRequest) {
     let id_len = request.id().len();
@@ -59,10 +59,16 @@ pub fn encode_query(instance: *mut lcb_INSTANCE, request: QueryRequest) {
     let mut command: *mut lcb_CMDQUERY = ptr::null_mut();
 
     let timeout = request.options().timeout.map(|t| t.as_micros() as u32);
-    let scan_consistency = request.options().scan_consistency.as_ref().map(|s| match s {
-        QueryScanConsistency::NotBounded => lcb_QUERY_CONSISTENCY_LCB_QUERY_CONSISTENCY_NONE,
-        QueryScanConsistency::RequestPlus => lcb_QUERY_CONSISTENCY_LCB_QUERY_CONSISTENCY_REQUEST,
-    });
+    let scan_consistency = request
+        .options()
+        .scan_consistency
+        .as_ref()
+        .map(|s| match s {
+            QueryScanConsistency::NotBounded => lcb_QUERY_CONSISTENCY_LCB_QUERY_CONSISTENCY_NONE,
+            QueryScanConsistency::RequestPlus => {
+                lcb_QUERY_CONSISTENCY_LCB_QUERY_CONSISTENCY_REQUEST
+            }
+        });
 
     let (meta_sender, meta_receiver) = futures::channel::oneshot::channel();
     let (rows_sender, rows_receiver) = futures::channel::mpsc::unbounded();

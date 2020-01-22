@@ -2,10 +2,10 @@ use crate::api::error::{CouchbaseError, CouchbaseResult, ErrorContext};
 use crate::api::MutationToken;
 use futures::channel::mpsc::UnboundedReceiver;
 use futures::channel::oneshot::Receiver;
-use std::fmt;
-use futures::{StreamExt, Stream};
+use futures::{Stream, StreamExt};
 use serde::de::DeserializeOwned;
 use serde_derive::Deserialize;
+use std::fmt;
 use std::time::Duration;
 
 #[derive(Debug)]
@@ -16,20 +16,25 @@ pub struct QueryResult {
 
 impl QueryResult {
     pub fn new(rows: UnboundedReceiver<Vec<u8>>, meta: Receiver<QueryMetaData>) -> Self {
-        Self { rows: Some(rows), meta: Some(meta) }
+        Self {
+            rows: Some(rows),
+            meta: Some(meta),
+        }
     }
 
-    pub fn rows<T>(&mut self) -> impl Stream<Item = CouchbaseResult<T>> where
-    T: DeserializeOwned {
-        self.rows.take().expect("Can not consume rows twice!").map(|v| {
-            match serde_json::from_slice(v.as_slice()) {
+    pub fn rows<T>(&mut self) -> impl Stream<Item = CouchbaseResult<T>>
+    where
+        T: DeserializeOwned,
+    {
+        self.rows.take().expect("Can not consume rows twice!").map(
+            |v| match serde_json::from_slice(v.as_slice()) {
                 Ok(decoded) => Ok(decoded),
                 Err(e) => Err(CouchbaseError::DecodingFailure {
                     ctx: ErrorContext::default(),
                     source: e.into(),
                 }),
-            }
-        })
+            },
+        )
     }
 
     pub async fn meta_data(&mut self) -> QueryMetaData {
@@ -49,7 +54,6 @@ pub struct QueryMetaData {
 }
 
 impl QueryMetaData {
-
     pub fn metrics(&self) -> &QueryMetrics {
         &self.metrics
     }
@@ -84,18 +88,17 @@ pub struct QueryMetrics {
 }
 
 impl QueryMetrics {
-
     pub fn elapsed_time(&self) -> Duration {
         match parse_duration::parse(&self.elapsed_time) {
             Ok(d) => d,
-            Err(_e) => return Duration::from_secs(0)
+            Err(_e) => Duration::from_secs(0),
         }
     }
 
     pub fn execution_time(&self) -> Duration {
         match parse_duration::parse(&self.execution_time) {
             Ok(d) => d,
-            Err(_e) => return Duration::from_secs(0)
+            Err(_e) => Duration::from_secs(0),
         }
     }
 
@@ -178,7 +181,10 @@ pub struct MutationResult {
 }
 
 impl MutationResult {
-    pub fn new( cas: u64, mutation_token: Option<MutationToken>) -> Self {
-        Self { cas, mutation_token }
+    pub fn new(cas: u64, mutation_token: Option<MutationToken>) -> Self {
+        Self {
+            cas,
+            mutation_token,
+        }
     }
 }

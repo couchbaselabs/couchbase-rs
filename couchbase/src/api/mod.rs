@@ -2,15 +2,15 @@ pub mod error;
 pub mod options;
 pub mod results;
 
-use crate::api::error::{CouchbaseError, ErrorContext, CouchbaseResult};
+use crate::api::error::{CouchbaseError, CouchbaseResult, ErrorContext};
 use crate::api::options::{GetOptions, QueryOptions, UpsertOptions};
 use crate::api::results::{GetResult, MutationResult, QueryResult};
-use crate::io::request::{UpsertRequest, GetRequest, QueryRequest, Request};
+use crate::io::request::{GetRequest, QueryRequest, Request, UpsertRequest};
 use crate::io::Core;
 use futures::channel::oneshot;
-use std::sync::Arc;
 use serde::Serialize;
 use serde_json::to_vec;
+use std::sync::Arc;
 
 pub struct Cluster {
     core: Arc<Core>,
@@ -92,18 +92,27 @@ impl Collection {
         id: S,
         content: T,
         options: UpsertOptions,
-    ) -> CouchbaseResult<MutationResult> where T: Serialize {
+    ) -> CouchbaseResult<MutationResult>
+    where
+        T: Serialize,
+    {
         let serialized = match to_vec(&content) {
             Ok(v) => v,
-            Err(e) => return Err(CouchbaseError::EncodingFailure {
-                ctx: ErrorContext::default(),
-                source: e.into(),
-            }),
+            Err(e) => {
+                return Err(CouchbaseError::EncodingFailure {
+                    ctx: ErrorContext::default(),
+                    source: e.into(),
+                })
+            }
         };
 
         let (sender, receiver) = oneshot::channel();
-        self.core
-            .send(Request::Upsert(UpsertRequest::new(id.into(), serialized, options, sender)));
+        self.core.send(Request::Upsert(UpsertRequest::new(
+            id.into(),
+            serialized,
+            options,
+            sender,
+        )));
         receiver.await.unwrap()
     }
 }
@@ -116,10 +125,12 @@ pub struct MutationToken {
 }
 
 impl MutationToken {
-    pub fn new(partition_uuid: u64,
-        sequence_number: u64,
-        partition_id: u16) -> Self {
-        Self { partition_uuid, sequence_number, partition_id }
+    pub fn new(partition_uuid: u64, sequence_number: u64, partition_id: u16) -> Self {
+        Self {
+            partition_uuid,
+            sequence_number,
+            partition_id,
+        }
     }
 
     pub fn partition_uuid(&self) -> u64 {

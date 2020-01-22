@@ -1,6 +1,6 @@
 use crate::api::error::CouchbaseResult;
-use crate::api::options::{UpsertOptions, GetOptions, QueryOptions};
-use crate::api::results::{MutationResult, GetResult, QueryResult};
+use crate::api::options::{GetOptions, QueryOptions, UpsertOptions};
+use crate::api::results::{GetResult, MutationResult, QueryResult};
 use futures::channel::oneshot::Sender;
 
 #[derive(Debug)]

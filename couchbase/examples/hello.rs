@@ -9,15 +9,18 @@ pub fn main() {
     let bucket = cluster.bucket("travel-sample");
     let collection = bucket.default_collection();
 
-    let result = block_on(collection.get("airline_10", GetOptions::default()));
+    let result = block_on(collection.get("airline_1110", GetOptions::default()));
     println!("result: {:?}", result);
     match result {
         Ok(r) => println!("content: {:?}", r.content::<serde_json::Value>()),
-        Err(e) => println!("got error! {:?}", e),
+        Err(e) => println!("got error! {}", e),
     };
 
     let mut content = HashMap::new();
     content.insert("Hello", "World1");
 
-    println!("UpsertResult: {:?}", block_on(collection.upsert("foo", content, UpsertOptions::default())));
+    println!(
+        "UpsertResult: {:?}",
+        block_on(collection.upsert("foo", content, UpsertOptions::default()))
+    );
 }
