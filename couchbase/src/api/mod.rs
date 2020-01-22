@@ -59,21 +59,56 @@ impl Bucket {
     }
 
     pub fn default_collection(&self) -> Collection {
-        Collection::new(self.core.clone())
+        Collection::new(self.core.clone(), "_default".into(), "_default".into())
+    }
+
+    pub fn name(&self) -> &str {
+        self.name.as_str()
+    }
+
+    #[cfg(feature = "volatile")]
+    pub fn collection<S: Into<String>>(&self, name: S) -> Collection {
+        Collection::new(self.core.clone(), name.into())
+    }
+
+    #[cfg(feature = "volatile")]
+    pub fn scope<S: Into<String>>(&self, name: S) -> Scope {
+        Scope::new(self.core.clone(), name.into())
     }
 }
 
-pub struct Scope {}
-
-impl Scope {}
-
-pub struct Collection {
+#[cfg(feature = "volatile")]
+pub struct Scope {
+    name: String,
     core: Arc<Core>,
 }
 
+
+#[cfg(feature = "volatile")]
+impl Scope {
+
+    pub(crate) fn new(core: Arc<Core>, name: String) -> Self {
+        Self { core, name }
+    }
+
+    pub fn collection<S: Into<String>>(&self, name: S) -> Collection {
+        Collection::new(self.core.clone(), name.into(), self.name.clone())
+    }
+}
+
+pub struct Collection {
+    core: Arc<Core>,
+    name: String,
+    _scope_name: String,
+}
+
 impl Collection {
-    pub(crate) fn new(core: Arc<Core>) -> Self {
-        Self { core }
+    pub(crate) fn new(core: Arc<Core>, name: String, scope_name: String) -> Self {
+        Self { core, name, _scope_name: scope_name }
+    }
+
+    pub fn name(&self) -> &str {
+        self.name.as_str()
     }
 
     pub async fn get<S: Into<String>>(

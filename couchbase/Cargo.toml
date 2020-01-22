@@ -29,5 +29,11 @@ cc = { version = "1.0", optional = true }
 env_logger = "0.7"
 
 [features]
+# By default, the libcouchbase (C) backend is used. More will be available in the future
 default = ["libcouchbase"]
+# The libcouchbase C backend will be compiled and used
 libcouchbase = ["couchbase-sys", "cc"]
+# If enabled, exposes all APIs currently marked as uncomitted
+uncomitted = []
+# If enabled, exposes all APIs currently marked as volatile or uncomitted
+volatile = ["uncomitted"]
