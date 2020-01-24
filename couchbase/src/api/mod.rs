@@ -39,11 +39,11 @@ impl Cluster {
         options: QueryOptions,
     ) -> CouchbaseResult<QueryResult> {
         let (sender, receiver) = oneshot::channel();
-        self.core.send(Request::Query(QueryRequest::new(
-            statement.into(),
+        self.core.send(Request::Query(QueryRequest {
+            statement: statement.into(),
             options,
             sender,
-        )));
+        }));
         receiver.await.unwrap()
     }
 }
@@ -83,10 +83,8 @@ pub struct Scope {
     core: Arc<Core>,
 }
 
-
 #[cfg(feature = "volatile")]
 impl Scope {
-
     pub(crate) fn new(core: Arc<Core>, name: String) -> Self {
         Self { core, name }
     }
@@ -104,7 +102,11 @@ pub struct Collection {
 
 impl Collection {
     pub(crate) fn new(core: Arc<Core>, name: String, scope_name: String) -> Self {
-        Self { core, name, _scope_name: scope_name }
+        Self {
+            core,
+            name,
+            _scope_name: scope_name,
+        }
     }
 
     pub fn name(&self) -> &str {
@@ -117,8 +119,11 @@ impl Collection {
         options: GetOptions,
     ) -> CouchbaseResult<GetResult> {
         let (sender, receiver) = oneshot::channel();
-        self.core
-            .send(Request::Get(GetRequest::new(id.into(), options, sender)));
+        self.core.send(Request::Get(GetRequest {
+            id: id.into(),
+            options,
+            sender,
+        }));
         receiver.await.unwrap()
     }
 
@@ -142,12 +147,12 @@ impl Collection {
         };
 
         let (sender, receiver) = oneshot::channel();
-        self.core.send(Request::Upsert(UpsertRequest::new(
-            id.into(),
-            serialized,
+        self.core.send(Request::Upsert(UpsertRequest {
+            id: id.into(),
+            content: serialized,
             options,
             sender,
-        )));
+        }));
         receiver.await.unwrap()
     }
 }

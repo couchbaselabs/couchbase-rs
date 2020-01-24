@@ -9,7 +9,7 @@ pub fn main() {
     let bucket = cluster.bucket("travel-sample");
     let collection = bucket.default_collection();
 
-    let result = block_on(collection.get("airline_1110", GetOptions::default()));
+    let result = block_on(collection.get("airline_110", GetOptions::default()));
     println!("result: {:?}", result);
     match result {
         Ok(r) => println!("content: {:?}", r.content::<serde_json::Value>()),
