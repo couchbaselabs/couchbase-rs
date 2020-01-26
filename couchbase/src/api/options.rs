@@ -225,6 +225,21 @@ impl ReplaceOptions {
 }
 
 #[derive(Debug, Default)]
+pub struct RemoveOptions {
+    pub(crate) timeout: Option<Duration>,
+    pub(crate) cas: Option<u64>,
+}
+
+impl RemoveOptions {
+    timeout!();
+
+    pub fn cas(mut self, cas: u64) -> Self {
+        self.cas = Some(cas);
+        self
+    }
+}
+
+#[derive(Debug, Default)]
 pub struct ExistsOptions {
     pub(crate) timeout: Option<Duration>,
 }

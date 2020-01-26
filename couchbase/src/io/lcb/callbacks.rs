@@ -57,6 +57,52 @@ pub unsafe extern "C" fn store_callback(
     sender.send(result).expect("Could not complete Future!");
 }
 
+pub unsafe extern "C" fn remove_callback(
+    instance: *mut lcb_INSTANCE,
+    _cbtype: i32,
+    res: *const lcb_RESPBASE,
+) {
+    decrement_outstanding_requests(instance);
+    let remove_res = res as *const lcb_RESPREMOVE;
+
+    let mut cookie_ptr: *mut c_void = ptr::null_mut();
+    lcb_respremove_cookie(remove_res, &mut cookie_ptr);
+    let sender = Box::from_raw(
+        cookie_ptr as *mut futures::channel::oneshot::Sender<CouchbaseResult<MutationResult>>,
+    );
+
+    let status = lcb_respremove_status(remove_res);
+    let result = if status == lcb_STATUS_LCB_SUCCESS {
+        let mut cas: u64 = 0;
+        lcb_respremove_cas(remove_res, &mut cas);
+
+        let mut lcb_mutation_token = lcb_MUTATION_TOKEN {
+            uuid_: 0,
+            seqno_: 0,
+            vbid_: 0,
+        };
+        lcb_respremove_mutation_token(remove_res, &mut lcb_mutation_token);
+        let mutation_token = if lcb_mutation_token.uuid_ != 0 {
+            Some(MutationToken::new(
+                lcb_mutation_token.uuid_,
+                lcb_mutation_token.seqno_,
+                lcb_mutation_token.vbid_,
+            ))
+        } else {
+            None
+        };
+        Ok(MutationResult::new(cas, mutation_token))
+    } else {
+        let mut lcb_ctx: *const lcb_KEY_VALUE_ERROR_CONTEXT = ptr::null();
+        lcb_respremove_error_context(remove_res, &mut lcb_ctx);
+        Err(couchbase_error_from_lcb_status(
+            status,
+            build_kv_error_context(lcb_ctx),
+        ))
+    };
+    sender.send(result).expect("Could not complete Future!");
+}
+
 pub unsafe extern "C" fn get_callback(
     instance: *mut lcb_INSTANCE,
     _cbtype: i32,

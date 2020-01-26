@@ -1,4 +1,4 @@
-use couchbase::{Cluster, GetOptions, ReplaceOptions, ExistsOptions};
+use couchbase::*;
 use futures::executor::block_on;
 use std::collections::HashMap;
 
@@ -8,6 +8,8 @@ pub fn main() {
     let cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
     let bucket = cluster.bucket("travel-sample");
     let collection = bucket.default_collection();
+
+
 
     let result = block_on(collection.get("airline_110", GetOptions::default()));
     println!("result: {:?}", result);
@@ -21,6 +23,14 @@ pub fn main() {
 
     println!(
         "UpsertResult: {:?}",
-        block_on(collection.replace("foo", content, ReplaceOptions::default()))
+        block_on(collection.upsert("foo", content, UpsertOptions::default()))
     );
+
+    println!("{:?}", block_on(collection.get("foo", GetOptions::default())));
+
+    println!("{:?}", block_on(collection.remove("foo", RemoveOptions::default())));
+
+    println!("{:?}", block_on(collection.get("foo", GetOptions::default())));
+
+
 }

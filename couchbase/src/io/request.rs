@@ -1,9 +1,6 @@
 use crate::api::error::CouchbaseResult;
-use crate::api::options::{
-    ExistsOptions, GetAndLockOptions, GetAndTouchOptions, GetOptions, InsertOptions, QueryOptions,
-    ReplaceOptions, UpsertOptions,
-};
-use crate::api::results::{ExistsResult, GetResult, MutationResult, QueryResult};
+use crate::api::options::*;
+use crate::api::results::*;
 use futures::channel::oneshot::Sender;
 use std::time::Duration;
 
@@ -13,6 +10,7 @@ pub enum Request {
     Mutate(MutateRequest),
     Query(QueryRequest),
     Exists(ExistsRequest),
+    Remove(RemoveRequest),
 }
 
 #[derive(Debug)]
@@ -42,6 +40,13 @@ pub struct ExistsRequest {
     pub(crate) id: String,
     pub(crate) sender: Sender<CouchbaseResult<ExistsResult>>,
     pub(crate) options: ExistsOptions,
+}
+
+#[derive(Debug)]
+pub struct RemoveRequest {
+    pub(crate) id: String,
+    pub(crate) sender: Sender<CouchbaseResult<MutationResult>>,
+    pub(crate) options: RemoveOptions,
 }
 
 #[derive(Debug)]

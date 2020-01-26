@@ -1,8 +1,6 @@
 use crate::api::options::QueryScanConsistency;
 use crate::io::lcb::QueryCookie;
-use crate::io::request::{
-    ExistsRequest, GetRequest, GetRequestType, MutateRequest, MutateRequestType, QueryRequest,
-};
+use crate::io::request::*;
 
 use crate::io::lcb::callbacks::query_callback;
 
@@ -128,6 +126,28 @@ pub fn encode_mutate(instance: *mut lcb_INSTANCE, request: MutateRequest) {
 
         lcb_store(instance, cookie as *mut c_void, command);
         lcb_cmdstore_destroy(command);
+    }
+}
+
+/// Encodes a `RemoveRequest` into its libcouchbase `lcb_CMDREMOVE` representation.
+pub fn encode_remove(instance: *mut lcb_INSTANCE, request: RemoveRequest) {
+    let (id_len, id) = into_cstring(request.id);
+    let cookie = Box::into_raw(Box::new(request.sender));
+
+    let mut command: *mut lcb_CMDREMOVE = ptr::null_mut();
+    unsafe {
+        lcb_cmdremove_create(&mut command);
+        lcb_cmdremove_key(command, id.as_ptr(), id_len);
+
+        if let Some(cas) = request.options.cas {
+            lcb_cmdremove_cas(command, cas);
+        }
+        if let Some(timeout) = request.options.timeout {
+            lcb_cmdremove_timeout(command, timeout.as_micros() as u32);
+        }
+
+        lcb_remove(instance, cookie as *mut c_void, command);
+        lcb_cmdremove_destroy(command);
     }
 }
 

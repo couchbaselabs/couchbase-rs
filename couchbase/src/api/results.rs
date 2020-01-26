@@ -174,7 +174,6 @@ impl fmt::Debug for GetResult {
     }
 }
 
-#[derive(Debug)]
 pub struct ExistsResult {
     cas: Option<u64>,
     exists: bool,
@@ -194,7 +193,16 @@ impl ExistsResult {
     }
 }
 
-#[derive(Debug)]
+impl fmt::Debug for ExistsResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ExistsResult {{ exists: {:?}, cas: {:?} }}",
+            self.exists, self.cas.map(|c| format!("0x{:x}", c))
+        )
+    }
+}
+
 pub struct MutationResult {
     cas: u64,
     mutation_token: Option<MutationToken>,
@@ -206,5 +214,15 @@ impl MutationResult {
             cas,
             mutation_token,
         }
+    }
+}
+
+impl fmt::Debug for MutationResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "MutationResult {{ cas: 0x{:x}, mutation_token: {:?} }}",
+            self.cas, self.mutation_token
+        )
     }
 }

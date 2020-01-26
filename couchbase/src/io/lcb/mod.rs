@@ -5,7 +5,9 @@ use crate::api::error::CouchbaseResult;
 use crate::api::results::{QueryMetaData, QueryResult};
 use crate::io::request::Request;
 
-use callbacks::{exists_callback, get_callback, logger_callback, open_callback, store_callback};
+use callbacks::{
+    exists_callback, get_callback, logger_callback, open_callback, remove_callback, store_callback,
+};
 
 use couchbase_sys::*;
 use log::debug;
@@ -166,6 +168,11 @@ unsafe fn install_instance_callbacks(instance: *mut lcb_INSTANCE) {
         lcb_CALLBACK_TYPE_LCB_CALLBACK_EXISTS as i32,
         Some(exists_callback),
     );
+    lcb_install_callback(
+        instance,
+        lcb_CALLBACK_TYPE_LCB_CALLBACK_REMOVE as i32,
+        Some(remove_callback),
+    );
     lcb_set_open_callback(instance, Some(open_callback));
 }
 
@@ -222,6 +229,7 @@ fn encode(instance: *mut lcb_INSTANCE, request: Request) {
         Request::Query(r) => encode::encode_query(instance, r),
         Request::Mutate(r) => encode::encode_mutate(instance, r),
         Request::Exists(r) => encode::encode_exists(instance, r),
+        Request::Remove(r) => encode::encode_remove(instance, r),
     }
 }
 

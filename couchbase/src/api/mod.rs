@@ -3,15 +3,9 @@ pub mod options;
 pub mod results;
 
 use crate::api::error::{CouchbaseError, CouchbaseResult, ErrorContext};
-use crate::api::options::{
-    ExistsOptions, GetAndLockOptions, GetAndTouchOptions, GetOptions, InsertOptions, QueryOptions,
-    ReplaceOptions, UpsertOptions,
-};
-use crate::api::results::{ExistsResult, GetResult, MutationResult, QueryResult};
-use crate::io::request::{
-    ExistsRequest, GetRequest, GetRequestType, MutateRequest, MutateRequestType, QueryRequest,
-    Request,
-};
+use crate::api::options::*;
+use crate::api::results::*;
+use crate::io::request::*;
 use crate::io::Core;
 use futures::channel::oneshot;
 use serde::Serialize;
@@ -242,6 +236,20 @@ impl Collection {
             content: serialized,
             sender,
             ty,
+        }));
+        receiver.await.unwrap()
+    }
+
+    pub async fn remove<S: Into<String>>(
+        &self,
+        id: S,
+        options: RemoveOptions,
+    ) -> CouchbaseResult<MutationResult> {
+        let (sender, receiver) = oneshot::channel();
+        self.core.send(Request::Remove(RemoveRequest {
+            id: id.into(),
+            sender,
+            options,
         }));
         receiver.await.unwrap()
     }
