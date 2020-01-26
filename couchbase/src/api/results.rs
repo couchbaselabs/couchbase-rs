@@ -175,6 +175,26 @@ impl fmt::Debug for GetResult {
 }
 
 #[derive(Debug)]
+pub struct ExistsResult {
+    cas: Option<u64>,
+    exists: bool,
+}
+
+impl ExistsResult {
+    pub fn new(exists: bool, cas: Option<u64>) -> Self {
+        Self { exists, cas }
+    }
+
+    pub fn exists(&self) -> bool {
+        self.exists
+    }
+
+    pub fn cas(&self) -> &Option<u64> {
+        &self.cas
+    }
+}
+
+#[derive(Debug)]
 pub struct MutationResult {
     cas: u64,
     mutation_token: Option<MutationToken>,

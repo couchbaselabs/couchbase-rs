@@ -1,6 +1,8 @@
 use crate::api::options::QueryScanConsistency;
 use crate::io::lcb::QueryCookie;
-use crate::io::request::{GetRequest, QueryRequest, UpsertRequest};
+use crate::io::request::{
+    ExistsRequest, GetRequest, GetRequestType, MutateRequest, MutateRequestType, QueryRequest,
+};
 
 use crate::io::lcb::callbacks::query_callback;
 
@@ -20,6 +22,10 @@ fn into_cstring<T: Into<Vec<u8>>>(input: T) -> (usize, CString) {
 }
 
 /// Encodes a `GetRequest` into its libcouchbase `lcb_CMDGET` representation.
+///
+/// Note that this method also handles get_and_lock and get_and_touch by looking
+/// at the ty (type) enum of the get request. If one of them is used their inner
+/// duration is passed down to libcouchbase either as a locktime or the expiry.
 pub fn encode_get(instance: *mut lcb_INSTANCE, request: GetRequest) {
     let (id_len, id) = into_cstring(request.id);
     let cookie = Box::into_raw(Box::new(request.sender));
@@ -29,17 +35,57 @@ pub fn encode_get(instance: *mut lcb_INSTANCE, request: GetRequest) {
         lcb_cmdget_create(&mut command);
         lcb_cmdget_key(command, id.as_ptr(), id_len);
 
-        if let Some(timeout) = request.options.timeout {
-            lcb_cmdget_timeout(command, timeout.as_micros() as u32);
-        }
+        match request.ty {
+            GetRequestType::Get { options } => {
+                if let Some(timeout) = options.timeout {
+                    lcb_cmdget_timeout(command, timeout.as_micros() as u32);
+                }
+            }
+            GetRequestType::GetAndLock { lock_time, options } => {
+                lcb_cmdget_locktime(command, lock_time.as_micros() as u32);
+
+                if let Some(timeout) = options.timeout {
+                    lcb_cmdget_timeout(command, timeout.as_micros() as u32);
+                }
+            }
+            GetRequestType::GetAndTouch { expiry, options } => {
+                lcb_cmdget_expiry(command, expiry.as_micros() as u32);
+
+                if let Some(timeout) = options.timeout {
+                    lcb_cmdget_timeout(command, timeout.as_micros() as u32);
+                }
+            }
+        };
 
         lcb_get(instance, cookie as *mut c_void, command);
         lcb_cmdget_destroy(command);
     }
 }
 
-/// Encodes a `UpsertRequest` into its libcouchbase `lcb_CMDSTORE` representation.
-pub fn encode_upsert(instance: *mut lcb_INSTANCE, request: UpsertRequest) {
+/// Encodes a `ExistsRequest` into its libcouchbase `lcb_CMDEXISTS` representation.
+pub fn encode_exists(instance: *mut lcb_INSTANCE, request: ExistsRequest) {
+    let (id_len, id) = into_cstring(request.id);
+    let cookie = Box::into_raw(Box::new(request.sender));
+
+    let mut command: *mut lcb_CMDEXISTS = ptr::null_mut();
+    unsafe {
+        lcb_cmdexists_create(&mut command);
+        lcb_cmdexists_key(command, id.as_ptr(), id_len);
+
+        if let Some(timeout) = request.options.timeout {
+            lcb_cmdexists_timeout(command, timeout.as_micros() as u32);
+        }
+
+        lcb_exists(instance, cookie as *mut c_void, command);
+        lcb_cmdexists_destroy(command);
+    }
+}
+
+/// Encodes a `MutateRequest` into its libcouchbase `lcb_CMDSTORE` representation.
+///
+/// This method covers insert, upsert and replace since they are very similar and
+/// only differ on certain properties.
+pub fn encode_mutate(instance: *mut lcb_INSTANCE, request: MutateRequest) {
     let (id_len, id) = into_cstring(request.id);
     let (value_len, value) = into_cstring(request.content);
     let cookie = Box::into_raw(Box::new(request.sender));
@@ -50,8 +96,34 @@ pub fn encode_upsert(instance: *mut lcb_INSTANCE, request: UpsertRequest) {
         lcb_cmdstore_key(command, id.as_ptr(), id_len);
         lcb_cmdstore_value(command, value.as_ptr(), value_len);
 
-        if let Some(timeout) = request.options.timeout {
-            lcb_cmdstore_timeout(command, timeout.as_micros() as u32);
+        match request.ty {
+            MutateRequestType::Upsert { options } => {
+                if let Some(timeout) = options.timeout {
+                    lcb_cmdstore_timeout(command, timeout.as_micros() as u32);
+                }
+                if let Some(expiry) = options.expiry {
+                    lcb_cmdstore_expiry(command, expiry.as_secs() as u32);
+                }
+            }
+            MutateRequestType::Insert { options } => {
+                if let Some(timeout) = options.timeout {
+                    lcb_cmdstore_timeout(command, timeout.as_micros() as u32);
+                }
+                if let Some(expiry) = options.expiry {
+                    lcb_cmdstore_expiry(command, expiry.as_secs() as u32);
+                }
+            }
+            MutateRequestType::Replace { options } => {
+                if let Some(cas) = options.cas {
+                    lcb_cmdstore_cas(command, cas);
+                }
+                if let Some(timeout) = options.timeout {
+                    lcb_cmdstore_timeout(command, timeout.as_micros() as u32);
+                }
+                if let Some(expiry) = options.expiry {
+                    lcb_cmdstore_expiry(command, expiry.as_secs() as u32);
+                }
+            }
         }
 
         lcb_store(instance, cookie as *mut c_void, command);
@@ -82,15 +154,71 @@ pub fn encode_query(instance: *mut lcb_INSTANCE, request: QueryRequest) {
             lcb_cmdquery_timeout(command, timeout.as_micros() as u32);
         }
         if let Some(sc) = request.options.scan_consistency {
-            match sc {
-                QueryScanConsistency::RequestPlus => {
-                    lcb_cmdquery_consistency(
-                        command,
-                        lcb_QUERY_CONSISTENCY_LCB_QUERY_CONSISTENCY_REQUEST,
-                    );
-                }
-                _ => {}
+            if let QueryScanConsistency::RequestPlus = sc {
+                lcb_cmdquery_consistency(
+                    command,
+                    lcb_QUERY_CONSISTENCY_LCB_QUERY_CONSISTENCY_REQUEST,
+                );
             }
+        }
+        if let Some(a) = request.options.adhoc {
+            lcb_cmdquery_adhoc(command, a.into());
+        }
+
+        if let Some(r) = request.options.readonly {
+            lcb_cmdquery_readonly(command, r.into());
+        }
+
+        if let Some(m) = request.options.metrics {
+            lcb_cmdquery_metrics(command, m.into());
+        }
+
+        if let Some(c) = request.options.scan_cap {
+            lcb_cmdquery_scan_cap(command, c as i32);
+        }
+
+        if let Some(c) = request.options.pipeline_cap {
+            lcb_cmdquery_pipeline_cap(command, c as i32);
+        }
+
+        if let Some(c) = request.options.pipeline_batch {
+            lcb_cmdquery_pipeline_batch(command, c as i32);
+        }
+
+        if let Some(_c) = request.options.max_parallelism {
+            // TODO: needs to be added once lcb adds it
+            //lcb_cmdquery_max_parallelism(command, c as i32);
+        }
+
+        if let Some(_c) = request.options.client_context_id {
+            // TODO
+        }
+
+        if let Some(_w) = request.options.scan_wait {
+            // TODO
+            // file a bug, lcb is missing it
+        }
+
+        if let Some(_p) = request.options.profile {
+            // TODO
+            // file a bug, lcb is missing it
+        }
+
+        if let Some(_c) = request.options.consistent_with {
+            // TODO
+            // add code for creating lcb mutation tokens and pass down
+        }
+
+        if let Some(_p) = request.options.positional_parameters {
+            // TODO
+        }
+
+        if let Some(_p) = request.options.named_parameters {
+            // TODO
+        }
+
+        if let Some(_r) = request.options.raw {
+            // TODO
         }
 
         lcb_cmdquery_callback(command, Some(query_callback));

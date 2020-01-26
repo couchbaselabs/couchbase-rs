@@ -1,4 +1,4 @@
-use couchbase::{Cluster, GetOptions, UpsertOptions};
+use couchbase::{Cluster, GetOptions, ReplaceOptions, ExistsOptions};
 use futures::executor::block_on;
 use std::collections::HashMap;
 
@@ -21,6 +21,6 @@ pub fn main() {
 
     println!(
         "UpsertResult: {:?}",
-        block_on(collection.upsert("foo", content, UpsertOptions::default()))
+        block_on(collection.replace("foo", content, ReplaceOptions::default()))
     );
 }

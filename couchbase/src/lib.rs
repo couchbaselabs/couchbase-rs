@@ -1,5 +1,10 @@
 mod api;
 mod io;
 
-pub use api::options::{GetOptions, QueryOptions, QueryScanConsistency, UpsertOptions};
-pub use api::Cluster;
+pub use api::error::*;
+pub use api::options::*;
+pub use api::results::*;
+pub use api::{Bucket, Cluster, Collection, MutationState, MutationToken};
+
+#[cfg(feature = "volatile")]
+pub use api::Scope;

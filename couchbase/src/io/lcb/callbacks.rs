@@ -1,5 +1,5 @@
 use crate::api::error::{CouchbaseError, CouchbaseResult, ErrorContext};
-use crate::api::results::{GetResult, MutationResult, QueryResult};
+use crate::api::results::{ExistsResult, GetResult, MutationResult, QueryResult};
 use crate::api::MutationToken;
 use couchbase_sys::*;
 use log::debug;
@@ -90,6 +90,40 @@ pub unsafe extern "C" fn get_callback(
         ))
     };
 
+    sender.send(result).expect("Could not complete Future!");
+}
+
+pub unsafe extern "C" fn exists_callback(
+    instance: *mut lcb_INSTANCE,
+    _cbtype: i32,
+    res: *const lcb_RESPBASE,
+) {
+    decrement_outstanding_requests(instance);
+    let exists_res = res as *const lcb_RESPEXISTS;
+    let mut cookie_ptr: *mut c_void = ptr::null_mut();
+    lcb_respexists_cookie(exists_res, &mut cookie_ptr);
+    let sender = Box::from_raw(
+        cookie_ptr as *mut futures::channel::oneshot::Sender<CouchbaseResult<ExistsResult>>,
+    );
+
+    let status = lcb_respexists_status(exists_res);
+    let result = if status == lcb_STATUS_LCB_SUCCESS {
+        let found = lcb_respexists_is_found(exists_res);
+        Ok(if found != 0 {
+            let mut cas: u64 = 0;
+            lcb_respexists_cas(exists_res, &mut cas);
+            ExistsResult::new(true, Some(cas))
+        } else {
+            ExistsResult::new(false, None)
+        })
+    } else {
+        let mut lcb_ctx: *const lcb_KEY_VALUE_ERROR_CONTEXT = ptr::null();
+        lcb_respexists_error_context(exists_res, &mut lcb_ctx);
+        Err(couchbase_error_from_lcb_status(
+            status,
+            build_kv_error_context(lcb_ctx),
+        ))
+    };
     sender.send(result).expect("Could not complete Future!");
 }
 

@@ -3,14 +3,21 @@ pub mod options;
 pub mod results;
 
 use crate::api::error::{CouchbaseError, CouchbaseResult, ErrorContext};
-use crate::api::options::{GetOptions, QueryOptions, UpsertOptions};
-use crate::api::results::{GetResult, MutationResult, QueryResult};
-use crate::io::request::{GetRequest, QueryRequest, Request, UpsertRequest};
+use crate::api::options::{
+    ExistsOptions, GetAndLockOptions, GetAndTouchOptions, GetOptions, InsertOptions, QueryOptions,
+    ReplaceOptions, UpsertOptions,
+};
+use crate::api::results::{ExistsResult, GetResult, MutationResult, QueryResult};
+use crate::io::request::{
+    ExistsRequest, GetRequest, GetRequestType, MutateRequest, MutateRequestType, QueryRequest,
+    Request,
+};
 use crate::io::Core;
 use futures::channel::oneshot;
 use serde::Serialize;
 use serde_json::to_vec;
 use std::sync::Arc;
+use std::time::Duration;
 
 pub struct Cluster {
     core: Arc<Core>,
@@ -121,6 +128,50 @@ impl Collection {
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::Get(GetRequest {
             id: id.into(),
+            ty: GetRequestType::Get { options },
+            sender,
+        }));
+        receiver.await.unwrap()
+    }
+
+    pub async fn get_and_lock<S: Into<String>>(
+        &self,
+        id: S,
+        lock_time: Duration,
+        options: GetAndLockOptions,
+    ) -> CouchbaseResult<GetResult> {
+        let (sender, receiver) = oneshot::channel();
+        self.core.send(Request::Get(GetRequest {
+            id: id.into(),
+            ty: GetRequestType::GetAndLock { options, lock_time },
+            sender,
+        }));
+        receiver.await.unwrap()
+    }
+
+    pub async fn get_and_touch<S: Into<String>>(
+        &self,
+        id: S,
+        expiry: Duration,
+        options: GetAndTouchOptions,
+    ) -> CouchbaseResult<GetResult> {
+        let (sender, receiver) = oneshot::channel();
+        self.core.send(Request::Get(GetRequest {
+            id: id.into(),
+            ty: GetRequestType::GetAndTouch { options, expiry },
+            sender,
+        }));
+        receiver.await.unwrap()
+    }
+
+    pub async fn exists<S: Into<String>>(
+        &self,
+        id: S,
+        options: ExistsOptions,
+    ) -> CouchbaseResult<ExistsResult> {
+        let (sender, receiver) = oneshot::channel();
+        self.core.send(Request::Exists(ExistsRequest {
+            id: id.into(),
             options,
             sender,
         }));
@@ -136,6 +187,45 @@ impl Collection {
     where
         T: Serialize,
     {
+        self.mutate(id, content, MutateRequestType::Upsert { options })
+            .await
+    }
+
+    pub async fn insert<S: Into<String>, T>(
+        &self,
+        id: S,
+        content: T,
+        options: InsertOptions,
+    ) -> CouchbaseResult<MutationResult>
+    where
+        T: Serialize,
+    {
+        self.mutate(id, content, MutateRequestType::Insert { options })
+            .await
+    }
+
+    pub async fn replace<S: Into<String>, T>(
+        &self,
+        id: S,
+        content: T,
+        options: ReplaceOptions,
+    ) -> CouchbaseResult<MutationResult>
+    where
+        T: Serialize,
+    {
+        self.mutate(id, content, MutateRequestType::Replace { options })
+            .await
+    }
+
+    async fn mutate<S: Into<String>, T>(
+        &self,
+        id: S,
+        content: T,
+        ty: MutateRequestType,
+    ) -> CouchbaseResult<MutationResult>
+    where
+        T: Serialize,
+    {
         let serialized = match to_vec(&content) {
             Ok(v) => v,
             Err(e) => {
@@ -147,14 +237,19 @@ impl Collection {
         };
 
         let (sender, receiver) = oneshot::channel();
-        self.core.send(Request::Upsert(UpsertRequest {
+        self.core.send(Request::Mutate(MutateRequest {
             id: id.into(),
             content: serialized,
-            options,
             sender,
+            ty,
         }));
         receiver.await.unwrap()
     }
+}
+
+#[derive(Debug)]
+pub struct MutationState {
+    tokens: Vec<MutationToken>,
 }
 
 #[derive(Debug)]

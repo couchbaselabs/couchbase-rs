@@ -6,7 +6,7 @@ pub fn main() {
 
     let cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
     let bucket = cluster.bucket("travel-sample");
-    let collection = bucket.default_collection();
+    let _collection = bucket.default_collection();
 
     let mut result = block_on(cluster.query(
         "select * from `travel-sample` limit 2",
