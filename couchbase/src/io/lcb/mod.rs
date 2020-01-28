@@ -18,7 +18,7 @@ use std::thread::JoinHandle;
 use std::{ptr, thread};
 
 pub struct IoCore {
-    _thread_handle: JoinHandle<()>,
+    thread_handle: Option<JoinHandle<()>>,
     queue_tx: Sender<IoRequest>,
 }
 
@@ -30,7 +30,7 @@ impl IoCore {
         let thread_handle =
             thread::spawn(move || run_lcb_loop(queue_rx, connection_string, username, password));
         Self {
-            _thread_handle: thread_handle,
+            thread_handle: Some(thread_handle),
             queue_tx,
         }
     }
@@ -45,6 +45,15 @@ impl IoCore {
         self.queue_tx
             .send(IoRequest::OpenBucket { name })
             .expect("Could not send open bucket request")
+    }
+}
+
+impl Drop for IoCore {
+    fn drop(&mut self) {
+        debug!("Dropping LCB IoCore, sending shutdown signal");
+        self.queue_tx.send(IoRequest::Shutdown).expect("Failure while shutting down!");
+        self.thread_handle.take().unwrap().join().expect("Failure while waiting for lcb thread to die!");
+        debug!("LCB Thread completed, finishing Drop sequence");
     }
 }
 
