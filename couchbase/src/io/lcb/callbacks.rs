@@ -191,6 +191,60 @@ fn build_kv_error_context(lcb_ctx: *const lcb_KEY_VALUE_ERROR_CONTEXT) -> ErrorC
     };
     ctx.insert("opaque", Value::Number(opaque.into()));
 
+    let mut bucket_len: usize = 0;
+    let mut bucket_ptr: *const c_char = ptr::null();
+    let bucket = unsafe {
+        lcb_errctx_kv_bucket(lcb_ctx, &mut bucket_ptr, &mut bucket_len);
+        CStr::from_ptr(bucket_ptr).to_str().unwrap().into()
+    };
+    ctx.insert("bucket", Value::String(bucket));
+
+    let cas = unsafe {
+        let mut o = 0u64;
+        lcb_errctx_kv_cas(lcb_ctx, &mut o);
+        o
+    };
+    if cas != 0 {
+        ctx.insert("cas", Value::Number(cas.into()));
+    }
+
+    let mut collection_len: usize = 0;
+    let mut collection_ptr: *const c_char = ptr::null();
+    unsafe {
+        lcb_errctx_kv_collection(lcb_ctx, &mut collection_ptr, &mut collection_len);
+        if !collection_ptr.is_null() {
+            let collection = CStr::from_ptr(collection_ptr).to_str().unwrap().into();
+            ctx.insert("collection", Value::String(collection));
+        }
+    }
+
+    let mut scope_len: usize = 0;
+    let mut scope_ptr: *const c_char = ptr::null();
+    unsafe {
+        lcb_errctx_kv_scope(lcb_ctx, &mut scope_ptr, &mut scope_len);
+        if !scope_ptr.is_null() {
+            let scope = CStr::from_ptr(scope_ptr).to_str().unwrap().into();
+            ctx.insert("scope", Value::String(scope));
+        }
+    }
+
+    let mut endpoint_len: usize = 0;
+    let mut endpoint_ptr: *const c_char = ptr::null();
+    unsafe {
+        lcb_errctx_kv_endpoint(lcb_ctx, &mut endpoint_ptr, &mut endpoint_len);
+        if !endpoint_ptr.is_null() {
+            let endpoint = CStr::from_ptr(endpoint_ptr).to_str().unwrap().into();
+            ctx.insert("remote", Value::String(endpoint));
+        }
+    }
+
+    let status = unsafe {
+        let mut o = 0u16;
+        lcb_errctx_kv_status_code(lcb_ctx, &mut o);
+        o
+    };
+    ctx.insert("status", Value::Number(status.into()));
+
     ctx
 }
 
