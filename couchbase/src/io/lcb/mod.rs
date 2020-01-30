@@ -109,21 +109,17 @@ fn run_lcb_loop(
         );
     }
 
-    'run: loop {
+    'running: loop {
         if instance_cookie.has_outstanding() {
             while let Ok(req) = queue_rx.try_recv() {
                 if handle_io_request(req, instance, &mut instance_cookie) {
-                    break 'run;
+                    break 'running;
                 }
             }
         } else {
-            while let Ok(req) = queue_rx.recv() {
+            if let Ok(req) = queue_rx.recv() {
                 if handle_io_request(req, instance, &mut instance_cookie) {
-                    break 'run;
-                } else {
-                    // We now might have a request outstanding so we cannot
-                    // go back to blocking recv and need to switch to try_recv
-                    break;
+                    break 'running;
                 }
             }
         }
