@@ -21,6 +21,7 @@ futures = "0.3"
 log = "0.4"
 parse_duration = "2.0"
 couchbase-sys = { path = "../couchbase-sys", optional = true }
+crossbeam-channel = { version = "0.4", optional = true }
 
 [build-dependencies]
 cc = { version = "1.0", optional = true }
@@ -32,7 +33,7 @@ env_logger = "0.7"
 # By default, the libcouchbase (C) backend is used. More will be available in the future
 default = ["libcouchbase"]
 # The libcouchbase C backend will be compiled and used
-libcouchbase = ["couchbase-sys", "cc"]
+libcouchbase = ["couchbase-sys", "cc", "crossbeam-channel"]
 # If enabled, exposes all APIs currently marked as uncomitted
 uncomitted = []
 # If enabled, exposes all APIs currently marked as volatile or uncomitted

@@ -13,7 +13,7 @@ use couchbase_sys::*;
 use log::debug;
 use std::ffi::CString;
 use std::os::raw::{c_char, c_int, c_uint, c_void};
-use std::sync::mpsc::{channel, Receiver, Sender};
+use crossbeam_channel::{Sender, Receiver, unbounded};
 use std::thread::JoinHandle;
 use std::{ptr, thread};
 
@@ -26,7 +26,7 @@ impl IoCore {
     pub fn new(connection_string: String, username: String, password: String) -> Self {
         debug!("Using libcouchbase IO transport");
 
-        let (queue_tx, queue_rx) = channel();
+        let (queue_tx, queue_rx) = unbounded();
         let thread_handle =
             thread::spawn(move || run_lcb_loop(queue_rx, connection_string, username, password));
         Self {
