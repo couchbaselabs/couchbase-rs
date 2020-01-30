@@ -1,7 +1,6 @@
 use crate::api::MutationState;
 use serde::Serializer;
 use serde_derive::Serialize;
-use serde_json::to_vec;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::time::Duration;
@@ -74,7 +73,7 @@ pub struct QueryOptions {
     pub(crate) statement: Option<String>,
 }
 
-fn convert_mutation_state<S>(x: &Option<MutationState>, s: S) -> Result<S::Ok, S::Error>
+fn convert_mutation_state<S>(_x: &Option<MutationState>, _s: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
@@ -108,8 +107,10 @@ where
 {
     match x {
         Some(m) => {
-            let conv: HashMap<String, &Box<Value>> =
-                m.iter().map(|(k, v)| (format!("${}", k), v)).collect();
+            let conv = m
+                .iter()
+                .map(|(k, v)| (format!("${}", k), v))
+                .collect::<HashMap<String, &Box<Value>>>();
             s.serialize_some(&conv)
         }
         None => s.serialize_none(),
@@ -184,8 +185,7 @@ impl QueryOptions {
         self
     }
 
-    pub fn named_parameters(mut self, named_parameters: HashMap<String, Box<Value>>) -> Self
-where {
+    pub fn named_parameters(mut self, named_parameters: HashMap<String, Box<Value>>) -> Self {
         self.named_parameters = Some(named_parameters);
         self
     }
@@ -212,6 +212,83 @@ pub enum QueryProfile {
     Phases,
     #[serde(rename = "timings")]
     Timings,
+}
+
+#[derive(Debug, Default, Serialize)]
+pub struct AnalyticsOptions {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) scan_consistency: Option<AnalyticsScanConsistency>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(serialize_with = "convert_duration_for_golang")]
+    pub(crate) timeout: Option<Duration>,
+    #[serde(serialize_with = "default_client_context_id")]
+    pub(crate) client_context_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "args")]
+    pub(crate) positional_parameters: Option<Vec<Box<Value>>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(flatten)]
+    #[serde(serialize_with = "convert_named_params")]
+    pub(crate) named_parameters: Option<HashMap<String, Box<Value>>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) readonly: Option<bool>,
+    #[serde(skip)]
+    pub(crate) priority: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(flatten)]
+    pub(crate) raw: Option<HashMap<String, Box<Value>>>,
+    // The statement is not part of the public API, but added here
+    // as a convenience so we can conver the whole block into the
+    // JSON payload the analytics engine expects. DO NOT ADD A PUBLIC
+    // SETTER!
+    pub(crate) statement: Option<String>,
+}
+
+impl AnalyticsOptions {
+    timeout!();
+
+    pub fn scan_consistency(mut self, scan_consistency: AnalyticsScanConsistency) -> Self {
+        self.scan_consistency = Some(scan_consistency);
+        self
+    }
+
+    pub fn client_context_id(mut self, client_context_id: String) -> Self {
+        self.client_context_id = Some(client_context_id);
+        self
+    }
+
+    pub fn readonly(mut self, readonly: bool) -> Self {
+        self.readonly = Some(readonly);
+        self
+    }
+
+    pub fn positional_parameters(mut self, positional_parameters: Vec<Box<Value>>) -> Self {
+        self.positional_parameters = Some(positional_parameters);
+        self
+    }
+    
+    pub fn priority(mut self, priority: bool) -> Self {
+        self.priority = Some(if priority == true { -1 } else { 0 });
+        self
+    }
+
+    pub fn named_parameters(mut self, named_parameters: HashMap<String, Box<Value>>) -> Self {
+        self.named_parameters = Some(named_parameters);
+        self
+    }
+
+    pub fn raw(mut self, raw: HashMap<String, Box<Value>>) -> Self {
+        self.raw = Some(raw);
+        self
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub enum AnalyticsScanConsistency {
+    #[serde(rename = "not_bounded")]
+    NotBounded,
+    #[serde(rename = "request_plus")]
+    RequestPlus,
 }
 
 #[derive(Debug, Default)]

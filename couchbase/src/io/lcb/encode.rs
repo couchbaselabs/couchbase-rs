@@ -1,12 +1,9 @@
-use crate::api::options::QueryScanConsistency;
-use crate::io::lcb::QueryCookie;
+use crate::io::lcb::{AnalyticsCookie, QueryCookie};
 use crate::io::request::*;
 
-use crate::io::lcb::callbacks::query_callback;
+use crate::io::lcb::callbacks::{analytics_callback, query_callback};
 
-use crate::QueryProfile;
 use couchbase_sys::*;
-use serde_json::json;
 use std::ffi::CString;
 use std::os::raw::c_void;
 use std::ptr;
@@ -180,5 +177,30 @@ pub fn encode_query(instance: *mut lcb_INSTANCE, mut request: QueryRequest) {
         lcb_cmdquery_callback(command, Some(query_callback));
         lcb_query(instance, cookie as *mut c_void, command);
         lcb_cmdquery_destroy(command);
+    }
+}
+
+/// Encodes a `AnalyticsRequest` into its libcouchbase `lcb_CMDANALYTICS` representation.
+pub fn encode_analytics(instance: *mut lcb_INSTANCE, mut request: AnalyticsRequest) {
+    request.options.statement = Some(request.statement);
+    let (payload_len, payload) = into_cstring(serde_json::to_vec(&request.options).unwrap());
+
+    let (meta_sender, meta_receiver) = futures::channel::oneshot::channel();
+    let (rows_sender, rows_receiver) = futures::channel::mpsc::unbounded();
+    let cookie = Box::into_raw(Box::new(AnalyticsCookie {
+        sender: Some(request.sender),
+        meta_sender,
+        meta_receiver: Some(meta_receiver),
+        rows_sender,
+        rows_receiver: Some(rows_receiver),
+    }));
+
+    let mut command: *mut lcb_CMDANALYTICS = ptr::null_mut();
+    unsafe {
+        lcb_cmdanalytics_create(&mut command);
+        lcb_cmdanalytics_payload(command, payload.as_ptr(), payload_len);
+        lcb_cmdanalytics_callback(command, Some(analytics_callback));
+        lcb_analytics(instance, cookie as *mut c_void, command);
+        lcb_cmdanalytics_destroy(command);
     }
 }

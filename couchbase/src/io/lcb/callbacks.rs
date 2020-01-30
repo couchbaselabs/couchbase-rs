@@ -1,5 +1,5 @@
 use crate::api::error::{CouchbaseError, CouchbaseResult, ErrorContext};
-use crate::api::results::{ExistsResult, GetResult, MutationResult, QueryResult};
+use crate::api::results::{ExistsResult, GetResult, MutationResult, QueryResult, AnalyticsResult};
 use crate::api::MutationToken;
 use couchbase_sys::*;
 use log::debug;
@@ -9,7 +9,7 @@ use std::os::raw::{c_char, c_int, c_uint, c_void};
 use std::ptr;
 use std::slice::from_raw_parts;
 
-use crate::io::lcb::{decrement_outstanding_requests, wrapped_vsnprintf, QueryCookie};
+use crate::io::lcb::{decrement_outstanding_requests, wrapped_vsnprintf, QueryCookie, AnalyticsCookie};
 
 pub unsafe extern "C" fn store_callback(
     instance: *mut lcb_INSTANCE,
@@ -262,6 +262,21 @@ fn build_query_error_context(lcb_ctx: *const lcb_QUERY_ERROR_CONTEXT) -> ErrorCo
     ctx
 }
 
+fn build_analytics_error_context(lcb_ctx: *const lcb_ANALYTICS_ERROR_CONTEXT) -> ErrorContext {
+    let mut ctx = ErrorContext::default();
+
+    let mut statement_len: usize = 0;
+    let mut statement_ptr: *const c_char = ptr::null();
+    let key = unsafe {
+        lcb_errctx_analytics_statement(lcb_ctx, &mut statement_ptr, &mut statement_len);
+        CStr::from_ptr(statement_ptr).to_str().unwrap().into()
+    };
+    ctx.insert("statement", Value::String(key));
+
+    ctx
+}
+
+
 pub unsafe extern "C" fn query_callback(
     instance: *mut lcb_INSTANCE,
     _cbtype: i32,
@@ -302,6 +317,65 @@ pub unsafe extern "C" fn query_callback(
     }
 
     if lcb_respquery_is_final(res) != 0 {
+        cookie.rows_sender.close_channel();
+
+        if status == 0 {
+            cookie
+                .meta_sender
+                .send(serde_json::from_slice(row).unwrap())
+                .expect("Could not send meta");
+        }
+
+        decrement_outstanding_requests(instance);
+    } else {
+        cookie
+            .rows_sender
+            .unbounded_send(row.to_vec())
+            .expect("Could not send rows");
+        Box::into_raw(cookie);
+    }
+}
+
+pub unsafe extern "C" fn analytics_callback(
+    instance: *mut lcb_INSTANCE,
+    _cbtype: i32,
+    res: *const lcb_RESPANALYTICS,
+) {
+    let mut row_len: usize = 0;
+    let mut row_ptr: *const c_char = ptr::null();
+    lcb_respanalytics_row(res, &mut row_ptr, &mut row_len);
+    let row = from_raw_parts(row_ptr as *const u8, row_len);
+
+    let mut cookie_ptr: *mut c_void = ptr::null_mut();
+    lcb_respanalytics_cookie(res, &mut cookie_ptr);
+    let mut cookie = Box::from_raw(cookie_ptr as *mut AnalyticsCookie);
+
+    let status = lcb_respanalytics_status(res);
+
+    if cookie.sender.is_some() {
+        let response = if status != 0 {
+            let mut lcb_ctx: *const lcb_ANALYTICS_ERROR_CONTEXT = ptr::null();
+            lcb_respanalytics_error_context(res, &mut lcb_ctx);
+            Err(couchbase_error_from_lcb_status(
+                status,
+                build_analytics_error_context(lcb_ctx),
+            ))
+        } else {
+            Ok(AnalyticsResult::new(
+                cookie.rows_receiver.take().unwrap(),
+                cookie.meta_receiver.take().unwrap(),
+            ))
+        };
+
+        cookie
+            .sender
+            .take()
+            .expect("Could not take result!")
+            .send(response)
+            .expect("Could not complete analytics future");
+    }
+
+    if lcb_respanalytics_is_final(res) != 0 {
         cookie.rows_sender.close_channel();
 
         if status == 0 {

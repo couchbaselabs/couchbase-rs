@@ -9,6 +9,7 @@ pub enum Request {
     Get(GetRequest),
     Mutate(MutateRequest),
     Query(QueryRequest),
+    Analytics(AnalyticsRequest),
     Exists(ExistsRequest),
     Remove(RemoveRequest),
 }
@@ -69,4 +70,11 @@ pub struct QueryRequest {
     pub(crate) statement: String,
     pub(crate) sender: Sender<CouchbaseResult<QueryResult>>,
     pub(crate) options: QueryOptions,
+}
+
+#[derive(Debug)]
+pub struct AnalyticsRequest {
+    pub(crate) statement: String,
+    pub(crate) sender: Sender<CouchbaseResult<AnalyticsResult>>,
+    pub(crate) options: AnalyticsOptions,
 }

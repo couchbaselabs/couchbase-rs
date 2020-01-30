@@ -2,7 +2,7 @@ mod callbacks;
 mod encode;
 
 use crate::api::error::CouchbaseResult;
-use crate::api::results::{QueryMetaData, QueryResult};
+use crate::api::results::{QueryMetaData, QueryResult, AnalyticsResult, AnalyticsMetaData};
 use crate::io::request::Request;
 
 use callbacks::{
@@ -238,6 +238,7 @@ fn encode(instance: *mut lcb_INSTANCE, request: Request) {
     match request {
         Request::Get(r) => encode::encode_get(instance, r),
         Request::Query(r) => encode::encode_query(instance, r),
+        Request::Analytics(r) => encode::encode_analytics(instance, r),
         Request::Mutate(r) => encode::encode_mutate(instance, r),
         Request::Exists(r) => encode::encode_exists(instance, r),
         Request::Remove(r) => encode::encode_remove(instance, r),
@@ -250,4 +251,12 @@ struct QueryCookie {
     rows_receiver: Option<futures::channel::mpsc::UnboundedReceiver<Vec<u8>>>,
     meta_sender: futures::channel::oneshot::Sender<QueryMetaData>,
     meta_receiver: Option<futures::channel::oneshot::Receiver<QueryMetaData>>,
+}
+
+struct AnalyticsCookie {
+    sender: Option<futures::channel::oneshot::Sender<CouchbaseResult<AnalyticsResult>>>,
+    rows_sender: futures::channel::mpsc::UnboundedSender<Vec<u8>>,
+    rows_receiver: Option<futures::channel::mpsc::UnboundedReceiver<Vec<u8>>>,
+    meta_sender: futures::channel::oneshot::Sender<AnalyticsMetaData>,
+    meta_receiver: Option<futures::channel::oneshot::Receiver<AnalyticsMetaData>>,
 }

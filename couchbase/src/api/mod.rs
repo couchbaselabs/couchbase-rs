@@ -47,6 +47,20 @@ impl Cluster {
         }));
         receiver.await.unwrap()
     }
+
+    pub async fn analytics_query<S: Into<String>>(
+        &self,
+        statement: S,
+        options: AnalyticsOptions,
+    ) -> CouchbaseResult<AnalyticsResult> {
+        let (sender, receiver) = oneshot::channel();
+        self.core.send(Request::Analytics(AnalyticsRequest {
+            statement: statement.into(),
+            options,
+            sender,
+        }));
+        receiver.await.unwrap()
+    }
 }
 
 pub struct Bucket {

@@ -127,6 +127,48 @@ impl QueryMetrics {
     }
 }
 
+#[derive(Debug)]
+pub struct AnalyticsResult {
+    rows: Option<UnboundedReceiver<Vec<u8>>>,
+    meta: Option<Receiver<AnalyticsMetaData>>,
+}
+
+impl AnalyticsResult {
+    pub fn new(rows: UnboundedReceiver<Vec<u8>>, meta: Receiver<AnalyticsMetaData>) -> Self {
+        Self {
+            rows: Some(rows),
+            meta: Some(meta),
+        }
+    }
+
+    pub fn rows<T>(&mut self) -> impl Stream<Item = CouchbaseResult<T>>
+    where
+        T: DeserializeOwned,
+    {
+        self.rows.take().expect("Can not consume rows twice!").map(
+            |v| match serde_json::from_slice(v.as_slice()) {
+                Ok(decoded) => Ok(decoded),
+                Err(e) => Err(CouchbaseError::DecodingFailure {
+                    ctx: ErrorContext::default(),
+                    source: e.into(),
+                }),
+            },
+        )
+    }
+
+    pub async fn meta_data(&mut self) -> AnalyticsMetaData {
+        self.meta.take().unwrap().await.unwrap()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AnalyticsMetaData {
+    #[serde(rename = "requestID")]
+    request_id: String,
+    #[serde(rename = "clientContextID")]
+    client_context_id: String,
+}
+
 pub struct GetResult {
     content: Vec<u8>,
     cas: u64,
