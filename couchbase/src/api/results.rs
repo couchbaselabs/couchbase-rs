@@ -198,7 +198,8 @@ impl fmt::Debug for ExistsResult {
         write!(
             f,
             "ExistsResult {{ exists: {:?}, cas: {:?} }}",
-            self.exists, self.cas.map(|c| format!("0x{:x}", c))
+            self.exists,
+            self.cas.map(|c| format!("0x{:x}", c))
         )
     }
 }

@@ -1,9 +1,11 @@
 use crate::api::MutationState;
-use serde::Serialize;
+use serde::Serializer;
+use serde_derive::Serialize;
 use serde_json::to_vec;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::time::Duration;
+use uuid::Uuid;
 
 /// Macro to DRY up the repetitive timeout setter.
 macro_rules! timeout {
@@ -24,24 +26,94 @@ macro_rules! expiry {
     )
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize)]
 pub struct QueryOptions {
-    pub(crate) timeout: Option<Duration>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) scan_consistency: Option<QueryScanConsistency>,
+    #[serde(skip)]
     pub(crate) adhoc: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(serialize_with = "convert_duration_for_golang")]
+    pub(crate) timeout: Option<Duration>,
+    #[serde(serialize_with = "default_client_context_id")]
     pub(crate) client_context_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) max_parallelism: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) pipeline_batch: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) pipeline_cap: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) scan_cap: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(serialize_with = "convert_duration_for_golang")]
     pub(crate) scan_wait: Option<Duration>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) readonly: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) metrics: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) profile: Option<QueryProfile>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(serialize_with = "convert_mutation_state")]
     pub(crate) consistent_with: Option<MutationState>,
-    pub(crate) positional_parameters: Option<Vec<Vec<u8>>>,
-    pub(crate) named_parameters: Option<HashMap<String, Vec<u8>>>,
-    pub(crate) raw: Option<HashMap<String, Vec<u8>>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "args")]
+    pub(crate) positional_parameters: Option<Vec<Box<Value>>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(flatten)]
+    #[serde(serialize_with = "convert_named_params")]
+    pub(crate) named_parameters: Option<HashMap<String, Box<Value>>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(flatten)]
+    pub(crate) raw: Option<HashMap<String, Box<Value>>>,
+    // The statement is not part of the public API, but added here
+    // as a convenience so we can conver the whole block into the
+    // JSON payload the query engine expects. DO NOT ADD A PUBLIC
+    // SETTER!
+    pub(crate) statement: Option<String>,
+}
+
+fn convert_mutation_state<S>(x: &Option<MutationState>, s: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    todo!("Mutation token conversion still needs to be implemented")
+}
+
+fn convert_duration_for_golang<S>(x: &Option<Duration>, s: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    s.serialize_str(&format!(
+        "{}ms",
+        x.expect("Expected a duration!").as_millis()
+    ))
+}
+
+fn default_client_context_id<S>(x: &Option<String>, s: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    if x.is_some() {
+        s.serialize_str(x.as_ref().unwrap())
+    } else {
+        s.serialize_str(&format!("{}", Uuid::new_v4()))
+    }
+}
+
+fn convert_named_params<S>(x: &Option<HashMap<String, Box<Value>>>, s: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    match x {
+        Some(m) => {
+            let conv: HashMap<String, &Box<Value>> =
+                m.iter().map(|(k, v)| (format!("${}", k), v)).collect();
+            s.serialize_some(&conv)
+        }
+        None => s.serialize_none(),
+    }
 }
 
 impl QueryOptions {
@@ -107,54 +179,38 @@ impl QueryOptions {
         self
     }
 
-    pub fn positional_parameters<T>(mut self, positional_parameters: Vec<Value>) -> Self {
-        self.positional_parameters = Some(
-            positional_parameters
-                .iter()
-                .map(|v| to_vec(v).expect("Could not encode positional parameter!"))
-                .collect(),
-        );
+    pub fn positional_parameters(mut self, positional_parameters: Vec<Box<Value>>) -> Self {
+        self.positional_parameters = Some(positional_parameters);
         self
     }
 
-    pub fn named_parameters<T>(mut self, named_parameters: HashMap<String, Value>) -> Self
-    where
-        T: Serialize,
-    {
-        self.named_parameters = Some(
-            named_parameters
-                .into_iter()
-                .map(|(k, v)| {
-                    (
-                        k,
-                        to_vec(&v).expect("Could not encode positional parameter!"),
-                    )
-                })
-                .collect(),
-        );
+    pub fn named_parameters(mut self, named_parameters: HashMap<String, Box<Value>>) -> Self
+where {
+        self.named_parameters = Some(named_parameters);
         self
     }
 
-    pub fn raw(mut self, raw: HashMap<String, Value>) -> Self {
-        self.raw = Some(
-            raw.into_iter()
-                .map(|(k, v)| (k, to_vec(&v).expect("Could not encode raw value!")))
-                .collect(),
-        );
+    pub fn raw(mut self, raw: HashMap<String, Box<Value>>) -> Self {
+        self.raw = Some(raw);
         self
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub enum QueryScanConsistency {
+    #[serde(rename = "not_bounded")]
     NotBounded,
+    #[serde(rename = "request_plus")]
     RequestPlus,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub enum QueryProfile {
+    #[serde(rename = "off")]
     Off,
+    #[serde(rename = "phases")]
     Phases,
+    #[serde(rename = "timings")]
     Timings,
 }
 

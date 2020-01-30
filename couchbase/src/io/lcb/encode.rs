@@ -4,7 +4,9 @@ use crate::io::request::*;
 
 use crate::io::lcb::callbacks::query_callback;
 
+use crate::QueryProfile;
 use couchbase_sys::*;
+use serde_json::json;
 use std::ffi::CString;
 use std::os::raw::c_void;
 use std::ptr;
@@ -152,8 +154,9 @@ pub fn encode_remove(instance: *mut lcb_INSTANCE, request: RemoveRequest) {
 }
 
 /// Encodes a `QueryRequest` into its libcouchbase `lcb_CMDQUERY` representation.
-pub fn encode_query(instance: *mut lcb_INSTANCE, request: QueryRequest) {
-    let (statement_len, statement) = into_cstring(request.statement);
+pub fn encode_query(instance: *mut lcb_INSTANCE, mut request: QueryRequest) {
+    request.options.statement = Some(request.statement);
+    let (payload_len, payload) = into_cstring(serde_json::to_vec(&request.options).unwrap());
 
     let (meta_sender, meta_receiver) = futures::channel::oneshot::channel();
     let (rows_sender, rows_receiver) = futures::channel::mpsc::unbounded();
@@ -168,77 +171,10 @@ pub fn encode_query(instance: *mut lcb_INSTANCE, request: QueryRequest) {
     let mut command: *mut lcb_CMDQUERY = ptr::null_mut();
     unsafe {
         lcb_cmdquery_create(&mut command);
-        lcb_cmdquery_statement(command, statement.as_ptr(), statement_len);
+        lcb_cmdquery_payload(command, payload.as_ptr(), payload_len);
 
-        if let Some(timeout) = request.options.timeout {
-            lcb_cmdquery_timeout(command, timeout.as_micros() as u32);
-        }
-        if let Some(sc) = request.options.scan_consistency {
-            if let QueryScanConsistency::RequestPlus = sc {
-                lcb_cmdquery_consistency(
-                    command,
-                    lcb_QUERY_CONSISTENCY_LCB_QUERY_CONSISTENCY_REQUEST,
-                );
-            }
-        }
         if let Some(a) = request.options.adhoc {
             lcb_cmdquery_adhoc(command, a.into());
-        }
-
-        if let Some(r) = request.options.readonly {
-            lcb_cmdquery_readonly(command, r.into());
-        }
-
-        if let Some(m) = request.options.metrics {
-            lcb_cmdquery_metrics(command, m.into());
-        }
-
-        if let Some(c) = request.options.scan_cap {
-            lcb_cmdquery_scan_cap(command, c as i32);
-        }
-
-        if let Some(c) = request.options.pipeline_cap {
-            lcb_cmdquery_pipeline_cap(command, c as i32);
-        }
-
-        if let Some(c) = request.options.pipeline_batch {
-            lcb_cmdquery_pipeline_batch(command, c as i32);
-        }
-
-        if let Some(_c) = request.options.max_parallelism {
-            // TODO: needs to be added once lcb adds it
-            //lcb_cmdquery_max_parallelism(command, c as i32);
-        }
-
-        if let Some(_c) = request.options.client_context_id {
-            // TODO
-        }
-
-        if let Some(_w) = request.options.scan_wait {
-            // TODO
-            // file a bug, lcb is missing it
-        }
-
-        if let Some(_p) = request.options.profile {
-            // TODO
-            // file a bug, lcb is missing it
-        }
-
-        if let Some(_c) = request.options.consistent_with {
-            // TODO
-            // add code for creating lcb mutation tokens and pass down
-        }
-
-        if let Some(_p) = request.options.positional_parameters {
-            // TODO
-        }
-
-        if let Some(_p) = request.options.named_parameters {
-            // TODO
-        }
-
-        if let Some(_r) = request.options.raw {
-            // TODO
         }
 
         lcb_cmdquery_callback(command, Some(query_callback));

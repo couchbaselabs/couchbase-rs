@@ -10,10 +10,10 @@ use callbacks::{
 };
 
 use couchbase_sys::*;
+use crossbeam_channel::{unbounded, Receiver, Sender};
 use log::debug;
 use std::ffi::CString;
 use std::os::raw::{c_char, c_int, c_uint, c_void};
-use crossbeam_channel::{Sender, Receiver, unbounded};
 use std::thread::JoinHandle;
 use std::{ptr, thread};
 
@@ -51,8 +51,14 @@ impl IoCore {
 impl Drop for IoCore {
     fn drop(&mut self) {
         debug!("Dropping LCB IoCore, sending shutdown signal");
-        self.queue_tx.send(IoRequest::Shutdown).expect("Failure while shutting down!");
-        self.thread_handle.take().unwrap().join().expect("Failure while waiting for lcb thread to die!");
+        self.queue_tx
+            .send(IoRequest::Shutdown)
+            .expect("Failure while shutting down!");
+        self.thread_handle
+            .take()
+            .unwrap()
+            .join()
+            .expect("Failure while waiting for lcb thread to die!");
         debug!("LCB Thread completed, finishing Drop sequence");
     }
 }

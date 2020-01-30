@@ -9,8 +9,6 @@ pub fn main() {
     let bucket = cluster.bucket("travel-sample");
     let collection = bucket.default_collection();
 
-
-
     let result = block_on(collection.get("airline_110", GetOptions::default()));
     println!("result: {:?}", result);
     match result {
@@ -26,11 +24,18 @@ pub fn main() {
         block_on(collection.upsert("foo", content, UpsertOptions::default()))
     );
 
-    println!("{:?}", block_on(collection.get("foo", GetOptions::default())));
+    println!(
+        "{:?}",
+        block_on(collection.get("foo", GetOptions::default()))
+    );
 
-    println!("{:?}", block_on(collection.remove("foo", RemoveOptions::default())));
+    println!(
+        "{:?}",
+        block_on(collection.remove("foo", RemoveOptions::default()))
+    );
 
-    println!("{:?}", block_on(collection.get("foo", GetOptions::default())));
-
-
+    println!(
+        "{:?}",
+        block_on(collection.get("foo", GetOptions::default()))
+    );
 }
