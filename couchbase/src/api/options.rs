@@ -58,14 +58,14 @@ pub struct QueryOptions {
     pub(crate) consistent_with: Option<MutationState>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "args")]
-    pub(crate) positional_parameters: Option<Vec<Box<Value>>>,
+    pub(crate) positional_parameters: Option<Vec<Value>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(flatten)]
     #[serde(serialize_with = "convert_named_params")]
-    pub(crate) named_parameters: Option<HashMap<String, Box<Value>>>,
+    pub(crate) named_parameters: Option<serde_json::Map<String, Value>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(flatten)]
-    pub(crate) raw: Option<HashMap<String, Box<Value>>>,
+    pub(crate) raw: Option<serde_json::Map<String, Value>>,
     // The statement is not part of the public API, but added here
     // as a convenience so we can conver the whole block into the
     // JSON payload the query engine expects. DO NOT ADD A PUBLIC
@@ -101,16 +101,16 @@ where
     }
 }
 
-fn convert_named_params<S>(x: &Option<HashMap<String, Box<Value>>>, s: S) -> Result<S::Ok, S::Error>
+fn convert_named_params<S>(x: &Option<serde_json::Map<String, Value>>, s: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
     match x {
         Some(m) => {
-            let conv = m
+            let conv: HashMap<String, &Value> = m
                 .iter()
                 .map(|(k, v)| (format!("${}", k), v))
-                .collect::<HashMap<String, &Box<Value>>>();
+                .collect();
             s.serialize_some(&conv)
         }
         None => s.serialize_none(),
@@ -180,17 +180,32 @@ impl QueryOptions {
         self
     }
 
-    pub fn positional_parameters(mut self, positional_parameters: Vec<Box<Value>>) -> Self {
+    pub fn positional_parameters<T>(mut self, positional_parameters: T) -> Self where T: serde::Serialize {
+        let positional_parameters = match serde_json::to_value(positional_parameters) {
+            Ok(Value::Array(a)) => a,
+            Ok(_) => panic!("Only arrays are allowed"),
+            _ => panic!("Could not encode positional parameters"),
+        };
         self.positional_parameters = Some(positional_parameters);
         self
     }
 
-    pub fn named_parameters(mut self, named_parameters: HashMap<String, Box<Value>>) -> Self {
+    pub fn named_parameters<T>(mut self, named_parameters: T) -> Self where T: serde::Serialize {
+        let named_parameters = match serde_json::to_value(named_parameters) {
+            Ok(Value::Object(a)) => a,
+            Ok(_) => panic!("Only objects are allowed"),
+            _ => panic!("Could not encode positional parameters"),
+        };
         self.named_parameters = Some(named_parameters);
         self
     }
 
-    pub fn raw(mut self, raw: HashMap<String, Box<Value>>) -> Self {
+    pub fn raw<T>(mut self, raw: T) -> Self where T: serde::Serialize {
+        let raw = match serde_json::to_value(raw) {
+            Ok(Value::Object(a)) => a,
+            Ok(_) => panic!("Only objects are allowed"),
+            _ => panic!("Could not encode raw parameters"),
+        };
         self.raw = Some(raw);
         self
     }
@@ -225,18 +240,18 @@ pub struct AnalyticsOptions {
     pub(crate) client_context_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "args")]
-    pub(crate) positional_parameters: Option<Vec<Box<Value>>>,
+    pub(crate) positional_parameters: Option<Vec<Value>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(flatten)]
     #[serde(serialize_with = "convert_named_params")]
-    pub(crate) named_parameters: Option<HashMap<String, Box<Value>>>,
+    pub(crate) named_parameters: Option<serde_json::Map<String, Value>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) readonly: Option<bool>,
     #[serde(skip)]
     pub(crate) priority: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(flatten)]
-    pub(crate) raw: Option<HashMap<String, Box<Value>>>,
+    pub(crate) raw: Option<serde_json::Map<String, Value>>,
     // The statement is not part of the public API, but added here
     // as a convenience so we can conver the whole block into the
     // JSON payload the analytics engine expects. DO NOT ADD A PUBLIC
@@ -262,8 +277,23 @@ impl AnalyticsOptions {
         self
     }
 
-    pub fn positional_parameters(mut self, positional_parameters: Vec<Box<Value>>) -> Self {
+    pub fn positional_parameters<T>(mut self, positional_parameters: T) -> Self where T: serde::Serialize {
+        let positional_parameters = match serde_json::to_value(positional_parameters) {
+            Ok(Value::Array(a)) => a,
+            Ok(_) => panic!("Only arrays are allowed"),
+            _ => panic!("Could not encode positional parameters"),
+        };
         self.positional_parameters = Some(positional_parameters);
+        self
+    }
+
+    pub fn named_parameters<T>(mut self, named_parameters: T) -> Self where T: serde::Serialize {
+        let named_parameters = match serde_json::to_value(named_parameters) {
+            Ok(Value::Object(a)) => a,
+            Ok(_) => panic!("Only objects are allowed"),
+            _ => panic!("Could not encode positional parameters"),
+        };
+        self.named_parameters = Some(named_parameters);
         self
     }
     
@@ -272,12 +302,12 @@ impl AnalyticsOptions {
         self
     }
 
-    pub fn named_parameters(mut self, named_parameters: HashMap<String, Box<Value>>) -> Self {
-        self.named_parameters = Some(named_parameters);
-        self
-    }
-
-    pub fn raw(mut self, raw: HashMap<String, Box<Value>>) -> Self {
+    pub fn raw<T>(mut self, raw: T) -> Self where T: serde::Serialize {
+        let raw = match serde_json::to_value(raw) {
+            Ok(Value::Object(a)) => a,
+            Ok(_) => panic!("Only objects are allowed"),
+            _ => panic!("Could not encode raw parameters"),
+        };
         self.raw = Some(raw);
         self
     }
