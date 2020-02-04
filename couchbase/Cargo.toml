@@ -21,7 +21,7 @@ futures = "0.3"
 log = "0.4"
 parse_duration = "2.0"
 uuid = { version = "0.8", features = ["v4"] }
-couchbase-sys = { path = "../couchbase-sys", optional = true }
+couchbase-sys = { version = "1.0.0-alpha.3", optional = true }
 crossbeam-channel = { version = "0.4", optional = true }
 
 [build-dependencies]
