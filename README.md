@@ -7,13 +7,13 @@ This is the repository for the official, community supported Couchbase Rust SDK.
 
 ## Requirements
 
-Make sure to have all [libcouchbase](https://docs.couchbase.com/c-sdk/current/start-using-sdk.html) requirements satisfied to build it properly. Also [bindgen](https://rust-lang.github.io/rust-bindgen/requirements.html) requirements need to be in place. Other than that, you should be good to go out of the box if you use a recent rust version. We recommend the 2018 edition just because.
+Make sure to have all [libcouchbase](https://docs.couchbase.com/c-sdk/current/start-using-sdk.html) requirements satisfied to build it properly. Also [bindgen](https://rust-lang.github.io/rust-bindgen/requirements.html) requirements need to be in place. You need a rust version newer or equal to `1.39` because this SDK makes heavy use of `async/await`.
 
 ## Installation
 
 ```toml
 [dependencies]
-couchbase = "1.0.0-alpha.2"
+couchbase = "1.0.0-alpha.3"
 ```
 
 ## Usage
@@ -21,39 +21,28 @@ couchbase = "1.0.0-alpha.2"
 The `examples` folder has a bunch more, but here is a basic getting started doing a kv op:
 
 ```rust
-use couchbase::Cluster;
-use futures::Future;
-use serde_derive::Deserialize;
-
-#[derive(Debug, Deserialize)]
-struct Airport {
-    airportname: String,
-    icao: String,
-}
-
-fn main() {
-    let mut cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password")
-        .expect("Could not create Cluster reference!");
-
-    let bucket = cluster
-        .bucket("travel-sample")
-        .expect("Could not open bucket");
+pub fn main() {
+    // Connect to the cluster with a connection string and credentials
+    let cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
+    // Open a bucket
+    let bucket = cluster.bucket("travel-sample");
+    // Use the default collection (needs to be used for all server 6.5 and earlier)
     let collection = bucket.default_collection();
 
-    let found_doc = collection
-        .get("airport_1297", None)
-        .wait()
-        .expect("Error while loading doc");
-    println!("Airline Document: {:?}", found_doc);
+    // Fetch a document
+    match block_on(collection.get("airline_10", GetOptions::default())) {
+        Ok(r) => println!("get result: {:?}", r),
+        Err(e) => println!("get failed! {}", e),
+    };
 
-    if found_doc.is_some() {
-        println!(
-            "Content Decoded {:?}",
-            found_doc.unwrap().content_as::<Airport>()
-        );
-    }
+    // Upsert a document as JSON
+    let mut content = HashMap::new();
+    content.insert("Hello", "Rust!");
 
-    cluster.disconnect().expect("Could not shutdown properly");
+    match block_on(collection.upsert("foo", content, UpsertOptions::default())) {
+        Ok(r) => println!("upsert result: {:?}", r),
+        Err(e) => println!("upsert failed! {}", e),
+    };
 }
 ```
 
@@ -61,4 +50,4 @@ fn main() {
 More examples can be found in the `examples` folder. Please open a ticket if something is not present or does not showcase what you need.
 
 ## Unsafe Code
-This code contains **unsafe {}** code blocks. Breathe slowly and calm down, it's going to be okay. The reason why we use unsafe code is so that we can call into `libcouchbase` which is a C library. The only unsafe code is found in the lcb part of the IO module. So if you experience a segfault, it will likely come from there. We are trying to even keep unsafe in there minimal, but by the nature of it, it is all over the place. We are also working on a pure Rust SDK with no unsafe code (hoepfully), but until this ships and is mature we have to live with it.
+This code contains **unsafe {}** code blocks. Breathe slowly and calm down, it's going to be okay. The reason why we use unsafe code is so that we can call into `libcouchbase` which is a C library. The only unsafe code is found in the lcb part of the IO module. So if you experience a segfault, it will likely come from there. We are trying to even keep unsafe in there minimal, but by the nature of it, it is all over the place. We are also working on a pure Rust SDK with no unsafe code (hopefully), but until this ships and is mature we have to live with it.
