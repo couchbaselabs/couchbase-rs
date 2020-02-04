@@ -1,6 +1,6 @@
 [package]
 name = "couchbase"
-version = "1.0.0-alpha.3"
+version = "1.0.0-alpha.3" # remember to update html_root_url
 authors = ["Michael Nitschinger <michael@nitschinger.at>"]
 edition = "2018"
 build = "build.rs"

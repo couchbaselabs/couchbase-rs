@@ -4,10 +4,13 @@
 
 ### Enhancements
 
+Note: this release another big rewrite but hopefully the last one on the track to a stable release. Much more API needs to be fleshed out, but the one that is in there should not change a lot.
+
  - Moved to `std::future` and `async/await`.
- - Added support for automatic and custom Query `client_context_id` option.
- - Updated libcouchbase to `3.0.0-beta.1`.
- - Get APIs are now not returning an `Option<GetResult>` but rather a plain `GetResult` for simplicity.
+ - Updated libcouchbase to `3.0.0`.
+ - Significantly overhauled the API to be in-line with the "SDK RFC 3.0" initiative.
+ - All APIs now return consistent results and take consistent options.
+ - Make use of features (for now only to enable libcouchbase by default).
 
 ## 1.0.0-alpha.2
 
