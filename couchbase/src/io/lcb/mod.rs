@@ -2,7 +2,7 @@ mod callbacks;
 mod encode;
 
 use crate::api::error::CouchbaseResult;
-use crate::api::results::{QueryMetaData, QueryResult, AnalyticsResult, AnalyticsMetaData};
+use crate::api::results::{AnalyticsMetaData, AnalyticsResult, QueryMetaData, QueryResult};
 use crate::io::request::Request;
 
 use callbacks::{

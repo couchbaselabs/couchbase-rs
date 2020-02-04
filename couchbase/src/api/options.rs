@@ -101,16 +101,17 @@ where
     }
 }
 
-fn convert_named_params<S>(x: &Option<serde_json::Map<String, Value>>, s: S) -> Result<S::Ok, S::Error>
+fn convert_named_params<S>(
+    x: &Option<serde_json::Map<String, Value>>,
+    s: S,
+) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
     match x {
         Some(m) => {
-            let conv: HashMap<String, &Value> = m
-                .iter()
-                .map(|(k, v)| (format!("${}", k), v))
-                .collect();
+            let conv: HashMap<String, &Value> =
+                m.iter().map(|(k, v)| (format!("${}", k), v)).collect();
             s.serialize_some(&conv)
         }
         None => s.serialize_none(),
@@ -180,7 +181,10 @@ impl QueryOptions {
         self
     }
 
-    pub fn positional_parameters<T>(mut self, positional_parameters: T) -> Self where T: serde::Serialize {
+    pub fn positional_parameters<T>(mut self, positional_parameters: T) -> Self
+    where
+        T: serde::Serialize,
+    {
         let positional_parameters = match serde_json::to_value(positional_parameters) {
             Ok(Value::Array(a)) => a,
             Ok(_) => panic!("Only arrays are allowed"),
@@ -190,7 +194,10 @@ impl QueryOptions {
         self
     }
 
-    pub fn named_parameters<T>(mut self, named_parameters: T) -> Self where T: serde::Serialize {
+    pub fn named_parameters<T>(mut self, named_parameters: T) -> Self
+    where
+        T: serde::Serialize,
+    {
         let named_parameters = match serde_json::to_value(named_parameters) {
             Ok(Value::Object(a)) => a,
             Ok(_) => panic!("Only objects are allowed"),
@@ -200,7 +207,10 @@ impl QueryOptions {
         self
     }
 
-    pub fn raw<T>(mut self, raw: T) -> Self where T: serde::Serialize {
+    pub fn raw<T>(mut self, raw: T) -> Self
+    where
+        T: serde::Serialize,
+    {
         let raw = match serde_json::to_value(raw) {
             Ok(Value::Object(a)) => a,
             Ok(_) => panic!("Only objects are allowed"),
@@ -277,7 +287,10 @@ impl AnalyticsOptions {
         self
     }
 
-    pub fn positional_parameters<T>(mut self, positional_parameters: T) -> Self where T: serde::Serialize {
+    pub fn positional_parameters<T>(mut self, positional_parameters: T) -> Self
+    where
+        T: serde::Serialize,
+    {
         let positional_parameters = match serde_json::to_value(positional_parameters) {
             Ok(Value::Array(a)) => a,
             Ok(_) => panic!("Only arrays are allowed"),
@@ -287,7 +300,10 @@ impl AnalyticsOptions {
         self
     }
 
-    pub fn named_parameters<T>(mut self, named_parameters: T) -> Self where T: serde::Serialize {
+    pub fn named_parameters<T>(mut self, named_parameters: T) -> Self
+    where
+        T: serde::Serialize,
+    {
         let named_parameters = match serde_json::to_value(named_parameters) {
             Ok(Value::Object(a)) => a,
             Ok(_) => panic!("Only objects are allowed"),
@@ -296,13 +312,16 @@ impl AnalyticsOptions {
         self.named_parameters = Some(named_parameters);
         self
     }
-    
+
     pub fn priority(mut self, priority: bool) -> Self {
         self.priority = Some(if priority == true { -1 } else { 0 });
         self
     }
 
-    pub fn raw<T>(mut self, raw: T) -> Self where T: serde::Serialize {
+    pub fn raw<T>(mut self, raw: T) -> Self
+    where
+        T: serde::Serialize,
+    {
         let raw = match serde_json::to_value(raw) {
             Ok(Value::Object(a)) => a,
             Ok(_) => panic!("Only objects are allowed"),

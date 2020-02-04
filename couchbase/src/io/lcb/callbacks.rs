@@ -1,5 +1,5 @@
 use crate::api::error::{CouchbaseError, CouchbaseResult, ErrorContext};
-use crate::api::results::{ExistsResult, GetResult, MutationResult, QueryResult, AnalyticsResult};
+use crate::api::results::{AnalyticsResult, ExistsResult, GetResult, MutationResult, QueryResult};
 use crate::api::MutationToken;
 use couchbase_sys::*;
 use log::debug;
@@ -9,7 +9,9 @@ use std::os::raw::{c_char, c_int, c_uint, c_void};
 use std::ptr;
 use std::slice::from_raw_parts;
 
-use crate::io::lcb::{decrement_outstanding_requests, wrapped_vsnprintf, QueryCookie, AnalyticsCookie};
+use crate::io::lcb::{
+    decrement_outstanding_requests, wrapped_vsnprintf, AnalyticsCookie, QueryCookie,
+};
 
 pub unsafe extern "C" fn store_callback(
     instance: *mut lcb_INSTANCE,
@@ -275,7 +277,6 @@ fn build_analytics_error_context(lcb_ctx: *const lcb_ANALYTICS_ERROR_CONTEXT) ->
 
     ctx
 }
-
 
 pub unsafe extern "C" fn query_callback(
     instance: *mut lcb_INSTANCE,
