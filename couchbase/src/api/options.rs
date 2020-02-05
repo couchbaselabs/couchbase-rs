@@ -73,11 +73,16 @@ pub struct QueryOptions {
     pub(crate) statement: Option<String>,
 }
 
-fn convert_mutation_state<S>(_x: &Option<MutationState>, _s: S) -> Result<S::Ok, S::Error>
+fn convert_mutation_state<S>(x: &Option<MutationState>, s: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
-    todo!("Mutation token conversion still needs to be implemented")
+    match x {
+        Some(state) => {
+            s.serialize_str("bla")
+        },
+        None =>  s.serialize_none(),
+    }
 }
 
 fn convert_duration_for_golang<S>(x: &Option<Duration>, s: S) -> Result<S::Ok, S::Error>

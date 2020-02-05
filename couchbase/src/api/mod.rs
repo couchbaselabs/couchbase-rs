@@ -279,14 +279,16 @@ pub struct MutationToken {
     partition_uuid: u64,
     sequence_number: u64,
     partition_id: u16,
+    bucket_name: String,
 }
 
 impl MutationToken {
-    pub fn new(partition_uuid: u64, sequence_number: u64, partition_id: u16) -> Self {
+    pub fn new(partition_uuid: u64, sequence_number: u64, partition_id: u16, bucket_name: String) -> Self {
         Self {
             partition_uuid,
             sequence_number,
             partition_id,
+            bucket_name
         }
     }
 
@@ -303,6 +305,6 @@ impl MutationToken {
     }
 
     pub fn bucket_name(&self) -> &String {
-        todo!()
+        &self.bucket_name
     }
 }

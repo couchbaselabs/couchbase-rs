@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.0-alpha.4
+
+### Enhancements
+
+ - Add the `bucket_name` to `MutationToken`
+
+### Fixes
+
+
 ## 1.0.0-alpha.3
 
 ### Enhancements
