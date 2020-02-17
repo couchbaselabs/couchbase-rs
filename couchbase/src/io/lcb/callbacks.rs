@@ -1,5 +1,8 @@
 use crate::api::error::{CouchbaseError, CouchbaseResult, ErrorContext};
-use crate::api::results::{AnalyticsResult, ExistsResult, GetResult, MutationResult, QueryResult};
+use crate::api::results::{
+    AnalyticsResult, ExistsResult, GetResult, LookupInResult, MutateInResult, MutationResult,
+    QueryResult, SubDocField,
+};
 use crate::api::MutationToken;
 use couchbase_sys::*;
 use log::debug;
@@ -53,7 +56,7 @@ pub unsafe extern "C" fn store_callback(
                 lcb_mutation_token.uuid_,
                 lcb_mutation_token.seqno_,
                 lcb_mutation_token.vbid_,
-                bucket
+                bucket,
             ))
         } else {
             None
@@ -108,7 +111,7 @@ pub unsafe extern "C" fn remove_callback(
                 lcb_mutation_token.uuid_,
                 lcb_mutation_token.seqno_,
                 lcb_mutation_token.vbid_,
-                bucket
+                bucket,
             ))
         } else {
             None
@@ -191,6 +194,55 @@ pub unsafe extern "C" fn exists_callback(
         ))
     };
     sender.send(result).expect("Could not complete Future!");
+}
+
+pub unsafe extern "C" fn lookup_in_callback(
+    instance: *mut lcb_INSTANCE,
+    _cbtype: i32,
+    res: *const lcb_RESPBASE,
+) {
+    decrement_outstanding_requests(instance);
+    let subdoc_res = res as *const lcb_RESPSUBDOC;
+    let mut cookie_ptr: *mut c_void = ptr::null_mut();
+    lcb_respsubdoc_cookie(subdoc_res, &mut cookie_ptr);
+    let sender = Box::from_raw(
+        cookie_ptr as *mut futures::channel::oneshot::Sender<CouchbaseResult<LookupInResult>>,
+    );
+
+    let status = lcb_respsubdoc_status(subdoc_res);
+    let result = if status == lcb_STATUS_LCB_SUCCESS {
+        let total_size = lcb_respsubdoc_result_size(subdoc_res);
+        let mut fields = vec![];
+        for i in 0..total_size {
+            let status = lcb_respsubdoc_result_status(subdoc_res, i);
+            let mut value_len: usize = 0;
+            let mut value_ptr: *const c_char = ptr::null();
+            lcb_respsubdoc_result_value(subdoc_res, i, &mut value_ptr, &mut value_len);
+            let value = from_raw_parts(value_ptr as *const u8, value_len);
+            fields.push(SubDocField {
+                status,
+                value: value.into(),
+            });
+        }
+        let mut cas: u64 = 0;
+        lcb_respsubdoc_cas(subdoc_res, &mut cas);
+        Ok(LookupInResult::new(fields, cas))
+    } else {
+        let mut lcb_ctx: *const lcb_KEY_VALUE_ERROR_CONTEXT = ptr::null();
+        lcb_respsubdoc_error_context(subdoc_res, &mut lcb_ctx);
+        Err(couchbase_error_from_lcb_status(
+            status,
+            build_kv_error_context(lcb_ctx),
+        ))
+    };
+    sender.send(result).expect("Could not complete Future!");
+}
+
+pub unsafe extern "C" fn mutate_in_callback(
+    instance: *mut lcb_INSTANCE,
+    _cbtype: i32,
+    res: *const lcb_RESPBASE,
+) {
 }
 
 fn build_kv_error_context(lcb_ctx: *const lcb_KEY_VALUE_ERROR_CONTEXT) -> ErrorContext {

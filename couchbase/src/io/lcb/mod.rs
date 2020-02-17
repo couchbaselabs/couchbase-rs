@@ -6,7 +6,8 @@ use crate::api::results::{AnalyticsMetaData, AnalyticsResult, QueryMetaData, Que
 use crate::io::request::Request;
 
 use callbacks::{
-    exists_callback, get_callback, logger_callback, open_callback, remove_callback, store_callback,
+    exists_callback, get_callback, logger_callback, lookup_in_callback, mutate_in_callback,
+    open_callback, remove_callback, store_callback,
 };
 
 use couchbase_sys::*;
@@ -184,6 +185,16 @@ unsafe fn install_instance_callbacks(instance: *mut lcb_INSTANCE) {
         lcb_CALLBACK_TYPE_LCB_CALLBACK_REMOVE as i32,
         Some(remove_callback),
     );
+    lcb_install_callback(
+        instance,
+        lcb_CALLBACK_TYPE_LCB_CALLBACK_SDMUTATE as i32,
+        Some(mutate_in_callback),
+    );
+    lcb_install_callback(
+        instance,
+        lcb_CALLBACK_TYPE_LCB_CALLBACK_SDLOOKUP as i32,
+        Some(lookup_in_callback),
+    );
     lcb_set_open_callback(instance, Some(open_callback));
 }
 
@@ -242,6 +253,8 @@ fn encode(instance: *mut lcb_INSTANCE, request: Request) {
         Request::Mutate(r) => encode::encode_mutate(instance, r),
         Request::Exists(r) => encode::encode_exists(instance, r),
         Request::Remove(r) => encode::encode_remove(instance, r),
+        Request::LookupIn(r) => encode::encode_lookup_in(instance, r),
+        Request::MutateIn(r) => encode::encode_mutate_in(instance, r),
     }
 }
 

@@ -1,6 +1,7 @@
 use crate::api::error::CouchbaseResult;
 use crate::api::options::*;
 use crate::api::results::*;
+use crate::api::{LookupInSpec, MutateInSpec};
 use futures::channel::oneshot::Sender;
 use std::time::Duration;
 
@@ -12,6 +13,8 @@ pub enum Request {
     Analytics(AnalyticsRequest),
     Exists(ExistsRequest),
     Remove(RemoveRequest),
+    MutateIn(MutateInRequest),
+    LookupIn(LookupInRequest),
 }
 
 #[derive(Debug)]
@@ -77,4 +80,20 @@ pub struct AnalyticsRequest {
     pub(crate) statement: String,
     pub(crate) sender: Sender<CouchbaseResult<AnalyticsResult>>,
     pub(crate) options: AnalyticsOptions,
+}
+
+#[derive(Debug)]
+pub struct LookupInRequest {
+    pub(crate) id: String,
+    pub(crate) sender: Sender<CouchbaseResult<LookupInResult>>,
+    pub(crate) specs: Vec<LookupInSpec>,
+    pub(crate) options: LookupInOptions,
+}
+
+#[derive(Debug)]
+pub struct MutateInRequest {
+    pub(crate) id: String,
+    pub(crate) sender: Sender<CouchbaseResult<MutateInResult>>,
+    pub(crate) specs: Vec<MutateInSpec>,
+    pub(crate) options: MutateInOptions,
 }

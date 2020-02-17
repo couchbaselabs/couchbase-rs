@@ -73,16 +73,11 @@ pub struct QueryOptions {
     pub(crate) statement: Option<String>,
 }
 
-fn convert_mutation_state<S>(x: &Option<MutationState>, s: S) -> Result<S::Ok, S::Error>
+fn convert_mutation_state<S>(_x: &Option<MutationState>, _s: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
-    match x {
-        Some(state) => {
-            s.serialize_str("bla")
-        },
-        None =>  s.serialize_none(),
-    }
+    todo!()
 }
 
 fn convert_duration_for_golang<S>(x: &Option<Duration>, s: S) -> Result<S::Ok, S::Error>
@@ -433,4 +428,59 @@ pub struct ExistsOptions {
 
 impl ExistsOptions {
     timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct MutateInOptions {
+    pub(crate) timeout: Option<Duration>,
+    pub(crate) cas: Option<u64>,
+    pub(crate) store_semantics: Option<StoreSemantics>,
+    pub(crate) expiry: Option<Duration>,
+    pub(crate) access_deleted: Option<bool>,
+}
+
+impl MutateInOptions {
+    timeout!();
+    expiry!();
+
+    pub fn cas(mut self, cas: u64) -> Self {
+        self.cas = Some(cas);
+        self
+    }
+
+    pub fn store_semantics(mut self, store_semantics: StoreSemantics) -> Self {
+        self.store_semantics = Some(store_semantics);
+        self
+    }
+
+    pub fn access_deleted(mut self, access_deleted: bool) -> Self {
+        self.access_deleted = Some(access_deleted);
+        self
+    }
+}
+
+/// Describes how the outer document store semantics on subdoc should act.
+#[derive(Debug)]
+pub enum StoreSemantics {
+    /// Create the document, fail if it exists.
+    Insert,
+    /// Replace the document or create it if it does not exist.
+    Upsert,
+    /// Replace the document, fail if it does not exist. This is the default.
+    Replace,
+}
+
+#[derive(Debug, Default)]
+pub struct LookupInOptions {
+    pub(crate) timeout: Option<Duration>,
+    pub(crate) access_deleted: Option<bool>,
+}
+
+impl LookupInOptions {
+    timeout!();
+
+    pub fn access_deleted(mut self, access_deleted: bool) -> Self {
+        self.access_deleted = Some(access_deleted);
+        self
+    }
 }

@@ -269,3 +269,52 @@ impl fmt::Debug for MutationResult {
         )
     }
 }
+
+#[derive(Debug)]
+pub(crate) struct SubDocField {
+    pub status: u32,
+    pub value: Vec<u8>,
+}
+
+#[derive(Debug)]
+pub struct MutateInResult {}
+
+#[derive(Debug)]
+pub struct LookupInResult {
+    content: Vec<SubDocField>,
+    cas: u64,
+}
+
+impl LookupInResult {
+    pub(crate) fn new(content: Vec<SubDocField>, cas: u64) -> Self {
+        Self { content, cas }
+    }
+
+    pub fn cas(&self) -> u64 {
+        self.cas
+    }
+
+    pub fn content<'a, T>(&'a self, index: usize) -> CouchbaseResult<T>
+    where
+        T: serde::Deserialize<'a>,
+    {
+        match serde_json::from_slice(
+            &self
+                .content
+                .get(index)
+                .expect("index not found")
+                .value
+                .as_slice(),
+        ) {
+            Ok(v) => Ok(v),
+            Err(e) => Err(CouchbaseError::DecodingFailure {
+                ctx: ErrorContext::default(),
+                source: e.into(),
+            }),
+        }
+    }
+
+    pub fn exists(&self, index: usize) -> bool {
+        &self.content.get(index).expect("index not found").status == &0
+    }
+}
