@@ -1,13 +1,13 @@
 mod callbacks;
 mod encode;
 
-use crate::api::error::CouchbaseResult;
+use crate::api::error::{CouchbaseResult, ErrorContext};
 use crate::api::results::{AnalyticsMetaData, AnalyticsResult, QueryMetaData, QueryResult};
 use crate::io::request::Request;
 
 use callbacks::{
-    exists_callback, get_callback, logger_callback, lookup_in_callback, mutate_in_callback,
-    open_callback, remove_callback, store_callback,
+    couchbase_error_from_lcb_status, exists_callback, get_callback, logger_callback,
+    lookup_in_callback, mutate_in_callback, open_callback, remove_callback, store_callback,
 };
 
 use couchbase_sys::*;
@@ -84,34 +84,35 @@ fn run_lcb_loop(
     let mut logger: *mut lcb_LOGGER = ptr::null_mut();
 
     unsafe {
-        lcb_createopts_create(&mut create_options, lcb_INSTANCE_TYPE_LCB_TYPE_CLUSTER);
+        check_status_and_panic(
+            lcb_createopts_create(&mut create_options, lcb_INSTANCE_TYPE_LCB_TYPE_CLUSTER),
+            "createopts_create",
+        );
 
-        lcb_logger_create(&mut logger, ptr::null_mut());
-        lcb_logger_callback(logger, Some(logger_callback));
-        lcb_createopts_logger(create_options, logger);
+        check_status_and_panic(lcb_logger_create(&mut logger, ptr::null_mut()), "logger_create");
+        check_status_and_panic(lcb_logger_callback(logger, Some(logger_callback)), "logger_callback");
+        check_status_and_panic(lcb_createopts_logger(create_options, logger), "createopts_logger");
 
-        lcb_createopts_connstr(
+        check_status_and_panic(lcb_createopts_connstr(
             create_options,
             connection_string.as_ptr(),
             connection_string_len,
-        );
-        lcb_createopts_credentials(
+        ), "createopts_connstr");
+        check_status_and_panic(lcb_createopts_credentials(
             create_options,
             username.as_ptr(),
             username_len,
             password.as_ptr(),
             password_len,
-        );
-        debug!(
-            "Result of create: {:x}",
-            lcb_create(&mut instance, create_options)
-        );
-        lcb_createopts_destroy(create_options);
+        ), "createopts_credentials");
+
+        check_status_and_panic(lcb_create(&mut instance, create_options), "create");
+        check_status_and_panic(lcb_createopts_destroy(create_options), "createopts_destroy");
 
         install_instance_callbacks(instance);
 
-        lcb_connect(instance);
-        lcb_wait(instance, lcb_WAITFLAGS_LCB_WAIT_DEFAULT);
+        check_status_and_panic(lcb_connect(instance), "connect");
+        check_status_and_panic(lcb_wait(instance, lcb_WAITFLAGS_LCB_WAIT_DEFAULT), "wait");
 
         lcb_set_cookie(
             instance,
@@ -142,6 +143,18 @@ fn run_lcb_loop(
     unsafe {
         lcb_wait(instance, lcb_WAITFLAGS_LCB_WAIT_DEFAULT);
         lcb_destroy(instance);
+    }
+}
+
+/// Panicing is not good, but until we have better error handling at least
+/// make it obvious that something is going wrong.
+fn check_status_and_panic(status: lcb_STATUS, description: &'static str) {
+    if status != lcb_STATUS_LCB_SUCCESS {
+        panic!(
+            "Operation lcb_{} failed with error: {}",
+            description,
+            couchbase_error_from_lcb_status(status, ErrorContext::default())
+        )
     }
 }
 
@@ -211,23 +224,26 @@ unsafe fn decrement_outstanding_requests(instance: *mut lcb_INSTANCE) {
 
 /// Helper method to ask the instance for the current bucket name and return it if any
 /// is present.
+///
+/// Note that libcouchbase still wants to own the buffer, so we can only look into the
+/// returned opaque str and clone it into ownership before return.
 fn bucket_name_for_instance(instance: *mut lcb_INSTANCE) -> Option<String> {
     let mut bucket_ptr = ptr::null_mut();
-    let raw_ptr = &mut bucket_ptr as *mut *mut i8;
+    let opaque_ptr = &mut bucket_ptr as *mut *mut i8;
 
     unsafe {
         let status = lcb_cntl(
             instance,
             LCB_CNTL_GET as i32,
             LCB_CNTL_BUCKETNAME as i32,
-            raw_ptr as *mut c_void,
+            opaque_ptr as *mut c_void,
         );
         if status == lcb_STATUS_LCB_SUCCESS {
-            return Some(CStr::from_ptr(bucket_ptr).to_str().unwrap().into());
+            Some(CStr::from_ptr(bucket_ptr).to_str().unwrap().into())
         } else {
-            return None;
+            None
         }
-    };
+    }
 }
 
 extern "C" {

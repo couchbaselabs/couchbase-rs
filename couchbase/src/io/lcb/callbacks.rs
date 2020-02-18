@@ -468,7 +468,7 @@ pub unsafe extern "C" fn analytics_callback(
 }
 
 #[allow(non_upper_case_globals)]
-fn couchbase_error_from_lcb_status(status: lcb_STATUS, ctx: ErrorContext) -> CouchbaseError {
+pub fn couchbase_error_from_lcb_status(status: lcb_STATUS, ctx: ErrorContext) -> CouchbaseError {
     match status {
         lcb_STATUS_LCB_ERR_DOCUMENT_NOT_FOUND => CouchbaseError::DocumentNotFound { ctx },
         lcb_STATUS_LCB_ERR_TIMEOUT | lcb_STATUS_LCB_ERR_AMBIGUOUS_TIMEOUT => {
