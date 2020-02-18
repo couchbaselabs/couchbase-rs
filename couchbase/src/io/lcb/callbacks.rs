@@ -13,7 +13,8 @@ use std::ptr;
 use std::slice::from_raw_parts;
 
 use crate::io::lcb::{
-    decrement_outstanding_requests, wrapped_vsnprintf, AnalyticsCookie, QueryCookie,
+    bucket_name_for_instance, decrement_outstanding_requests, wrapped_vsnprintf, AnalyticsCookie,
+    QueryCookie,
 };
 
 pub unsafe extern "C" fn store_callback(
@@ -605,6 +606,10 @@ pub unsafe extern "C" fn logger_callback(
     log::log!(level, "{}", decoded.to_str().unwrap());
 }
 
-pub unsafe extern "C" fn open_callback(_instance: *mut lcb_INSTANCE, err: lcb_STATUS) {
-    debug!("Completed bucket open attempt (status: 0x{:x})", &err);
+pub unsafe extern "C" fn open_callback(instance: *mut lcb_INSTANCE, err: lcb_STATUS) {
+    debug!(
+        "Libcouchbase notified of completed bucket open attempt for bucket {:?} (status: 0x{:x})",
+        bucket_name_for_instance(instance),
+        &err
+    );
 }

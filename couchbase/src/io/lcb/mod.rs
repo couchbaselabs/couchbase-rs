@@ -13,7 +13,7 @@ use callbacks::{
 use couchbase_sys::*;
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use log::debug;
-use std::ffi::CString;
+use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_uint, c_void};
 use std::thread::JoinHandle;
 use std::{ptr, thread};
@@ -102,7 +102,10 @@ fn run_lcb_loop(
             password.as_ptr(),
             password_len,
         );
-        lcb_create(&mut instance, create_options);
+        debug!(
+            "Result of create: {:x}",
+            lcb_create(&mut instance, create_options)
+        );
         lcb_createopts_destroy(create_options);
 
         install_instance_callbacks(instance);
@@ -156,9 +159,10 @@ fn handle_io_request(
         IoRequest::OpenBucket { name } => unsafe {
             debug!("Starting bucket open for {}", &name);
             let name_len = name.len();
-            let name = CString::new(name).unwrap();
-            lcb_open(instance, name.as_ptr(), name_len);
+            let c_name = CString::new(name.clone()).unwrap();
+            lcb_open(instance, c_name.as_ptr(), name_len);
             lcb_wait(instance, lcb_WAITFLAGS_LCB_WAIT_DEFAULT);
+            debug!("Finished bucket open for {}", &name);
         },
     };
     false
@@ -203,6 +207,27 @@ unsafe fn decrement_outstanding_requests(instance: *mut lcb_INSTANCE) {
     let mut instance_cookie = Box::from_raw(instance_cookie_ptr as *mut Box<InstanceCookie>);
     instance_cookie.decrement_outstanding();
     Box::into_raw(instance_cookie);
+}
+
+/// Helper method to ask the instance for the current bucket name and return it if any
+/// is present.
+fn bucket_name_for_instance(instance: *mut lcb_INSTANCE) -> Option<String> {
+    let mut bucket_ptr = ptr::null_mut();
+    let raw_ptr = &mut bucket_ptr as *mut *mut i8;
+
+    unsafe {
+        let status = lcb_cntl(
+            instance,
+            LCB_CNTL_GET as i32,
+            LCB_CNTL_BUCKETNAME as i32,
+            raw_ptr as *mut c_void,
+        );
+        if status == lcb_STATUS_LCB_SUCCESS {
+            return Some(CStr::from_ptr(bucket_ptr).to_str().unwrap().into());
+        } else {
+            return None;
+        }
+    };
 }
 
 extern "C" {
