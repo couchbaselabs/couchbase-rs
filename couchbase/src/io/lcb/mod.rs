@@ -243,7 +243,7 @@ unsafe fn decrement_outstanding_requests(instance: *mut lcb_INSTANCE) {
 /// Note that libcouchbase still wants to own the buffer, so we can only look into the
 /// returned opaque str and clone it into ownership before return.
 fn bucket_name_for_instance(instance: *mut lcb_INSTANCE) -> Option<String> {
-    let mut bucket_ptr = ptr::null_mut();
+    let mut bucket_ptr: *mut i8 = ptr::null_mut();
     let opaque_ptr = &mut bucket_ptr as *mut *mut i8;
 
     unsafe {
@@ -253,7 +253,7 @@ fn bucket_name_for_instance(instance: *mut lcb_INSTANCE) -> Option<String> {
             LCB_CNTL_BUCKETNAME as i32,
             opaque_ptr as *mut c_void,
         );
-        if status == lcb_STATUS_LCB_SUCCESS {
+        if status == lcb_STATUS_LCB_SUCCESS && !bucket_ptr.is_null() {
             Some(CStr::from_ptr(bucket_ptr).to_str().unwrap().into())
         } else {
             None
