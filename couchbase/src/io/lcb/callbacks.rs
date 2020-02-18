@@ -5,7 +5,7 @@ use crate::api::results::{
 };
 use crate::api::MutationToken;
 use couchbase_sys::*;
-use log::debug;
+use log::{debug, trace};
 use serde_json::Value;
 use std::ffi::CStr;
 use std::os::raw::{c_char, c_int, c_uint, c_void};
@@ -69,7 +69,10 @@ pub unsafe extern "C" fn store_callback(
             build_kv_error_context(lcb_ctx),
         ))
     };
-    sender.send(result).expect("Could not complete Future!");
+    match sender.send(result) {
+        Ok(_) => {}
+        Err(e) => trace!("Failed to send store result because of {:?}", e),
+    }
 }
 
 pub unsafe extern "C" fn remove_callback(
@@ -124,7 +127,10 @@ pub unsafe extern "C" fn remove_callback(
             build_kv_error_context(lcb_ctx),
         ))
     };
-    sender.send(result).expect("Could not complete Future!");
+    match sender.send(result) {
+        Ok(_) => {}
+        Err(e) => trace!("Failed to send remove result because of {:?}", e),
+    }
 }
 
 pub unsafe extern "C" fn get_callback(
@@ -160,7 +166,10 @@ pub unsafe extern "C" fn get_callback(
         ))
     };
 
-    sender.send(result).expect("Could not complete Future!");
+    match sender.send(result) {
+        Ok(_) => {}
+        Err(e) => trace!("Failed to send get result because of {:?}", e),
+    }
 }
 
 pub unsafe extern "C" fn exists_callback(
@@ -194,7 +203,10 @@ pub unsafe extern "C" fn exists_callback(
             build_kv_error_context(lcb_ctx),
         ))
     };
-    sender.send(result).expect("Could not complete Future!");
+    match sender.send(result) {
+        Ok(_) => {}
+        Err(e) => trace!("Failed to send exists result because of {:?}", e),
+    }
 }
 
 pub unsafe extern "C" fn lookup_in_callback(
@@ -236,7 +248,10 @@ pub unsafe extern "C" fn lookup_in_callback(
             build_kv_error_context(lcb_ctx),
         ))
     };
-    sender.send(result).expect("Could not complete Future!");
+    match sender.send(result) {
+        Ok(_) => {}
+        Err(e) => trace!("Failed to send lookup in result because of {:?}", e),
+    }
 }
 
 pub unsafe extern "C" fn mutate_in_callback(
@@ -380,30 +395,36 @@ pub unsafe extern "C" fn query_callback(
             ))
         };
 
-        cookie
+        match cookie
             .sender
             .take()
             .expect("Could not take result!")
             .send(response)
-            .expect("Could not complete query future");
+        {
+            Ok(_) => {}
+            Err(e) => trace!("Failed to send query result because of {:?}", e),
+        }
     }
 
     if lcb_respquery_is_final(res) != 0 {
         cookie.rows_sender.close_channel();
 
         if status == 0 {
-            cookie
+            match cookie
                 .meta_sender
                 .send(serde_json::from_slice(row).unwrap())
-                .expect("Could not send meta");
+            {
+                Ok(_) => {}
+                Err(e) => trace!("Failed to send query meta data because of {:?}", e),
+            }
         }
 
         decrement_outstanding_requests(instance);
     } else {
-        cookie
-            .rows_sender
-            .unbounded_send(row.to_vec())
-            .expect("Could not send rows");
+        match cookie.rows_sender.unbounded_send(row.to_vec()) {
+            Ok(_) => {}
+            Err(e) => trace!("Failed to send query row because of {:?}", e),
+        }
         Box::into_raw(cookie);
     }
 }
@@ -439,30 +460,36 @@ pub unsafe extern "C" fn analytics_callback(
             ))
         };
 
-        cookie
+        match cookie
             .sender
             .take()
             .expect("Could not take result!")
             .send(response)
-            .expect("Could not complete analytics future");
+        {
+            Ok(_) => {}
+            Err(e) => trace!("Failed to send analytics result because of {:?}", e),
+        }
     }
 
     if lcb_respanalytics_is_final(res) != 0 {
         cookie.rows_sender.close_channel();
 
         if status == 0 {
-            cookie
+            match cookie
                 .meta_sender
                 .send(serde_json::from_slice(row).unwrap())
-                .expect("Could not send meta");
+            {
+                Ok(_) => {}
+                Err(e) => trace!("Failed to send analytics meta data ecause of {:?}", e),
+            }
         }
 
         decrement_outstanding_requests(instance);
     } else {
-        cookie
-            .rows_sender
-            .unbounded_send(row.to_vec())
-            .expect("Could not send rows");
+        match cookie.rows_sender.unbounded_send(row.to_vec()) {
+            Ok(_) => {}
+            Err(e) => trace!("Failed to send analytics row because of {:?}", e),
+        }
         Box::into_raw(cookie);
     }
 }

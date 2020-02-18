@@ -89,22 +89,37 @@ fn run_lcb_loop(
             "createopts_create",
         );
 
-        check_status_and_panic(lcb_logger_create(&mut logger, ptr::null_mut()), "logger_create");
-        check_status_and_panic(lcb_logger_callback(logger, Some(logger_callback)), "logger_callback");
-        check_status_and_panic(lcb_createopts_logger(create_options, logger), "createopts_logger");
+        check_status_and_panic(
+            lcb_logger_create(&mut logger, ptr::null_mut()),
+            "logger_create",
+        );
+        check_status_and_panic(
+            lcb_logger_callback(logger, Some(logger_callback)),
+            "logger_callback",
+        );
+        check_status_and_panic(
+            lcb_createopts_logger(create_options, logger),
+            "createopts_logger",
+        );
 
-        check_status_and_panic(lcb_createopts_connstr(
-            create_options,
-            connection_string.as_ptr(),
-            connection_string_len,
-        ), "createopts_connstr");
-        check_status_and_panic(lcb_createopts_credentials(
-            create_options,
-            username.as_ptr(),
-            username_len,
-            password.as_ptr(),
-            password_len,
-        ), "createopts_credentials");
+        check_status_and_panic(
+            lcb_createopts_connstr(
+                create_options,
+                connection_string.as_ptr(),
+                connection_string_len,
+            ),
+            "createopts_connstr",
+        );
+        check_status_and_panic(
+            lcb_createopts_credentials(
+                create_options,
+                username.as_ptr(),
+                username_len,
+                password.as_ptr(),
+                password_len,
+            ),
+            "createopts_credentials",
+        );
 
         check_status_and_panic(lcb_create(&mut instance, create_options), "create");
         check_status_and_panic(lcb_createopts_destroy(create_options), "createopts_destroy");
