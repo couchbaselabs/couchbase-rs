@@ -1,5 +1,6 @@
 # Couchbase Rust SDK
 
+[![GitHub Actions](https://github.com/couchbaselabs/couchbase-rs/workflows/CI/badge.svg)](https://github.com/couchbaselabs/couchbase-rs/actions?query=workflow%3ACI)
 [![LICENSE](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Crates.io Version](https://img.shields.io/crates/v/couchbase.svg)](https://crates.io/crates/couchbase)
 
