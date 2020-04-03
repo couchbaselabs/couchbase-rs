@@ -44,15 +44,17 @@ fn main() {
         build_cfg.define(flag, env::var(flag).unwrap());
     }
 
-    let build_dst = build_cfg.build();
-
     if cfg!(feature = "link-static") {
         build_cfg.define("LCB_BUILD_STATIC", "ON");
         build_cfg.define("LIBCOUCHBASE_STATIC", "ON");
 
         // Need to figure out how to build with SSL at some point
         build_cfg.define("LCB_NO_SSL", "ON");
-        
+    }
+
+    let build_dst = build_cfg.build();
+
+    if cfg!(feature = "link-static") {        
         std::fs::copy(
             format!("{}/libcouchbaseS.a", build_dst.join("build/lib").display()),
             format!("{}/libcouchbase.a", build_dst.join("build/lib").display()),
