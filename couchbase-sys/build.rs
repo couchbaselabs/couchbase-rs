@@ -37,6 +37,7 @@ fn main() {
         "LCB_BUILD_LIBEVENT",
         "LCB_BUILD_LIBEV",
         "LCB_BUILD_LIBUV",
+        "LIBCOUCHBASE_STATIC",
     ];
 
     for flag in env_flags.iter().filter(|flag| env::var(flag).is_ok()) {
@@ -45,11 +46,22 @@ fn main() {
 
     let build_dst = build_cfg.build();
 
+    if cfg!(feature = "link-static") {
+        std::fs::copy(
+            format!("{}/libcouchbaseS.a", build_dst.join("build/lib").display()),
+            format!("{}/libcouchbase.a", build_dst.join("build/lib").display()),
+        )
+        .unwrap();
+        println!("cargo:rustc-link-lib=dylib=c++");
+        println!("cargo:rustc-link-lib=static=couchbase");
+    } else {
+        println!("cargo:rustc-link-lib=dylib=couchbase");
+    }
+
     println!(
         "cargo:rustc-link-search=native={}",
-        build_dst.join("lib").display()
+        build_dst.join("build/lib").display()
     );
-    println!("cargo:rustc-link-lib=dylib=couchbase");
 
     let bindings = bindgen::Builder::default()
         .header("headers.h")

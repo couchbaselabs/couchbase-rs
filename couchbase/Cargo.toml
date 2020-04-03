@@ -35,6 +35,8 @@ env_logger = "0.7"
 default = ["libcouchbase"]
 # The libcouchbase C backend will be compiled and used
 libcouchbase = ["couchbase-sys", "cc", "crossbeam-channel"]
+# Libcouchbase will be built and linked statically
+libcouchbase-static = ["couchbase-sys/link-static"]
 # If enabled, exposes all APIs currently marked as uncomitted
 uncomitted = []
 # If enabled, exposes all APIs currently marked as volatile or uncomitted
