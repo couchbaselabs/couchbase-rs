@@ -54,13 +54,19 @@ fn main() {
 
     let build_dst = build_cfg.build();
 
-    if cfg!(feature = "link-static") {        
+    if cfg!(feature = "link-static") {
         std::fs::copy(
             format!("{}/libcouchbaseS.a", build_dst.join("build/lib").display()),
             format!("{}/libcouchbase.a", build_dst.join("build/lib").display()),
         )
         .unwrap();
-        println!("cargo:rustc-link-lib=dylib=c++");
+
+        if cfg!(any(target_os = "macos", target_os = "freebsd")) {
+            println!("cargo:rustc-link-lib=dylib=c++");
+        } else {
+            println!("cargo:rustc-link-lib=dylib=stdc++");
+            println!("cargo:rustc-link-lib=dylib=gcc");
+        }
         println!("cargo:rustc-link-lib=static=couchbase");
     } else {
         println!("cargo:rustc-link-lib=dylib=couchbase");
