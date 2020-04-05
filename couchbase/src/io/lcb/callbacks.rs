@@ -11,6 +11,7 @@ use std::ffi::CStr;
 use std::os::raw::{c_char, c_int, c_uint, c_void};
 use std::ptr;
 use std::slice::from_raw_parts;
+use std::str;
 
 use crate::io::lcb::{
     bucket_name_for_instance, decrement_outstanding_requests, wrapped_vsnprintf, AnalyticsCookie,
@@ -50,7 +51,9 @@ pub unsafe extern "C" fn store_callback(
             let mut bucket_ptr: *const c_char = ptr::null();
             let bucket = {
                 lcb_errctx_kv_bucket(lcb_ctx, &mut bucket_ptr, &mut bucket_len);
-                CStr::from_ptr(bucket_ptr).to_str().unwrap().into()
+                str::from_utf8(from_raw_parts(bucket_ptr as *const u8, bucket_len))
+                    .unwrap()
+                    .into()
             };
 
             Some(MutationToken::new(
@@ -108,7 +111,9 @@ pub unsafe extern "C" fn remove_callback(
             let mut bucket_ptr: *const c_char = ptr::null();
             let bucket = {
                 lcb_errctx_kv_bucket(lcb_ctx, &mut bucket_ptr, &mut bucket_len);
-                CStr::from_ptr(bucket_ptr).to_str().unwrap().into()
+                str::from_utf8(from_raw_parts(bucket_ptr as *const u8, bucket_len))
+                    .unwrap()
+                    .into()
             };
 
             Some(MutationToken::new(
@@ -268,7 +273,9 @@ fn build_kv_error_context(lcb_ctx: *const lcb_KEY_VALUE_ERROR_CONTEXT) -> ErrorC
     let mut key_ptr: *const c_char = ptr::null();
     let key = unsafe {
         lcb_errctx_kv_key(lcb_ctx, &mut key_ptr, &mut key_len);
-        CStr::from_ptr(key_ptr).to_str().unwrap().into()
+        str::from_utf8(from_raw_parts(key_ptr as *const u8, key_len))
+            .unwrap()
+            .into()
     };
     ctx.insert("key", Value::String(key));
 
@@ -283,7 +290,9 @@ fn build_kv_error_context(lcb_ctx: *const lcb_KEY_VALUE_ERROR_CONTEXT) -> ErrorC
     let mut bucket_ptr: *const c_char = ptr::null();
     let bucket = unsafe {
         lcb_errctx_kv_bucket(lcb_ctx, &mut bucket_ptr, &mut bucket_len);
-        CStr::from_ptr(bucket_ptr).to_str().unwrap().into()
+        str::from_utf8(from_raw_parts(bucket_ptr as *const u8, bucket_len))
+            .unwrap()
+            .into()
     };
     ctx.insert("bucket", Value::String(bucket));
 
@@ -301,7 +310,10 @@ fn build_kv_error_context(lcb_ctx: *const lcb_KEY_VALUE_ERROR_CONTEXT) -> ErrorC
     unsafe {
         lcb_errctx_kv_collection(lcb_ctx, &mut collection_ptr, &mut collection_len);
         if !collection_ptr.is_null() {
-            let collection = CStr::from_ptr(collection_ptr).to_str().unwrap().into();
+            let collection =
+                str::from_utf8(from_raw_parts(collection_ptr as *const u8, collection_len))
+                    .unwrap()
+                    .into();
             ctx.insert("collection", Value::String(collection));
         }
     }
@@ -311,7 +323,9 @@ fn build_kv_error_context(lcb_ctx: *const lcb_KEY_VALUE_ERROR_CONTEXT) -> ErrorC
     unsafe {
         lcb_errctx_kv_scope(lcb_ctx, &mut scope_ptr, &mut scope_len);
         if !scope_ptr.is_null() {
-            let scope = CStr::from_ptr(scope_ptr).to_str().unwrap().into();
+            let scope = str::from_utf8(from_raw_parts(scope_ptr as *const u8, scope_len))
+                .unwrap()
+                .into();
             ctx.insert("scope", Value::String(scope));
         }
     }
@@ -321,7 +335,9 @@ fn build_kv_error_context(lcb_ctx: *const lcb_KEY_VALUE_ERROR_CONTEXT) -> ErrorC
     unsafe {
         lcb_errctx_kv_endpoint(lcb_ctx, &mut endpoint_ptr, &mut endpoint_len);
         if !endpoint_ptr.is_null() {
-            let endpoint = CStr::from_ptr(endpoint_ptr).to_str().unwrap().into();
+            let endpoint = str::from_utf8(from_raw_parts(endpoint_ptr as *const u8, endpoint_len))
+                .unwrap()
+                .into();
             ctx.insert("remote", Value::String(endpoint));
         }
     }
@@ -343,7 +359,9 @@ fn build_query_error_context(lcb_ctx: *const lcb_QUERY_ERROR_CONTEXT) -> ErrorCo
     let mut statement_ptr: *const c_char = ptr::null();
     let key = unsafe {
         lcb_errctx_query_statement(lcb_ctx, &mut statement_ptr, &mut statement_len);
-        CStr::from_ptr(statement_ptr).to_str().unwrap().into()
+        str::from_utf8(from_raw_parts(statement_ptr as *const u8, statement_len))
+            .unwrap()
+            .into()
     };
     ctx.insert("statement", Value::String(key));
 
@@ -357,7 +375,9 @@ fn build_analytics_error_context(lcb_ctx: *const lcb_ANALYTICS_ERROR_CONTEXT) ->
     let mut statement_ptr: *const c_char = ptr::null();
     let key = unsafe {
         lcb_errctx_analytics_statement(lcb_ctx, &mut statement_ptr, &mut statement_len);
-        CStr::from_ptr(statement_ptr).to_str().unwrap().into()
+        str::from_utf8(from_raw_parts(statement_ptr as *const u8, statement_len))
+            .unwrap()
+            .into()
     };
     ctx.insert("statement", Value::String(key));
 
