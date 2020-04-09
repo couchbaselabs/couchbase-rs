@@ -1,7 +1,7 @@
 use crate::api::error::{CouchbaseError, CouchbaseResult, ErrorContext};
 use crate::api::results::{
-    AnalyticsResult, ExistsResult, GetResult, LookupInResult, MutateInResult, MutationResult,
-    QueryResult, SubDocField,
+    AnalyticsResult, ExistsResult, GetResult, LookupInResult, MutationResult, QueryResult,
+    SubDocField,
 };
 use crate::api::MutationToken;
 use couchbase_sys::*;
@@ -255,9 +255,9 @@ pub unsafe extern "C" fn lookup_in_callback(
 }
 
 pub unsafe extern "C" fn mutate_in_callback(
-    instance: *mut lcb_INSTANCE,
+    _instance: *mut lcb_INSTANCE,
     _cbtype: i32,
-    res: *const lcb_RESPBASE,
+    _res: *const lcb_RESPBASE,
 ) {
 }
 
@@ -593,7 +593,7 @@ pub fn couchbase_error_from_lcb_status(status: lcb_STATUS, ctx: ErrorContext) ->
         lcb_STATUS_LCB_ERR_USER_NOT_FOUND => CouchbaseError::UserNotFound { ctx },
         lcb_STATUS_LCB_ERR_GROUP_NOT_FOUND => CouchbaseError::GroupNotFound { ctx },
         lcb_STATUS_LCB_ERR_BUCKET_ALREADY_EXISTS => CouchbaseError::BucketExists { ctx },
-        lcb_STATUS_LCB_ERR_GENERIC | _ => CouchbaseError::Generic { ctx },
+        _ => CouchbaseError::Generic { ctx },
     }
 }
 

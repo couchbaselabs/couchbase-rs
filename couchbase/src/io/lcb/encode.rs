@@ -254,7 +254,7 @@ pub fn encode_lookup_in(instance: *mut lcb_INSTANCE, request: LookupInRequest) {
                     lcb_subdocspecs_get_count(specs, idx, 0, path.as_ptr(), *path_len);
                 }
             }
-            idx = idx + 1;
+            idx += 1;
         }
 
         lcb_cmdsubdoc_create(&mut command);
@@ -553,7 +553,7 @@ pub fn encode_mutate_in(instance: *mut lcb_INSTANCE, request: MutateInRequest) {
                     );
                 }
             }
-            idx = idx + 1;
+            idx += 1;
         }
 
         lcb_cmdsubdoc_create(&mut command);

@@ -315,6 +315,6 @@ impl LookupInResult {
     }
 
     pub fn exists(&self, index: usize) -> bool {
-        &self.content.get(index).expect("index not found").status == &0
+        self.content.get(index).expect("index not found").status == 0
     }
 }

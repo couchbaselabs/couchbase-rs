@@ -314,7 +314,7 @@ impl AnalyticsOptions {
     }
 
     pub fn priority(mut self, priority: bool) -> Self {
-        self.priority = Some(if priority == true { -1 } else { 0 });
+        self.priority = Some(if priority { -1 } else { 0 });
         self
     }
 

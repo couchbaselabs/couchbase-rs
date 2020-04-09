@@ -142,11 +142,9 @@ fn run_lcb_loop(
                     break 'running;
                 }
             }
-        } else {
-            if let Ok(req) = queue_rx.recv() {
-                if handle_io_request(req, instance, &mut instance_cookie) {
-                    break 'running;
-                }
+        } else if let Ok(req) = queue_rx.recv() {
+            if handle_io_request(req, instance, &mut instance_cookie) {
+                break 'running;
             }
         }
 
