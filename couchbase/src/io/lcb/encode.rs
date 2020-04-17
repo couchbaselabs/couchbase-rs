@@ -90,12 +90,9 @@ pub fn encode_mutate(instance: *mut lcb_INSTANCE, request: MutateRequest) {
 
     let mut command: *mut lcb_CMDSTORE = ptr::null_mut();
     unsafe {
-        lcb_cmdstore_create(&mut command, lcb_STORE_OPERATION_LCB_STORE_UPSERT);
-        lcb_cmdstore_key(command, id.as_ptr(), id_len);
-        lcb_cmdstore_value(command, value.as_ptr(), value_len);
-
         match request.ty {
             MutateRequestType::Upsert { options } => {
+                lcb_cmdstore_create(&mut command, lcb_STORE_OPERATION_LCB_STORE_UPSERT);
                 if let Some(timeout) = options.timeout {
                     lcb_cmdstore_timeout(command, timeout.as_micros() as u32);
                 }
@@ -104,6 +101,7 @@ pub fn encode_mutate(instance: *mut lcb_INSTANCE, request: MutateRequest) {
                 }
             }
             MutateRequestType::Insert { options } => {
+                lcb_cmdstore_create(&mut command, lcb_STORE_OPERATION_LCB_STORE_INSERT);
                 if let Some(timeout) = options.timeout {
                     lcb_cmdstore_timeout(command, timeout.as_micros() as u32);
                 }
@@ -112,6 +110,7 @@ pub fn encode_mutate(instance: *mut lcb_INSTANCE, request: MutateRequest) {
                 }
             }
             MutateRequestType::Replace { options } => {
+                lcb_cmdstore_create(&mut command, lcb_STORE_OPERATION_LCB_STORE_REPLACE);
                 if let Some(cas) = options.cas {
                     lcb_cmdstore_cas(command, cas);
                 }
@@ -123,6 +122,8 @@ pub fn encode_mutate(instance: *mut lcb_INSTANCE, request: MutateRequest) {
                 }
             }
         }
+        lcb_cmdstore_key(command, id.as_ptr(), id_len);
+        lcb_cmdstore_value(command, value.as_ptr(), value_len);
 
         lcb_store(instance, cookie as *mut c_void, command);
         lcb_cmdstore_destroy(command);
