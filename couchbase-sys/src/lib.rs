@@ -3,4 +3,8 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_snake_case)]
 
+#[cfg(feature = "link-static")]
+#[link(name = "openssl", kind = "static")]
+extern crate openssl_sys;
+
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));

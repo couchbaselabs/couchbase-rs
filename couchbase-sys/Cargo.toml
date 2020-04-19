@@ -13,6 +13,9 @@ homepage = "https://github.com/couchbaselabs/couchbase-rs"
 documentation = "https://docs.rs/couchbase-sys"
 edition = "2018"
 
+[dependencies]
+openssl-sys = "0.9.55"
+
 [build-dependencies]
 cmake = "0.1"
 
