@@ -258,6 +258,14 @@ impl MutationResult {
             mutation_token,
         }
     }
+
+    pub fn cas(&self) -> u64 {
+        self.cas
+    }
+
+    pub fn mutation_token(&self) -> Option<&MutationToken> {
+        self.mutation_token.as_ref()
+    }
 }
 
 impl fmt::Debug for MutationResult {
