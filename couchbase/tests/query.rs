@@ -8,10 +8,6 @@ fn run_query_tests() {
     });
 }
 
-fn foo() {
+fn foo() {}
 
-}
-
-fn bar() {
-
-}
+fn bar() {}

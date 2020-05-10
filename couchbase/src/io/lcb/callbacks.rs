@@ -12,10 +12,9 @@ use std::os::raw::{c_char, c_int, c_uint, c_void};
 use std::ptr;
 use std::slice::from_raw_parts;
 
-use crate::io::lcb::{
-    bucket_name_for_instance, decrement_outstanding_requests, wrapped_vsnprintf, AnalyticsCookie,
-    QueryCookie,
-};
+use crate::io::lcb::{bucket_name_for_instance, wrapped_vsnprintf, AnalyticsCookie, QueryCookie};
+
+use crate::io::lcb::instance::decrement_outstanding_requests;
 
 pub unsafe extern "C" fn store_callback(
     instance: *mut lcb_INSTANCE,

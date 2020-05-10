@@ -1,8 +1,6 @@
 use super::{ConfigAware, TestConfig};
 
-pub struct StandaloneCluster {
-
-}
+pub struct StandaloneCluster {}
 
 impl StandaloneCluster {
     pub fn start() -> Self {

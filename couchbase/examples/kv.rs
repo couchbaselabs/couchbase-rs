@@ -11,7 +11,7 @@ pub fn main() {
     env_logger::init();
 
     // Connect to the cluster with a connection string and credentials
-    let cluster = Cluster::connect("couchbase://10.143.193.101", "Administrator", "password");
+    let cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
     // Open a bucket
     let bucket = cluster.bucket("travel-sample");
     // Use the default collection (needs to be used for all server 6.5 and earlier)

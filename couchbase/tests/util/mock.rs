@@ -1,8 +1,6 @@
 use super::{ConfigAware, TestConfig};
 
-pub struct MockCluster {
-
-}
+pub struct MockCluster {}
 
 impl MockCluster {
     pub fn start() -> Self {

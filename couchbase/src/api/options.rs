@@ -8,21 +8,21 @@ use uuid::Uuid;
 
 /// Macro to DRY up the repetitive timeout setter.
 macro_rules! timeout {
-    () => (
+    () => {
         pub fn timeout(mut self, timeout: Duration) -> Self {
             self.timeout = Some(timeout);
             self
         }
-    )
+    };
 }
 
 macro_rules! expiry {
-    () => (
+    () => {
         pub fn expiry(mut self, expiry: Duration) -> Self {
             self.expiry = Some(expiry);
             self
         }
-    )
+    };
 }
 
 #[derive(Debug, Default, Serialize)]

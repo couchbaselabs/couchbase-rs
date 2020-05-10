@@ -8,10 +8,6 @@ fn run_kv_tests() {
     });
 }
 
-fn foo() {
+fn foo() {}
 
-}
-
-fn bar() {
-
-}
+fn bar() {}

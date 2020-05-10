@@ -11,7 +11,7 @@ use std::ptr;
 
 /// Helper method to turn a string into a tuple of CString and its length.
 #[inline]
-fn into_cstring<T: Into<Vec<u8>>>(input: T) -> (usize, CString) {
+pub fn into_cstring<T: Into<Vec<u8>>>(input: T) -> (usize, CString) {
     let input = input.into();
     (
         input.len(),
