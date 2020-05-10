@@ -2,12 +2,10 @@ mod callbacks;
 mod encode;
 mod instance;
 
-use crate::api::error::{CouchbaseResult, ErrorContext};
+use crate::api::error::CouchbaseResult;
 use crate::api::results::{AnalyticsMetaData, AnalyticsResult, QueryMetaData, QueryResult};
 use crate::io::request::Request;
 use instance::LcbInstance;
-
-use callbacks::couchbase_error_from_lcb_status;
 
 use couchbase_sys::*;
 use crossbeam_channel::{unbounded, Receiver, Sender};
@@ -90,18 +88,6 @@ fn run_lcb_loop(
         }
 
         instance.tick_nowait().unwrap();
-    }
-}
-
-/// Panicing is not good, but until we have better error handling at least
-/// make it obvious that something is going wrong.
-fn check_status_and_panic(status: lcb_STATUS, description: &'static str) {
-    if status != lcb_STATUS_LCB_SUCCESS {
-        panic!(
-            "Operation lcb_{} failed with error: {}",
-            description,
-            couchbase_error_from_lcb_status(status, ErrorContext::default())
-        )
     }
 }
 

@@ -202,6 +202,7 @@ impl InstanceCookie {
 /// higher level API can use as many as it needs.
 struct LcbInstances {}
 
+#[allow(non_upper_case_globals)]
 fn check_lcb_status(status: lcb_STATUS) -> Result<(), lcb_STATUS> {
     match status {
         lcb_STATUS_LCB_SUCCESS => Ok(()),
