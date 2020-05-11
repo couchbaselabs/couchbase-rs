@@ -267,12 +267,14 @@ impl LcbInstances {
                 username,
                 password,
             } => {
-                if self.has_unbound_instance() {
-                    self.bind_unbound_to_bucket(name)?
-                } else {
-                    let mut instance = LcbInstance::new(connection_string, username, password)?;
-                    instance.bind_to_bucket(name.clone())?;
-                    self.set_bound(name, instance);
+                if !self.bound.contains_key(&name) {
+                    if self.has_unbound_instance() {
+                        self.bind_unbound_to_bucket(name)?
+                    } else {
+                        let mut instance = LcbInstance::new(connection_string, username, password)?;
+                        instance.bind_to_bucket(name.clone())?;
+                        self.set_bound(name, instance);
+                    }
                 }
             }
         };
