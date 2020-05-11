@@ -5,7 +5,7 @@ mod instance;
 use crate::api::error::CouchbaseResult;
 use crate::api::results::{AnalyticsMetaData, AnalyticsResult, QueryMetaData, QueryResult};
 use crate::io::request::Request;
-use instance::LcbInstance;
+use instance::{LcbInstance, LcbInstances};
 
 use couchbase_sys::*;
 use crossbeam_channel::{unbounded, Receiver, Sender};
@@ -18,6 +18,9 @@ use std::{ptr, thread};
 pub struct IoCore {
     thread_handle: Option<JoinHandle<()>>,
     queue_tx: Sender<IoRequest>,
+    connection_string: String,
+    username: String,
+    password: String,
 }
 
 impl IoCore {
@@ -25,11 +28,17 @@ impl IoCore {
         debug!("Using libcouchbase IO transport");
 
         let (queue_tx, queue_rx) = unbounded();
-        let thread_handle =
-            thread::spawn(move || run_lcb_loop(queue_rx, connection_string, username, password));
+
+        let cstring = connection_string.clone();
+        let uname = username.clone();
+        let pwd = password.clone();
+        let thread_handle = thread::spawn(move || run_lcb_loop(queue_rx, cstring, uname, pwd));
         Self {
             thread_handle: Some(thread_handle),
             queue_tx,
+            connection_string,
+            username,
+            password,
         }
     }
 
@@ -41,7 +50,12 @@ impl IoCore {
 
     pub fn open_bucket(&self, name: String) {
         self.queue_tx
-            .send(IoRequest::OpenBucket { name })
+            .send(IoRequest::OpenBucket {
+                name,
+                connection_string: self.connection_string.clone(),
+                username: self.username.clone(),
+                password: self.password.clone(),
+            })
             .expect("Could not send open bucket request")
     }
 }
@@ -67,27 +81,31 @@ fn run_lcb_loop(
     username: String,
     password: String,
 ) {
-    let mut instance = LcbInstance::new(
+    let mut instances = LcbInstances::default();
+
+    let instance = LcbInstance::new(
         connection_string.into_bytes(),
         username.into_bytes(),
         password.into_bytes(),
     )
     .unwrap();
 
+    instances.set_unbound(instance);
+
     'running: loop {
-        if instance.has_outstanding_requests() {
+        if instances.have_outstanding_requests() {
             while let Ok(req) = queue_rx.try_recv() {
-                if instance.handle_request(req).unwrap() {
+                if instances.handle_request(req).unwrap() {
                     break 'running;
                 }
             }
         } else if let Ok(req) = queue_rx.recv() {
-            if instance.handle_request(req).unwrap() {
+            if instances.handle_request(req).unwrap() {
                 break 'running;
             }
         }
 
-        instance.tick_nowait().unwrap();
+        instances.tick_nowait().unwrap();
     }
 }
 
@@ -128,7 +146,12 @@ extern "C" {
 #[derive(Debug)]
 pub enum IoRequest {
     Data(Request),
-    OpenBucket { name: String },
+    OpenBucket {
+        name: String,
+        connection_string: String,
+        username: String,
+        password: String,
+    },
     Shutdown,
 }
 

@@ -74,7 +74,12 @@ impl Bucket {
     }
 
     pub fn default_collection(&self) -> Collection {
-        Collection::new(self.core.clone(), "_default".into(), "_default".into())
+        Collection::new(
+            self.core.clone(),
+            "_default".into(),
+            "_default".into(),
+            self.name.clone(),
+        )
     }
 
     pub fn name(&self) -> &str {
@@ -113,14 +118,21 @@ pub struct Collection {
     core: Arc<Core>,
     name: String,
     _scope_name: String,
+    bucket_name: String,
 }
 
 impl Collection {
-    pub(crate) fn new(core: Arc<Core>, name: String, scope_name: String) -> Self {
+    pub(crate) fn new(
+        core: Arc<Core>,
+        name: String,
+        scope_name: String,
+        bucket_name: String,
+    ) -> Self {
         Self {
             core,
             name,
             _scope_name: scope_name,
+            bucket_name,
         }
     }
 
@@ -137,6 +149,7 @@ impl Collection {
         self.core.send(Request::Get(GetRequest {
             id: id.into(),
             ty: GetRequestType::Get { options },
+            bucket: self.bucket_name.clone(),
             sender,
         }));
         receiver.await.unwrap()
@@ -152,6 +165,7 @@ impl Collection {
         self.core.send(Request::Get(GetRequest {
             id: id.into(),
             ty: GetRequestType::GetAndLock { options, lock_time },
+            bucket: self.bucket_name.clone(),
             sender,
         }));
         receiver.await.unwrap()
@@ -167,6 +181,7 @@ impl Collection {
         self.core.send(Request::Get(GetRequest {
             id: id.into(),
             ty: GetRequestType::GetAndTouch { options, expiry },
+            bucket: self.bucket_name.clone(),
             sender,
         }));
         receiver.await.unwrap()
@@ -181,6 +196,7 @@ impl Collection {
         self.core.send(Request::Exists(ExistsRequest {
             id: id.into(),
             options,
+            bucket: self.bucket_name.clone(),
             sender,
         }));
         receiver.await.unwrap()
@@ -249,6 +265,7 @@ impl Collection {
             id: id.into(),
             content: serialized,
             sender,
+            bucket: self.bucket_name.clone(),
             ty,
         }));
         receiver.await.unwrap()
@@ -263,6 +280,7 @@ impl Collection {
         self.core.send(Request::Remove(RemoveRequest {
             id: id.into(),
             sender,
+            bucket: self.bucket_name.clone(),
             options,
         }));
         receiver.await.unwrap()
@@ -279,6 +297,7 @@ impl Collection {
             id: id.into(),
             specs,
             sender,
+            bucket: self.bucket_name.clone(),
             options,
         }));
         receiver.await.unwrap()
@@ -295,6 +314,7 @@ impl Collection {
             id: id.into(),
             specs,
             sender,
+            bucket: self.bucket_name.clone(),
             options,
         }));
         receiver.await.unwrap()

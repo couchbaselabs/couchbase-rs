@@ -17,9 +17,24 @@ pub enum Request {
     LookupIn(LookupInRequest),
 }
 
+impl Request {
+    pub fn bucket(&self) -> Option<&String> {
+        match self {
+            Self::Get(r) => Some(&r.bucket),
+            Self::Mutate(r) => Some(&r.bucket),
+            Self::Exists(r) => Some(&r.bucket),
+            Self::Remove(r) => Some(&r.bucket),
+            Self::MutateIn(r) => Some(&r.bucket),
+            Self::LookupIn(r) => Some(&r.bucket),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct GetRequest {
     pub(crate) id: String,
+    pub(crate) bucket: String,
     pub(crate) sender: Sender<CouchbaseResult<GetResult>>,
     pub(crate) ty: GetRequestType,
 }
@@ -42,6 +57,7 @@ pub enum GetRequestType {
 #[derive(Debug)]
 pub struct ExistsRequest {
     pub(crate) id: String,
+    pub(crate) bucket: String,
     pub(crate) sender: Sender<CouchbaseResult<ExistsResult>>,
     pub(crate) options: ExistsOptions,
 }
@@ -49,6 +65,7 @@ pub struct ExistsRequest {
 #[derive(Debug)]
 pub struct RemoveRequest {
     pub(crate) id: String,
+    pub(crate) bucket: String,
     pub(crate) sender: Sender<CouchbaseResult<MutationResult>>,
     pub(crate) options: RemoveOptions,
 }
@@ -56,6 +73,7 @@ pub struct RemoveRequest {
 #[derive(Debug)]
 pub struct MutateRequest {
     pub(crate) id: String,
+    pub(crate) bucket: String,
     pub(crate) content: Vec<u8>,
     pub(crate) sender: Sender<CouchbaseResult<MutationResult>>,
     pub(crate) ty: MutateRequestType,
@@ -85,6 +103,7 @@ pub struct AnalyticsRequest {
 #[derive(Debug)]
 pub struct LookupInRequest {
     pub(crate) id: String,
+    pub(crate) bucket: String,
     pub(crate) sender: Sender<CouchbaseResult<LookupInResult>>,
     pub(crate) specs: Vec<LookupInSpec>,
     pub(crate) options: LookupInOptions,
@@ -93,6 +112,7 @@ pub struct LookupInRequest {
 #[derive(Debug)]
 pub struct MutateInRequest {
     pub(crate) id: String,
+    pub(crate) bucket: String,
     pub(crate) sender: Sender<CouchbaseResult<MutateInResult>>,
     pub(crate) specs: Vec<MutateInSpec>,
     pub(crate) options: MutateInOptions,
