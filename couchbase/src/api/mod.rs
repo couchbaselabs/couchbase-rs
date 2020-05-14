@@ -13,11 +13,34 @@ use serde_json::{to_vec, Value};
 use std::sync::Arc;
 use std::time::Duration;
 
+/// Connect to a Couchbase cluster and perform cluster-level operations
+///
+/// This `Cluster` object is also your main and only entry point into the SDK.
 pub struct Cluster {
     core: Arc<Core>,
 }
 
 impl Cluster {
+
+    /// Connect to a couchbase cluster
+    ///
+    /// # Arguments
+    ///
+    /// * `connection_string` - the connection string containing the bootstrap hosts
+    /// * `username` - the name of the user, used for authentication
+    /// * `password` - the password of the user
+    ///
+    /// # Examples
+    ///
+    /// Connecting to localhost with the `username` and its `password`.
+    /// ```no_run
+    /// let cluster = Cluster::connect("127.0.0.1", "username", "password");
+    /// ```
+    ///
+    /// Using three nodes for bootstrapping (recommended for production):
+     /// ```no_run
+    /// let cluster = Cluster::connect("couchbase://hosta,hostb,hostc", "username", "password");
+    /// ```
     pub fn connect<S: Into<String>>(connection_string: S, username: S, password: S) -> Self {
         Cluster {
             core: Arc::new(Core::new(
@@ -28,12 +51,53 @@ impl Cluster {
         }
     }
 
+    /// Open and connect to a couchbase `Bucket`
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - the name of the bucket
+    ///
+    /// # Examples
+    ///
+    /// Connect and open the `travel-sample` bucket.
+    /// ```no_run
+    /// let cluster = Cluster::connect("127.0.0.1", "username", "password");
+    /// let bucket = cluster.bucket("travel-sample");
+    /// ```
     pub fn bucket<S: Into<String>>(&self, name: S) -> Bucket {
         let name = name.into();
         self.core.open_bucket(name.clone());
         Bucket::new(self.core.clone(), name)
     }
 
+    /// Executes a N1QL statement
+    ///
+    /// # Arguments
+    ///
+    /// * `statement` - the N1QL statement to execute
+    /// * `options` - allows to pass in custom options
+    ///
+    /// # Examples
+    ///
+    /// Run a N1QL query with default options.
+    /// ```no_run
+    /// # let cluster = Cluster::connect("127.0.0.1", "username", "password");
+    /// let result = cluster.query("select * from bucket", QueryOptions::default());
+    /// ```
+    ///
+    /// This will return an async result, which can be consumed:
+    /// ```no_run
+    /// # let cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
+    /// match cluster.query("select 1=1", QueryOptions::default()).await {
+    ///     Ok(mut result) => {
+    ///         for row in result.rows::<serde_json::Value>().next().await {
+    ///             println!("Found Row {:?}", row);
+    ///         }
+    ///     },
+    ///     Err(e) => panic!("Query failed: {:?}", e),
+    /// }
+    /// ```
+    /// See the [QueryResult](struct.QueryResult.html) for more information on what and how it can be consumed.
     pub async fn query<S: Into<String>>(
         &self,
         statement: S,
@@ -48,6 +112,34 @@ impl Cluster {
         receiver.await.unwrap()
     }
 
+    /// Executes an analytics query
+    ///
+    /// # Arguments
+    ///
+    /// * `statement` - the analyticss statement to execute
+    /// * `options` - allows to pass in custom options
+    ///
+    /// # Exampless
+    ///
+    /// Run an analytics query with default options.
+    /// ```no_run
+    /// # let cluster = Cluster::connect("127.0.0.1", "username", "password");
+    /// let result = cluster.analytics_query("select * from dataset", AnalyticsOptions::default());
+    /// ```
+    ///
+    /// This will return an async result, which can be consumed:
+    /// ```no_run
+    /// # let cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
+    /// match cluster.query("select 1=1", AnalyticsOptions::default()).await {
+    ///     Ok(mut result) => {
+    ///         for row in result.rows::<serde_json::Value>().next().await {
+    ///             println!("Found Row {:?}", row);
+    ///         }
+    ///     },
+    ///     Err(e) => panic!("Query failed: {:?}", e),
+    /// }
+    /// ```
+    /// See the [AnalyticsResult](struct.AnalyticsResult.html) for more information on what and how it can be consumed.
     pub async fn analytics_query<S: Into<String>>(
         &self,
         statement: S,

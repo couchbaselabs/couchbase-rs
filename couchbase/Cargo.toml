@@ -30,6 +30,7 @@ cc = { version = "1.0", optional = true }
 [dev-dependencies]
 env_logger = "0.7"
 lazy_static = "1.4"
+async-std = "1.5"
 
 [features]
 # By default, the libcouchbase (C) backend is used. More will be available in the future
