@@ -281,7 +281,7 @@ fn build_kv_error_context(lcb_ctx: *const lcb_KEY_VALUE_ERROR_CONTEXT) -> ErrorC
 
     let mut bucket_len: usize = 0;
     let mut bucket_ptr: *const c_char = ptr::null();
-    
+
     unsafe { lcb_errctx_kv_bucket(lcb_ctx, &mut bucket_ptr, &mut bucket_len) };
     let bucket = decode_and_own_str(bucket_ptr, bucket_len);
     ctx.insert("bucket", Value::String(bucket));

@@ -179,29 +179,44 @@ impl Bucket {
 
     #[cfg(feature = "volatile")]
     pub fn collection<S: Into<String>>(&self, name: S) -> Collection {
-        Collection::new(self.core.clone(), name.into())
+        Collection::new(
+            self.core.clone(),
+            name.into(),
+            "_default".into(),
+            self.name.clone(),
+        )
     }
 
     #[cfg(feature = "volatile")]
     pub fn scope<S: Into<String>>(&self, name: S) -> Scope {
-        Scope::new(self.core.clone(), name.into())
+        Scope::new(self.core.clone(), name.into(), self.name.clone())
     }
 }
 
 #[cfg(feature = "volatile")]
 pub struct Scope {
+    bucket_name: String,
     name: String,
     core: Arc<Core>,
 }
 
 #[cfg(feature = "volatile")]
 impl Scope {
-    pub(crate) fn new(core: Arc<Core>, name: String) -> Self {
-        Self { core, name }
+    pub(crate) fn new(core: Arc<Core>, name: String, bucket_name: String) -> Self {
+        Self {
+            core,
+            name,
+            bucket_name,
+        }
     }
 
     pub fn collection<S: Into<String>>(&self, name: S) -> Collection {
-        Collection::new(self.core.clone(), name.into(), self.name.clone())
+        Collection::new(
+            self.core.clone(),
+            name.into(),
+            self.name.clone(),
+            self.bucket_name.clone(),
+        )
     }
 }
 
