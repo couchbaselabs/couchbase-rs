@@ -118,7 +118,7 @@ impl Cluster {
     /// * `statement` - the analyticss statement to execute
     /// * `options` - allows to pass in custom options
     ///
-    /// # Exampless
+    /// # Examples
     ///
     /// Run an analytics query with default options.
     /// ```no_run
@@ -154,6 +154,7 @@ impl Cluster {
     }
 }
 
+/// Provides bucket-level access to collections and view operations
 pub struct Bucket {
     name: String,
     core: Arc<Core>,
@@ -164,6 +165,10 @@ impl Bucket {
         Self { name, core }
     }
 
+    /// Opens the `default` collection (also used when a cluster with no collection support is used)
+    ///
+    /// The collection API provides acess to the Key/Value operations. The default collection is also
+    /// implicitly using the default scope.
     pub fn default_collection(&self) -> Collection {
         Collection::new(
             self.core.clone(),
@@ -173,10 +178,16 @@ impl Bucket {
         )
     }
 
+    /// The name of the bucket
     pub fn name(&self) -> &str {
         self.name.as_str()
     }
 
+    /// Opens a custom collection inside the `default` scope
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - the collection name
     #[cfg(feature = "volatile")]
     pub fn collection<S: Into<String>>(&self, name: S) -> Collection {
         Collection::new(
@@ -187,12 +198,18 @@ impl Bucket {
         )
     }
 
+    /// Opens a custom scope
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - the scope name
     #[cfg(feature = "volatile")]
     pub fn scope<S: Into<String>>(&self, name: S) -> Scope {
         Scope::new(self.core.clone(), name.into(), self.name.clone())
     }
 }
 
+/// Scopes provide access to a group of collections
 #[cfg(feature = "volatile")]
 pub struct Scope {
     bucket_name: String,
@@ -210,6 +227,16 @@ impl Scope {
         }
     }
 
+    /// The name of the scope
+    pub fn name(&self) -> &str {
+        self.name.as_str()
+    }
+
+    /// Opens a custom collection inside the current scope
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - the collection name
     pub fn collection<S: Into<String>>(&self, name: S) -> Collection {
         Collection::new(
             self.core.clone(),
@@ -220,6 +247,7 @@ impl Scope {
     }
 }
 
+/// Primary API to access Key/Value operations
 pub struct Collection {
     core: Arc<Core>,
     name: String,
@@ -242,6 +270,7 @@ impl Collection {
         }
     }
 
+    /// The name of the collection
     pub fn name(&self) -> &str {
         self.name.as_str()
     }
