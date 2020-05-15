@@ -3,7 +3,7 @@ mod encode;
 mod instance;
 
 use crate::api::error::CouchbaseResult;
-use crate::api::results::{AnalyticsMetaData, AnalyticsResult, QueryMetaData, QueryResult};
+use crate::api::results::{AnalyticsMetaData, AnalyticsResult, QueryMetaData, QueryResult, GenericManagementResult};
 use crate::io::request::Request;
 use instance::{LcbInstance, LcbInstances};
 
@@ -165,6 +165,7 @@ fn encode_request(instance: *mut lcb_INSTANCE, request: Request) {
         Request::Remove(r) => encode::encode_remove(instance, r),
         Request::LookupIn(r) => encode::encode_lookup_in(instance, r),
         Request::MutateIn(r) => encode::encode_mutate_in(instance, r),
+        Request::GenericManagementRequest(r) => encode::encode_generic_management_request(instance, r),
     }
 }
 
@@ -182,4 +183,11 @@ struct AnalyticsCookie {
     rows_receiver: Option<futures::channel::mpsc::UnboundedReceiver<Vec<u8>>>,
     meta_sender: futures::channel::oneshot::Sender<AnalyticsMetaData>,
     meta_receiver: Option<futures::channel::oneshot::Receiver<AnalyticsMetaData>>,
+}
+
+/// This cookie can represent all different generic http requestes fired against lcb.
+///
+/// Note that we need an enum so we can match the correct request type on encode.
+enum HttpCookie {
+    GenericManagementRequest { sender: futures::channel::oneshot::Sender<CouchbaseResult<GenericManagementResult>> },
 }

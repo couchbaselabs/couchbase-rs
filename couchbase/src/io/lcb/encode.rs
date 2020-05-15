@@ -1,7 +1,7 @@
 use crate::api::options::StoreSemantics;
 use crate::api::{LookupInSpec, MutateInSpec};
 use crate::io::lcb::callbacks::{analytics_callback, query_callback};
-use crate::io::lcb::{AnalyticsCookie, QueryCookie};
+use crate::io::lcb::{AnalyticsCookie, QueryCookie, HttpCookie};
 use crate::io::request::*;
 
 use couchbase_sys::*;
@@ -585,5 +585,35 @@ pub fn encode_mutate_in(instance: *mut lcb_INSTANCE, request: MutateInRequest) {
         lcb_subdoc(instance, cookie as *mut c_void, command);
         lcb_subdocspecs_destroy(specs);
         lcb_cmdsubdoc_destroy(command);
+    }
+}
+
+
+pub fn encode_generic_management_request(instance: *mut lcb_INSTANCE, request: GenericManagementRequest) {
+    let (path_len, path) = into_cstring(request.path);
+    let cookie = Box::into_raw(Box::new(HttpCookie::GenericManagementRequest { sender: request.sender }));
+    let encoded_payload = request.payload.map(|p| {
+        into_cstring(p)
+    });
+
+    let mut command: *mut lcb_CMDHTTP = ptr::null_mut();
+    unsafe {
+        lcb_cmdhttp_create(&mut command, lcb_HTTP_TYPE_LCB_HTTP_TYPE_MANAGEMENT);
+        let method = match request.method.as_str() {
+            "get" => lcb_HTTP_METHOD_LCB_HTTP_METHOD_GET,
+            "put" => lcb_HTTP_METHOD_LCB_HTTP_METHOD_PUT,
+            "post" => lcb_HTTP_METHOD_LCB_HTTP_METHOD_POST,
+            "delete" => lcb_HTTP_METHOD_LCB_HTTP_METHOD_DELETE,
+            _ => panic!("Unknown HTTP method used"),
+        };
+        lcb_cmdhttp_method(command, method);
+        lcb_cmdhttp_path(command, path.as_ptr(), path_len);
+
+        if let Some((body_len, body)) = encoded_payload {
+            lcb_cmdhttp_body(command, body.as_ptr(), body_len);
+        }
+
+        lcb_http(instance, cookie as *mut c_void, command);
+        lcb_cmdhttp_destroy(command);
     }
 }

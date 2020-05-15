@@ -152,6 +152,16 @@ impl Cluster {
         }));
         receiver.await.unwrap()
     }
+
+    /// Returns a reference to the underlying core.
+    ///
+    /// Note that this API is unsupported and not stable, so you need to opt in via the
+    /// `volatile` feature to access it.
+    #[cfg(feature = "volatile")]
+    pub fn core(&self) -> Arc<Core> {
+        self.core.clone()
+    }
+
 }
 
 /// Provides bucket-level access to collections and view operations

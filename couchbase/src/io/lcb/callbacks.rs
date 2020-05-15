@@ -1,8 +1,9 @@
 use crate::api::error::{CouchbaseError, CouchbaseResult, ErrorContext};
 use crate::api::results::{
     AnalyticsResult, ExistsResult, GetResult, LookupInResult, MutationResult, QueryResult,
-    SubDocField,
+    SubDocField, GenericManagementResult,
 };
+use crate::io::lcb::HttpCookie;
 use crate::api::MutationToken;
 use couchbase_sys::*;
 use log::{debug, trace};
@@ -639,4 +640,42 @@ pub unsafe extern "C" fn open_callback(instance: *mut lcb_INSTANCE, err: lcb_STA
         bucket_name_for_instance(instance),
         &err
     );
+}
+
+pub unsafe extern "C" fn http_callback(
+    instance: *mut lcb_INSTANCE,
+    _cbtype: i32,
+    res: *const lcb_RESPBASE,
+) {
+    decrement_outstanding_requests(instance);
+    let http_res = res as *const lcb_RESPHTTP;
+
+    let mut cookie_ptr: *mut c_void = ptr::null_mut();
+    lcb_resphttp_cookie(http_res, &mut cookie_ptr);
+    let cookie = Box::from_raw(
+        cookie_ptr as *mut HttpCookie,
+    );
+
+    match *cookie {
+        HttpCookie::GenericManagementRequest { sender: s } => {
+            if lcb_resphttp_is_final(http_res) != 0 {
+                let status = {
+                    let mut o = 0u16;
+                    lcb_resphttp_http_status(http_res, &mut o);
+                    o
+                };
+
+                let mut body_len: usize = 0;
+                let mut body_ptr: *const c_char = ptr::null();
+                lcb_resphttp_body(http_res, &mut body_ptr, &mut body_len);
+                let row = from_raw_parts(body_ptr as *const u8, body_len).to_vec();
+                let payload = if row.is_empty() {
+                    None
+                } else {
+                    Some(row)
+                };
+                s.send(Ok(GenericManagementResult::new(status, payload))).unwrap();
+            }
+        }
+    }
 }

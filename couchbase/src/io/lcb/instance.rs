@@ -103,6 +103,11 @@ impl LcbInstance {
             lcb_CALLBACK_TYPE_LCB_CALLBACK_SDLOOKUP as i32,
             Some(lookup_in_callback),
         );
+        lcb_install_callback(
+            instance,
+            lcb_CALLBACK_TYPE_LCB_CALLBACK_HTTP as i32,
+            Some(http_callback),
+        );
         lcb_set_open_callback(instance, Some(open_callback));
     }
 

@@ -12,3 +12,6 @@ pub use api::{
 
 #[cfg(feature = "volatile")]
 pub use api::Scope;
+
+#[cfg(feature = "volatile")]
+pub use io::request::{Request, GenericManagementRequest};

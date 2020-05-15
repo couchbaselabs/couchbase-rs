@@ -9,12 +9,13 @@ use std::time::Duration;
 pub enum Request {
     Get(GetRequest),
     Mutate(MutateRequest),
-    Query(QueryRequest),
-    Analytics(AnalyticsRequest),
     Exists(ExistsRequest),
     Remove(RemoveRequest),
     MutateIn(MutateInRequest),
     LookupIn(LookupInRequest),
+    Query(QueryRequest),
+    Analytics(AnalyticsRequest),
+    GenericManagementRequest(GenericManagementRequest),
 }
 
 impl Request {
@@ -116,4 +117,28 @@ pub struct MutateInRequest {
     pub(crate) sender: Sender<CouchbaseResult<MutateInResult>>,
     pub(crate) specs: Vec<MutateInSpec>,
     pub(crate) options: MutateInOptions,
+}
+
+#[derive(Debug)]
+pub struct GenericManagementRequest {
+    pub(crate) path: String,
+    pub(crate) method: String,
+    pub(crate) payload: Option<String>,
+    pub(crate) sender: Sender<CouchbaseResult<GenericManagementResult>>,
+}
+
+impl GenericManagementRequest {
+    pub fn new(
+        sender: Sender<CouchbaseResult<GenericManagementResult>>,
+        path: String,
+        method: String,
+        payload: Option<String>,
+    ) -> Self {
+        Self {
+            sender,
+            path,
+            method,
+            payload,
+        }
+    }
 }
