@@ -11,10 +11,17 @@ use std::ffi::CStr;
 use std::os::raw::{c_char, c_int, c_uint, c_void};
 use std::ptr;
 use std::slice::from_raw_parts;
+use std::str;
 
 use crate::io::lcb::{bucket_name_for_instance, wrapped_vsnprintf, AnalyticsCookie, QueryCookie};
 
 use crate::io::lcb::instance::decrement_outstanding_requests;
+
+fn decode_and_own_str(ptr: *const c_char, len: usize) -> String {
+    str::from_utf8(unsafe { from_raw_parts(ptr as *const u8, len) })
+        .unwrap()
+        .into()
+}
 
 pub unsafe extern "C" fn store_callback(
     instance: *mut lcb_INSTANCE,
@@ -47,10 +54,8 @@ pub unsafe extern "C" fn store_callback(
         let mutation_token = if lcb_mutation_token.uuid_ != 0 {
             let mut bucket_len: usize = 0;
             let mut bucket_ptr: *const c_char = ptr::null();
-            let bucket = {
-                lcb_errctx_kv_bucket(lcb_ctx, &mut bucket_ptr, &mut bucket_len);
-                CStr::from_ptr(bucket_ptr).to_str().unwrap().into()
-            };
+            lcb_errctx_kv_bucket(lcb_ctx, &mut bucket_ptr, &mut bucket_len);
+            let bucket = decode_and_own_str(bucket_ptr, bucket_len);
 
             Some(MutationToken::new(
                 lcb_mutation_token.uuid_,
@@ -105,10 +110,8 @@ pub unsafe extern "C" fn remove_callback(
         let mutation_token = if lcb_mutation_token.uuid_ != 0 {
             let mut bucket_len: usize = 0;
             let mut bucket_ptr: *const c_char = ptr::null();
-            let bucket = {
-                lcb_errctx_kv_bucket(lcb_ctx, &mut bucket_ptr, &mut bucket_len);
-                CStr::from_ptr(bucket_ptr).to_str().unwrap().into()
-            };
+            lcb_errctx_kv_bucket(lcb_ctx, &mut bucket_ptr, &mut bucket_len);
+            let bucket = decode_and_own_str(bucket_ptr, bucket_len);
 
             Some(MutationToken::new(
                 lcb_mutation_token.uuid_,
@@ -265,10 +268,8 @@ fn build_kv_error_context(lcb_ctx: *const lcb_KEY_VALUE_ERROR_CONTEXT) -> ErrorC
 
     let mut key_len: usize = 0;
     let mut key_ptr: *const c_char = ptr::null();
-    let key = unsafe {
-        lcb_errctx_kv_key(lcb_ctx, &mut key_ptr, &mut key_len);
-        CStr::from_ptr(key_ptr).to_str().unwrap().into()
-    };
+    unsafe { lcb_errctx_kv_key(lcb_ctx, &mut key_ptr, &mut key_len) };
+    let key = decode_and_own_str(key_ptr, key_len);
     ctx.insert("key", Value::String(key));
 
     let opaque = unsafe {
@@ -280,10 +281,9 @@ fn build_kv_error_context(lcb_ctx: *const lcb_KEY_VALUE_ERROR_CONTEXT) -> ErrorC
 
     let mut bucket_len: usize = 0;
     let mut bucket_ptr: *const c_char = ptr::null();
-    let bucket = unsafe {
-        lcb_errctx_kv_bucket(lcb_ctx, &mut bucket_ptr, &mut bucket_len);
-        CStr::from_ptr(bucket_ptr).to_str().unwrap().into()
-    };
+    
+    unsafe { lcb_errctx_kv_bucket(lcb_ctx, &mut bucket_ptr, &mut bucket_len) };
+    let bucket = decode_and_own_str(bucket_ptr, bucket_len);
     ctx.insert("bucket", Value::String(bucket));
 
     let cas = unsafe {
@@ -300,7 +300,7 @@ fn build_kv_error_context(lcb_ctx: *const lcb_KEY_VALUE_ERROR_CONTEXT) -> ErrorC
     unsafe {
         lcb_errctx_kv_collection(lcb_ctx, &mut collection_ptr, &mut collection_len);
         if !collection_ptr.is_null() {
-            let collection = CStr::from_ptr(collection_ptr).to_str().unwrap().into();
+            let collection = decode_and_own_str(collection_ptr, collection_len);
             ctx.insert("collection", Value::String(collection));
         }
     }
@@ -310,7 +310,7 @@ fn build_kv_error_context(lcb_ctx: *const lcb_KEY_VALUE_ERROR_CONTEXT) -> ErrorC
     unsafe {
         lcb_errctx_kv_scope(lcb_ctx, &mut scope_ptr, &mut scope_len);
         if !scope_ptr.is_null() {
-            let scope = CStr::from_ptr(scope_ptr).to_str().unwrap().into();
+            let scope = decode_and_own_str(scope_ptr, scope_len);
             ctx.insert("scope", Value::String(scope));
         }
     }
@@ -320,7 +320,8 @@ fn build_kv_error_context(lcb_ctx: *const lcb_KEY_VALUE_ERROR_CONTEXT) -> ErrorC
     unsafe {
         lcb_errctx_kv_endpoint(lcb_ctx, &mut endpoint_ptr, &mut endpoint_len);
         if !endpoint_ptr.is_null() {
-            let endpoint = CStr::from_ptr(endpoint_ptr).to_str().unwrap().into();
+            // Looks like the endpoint is 0 terminated, as opposed to bucket etc...
+            let endpoint = decode_and_own_str(endpoint_ptr, endpoint_len - 1);
             ctx.insert("remote", Value::String(endpoint));
         }
     }
@@ -340,11 +341,11 @@ fn build_query_error_context(lcb_ctx: *const lcb_QUERY_ERROR_CONTEXT) -> ErrorCo
 
     let mut statement_len: usize = 0;
     let mut statement_ptr: *const c_char = ptr::null();
-    let key = unsafe {
+    let statement = unsafe {
         lcb_errctx_query_statement(lcb_ctx, &mut statement_ptr, &mut statement_len);
-        CStr::from_ptr(statement_ptr).to_str().unwrap().into()
+        decode_and_own_str(statement_ptr, statement_len)
     };
-    ctx.insert("statement", Value::String(key));
+    ctx.insert("statement", Value::String(statement));
 
     ctx
 }
@@ -354,11 +355,11 @@ fn build_analytics_error_context(lcb_ctx: *const lcb_ANALYTICS_ERROR_CONTEXT) ->
 
     let mut statement_len: usize = 0;
     let mut statement_ptr: *const c_char = ptr::null();
-    let key = unsafe {
+    let statement = unsafe {
         lcb_errctx_analytics_statement(lcb_ctx, &mut statement_ptr, &mut statement_len);
-        CStr::from_ptr(statement_ptr).to_str().unwrap().into()
+        decode_and_own_str(statement_ptr, statement_len)
     };
-    ctx.insert("statement", Value::String(key));
+    ctx.insert("statement", Value::String(statement));
 
     ctx
 }

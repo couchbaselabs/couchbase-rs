@@ -14,7 +14,7 @@ async fn run() {
             for row in result.rows::<serde_json::Value>().next().await {
                 println!("Found Row {:?}", row);
             }
-        },
+        }
         Err(e) => panic!("Query failed: {:?}", e),
     }
 }

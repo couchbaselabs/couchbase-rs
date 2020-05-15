@@ -27,7 +27,7 @@ pub fn main() {
     let mut content = HashMap::new();
     content.insert("Hello", "Rust!");
 
-    match block_on(collection.upsert("foo", content, UpsertOptions::default())) {
+    match block_on(collection.replace("foo", content, ReplaceOptions::default())) {
         Ok(r) => println!("upsert result: {:?}", r),
         Err(e) => println!("upsert failed! {}", e),
     };

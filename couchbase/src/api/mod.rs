@@ -21,7 +21,6 @@ pub struct Cluster {
 }
 
 impl Cluster {
-
     /// Connect to a couchbase cluster
     ///
     /// # Arguments
@@ -38,7 +37,7 @@ impl Cluster {
     /// ```
     ///
     /// Using three nodes for bootstrapping (recommended for production):
-     /// ```no_run
+    /// ```no_run
     /// let cluster = Cluster::connect("couchbase://hosta,hostb,hostc", "username", "password");
     /// ```
     pub fn connect<S: Into<String>>(connection_string: S, username: S, password: S) -> Self {
