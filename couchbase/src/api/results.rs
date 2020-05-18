@@ -341,4 +341,8 @@ impl GenericManagementResult {
     pub fn payload(&self) -> Option<&Vec<u8>> {
         self.payload.as_ref()
     }
+
+    pub fn http_status(&self) -> u16 {
+        self.status
+    }
 }
