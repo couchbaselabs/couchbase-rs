@@ -12,10 +12,22 @@ pub fn main() {
     // Use the default collection (needs to be used for all server 6.5 and earlier)
     let collection = bucket.default_collection();
 
-    let result = block_on(collection.lookup_in(
+    let lookup_in_result = block_on(collection.lookup_in(
         "airline_10",
         vec![LookupInSpec::get("country"), LookupInSpec::exists("iata")],
         LookupInOptions::default(),
     ));
-    println!("{:?}", result);
+    println!("{:?}", lookup_in_result);
+
+    // MutateIn is an atomic operation. If any single operation fails,
+    // then the entire document is left unchanged.
+    let mutate_in_result = block_on(collection.mutate_in(
+        "airline_10",
+        vec![
+            MutateInSpec::replace("name", "52-Mile Air"),
+            MutateInSpec::upsert("foo", "bar"),
+        ],
+        MutateInOptions::default(),
+    ));
+    println!("{:?}", mutate_in_result);
 }
