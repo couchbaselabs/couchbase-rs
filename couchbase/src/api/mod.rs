@@ -161,7 +161,6 @@ impl Cluster {
     pub fn core(&self) -> Arc<Core> {
         self.core.clone()
     }
-
 }
 
 /// Provides bucket-level access to collections and view operations

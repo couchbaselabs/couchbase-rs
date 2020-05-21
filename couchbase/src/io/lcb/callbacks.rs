@@ -1,10 +1,10 @@
 use crate::api::error::{CouchbaseError, CouchbaseResult, ErrorContext};
 use crate::api::results::{
-    AnalyticsResult, ExistsResult, GetResult, LookupInResult, MutationResult, QueryResult,
-    SubDocField, GenericManagementResult,
+    AnalyticsResult, ExistsResult, GenericManagementResult, GetResult, LookupInResult,
+    MutationResult, QueryResult, SubDocField,
 };
-use crate::io::lcb::HttpCookie;
 use crate::api::MutationToken;
+use crate::io::lcb::HttpCookie;
 use couchbase_sys::*;
 use log::{debug, trace};
 use serde_json::Value;
@@ -652,9 +652,7 @@ pub unsafe extern "C" fn http_callback(
 
     let mut cookie_ptr: *mut c_void = ptr::null_mut();
     lcb_resphttp_cookie(http_res, &mut cookie_ptr);
-    let cookie = Box::from_raw(
-        cookie_ptr as *mut HttpCookie,
-    );
+    let cookie = Box::from_raw(cookie_ptr as *mut HttpCookie);
 
     match *cookie {
         HttpCookie::GenericManagementRequest { sender: s } => {
@@ -669,12 +667,9 @@ pub unsafe extern "C" fn http_callback(
                 let mut body_ptr: *const c_char = ptr::null();
                 lcb_resphttp_body(http_res, &mut body_ptr, &mut body_len);
                 let row = from_raw_parts(body_ptr as *const u8, body_len).to_vec();
-                let payload = if row.is_empty() {
-                    None
-                } else {
-                    Some(row)
-                };
-                s.send(Ok(GenericManagementResult::new(status, payload))).unwrap();
+                let payload = if row.is_empty() { None } else { Some(row) };
+                s.send(Ok(GenericManagementResult::new(status, payload)))
+                    .unwrap();
             }
         }
     }

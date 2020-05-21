@@ -1,7 +1,7 @@
 use crate::api::options::StoreSemantics;
 use crate::api::{LookupInSpec, MutateInSpec};
 use crate::io::lcb::callbacks::{analytics_callback, query_callback};
-use crate::io::lcb::{AnalyticsCookie, QueryCookie, HttpCookie};
+use crate::io::lcb::{AnalyticsCookie, HttpCookie, QueryCookie};
 use crate::io::request::*;
 
 use couchbase_sys::*;
@@ -588,13 +588,15 @@ pub fn encode_mutate_in(instance: *mut lcb_INSTANCE, request: MutateInRequest) {
     }
 }
 
-
-pub fn encode_generic_management_request(instance: *mut lcb_INSTANCE, request: GenericManagementRequest) {
+pub fn encode_generic_management_request(
+    instance: *mut lcb_INSTANCE,
+    request: GenericManagementRequest,
+) {
     let (path_len, path) = into_cstring(request.path);
-    let cookie = Box::into_raw(Box::new(HttpCookie::GenericManagementRequest { sender: request.sender }));
-    let encoded_payload = request.payload.map(|p| {
-        into_cstring(p)
-    });
+    let cookie = Box::into_raw(Box::new(HttpCookie::GenericManagementRequest {
+        sender: request.sender,
+    }));
+    let encoded_payload = request.payload.map(|p| into_cstring(p));
 
     let mut command: *mut lcb_CMDHTTP = ptr::null_mut();
     unsafe {
