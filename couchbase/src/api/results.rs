@@ -285,7 +285,20 @@ pub(crate) struct SubDocField {
 }
 
 #[derive(Debug)]
-pub struct MutateInResult {}
+pub struct MutateInResult {
+    content: Vec<SubDocField>,
+    cas: u64,
+}
+
+impl MutateInResult {
+    pub(crate) fn new(content: Vec<SubDocField>, cas: u64) -> Self {
+        Self { content, cas }
+    }
+
+    pub fn cas(&self) -> u64 {
+        self.cas
+    }
+}
 
 #[derive(Debug)]
 pub struct LookupInResult {
