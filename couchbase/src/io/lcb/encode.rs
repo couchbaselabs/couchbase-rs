@@ -596,7 +596,10 @@ pub fn encode_generic_management_request(
     let cookie = Box::into_raw(Box::new(HttpCookie::GenericManagementRequest {
         sender: request.sender,
     }));
-    let encoded_payload = request.payload.map(|p| into_cstring(p));
+
+    let (body_len, body) = into_cstring(request.payload.unwrap_or(String::from("")));
+    let (content_type_len, content_type) =
+        into_cstring(request.content_type.unwrap_or(String::from("")));
 
     let mut command: *mut lcb_CMDHTTP = ptr::null_mut();
     unsafe {
@@ -611,7 +614,15 @@ pub fn encode_generic_management_request(
         lcb_cmdhttp_method(command, method);
         lcb_cmdhttp_path(command, path.as_ptr(), path_len);
 
-        if let Some((body_len, body)) = encoded_payload {
+        if let Some(timeout) = request.timeout {
+            lcb_cmdhttp_timeout(command, timeout.as_micros() as u32);
+        }
+
+        if content_type_len > 0 {
+            lcb_cmdhttp_content_type(command, content_type.as_ptr(), content_type_len);
+        }
+
+        if body_len > 0 {
             lcb_cmdhttp_body(command, body.as_ptr(), body_len);
         }
 

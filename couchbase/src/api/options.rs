@@ -484,3 +484,101 @@ impl LookupInOptions {
         self
     }
 }
+
+macro_rules! domain_name {
+    () => {
+        pub fn domain_name(mut self, domain_name: String) -> Self {
+            self.domain_name = Some(domain_name);
+            self
+        }
+    };
+}
+
+#[derive(Debug, Default)]
+pub struct GetUserOptions {
+    pub(crate) timeout: Option<Duration>,
+    pub(crate) domain_name: Option<String>,
+}
+
+impl GetUserOptions {
+    timeout!();
+    domain_name!();
+}
+
+#[derive(Debug, Default)]
+pub struct GetAllUsersOptions {
+    pub(crate) timeout: Option<Duration>,
+    pub(crate) domain_name: Option<String>,
+}
+
+impl GetAllUsersOptions {
+    timeout!();
+    domain_name!();
+}
+
+#[derive(Debug, Default)]
+pub struct UpsertUserOptions {
+    pub(crate) timeout: Option<Duration>,
+    pub(crate) domain_name: Option<String>,
+}
+
+impl UpsertUserOptions {
+    timeout!();
+    domain_name!();
+}
+
+#[derive(Debug, Default)]
+pub struct DropUserOptions {
+    pub(crate) timeout: Option<Duration>,
+    pub(crate) domain_name: Option<String>,
+}
+
+impl DropUserOptions {
+    timeout!();
+    domain_name!();
+}
+
+#[derive(Debug, Default)]
+pub struct GetRolesOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl GetRolesOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct GetGroupOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl GetGroupOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct GetAllGroupsOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl GetAllGroupsOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct UpsertGroupOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl UpsertGroupOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct DropGroupOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl DropGroupOptions {
+    timeout!();
+}
