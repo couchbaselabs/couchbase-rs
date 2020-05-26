@@ -1,12 +1,14 @@
 pub mod error;
 pub mod options;
 pub mod results;
+pub mod users;
 
 use crate::api::error::{CouchbaseError, CouchbaseResult, ErrorContext};
 use crate::api::options::*;
 use crate::api::results::*;
 use crate::io::request::*;
 use crate::io::Core;
+use crate::UserManager;
 use futures::channel::oneshot;
 use serde::Serialize;
 use serde_json::{to_vec, Value};
@@ -151,6 +153,21 @@ impl Cluster {
             sender,
         }));
         receiver.await.unwrap()
+    }
+
+    /// Returns a new `UserManager`
+    ///
+    /// # Arguments
+    ///
+    /// # Examples
+    ///
+    /// Connect and open the `travel-sample` bucket.
+    /// ```no_run
+    /// let cluster = Cluster::connect("127.0.0.1", "username", "password");
+    /// let bucket = cluster.U("travel-sample");
+    /// ```
+    pub fn users(&self) -> UserManager {
+        UserManager::new(self.core.clone())
     }
 
     /// Returns a reference to the underlying core.

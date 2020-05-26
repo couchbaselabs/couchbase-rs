@@ -150,6 +150,12 @@ pub enum CouchbaseError {
     UserExists { ctx: ErrorContext },
     #[snafu(display("The bucket does not have flush enabled: {}", ctx))]
     BucketNotFlushable { ctx: ErrorContext },
+    #[snafu(display("An error occurred: {} {} {}", ctx, status, message))]
+    GenericHTTP {
+        ctx: ErrorContext,
+        status: u16,
+        message: String,
+    },
 }
 
 pub type CouchbaseResult<T, E = CouchbaseError> = std::result::Result<T, E>;
