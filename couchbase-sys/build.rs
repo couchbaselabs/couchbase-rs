@@ -75,12 +75,18 @@ fn main() {
         build_dst.join("build/lib").display()
     );
 
-    let bindings = bindgen::Builder::default()
+    let mut bindings_builder = bindgen::Builder::default()
         .header("headers.h")
         .clang_arg("-I")
         .clang_arg(format!("{}/include", env::var("OUT_DIR").unwrap()))
         .blacklist_type("max_align_t")
-        .generate_comments(false)
+        .generate_comments(false);
+
+    if cfg!(feature = "volatile") {
+        bindings_builder = bindings_builder.header("internal-headers.h");
+    }
+
+    let bindings = bindings_builder
         .generate()
         .expect("Unable to generate bindings!");
 

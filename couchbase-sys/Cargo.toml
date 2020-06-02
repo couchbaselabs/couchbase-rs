@@ -29,3 +29,6 @@ default = []
 
 # If you want to build and link libcouchbase statically, set this flag.
 link-static = []
+
+# If you want to include internal/volatile structs (like lcb_stats)
+volatile = []

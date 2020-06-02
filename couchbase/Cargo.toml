@@ -43,4 +43,4 @@ libcouchbase-static = ["couchbase-sys/link-static"]
 # If enabled, exposes all APIs currently marked as uncomitted
 uncomitted = []
 # If enabled, exposes all APIs currently marked as volatile or uncomitted
-volatile = ["uncomitted"]
+volatile = ["uncomitted", "couchbase-sys/volatile"]
