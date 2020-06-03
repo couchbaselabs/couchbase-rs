@@ -1,6 +1,7 @@
 pub mod error;
 pub mod options;
 pub mod results;
+pub mod search;
 pub mod users;
 
 use crate::api::error::{CouchbaseError, CouchbaseResult, ErrorContext};
@@ -8,7 +9,7 @@ use crate::api::options::*;
 use crate::api::results::*;
 use crate::io::request::*;
 use crate::io::Core;
-use crate::UserManager;
+use crate::{SearchQuery, UserManager};
 use futures::channel::oneshot;
 use serde::Serialize;
 use serde_json::{to_vec, Value};
@@ -149,6 +150,59 @@ impl Cluster {
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::Analytics(AnalyticsRequest {
             statement: statement.into(),
+            options,
+            sender,
+        }));
+        receiver.await.unwrap()
+    }
+
+    /// Executes a search query
+    ///
+    /// # Arguments
+    ///
+    /// * `index` - the search index name to use
+    /// * `query` - the search query to perform
+    /// * `options` - allows to pass in custom options
+    ///
+    /// # Examples
+    ///
+    /// Run a search query with default options.
+    /// ```no_run
+    /// # let cluster = Cluster::connect("127.0.0.1", "username", "password");
+    /// let result = cluster.search_query(
+    ///    String::from("test"),
+    ///    QueryStringQuery::new(String::from("swanky")),
+    ///    SearchOptions::default(),
+    ///);
+    /// ```
+    ///
+    /// This will return an async result, which can be consumed:
+    /// ```no_run
+    /// # let cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
+    /// match cluster.cluster.search_query(
+    ///    String::from("test"),
+    ///    QueryStringQuery::new(String::from("swanky")),
+    ///    SearchOptions::default(),
+    ///).await {
+    ///     Ok(mut result) => {
+    ///         for row in result.rows::<serde_json::Value>().next().await {
+    ///             println!("Found Row {:?}", row);
+    ///         }
+    ///     },
+    ///     Err(e) => panic!("Query failed: {:?}", e),
+    /// }
+    /// ```
+    /// See the [SearchResult](struct.SearchResult.html) for more information on what and how it can be consumed.
+    pub async fn search_query<S: Into<String>, T: SearchQuery>(
+        &self,
+        index: S,
+        query: T,
+        options: SearchOptions,
+    ) -> CouchbaseResult<SearchResult> {
+        let (sender, receiver) = oneshot::channel();
+        self.core.send(Request::Search(SearchRequest {
+            index: index.into(),
+            query: query.to_json(),
             options,
             sender,
         }));

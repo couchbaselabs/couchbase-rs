@@ -15,6 +15,7 @@ pub enum Request {
     LookupIn(LookupInRequest),
     Query(QueryRequest),
     Analytics(AnalyticsRequest),
+    Search(SearchRequest),
     GenericManagementRequest(GenericManagementRequest),
 }
 
@@ -99,6 +100,14 @@ pub struct AnalyticsRequest {
     pub(crate) statement: String,
     pub(crate) sender: Sender<CouchbaseResult<AnalyticsResult>>,
     pub(crate) options: AnalyticsOptions,
+}
+
+#[derive(Debug)]
+pub struct SearchRequest {
+    pub(crate) index: String,
+    pub(crate) query: serde_json::Value,
+    pub(crate) sender: Sender<CouchbaseResult<SearchResult>>,
+    pub(crate) options: SearchOptions,
 }
 
 #[derive(Debug)]

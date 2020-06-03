@@ -1,7 +1,7 @@
 use crate::api::options::StoreSemantics;
 use crate::api::{LookupInSpec, MutateInSpec};
-use crate::io::lcb::callbacks::{analytics_callback, query_callback};
-use crate::io::lcb::{AnalyticsCookie, HttpCookie, QueryCookie};
+use crate::io::lcb::callbacks::{analytics_callback, query_callback, search_callback};
+use crate::io::lcb::{AnalyticsCookie, HttpCookie, QueryCookie, SearchCookie};
 use crate::io::request::*;
 
 use couchbase_sys::*;
@@ -204,6 +204,33 @@ pub fn encode_analytics(instance: *mut lcb_INSTANCE, mut request: AnalyticsReque
         lcb_cmdanalytics_callback(command, Some(analytics_callback));
         lcb_analytics(instance, cookie as *mut c_void, command);
         lcb_cmdanalytics_destroy(command);
+    }
+}
+
+/// Encodes a `SearchRequest` into its libcouchbase `lcb_CMDSEARCH` representation.
+pub fn encode_search(instance: *mut lcb_INSTANCE, mut request: SearchRequest) {
+    request.options.index = Some(request.index);
+    request.options.query = Some(request.query);
+
+    let (payload_len, payload) = into_cstring(serde_json::to_vec(&request.options).unwrap());
+
+    let (meta_sender, meta_receiver) = futures::channel::oneshot::channel();
+    let (rows_sender, rows_receiver) = futures::channel::mpsc::unbounded();
+    let cookie = Box::into_raw(Box::new(SearchCookie {
+        sender: Some(request.sender),
+        meta_sender,
+        meta_receiver: Some(meta_receiver),
+        rows_sender,
+        rows_receiver: Some(rows_receiver),
+    }));
+
+    let mut command: *mut lcb_CMDSEARCH = ptr::null_mut();
+    unsafe {
+        lcb_cmdsearch_create(&mut command);
+        lcb_cmdsearch_payload(command, payload.as_ptr(), payload_len);
+        lcb_cmdsearch_callback(command, Some(search_callback));
+        lcb_search(instance, cookie as *mut c_void, command);
+        lcb_cmdsearch_destroy(command);
     }
 }
 
