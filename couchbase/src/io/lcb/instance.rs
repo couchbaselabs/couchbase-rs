@@ -108,6 +108,13 @@ impl LcbInstance {
             lcb_CALLBACK_TYPE_LCB_CALLBACK_HTTP as i32,
             Some(http_callback),
         );
+
+        lcb_install_callback(
+            instance,
+            lcb_CALLBACK_TYPE_LCB_CALLBACK_STATS as i32,
+            Some(stats_callback),
+        );
+
         lcb_set_open_callback(instance, Some(open_callback));
     }
 

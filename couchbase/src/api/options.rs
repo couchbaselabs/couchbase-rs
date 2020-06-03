@@ -582,3 +582,14 @@ pub struct DropGroupOptions {
 impl DropGroupOptions {
     timeout!();
 }
+
+#[derive(Debug, Default)]
+#[cfg(feature = "volatile")]
+pub struct KvStatsOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+#[cfg(feature = "volatile")]
+impl KvStatsOptions {
+    timeout!();
+}

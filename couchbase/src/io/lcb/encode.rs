@@ -630,3 +630,43 @@ pub fn encode_generic_management_request(
         lcb_cmdhttp_destroy(command);
     }
 }
+
+#[cfg(feature = "volatile")]
+pub fn encode_kv_stats(instance: *mut lcb_INSTANCE, request: KvStatsRequest) {
+    let (scope_len, scope) = into_cstring(String::from(""));
+    let (collection_len, collection) = into_cstring(String::from(""));
+    let (key_len, key) = into_cstring(String::from(""));
+
+    let key = lcb_KEYBUF {
+        type_: lcb_KVBUFTYPE_LCB_KV_COPY,
+        vbid: 0,
+        contig: lcb_CONTIGBUF {
+            bytes: key.as_ptr() as *const c_void,
+            nbytes: key_len,
+        },
+    };
+
+    let command = lcb_CMDSTATS {
+        cmdflags: 0,
+        exptime: 0,
+        cas: 0,
+        cid: 0,
+        scope: scope.as_ptr(),
+        nscope: scope_len,
+        collection: collection.as_ptr(),
+        ncollection: collection_len,
+        key,
+        timeout: 0,
+        pspan: ptr::null_mut(),
+    };
+
+    let (stats_sender, stats_receiver) = futures::channel::mpsc::unbounded();
+    let cookie = Box::into_raw(Box::new(crate::io::lcb::KvStatsCookie {
+        sender: Some(request.sender),
+        stats_sender,
+        stats_receiver: Some(stats_receiver),
+    }));
+    unsafe {
+        lcb_stats3(instance, cookie as *mut c_void, &command);
+    }
+}

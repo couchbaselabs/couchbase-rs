@@ -16,6 +16,8 @@ pub enum Request {
     Query(QueryRequest),
     Analytics(AnalyticsRequest),
     GenericManagementRequest(GenericManagementRequest),
+    #[cfg(feature = "volatile")]
+    KvStatsRequest(KvStatsRequest),
 }
 
 impl Request {
@@ -152,5 +154,22 @@ impl GenericManagementRequest {
 
     pub fn timeout(&mut self, timeout: Duration) {
         self.timeout = Some(timeout)
+    }
+}
+
+#[derive(Debug)]
+#[cfg(feature = "volatile")]
+pub struct KvStatsRequest {
+    pub(crate) sender: Sender<CouchbaseResult<KvStatsResult>>,
+    pub(crate) options: KvStatsOptions,
+}
+
+#[cfg(feature = "volatile")]
+impl KvStatsRequest {
+    pub fn new(sender: Sender<CouchbaseResult<KvStatsResult>>) -> Self {
+        Self {
+            sender,
+            options: KvStatsOptions::default(),
+        }
     }
 }

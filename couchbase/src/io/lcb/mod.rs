@@ -6,6 +6,7 @@ use crate::api::error::CouchbaseResult;
 use crate::api::results::{
     AnalyticsMetaData, AnalyticsResult, GenericManagementResult, QueryMetaData, QueryResult,
 };
+
 use crate::io::request::Request;
 use instance::{LcbInstance, LcbInstances};
 
@@ -170,6 +171,8 @@ fn encode_request(instance: *mut lcb_INSTANCE, request: Request) {
         Request::GenericManagementRequest(r) => {
             encode::encode_generic_management_request(instance, r)
         }
+        #[cfg(feature = "volatile")]
+        Request::KvStatsRequest(r) => encode::encode_kv_stats(instance, r),
     }
 }
 
@@ -196,4 +199,13 @@ enum HttpCookie {
     GenericManagementRequest {
         sender: futures::channel::oneshot::Sender<CouchbaseResult<GenericManagementResult>>,
     },
+}
+
+#[cfg(feature = "volatile")]
+struct KvStatsCookie {
+    sender: Option<
+        futures::channel::oneshot::Sender<CouchbaseResult<crate::api::results::KvStatsResult>>,
+    >,
+    stats_sender: futures::channel::mpsc::UnboundedSender<crate::api::results::KvStat>,
+    stats_receiver: Option<futures::channel::mpsc::UnboundedReceiver<crate::api::results::KvStat>>,
 }
