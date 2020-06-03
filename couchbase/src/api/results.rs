@@ -182,6 +182,20 @@ pub struct SearchRow {
     score: f32,
 }
 
+impl SearchRow {
+    pub fn index(&self) -> &str {
+        &self.index
+    }
+
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    pub fn score(&self) -> f32 {
+        self.score
+    }
+}
+
 #[derive(Debug)]
 pub struct SearchResult {
     rows: Option<UnboundedReceiver<Vec<u8>>>,
