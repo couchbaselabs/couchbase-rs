@@ -340,6 +340,63 @@ pub enum AnalyticsScanConsistency {
     RequestPlus,
 }
 
+#[derive(Debug, Default, Serialize)]
+pub struct SearchOptions {
+    #[serde(rename = "size")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) limit: Option<u32>,
+    #[serde(rename = "from")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) skip: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) explain: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(serialize_with = "convert_duration_for_golang")]
+    pub(crate) timeout: Option<Duration>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(flatten)]
+    pub(crate) raw: Option<serde_json::Map<String, Value>>,
+    // The query and index are not part of the public API, but added here
+    // as a convenience so we can conver the whole block into the
+    // JSON payload the search engine expects. DO NOT ADD A PUBLIC
+    // SETTER!
+    #[serde(rename = "indexName")]
+    pub(crate) index: Option<String>,
+    pub(crate) query: Option<serde_json::Value>,
+}
+
+impl SearchOptions {
+    timeout!();
+
+    pub fn limit(mut self, limit: u32) -> Self {
+        self.limit = Some(limit);
+        self
+    }
+
+    pub fn skip(mut self, skip: u32) -> Self {
+        self.skip = Some(skip);
+        self
+    }
+
+    pub fn explain(mut self, explain: bool) -> Self {
+        self.explain = Some(explain);
+        self
+    }
+
+    pub fn raw<T>(mut self, raw: T) -> Self
+    where
+        T: serde::Serialize,
+    {
+        let raw = match serde_json::to_value(raw) {
+            Ok(Value::Object(a)) => a,
+            Ok(_) => panic!("Only objects are allowed"),
+            _ => panic!("Could not encode raw parameters"),
+        };
+        self.raw = Some(raw);
+        self
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct GetOptions {
     pub(crate) timeout: Option<Duration>,

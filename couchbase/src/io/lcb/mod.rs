@@ -5,6 +5,7 @@ mod instance;
 use crate::api::error::CouchbaseResult;
 use crate::api::results::{
     AnalyticsMetaData, AnalyticsResult, GenericManagementResult, QueryMetaData, QueryResult,
+    SearchMetaData, SearchResult,
 };
 
 use crate::io::request::Request;
@@ -163,6 +164,7 @@ fn encode_request(instance: *mut lcb_INSTANCE, request: Request) {
         Request::Get(r) => encode::encode_get(instance, r),
         Request::Query(r) => encode::encode_query(instance, r),
         Request::Analytics(r) => encode::encode_analytics(instance, r),
+        Request::Search(r) => encode::encode_search(instance, r),
         Request::Mutate(r) => encode::encode_mutate(instance, r),
         Request::Exists(r) => encode::encode_exists(instance, r),
         Request::Remove(r) => encode::encode_remove(instance, r),
@@ -190,6 +192,14 @@ struct AnalyticsCookie {
     rows_receiver: Option<futures::channel::mpsc::UnboundedReceiver<Vec<u8>>>,
     meta_sender: futures::channel::oneshot::Sender<AnalyticsMetaData>,
     meta_receiver: Option<futures::channel::oneshot::Receiver<AnalyticsMetaData>>,
+}
+
+struct SearchCookie {
+    sender: Option<futures::channel::oneshot::Sender<CouchbaseResult<SearchResult>>>,
+    rows_sender: futures::channel::mpsc::UnboundedSender<Vec<u8>>,
+    rows_receiver: Option<futures::channel::mpsc::UnboundedReceiver<Vec<u8>>>,
+    meta_sender: futures::channel::oneshot::Sender<SearchMetaData>,
+    meta_receiver: Option<futures::channel::oneshot::Receiver<SearchMetaData>>,
 }
 
 /// This cookie can represent all different generic http requestes fired against lcb.

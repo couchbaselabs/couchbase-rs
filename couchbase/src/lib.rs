@@ -6,6 +6,7 @@ mod io;
 pub use api::error::*;
 pub use api::options::*;
 pub use api::results::*;
+pub use api::search::*;
 pub use api::users::*;
 pub use api::{
     Bucket, Cluster, Collection, LookupInSpec, MutateInSpec, MutationState, MutationToken,

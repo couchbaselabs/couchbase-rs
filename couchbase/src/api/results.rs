@@ -5,6 +5,7 @@ use futures::channel::oneshot::Receiver;
 use futures::{Stream, StreamExt};
 use serde::de::DeserializeOwned;
 use serde_derive::Deserialize;
+use std::collections::HashMap;
 use std::fmt;
 use std::time::Duration;
 
@@ -167,6 +168,49 @@ pub struct AnalyticsMetaData {
     request_id: String,
     #[serde(rename = "clientContextID")]
     client_context_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SearchMetaData {
+    errors: Option<HashMap<String, String>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SearchRow {
+    index: String,
+    id: String,
+    score: f32,
+}
+
+#[derive(Debug)]
+pub struct SearchResult {
+    rows: Option<UnboundedReceiver<Vec<u8>>>,
+    meta: Option<Receiver<SearchMetaData>>,
+}
+
+impl SearchResult {
+    pub fn new(rows: UnboundedReceiver<Vec<u8>>, meta: Receiver<SearchMetaData>) -> Self {
+        Self {
+            rows: Some(rows),
+            meta: Some(meta),
+        }
+    }
+
+    pub fn rows(&mut self) -> impl Stream<Item = CouchbaseResult<SearchRow>> {
+        self.rows.take().expect("Can not consume rows twice!").map(
+            |v| match serde_json::from_slice(v.as_slice()) {
+                Ok(decoded) => Ok(decoded),
+                Err(e) => Err(CouchbaseError::DecodingFailure {
+                    ctx: ErrorContext::default(),
+                    source: e.into(),
+                }),
+            },
+        )
+    }
+
+    pub async fn meta_data(&mut self) -> SearchMetaData {
+        self.meta.take().unwrap().await.unwrap()
+    }
 }
 
 pub struct GetResult {

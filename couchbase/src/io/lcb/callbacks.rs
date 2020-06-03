@@ -1,7 +1,7 @@
 use crate::api::error::{CouchbaseError, CouchbaseResult, ErrorContext};
 use crate::api::results::{
     AnalyticsResult, ExistsResult, GenericManagementResult, GetResult, LookupInResult,
-    MutateInResult, MutationResult, QueryResult, SubDocField,
+    MutateInResult, MutationResult, QueryResult, SearchResult, SubDocField,
 };
 use crate::api::MutationToken;
 use crate::io::lcb::HttpCookie;
@@ -14,7 +14,9 @@ use std::ptr;
 use std::slice::from_raw_parts;
 use std::str;
 
-use crate::io::lcb::{bucket_name_for_instance, wrapped_vsnprintf, AnalyticsCookie, QueryCookie};
+use crate::io::lcb::{
+    bucket_name_for_instance, wrapped_vsnprintf, AnalyticsCookie, QueryCookie, SearchCookie,
+};
 
 use crate::io::lcb::instance::decrement_outstanding_requests;
 
@@ -403,6 +405,20 @@ fn build_analytics_error_context(lcb_ctx: *const lcb_ANALYTICS_ERROR_CONTEXT) ->
     ctx
 }
 
+fn build_search_error_context(lcb_ctx: *const lcb_SEARCH_ERROR_CONTEXT) -> ErrorContext {
+    let mut ctx = ErrorContext::default();
+
+    let mut query_len: usize = 0;
+    let mut query_ptr: *const c_char = ptr::null();
+    let query = unsafe {
+        lcb_errctx_search_query(lcb_ctx, &mut query_ptr, &mut query_len);
+        decode_and_own_str(query_ptr, query_len)
+    };
+    ctx.insert("query", Value::String(query));
+
+    ctx
+}
+
 pub unsafe extern "C" fn query_callback(
     instance: *mut lcb_INSTANCE,
     _cbtype: i32,
@@ -528,6 +544,71 @@ pub unsafe extern "C" fn analytics_callback(
         match cookie.rows_sender.unbounded_send(row.to_vec()) {
             Ok(_) => {}
             Err(e) => trace!("Failed to send analytics row because of {:?}", e),
+        }
+        Box::into_raw(cookie);
+    }
+}
+
+pub unsafe extern "C" fn search_callback(
+    instance: *mut lcb_INSTANCE,
+    _cbtype: i32,
+    res: *const lcb_RESPSEARCH,
+) {
+    let mut row_len: usize = 0;
+    let mut row_ptr: *const c_char = ptr::null();
+    lcb_respsearch_row(res, &mut row_ptr, &mut row_len);
+    let row = from_raw_parts(row_ptr as *const u8, row_len);
+
+    let mut cookie_ptr: *mut c_void = ptr::null_mut();
+    lcb_respsearch_cookie(res, &mut cookie_ptr);
+    let mut cookie = Box::from_raw(cookie_ptr as *mut SearchCookie);
+
+    let status = lcb_respsearch_status(res);
+
+    if cookie.sender.is_some() {
+        let response = if status != 0 {
+            let mut lcb_ctx: *const lcb_SEARCH_ERROR_CONTEXT = ptr::null();
+            lcb_respsearch_error_context(res, &mut lcb_ctx);
+            Err(couchbase_error_from_lcb_status(
+                status,
+                build_search_error_context(lcb_ctx),
+            ))
+        } else {
+            Ok(SearchResult::new(
+                cookie.rows_receiver.take().unwrap(),
+                cookie.meta_receiver.take().unwrap(),
+            ))
+        };
+
+        match cookie
+            .sender
+            .take()
+            .expect("Could not take result!")
+            .send(response)
+        {
+            Ok(_) => {}
+            Err(e) => trace!("Failed to send search result because of {:?}", e),
+        }
+    }
+
+    if lcb_respsearch_is_final(res) != 0 {
+        cookie.rows_sender.close_channel();
+
+        if status == 0 {
+            match cookie
+                .meta_sender
+                .send(serde_json::from_slice(row).unwrap())
+            {
+                Ok(_) => {}
+                Err(e) => trace!("Failed to send search meta data ecause of {:?}", e),
+            }
+        }
+
+        decrement_outstanding_requests(instance);
+    } else {
+        match cookie.rows_sender.unbounded_send(row.to_vec()) {
+            Ok(_) => {}
+            Err(e) => trace!("Failed to send search row because of {:?}", e),
         }
         Box::into_raw(cookie);
     }
