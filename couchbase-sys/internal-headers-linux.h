@@ -1,0 +1,1 @@
+#include "libcouchbase/src/internalstructs.h"

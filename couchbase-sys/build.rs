@@ -83,7 +83,11 @@ fn main() {
         .generate_comments(false);
 
     if cfg!(feature = "volatile") {
-        bindings_builder = bindings_builder.header("internal-headers.h");
+        if cfg!(any(target_os = "macos", target_os = "freebsd")) {
+            bindings_builder = bindings_builder.header("internal-headers-osx.h");
+        } else {
+            bindings_builder = bindings_builder.header("internal-headers-linux.h");
+        }
     }
 
     let bindings = bindings_builder
