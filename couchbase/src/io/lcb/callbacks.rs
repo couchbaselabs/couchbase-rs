@@ -748,7 +748,12 @@ pub unsafe extern "C" fn logger_callback(
         fmt,
         ap,
     ) as usize;
-    let decoded = CStr::from_bytes_with_nul(&target_buffer[0..=result]).unwrap();
+    let range_end = if result < target_buffer.len() {
+        result + 1
+    } else {
+        target_buffer.len()
+    };
+    let decoded = CStr::from_bytes_with_nul(&target_buffer[0..range_end]).unwrap();
 
     log::log!(level, "{}", decoded.to_str().unwrap());
 }
