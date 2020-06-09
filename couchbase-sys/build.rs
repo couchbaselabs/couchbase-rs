@@ -38,6 +38,7 @@ fn main() {
         "LCB_BUILD_LIBEV",
         "LCB_BUILD_LIBUV",
         "LIBCOUCHBASE_STATIC",
+        "LCB_DUMP_PACKETS",
     ];
 
     for flag in env_flags.iter().filter(|flag| env::var(flag).is_ok()) {
