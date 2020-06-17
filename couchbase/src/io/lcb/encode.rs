@@ -8,6 +8,7 @@ use couchbase_sys::*;
 use std::ffi::CString;
 use std::os::raw::c_void;
 use std::ptr;
+use uuid::Uuid;
 
 /// Helper method to turn a string into a tuple of CString and its length.
 #[inline]
@@ -695,5 +696,25 @@ pub fn encode_kv_stats(instance: *mut lcb_INSTANCE, request: KvStatsRequest) {
     }));
     unsafe {
         lcb_stats3(instance, cookie as *mut c_void, &command);
+    }
+}
+
+/// Encodes a `PingRequest` into its libcouchbase `lcb_CMDPING` representation.
+pub fn encode_ping(instance: *mut lcb_INSTANCE, request: PingRequest) {
+    let cookie = Box::into_raw(Box::new(request.sender));
+
+    let report_id = request
+        .options
+        .report_id
+        .unwrap_or(Uuid::new_v4().to_hyphenated().to_string());
+    let (report_id_len, c_report_id) = into_cstring(report_id);
+
+    let mut command: *mut lcb_CMDPING = ptr::null_mut();
+    unsafe {
+        lcb_cmdping_create(&mut command);
+        lcb_cmdping_report_id(command, c_report_id.as_ptr(), report_id_len);
+        lcb_cmdping_all(command);
+        lcb_ping(instance, cookie as *mut c_void, command);
+        lcb_cmdping_destroy(command);
     }
 }

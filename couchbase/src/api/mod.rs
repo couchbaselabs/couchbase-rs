@@ -287,6 +287,40 @@ impl Bucket {
     pub fn scope<S: Into<String>>(&self, name: S) -> Scope {
         Scope::new(self.core.clone(), name.into(), self.name.clone())
     }
+
+    /// Executes a ping request
+    ///
+    /// # Arguments
+    ///
+    /// * `options` - allows to pass in custom options
+    ///
+    /// # Examples
+    ///
+    /// Run a ping with default options.
+    /// ```no_run
+    /// # let cluster = Cluster::connect("127.0.0.1", "username", "password");
+    /// # let bucket = cluster.bucket("travel-sample");
+    /// # let result = bucket.ping(PingOptions::default());
+    /// ```
+    ///
+    /// This will return an async result, which can be consumed:
+    /// ```no_run
+    /// # let cluster = Cluster::connect("127.0.0.1", "username", "password");
+    /// # let bucket = cluster.bucket("travel-sample");
+    /// match  bucket.ping(PingOptions::default()).await {
+    ///     Ok(mut result) => {
+    ///         println!("Ping results {:?}", row);
+    ///     },
+    ///     Err(e) => panic!("Ping failed: {:?}", e),
+    /// }
+    /// ```
+    /// See the [PingResult](struct.PingResult.html) for more information on what and how it can be consumed.
+    pub async fn ping(&self, options: PingOptions) -> CouchbaseResult<PingResult> {
+        let (sender, receiver) = oneshot::channel();
+        self.core
+            .send(Request::Ping(PingRequest { options, sender }));
+        receiver.await.unwrap()
+    }
 }
 
 /// Scopes provide access to a group of collections

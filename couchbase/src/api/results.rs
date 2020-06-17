@@ -457,3 +457,121 @@ impl KvStat {
         &self.value
     }
 }
+
+#[derive(Debug)]
+pub struct PingResult {
+    id: String,
+    services: HashMap<ServiceType, Vec<EndpointPingReport>>,
+}
+
+impl PingResult {
+    pub(crate) fn new(id: String, services: HashMap<ServiceType, Vec<EndpointPingReport>>) -> Self {
+        Self { id, services }
+    }
+
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    pub fn endpoints(&self) -> &HashMap<ServiceType, Vec<EndpointPingReport>> {
+        &self.services
+    }
+}
+
+#[derive(Debug)]
+pub struct EndpointPingReport {
+    local: Option<String>,
+    remote: Option<String>,
+    status: PingState,
+    error: Option<String>,
+    latency: Duration,
+    scope: Option<String>,
+    id: String,
+    typ: ServiceType,
+}
+
+impl EndpointPingReport {
+    pub(crate) fn new(
+        local: Option<String>,
+        remote: Option<String>,
+        status: PingState,
+        error: Option<String>,
+        latency: Duration,
+        scope: Option<String>,
+        id: String,
+        typ: ServiceType,
+    ) -> Self {
+        Self {
+            local,
+            remote,
+            status,
+            error,
+            latency,
+            scope,
+            id,
+            typ,
+        }
+    }
+
+    pub fn service_type(&self) -> ServiceType {
+        self.typ.clone()
+    }
+
+    pub fn id(&self) -> String {
+        self.id.clone()
+    }
+
+    pub fn local(&self) -> Option<String> {
+        self.local.clone()
+    }
+
+    pub fn remote(&self) -> Option<String> {
+        self.remote.clone()
+    }
+
+    pub fn state(&self) -> PingState {
+        self.status.clone()
+    }
+
+    pub fn error(&self) -> Option<String> {
+        self.error.clone()
+    }
+
+    pub fn namespace(&self) -> Option<String> {
+        self.scope.clone()
+    }
+
+    pub fn latency(&self) -> Duration {
+        self.latency
+    }
+}
+
+#[derive(Debug, Hash, Eq, PartialEq, Clone, Copy)]
+pub enum ServiceType {
+    Management,
+    KeyValue,
+    Views,
+    Query,
+    Search,
+    Analytics,
+}
+
+impl fmt::Display for ServiceType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+#[derive(Debug, Hash, Eq, PartialEq, Clone, Copy)]
+pub enum PingState {
+    OK,
+    Timeout,
+    Error,
+    Invalid,
+}
+
+impl fmt::Display for PingState {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}

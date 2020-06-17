@@ -175,6 +175,7 @@ fn encode_request(instance: *mut lcb_INSTANCE, request: Request) {
         }
         #[cfg(feature = "volatile")]
         Request::KvStatsRequest(r) => encode::encode_kv_stats(instance, r),
+        Request::Ping(r) => encode::encode_ping(instance, r),
     }
 }
 

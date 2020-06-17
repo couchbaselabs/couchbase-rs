@@ -1,7 +1,7 @@
 use crate::api::error::{CouchbaseError, CouchbaseResult, ErrorContext};
 use crate::api::results::{
     AnalyticsResult, ExistsResult, GenericManagementResult, GetResult, LookupInResult,
-    MutateInResult, MutationResult, QueryResult, SearchResult, SubDocField,
+    MutateInResult, MutationResult, PingResult, PingState, QueryResult, SearchResult, SubDocField,
 };
 use crate::api::MutationToken;
 use crate::io::lcb::HttpCookie;
@@ -13,12 +13,15 @@ use std::os::raw::{c_char, c_int, c_uint, c_void};
 use std::ptr;
 use std::slice::from_raw_parts;
 use std::str;
+use std::time::Duration;
 
 use crate::io::lcb::{
     bucket_name_for_instance, wrapped_vsnprintf, AnalyticsCookie, QueryCookie, SearchCookie,
 };
 
 use crate::io::lcb::instance::decrement_outstanding_requests;
+use crate::{EndpointPingReport, ServiceType};
+use std::collections::HashMap;
 
 fn decode_and_own_str(ptr: *const c_char, len: usize) -> String {
     str::from_utf8(unsafe { from_raw_parts(ptr as *const u8, len) })
@@ -851,5 +854,121 @@ pub unsafe extern "C" fn stats_callback(
         }
 
         Box::into_raw(cookie);
+    }
+}
+
+pub unsafe extern "C" fn ping_callback(
+    instance: *mut lcb_INSTANCE,
+    _cbtype: i32,
+    res: *const lcb_RESPBASE,
+) {
+    decrement_outstanding_requests(instance);
+    let ping_res = res as *const lcb_RESPPING;
+    let mut cookie_ptr: *mut c_void = ptr::null_mut();
+    lcb_respping_cookie(ping_res, &mut cookie_ptr);
+    let sender = Box::from_raw(
+        cookie_ptr as *mut futures::channel::oneshot::Sender<CouchbaseResult<PingResult>>,
+    );
+
+    let mut services: HashMap<ServiceType, Vec<EndpointPingReport>> = HashMap::new();
+
+    let status = lcb_respping_status(ping_res);
+    let result = if status == lcb_STATUS_LCB_SUCCESS {
+        let result_size = lcb_respping_result_size(ping_res);
+
+        for i in 0..result_size {
+            let mut svc = lcb_PING_SERVICE_LCB_PING_SERVICE__MAX;
+            lcb_respping_result_service(ping_res, i, &mut svc);
+
+            let lcb_status: u32 = lcb_respping_result_status(ping_res, i);
+
+            let service_type = match svc {
+                0 => ServiceType::KeyValue,
+                1 => ServiceType::Views,
+                2 => ServiceType::Query,
+                3 => ServiceType::Search,
+                4 => ServiceType::Analytics,
+                _ => continue,
+            };
+
+            let status = match lcb_status {
+                0 => PingState::OK,
+                1 => PingState::Timeout,
+                2 => PingState::Error,
+                _ => PingState::Invalid,
+            };
+
+            let mut id_len: usize = 0;
+            let mut id_ptr: *const c_char = ptr::null();
+            lcb_respping_result_id(ping_res, i, &mut id_ptr, &mut id_len);
+            let id = decode_and_own_str(id_ptr, id_len);
+
+            let mut local_len: usize = 0;
+            let mut local_ptr: *const c_char = ptr::null();
+            lcb_respping_result_local(ping_res, i, &mut local_ptr, &mut local_len);
+            let local = match local_ptr.is_null() {
+                true => None,
+                false => Some(decode_and_own_str(local_ptr, local_len)),
+            };
+
+            let mut remote_len: usize = 0;
+            let mut remote_ptr: *const c_char = ptr::null();
+            lcb_respping_result_remote(ping_res, i, &mut remote_ptr, &mut remote_len);
+            let remote = match remote_ptr.is_null() {
+                true => None,
+                false => Some(decode_and_own_str(remote_ptr, remote_len)),
+            };
+
+            let scope = match service_type {
+                ServiceType::KeyValue => {
+                    let mut scope_len: usize = 0;
+                    let mut scope_ptr: *const c_char = ptr::null();
+                    lcb_respping_result_scope(ping_res, i, &mut scope_ptr, &mut scope_len);
+                    Some(decode_and_own_str(scope_ptr, scope_len))
+                }
+                _ => None,
+            };
+
+            let error = match lcb_status {
+                0 => None,
+                1 => Some(String::from("Timeout")),
+                _ => {
+                    let lcb_error = CStr::from_ptr(lcb_strerror_long(lcb_status));
+                    Some(lcb_error.to_str().unwrap().into())
+                }
+            };
+
+            let mut latency: u64 = 0;
+            lcb_respping_result_latency(ping_res, i, &mut latency);
+
+            if !services.contains_key(&service_type) {
+                services.insert(service_type.clone(), Vec::new());
+            }
+            let service = services.get_mut(&service_type).unwrap();
+
+            service.push(EndpointPingReport::new(
+                local,
+                remote,
+                status,
+                error,
+                Duration::from_micros(latency),
+                scope,
+                id,
+                service_type,
+            ))
+        }
+
+        Ok(PingResult::new(String::from(""), services))
+    } else {
+        // let lcb_error = unsafe { CStr::from_ptr(lcb_strerror_long(status)) };
+        // let error: String = lcb_error.to_str().unwrap().into();
+        Err(couchbase_error_from_lcb_status(
+            status,
+            ErrorContext::default(),
+        ))
+    };
+    match sender.send(result) {
+        Ok(_) => {}
+        Err(e) => trace!("Failed to send exists result because of {:?}", e),
     }
 }
