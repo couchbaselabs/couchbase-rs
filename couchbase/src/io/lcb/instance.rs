@@ -115,6 +115,12 @@ impl LcbInstance {
             Some(stats_callback),
         );
 
+        lcb_install_callback(
+            instance,
+            lcb_CALLBACK_TYPE_LCB_CALLBACK_PING as i32,
+            Some(ping_callback),
+        );
+
         lcb_set_open_callback(instance, Some(open_callback));
     }
 

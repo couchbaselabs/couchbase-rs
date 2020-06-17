@@ -650,3 +650,15 @@ pub struct KvStatsOptions {
 impl KvStatsOptions {
     timeout!();
 }
+
+#[derive(Debug, Default)]
+pub struct PingOptions {
+    pub(crate) report_id: Option<String>,
+}
+
+impl PingOptions {
+    pub fn report_id(mut self, report_id: String) -> Self {
+        self.report_id = Some(report_id);
+        self
+    }
+}

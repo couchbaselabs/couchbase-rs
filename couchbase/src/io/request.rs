@@ -19,6 +19,7 @@ pub enum Request {
     GenericManagementRequest(GenericManagementRequest),
     #[cfg(feature = "volatile")]
     KvStatsRequest(KvStatsRequest),
+    Ping(PingRequest),
 }
 
 impl Request {
@@ -181,4 +182,10 @@ impl KvStatsRequest {
             options: KvStatsOptions::default(),
         }
     }
+}
+
+#[derive(Debug)]
+pub struct PingRequest {
+    pub(crate) sender: Sender<CouchbaseResult<PingResult>>,
+    pub(crate) options: PingOptions,
 }
