@@ -81,6 +81,7 @@ fn main() {
         .clang_arg("-I")
         .clang_arg(format!("{}/include", env::var("OUT_DIR").unwrap()))
         .blacklist_type("max_align_t")
+        .size_t_is_usize(true)
         .generate_comments(false);
 
     if cfg!(feature = "volatile") {
