@@ -14,6 +14,7 @@ use std::ptr;
 use std::slice::from_raw_parts;
 use std::str;
 use std::time::Duration;
+use std::convert::TryInto;
 
 use crate::io::lcb::{
     bucket_name_for_instance, wrapped_vsnprintf, AnalyticsCookie, QueryCookie, SearchCookie,
@@ -241,7 +242,7 @@ pub unsafe extern "C" fn lookup_in_callback(
             lcb_respsubdoc_result_value(subdoc_res, i, &mut value_ptr, &mut value_len);
             let value = from_raw_parts(value_ptr as *const u8, value_len);
             fields.push(SubDocField {
-                status,
+                status: status.try_into().unwrap(),
                 value: value.into(),
             });
         }
@@ -286,7 +287,7 @@ pub unsafe extern "C" fn mutate_in_callback(
             lcb_respsubdoc_result_value(subdoc_res, i, &mut value_ptr, &mut value_len);
             let value = from_raw_parts(value_ptr as *const u8, value_len);
             fields.push(SubDocField {
-                status,
+                status: status.try_into().unwrap(),
                 value: value.into(),
             });
         }
@@ -880,7 +881,7 @@ pub unsafe extern "C" fn ping_callback(
             let mut svc = lcb_PING_SERVICE_LCB_PING_SERVICE__MAX;
             lcb_respping_result_service(ping_res, i, &mut svc);
 
-            let lcb_status: u32 = lcb_respping_result_status(ping_res, i);
+            let lcb_status = lcb_respping_result_status(ping_res, i);
 
             let service_type = match svc {
                 0 => ServiceType::KeyValue,

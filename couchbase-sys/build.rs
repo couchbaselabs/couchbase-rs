@@ -85,7 +85,8 @@ fn main() {
         .generate_comments(false)
         .whitelist_function("lcb_.*")
         .whitelist_type("lcb_.*")
-        .whitelist_var("LCB_.*");
+        .whitelist_var("LCB_.*")
+        .whitelist_type("__va_list_tag");
 
     if cfg!(feature = "volatile") {
         bindings_builder = bindings_builder.header("internal-headers.h");
