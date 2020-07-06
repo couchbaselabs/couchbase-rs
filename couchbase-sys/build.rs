@@ -82,7 +82,10 @@ fn main() {
         .clang_arg(format!("{}/include", env::var("OUT_DIR").unwrap()))
         .blacklist_type("max_align_t")
         .size_t_is_usize(true)
-        .generate_comments(false);
+        .generate_comments(false)
+        .whitelist_function("lcb_.*")
+        .whitelist_type("lcb_.*")
+        .whitelist_var("LCB_.*");
 
     if cfg!(feature = "volatile") {
         bindings_builder = bindings_builder.header("internal-headers.h");
