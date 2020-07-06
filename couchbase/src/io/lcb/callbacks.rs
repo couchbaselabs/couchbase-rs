@@ -8,13 +8,13 @@ use crate::io::lcb::HttpCookie;
 use couchbase_sys::*;
 use log::{debug, trace};
 use serde_json::Value;
+use std::convert::TryInto;
 use std::ffi::CStr;
 use std::os::raw::{c_char, c_int, c_uint, c_void};
 use std::ptr;
 use std::slice::from_raw_parts;
 use std::str;
 use std::time::Duration;
-use std::convert::TryInto;
 
 use crate::io::lcb::{
     bucket_name_for_instance, wrapped_vsnprintf, AnalyticsCookie, QueryCookie, SearchCookie,

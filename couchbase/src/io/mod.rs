@@ -6,6 +6,12 @@ mod lcb;
 #[cfg(feature = "libcouchbase")]
 use crate::io::lcb::IoCore;
 
+#[cfg(all(feature = "native", not(feature = "libcouchbase")))]
+mod native;
+
+#[cfg(all(feature = "native", not(feature = "libcouchbase")))]
+use crate::io::native::IoCore;
+
 pub mod request;
 
 pub struct Core {

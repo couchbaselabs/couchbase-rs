@@ -1,6 +1,6 @@
 mod util;
 
-#[test]
+//#[test]
 fn run_kv_tests() {
     util::run(|_cfg| {
         foo();

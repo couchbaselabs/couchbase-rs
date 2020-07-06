@@ -1,6 +1,6 @@
 mod util;
 
-#[test]
+//#[test]
 fn run_query_tests() {
     util::run(|_cfg| {
         foo();

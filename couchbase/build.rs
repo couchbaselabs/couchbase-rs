@@ -1,5 +1,7 @@
+#[cfg(feature = "libcouchbase")]
 fn main() {
-    if cfg!(feature = "libcouchbase") {
-        cc::Build::new().file("src/io/utils.c").compile("utils")
-    }
+    cc::Build::new().file("src/io/utils.c").compile("utils")
 }
+
+#[cfg(not(feature = "libcouchbase"))]
+fn main() {}

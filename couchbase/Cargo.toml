@@ -25,6 +25,10 @@ uuid = { version = "0.8", features = ["v4"] }
 couchbase-sys = { path = "../couchbase-sys", version = "=1.0.0-alpha.4", optional = true }
 crossbeam-channel = { version = "0.4", optional = true }
 
+tokio = { version = "0.2", features = ["full"], optional = true }
+tokio-util = { version = "0.3", features = ["codec"], optional = true }
+bytes = { version = "0.5", optional = true }
+
 [build-dependencies]
 cc = { version = "1.0", optional = true }
 
@@ -44,3 +48,7 @@ libcouchbase-static = ["couchbase-sys/link-static"]
 uncomitted = []
 # If enabled, exposes all APIs currently marked as volatile or uncomitted
 volatile = ["uncomitted", "couchbase-sys/volatile"]
+# If enabled, does not use libcouchbase but the fully native SDK
+native = ["tokio-runtime", "bytes"]
+# If enabled, will use a tokio based runtime for the native SDK
+tokio-runtime = ["tokio", "tokio-util"]
