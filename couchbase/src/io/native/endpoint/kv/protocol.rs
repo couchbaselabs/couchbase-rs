@@ -140,15 +140,17 @@ pub fn response(
 }
 
 pub enum Opcode {
-    Noop,
     Get,
+    Hello,
+    Noop,
 }
 
 impl Opcode {
     pub fn encoded(&self) -> u8 {
         match self {
-            Self::Noop => 0x0A,
             Self::Get => 0x00,
+            Self::Hello => 0x1F,
+            Self::Noop => 0x0A,
         }
     }
 }

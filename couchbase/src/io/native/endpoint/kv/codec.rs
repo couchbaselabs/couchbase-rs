@@ -1,3 +1,5 @@
+//! Encoding and decoding facilities for the kv protocol.
+
 use tokio_util::codec::Decoder;
 use tokio_util::codec::Encoder;
 
@@ -7,6 +9,16 @@ use std::io;
 
 use super::protocol::HEADER_SIZE;
 
+/// The `KeyValueCodec` aggregates byte chunks into full packets at their boundaries
+/// on decoding.
+///
+/// This is important, since over TCP the packets can arrive in various chunk sizes
+/// which are not necessarily exactly at the memcache binary protocol boundaries. On
+/// The encoding side though the codec just sends along the data, since there is no
+/// need to split up anything.
+///
+/// In the future this codec could also do basic validation of the payload, but at
+/// the moment this is not implemented.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Default)]
 pub struct KeyValueCodec(());
 
@@ -20,6 +32,17 @@ impl Decoder for KeyValueCodec {
     type Item = BytesMut;
     type Error = io::Error;
 
+    /// Decodes packets onto their correct protocol boundaries.
+    ///
+    /// The algorithm is rather simple, and copied from the current java implementation.
+    /// It first checks if we have at least a 24 byte header (HEADER_SIZE) available to
+    /// figure out how many bytes the total boy length is. Once the header is received
+    /// we extract the body length and then make sure we have the full packet around
+    /// so header size plus total body length. Once this is the case, split at that
+    /// boundary and return it to the caller.
+    ///
+    /// Subsequent packets will be left in the input buffer and consumed during the
+    /// next iterations.
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<BytesMut>, io::Error> {
         let buf_len = buf.len();
 
@@ -43,6 +66,12 @@ impl Decoder for KeyValueCodec {
 impl Encoder<Bytes> for KeyValueCodec {
     type Error = io::Error;
 
+    /// The encoder just reserves the bytes on the output buffer and writes
+    /// the data completely into it in one shot.
+    ///
+    /// No chunking or boundary checks are performed during encode as opposed
+    /// to the decode logic. The upper levels are responsible for sending
+    /// correctly formatted requests and responses downstream.
     fn encode(&mut self, data: Bytes, buf: &mut BytesMut) -> Result<(), io::Error> {
         buf.reserve(data.len());
         buf.put(data);
