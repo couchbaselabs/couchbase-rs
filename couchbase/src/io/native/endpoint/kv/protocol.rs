@@ -1,8 +1,10 @@
 //! Utility functions and statics for interacting with the KV binary protocol
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
+use std::convert::TryFrom;
 
 pub static HEADER_SIZE: usize = 24;
+pub static ERROR_MAP_VERSION: u16 = 1;
 
 /// Creates a regular, non-flex request with all fields necessary.
 pub fn request(
@@ -192,7 +194,7 @@ pub fn dump(input: &Bytes) -> String {
     output.push_str(&format!(
         "    Opcode: 0x{:x} ({:?})\n",
         opcode,
-        Opcode::from(opcode)
+        Opcode::try_from(opcode).unwrap()
     ));
     let key_size = slice.get_u16();
     output.push_str(&format!("   Key Len: {} bytes\n", key_size));
@@ -217,7 +219,7 @@ pub enum Opcode {
     Get,
     Hello,
     Noop,
-    Unknown,
+    ErrorMap,
 }
 
 impl Opcode {
@@ -226,19 +228,22 @@ impl Opcode {
             Self::Get => 0x00,
             Self::Hello => 0x1F,
             Self::Noop => 0x0A,
-            Self::Unknown => panic!("Cannot convert unknown opcode"),
+            Self::ErrorMap => 0xFE,
         }
     }
 }
 
-impl From<u8> for Opcode {
-    fn from(input: u8) -> Opcode {
-        match input {
+impl TryFrom<u8> for Opcode {
+    type Error = u8;
+
+    fn try_from(input: u8) -> Result<Self, Self::Error> {
+        Ok(match input {
             0x00 => Opcode::Get,
             0x1F => Opcode::Hello,
             0x0A => Opcode::Noop,
-            _ => Opcode::Unknown,
-        }
+            0xFE => Opcode::ErrorMap,
+            _ => return Err(input),
+        })
     }
 }
 

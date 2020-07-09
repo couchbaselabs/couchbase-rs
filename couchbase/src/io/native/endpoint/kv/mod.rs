@@ -8,6 +8,7 @@ use futures::sink::SinkExt;
 use futures::Sink;
 use futures::Stream;
 use futures::StreamExt;
+use serde_derive::Deserialize;
 use std::convert::TryFrom;
 use std::io::Error as IoError;
 use std::net::SocketAddr;
@@ -29,19 +30,25 @@ impl KvEndpoint {
         let mut socket = TcpStream::connect(self.remote_addr).await.unwrap();
         println!("Connected to socket {:?}", socket);
         let (r, w) = socket.split();
-        let output = FramedWrite::new(w, KeyValueCodec::new());
+        let mut output = FramedWrite::new(w, KeyValueCodec::new());
         let input = FramedRead::new(r, KeyValueCodec::new());
 
         pin_mut!(input);
 
-        send_hello(output).await.unwrap();
-        let features = receive_hello(input).await.unwrap();
+        send_hello(&mut output).await.unwrap();
+        send_error_map(&mut output).await.unwrap();
+
+        let features = receive_hello(&mut input).await.unwrap();
+        let error_map = receive_error_map(&mut input).await.unwrap();
 
         println!("Negotiated features {:?}", features);
+        println!("Error Map: {:?}", error_map);
     }
 }
 
-async fn send_hello(mut output: impl Sink<Bytes, Error = IoError> + Unpin) -> Result<(), IoError> {
+async fn send_hello(
+    output: &mut (impl Sink<Bytes, Error = IoError> + Unpin),
+) -> Result<(), IoError> {
     let features = vec![
         ServerFeature::SelectBucket,
         ServerFeature::Xattr,
@@ -72,7 +79,7 @@ async fn send_hello(mut output: impl Sink<Bytes, Error = IoError> + Unpin) -> Re
 }
 
 async fn receive_hello(
-    mut input: Pin<&mut dyn Stream<Item = Result<BytesMut, IoError>>>,
+    input: &mut Pin<&mut impl Stream<Item = Result<BytesMut, IoError>>>,
 ) -> Result<Vec<ServerFeature>, IoError> {
     let response = input.next().await.unwrap()?.freeze();
 
@@ -88,6 +95,37 @@ async fn receive_hello(
     }
 
     Ok(features)
+}
+
+async fn send_error_map(
+    output: &mut (impl Sink<Bytes, Error = IoError> + Unpin),
+) -> Result<(), IoError> {
+    let mut body = BytesMut::with_capacity(2);
+    body.put_u16(protocol::ERROR_MAP_VERSION);
+
+    let req = protocol::request(
+        protocol::Opcode::ErrorMap,
+        0,
+        0,
+        0,
+        0,
+        None,
+        None,
+        Some(body.freeze()),
+    );
+    output.send(req.freeze()).await?;
+    Ok(())
+}
+
+async fn receive_error_map(
+    input: &mut Pin<&mut impl Stream<Item = Result<BytesMut, IoError>>>,
+) -> Result<ErrorMap, IoError> {
+    let response = input.next().await.unwrap()?.freeze();
+    if let Some(mut body) = protocol::body(&response) {
+        let error_map = serde_json::from_slice(body.bytes()).unwrap();
+        return Ok(error_map);
+    }
+    panic!("Unhandled IO Error");
 }
 
 #[derive(Debug)]
@@ -145,6 +183,12 @@ impl TryFrom<u16> for ServerFeature {
             _ => return Err(input),
         })
     }
+}
+
+#[derive(Debug, Deserialize)]
+struct ErrorMap {
+    version: u16,
+    revision: u16,
 }
 
 #[cfg(test)]
