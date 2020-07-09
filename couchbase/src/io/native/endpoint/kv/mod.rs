@@ -1,13 +1,14 @@
 mod codec;
 mod protocol;
 
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::{Buf, BufMut, Bytes, BytesMut};
 use codec::KeyValueCodec;
 use futures::pin_mut;
 use futures::sink::SinkExt;
 use futures::Sink;
 use futures::Stream;
 use futures::StreamExt;
+use std::convert::TryFrom;
 use std::io::Error as IoError;
 use std::net::SocketAddr;
 use std::pin::Pin;
@@ -33,16 +34,14 @@ impl KvEndpoint {
 
         pin_mut!(input);
 
-        let features = negotiate_hello(input, output).await.unwrap();
+        send_hello(output).await.unwrap();
+        let features = receive_hello(input).await.unwrap();
+
         println!("Negotiated features {:?}", features);
     }
-
 }
 
-async fn negotiate_hello(
-    mut input: Pin<&mut dyn Stream<Item = Result<BytesMut, IoError>>>,
-    mut output: impl Sink<Bytes, Error = IoError> + Unpin,
-) -> Result<Vec<ServerFeature>, IoError> {
+async fn send_hello(mut output: impl Sink<Bytes, Error = IoError> + Unpin) -> Result<(), IoError> {
     let features = vec![
         ServerFeature::SelectBucket,
         ServerFeature::Xattr,
@@ -69,13 +68,27 @@ async fn negotiate_hello(
         Some(body.freeze()),
     );
     output.send(req.freeze()).await?;
-
-    let response = input.next().await.unwrap()?;
-
-    println!("--> {:?}", response);
-    Ok(vec![])
+    Ok(())
 }
 
+async fn receive_hello(
+    mut input: Pin<&mut dyn Stream<Item = Result<BytesMut, IoError>>>,
+) -> Result<Vec<ServerFeature>, IoError> {
+    let response = input.next().await.unwrap()?.freeze();
+
+    let mut features = vec![];
+    if let Some(mut body) = protocol::body(&response) {
+        while body.remaining() > 0 {
+            if let Ok(f) = ServerFeature::try_from(body.get_u16()) {
+                features.push(f);
+            } else {
+                // todo: debug that we got an unknown server feature
+            }
+        }
+    }
+
+    Ok(features)
+}
 
 #[derive(Debug)]
 enum ServerFeature {
@@ -109,6 +122,28 @@ impl ServerFeature {
             Self::Vattr => 0x15,
             Self::CreateAsDeleted => 0x17,
         }
+    }
+}
+
+impl TryFrom<u16> for ServerFeature {
+    type Error = u16;
+
+    fn try_from(input: u16) -> Result<Self, Self::Error> {
+        Ok(match input {
+            0x08 => Self::SelectBucket,
+            0x06 => Self::Xattr,
+            0x07 => Self::Xerror,
+            0x10 => Self::AltRequest,
+            0x11 => Self::SyncReplication,
+            0x12 => Self::Collections,
+            0x0F => Self::Tracing,
+            0x04 => Self::MutationSeqno,
+            0x0A => Self::Snappy,
+            0x0E => Self::UnorderedExecution,
+            0x15 => Self::Vattr,
+            0x17 => Self::CreateAsDeleted,
+            _ => return Err(input),
+        })
     }
 }
 
