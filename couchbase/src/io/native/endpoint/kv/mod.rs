@@ -15,6 +15,7 @@ use std::net::SocketAddr;
 use std::pin::Pin;
 use tokio::net::TcpStream;
 use tokio_util::codec::{FramedRead, FramedWrite};
+use std::collections::{HashSet, HashMap};
 
 pub struct KvEndpoint {
     remote_addr: SocketAddr,
@@ -41,8 +42,8 @@ impl KvEndpoint {
         let features = receive_hello(&mut input).await.unwrap();
         let error_map = receive_error_map(&mut input).await.unwrap();
 
-        println!("Negotiated features {:?}", features);
-        println!("Error Map: {:?}", error_map);
+        // println!("Negotiated features {:?}", features);
+        // println!("Error Map: {:?}", error_map);
     }
 }
 
@@ -121,7 +122,7 @@ async fn receive_error_map(
     input: &mut Pin<&mut impl Stream<Item = Result<BytesMut, IoError>>>,
 ) -> Result<ErrorMap, IoError> {
     let response = input.next().await.unwrap()?.freeze();
-    if let Some(mut body) = protocol::body(&response) {
+    if let Some(body) = protocol::body(&response) {
         let error_map = serde_json::from_slice(body.bytes()).unwrap();
         return Ok(error_map);
     }
@@ -189,6 +190,73 @@ impl TryFrom<u16> for ServerFeature {
 struct ErrorMap {
     version: u16,
     revision: u16,
+    errors: HashMap<String, ErrorCode>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ErrorCode {
+    name: String,
+    desc: String,
+    attrs: HashSet<ErrorAttribute>,
+    retry: Option<RetrySpecification>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RetrySpecification {
+    strategy: RetryStrategy,
+    interval: u32,
+    after: u32,
+    #[serde(rename = "max-duration")]
+    max_duration: u32,
+    ceil: u32,
+}
+
+#[derive(Debug, Deserialize, Eq, PartialEq, Hash)]
+enum ErrorAttribute {
+    #[serde(rename = "success")]
+    Success,
+    #[serde(rename = "item-only")]
+    ItemOnly,
+    #[serde(rename = "invalid-input")]
+    InvalidInput,
+    #[serde(rename = "fetch-config")]
+    FetchConfig,
+    #[serde(rename = "conn-state-invalidated")]
+    ConnStateInvalidated,
+    #[serde(rename = "auth")]
+    Auth,
+    #[serde(rename = "special-handling")]
+    SpecialHandling,
+    #[serde(rename = "support")]
+    Support,
+    #[serde(rename = "temp")]
+    Temp,
+    #[serde(rename = "internal")]
+    Internal,
+    #[serde(rename = "retry-now")]
+    RetryNow,
+    #[serde(rename = "retry-later")]
+    RetryLater,
+    #[serde(rename = "subdoc")]
+    Subdoc,
+    #[serde(rename = "dcp")]
+    Dcp,
+    #[serde(rename = "auto-retry")]
+    AutoRetry,
+    #[serde(rename = "item-locked")]
+    ItemLocked,
+    #[serde(rename = "item-deleted")]
+    ItemDeleted,
+}
+
+#[derive(Debug, Deserialize)]
+enum RetryStrategy {
+    #[serde(rename = "exponential")]
+    Exponential,
+    #[serde(rename = "linear")]
+    Linear,
+    #[serde(rename = "constant")]
+    Constant,
 }
 
 #[cfg(test)]
