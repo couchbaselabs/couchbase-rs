@@ -8,13 +8,13 @@ use crate::io::lcb::HttpCookie;
 use couchbase_sys::*;
 use log::{debug, trace};
 use serde_json::Value;
+use std::convert::TryInto;
 use std::ffi::CStr;
 use std::os::raw::{c_char, c_int, c_uint, c_void};
 use std::ptr;
 use std::slice::from_raw_parts;
 use std::str;
 use std::time::Duration;
-use std::convert::TryInto;
 
 use crate::io::lcb::{
     bucket_name_for_instance, wrapped_vsnprintf, AnalyticsCookie, QueryCookie, SearchCookie,
@@ -727,6 +727,12 @@ fn gen_lcb_io_error() -> std::io::Error {
 
 const LOG_MSG_LENGTH: usize = 1024;
 
+// Windows disagrees with Linux and Macos on which type is available.
+#[cfg(not(target_os = "windows"))]
+pub(crate) type VaList = *mut __va_list_tag;
+#[cfg(target_os = "windows")]
+pub(crate) type VaList = va_list;
+
 pub unsafe extern "C" fn logger_callback(
     _procs: *const lcb_LOGGER,
     _iid: u64,
@@ -735,7 +741,7 @@ pub unsafe extern "C" fn logger_callback(
     _srcfile: *const c_char,
     _srcline: c_int,
     fmt: *const c_char,
-    ap: *mut __va_list_tag,
+    ap: VaList,
 ) {
     let level = match severity {
         0 => log::Level::Trace,
@@ -842,7 +848,10 @@ pub unsafe extern "C" fn stats_callback(
     } else {
         let server = CStr::from_ptr((*stats_res).server).to_str().unwrap();
 
-        let value = from_raw_parts((*stats_res).value as *const u8, (*stats_res).nvalue);
+        let value = from_raw_parts(
+            (*stats_res).value as *const u8,
+            (*stats_res).nvalue.try_into().unwrap(),
+        );
         let value = String::from(std::str::from_utf8(value).unwrap());
 
         let key = from_raw_parts((*stats_res).ctx.key as *const u8, (*stats_res).ctx.key_len);

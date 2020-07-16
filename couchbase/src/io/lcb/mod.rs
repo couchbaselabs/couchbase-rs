@@ -143,7 +143,7 @@ extern "C" {
         buf: *mut c_char,
         size: c_uint,
         format: *const c_char,
-        ap: *mut __va_list_tag,
+        ap: callbacks::VaList,
     ) -> c_int;
 }
 

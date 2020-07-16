@@ -17,7 +17,8 @@ edition = "2018"
 openssl-sys = "0.9.58"
 
 [build-dependencies]
-cmake = "0.1"
+#cmake = "0.1"
+cmake = { rev = "381b60b8fa093737d176de91140902496c78a3c2", git = "https://github.com/chvck/cmake-rs" }
 
 [build-dependencies.bindgen]
 version = "0.54"
