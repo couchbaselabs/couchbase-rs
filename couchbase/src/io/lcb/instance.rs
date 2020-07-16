@@ -154,8 +154,8 @@ impl LcbInstance {
         let (name_len, c_name) = into_cstring(name.clone());
         unsafe {
             check_lcb_status(lcb_open(self.inner, c_name.as_ptr(), name_len))?;
-            check_lcb_status(lcb_wait(self.inner, lcb_WAITFLAGS_LCB_WAIT_DEFAULT))?;
         }
+        self.tick_nowait()?;
         debug!("Finished bucket bind for {}", &name);
         Ok(())
     }
