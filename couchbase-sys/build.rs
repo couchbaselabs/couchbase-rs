@@ -50,17 +50,35 @@ fn main() {
         build_cfg.define("LIBCOUCHBASE_STATIC", "ON");
     }
 
+    if cfg!(target_os = "windows") {
+        build_cfg.no_c_flags(true);
+    }
+
     let build_dst = build_cfg.build();
 
     if cfg!(feature = "link-static") {
-        std::fs::copy(
-            format!("{}/libcouchbaseS.a", build_dst.join("build/lib").display()),
-            format!("{}/libcouchbase.a", build_dst.join("build/lib").display()),
-        )
-        .unwrap();
+        if cfg!(target_os = "windows") {
+            std::fs::copy(
+                format!(
+                    "{}/couchbaseS_d.lib",
+                    build_dst.join("build/lib/debug").display()
+                ),
+                format!("{}/couchbase.lib", build_dst.join("build/lib").display()),
+            )
+            .unwrap();
+        } else {
+            std::fs::copy(
+                format!("{}/libcouchbaseS.a", build_dst.join("build/lib").display()),
+                format!("{}/libcouchbase.a", build_dst.join("build/lib").display()),
+            )
+            .unwrap();
+        }
 
         if cfg!(any(target_os = "macos", target_os = "freebsd")) {
             println!("cargo:rustc-link-lib=dylib=c++");
+        } else if cfg!(target_os = "windows") {
+            println!("cargo:rustc-link-lib=dylib=msvcrtd");
+            println!("cargo:rustc-link-lib=dylib=dnsapi");
         } else {
             println!("cargo:rustc-link-lib=dylib=resolv");
             println!("cargo:rustc-link-lib=dylib=stdc++");
