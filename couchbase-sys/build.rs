@@ -58,14 +58,25 @@ fn main() {
 
     if cfg!(feature = "link-static") {
         if cfg!(target_os = "windows") {
-            std::fs::copy(
-                format!(
-                    "{}/couchbaseS_d.lib",
-                    build_dst.join("build/lib/debug").display()
-                ),
-                format!("{}/couchbase.lib", build_dst.join("build/lib").display()),
-            )
-            .unwrap();
+            if env::var("PROFILE").unwrap() == "release" {
+                std::fs::copy(
+                    format!(
+                        "{}/couchbaseS.lib",
+                        build_dst.join("build/lib/Release").display()
+                    ),
+                    format!("{}/couchbase.lib", build_dst.join("build/lib").display()),
+                )
+                .unwrap();
+            } else {
+                std::fs::copy(
+                    format!(
+                        "{}/couchbaseS_d.lib",
+                        build_dst.join("build/lib/debug").display()
+                    ),
+                    format!("{}/couchbase.lib", build_dst.join("build/lib").display()),
+                )
+                .unwrap();
+            }
         } else {
             std::fs::copy(
                 format!("{}/libcouchbaseS.a", build_dst.join("build/lib").display()),
