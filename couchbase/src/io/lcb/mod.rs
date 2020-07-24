@@ -13,7 +13,7 @@ use instance::{LcbInstance, LcbInstances};
 
 use couchbase_sys::*;
 use crossbeam_channel::{unbounded, Receiver, Sender};
-use log::debug;
+use log::{debug, warn};
 use std::ffi::CStr;
 use std::os::raw::{c_char, c_int, c_uint, c_void};
 use std::thread::JoinHandle;
@@ -87,14 +87,14 @@ fn run_lcb_loop(
 ) {
     let mut instances = LcbInstances::default();
 
-    let instance = LcbInstance::new(
+    match LcbInstance::new(
         connection_string.into_bytes(),
         username.into_bytes(),
         password.into_bytes(),
-    )
-    .unwrap();
-
-    instances.set_unbound(instance);
+    ) {
+        Ok(i) => instances.set_unbound(i),
+        Err(e) => warn!("Could not open libcouchbase instance {}", e),
+    };
 
     'running: loop {
         if instances.have_outstanding_requests() {

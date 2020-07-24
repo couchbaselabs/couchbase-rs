@@ -3,6 +3,7 @@ use crate::api::{LookupInSpec, MutateInSpec};
 use crate::io::lcb::callbacks::{analytics_callback, query_callback, search_callback};
 use crate::io::lcb::{AnalyticsCookie, HttpCookie, QueryCookie, SearchCookie};
 use crate::io::request::*;
+use log::warn;
 
 use couchbase_sys::*;
 use std::ffi::CString;
@@ -56,6 +57,7 @@ pub fn encode_get(instance: *mut lcb_INSTANCE, request: GetRequest) {
             }
         };
 
+        warn!("Sending now");
         lcb_get(instance, cookie as *mut c_void, command);
         lcb_cmdget_destroy(command);
     }

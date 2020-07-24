@@ -18,7 +18,7 @@ pub fn main() {
     let collection = bucket.default_collection();
 
     // Fetch a document
-    match block_on(collection.get("airline_10", GetOptions::default())) {
+    match block_on(collection.get("airline_10123", GetOptions::default())) {
         Ok(r) => println!("get result: {:?}", r),
         Err(e) => println!("get failed! {}", e),
     };
@@ -28,8 +28,8 @@ pub fn main() {
     content.insert("Hello", "Rust!");
 
     match block_on(collection.replace("foo", content, ReplaceOptions::default())) {
-        Ok(r) => println!("upsert result: {:?}", r),
-        Err(e) => println!("upsert failed! {}", e),
+        Ok(r) => println!("replace result: {:?}", r),
+        Err(e) => println!("replace failed! {}", e),
     };
 
     // Remove a document

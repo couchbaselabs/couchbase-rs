@@ -366,7 +366,7 @@ fn build_kv_error_context(lcb_ctx: *const lcb_KEY_VALUE_ERROR_CONTEXT) -> ErrorC
         lcb_errctx_kv_endpoint(lcb_ctx, &mut endpoint_ptr, &mut endpoint_len);
         if !endpoint_ptr.is_null() && endpoint_len > 0 {
             // Looks like the endpoint is 0 terminated, as opposed to bucket etc...
-            let endpoint = decode_and_own_str(endpoint_ptr, endpoint_len - 1);
+            let endpoint = decode_and_own_str(endpoint_ptr, endpoint_len);
             ctx.insert("remote", Value::String(endpoint));
         }
     }

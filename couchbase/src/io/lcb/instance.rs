@@ -1,9 +1,11 @@
+use crate::api::error::{CouchbaseError, ErrorContext};
 use crate::io::lcb::callbacks::*;
 use crate::io::lcb::encode::into_cstring;
 use crate::io::lcb::{encode_request, IoRequest};
 use crate::io::request::Request;
 use couchbase_sys::*;
-use log::debug;
+use log::{debug, warn};
+use serde_json::Value;
 use std::collections::HashMap;
 use std::os::raw::c_void;
 use std::ptr;
@@ -155,7 +157,15 @@ impl LcbInstance {
         unsafe {
             check_lcb_status(lcb_open(self.inner, c_name.as_ptr(), name_len))?;
         }
-        self.tick_nowait()?;
+
+        // We need a blocking wait here for now (until lcb fixes it in CCBC-1025), because
+        // right now if we nowait a incoming request can race with the open and will end
+        // up being never completed...
+        // self.tick_nowait()?;
+        unsafe {
+            lcb_wait(self.inner, lcb_WAITFLAGS_LCB_WAIT_DEFAULT);
+        }
+
         debug!("Finished bucket bind for {}", &name);
         Ok(())
     }
@@ -275,7 +285,18 @@ impl LcbInstances {
                 };
                 match instance {
                     Some(i) => i.handle_request(r),
-                    None => panic!("Could not find open bucket or global bucket!"),
+                    None => {
+                        let mut ctx = ErrorContext::default();
+                        ctx.insert(
+                            "cause",
+                            Value::String(
+                                "No active libcouchbase instance found to handle the request! Did bootstrap fail?"
+                                    .into(),
+                            ),
+                        );
+                        r.fail(CouchbaseError::RequestCanceled { ctx });
+                        warn!("Cannot dispatch operation because no open bucket found!");
+                    }
                 };
             }
             IoRequest::Shutdown => return Ok(true),
@@ -289,9 +310,15 @@ impl LcbInstances {
                     if self.has_unbound_instance() {
                         self.bind_unbound_to_bucket(name)?
                     } else {
-                        let mut instance = LcbInstance::new(connection_string, username, password)?;
-                        instance.bind_to_bucket(name.clone())?;
-                        self.set_bound(name, instance);
+                        match LcbInstance::new(connection_string, username, password) {
+                            Ok(mut i) => {
+                                i.bind_to_bucket(name.clone())?;
+                                self.set_bound(name, i);
+                            }
+                            Err(e) => {
+                                warn!("Could not open libcouchbase bucket: {}", e);
+                            }
+                        }
                     }
                 }
             }

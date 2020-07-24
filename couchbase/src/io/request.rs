@@ -1,4 +1,4 @@
-use crate::api::error::CouchbaseResult;
+use crate::api::error::{CouchbaseError, CouchbaseResult};
 use crate::api::options::*;
 use crate::api::results::*;
 use crate::api::{LookupInSpec, MutateInSpec};
@@ -33,6 +33,24 @@ impl Request {
             Self::LookupIn(r) => Some(&r.bucket),
             _ => None,
         }
+    }
+
+    pub fn fail(self, reason: CouchbaseError) {
+        match self {
+            Self::Get(r) => r.sender.send(Err(reason)).unwrap(),
+            Self::Mutate(r) => r.sender.send(Err(reason)).unwrap(),
+            Self::Exists(r) => r.sender.send(Err(reason)).unwrap(),
+            Self::Remove(r) => r.sender.send(Err(reason)).unwrap(),
+            Self::MutateIn(r) => r.sender.send(Err(reason)).unwrap(),
+            Self::LookupIn(r) => r.sender.send(Err(reason)).unwrap(),
+            Self::Query(r) => r.sender.send(Err(reason)).unwrap(),
+            Self::Analytics(r) => r.sender.send(Err(reason)).unwrap(),
+            Self::Search(r) => r.sender.send(Err(reason)).unwrap(),
+            Self::Ping(r) => r.sender.send(Err(reason)).unwrap(),
+            Self::GenericManagementRequest(r) => r.sender.send(Err(reason)).unwrap(),
+            #[cfg(feature = "volatile")]
+            Self::KvStatsRequest(r) => r.sender.send(Err(reason)).unwrap(),
+        };
     }
 }
 
