@@ -190,13 +190,15 @@ impl GenericManagementRequest {
 pub struct KvStatsRequest {
     pub(crate) sender: Sender<CouchbaseResult<KvStatsResult>>,
     pub(crate) options: KvStatsOptions,
+    pub(crate) key: Option<String>,
 }
 
 #[cfg(feature = "volatile")]
 impl KvStatsRequest {
-    pub fn new(sender: Sender<CouchbaseResult<KvStatsResult>>) -> Self {
+    pub fn new(sender: Sender<CouchbaseResult<KvStatsResult>>, key: Option<String>) -> Self {
         Self {
             sender,
+            key,
             options: KvStatsOptions::default(),
         }
     }

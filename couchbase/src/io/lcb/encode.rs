@@ -665,7 +665,7 @@ pub fn encode_generic_management_request(
 pub fn encode_kv_stats(instance: *mut lcb_INSTANCE, request: KvStatsRequest) {
     let (scope_len, scope) = into_cstring(String::from(""));
     let (collection_len, collection) = into_cstring(String::from(""));
-    let (key_len, key) = into_cstring(String::from(""));
+    let (key_len, key) = into_cstring(request.key.unwrap_or_default());
 
     let key = lcb_KEYBUF {
         type_: lcb_KVBUFTYPE_LCB_KV_COPY,
