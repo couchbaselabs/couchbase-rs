@@ -13,7 +13,7 @@ Make sure to have all [libcouchbase](https://docs.couchbase.com/c-sdk/current/st
 
 ```toml
 [dependencies]
-couchbase = "1.0.0-alpha.3"
+couchbase = "1.0.0-alpha.4"
 ```
 
 ## Usage

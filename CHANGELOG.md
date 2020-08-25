@@ -5,12 +5,13 @@
 ### Enhancements
 
  - Libcouchbase can now be built statically through a feature flag
- - Depend on libcouchbase 3.0.1
+ - Depend on libcouchbase 3.0.3
  - Libcouchbase is now built with OpenSSL
  - Add the `bucket_name` to `MutationToken`
  - Adds basic support for subdoc operations
  - Add support for multiple buckets to be open at the same time
  - Accessors to cas/mutation token for the `MutationResult`
+ - Add various API commands like `ping` and the `UserManager`
 
 ### Fixes
 
