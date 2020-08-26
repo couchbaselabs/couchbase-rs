@@ -1,5 +1,7 @@
 //! Build script for `couchbase-sys` to bind to `libcouchbase`.
 
+mod cmake;
+
 use std::env;
 use std::path::PathBuf;
 
