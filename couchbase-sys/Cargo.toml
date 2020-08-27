@@ -1,6 +1,6 @@
 [package]
 name = "couchbase-sys"
-version = "1.0.0-alpha.4" # remember to update html_root_url
+version = "1.0.0-alpha.5" # remember to update html_root_url
 authors = ["Michael Nitschinger <michael.nitschinger@couchbase.com>"]
 build = "build/main.rs"
 links = "libcouchbase"
@@ -20,7 +20,7 @@ openssl-sys = "0.9.58"
 cc = "1.0"
 
 [build-dependencies.bindgen]
-version = "0.54"
+version = "0.55"
 default-features = false
 features = ["logging", "runtime", "which-rustfmt"]
 
