@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.0-alpha.5 (In Progress)
+
+### Enhancements
+
+ - Update libcouchbase to 3.0.5
+
+### Fixes
+
+ - Make sure libcouchbase gets to run bg tasks every 100ms on
+   idle systems
+
 ## 1.0.0-alpha.4
 
 ### Enhancements
