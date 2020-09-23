@@ -12,11 +12,13 @@ use crate::io::request::Request;
 use instance::{LcbInstance, LcbInstances};
 
 use couchbase_sys::*;
+use crossbeam_channel::RecvTimeoutError;
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use log::{debug, warn};
 use std::ffi::CStr;
 use std::os::raw::{c_char, c_int, c_uint, c_void};
 use std::thread::JoinHandle;
+use std::time::Duration;
 use std::{ptr, thread};
 
 pub struct IoCore {
@@ -103,9 +105,21 @@ fn run_lcb_loop(
                     break 'running;
                 }
             }
-        } else if let Ok(req) = queue_rx.recv() {
-            if instances.handle_request(req).unwrap() {
-                break 'running;
+        } else {
+            match queue_rx.recv_timeout(Duration::from_millis(100)) {
+                Ok(req) => {
+                    if instances.handle_request(req).unwrap() {
+                        // We got shut down, bail out.
+                        break 'running;
+                    }
+                }
+                Err(RecvTimeoutError::Disconnected) => {
+                    // The sender disconnected, bail out.
+                    break 'running;
+                }
+                Err(RecvTimeoutError::Timeout) => {
+                    // Keep going, it will make sure to tick below and then block again
+                }
             }
         }
 
