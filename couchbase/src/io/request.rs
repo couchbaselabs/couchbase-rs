@@ -58,6 +58,8 @@ impl Request {
 pub struct GetRequest {
     pub(crate) id: String,
     pub(crate) bucket: String,
+    pub(crate) scope: String,
+    pub(crate) collection: String,
     pub(crate) sender: Sender<CouchbaseResult<GetResult>>,
     pub(crate) ty: GetRequestType,
 }
@@ -81,6 +83,8 @@ pub enum GetRequestType {
 pub struct ExistsRequest {
     pub(crate) id: String,
     pub(crate) bucket: String,
+    pub(crate) scope: String,
+    pub(crate) collection: String,
     pub(crate) sender: Sender<CouchbaseResult<ExistsResult>>,
     pub(crate) options: ExistsOptions,
 }
@@ -89,6 +93,8 @@ pub struct ExistsRequest {
 pub struct RemoveRequest {
     pub(crate) id: String,
     pub(crate) bucket: String,
+    pub(crate) scope: String,
+    pub(crate) collection: String,
     pub(crate) sender: Sender<CouchbaseResult<MutationResult>>,
     pub(crate) options: RemoveOptions,
 }
@@ -98,6 +104,8 @@ pub struct MutateRequest {
     pub(crate) id: String,
     pub(crate) bucket: String,
     pub(crate) content: Vec<u8>,
+    pub(crate) scope: String,
+    pub(crate) collection: String,
     pub(crate) sender: Sender<CouchbaseResult<MutationResult>>,
     pub(crate) ty: MutateRequestType,
 }
@@ -135,6 +143,8 @@ pub struct SearchRequest {
 pub struct LookupInRequest {
     pub(crate) id: String,
     pub(crate) bucket: String,
+    pub(crate) scope: String,
+    pub(crate) collection: String,
     pub(crate) sender: Sender<CouchbaseResult<LookupInResult>>,
     pub(crate) specs: Vec<LookupInSpec>,
     pub(crate) options: LookupInOptions,
@@ -144,6 +154,8 @@ pub struct LookupInRequest {
 pub struct MutateInRequest {
     pub(crate) id: String,
     pub(crate) bucket: String,
+    pub(crate) scope: String,
+    pub(crate) collection: String,
     pub(crate) sender: Sender<CouchbaseResult<MutateInResult>>,
     pub(crate) specs: Vec<MutateInSpec>,
     pub(crate) options: MutateInOptions,

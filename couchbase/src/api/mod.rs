@@ -365,7 +365,7 @@ impl Scope {
 pub struct Collection {
     core: Arc<Core>,
     name: String,
-    _scope_name: String,
+    scope_name: String,
     bucket_name: String,
 }
 
@@ -379,7 +379,7 @@ impl Collection {
         Self {
             core,
             name,
-            _scope_name: scope_name,
+            scope_name: scope_name,
             bucket_name,
         }
     }
@@ -400,6 +400,8 @@ impl Collection {
             ty: GetRequestType::Get { options },
             bucket: self.bucket_name.clone(),
             sender,
+            scope: self.scope_name.clone(),
+            collection: self.name.clone(),
         }));
         receiver.await.unwrap()
     }
@@ -416,6 +418,8 @@ impl Collection {
             ty: GetRequestType::GetAndLock { options, lock_time },
             bucket: self.bucket_name.clone(),
             sender,
+            scope: self.scope_name.clone(),
+            collection: self.name.clone(),
         }));
         receiver.await.unwrap()
     }
@@ -432,6 +436,8 @@ impl Collection {
             ty: GetRequestType::GetAndTouch { options, expiry },
             bucket: self.bucket_name.clone(),
             sender,
+            scope: self.scope_name.clone(),
+            collection: self.name.clone(),
         }));
         receiver.await.unwrap()
     }
@@ -447,6 +453,8 @@ impl Collection {
             options,
             bucket: self.bucket_name.clone(),
             sender,
+            scope: self.scope_name.clone(),
+            collection: self.name.clone(),
         }));
         receiver.await.unwrap()
     }
@@ -516,6 +524,8 @@ impl Collection {
             sender,
             bucket: self.bucket_name.clone(),
             ty,
+            scope: self.scope_name.clone(),
+            collection: self.name.clone(),
         }));
         receiver.await.unwrap()
     }
@@ -531,6 +541,8 @@ impl Collection {
             sender,
             bucket: self.bucket_name.clone(),
             options,
+            scope: self.scope_name.clone(),
+            collection: self.name.clone(),
         }));
         receiver.await.unwrap()
     }
@@ -548,6 +560,8 @@ impl Collection {
             sender,
             bucket: self.bucket_name.clone(),
             options,
+            scope: self.scope_name.clone(),
+            collection: self.name.clone(),
         }));
         receiver.await.unwrap()
     }
@@ -565,6 +579,8 @@ impl Collection {
             sender,
             bucket: self.bucket_name.clone(),
             options,
+            scope: self.scope_name.clone(),
+            collection: self.name.clone(),
         }));
         receiver.await.unwrap()
     }
