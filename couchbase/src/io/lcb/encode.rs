@@ -29,11 +29,20 @@ pub fn into_cstring<T: Into<Vec<u8>>>(input: T) -> (usize, CString) {
 pub fn encode_get(instance: *mut lcb_INSTANCE, request: GetRequest) {
     let (id_len, id) = into_cstring(request.id);
     let cookie = Box::into_raw(Box::new(request.sender));
+    let (scope_len, scope) = into_cstring(request.scope);
+    let (collection_len, collection) = into_cstring(request.collection);
 
     let mut command: *mut lcb_CMDGET = ptr::null_mut();
     unsafe {
         lcb_cmdget_create(&mut command);
         lcb_cmdget_key(command, id.as_ptr(), id_len);
+        lcb_cmdget_collection(
+            command,
+            scope.as_ptr(),
+            scope_len,
+            collection.as_ptr(),
+            collection_len,
+        );
 
         match request.ty {
             GetRequestType::Get { options } => {
@@ -67,11 +76,20 @@ pub fn encode_get(instance: *mut lcb_INSTANCE, request: GetRequest) {
 pub fn encode_exists(instance: *mut lcb_INSTANCE, request: ExistsRequest) {
     let (id_len, id) = into_cstring(request.id);
     let cookie = Box::into_raw(Box::new(request.sender));
+    let (scope_len, scope) = into_cstring(request.scope);
+    let (collection_len, collection) = into_cstring(request.collection);
 
     let mut command: *mut lcb_CMDEXISTS = ptr::null_mut();
     unsafe {
         lcb_cmdexists_create(&mut command);
         lcb_cmdexists_key(command, id.as_ptr(), id_len);
+        lcb_cmdexists_collection(
+            command,
+            scope.as_ptr(),
+            scope_len,
+            collection.as_ptr(),
+            collection_len,
+        );
 
         if let Some(timeout) = request.options.timeout {
             lcb_cmdexists_timeout(command, timeout.as_micros() as u32);
@@ -90,6 +108,8 @@ pub fn encode_mutate(instance: *mut lcb_INSTANCE, request: MutateRequest) {
     let (id_len, id) = into_cstring(request.id);
     let (value_len, value) = into_cstring(request.content);
     let cookie = Box::into_raw(Box::new(request.sender));
+    let (scope_len, scope) = into_cstring(request.scope);
+    let (collection_len, collection) = into_cstring(request.collection);
 
     let mut command: *mut lcb_CMDSTORE = ptr::null_mut();
     unsafe {
@@ -127,6 +147,13 @@ pub fn encode_mutate(instance: *mut lcb_INSTANCE, request: MutateRequest) {
         }
         lcb_cmdstore_key(command, id.as_ptr(), id_len);
         lcb_cmdstore_value(command, value.as_ptr(), value_len);
+        lcb_cmdstore_collection(
+            command,
+            scope.as_ptr(),
+            scope_len,
+            collection.as_ptr(),
+            collection_len,
+        );
 
         lcb_store(instance, cookie as *mut c_void, command);
         lcb_cmdstore_destroy(command);
@@ -137,11 +164,20 @@ pub fn encode_mutate(instance: *mut lcb_INSTANCE, request: MutateRequest) {
 pub fn encode_remove(instance: *mut lcb_INSTANCE, request: RemoveRequest) {
     let (id_len, id) = into_cstring(request.id);
     let cookie = Box::into_raw(Box::new(request.sender));
+    let (scope_len, scope) = into_cstring(request.scope);
+    let (collection_len, collection) = into_cstring(request.collection);
 
     let mut command: *mut lcb_CMDREMOVE = ptr::null_mut();
     unsafe {
         lcb_cmdremove_create(&mut command);
         lcb_cmdremove_key(command, id.as_ptr(), id_len);
+        lcb_cmdremove_collection(
+            command,
+            scope.as_ptr(),
+            scope_len,
+            collection.as_ptr(),
+            collection_len,
+        );
 
         if let Some(cas) = request.options.cas {
             lcb_cmdremove_cas(command, cas);
@@ -247,6 +283,8 @@ enum EncodedLookupSpec {
 pub fn encode_lookup_in(instance: *mut lcb_INSTANCE, request: LookupInRequest) {
     let (id_len, id) = into_cstring(request.id);
     let cookie = Box::into_raw(Box::new(request.sender));
+    let (scope_len, scope) = into_cstring(request.scope);
+    let (collection_len, collection) = into_cstring(request.collection);
 
     let lookup_specs = request
         .specs
@@ -290,6 +328,13 @@ pub fn encode_lookup_in(instance: *mut lcb_INSTANCE, request: LookupInRequest) {
 
         lcb_cmdsubdoc_create(&mut command);
         lcb_cmdsubdoc_key(command, id.as_ptr(), id_len);
+        lcb_cmdsubdoc_collection(
+            command,
+            scope.as_ptr(),
+            scope_len,
+            collection.as_ptr(),
+            collection_len,
+        );
 
         if let Some(timeout) = request.options.timeout {
             lcb_cmdsubdoc_timeout(command, timeout.as_micros() as u32);
@@ -363,6 +408,8 @@ pub enum EncodedMutateSpec {
 pub fn encode_mutate_in(instance: *mut lcb_INSTANCE, request: MutateInRequest) {
     let (id_len, id) = into_cstring(request.id);
     let cookie = Box::into_raw(Box::new(request.sender));
+    let (scope_len, scope) = into_cstring(request.scope);
+    let (collection_len, collection) = into_cstring(request.collection);
 
     let mutate_specs = request
         .specs
@@ -589,6 +636,13 @@ pub fn encode_mutate_in(instance: *mut lcb_INSTANCE, request: MutateInRequest) {
 
         lcb_cmdsubdoc_create(&mut command);
         lcb_cmdsubdoc_key(command, id.as_ptr(), id_len);
+        lcb_cmdsubdoc_collection(
+            command,
+            scope.as_ptr(),
+            scope_len,
+            collection.as_ptr(),
+            collection_len,
+        );
 
         if let Some(timeout) = request.options.timeout {
             lcb_cmdsubdoc_timeout(command, timeout.as_micros() as u32);
