@@ -8,6 +8,8 @@ use crate::api::results::{
     SearchMetaData, SearchResult,
 };
 
+use encode::EncodeFailure;
+
 use crate::io::request::Request;
 use instance::{LcbInstance, LcbInstances};
 
@@ -173,24 +175,26 @@ pub enum IoRequest {
     Shutdown,
 }
 
-fn encode_request(instance: *mut lcb_INSTANCE, request: Request) {
+fn encode_request(instance: *mut lcb_INSTANCE, request: Request) -> Result<(), EncodeFailure> {
     match request {
-        Request::Get(r) => encode::encode_get(instance, r),
-        Request::Query(r) => encode::encode_query(instance, r),
-        Request::Analytics(r) => encode::encode_analytics(instance, r),
-        Request::Search(r) => encode::encode_search(instance, r),
-        Request::Mutate(r) => encode::encode_mutate(instance, r),
-        Request::Exists(r) => encode::encode_exists(instance, r),
-        Request::Remove(r) => encode::encode_remove(instance, r),
-        Request::LookupIn(r) => encode::encode_lookup_in(instance, r),
-        Request::MutateIn(r) => encode::encode_mutate_in(instance, r),
+        Request::Get(r) => encode::encode_get(instance, r)?,
+        Request::Query(r) => encode::encode_query(instance, r)?,
+        Request::Analytics(r) => encode::encode_analytics(instance, r)?,
+        Request::Search(r) => encode::encode_search(instance, r)?,
+        Request::Mutate(r) => encode::encode_mutate(instance, r)?,
+        Request::Exists(r) => encode::encode_exists(instance, r)?,
+        Request::Remove(r) => encode::encode_remove(instance, r)?,
+        Request::LookupIn(r) => encode::encode_lookup_in(instance, r)?,
+        Request::MutateIn(r) => encode::encode_mutate_in(instance, r)?,
         Request::GenericManagementRequest(r) => {
-            encode::encode_generic_management_request(instance, r)
+            encode::encode_generic_management_request(instance, r)?
         }
         #[cfg(feature = "volatile")]
-        Request::KvStatsRequest(r) => encode::encode_kv_stats(instance, r),
-        Request::Ping(r) => encode::encode_ping(instance, r),
+        Request::KvStatsRequest(r) => encode::encode_kv_stats(instance, r)?,
+        Request::Ping(r) => encode::encode_ping(instance, r)?,
     }
+
+    Ok(())
 }
 
 struct QueryCookie {
