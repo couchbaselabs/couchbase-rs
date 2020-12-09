@@ -250,12 +250,7 @@ impl Bucket {
     /// The collection API provides acess to the Key/Value operations. The default collection is also
     /// implicitly using the default scope.
     pub fn default_collection(&self) -> Collection {
-        Collection::new(
-            self.core.clone(),
-            "_default".into(),
-            "_default".into(),
-            self.name.clone(),
-        )
+        Collection::new(self.core.clone(), "".into(), "".into(), self.name.clone())
     }
 
     /// The name of the bucket
@@ -270,12 +265,7 @@ impl Bucket {
     /// * `name` - the collection name
     #[cfg(feature = "volatile")]
     pub fn collection<S: Into<String>>(&self, name: S) -> Collection {
-        Collection::new(
-            self.core.clone(),
-            name.into(),
-            "_default".into(),
-            self.name.clone(),
-        )
+        Collection::new(self.core.clone(), name.into(), "".into(), self.name.clone())
     }
 
     /// Opens a custom scope
@@ -379,7 +369,7 @@ impl Collection {
         Self {
             core,
             name,
-            scope_name: scope_name,
+            scope_name,
             bucket_name,
         }
     }
