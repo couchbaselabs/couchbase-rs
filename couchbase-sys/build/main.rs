@@ -21,6 +21,7 @@ fn main() {
     build_cfg.define("LCB_NO_MOCK", "ON");
     build_cfg.define("LCB_BUILD_LIBEV", "OFF");
     build_cfg.define("LCB_BUILD_LIBUV", "OFF");
+    build_cfg.define("LCB_USE_HDR_HISTOGRAM", "OFF");
 
     // list of environment flags that control libcouchbase compilation
     // if one you need is not in this list, feel free to add it and
