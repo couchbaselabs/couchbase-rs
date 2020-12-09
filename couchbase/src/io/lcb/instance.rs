@@ -171,8 +171,10 @@ impl LcbInstance {
     }
 
     pub fn handle_request(&mut self, request: Request) {
-        encode_request(self.inner, request);
-        self.increment_outstanding_requests();
+        match encode_request(self.inner, request) {
+            Ok(_) => self.increment_outstanding_requests(),
+            Err(e) => warn!("Failed to encode request because of {:?}", e),
+        }
     }
 }
 
