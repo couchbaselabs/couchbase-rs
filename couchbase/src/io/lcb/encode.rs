@@ -143,6 +143,31 @@ fn verify_http(status: lcb_STATUS, sender: *mut HttpCookie) -> Result<(), Encode
     Ok(())
 }
 
+fn verify_kv_stats(
+    status: lcb_STATUS,
+    sender: *mut crate::io::lcb::KvStatsCookie,
+) -> Result<(), EncodeFailure> {
+    if status != lcb_STATUS_LCB_SUCCESS {
+        if sender.is_null() {
+            warn!("Failed to notify request of encode failure because the pointer is null. This is a bug!");
+            return Ok(());
+        }
+        let mut sender = unsafe { Box::from_raw(sender) };
+        let mut ctx = ErrorContext::default();
+        if let Ok(msg) = unsafe { CStr::from_ptr(lcb_strerror_short(status)) }.to_str() {
+            ctx.insert("msg", Value::String(msg.to_string()));
+        }
+        let err = couchbase_error_from_lcb_status(status, ctx);
+        if let Err(_) = sender.sender.take().unwrap().send(Err(err)) {
+            debug!("Failed to notify request of encode failure, because the listener has been already dropped.");
+        }
+        // Close the rest that needs to be closed
+        sender.stats_sender.close_channel();
+        return Err(EncodeFailure(status));
+    }
+    Ok(())
+}
+
 /// Encodes a `GetRequest` into its libcouchbase `lcb_CMDGET` representation.
 ///
 /// Note that this method also handles get_and_lock and get_and_touch by looking
@@ -1071,7 +1096,7 @@ pub fn encode_kv_stats(
         stats_receiver: Some(stats_receiver),
     }));
     unsafe {
-        verify(
+        verify_kv_stats(
             lcb_stats3(instance, cookie as *mut c_void, &command),
             cookie,
         )?;
