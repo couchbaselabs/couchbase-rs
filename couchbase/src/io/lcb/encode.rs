@@ -143,6 +143,7 @@ fn verify_http(status: lcb_STATUS, sender: *mut HttpCookie) -> Result<(), Encode
     Ok(())
 }
 
+#[cfg(feature = "volatile")]
 fn verify_kv_stats(
     status: lcb_STATUS,
     sender: *mut crate::io::lcb::KvStatsCookie,
@@ -350,6 +351,36 @@ pub fn encode_mutate(
                     )?;
                 }
             }
+            MutateRequestType::Append { options } => {
+                verify(
+                    lcb_cmdstore_create(&mut command, lcb_STORE_OPERATION_LCB_STORE_APPEND),
+                    cookie,
+                )?;
+                if let Some(cas) = options.cas {
+                    verify(lcb_cmdstore_cas(command, cas), cookie)?;
+                }
+                if let Some(timeout) = options.timeout {
+                    verify(
+                        lcb_cmdstore_timeout(command, timeout.as_micros() as u32),
+                        cookie,
+                    )?;
+                }
+            }
+            MutateRequestType::Prepend { options } => {
+                verify(
+                    lcb_cmdstore_create(&mut command, lcb_STORE_OPERATION_LCB_STORE_PREPEND),
+                    cookie,
+                )?;
+                if let Some(cas) = options.cas {
+                    verify(lcb_cmdstore_cas(command, cas), cookie)?;
+                }
+                if let Some(timeout) = options.timeout {
+                    verify(
+                        lcb_cmdstore_timeout(command, timeout.as_micros() as u32),
+                        cookie,
+                    )?;
+                }
+            }
         }
         verify(lcb_cmdstore_key(command, id.as_ptr(), id_len), cookie)?;
         verify(
@@ -411,6 +442,61 @@ pub fn encode_remove(
 
         verify(lcb_remove(instance, cookie as *mut c_void, command), cookie)?;
         verify(lcb_cmdremove_destroy(command), cookie)?;
+    }
+
+    Ok(())
+}
+
+/// Encodes a `CounterRequest` into its libcouchbase `lcb_CMDCOUNTER` representation.
+///
+/// This method covers increment and decrement since they are effectively the same operation but
+/// with a different operation applied to the delta value.
+pub fn encode_counter(
+    instance: *mut lcb_INSTANCE,
+    request: CounterRequest,
+) -> Result<(), EncodeFailure> {
+    let (id_len, id) = into_cstring(request.id);
+    let cookie = Box::into_raw(Box::new(request.sender));
+    let (scope_len, scope) = into_cstring(request.scope);
+    let (collection_len, collection) = into_cstring(request.collection);
+
+    let mut command: *mut lcb_CMDCOUNTER = ptr::null_mut();
+    unsafe {
+        verify(lcb_cmdcounter_create(&mut command), cookie)?;
+        verify(lcb_cmdcounter_key(command, id.as_ptr(), id_len), cookie)?;
+        verify(
+            lcb_cmdcounter_collection(
+                command,
+                scope.as_ptr(),
+                scope_len,
+                collection.as_ptr(),
+                collection_len,
+            ),
+            cookie,
+        )?;
+
+        if let Some(cas) = request.options.cas {
+            verify(lcb_cmdcounter_cas(command, cas), cookie)?;
+        }
+        if let Some(timeout) = request.options.timeout {
+            verify(
+                lcb_cmdcounter_timeout(command, timeout.as_micros() as u32),
+                cookie,
+            )?;
+        }
+        if let Some(expiry) = request.options.expiry {
+            verify(
+                lcb_cmdcounter_expiry(command, expiry.as_secs() as u32),
+                cookie,
+            )?;
+        }
+
+        verify(lcb_cmdcounter_delta(command, request.options.delta), cookie)?;
+        verify(
+            lcb_counter(instance, cookie as *mut c_void, command),
+            cookie,
+        )?;
+        verify(lcb_cmdcounter_destroy(command), cookie)?;
     }
 
     Ok(())

@@ -336,6 +336,44 @@ impl fmt::Debug for MutationResult {
     }
 }
 
+pub struct CounterResult {
+    cas: u64,
+    mutation_token: Option<MutationToken>,
+    content: u64,
+}
+
+impl CounterResult {
+    pub fn new(cas: u64, mutation_token: Option<MutationToken>, content: u64) -> Self {
+        Self {
+            cas,
+            mutation_token,
+            content,
+        }
+    }
+
+    pub fn cas(&self) -> u64 {
+        self.cas
+    }
+
+    pub fn mutation_token(&self) -> Option<&MutationToken> {
+        self.mutation_token.as_ref()
+    }
+
+    pub fn content(&self) -> u64 {
+        self.content
+    }
+}
+
+impl fmt::Debug for CounterResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "CounterResult {{ cas: 0x{:x}, mutation_token: {:?},  content: {:?}}}",
+            self.cas, self.mutation_token, self.content
+        )
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct SubDocField {
     pub status: u32,

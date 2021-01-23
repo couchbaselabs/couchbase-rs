@@ -21,7 +21,7 @@ use crate::io::lcb::{
 };
 
 use crate::io::lcb::instance::decrement_outstanding_requests;
-use crate::{EndpointPingReport, ServiceType};
+use crate::{CounterResult, EndpointPingReport, ServiceType};
 use std::collections::HashMap;
 
 fn decode_and_own_str(ptr: *const c_char, len: usize) -> String {
@@ -305,6 +305,65 @@ pub unsafe extern "C" fn mutate_in_callback(
     match sender.send(result) {
         Ok(_) => {}
         Err(e) => trace!("Failed to send mutate in result because of {:?}", e),
+    }
+}
+
+pub unsafe extern "C" fn counter_callback(
+    instance: *mut lcb_INSTANCE,
+    _cbtype: i32,
+    res: *const lcb_RESPBASE,
+) {
+    decrement_outstanding_requests(instance);
+    let counter_res = res as *const lcb_RESPCOUNTER;
+
+    let mut cookie_ptr: *mut c_void = ptr::null_mut();
+    lcb_respcounter_cookie(counter_res, &mut cookie_ptr);
+    let sender = Box::from_raw(
+        cookie_ptr as *mut futures::channel::oneshot::Sender<CouchbaseResult<CounterResult>>,
+    );
+
+    let mut lcb_ctx: *const lcb_KEY_VALUE_ERROR_CONTEXT = ptr::null();
+    lcb_respcounter_error_context(counter_res, &mut lcb_ctx);
+
+    let status = lcb_respcounter_status(counter_res);
+    let result = if status == lcb_STATUS_LCB_SUCCESS {
+        let mut cas: u64 = 0;
+        lcb_respcounter_cas(counter_res, &mut cas);
+
+        let mut lcb_mutation_token = lcb_MUTATION_TOKEN {
+            uuid_: 0,
+            seqno_: 0,
+            vbid_: 0,
+        };
+        lcb_respcounter_mutation_token(counter_res, &mut lcb_mutation_token);
+        let mutation_token = if lcb_mutation_token.uuid_ != 0 {
+            let mut bucket_len: usize = 0;
+            let mut bucket_ptr: *const c_char = ptr::null();
+            lcb_errctx_kv_bucket(lcb_ctx, &mut bucket_ptr, &mut bucket_len);
+            let bucket = decode_and_own_str(bucket_ptr, bucket_len);
+
+            Some(MutationToken::new(
+                lcb_mutation_token.uuid_,
+                lcb_mutation_token.seqno_,
+                lcb_mutation_token.vbid_,
+                bucket,
+            ))
+        } else {
+            None
+        };
+
+        let mut value: u64 = 0;
+        lcb_respcounter_value(counter_res, &mut value);
+        Ok(CounterResult::new(cas, mutation_token, value))
+    } else {
+        Err(couchbase_error_from_lcb_status(
+            status,
+            build_kv_error_context(lcb_ctx),
+        ))
+    };
+    match sender.send(result) {
+        Ok(_) => {}
+        Err(e) => trace!("Failed to send remove result because of {:?}", e),
     }
 }
 

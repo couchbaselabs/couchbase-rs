@@ -488,6 +488,91 @@ impl ExistsOptions {
 }
 
 #[derive(Debug, Default)]
+pub struct AppendOptions {
+    pub(crate) timeout: Option<Duration>,
+    pub(crate) cas: Option<u64>,
+}
+
+impl AppendOptions {
+    timeout!();
+
+    pub fn cas(mut self, cas: u64) -> Self {
+        self.cas = Some(cas);
+        self
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct PrependOptions {
+    pub(crate) timeout: Option<Duration>,
+    pub(crate) cas: Option<u64>,
+    pub(crate) expiry: Option<Duration>,
+}
+
+impl PrependOptions {
+    timeout!();
+
+    pub fn cas(mut self, cas: u64) -> Self {
+        self.cas = Some(cas);
+        self
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct IncrementOptions {
+    pub(crate) timeout: Option<Duration>,
+    pub(crate) cas: Option<u64>,
+    pub(crate) expiry: Option<Duration>,
+    pub(crate) delta: Option<u64>,
+}
+
+impl IncrementOptions {
+    timeout!();
+    expiry!();
+
+    pub fn delta(mut self, delta: u64) -> Self {
+        self.delta = Some(delta);
+        self
+    }
+
+    pub fn cas(mut self, cas: u64) -> Self {
+        self.cas = Some(cas);
+        self
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct DecrementOptions {
+    pub(crate) timeout: Option<Duration>,
+    pub(crate) cas: Option<u64>,
+    pub(crate) expiry: Option<Duration>,
+    pub(crate) delta: Option<u64>,
+}
+
+impl DecrementOptions {
+    timeout!();
+    expiry!();
+
+    pub fn delta(mut self, delta: u64) -> Self {
+        self.delta = Some(delta);
+        self
+    }
+
+    pub fn cas(mut self, cas: u64) -> Self {
+        self.cas = Some(cas);
+        self
+    }
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct CounterOptions {
+    pub(crate) timeout: Option<Duration>,
+    pub(crate) cas: Option<u64>,
+    pub(crate) expiry: Option<Duration>,
+    pub(crate) delta: i64,
+}
+
+#[derive(Debug, Default)]
 pub struct MutateInOptions {
     pub(crate) timeout: Option<Duration>,
     pub(crate) cas: Option<u64>,
