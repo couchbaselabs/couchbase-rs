@@ -20,6 +20,7 @@ pub enum Request {
     #[cfg(feature = "volatile")]
     KvStatsRequest(KvStatsRequest),
     Ping(PingRequest),
+    Counter(CounterRequest),
 }
 
 impl Request {
@@ -31,6 +32,7 @@ impl Request {
             Self::Remove(r) => Some(&r.bucket),
             Self::MutateIn(r) => Some(&r.bucket),
             Self::LookupIn(r) => Some(&r.bucket),
+            Self::Counter(r) => Some(&r.bucket),
             _ => None,
         }
     }
@@ -50,6 +52,7 @@ impl Request {
             Self::GenericManagementRequest(r) => r.sender.send(Err(reason)).unwrap(),
             #[cfg(feature = "volatile")]
             Self::KvStatsRequest(r) => r.sender.send(Err(reason)).unwrap(),
+            Self::Counter(r) => r.sender.send(Err(reason)).unwrap(),
         };
     }
 }
@@ -115,6 +118,18 @@ pub enum MutateRequestType {
     Insert { options: InsertOptions },
     Upsert { options: UpsertOptions },
     Replace { options: ReplaceOptions },
+    Append { options: AppendOptions },
+    Prepend { options: PrependOptions },
+}
+
+#[derive(Debug)]
+pub struct CounterRequest {
+    pub(crate) id: String,
+    pub(crate) bucket: String,
+    pub(crate) scope: String,
+    pub(crate) collection: String,
+    pub(crate) sender: Sender<CouchbaseResult<CounterResult>>,
+    pub(crate) options: CounterOptions,
 }
 
 #[derive(Debug)]
