@@ -292,7 +292,7 @@ pub struct UserManager {
 }
 
 impl UserManager {
-    pub fn new(core: Arc<Core>) -> Self {
+    pub(crate) fn new(core: Arc<Core>) -> Self {
         Self { core }
     }
 

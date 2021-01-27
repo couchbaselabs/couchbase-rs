@@ -747,3 +747,48 @@ impl PingOptions {
         self
     }
 }
+
+#[derive(Debug, Default)]
+pub struct GetAllScopesOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl GetAllScopesOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct CreateScopeOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl CreateScopeOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct CreateCollectionOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl CreateCollectionOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct DropScopeOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl DropScopeOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct DropCollectionOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl DropCollectionOptions {
+    timeout!();
+}

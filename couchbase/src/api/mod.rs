@@ -1,3 +1,4 @@
+pub mod collections;
 pub mod error;
 pub mod options;
 pub mod results;
@@ -9,7 +10,7 @@ use crate::api::options::*;
 use crate::api::results::*;
 use crate::io::request::*;
 use crate::io::Core;
-use crate::{SearchQuery, UserManager};
+use crate::{CollectionManager, SearchQuery, UserManager};
 use futures::channel::oneshot;
 use serde::Serialize;
 use serde_json::{to_vec, Value};
@@ -311,6 +312,22 @@ impl Bucket {
         self.core
             .send(Request::Ping(PingRequest { options, sender }));
         receiver.await.unwrap()
+    }
+
+    /// Returns a new `CollectionsManager`
+    ///
+    /// # Arguments
+    ///
+    /// # Examples
+    ///
+    /// Connect and open the `travel-sample` bucket.
+    /// ```no_run
+    /// let cluster = Cluster::connect("127.0.0.1", "username", "password");
+    /// let bucket = cluster.bucket("travel-sample");
+    /// let manager = bucket.collections();
+    /// ```
+    pub fn collections(&self) -> CollectionManager {
+        CollectionManager::new(self.core.clone(), self.name.clone())
     }
 }
 
