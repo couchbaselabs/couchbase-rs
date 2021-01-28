@@ -3,6 +3,7 @@
 mod api;
 mod io;
 
+pub use api::buckets::*;
 pub use api::collections::*;
 pub use api::error::*;
 pub use api::options::*;

@@ -792,3 +792,57 @@ pub struct DropCollectionOptions {
 impl DropCollectionOptions {
     timeout!();
 }
+
+#[derive(Debug, Default)]
+pub struct CreateBucketOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl CreateBucketOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct DropBucketOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl DropBucketOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct UpdateBucketOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl UpdateBucketOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct GetBucketOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl GetBucketOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct GetAllBucketsOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl GetAllBucketsOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct FlushBucketOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl FlushBucketOptions {
+    timeout!();
+}
