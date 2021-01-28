@@ -1,3 +1,4 @@
+pub mod buckets;
 pub mod collections;
 pub mod error;
 pub mod options;
@@ -5,16 +6,20 @@ pub mod results;
 pub mod search;
 pub mod users;
 
+use crate::api::buckets::BucketManager;
 use crate::api::error::{CouchbaseError, CouchbaseResult, ErrorContext};
 use crate::api::options::*;
 use crate::api::results::*;
 use crate::io::request::*;
 use crate::io::Core;
+use crate::CouchbaseError::Generic;
 use crate::{CollectionManager, SearchQuery, UserManager};
 use futures::channel::oneshot;
 use serde::Serialize;
 use serde_json::{to_vec, Value};
 use std::convert::TryFrom;
+use std::fmt;
+use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -224,6 +229,21 @@ impl Cluster {
     /// ```
     pub fn users(&self) -> UserManager {
         UserManager::new(self.core.clone())
+    }
+
+    /// Returns a new `BucketManager`
+    ///
+    /// # Arguments
+    ///
+    /// # Examples
+    ///
+    /// Connect and open the `travel-sample` bucket.
+    /// ```no_run
+    /// let cluster = Cluster::connect("127.0.0.1", "username", "password");
+    /// let bucket = cluster.buckets()
+    /// ```
+    pub fn buckets(&self) -> BucketManager {
+        BucketManager::new(self.core.clone())
     }
 
     /// Returns a reference to the underlying core.
@@ -934,5 +954,50 @@ impl BinaryCollection {
             collection: self.name.clone(),
         }));
         receiver.await.unwrap()
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum DurabilityLevel {
+    None = 0x00,
+    Majority = 0x01,
+    MajorityAndPersistOnMaster = 0x02,
+    PersistToMajority = 0x03,
+}
+
+impl Default for DurabilityLevel {
+    fn default() -> Self {
+        DurabilityLevel::None
+    }
+}
+
+impl Display for DurabilityLevel {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let alias = match *self {
+            DurabilityLevel::None => "none",
+            DurabilityLevel::Majority => "majority",
+            DurabilityLevel::MajorityAndPersistOnMaster => "majorityAndPersistActive",
+            DurabilityLevel::PersistToMajority => "persistToMajority",
+        };
+
+        write!(f, "{}", alias)
+    }
+}
+
+impl TryFrom<&str> for DurabilityLevel {
+    type Error = CouchbaseError;
+
+    fn try_from(alias: &str) -> Result<Self, Self::Error> {
+        match alias {
+            "none" => Ok(DurabilityLevel::None),
+            "majority" => Ok(DurabilityLevel::Majority),
+            "majorityAndPersistActive" => Ok(DurabilityLevel::MajorityAndPersistOnMaster),
+            "persistToMajority" => Ok(DurabilityLevel::PersistToMajority),
+            _ => {
+                let mut ctx = ErrorContext::default();
+                ctx.insert(alias, "invalid durability mode".into());
+                Err(Generic { ctx })
+            }
+        }
     }
 }
