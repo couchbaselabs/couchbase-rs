@@ -11,7 +11,8 @@ pub use api::results::*;
 pub use api::search::*;
 pub use api::users::*;
 pub use api::{
-    Bucket, Cluster, Collection, LookupInSpec, MutateInSpec, MutationState, MutationToken,
+    Bucket, Cluster, Collection, DurabilityLevel, LookupInSpec, MutateInSpec, MutationState,
+    MutationToken,
 };
 
 #[cfg(feature = "volatile")]
