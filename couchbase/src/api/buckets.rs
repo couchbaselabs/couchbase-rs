@@ -177,10 +177,10 @@ pub struct BucketSettingsBuilder {
 }
 
 impl BucketSettingsBuilder {
-    pub fn new<S: Into<String>>(name: S, ram_quota_mb: u64) -> BucketSettingsBuilder {
+    pub fn new<S: Into<String>>(name: S) -> BucketSettingsBuilder {
         Self {
             name: name.into(),
-            ram_quota_mb,
+            ram_quota_mb: 100,
             flush_enabled: false,
             num_replicas: 1,
             replica_indexes: false,
@@ -191,6 +191,11 @@ impl BucketSettingsBuilder {
             durability_level: DurabilityLevel::None,
             conflict_resolution_type: None,
         }
+    }
+
+    pub fn ram_quota_mb(mut self, ram_quota_mb: u64) -> BucketSettingsBuilder {
+        self.ram_quota_mb = ram_quota_mb;
+        self
     }
 
     pub fn flush_enabled(mut self, enabled: bool) -> BucketSettingsBuilder {
@@ -329,6 +334,11 @@ impl BucketSettings {
     }
 
     fn as_form(&self, is_update: bool) -> Result<Vec<(&str, String)>, CouchbaseError> {
+        if self.ram_quota_mb < 100 {
+            let mut ctx = ErrorContext::default();
+            ctx.insert("ram quota must be more than 100mb", "".into());
+            return Err(InvalidArgument { ctx });
+        }
         let flush_enabled = match self.flush_enabled {
             true => "1",
             false => "0",
@@ -476,8 +486,8 @@ impl BucketSettings {
         self.durability_level
     }
 
-    pub fn set_ram_quota_mb(&self) -> u64 {
-        self.ram_quota_mb
+    pub fn set_ram_quota_mb(&mut self, ram_quota_mb: u64) {
+        self.ram_quota_mb = ram_quota_mb;
     }
 
     pub fn set_flush_enabled(&mut self, enabled: bool) {
