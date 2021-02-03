@@ -101,7 +101,7 @@ impl CollectionManager {
         self.core.send(Request::GenericManagementRequest(
             GenericManagementRequest {
                 sender,
-                path: format!("/pools/default/buckets/{}/collections", self.bucket_name),
+                path: format!("/pools/default/buckets/{}/scopes", self.bucket_name),
                 method: String::from("get"),
                 payload: None,
                 content_type: None,
@@ -160,7 +160,7 @@ impl CollectionManager {
         self.core.send(Request::GenericManagementRequest(
             GenericManagementRequest {
                 sender,
-                path: format!("/pools/default/buckets/{}/collections", self.bucket_name),
+                path: format!("/pools/default/buckets/{}/scopes", self.bucket_name),
                 method: String::from("post"),
                 payload: Some(form_encoded),
                 content_type: Some(content_type),
@@ -202,7 +202,7 @@ impl CollectionManager {
             GenericManagementRequest {
                 sender,
                 path: format!(
-                    "/pools/default/buckets/{}/collections/{}",
+                    "/pools/default/buckets/{}/scopes/{}/collections/",
                     self.bucket_name, collection.scope_name
                 ),
                 method: String::from("post"),
@@ -239,7 +239,7 @@ impl CollectionManager {
             GenericManagementRequest {
                 sender,
                 path: format!(
-                    "/pools/default/buckets/{}/collections/{}",
+                    "/pools/default/buckets/{}/scopes/{}",
                     self.bucket_name, &scope,
                 ),
                 method: String::from("delete"),
@@ -274,7 +274,7 @@ impl CollectionManager {
             GenericManagementRequest {
                 sender,
                 path: format!(
-                    "/pools/default/buckets/{}/collections/{}/{}",
+                    "/pools/default/buckets/{}/scopes/{}/collections/{}",
                     self.bucket_name, collection.scope_name, collection.name
                 ),
                 method: String::from("delete"),
