@@ -532,6 +532,14 @@ pub fn encode_query(
             verify_query(lcb_cmdquery_adhoc(command, a.into()), cookie)?;
         }
 
+        if let Some(s) = request.scope {
+            let (scope_len, scope) = into_cstring(s);
+            verify_query(
+                lcb_cmdquery_scope_name(command, scope.as_ptr(), scope_len),
+                cookie,
+            )?;
+        }
+
         verify_query(lcb_cmdquery_callback(command, Some(query_callback)), cookie)?;
         verify_query(lcb_query(instance, cookie as *mut c_void, command), cookie)?;
         verify_query(lcb_cmdquery_destroy(command), cookie)?;

@@ -137,6 +137,7 @@ pub struct QueryRequest {
     pub(crate) statement: String,
     pub(crate) sender: Sender<CouchbaseResult<QueryResult>>,
     pub(crate) options: QueryOptions,
+    pub(crate) scope: Option<String>,
 }
 
 #[derive(Debug)]

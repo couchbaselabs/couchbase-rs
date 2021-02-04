@@ -117,6 +117,7 @@ impl Cluster {
             statement: statement.into(),
             options,
             sender,
+            scope: None,
         }));
         receiver.await.unwrap()
     }
@@ -386,6 +387,51 @@ impl Scope {
             self.name.clone(),
             self.bucket_name.clone(),
         )
+    }
+
+    /// Executes a N1QL statement
+    ///
+    /// # Arguments
+    ///
+    /// * `statement` - the N1QL statement to execute
+    /// * `options` - allows to pass in custom options
+    ///
+    /// # Examples
+    ///
+    /// Run a N1QL query with default options.
+    /// ```no_run
+    /// # let cluster = Cluster::connect("127.0.0.1", "username", "password");
+    /// let result = cluster.query("select * from bucket", QueryOptions::default());
+    /// ```
+    ///
+    /// This will return an async result, which can be consumed:
+    /// ```no_run
+    /// # let cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
+    /// let bucket = cluster.bucket("default");
+    /// let scope = bucket.scope("myscope");
+    /// match scope.query("select 1=1", QueryOptions::default()).await {
+    ///     Ok(mut result) => {
+    ///         for row in result.rows::<serde_json::Value>().next().await {
+    ///             println!("Found Row {:?}", row);
+    ///         }
+    ///     },
+    ///     Err(e) => panic!("Query failed: {:?}", e),
+    /// }
+    /// ```
+    /// See the [QueryResult](struct.QueryResult.html) for more information on what and how it can be consumed.
+    pub async fn query<S: Into<String>>(
+        &self,
+        statement: S,
+        options: QueryOptions,
+    ) -> CouchbaseResult<QueryResult> {
+        let (sender, receiver) = oneshot::channel();
+        self.core.send(Request::Query(QueryRequest {
+            statement: statement.into(),
+            options,
+            sender,
+            scope: Some(self.name.clone()),
+        }));
+        receiver.await.unwrap()
     }
 }
 
