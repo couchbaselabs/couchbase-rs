@@ -145,6 +145,7 @@ pub struct AnalyticsRequest {
     pub(crate) statement: String,
     pub(crate) sender: Sender<CouchbaseResult<AnalyticsResult>>,
     pub(crate) options: AnalyticsOptions,
+    pub(crate) scope: Option<String>,
 }
 
 #[derive(Debug)]

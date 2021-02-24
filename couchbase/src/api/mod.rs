@@ -160,6 +160,7 @@ impl Cluster {
             statement: statement.into(),
             options,
             sender,
+            scope: None,
         }));
         receiver.await.unwrap()
     }
@@ -426,6 +427,49 @@ impl Scope {
     ) -> CouchbaseResult<QueryResult> {
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::Query(QueryRequest {
+            statement: statement.into(),
+            options,
+            sender,
+            scope: Some(self.name.clone()),
+        }));
+        receiver.await.unwrap()
+    }
+
+    /// Executes an analytics query
+    ///
+    /// # Arguments
+    ///
+    /// * `statement` - the analyticss statement to execute
+    /// * `options` - allows to pass in custom options
+    ///
+    /// # Examples
+    ///
+    /// Run an analytics query with default options.
+    /// ```no_run
+    /// # let cluster = Cluster::connect("127.0.0.1", "username", "password");
+    /// let result = cluster.analytics_query("select * from dataset", AnalyticsOptions::default());
+    /// ```
+    ///
+    /// This will return an async result, which can be consumed:
+    /// ```no_run
+    /// # let cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
+    /// match cluster.query("select 1=1", AnalyticsOptions::default()).await {
+    ///     Ok(mut result) => {
+    ///         for row in result.rows::<serde_json::Value>().next().await {
+    ///             println!("Found Row {:?}", row);
+    ///         }
+    ///     },
+    ///     Err(e) => panic!("Query failed: {:?}", e),
+    /// }
+    /// ```
+    /// See the [AnalyticsResult](struct.AnalyticsResult.html) for more information on what and how it can be consumed.
+    pub async fn analytics_query<S: Into<String>>(
+        &self,
+        statement: S,
+        options: AnalyticsOptions,
+    ) -> CouchbaseResult<AnalyticsResult> {
+        let (sender, receiver) = oneshot::channel();
+        self.core.send(Request::Analytics(AnalyticsRequest {
             statement: statement.into(),
             options,
             sender,

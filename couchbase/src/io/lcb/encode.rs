@@ -577,6 +577,13 @@ pub fn encode_analytics(
             lcb_cmdanalytics_callback(command, Some(analytics_callback)),
             cookie,
         )?;
+        if let Some(s) = request.scope {
+            let (scope_len, scope) = into_cstring(s);
+            verify_analytics(
+                lcb_cmdanalytics_scope_name(command, scope.as_ptr(), scope_len),
+                cookie,
+            )?;
+        }
         verify_analytics(
             lcb_analytics(instance, cookie as *mut c_void, command),
             cookie,
