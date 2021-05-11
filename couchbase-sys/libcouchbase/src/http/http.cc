@@ -597,11 +597,14 @@ lcb_STATUS Request::setup_inputs(const lcb_CMDHTTP *cmd)
         }
     } else {
         if (cmd->host) {
-            if (reqtype == LCB_HTTP_TYPE_ANALYTICS || reqtype == LCB_HTTP_TYPE_PING) {
-                /* might be a deferred CBAS URL or PING */
-                base = cmd->host;
-            } else {
-                return LCB_ERR_INVALID_ARGUMENT;
+            switch (reqtype) {
+                case LCB_HTTP_TYPE_QUERY:
+                case LCB_HTTP_TYPE_ANALYTICS:
+                case LCB_HTTP_TYPE_PING:
+                    base = cmd->host;
+                    break;
+                default:
+                    return LCB_ERR_INVALID_ARGUMENT;
             }
         }
         if (base == nullptr) {
@@ -693,7 +696,6 @@ Request::Request(lcb_INSTANCE *instance_, const void *cookie, const lcb_CMDHTTP 
       callback(lcb_find_callback(instance, LCB_CALLBACK_HTTP)), io(instance->iotable), ioctx(nullptr), timer(nullptr),
       parser(nullptr), user_timeout(cmd->cmdflags & LCB_CMDHTTP_F_CASTMO ? cmd->cas : 0)
 {
-    memset(&creq, 0, sizeof creq);
 }
 
 Request::~Request()
@@ -726,7 +728,7 @@ uint32_t Request::timeout() const
 
 Request *Request::create(lcb_INSTANCE *instance, const void *cookie, const lcb_CMDHTTP *cmd, lcb_STATUS *rc)
 {
-    auto *req = new Request(instance, cookie, cmd);
+    auto *req = new lcb_HTTP_HANDLE_(instance, cookie, cmd);
     req->start = gethrtime();
 
     *rc = req->setup_inputs(cmd);
