@@ -248,7 +248,7 @@ void MockEnvironment::getResponse(MockResponse &ret)
     std::string rbuf;
     do {
         char c;
-        int rv = recv(mock->client, &c, 1, 0);
+        lcb_ssize_t rv = recv(mock->client, &c, 1, 0);
         assert(rv == 1);
         if (c == '\n') {
             break;
@@ -394,9 +394,9 @@ static void statsCallback(lcb_INSTANCE *instance, lcb_CALLBACK_TYPE, const lcb_R
         }
     }
     if (version == MockEnvironment::VERSION_UNKNOWN) {
-        lcb_log(LOGARGS(instance, ERROR), "Unable to determine version from string '%.*s', assuming 4.0",
+        lcb_log(LOGARGS(instance, ERROR), "Unable to determine version from string '%.*s', assuming 7.0",
                 (int)resp->nvalue, (const char *)resp->value);
-        version = MockEnvironment::VERSION_40;
+        version = MockEnvironment::VERSION_70;
     }
     me->setServerVersion(version);
     lcb_log(LOGARGS(instance, INFO), "Using real cluster version %.*s (id=%d)", (int)resp->nvalue,
@@ -485,6 +485,9 @@ void MockEnvironment::clearAndReset()
         lcb_wait(innerClient, LCB_WAIT_DEFAULT);
         EXPECT_EQ(LCB_SUCCESS, lcb_get_bootstrap_status(innerClient));
         lcb_install_callback(innerClient, LCB_CALLBACK_CBFLUSH, mock_flush_callback);
+    } else {
+        /* ensure that inner client is in a good shape (e.g. update internal timers, check dead sockets etc.) */
+        lcb_tick_nowait(innerClient);
     }
 
     lcb_CMDCBFLUSH fcmd = {0};
@@ -531,16 +534,20 @@ void MockEnvironment::SetUp()
     clearAndReset();
 }
 
-void MockEnvironment::TearDown() {}
-
-MockEnvironment::~MockEnvironment()
-{
-    shutdown_mock_server(mock);
-    mock = nullptr;
+void MockEnvironment::TearDown() {
+    if (mock != nullptr) {
+        shutdown_mock_server(mock);
+        mock = nullptr;
+    }
     if (innerClient != nullptr) {
         lcb_destroy(innerClient);
         innerClient = nullptr;
     }
+}
+
+MockEnvironment::~MockEnvironment()
+{
+    TearDown();
 }
 
 void HandleWrap::destroy()

@@ -1200,6 +1200,9 @@ void VersionHandler::run()
     printf("  Runtime: Version=%s, Changeset=%s\n", lcb_get_version(nullptr), changeset);
     printf("  Headers: Version=%s, Changeset=%s\n", LCB_VERSION_STRING, LCB_VERSION_CHANGESET);
     printf("  Build Timestamp: %s\n", LCB_BUILD_TIMESTAMP);
+#ifdef CMAKE_BUILD_TYPE
+    printf("  CMake Build Type: %s\n", CMAKE_BUILD_TYPE);
+#endif
 
     if (LCB_LIBDIR[0] == '/') {
         printf("  Default plugin directory: %s\n", LCB_LIBDIR);
@@ -1986,19 +1989,10 @@ void BucketCreateHandler::run()
     if (btype != "couchbase" && btype != "membase" && btype != "memcached") {
         throw BadArg("Unrecognized bucket type: " + btype);
     }
-    if (o_proxyport.passed() && o_bpass.passed()) {
-        throw BadArg("Custom ASCII port is only available for auth-less buckets");
-    }
 
     ss << "name=" << name;
     ss << "&bucketType=" << btype;
     ss << "&ramQuotaMB=" << o_ramquota.result();
-    if (o_proxyport.passed()) {
-        ss << "&authType=none&proxyPort=" << o_proxyport.result();
-    } else {
-        ss << "&authType=sasl&saslPassword=" << o_bpass.result();
-    }
-
     ss << "&replicaNumber=" << o_replicas.result();
     body_s = ss.str();
 

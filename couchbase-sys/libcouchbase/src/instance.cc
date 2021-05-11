@@ -616,15 +616,9 @@ void lcb_destroy(lcb_INSTANCE *instance)
     lcb_ASPEND_SETTYPE::iterator it;
     lcb_ASPEND_SETTYPE *pendq;
 
-    if (instance->cur_configinfo) {
-        instance->cur_configinfo->decref();
-        instance->cur_configinfo = nullptr;
-    }
-    instance->cmdq.config = nullptr;
     DESTROY(delete, bs_state)
     DESTROY(delete, ht_nodes)
     DESTROY(delete, mc_nodes)
-    DESTROY(delete, collcache)
 
     if ((pendq = po->items[LCB_PENDTYPE_DURABILITY])) {
         std::vector<void *> dsets(pendq->begin(), pendq->end());
@@ -659,10 +653,18 @@ void lcb_destroy(lcb_INSTANCE *instance)
             auto *server = static_cast<lcb::Server *>(instance->cmdq.pipelines[ii]);
             if (server) {
                 server->instance = nullptr;
+                server->parent = nullptr;
             }
         }
     }
     mcreq_queue_cleanup(&instance->cmdq);
+    DESTROY(delete, collcache)
+    if (instance->cur_configinfo) {
+        instance->cur_configinfo->decref();
+        instance->cur_configinfo = nullptr;
+    }
+    instance->cmdq.config = nullptr;
+    instance->cmdq.cqdata = nullptr;
     lcb_aspend_cleanup(po);
 
     if (instance->settings && instance->settings->tracer) {
@@ -929,7 +931,7 @@ static bool is_valid_collection_element(const char *element, size_t element_len)
 static bool is_default_collection_element(const char *element, size_t element_len)
 {
     static const std::string default_name("_default");
-    if (element_len == 0 || element == nullptr || default_name.compare(0, element_len, element) != 0) {
+    if (element_len == 0 || element == nullptr || default_name.compare(0, element_len, element) == 0) {
         return true;
     }
     return false;

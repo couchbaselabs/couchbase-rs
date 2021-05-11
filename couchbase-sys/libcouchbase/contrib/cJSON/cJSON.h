@@ -23,6 +23,8 @@
 #ifndef cJSON__h
 #define cJSON__h
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -72,7 +74,7 @@ typedef struct cJSON {
         int type; /* The type of the item, as above. */
 
         char *valuestring; /* The item's string, if type==cJSON_String */
-        int valueint; /* The item's number, if type==cJSON_Number */
+        int64_t valueint;  /* The item's number, if type==cJSON_Number */
         double valuedouble; /* The item's number, if type==cJSON_Number */
 
         char *string; /* The item's name string, if this item is the
@@ -115,6 +117,7 @@ extern cJSON *cJSON_GetObjectItem(cJSON *object,const char *string);
 extern cJSON *cJSON_CreateNull(void);
 extern cJSON *cJSON_CreateTrue(void);
 extern cJSON *cJSON_CreateFalse(void);
+extern cJSON *cJSON_CreateInt64(int64_t num);
 extern cJSON *cJSON_CreateNumber(double num);
 extern cJSON *cJSON_CreateString(const char *string);
 extern cJSON *cJSON_CreateArray(void);
