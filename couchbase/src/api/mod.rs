@@ -211,7 +211,7 @@ impl Cluster {
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::Search(SearchRequest {
             index: index.into(),
-            query: query.to_json(),
+            query: query.to_json()?,
             options,
             sender,
         }));
