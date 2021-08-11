@@ -43,12 +43,12 @@ impl Cluster {
     ///
     /// Connecting to localhost with the `username` and its `password`.
     /// ```no_run
-    /// let cluster = Cluster::connect("127.0.0.1", "username", "password");
+    /// let cluster = couchbase::Cluster::connect("127.0.0.1", "username", "password");
     /// ```
     ///
     /// Using three nodes for bootstrapping (recommended for production):
     /// ```no_run
-    /// let cluster = Cluster::connect("couchbase://hosta,hostb,hostc", "username", "password");
+    /// let cluster = couchbase::Cluster::connect("couchbase://hosta,hostb,hostc", "username", "password");
     /// ```
     pub fn connect<S: Into<String>>(connection_string: S, username: S, password: S) -> Self {
         Cluster {
@@ -70,7 +70,7 @@ impl Cluster {
     ///
     /// Connect and open the `travel-sample` bucket.
     /// ```no_run
-    /// let cluster = Cluster::connect("127.0.0.1", "username", "password");
+    /// let cluster = couchbase::Cluster::connect("127.0.0.1", "username", "password");
     /// let bucket = cluster.bucket("travel-sample");
     /// ```
     pub fn bucket<S: Into<String>>(&self, name: S) -> Bucket {
@@ -90,14 +90,14 @@ impl Cluster {
     ///
     /// Run a N1QL query with default options.
     /// ```no_run
-    /// # let cluster = Cluster::connect("127.0.0.1", "username", "password");
-    /// let result = cluster.query("select * from bucket", QueryOptions::default());
+    /// # let cluster = couchbase::Cluster::connect("127.0.0.1", "username", "password");
+    /// let result = cluster.query("select * from bucket", couchbase::QueryOptions::default());
     /// ```
     ///
     /// This will return an async result, which can be consumed:
     /// ```no_run
-    /// # let cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
-    /// match cluster.query("select 1=1", QueryOptions::default()).await {
+    /// # let cluster = couchbase::Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
+    /// match cluster.query("select 1=1", couchbase::QueryOptions::default()).await {
     ///     Ok(mut result) => {
     ///         for row in result.rows::<serde_json::Value>().next().await {
     ///             println!("Found Row {:?}", row);
@@ -133,14 +133,14 @@ impl Cluster {
     ///
     /// Run an analytics query with default options.
     /// ```no_run
-    /// # let cluster = Cluster::connect("127.0.0.1", "username", "password");
-    /// let result = cluster.analytics_query("select * from dataset", AnalyticsOptions::default());
+    /// # let cluster = Ccouchbase::luster::connect("127.0.0.1", "username", "password");
+    /// let result = cluster.analytics_query("select * from dataset", couchbase::AnalyticsOptions::default());
     /// ```
     ///
     /// This will return an async result, which can be consumed:
     /// ```no_run
-    /// # let cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
-    /// match cluster.query("select 1=1", AnalyticsOptions::default()).await {
+    /// # let cluster = couchbase::Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
+    /// match cluster.analytics_query("select 1=1", couchbase::AnalyticsOptions::default()).await {
     ///     Ok(mut result) => {
     ///         for row in result.rows::<serde_json::Value>().next().await {
     ///             println!("Found Row {:?}", row);
@@ -177,21 +177,21 @@ impl Cluster {
     ///
     /// Run a search query with default options.
     /// ```no_run
-    /// # let cluster = Cluster::connect("127.0.0.1", "username", "password");
+    /// # let cluster = couchbase::Cluster::connect("127.0.0.1", "username", "password");
     /// let result = cluster.search_query(
     ///    String::from("test"),
-    ///    QueryStringQuery::new(String::from("swanky")),
-    ///    SearchOptions::default(),
+    ///    couchbase::QueryStringQuery::new(String::from("swanky")),
+    ///    couchbase::SearchOptions::default(),
     ///);
     /// ```
     ///
     /// This will return an async result, which can be consumed:
     /// ```no_run
-    /// # let cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
+    /// # let cluster = couchbase::Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
     /// match cluster.cluster.search_query(
     ///    String::from("test"),
-    ///    QueryStringQuery::new(String::from("swanky")),
-    ///    SearchOptions::default(),
+    ///    couchbase::QueryStringQuery::new(String::from("swanky")),
+    ///    couchbase::SearchOptions::default(),
     ///).await {
     ///     Ok(mut result) => {
     ///         for row in result.rows::<serde_json::Value>().next().await {
@@ -226,7 +226,7 @@ impl Cluster {
     ///
     /// Connect and open the `travel-sample` bucket.
     /// ```no_run
-    /// let cluster = Cluster::connect("127.0.0.1", "username", "password");
+    /// let cluster = couchbase::Cluster::connect("127.0.0.1", "username", "password");
     /// let bucket = cluster.U("travel-sample");
     /// ```
     pub fn users(&self) -> UserManager {
@@ -241,8 +241,8 @@ impl Cluster {
     ///
     /// Connect and open the `travel-sample` bucket.
     /// ```no_run
-    /// let cluster = Cluster::connect("127.0.0.1", "username", "password");
-    /// let bucket = cluster.buckets()
+    /// let cluster = couchbase::Cluster::connect("127.0.0.1", "username", "password");
+    /// let bucket = cluster.buckets();
     /// ```
     pub fn buckets(&self) -> BucketManager {
         BucketManager::new(self.core.clone())
@@ -312,16 +312,16 @@ impl Bucket {
     ///
     /// Run a ping with default options.
     /// ```no_run
-    /// # let cluster = Cluster::connect("127.0.0.1", "username", "password");
+    /// # let cluster = couchbase::Cluster::connect("127.0.0.1", "username", "password");
     /// # let bucket = cluster.bucket("travel-sample");
-    /// # let result = bucket.ping(PingOptions::default());
+    /// # let result = bucket.ping(couchbase::PingOptions::default());
     /// ```
     ///
     /// This will return an async result, which can be consumed:
     /// ```no_run
-    /// # let cluster = Cluster::connect("127.0.0.1", "username", "password");
+    /// # let cluster = couchbase::Cluster::connect("127.0.0.1", "username", "password");
     /// # let bucket = cluster.bucket("travel-sample");
-    /// match  bucket.ping(PingOptions::default()).await {
+    /// match  bucket.ping(couchbase::PingOptions::default()).await {
     ///     Ok(mut result) => {
     ///         println!("Ping results {:?}", row);
     ///     },
@@ -344,7 +344,7 @@ impl Bucket {
     ///
     /// Connect and open the `travel-sample` bucket.
     /// ```no_run
-    /// let cluster = Cluster::connect("127.0.0.1", "username", "password");
+    /// let cluster = couchbase::Cluster::connect("127.0.0.1", "username", "password");
     /// let bucket = cluster.bucket("travel-sample");
     /// let manager = bucket.collections();
     /// ```
@@ -401,16 +401,16 @@ impl Scope {
     ///
     /// Run a N1QL query with default options.
     /// ```no_run
-    /// # let cluster = Cluster::connect("127.0.0.1", "username", "password");
-    /// let result = cluster.query("select * from bucket", QueryOptions::default());
+    /// # let cluster = couchbase::Cluster::connect("127.0.0.1", "username", "password");
+    /// let result = cluster.query("select * from bucket", couchbase::QueryOptions::default());
     /// ```
     ///
     /// This will return an async result, which can be consumed:
     /// ```no_run
-    /// # let cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
+    /// # let cluster = couchbase::Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
     /// let bucket = cluster.bucket("default");
     /// let scope = bucket.scope("myscope");
-    /// match scope.query("select 1=1", QueryOptions::default()).await {
+    /// match scope.query("select 1=1", couchbase::QueryOptions::default()).await {
     ///     Ok(mut result) => {
     ///         for row in result.rows::<serde_json::Value>().next().await {
     ///             println!("Found Row {:?}", row);
@@ -446,14 +446,14 @@ impl Scope {
     ///
     /// Run an analytics query with default options.
     /// ```no_run
-    /// # let cluster = Cluster::connect("127.0.0.1", "username", "password");
-    /// let result = cluster.analytics_query("select * from dataset", AnalyticsOptions::default());
+    /// # let cluster = couchbase::Cluster::connect("127.0.0.1", "username", "password");
+    /// let result = cluster.analytics_query("select * from dataset", couchbase::AnalyticsOptions::default());
     /// ```
     ///
     /// This will return an async result, which can be consumed:
     /// ```no_run
-    /// # let cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
-    /// match cluster.query("select 1=1", AnalyticsOptions::default()).await {
+    /// # let cluster = couchbase::Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
+    /// match cluster.analytics_query("select 1=1", couchbase::AnalyticsOptions::default()).await {
     ///     Ok(mut result) => {
     ///         for row in result.rows::<serde_json::Value>().next().await {
     ///             println!("Found Row {:?}", row);
