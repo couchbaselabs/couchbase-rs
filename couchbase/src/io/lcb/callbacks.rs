@@ -768,7 +768,7 @@ pub unsafe extern "C" fn view_callback(
         if doc_id.len() > 0 {
             id = Some(str::from_utf8(doc_id).unwrap().to_string());
         }
-        match cookie.rows_sender.unbounded_send(ViewRow{
+        match cookie.rows_sender.unbounded_send(ViewRow {
             id,
             key: key.to_vec(),
             value: row.to_vec(),

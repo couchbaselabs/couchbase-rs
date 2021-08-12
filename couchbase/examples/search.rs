@@ -1,4 +1,4 @@
-use couchbase::{Cluster, QueryStringQuery, SearchOptions, ConjunctionQuery, MatchPhraseQuery};
+use couchbase::{Cluster, ConjunctionQuery, MatchPhraseQuery, QueryStringQuery, SearchOptions};
 use futures::executor::{block_on, block_on_stream};
 
 /// Search Examples
@@ -19,7 +19,10 @@ pub fn main() {
     // Perform a simple search query
     match block_on(cluster.search_query(
         String::from("test"),
-        ConjunctionQuery::new(vec![Box::new(QueryStringQuery::new(String::from("swanky"))), Box::new(MatchPhraseQuery::new(String::from("t")))]),
+        ConjunctionQuery::new(vec![
+            Box::new(QueryStringQuery::new(String::from("swanky"))),
+            Box::new(MatchPhraseQuery::new(String::from("t"))),
+        ]),
         SearchOptions::default(),
     )) {
         Ok(mut result) => {

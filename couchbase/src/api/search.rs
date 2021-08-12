@@ -1,5 +1,5 @@
-use serde_json::json;
 use crate::CouchbaseError;
+use serde_json::json;
 
 pub trait SearchQuery {
     fn to_json(&self) -> Result<serde_json::Value, CouchbaseError>;
@@ -23,7 +23,7 @@ impl QueryStringQuery {
 
 impl SearchQuery for QueryStringQuery {
     fn to_json(&self) -> Result<serde_json::Value, CouchbaseError> {
-        let mut v =json!({
+        let mut v = json!({
             "query": &self.query.clone(),
         });
         if let Some(b) = self.boost {
@@ -778,8 +778,7 @@ impl SearchQuery for PrefixQuery {
     }
 }
 
-pub struct MatchAllQuery {
-}
+pub struct MatchAllQuery {}
 
 impl MatchAllQuery {
     pub fn new() -> Self {
@@ -795,8 +794,7 @@ impl SearchQuery for MatchAllQuery {
     }
 }
 
-pub struct MatchNoneQuery {
-}
+pub struct MatchNoneQuery {}
 
 impl MatchNoneQuery {
     pub fn new() -> Self {
@@ -832,7 +830,7 @@ impl TermRangeQuery {
             min: None,
             max: None,
             inclusive_min: None,
-            inclusive_max: None
+            inclusive_max: None,
         }
     }
 
@@ -940,7 +938,12 @@ pub struct GeoBoundingBoxQuery {
 }
 
 impl GeoBoundingBoxQuery {
-    pub fn new(top_left_lon: f64, top_left_lat: f64, bottom_right_lon: f64, bottom_right_lat: f64) -> Self {
+    pub fn new(
+        top_left_lon: f64,
+        top_left_lat: f64,
+        bottom_right_lon: f64,
+        bottom_right_lat: f64,
+    ) -> Self {
         Self {
             top_left: [top_left_lon, top_left_lat],
             bottom_right: [bottom_right_lon, bottom_right_lat],
@@ -978,7 +981,7 @@ impl SearchQuery for GeoBoundingBoxQuery {
 
 pub struct Coordinate {
     lon: f64,
-    lat: f64
+    lat: f64,
 }
 
 impl Coordinate {

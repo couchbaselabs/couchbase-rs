@@ -1,11 +1,11 @@
 use crate::api::MutationState;
-use serde::{Serializer};
+use crate::CouchbaseResult;
+use serde::Serializer;
 use serde_derive::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::time::Duration;
 use uuid::Uuid;
-use crate::{CouchbaseResult};
 
 /// Macro to DRY up the repetitive timeout setter.
 macro_rules! timeout {
@@ -864,13 +864,13 @@ pub enum ViewOrdering {
 #[derive(Debug, Clone, Copy)]
 pub enum ViewErrorMode {
     Continue,
-    Stop
+    Stop,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub enum DesignDocumentNamespace {
     Production,
-    Development
+    Development,
 }
 
 #[derive(Debug, Default)]
@@ -899,13 +899,13 @@ pub struct ViewOptions {
 impl ViewOptions {
     timeout!();
 
-    pub(crate)  fn form_data(&self) -> CouchbaseResult<Vec<(&str, String)>> {
+    pub(crate) fn form_data(&self) -> CouchbaseResult<Vec<(&str, String)>> {
         let mut form = vec![];
         if let Some(s) = self.scan_consistency {
             match s {
                 ViewScanConsistency::NotBounded => form.push(("stale", "ok".into())),
                 ViewScanConsistency::RequestPlus => form.push(("stale", "false".into())),
-                ViewScanConsistency::UpdateAfter => form.push(("stale", "update_after".into()))
+                ViewScanConsistency::UpdateAfter => form.push(("stale", "update_after".into())),
             }
         }
         if let Some(s) = self.skip {
@@ -952,7 +952,7 @@ impl ViewOptions {
             if let Some(i) = self.inclusive_end {
                 match i {
                     true => form.push(("inclusive_end", "true".into())),
-                    false => form.push(("inclusive_end", "false".into()))
+                    false => form.push(("inclusive_end", "false".into())),
                 }
             }
         }
@@ -1009,8 +1009,8 @@ impl ViewOptions {
         self
     }
     pub fn key<T>(mut self, key: T) -> Self
-        where
-            T: serde::Serialize,
+    where
+        T: serde::Serialize,
     {
         let k = match serde_json::to_value(key) {
             Ok(val) => val,
@@ -1020,8 +1020,8 @@ impl ViewOptions {
         self
     }
     pub fn keys<T>(mut self, keys: Vec<T>) -> Self
-        where
-            T: serde::Serialize,
+    where
+        T: serde::Serialize,
     {
         let ks = match serde_json::to_value(keys) {
             Ok(val) => val,
@@ -1031,8 +1031,8 @@ impl ViewOptions {
         self
     }
     pub fn start_key<T>(mut self, key: T) -> Self
-        where
-            T: serde::Serialize,
+    where
+        T: serde::Serialize,
     {
         let k = match serde_json::to_value(key) {
             Ok(val) => val,
@@ -1042,8 +1042,8 @@ impl ViewOptions {
         self
     }
     pub fn end_key<T>(mut self, key: T) -> Self
-        where
-            T: serde::Serialize,
+    where
+        T: serde::Serialize,
     {
         let k = match serde_json::to_value(key) {
             Ok(val) => val,
@@ -1077,8 +1077,8 @@ impl ViewOptions {
         self
     }
     pub fn raw<T>(mut self, raw: T) -> Self
-        where
-            T: serde::Serialize,
+    where
+        T: serde::Serialize,
     {
         let raw = match serde_json::to_value(raw) {
             Ok(Value::Object(a)) => a,

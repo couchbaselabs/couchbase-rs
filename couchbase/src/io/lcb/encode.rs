@@ -1,5 +1,7 @@
 use crate::api::{LookupInSpec, MutateInSpec};
-use crate::io::lcb::callbacks::{analytics_callback, query_callback, search_callback, view_callback};
+use crate::io::lcb::callbacks::{
+    analytics_callback, query_callback, search_callback, view_callback,
+};
 use crate::io::lcb::{AnalyticsCookie, HttpCookie, QueryCookie, SearchCookie, ViewCookie};
 use crate::io::request::*;
 use crate::{api::options::StoreSemantics, CouchbaseResult, ErrorContext};
@@ -655,10 +657,7 @@ pub fn encode_search(
 }
 
 /// Encodes a `ViewRequest` into its libcouchbase `lcb_CMDVIEW` representation.
-pub fn encode_view(
-    instance: *mut lcb_INSTANCE,
-    request: ViewRequest,
-) -> Result<(), EncodeFailure> {
+pub fn encode_view(instance: *mut lcb_INSTANCE, request: ViewRequest) -> Result<(), EncodeFailure> {
     let (ddoc_name_len, ddoc_name) = into_cstring(request.design_document);
     let (view_name_len, view_name) = into_cstring(request.view_name);
     let (payload_len, payload) = into_cstring(request.options);
@@ -688,10 +687,7 @@ pub fn encode_view(
             lcb_cmdview_option_string(command, payload.as_ptr(), payload_len),
             cookie,
         )?;
-        verify_view(
-            lcb_cmdview_callback(command, Some(view_callback)),
-            cookie,
-        )?;
+        verify_view(lcb_cmdview_callback(command, Some(view_callback)), cookie)?;
         verify_view(lcb_view(instance, cookie as *mut c_void, command), cookie)?;
         verify_view(lcb_cmdview_destroy(command), cookie)?;
     }

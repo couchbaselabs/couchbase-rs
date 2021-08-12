@@ -5,10 +5,10 @@ use futures::channel::oneshot::Receiver;
 use futures::{Stream, StreamExt};
 use serde::de::DeserializeOwned;
 use serde_derive::Deserialize;
+use serde_json::Value;
 use std::collections::HashMap;
 use std::fmt;
 use std::time::Duration;
-use serde_json::Value;
 
 #[derive(Debug)]
 pub struct QueryResult {
@@ -633,14 +633,20 @@ impl ViewRow {
         self.id.as_deref()
     }
 
-    pub fn key<T>(&self) -> CouchbaseResult<T> where T: DeserializeOwned {
+    pub fn key<T>(&self) -> CouchbaseResult<T>
+    where
+        T: DeserializeOwned,
+    {
         serde_json::from_slice(self.key.as_slice()).map_err(|e| CouchbaseError::DecodingFailure {
             ctx: ErrorContext::default(),
             source: e.into(),
         })
     }
 
-    pub fn value<T>(&self) -> CouchbaseResult<T> where T: DeserializeOwned {
+    pub fn value<T>(&self) -> CouchbaseResult<T>
+    where
+        T: DeserializeOwned,
+    {
         serde_json::from_slice(self.value.as_slice()).map_err(|e| CouchbaseError::DecodingFailure {
             ctx: ErrorContext::default(),
             source: e.into(),
@@ -663,15 +669,18 @@ impl ViewResult {
     }
 
     pub fn rows(&mut self) -> impl Stream<Item = CouchbaseResult<ViewRow>> {
-        self.rows.take().expect("Can not consume rows twice!").map(|v| Ok(v))
-            // .map(
-            // |v| match serde_json::from_slice(v.as_slice()) {
-            //     Ok(decoded) => Ok(decoded),
-            //     Err(e) => Err(CouchbaseError::DecodingFailure {
-            //         ctx: ErrorContext::default(),
-            //         source: e.into(),
-            //     }),
-            // },
+        self.rows
+            .take()
+            .expect("Can not consume rows twice!")
+            .map(|v| Ok(v))
+        // .map(
+        // |v| match serde_json::from_slice(v.as_slice()) {
+        //     Ok(decoded) => Ok(decoded),
+        //     Err(e) => Err(CouchbaseError::DecodingFailure {
+        //         ctx: ErrorContext::default(),
+        //         source: e.into(),
+        //     }),
+        // },
         // )
     }
 

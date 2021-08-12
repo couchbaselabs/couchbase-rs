@@ -13,6 +13,7 @@ use encode::EncodeFailure;
 use crate::io::request::Request;
 use instance::{LcbInstance, LcbInstances};
 
+use crate::{ViewMetaData, ViewResult, ViewRow};
 use couchbase_sys::*;
 use crossbeam_channel::RecvTimeoutError;
 use crossbeam_channel::{unbounded, Receiver, Sender};
@@ -22,7 +23,6 @@ use std::os::raw::{c_char, c_int, c_uint, c_void};
 use std::thread::JoinHandle;
 use std::time::Duration;
 use std::{ptr, thread};
-use crate::{ViewMetaData, ViewResult, ViewRow};
 
 pub struct IoCore {
     thread_handle: Option<JoinHandle<()>>,

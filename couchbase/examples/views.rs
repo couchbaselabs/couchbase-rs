@@ -1,4 +1,4 @@
-use couchbase::{Cluster, ViewOptions, CouchbaseResult};
+use couchbase::{Cluster, CouchbaseResult, ViewOptions};
 use futures::executor::{block_on, block_on_stream};
 
 /// Query Examples
