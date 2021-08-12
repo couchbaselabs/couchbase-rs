@@ -4,7 +4,7 @@ use crate::api::results::{
     MutateInResult, MutationResult, PingResult, PingState, QueryResult, SearchResult, SubDocField,
 };
 use crate::api::MutationToken;
-use crate::io::lcb::HttpCookie;
+use crate::io::lcb::{HttpCookie, ViewCookie};
 use couchbase_sys::*;
 use log::{debug, trace};
 use serde_json::Value;
@@ -21,7 +21,7 @@ use crate::io::lcb::{
 };
 
 use crate::io::lcb::instance::decrement_outstanding_requests;
-use crate::{CounterResult, EndpointPingReport, ServiceType};
+use crate::{CounterResult, EndpointPingReport, ServiceType, ViewResult, ViewRow};
 use std::collections::HashMap;
 
 fn decode_and_own_str(ptr: *const c_char, len: usize) -> String {
@@ -482,6 +482,28 @@ fn build_search_error_context(lcb_ctx: *const lcb_SEARCH_ERROR_CONTEXT) -> Error
     ctx
 }
 
+fn build_view_error_context(lcb_ctx: *const lcb_VIEW_ERROR_CONTEXT) -> ErrorContext {
+    let mut ctx = ErrorContext::default();
+
+    let mut ddoc_len: usize = 0;
+    let mut ddoc_ptr: *const c_char = ptr::null();
+    let ddoc = unsafe {
+        lcb_errctx_view_design_document(lcb_ctx, &mut ddoc_ptr, &mut ddoc_len);
+        decode_and_own_str(ddoc_ptr, ddoc_len)
+    };
+    ctx.insert("design_document_name", Value::String(ddoc));
+
+    let mut view_len: usize = 0;
+    let mut view_ptr: *const c_char = ptr::null();
+    let view = unsafe {
+        lcb_errctx_view_design_document(lcb_ctx, &mut view_ptr, &mut view_len);
+        decode_and_own_str(view_ptr, view_len)
+    };
+    ctx.insert("view_name", Value::String(view));
+
+    ctx
+}
+
 pub unsafe extern "C" fn query_callback(
     instance: *mut lcb_INSTANCE,
     _cbtype: i32,
@@ -670,6 +692,87 @@ pub unsafe extern "C" fn search_callback(
         decrement_outstanding_requests(instance);
     } else {
         match cookie.rows_sender.unbounded_send(row.to_vec()) {
+            Ok(_) => {}
+            Err(e) => trace!("Failed to send search row because of {:?}", e),
+        }
+        Box::into_raw(cookie);
+    }
+}
+
+pub unsafe extern "C" fn view_callback(
+    instance: *mut lcb_INSTANCE,
+    _cbtype: i32,
+    res: *const lcb_RESPVIEW,
+) {
+    let mut id_len: usize = 0;
+    let mut id_ptr: *const c_char = ptr::null();
+    lcb_respview_doc_id(res, &mut id_ptr, &mut id_len);
+    let doc_id = from_raw_parts(id_ptr as *const u8, id_len);
+    let mut key_len: usize = 0;
+    let mut key_ptr: *const c_char = ptr::null();
+    lcb_respview_key(res, &mut key_ptr, &mut key_len);
+    let key = from_raw_parts(key_ptr as *const u8, key_len);
+    let mut row_len: usize = 0;
+    let mut row_ptr: *const c_char = ptr::null();
+    lcb_respview_row(res, &mut row_ptr, &mut row_len);
+    let row = from_raw_parts(row_ptr as *const u8, row_len);
+
+    let mut cookie_ptr: *mut c_void = ptr::null_mut();
+    lcb_respview_cookie(res, &mut cookie_ptr);
+    let mut cookie = Box::from_raw(cookie_ptr as *mut ViewCookie);
+
+    let status = lcb_respview_status(res);
+
+    if cookie.sender.is_some() {
+        let response = if status != 0 {
+            let mut lcb_ctx: *const lcb_VIEW_ERROR_CONTEXT = ptr::null();
+            lcb_respview_error_context(res, &mut lcb_ctx);
+            Err(couchbase_error_from_lcb_status(
+                status,
+                build_view_error_context(lcb_ctx),
+            ))
+        } else {
+            Ok(ViewResult::new(
+                cookie.rows_receiver.take().unwrap(),
+                cookie.meta_receiver.take().unwrap(),
+            ))
+        };
+
+        match cookie
+            .sender
+            .take()
+            .expect("Could not take result!")
+            .send(response)
+        {
+            Ok(_) => {}
+            Err(e) => trace!("Failed to send view result because of {:?}", e),
+        }
+    }
+
+    if lcb_respview_is_final(res) != 0 {
+        cookie.rows_sender.close_channel();
+
+        if status == 0 {
+            match cookie
+                .meta_sender
+                .send(serde_json::from_slice(row).unwrap())
+            {
+                Ok(_) => {}
+                Err(e) => trace!("Failed to send view meta data because of {:?}", e),
+            }
+        }
+
+        decrement_outstanding_requests(instance);
+    } else {
+        let mut id: Option<String> = None;
+        if doc_id.len() > 0 {
+            id = Some(str::from_utf8(doc_id).unwrap().to_string());
+        }
+        match cookie.rows_sender.unbounded_send(ViewRow{
+            id,
+            key: key.to_vec(),
+            value: row.to_vec(),
+        }) {
             Ok(_) => {}
             Err(e) => trace!("Failed to send search row because of {:?}", e),
         }

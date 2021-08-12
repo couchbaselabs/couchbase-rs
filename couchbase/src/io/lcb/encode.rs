@@ -1,6 +1,6 @@
 use crate::api::{LookupInSpec, MutateInSpec};
-use crate::io::lcb::callbacks::{analytics_callback, query_callback, search_callback};
-use crate::io::lcb::{AnalyticsCookie, HttpCookie, QueryCookie, SearchCookie};
+use crate::io::lcb::callbacks::{analytics_callback, query_callback, search_callback, view_callback};
+use crate::io::lcb::{AnalyticsCookie, HttpCookie, QueryCookie, SearchCookie, ViewCookie};
 use crate::io::request::*;
 use crate::{api::options::StoreSemantics, CouchbaseResult, ErrorContext};
 use futures::channel::oneshot::Sender;
@@ -97,6 +97,28 @@ fn verify_analytics(status: lcb_STATUS, sender: *mut AnalyticsCookie) -> Result<
 }
 
 fn verify_search(status: lcb_STATUS, sender: *mut SearchCookie) -> Result<(), EncodeFailure> {
+    if status != lcb_STATUS_LCB_SUCCESS {
+        if sender.is_null() {
+            warn!("Failed to notify request of encode failure because the pointer is null. This is a bug!");
+            return Ok(());
+        }
+        let mut sender = unsafe { Box::from_raw(sender) };
+        let mut ctx = ErrorContext::default();
+        if let Ok(msg) = unsafe { CStr::from_ptr(lcb_strerror_short(status)) }.to_str() {
+            ctx.insert("msg", Value::String(msg.to_string()));
+        }
+        let err = couchbase_error_from_lcb_status(status, ctx);
+        if let Err(_) = sender.sender.take().unwrap().send(Err(err)) {
+            debug!("Failed to notify request of encode failure, because the listener has been already dropped.");
+        }
+        // Close the rest that needs to be closed
+        sender.rows_sender.close_channel();
+        return Err(EncodeFailure(status));
+    }
+    Ok(())
+}
+
+fn verify_view(status: lcb_STATUS, sender: *mut ViewCookie) -> Result<(), EncodeFailure> {
     if status != lcb_STATUS_LCB_SUCCESS {
         if sender.is_null() {
             warn!("Failed to notify request of encode failure because the pointer is null. This is a bug!");
@@ -627,6 +649,51 @@ pub fn encode_search(
         )?;
         verify_search(lcb_search(instance, cookie as *mut c_void, command), cookie)?;
         verify_search(lcb_cmdsearch_destroy(command), cookie)?;
+    }
+
+    Ok(())
+}
+
+/// Encodes a `ViewRequest` into its libcouchbase `lcb_CMDVIEW` representation.
+pub fn encode_view(
+    instance: *mut lcb_INSTANCE,
+    request: ViewRequest,
+) -> Result<(), EncodeFailure> {
+    let (ddoc_name_len, ddoc_name) = into_cstring(request.design_document);
+    let (view_name_len, view_name) = into_cstring(request.view_name);
+    let (payload_len, payload) = into_cstring(request.options);
+
+    let (meta_sender, meta_receiver) = futures::channel::oneshot::channel();
+    let (rows_sender, rows_receiver) = futures::channel::mpsc::unbounded();
+    let cookie = Box::into_raw(Box::new(ViewCookie {
+        sender: Some(request.sender),
+        meta_sender,
+        meta_receiver: Some(meta_receiver),
+        rows_sender,
+        rows_receiver: Some(rows_receiver),
+    }));
+
+    let mut command: *mut lcb_CMDVIEW = ptr::null_mut();
+    unsafe {
+        verify_view(lcb_cmdview_create(&mut command), cookie)?;
+        verify_view(
+            lcb_cmdview_design_document(command, ddoc_name.as_ptr(), ddoc_name_len),
+            cookie,
+        )?;
+        verify_view(
+            lcb_cmdview_view_name(command, view_name.as_ptr(), view_name_len),
+            cookie,
+        )?;
+        verify_view(
+            lcb_cmdview_option_string(command, payload.as_ptr(), payload_len),
+            cookie,
+        )?;
+        verify_view(
+            lcb_cmdview_callback(command, Some(view_callback)),
+            cookie,
+        )?;
+        verify_view(lcb_view(instance, cookie as *mut c_void, command), cookie)?;
+        verify_view(lcb_cmdview_destroy(command), cookie)?;
     }
 
     Ok(())

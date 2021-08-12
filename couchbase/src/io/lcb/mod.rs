@@ -22,6 +22,7 @@ use std::os::raw::{c_char, c_int, c_uint, c_void};
 use std::thread::JoinHandle;
 use std::time::Duration;
 use std::{ptr, thread};
+use crate::{ViewMetaData, ViewResult, ViewRow};
 
 pub struct IoCore {
     thread_handle: Option<JoinHandle<()>>,
@@ -181,6 +182,7 @@ fn encode_request(instance: *mut lcb_INSTANCE, request: Request) -> Result<(), E
         Request::Query(r) => encode::encode_query(instance, r)?,
         Request::Analytics(r) => encode::encode_analytics(instance, r)?,
         Request::Search(r) => encode::encode_search(instance, r)?,
+        Request::View(r) => encode::encode_view(instance, r)?,
         Request::Mutate(r) => encode::encode_mutate(instance, r)?,
         Request::Exists(r) => encode::encode_exists(instance, r)?,
         Request::Remove(r) => encode::encode_remove(instance, r)?,
@@ -220,6 +222,14 @@ struct SearchCookie {
     rows_receiver: Option<futures::channel::mpsc::UnboundedReceiver<Vec<u8>>>,
     meta_sender: futures::channel::oneshot::Sender<SearchMetaData>,
     meta_receiver: Option<futures::channel::oneshot::Receiver<SearchMetaData>>,
+}
+
+struct ViewCookie {
+    sender: Option<futures::channel::oneshot::Sender<CouchbaseResult<ViewResult>>>,
+    rows_sender: futures::channel::mpsc::UnboundedSender<ViewRow>,
+    rows_receiver: Option<futures::channel::mpsc::UnboundedReceiver<ViewRow>>,
+    meta_sender: futures::channel::oneshot::Sender<ViewMetaData>,
+    meta_receiver: Option<futures::channel::oneshot::Receiver<ViewMetaData>>,
 }
 
 /// This cookie can represent all different generic http requestes fired against lcb.

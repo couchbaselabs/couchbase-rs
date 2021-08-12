@@ -16,6 +16,7 @@ pub enum Request {
     Query(QueryRequest),
     Analytics(AnalyticsRequest),
     Search(SearchRequest),
+    View(ViewRequest),
     GenericManagementRequest(GenericManagementRequest),
     #[cfg(feature = "volatile")]
     KvStatsRequest(KvStatsRequest),
@@ -48,6 +49,7 @@ impl Request {
             Self::Query(r) => r.sender.send(Err(reason)).unwrap(),
             Self::Analytics(r) => r.sender.send(Err(reason)).unwrap(),
             Self::Search(r) => r.sender.send(Err(reason)).unwrap(),
+            Self::View(r) => r.sender.send(Err(reason)).unwrap(),
             Self::Ping(r) => r.sender.send(Err(reason)).unwrap(),
             Self::GenericManagementRequest(r) => r.sender.send(Err(reason)).unwrap(),
             #[cfg(feature = "volatile")]
@@ -176,6 +178,14 @@ pub struct MutateInRequest {
     pub(crate) sender: Sender<CouchbaseResult<MutateInResult>>,
     pub(crate) specs: Vec<MutateInSpec>,
     pub(crate) options: MutateInOptions,
+}
+
+#[derive(Debug)]
+pub struct ViewRequest {
+    pub(crate) design_document: String,
+    pub(crate) view_name: String,
+    pub(crate) sender: Sender<CouchbaseResult<ViewResult>>,
+    pub(crate) options: Vec<u8>,
 }
 
 #[derive(Debug)]
