@@ -1,0 +1,112 @@
+name: CI
+
+on:
+  pull_request:       # trigger on pull requests
+  push:
+    branches:         # array of glob patterns matching against refs/heads. Optional; defaults to all
+      - master
+
+jobs:
+  build:
+    name: Build
+
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        build: [linux, macos, windows]
+        include:
+          - build: linux
+            os: ubuntu-18.04
+            rust: stable
+          - build: macos
+            os: macos-latest
+            rust: stable
+          - build: windows
+            os: windows-2016
+            rust: stable
+
+    steps:
+      - uses: actions/checkout@v1
+      - name: Cache cargo registry
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+      - name: Cache cargo index
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+      #    - name: Cache cargo build
+      #      uses: actions/cache@v1
+      #      with:
+      #        path: target
+      #        key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+      - name: Install Rust (rustup)
+        run: rustup update ${{ matrix.rust }} --no-self-update && rustup default ${{ matrix.rust }}
+        if: matrix.os != 'macos-latest'
+        shell: bash
+      - name: Install Rust (macos)
+        run: |
+          curl https://sh.rustup.rs | sh -s -- -y
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+        if: matrix.os == 'macos-latest'
+
+      - name: Install dependencies (linux)
+        if: matrix.os == 'ubuntu-18.04'
+        run: sudo apt-get install libevent-dev libxcb-composite0-dev libx11-dev
+      - name: Install dependencies (macos)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install automake
+          rm -rf /usr/local/Cellar/openssl
+          ln -sf /usr/local/Cellar/openssl@1.1/1.1.1* /usr/local/opt/openssl
+          ln -sf /usr/local/Cellar/openssl@1.1/1.1.1*/bin/openssl /usr/local/bin/openssl
+#      - name: Install dependencies - LLVM via choco (windows)
+#        shell: powershell
+#        run: choco install llvm
+#        if: matrix.os == 'windows-2016'
+      - name: Install dependencies - Set vcpkg root (windows)
+        if: matrix.os == 'windows-2016'
+        run: echo "VCPKG_ROOT=$Env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Install dependencies - OpenSSL via vcpkg (windows)
+        run: |
+          vcpkg install openssl:x64-windows
+          echo "OPENSSL_DIR=$Env:VCPKG_ROOT\packages\openssl_x64-windows\" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "OPENSSL_ROOT_DIR=$Env:VCPKG_ROOT\packages\openssl_x64-windows\" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "OPENSSL_LIB_DIR=$Env:VCPKG_ROOT\packages\openssl_x64-windows\lib\" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "OPENSSL_INCLUDE_DIR=$Env:VCPKG_ROOT\packages\openssl_x64-windows\include\" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        if: matrix.os == 'windows-2016'
+
+      - name: Build
+        run: |
+          cargo build --verbose
+        if: matrix.os == 'ubuntu-18.04'
+
+      - name: Build
+        shell: cmd
+        run: |
+          set PATH=C:\msys64\mingw64\bin;%PATH%
+          cargo build --verbose
+        env:
+          VCPKGRS_DYNAMIC: 1
+        if: matrix.os == 'windows-2016'
+
+      - name: Build
+        run: |
+          cargo build --verbose
+        env:
+          MACOSX_DEPLOYMENT_TARGET: 10.9
+          OPENSSL_ROOT_DIR: /usr/local/opt/openssl
+          OPENSSL_LIB_DIR: /usr/local/opt/openssl/lib
+          OPENSSL_INCLUDE_DIR: /usr/local/opt/openssl/include
+        if: matrix.os == 'macos-latest'
+
+  rustfmt:
+    name: Rustfmt
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@master
+      - name: Install Rust
+        run: rustup update stable && rustup default stable && rustup component add rustfmt
+      - run: cargo fmt -- --check
