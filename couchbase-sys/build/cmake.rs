@@ -581,7 +581,7 @@ impl Config {
                  doesn't know how to generate cmake files for it, \
                  can the `cmake` crate be updated?"
             ),
-            Err(msg) => panic!(msg),
+            Err(msg) => panic!("{}", msg),
         };
         if ["i686", "x86_64", "thumbv7a", "aarch64"]
             .iter()
