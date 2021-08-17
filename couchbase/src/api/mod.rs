@@ -218,70 +218,6 @@ impl Cluster {
         receiver.await.unwrap()
     }
 
-    /// Executes a search query
-    ///
-    /// # Arguments
-    ///
-    /// * `index` - the search index name to use
-    /// * `query` - the search query to perform
-    /// * `options` - allows to pass in custom options
-    ///
-    /// # Examples
-    ///
-    /// Run a search query with default options.
-    /// ```no_run
-    /// # let cluster = couchbase::Cluster::connect("127.0.0.1", "username", "password");
-    /// let result = cluster.search_query(
-    ///    String::from("test"),
-    ///    couchbase::QueryStringQuery::new(String::from("swanky")),
-    ///    couchbase::SearchOptions::default(),
-    ///);
-    /// ```
-    ///
-    /// This will return an async result, which can be consumed:
-    /// ```no_run
-    ///  # let cluster = couchbase::Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
-    /// match cluster.search_query(
-    ///    String::from("test"),
-    ///    couchbase::QueryStringQuery::new(String::from("swanky")),
-    ///    couchbase::SearchOptions::default(),
-    ///).await {
-    ///     Ok(mut result) => {
-    ///         for row in result.rows().next().await {
-    ///             println!("Found Row {:?}", row);
-    ///         }
-    ///     },
-    ///     Err(e) => panic!("Query failed: {:?}", e),
-    /// }
-    /// ```
-    /// See the [SearchResult](struct.SearchResult.html) for more information on what and how it can be consumed.
-    pub async fn view_query(
-        &self,
-        design_document: impl Into<String>,
-        view_name: impl Into<String>,
-        options: ViewOptions,
-    ) -> CouchbaseResult<ViewResult> {
-        let form_data = options.form_data()?;
-        let payload = match serde_urlencoded::to_string(form_data) {
-            Ok(p) => p,
-            Err(e) => {
-                return Err(CouchbaseError::EncodingFailure {
-                    source: std::io::Error::new(std::io::ErrorKind::Other, e),
-                    ctx: ErrorContext::default(),
-                });
-            }
-        };
-
-        let (sender, receiver) = oneshot::channel();
-        self.core.send(Request::View(ViewRequest {
-            design_document: design_document.into(),
-            view_name: view_name.into(),
-            options: payload.into_bytes(),
-            sender,
-        }));
-        receiver.await.unwrap()
-    }
-
     /// Returns a new `UserManager`
     ///
     /// # Arguments
@@ -414,6 +350,72 @@ impl Bucket {
     /// ```
     pub fn collections(&self) -> CollectionManager {
         CollectionManager::new(self.core.clone(), self.name.clone())
+    }
+
+    /// Executes a view query
+    ///
+    /// # Arguments
+    ///
+    /// * `design_document` - the design document name to use
+    /// * `view_name` - the view name to use
+    /// * `options` - allows to pass in custom options
+    ///
+    /// # Examples
+    ///
+    /// Run a view query with default options.
+    /// ```no_run
+    /// let cluster = couchbase::Cluster::connect("127.0.0.1", "username", "password");
+    /// let bucket = cluster.bucket("travel-sample");
+    /// let result = bucket.view_query(
+    ///    "my_design_doc",
+    ///    "my_view",
+    ///    couchbase::ViewOptions::default(),
+    ///);
+    /// ```
+    ///
+    /// This will return an async result, which can be consumed:
+    /// ```no_run
+    /// let cluster = couchbase::Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
+    /// let bucket = cluster.bucket("travel-sample");
+    /// match bucket.view_query(
+    ///    "my_design_doc",
+    ///    "my_view",
+    ///    couchbase::ViewOptions::default(),
+    /// ).await {
+    ///     Ok(mut result) => {
+    ///         for row in result.rows().next().await {
+    ///             println!("Found Row {:?}", row);
+    ///         }
+    ///     },
+    ///     Err(e) => panic!("Query failed: {:?}", e),
+    /// }
+    /// ```
+    /// See the [ViewResult](struct.ViewResult.html) for more information on what and how it can be consumed.
+    pub async fn view_query(
+        &self,
+        design_document: impl Into<String>,
+        view_name: impl Into<String>,
+        options: ViewOptions,
+    ) -> CouchbaseResult<ViewResult> {
+        let form_data = options.form_data()?;
+        let payload = match serde_urlencoded::to_string(form_data) {
+            Ok(p) => p,
+            Err(e) => {
+                return Err(CouchbaseError::EncodingFailure {
+                    source: std::io::Error::new(std::io::ErrorKind::Other, e),
+                    ctx: ErrorContext::default(),
+                });
+            }
+        };
+
+        let (sender, receiver) = oneshot::channel();
+        self.core.send(Request::View(ViewRequest {
+            design_document: design_document.into(),
+            view_name: view_name.into(),
+            options: payload.into_bytes(),
+            sender,
+        }));
+        receiver.await.unwrap()
     }
 }
 

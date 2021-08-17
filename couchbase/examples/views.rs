@@ -17,7 +17,7 @@ pub fn main() {
     let _collection = bucket.default_collection();
 
     // Performs a simple query with no options and prints the results
-    match block_on(cluster.view_query(
+    match block_on(bucket.view_query(
         "dev_test_ddoc",
         "test_view",
         ViewOptions::default().limit(5).key("airline_659"),
