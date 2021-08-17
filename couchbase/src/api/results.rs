@@ -17,7 +17,7 @@ pub struct QueryResult {
 }
 
 impl QueryResult {
-    pub fn new(rows: UnboundedReceiver<Vec<u8>>, meta: Receiver<QueryMetaData>) -> Self {
+    pub(crate) fn new(rows: UnboundedReceiver<Vec<u8>>, meta: Receiver<QueryMetaData>) -> Self {
         Self {
             rows: Some(rows),
             meta: Some(meta),

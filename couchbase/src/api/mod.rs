@@ -2,6 +2,7 @@ pub mod buckets;
 pub mod collections;
 pub mod error;
 pub mod options;
+pub mod query_indexes;
 pub mod results;
 pub mod search;
 pub mod users;
@@ -9,6 +10,7 @@ pub mod users;
 use crate::api::buckets::BucketManager;
 use crate::api::error::{CouchbaseError, CouchbaseResult, ErrorContext};
 use crate::api::options::*;
+use crate::api::query_indexes::QueryIndexManager;
 use crate::api::results::*;
 use crate::io::request::*;
 use crate::io::Core;
@@ -227,7 +229,7 @@ impl Cluster {
     /// Connect and open the `travel-sample` bucket.
     /// ```no_run
     /// let cluster = couchbase::Cluster::connect("127.0.0.1", "username", "password");
-    /// let bucket = cluster.U("travel-sample");
+    /// let users = cluster.users();
     /// ```
     pub fn users(&self) -> UserManager {
         UserManager::new(self.core.clone())
@@ -246,6 +248,21 @@ impl Cluster {
     /// ```
     pub fn buckets(&self) -> BucketManager {
         BucketManager::new(self.core.clone())
+    }
+
+    /// Returns a new `QueryIndexManager`
+    ///
+    /// # Arguments
+    ///
+    /// # Examples
+    ///
+    /// Connect and open the `travel-sample` bucket.
+    /// ```no_run
+    /// let cluster = couchbase::Cluster::connect("127.0.0.1", "username", "password");
+    /// let indexes = cluster.query_indexes();
+    /// ```
+    pub fn query_indexes(&self) -> QueryIndexManager {
+        QueryIndexManager::new(self.core.clone())
     }
 
     /// Returns a reference to the underlying core.

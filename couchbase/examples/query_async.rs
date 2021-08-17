@@ -7,11 +7,12 @@ fn main() {
 }
 
 async fn run() {
-    let cluster = Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
+    let cluster = Cluster::connect("couchbase://localhost", "Administrator", "password");
 
-    match cluster.query("select 1=1", QueryOptions::default()).await {
+    match cluster.query("select * from `travel-sample` limit 5", QueryOptions::default()).await {
         Ok(mut result) => {
-            for row in result.rows::<serde_json::Value>().next().await {
+            let mut rows = result.rows::<serde_json::Value>();
+            while let Some(row) = rows.next().await {
                 println!("Found Row {:?}", row);
             }
         }
