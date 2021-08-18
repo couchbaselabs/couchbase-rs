@@ -22,6 +22,8 @@
 #include "ctx-log-inl.h"
 #include <lcbio/ssl.h>
 
+#include "capi/cmd_http.hh"
+
 #define LOGFMT CTX_LOGFMT
 #define LOGID(req) CTX_LOGID(req->ioctx)
 using namespace lcb::http;
@@ -109,6 +111,9 @@ unsigned Request::handle_parse_chunked(const char *buf, unsigned nbuf)
         resp.ctx.body = buf;
         resp.ctx.body_len = nbuf;
         passed_data = true;
+        if (nullptr != span && nullptr != ioctx) {
+            lcbtrace_span_add_host_and_port(span, ioctx->sock->info);
+        }
         callback(instance, LCB_CALLBACK_HTTP, (const lcb_RESPBASE *)&resp);
         status |= Request::CBINVOKED;
     }
