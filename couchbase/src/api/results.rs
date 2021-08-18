@@ -458,46 +458,6 @@ impl GenericManagementResult {
 }
 
 #[derive(Debug)]
-pub struct KvStatsResult {
-    stats: Option<UnboundedReceiver<KvStat>>,
-}
-
-impl KvStatsResult {
-    pub fn new(stats: UnboundedReceiver<KvStat>) -> Self {
-        Self { stats: Some(stats) }
-    }
-
-    pub fn stats(&mut self) -> impl Stream<Item = KvStat> {
-        self.stats.take().expect("Can not consume stats twice!")
-    }
-}
-
-#[derive(Debug)]
-pub struct KvStat {
-    server: String,
-    value: String,
-    key: String,
-}
-
-impl KvStat {
-    pub fn new(server: String, key: String, value: String) -> Self {
-        Self { server, key, value }
-    }
-
-    pub fn server(&self) -> &str {
-        &self.server
-    }
-
-    pub fn key(&self) -> &str {
-        &self.key
-    }
-
-    pub fn value(&self) -> &str {
-        &self.value
-    }
-}
-
-#[derive(Debug)]
 pub struct PingResult {
     id: String,
     services: HashMap<ServiceType, Vec<EndpointPingReport>>,

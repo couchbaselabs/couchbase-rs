@@ -793,17 +793,6 @@ impl DropGroupOptions {
 }
 
 #[derive(Debug, Default)]
-#[cfg(feature = "volatile")]
-pub struct KvStatsOptions {
-    pub(crate) timeout: Option<Duration>,
-}
-
-#[cfg(feature = "volatile")]
-impl KvStatsOptions {
-    timeout!();
-}
-
-#[derive(Debug, Default)]
 pub struct PingOptions {
     pub(crate) report_id: Option<String>,
 }

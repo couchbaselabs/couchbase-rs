@@ -18,8 +18,6 @@ pub enum Request {
     Search(SearchRequest),
     View(ViewRequest),
     GenericManagementRequest(GenericManagementRequest),
-    #[cfg(feature = "volatile")]
-    KvStatsRequest(KvStatsRequest),
     Ping(PingRequest),
     Counter(CounterRequest),
 }
@@ -52,8 +50,6 @@ impl Request {
             Self::View(r) => r.sender.send(Err(reason)).unwrap(),
             Self::Ping(r) => r.sender.send(Err(reason)).unwrap(),
             Self::GenericManagementRequest(r) => r.sender.send(Err(reason)).unwrap(),
-            #[cfg(feature = "volatile")]
-            Self::KvStatsRequest(r) => r.sender.send(Err(reason)).unwrap(),
             Self::Counter(r) => r.sender.send(Err(reason)).unwrap(),
         };
     }
@@ -221,25 +217,6 @@ impl GenericManagementRequest {
 
     pub fn timeout(&mut self, timeout: Duration) {
         self.timeout = Some(timeout)
-    }
-}
-
-#[derive(Debug)]
-#[cfg(feature = "volatile")]
-pub struct KvStatsRequest {
-    pub(crate) sender: Sender<CouchbaseResult<KvStatsResult>>,
-    pub(crate) options: KvStatsOptions,
-    pub(crate) key: Option<String>,
-}
-
-#[cfg(feature = "volatile")]
-impl KvStatsRequest {
-    pub fn new(sender: Sender<CouchbaseResult<KvStatsResult>>, key: Option<String>) -> Self {
-        Self {
-            sender,
-            key,
-            options: KvStatsOptions::default(),
-        }
     }
 }
 

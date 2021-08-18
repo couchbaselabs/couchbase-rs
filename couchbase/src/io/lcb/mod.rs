@@ -191,8 +191,6 @@ fn encode_request(instance: *mut lcb_INSTANCE, request: Request) -> Result<(), E
         Request::GenericManagementRequest(r) => {
             encode::encode_generic_management_request(instance, r)?
         }
-        #[cfg(feature = "volatile")]
-        Request::KvStatsRequest(r) => encode::encode_kv_stats(instance, r)?,
         Request::Ping(r) => encode::encode_ping(instance, r)?,
         Request::Counter(r) => encode::encode_counter(instance, r)?,
     }
@@ -239,13 +237,4 @@ enum HttpCookie {
     GenericManagementRequest {
         sender: futures::channel::oneshot::Sender<CouchbaseResult<GenericManagementResult>>,
     },
-}
-
-#[cfg(feature = "volatile")]
-struct KvStatsCookie {
-    sender: Option<
-        futures::channel::oneshot::Sender<CouchbaseResult<crate::api::results::KvStatsResult>>,
-    >,
-    stats_sender: futures::channel::mpsc::UnboundedSender<crate::api::results::KvStat>,
-    stats_receiver: Option<futures::channel::mpsc::UnboundedReceiver<crate::api::results::KvStat>>,
 }

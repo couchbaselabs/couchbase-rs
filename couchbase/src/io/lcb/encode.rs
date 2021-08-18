@@ -167,32 +167,6 @@ fn verify_http(status: lcb_STATUS, sender: *mut HttpCookie) -> Result<(), Encode
     Ok(())
 }
 
-#[cfg(feature = "volatile")]
-fn verify_kv_stats(
-    status: lcb_STATUS,
-    sender: *mut crate::io::lcb::KvStatsCookie,
-) -> Result<(), EncodeFailure> {
-    if status != lcb_STATUS_LCB_SUCCESS {
-        if sender.is_null() {
-            warn!("Failed to notify request of encode failure because the pointer is null. This is a bug!");
-            return Ok(());
-        }
-        let mut sender = unsafe { Box::from_raw(sender) };
-        let mut ctx = ErrorContext::default();
-        if let Ok(msg) = unsafe { CStr::from_ptr(lcb_strerror_short(status)) }.to_str() {
-            ctx.insert("msg", Value::String(msg.to_string()));
-        }
-        let err = couchbase_error_from_lcb_status(status, ctx);
-        if let Err(_) = sender.sender.take().unwrap().send(Err(err)) {
-            debug!("Failed to notify request of encode failure, because the listener has been already dropped.");
-        }
-        // Close the rest that needs to be closed
-        sender.stats_sender.close_channel();
-        return Err(EncodeFailure(status));
-    }
-    Ok(())
-}
-
 /// Encodes a `GetRequest` into its libcouchbase `lcb_CMDGET` representation.
 ///
 /// Note that this method also handles get_and_lock and get_and_touch by looking
@@ -1216,54 +1190,6 @@ pub fn encode_generic_management_request(
 
         verify_http(lcb_http(instance, cookie as *mut c_void, command), cookie)?;
         verify_http(lcb_cmdhttp_destroy(command), cookie)?;
-    }
-
-    Ok(())
-}
-
-#[cfg(feature = "volatile")]
-pub fn encode_kv_stats(
-    instance: *mut lcb_INSTANCE,
-    request: KvStatsRequest,
-) -> Result<(), EncodeFailure> {
-    let (scope_len, scope) = into_cstring(String::from(""));
-    let (collection_len, collection) = into_cstring(String::from(""));
-    let (key_len, key) = into_cstring(request.key.unwrap_or_default());
-
-    let key = lcb_KEYBUF {
-        type_: lcb_KVBUFTYPE_LCB_KV_COPY,
-        vbid: 0,
-        contig: lcb_CONTIGBUF {
-            bytes: key.as_ptr() as *const c_void,
-            nbytes: key_len,
-        },
-    };
-
-    let command = lcb_CMDSTATS {
-        cmdflags: 0,
-        exptime: 0,
-        cas: 0,
-        cid: 0,
-        scope: scope.as_ptr(),
-        nscope: scope_len,
-        collection: collection.as_ptr(),
-        ncollection: collection_len,
-        key,
-        timeout: 0,
-        pspan: ptr::null_mut(),
-    };
-
-    let (stats_sender, stats_receiver) = futures::channel::mpsc::unbounded();
-    let cookie = Box::into_raw(Box::new(crate::io::lcb::KvStatsCookie {
-        sender: Some(request.sender),
-        stats_sender,
-        stats_receiver: Some(stats_receiver),
-    }));
-    unsafe {
-        verify_kv_stats(
-            lcb_stats3(instance, cookie as *mut c_void, &command),
-            cookie,
-        )?;
     }
 
     Ok(())

@@ -19,4 +19,4 @@ pub use api::{
 pub use api::Scope;
 
 #[cfg(feature = "volatile")]
-pub use io::request::{GenericManagementRequest, KvStatsRequest, Request};
+pub use io::request::{GenericManagementRequest, Request};

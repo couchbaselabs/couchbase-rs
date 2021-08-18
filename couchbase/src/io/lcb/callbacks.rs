@@ -971,64 +971,6 @@ pub unsafe extern "C" fn http_callback(
     }
 }
 
-#[cfg(not(feature = "volatile"))]
-pub unsafe extern "C" fn stats_callback(
-    _instance: *mut lcb_INSTANCE,
-    _cbtype: i32,
-    _res: *const lcb_RESPBASE,
-) {
-}
-
-#[cfg(feature = "volatile")]
-pub unsafe extern "C" fn stats_callback(
-    instance: *mut lcb_INSTANCE,
-    _cbtype: i32,
-    res: *const lcb_RESPBASE,
-) {
-    let stats_res = res as *const lcb_RESPSTATS;
-
-    let mut cookie = Box::from_raw((*stats_res).cookie as *mut crate::io::lcb::KvStatsCookie);
-
-    if cookie.sender.is_some() {
-        let response = Ok(crate::api::results::KvStatsResult::new(
-            cookie.stats_receiver.take().unwrap(),
-        ));
-
-        match cookie
-            .sender
-            .take()
-            .expect("Could not take result!")
-            .send(response)
-        {
-            Ok(_) => {}
-            Err(e) => trace!("Failed to send kv stats result because of {:?}", e),
-        }
-    }
-
-    if (*stats_res).server.is_null() || (*stats_res).ctx.key.is_null() {
-        decrement_outstanding_requests(instance);
-    } else {
-        let server = CStr::from_ptr((*stats_res).server).to_str().unwrap();
-
-        let value = from_raw_parts(
-            (*stats_res).value as *const u8,
-            (*stats_res).nvalue.try_into().unwrap(),
-        );
-        let value = String::from(std::str::from_utf8(value).unwrap());
-
-        let key = from_raw_parts((*stats_res).ctx.key as *const u8, (*stats_res).ctx.key_len);
-        let key = String::from(std::str::from_utf8(key).unwrap());
-
-        let stats = crate::api::results::KvStat::new(server.into(), key, value);
-        match cookie.stats_sender.unbounded_send(stats) {
-            Ok(_) => {}
-            Err(e) => trace!("Failed to send kv stat because of {:?}", e),
-        }
-
-        Box::into_raw(cookie);
-    }
-}
-
 pub unsafe extern "C" fn ping_callback(
     instance: *mut lcb_INSTANCE,
     _cbtype: i32,
