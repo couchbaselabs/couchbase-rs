@@ -13,11 +13,11 @@ pub fn main() {
     // Connect to the cluster with a connection string and credentials
     let cluster = Cluster::connect("couchbase://10.112.210.101", "Administrator", "password");
     // Open a bucket
-    let bucket = cluster.bucket("default");
+    let _bucket = cluster.bucket("default");
 
     let mgr = cluster.buckets();
 
-    let settings = BucketSettingsBuilder::new("mybucket", 100)
+    let settings = BucketSettingsBuilder::new("mybucket")
         .flush_enabled(true)
         .build();
 
@@ -32,13 +32,11 @@ pub fn main() {
                 dbg!(&result);
                 result
             }
-            Err(e) => {
-                panic!(e)
-            }
+            Err(e) => std::panic::panic_any(e),
         };
 
     match block_on(mgr.flush_bucket("mybucket", FlushBucketOptions::default())) {
-        Ok(result) => {}
+        Ok(_result) => {}
         Err(e) => println!("got error! {}", e),
     };
 
@@ -55,7 +53,7 @@ pub fn main() {
     };
 
     match block_on(mgr.drop_bucket("mybucket", DropBucketOptions::default())) {
-        Ok(result) => {}
+        Ok(_result) => {}
         Err(e) => println!("got error! {}", e),
     };
 }

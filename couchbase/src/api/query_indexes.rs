@@ -138,7 +138,7 @@ impl QueryIndexManager {
         if let Some(e) = result_err {
             if opts.ignore_exists.unwrap_or_else(|| false) {
                 match e {
-                    CouchbaseError::IndexExists { ctx } => Ok(()),
+                    CouchbaseError::IndexExists { ctx: _ctx } => Ok(()),
                     _ => Err(e),
                 }
             } else {
@@ -174,7 +174,7 @@ impl QueryIndexManager {
         if let Some(e) = result_err {
             if opts.ignore_not_exists.unwrap_or_else(|| false) {
                 match e {
-                    CouchbaseError::IndexNotFound { ctx } => Ok(()),
+                    CouchbaseError::IndexNotFound { ctx: _ctx } => Ok(()),
                     _ => Err(e),
                 }
             } else {
@@ -210,7 +210,7 @@ impl QueryIndexManager {
         if let Some(e) = result_err {
             if opts.ignore_not_exists.unwrap_or_else(|| false) {
                 match e {
-                    CouchbaseError::IndexNotFound { ctx } => Ok(()),
+                    CouchbaseError::IndexNotFound { ctx: _ctx } => Ok(()),
                     _ => Err(e),
                 }
             } else {

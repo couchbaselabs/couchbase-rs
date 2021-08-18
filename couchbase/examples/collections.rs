@@ -19,16 +19,16 @@ pub fn main() {
     // Create a user manager
     let manager = bucket.collections();
 
-    match block_on(manager.create_scope("testest".into(), CreateScopeOptions::default())) {
-        Ok(result) => {}
+    match block_on(manager.create_scope("testest", CreateScopeOptions::default())) {
+        Ok(_result) => {}
         Err(e) => println!("got error! {}", e),
     };
 
     match block_on(manager.create_collection(
-        CollectionSpec::new("test2".into(), "testest".into(), Duration::from_secs(15)),
+        CollectionSpec::new("test2", "testest", Duration::from_secs(15)),
         CreateCollectionOptions::default(),
     )) {
-        Ok(result) => {}
+        Ok(_result) => {}
         Err(e) => println!("got error! {}", e),
     };
 
@@ -40,7 +40,7 @@ pub fn main() {
     };
 
     match block_on(manager.drop_collection(
-        CollectionSpec::new("test2".into(), "testest".into(), Duration::from_secs(0)),
+        CollectionSpec::new("test2", "testest", Duration::from_secs(0)),
         DropCollectionOptions::default(),
     )) {
         Ok(result) => {
@@ -49,7 +49,7 @@ pub fn main() {
         Err(e) => println!("got error! {}", e),
     };
 
-    match block_on(manager.drop_scope("testest".into(), DropScopeOptions::default())) {
+    match block_on(manager.drop_scope("testest", DropScopeOptions::default())) {
         Ok(result) => {
             println!("all scopes: {:?}", result);
         }

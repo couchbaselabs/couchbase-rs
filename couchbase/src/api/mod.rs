@@ -28,6 +28,7 @@ use std::time::Duration;
 /// Connect to a Couchbase cluster and perform cluster-level operations
 ///
 /// This `Cluster` object is also your main and only entry point into the SDK.
+#[derive(Debug)]
 pub struct Cluster {
     core: Arc<Core>,
 }
@@ -98,15 +99,24 @@ impl Cluster {
     ///
     /// This will return an async result, which can be consumed:
     /// ```no_run
-    /// # let cluster = couchbase::Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
+    /// # use std::io;
+    /// # use futures::stream::StreamExt;
+    /// # use futures::executor::block_on;
+    /// # fn main() -> io::Result<()> {
+    /// # block_on(async {
+    /// let cluster = couchbase::Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
     /// match cluster.query("select 1=1", couchbase::QueryOptions::default()).await {
     ///     Ok(mut result) => {
-    ///         for row in result.rows::<serde_json::Value>().next().await {
+    ///         let mut rows = result.rows::<serde_json::Value>();
+    ///         while let Some(row) = rows.next().await {
     ///             println!("Found Row {:?}", row);
     ///         }
     ///     },
     ///     Err(e) => panic!("Query failed: {:?}", e),
     /// }
+    /// # });
+    /// # Ok(())
+    /// # }
     /// ```
     /// See the [QueryResult](struct.QueryResult.html) for more information on what and how it can be consumed.
     pub async fn query<S: Into<String>>(
@@ -135,21 +145,30 @@ impl Cluster {
     ///
     /// Run an analytics query with default options.
     /// ```no_run
-    /// # let cluster = Ccouchbase::luster::connect("127.0.0.1", "username", "password");
+    /// # let cluster = couchbase::Cluster::connect("127.0.0.1", "username", "password");
     /// let result = cluster.analytics_query("select * from dataset", couchbase::AnalyticsOptions::default());
     /// ```
     ///
     /// This will return an async result, which can be consumed:
     /// ```no_run
-    /// # let cluster = couchbase::Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
+    /// # use std::io;
+    /// # use futures::stream::StreamExt;
+    /// # use futures::executor::block_on;
+    /// # fn main() -> io::Result<()> {
+    /// # block_on(async {
+    /// let cluster = couchbase::Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
     /// match cluster.analytics_query("select 1=1", couchbase::AnalyticsOptions::default()).await {
     ///     Ok(mut result) => {
-    ///         for row in result.rows::<serde_json::Value>().next().await {
+    ///         let mut rows = result.rows::<serde_json::Value>();
+    ///         while let Some(row) = rows.next().await {
     ///             println!("Found Row {:?}", row);
     ///         }
     ///     },
     ///     Err(e) => panic!("Query failed: {:?}", e),
     /// }
+    /// # });
+    /// # Ok(())
+    /// # }
     /// ```
     /// See the [AnalyticsResult](struct.AnalyticsResult.html) for more information on what and how it can be consumed.
     pub async fn analytics_query<S: Into<String>>(
@@ -189,7 +208,12 @@ impl Cluster {
     ///
     /// This will return an async result, which can be consumed:
     /// ```no_run
-    ///  # let cluster = couchbase::Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
+    /// # use std::io;
+    /// # use futures::stream::StreamExt;
+    /// # use futures::executor::block_on;
+    /// # fn main() -> io::Result<()> {
+    /// # block_on(async {
+    /// let cluster = couchbase::Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
     /// match cluster.search_query(
     ///    String::from("test"),
     ///    couchbase::QueryStringQuery::new(String::from("swanky")),
@@ -202,6 +226,9 @@ impl Cluster {
     ///     },
     ///     Err(e) => panic!("Query failed: {:?}", e),
     /// }
+    /// # });
+    /// # Ok(())
+    /// # }
     /// ```
     /// See the [SearchResult](struct.SearchResult.html) for more information on what and how it can be consumed.
     pub async fn search_query<S: Into<String>, T: SearchQuery>(
@@ -276,6 +303,7 @@ impl Cluster {
 }
 
 /// Provides bucket-level access to collections and view operations
+#[derive(Debug)]
 pub struct Bucket {
     name: String,
     core: Arc<Core>,
@@ -304,7 +332,6 @@ impl Bucket {
     /// # Arguments
     ///
     /// * `name` - the collection name
-    #[cfg(feature = "volatile")]
     pub fn collection<S: Into<String>>(&self, name: S) -> Collection {
         Collection::new(self.core.clone(), name.into(), "".into(), self.name.clone())
     }
@@ -314,7 +341,6 @@ impl Bucket {
     /// # Arguments
     ///
     /// * `name` - the scope name
-    #[cfg(feature = "volatile")]
     pub fn scope<S: Into<String>>(&self, name: S) -> Scope {
         Scope::new(self.core.clone(), name.into(), self.name.clone())
     }
@@ -336,14 +362,22 @@ impl Bucket {
     ///
     /// This will return an async result, which can be consumed:
     /// ```no_run
-    /// # let cluster = couchbase::Cluster::connect("127.0.0.1", "username", "password");
-    /// # let bucket = cluster.bucket("travel-sample");
+    /// # use std::io;
+    /// # use futures::stream::StreamExt;
+    /// # use futures::executor::block_on;
+    /// # fn main() -> io::Result<()> {
+    /// # block_on(async {
+    /// let cluster = couchbase::Cluster::connect("127.0.0.1", "username", "password");
+    /// let bucket = cluster.bucket("travel-sample");
     /// match  bucket.ping(couchbase::PingOptions::default()).await {
     ///     Ok(mut result) => {
-    ///         println!("Ping results {:?}", row);
+    ///         println!("Ping results {:?}", result);
     ///     },
     ///     Err(e) => panic!("Ping failed: {:?}", e),
     /// }
+    /// # });
+    /// # Ok(())
+    /// # }
     /// ```
     /// See the [PingResult](struct.PingResult.html) for more information on what and how it can be consumed.
     pub async fn ping(&self, options: PingOptions) -> CouchbaseResult<PingResult> {
@@ -392,6 +426,11 @@ impl Bucket {
     ///
     /// This will return an async result, which can be consumed:
     /// ```no_run
+    /// # use std::io;
+    /// # use futures::stream::StreamExt;
+    /// # use futures::executor::block_on;
+    /// # fn main() -> io::Result<()> {
+    /// # block_on(async {
     /// let cluster = couchbase::Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
     /// let bucket = cluster.bucket("travel-sample");
     /// match bucket.view_query(
@@ -406,6 +445,9 @@ impl Bucket {
     ///     },
     ///     Err(e) => panic!("Query failed: {:?}", e),
     /// }
+    /// # });
+    /// # Ok(())
+    /// # }
     /// ```
     /// See the [ViewResult](struct.ViewResult.html) for more information on what and how it can be consumed.
     pub async fn view_query(
@@ -437,14 +479,13 @@ impl Bucket {
 }
 
 /// Scopes provide access to a group of collections
-#[cfg(feature = "volatile")]
+#[derive(Debug)]
 pub struct Scope {
     bucket_name: String,
     name: String,
     core: Arc<Core>,
 }
 
-#[cfg(feature = "volatile")]
 impl Scope {
     pub(crate) fn new(core: Arc<Core>, name: String, bucket_name: String) -> Self {
         Self {
@@ -490,17 +531,26 @@ impl Scope {
     ///
     /// This will return an async result, which can be consumed:
     /// ```no_run
-    /// # let cluster = couchbase::Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
+    /// # use std::io;
+    /// # use futures::stream::StreamExt;
+    /// # use futures::executor::block_on;
+    /// # fn main() -> io::Result<()> {
+    /// # block_on(async {
+    /// let cluster = couchbase::Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
     /// let bucket = cluster.bucket("default");
     /// let scope = bucket.scope("myscope");
     /// match scope.query("select 1=1", couchbase::QueryOptions::default()).await {
     ///     Ok(mut result) => {
-    ///         for row in result.rows::<serde_json::Value>().next().await {
+    ///         let mut rows = result.rows::<serde_json::Value>();
+    ///         while let Some(row) = rows.next().await {
     ///             println!("Found Row {:?}", row);
     ///         }
     ///     },
     ///     Err(e) => panic!("Query failed: {:?}", e),
     /// }
+    /// # });
+    /// # Ok(())
+    /// # }
     /// ```
     /// See the [QueryResult](struct.QueryResult.html) for more information on what and how it can be consumed.
     pub async fn query<S: Into<String>>(
@@ -535,15 +585,24 @@ impl Scope {
     ///
     /// This will return an async result, which can be consumed:
     /// ```no_run
-    /// # let cluster = couchbase::Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
+    /// # use std::io;
+    /// # use futures::stream::StreamExt;
+    /// # use futures::executor::block_on;
+    /// # fn main() -> io::Result<()> {
+    /// # block_on(async {
+    /// let cluster = couchbase::Cluster::connect("couchbase://127.0.0.1", "Administrator", "password");
     /// match cluster.analytics_query("select 1=1", couchbase::AnalyticsOptions::default()).await {
     ///     Ok(mut result) => {
-    ///         for row in result.rows::<serde_json::Value>().next().await {
+    ///         let mut rows = result.rows::<serde_json::Value>();
+    ///         while let Some(row) = rows.next().await {
     ///             println!("Found Row {:?}", row);
     ///         }
     ///     },
     ///     Err(e) => panic!("Query failed: {:?}", e),
     /// }
+    /// # });
+    /// # Ok(())
+    /// # }
     /// ```
     /// See the [AnalyticsResult](struct.AnalyticsResult.html) for more information on what and how it can be consumed.
     pub async fn analytics_query<S: Into<String>>(
@@ -563,6 +622,7 @@ impl Scope {
 }
 
 /// Primary API to access Key/Value operations
+#[derive(Debug)]
 pub struct Collection {
     core: Arc<Core>,
     name: String,

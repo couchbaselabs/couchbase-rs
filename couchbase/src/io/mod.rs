@@ -8,6 +8,7 @@ use crate::io::lcb::IoCore;
 
 pub mod request;
 
+#[derive(Debug)]
 pub struct Core {
     io_core: IoCore,
 }
