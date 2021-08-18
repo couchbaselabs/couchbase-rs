@@ -1,6 +1,5 @@
 use couchbase::{AnalyticsOptions, Cluster};
 use futures::executor::{block_on, block_on_stream};
-use serde_json::json;
 
 /// Query Examples
 ///

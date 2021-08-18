@@ -4,4 +4,6 @@ Cargo.lock
 *.iml
 .vscode/
 CouchbaseMock.jar
+gocaves-macos
+couchbase/tests/config
 tags

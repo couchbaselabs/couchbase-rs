@@ -24,6 +24,7 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 use std::{ptr, thread};
 
+#[derive(Debug)]
 pub struct IoCore {
     thread_handle: Option<JoinHandle<()>>,
     queue_tx: Sender<IoRequest>,

@@ -15,7 +15,6 @@ pub use api::{
     MutationToken,
 };
 
-#[cfg(feature = "volatile")]
 pub use api::Scope;
 
 #[cfg(feature = "volatile")]
