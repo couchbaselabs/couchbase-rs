@@ -1,4 +1,8 @@
-use couchbase::{Cluster, CreateQueryIndexOptions, GetAllQueryIndexOptions, CreatePrimaryQueryIndexOptions, DropQueryIndexOptions, DropPrimaryQueryIndexOptions, BuildDeferredQueryIndexOptions};
+use couchbase::{
+    BuildDeferredQueryIndexOptions, Cluster, CreatePrimaryQueryIndexOptions,
+    CreateQueryIndexOptions, DropPrimaryQueryIndexOptions, DropQueryIndexOptions,
+    GetAllQueryIndexOptions,
+};
 use futures::executor::block_on;
 
 /// Query Index Examples
@@ -37,7 +41,9 @@ pub fn main() {
         Err(e) => println!("got error! {}", e),
     }
 
-    match block_on(index_manager.get_all_indexes("travel-sample", GetAllQueryIndexOptions::default())) {
+    match block_on(
+        index_manager.get_all_indexes("travel-sample", GetAllQueryIndexOptions::default()),
+    ) {
         Ok(result) => {
             for index in result {
                 println!("Got index {:?}", index);
@@ -47,7 +53,10 @@ pub fn main() {
     }
 
     // Trigger the deferred index to build.
-    match block_on(index_manager.build_deferred_indexes("travel-sample", BuildDeferredQueryIndexOptions::default())) {
+    match block_on(
+        index_manager
+            .build_deferred_indexes("travel-sample", BuildDeferredQueryIndexOptions::default()),
+    ) {
         Ok(result) => {
             for index in result {
                 println!("Triggered index {:?}", index);
@@ -56,7 +65,9 @@ pub fn main() {
         Err(e) => println!("got error! {}", e),
     }
 
-    match block_on(index_manager.get_all_indexes("travel-sample", GetAllQueryIndexOptions::default())) {
+    match block_on(
+        index_manager.get_all_indexes("travel-sample", GetAllQueryIndexOptions::default()),
+    ) {
         Ok(result) => {
             for index in result {
                 println!("Got index {:?}", index);
@@ -88,7 +99,9 @@ pub fn main() {
         Err(e) => println!("got error! {}", e),
     }
 
-    match block_on(index_manager.get_all_indexes("travel-sample", GetAllQueryIndexOptions::default())) {
+    match block_on(
+        index_manager.get_all_indexes("travel-sample", GetAllQueryIndexOptions::default()),
+    ) {
         Ok(result) => {
             for index in result {
                 println!("Got index {:?}", index);

@@ -9,7 +9,13 @@ fn main() {
 async fn run() {
     let cluster = Cluster::connect("couchbase://localhost", "Administrator", "password");
 
-    match cluster.query("select * from `travel-sample` limit 5", QueryOptions::default()).await {
+    match cluster
+        .query(
+            "select * from `travel-sample` limit 5",
+            QueryOptions::default(),
+        )
+        .await
+    {
         Ok(mut result) => {
             let mut rows = result.rows::<serde_json::Value>();
             while let Some(row) = rows.next().await {

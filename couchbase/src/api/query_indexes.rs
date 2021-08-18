@@ -1,10 +1,14 @@
 use crate::io::request::*;
 use crate::io::Core;
-use crate::{CouchbaseResult, CreateQueryIndexOptions, QueryOptions, CouchbaseError, CreatePrimaryQueryIndexOptions, DropQueryIndexOptions, GetAllQueryIndexOptions, DropPrimaryQueryIndexOptions, BuildDeferredQueryIndexOptions};
+use crate::{
+    BuildDeferredQueryIndexOptions, CouchbaseError, CouchbaseResult,
+    CreatePrimaryQueryIndexOptions, CreateQueryIndexOptions, DropPrimaryQueryIndexOptions,
+    DropQueryIndexOptions, GetAllQueryIndexOptions, QueryOptions,
+};
 use futures::channel::oneshot;
-use std::sync::Arc;
-use serde_derive::Deserialize;
 use futures::StreamExt;
+use serde_derive::Deserialize;
+use std::sync::Arc;
 
 #[derive(Debug, Copy, Clone, Deserialize)]
 pub enum QueryIndexType {
@@ -37,7 +41,11 @@ impl QueryIndexManager {
         Self { core }
     }
 
-    pub async fn get_all_indexes(&self, bucket_name: impl Into<String>, opts: GetAllQueryIndexOptions) -> CouchbaseResult<Vec<QueryIndex>> {
+    pub async fn get_all_indexes(
+        &self,
+        bucket_name: impl Into<String>,
+        opts: GetAllQueryIndexOptions,
+    ) -> CouchbaseResult<Vec<QueryIndex>> {
         let statement = format!("SELECT idx.* FROM system:indexes AS idx WHERE keyspace_id = \"{}\" AND `using`=\"gsi\" ORDER BY is_primary DESC, name ASC", bucket_name.into());
 
         let (sender, receiver) = oneshot::channel();
@@ -89,10 +97,8 @@ impl QueryIndexManager {
         if let Some(e) = result_err {
             if opts.ignore_exists.unwrap_or_else(|| false) {
                 match e {
-                    CouchbaseError::IndexExists { ctx: _ } => {
-                        Ok(())
-                    }
-                    _ => Err(e)
+                    CouchbaseError::IndexExists { ctx: _ } => Ok(()),
+                    _ => Err(e),
                 }
             } else {
                 Err(e)
@@ -113,8 +119,8 @@ impl QueryIndexManager {
             Some(n) => {
                 format!("CREATE PRiMARY INDEX `{}` ON `{}`", n, bucket_name.into())
             }
-            None => format!("CREATE PRIMARY INDEX ON `{}`", bucket_name.into())
-        } ;
+            None => format!("CREATE PRIMARY INDEX ON `{}`", bucket_name.into()),
+        };
 
         let with = opts.with.to_string();
         if !with.is_empty() {
@@ -132,10 +138,8 @@ impl QueryIndexManager {
         if let Some(e) = result_err {
             if opts.ignore_exists.unwrap_or_else(|| false) {
                 match e {
-                    CouchbaseError::IndexExists { ctx } => {
-                        Ok(())
-                    }
-                    _ => Err(e)
+                    CouchbaseError::IndexExists { ctx } => Ok(()),
+                    _ => Err(e),
                 }
             } else {
                 Err(e)
@@ -170,10 +174,8 @@ impl QueryIndexManager {
         if let Some(e) = result_err {
             if opts.ignore_not_exists.unwrap_or_else(|| false) {
                 match e {
-                    CouchbaseError::IndexNotFound { ctx } => {
-                        Ok(())
-                    }
-                    _ => Err(e)
+                    CouchbaseError::IndexNotFound { ctx } => Ok(()),
+                    _ => Err(e),
                 }
             } else {
                 Err(e)
@@ -194,7 +196,7 @@ impl QueryIndexManager {
             Some(n) => {
                 format!("DROP INDEX `{}` ON `{}`", n, bucket_name.into())
             }
-            None => format!("DROP PRIMARY INDEX ON `{}`", bucket_name.into())
+            None => format!("DROP PRIMARY INDEX ON `{}`", bucket_name.into()),
         };
 
         let (sender, receiver) = oneshot::channel();
@@ -208,10 +210,8 @@ impl QueryIndexManager {
         if let Some(e) = result_err {
             if opts.ignore_not_exists.unwrap_or_else(|| false) {
                 match e {
-                    CouchbaseError::IndexNotFound { ctx } => {
-                        Ok(())
-                    }
-                    _ => Err(e)
+                    CouchbaseError::IndexNotFound { ctx } => Ok(()),
+                    _ => Err(e),
                 }
             } else {
                 Err(e)
@@ -229,7 +229,9 @@ impl QueryIndexManager {
         opts: BuildDeferredQueryIndexOptions,
     ) -> CouchbaseResult<Vec<String>> {
         let bucket_name = bucket_name.into();
-        let indexes = self.get_all_indexes(bucket_name.clone(), GetAllQueryIndexOptions::from(&opts)).await?;
+        let indexes = self
+            .get_all_indexes(bucket_name.clone(), GetAllQueryIndexOptions::from(&opts))
+            .await?;
 
         let mut deferred_list = vec![];
         for index in indexes {
@@ -242,7 +244,11 @@ impl QueryIndexManager {
             return Ok(deferred_list);
         }
 
-        let escaped:Vec<String> = deferred_list.clone().into_iter().map(|i| {format!("`{}`", i)}).collect();
+        let escaped: Vec<String> = deferred_list
+            .clone()
+            .into_iter()
+            .map(|i| format!("`{}`", i))
+            .collect();
 
         let statement = format!("BUILD INDEX ON `{}` ({})", bucket_name, escaped.join(","));
 
