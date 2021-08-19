@@ -1,5 +1,7 @@
 use couchbase::{CouchbaseError, GetOptions, UpsertOptions};
 
+use crate::util::TestFeature;
+use log::warn;
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -8,6 +10,10 @@ mod util;
 #[tokio::test]
 async fn upsert_get() -> Result<(), CouchbaseError> {
     let cfg = util::setup().await;
+    if !cfg.supports_feature(TestFeature::KeyValue) {
+        warn!("Skipped...");
+        return Ok(());
+    }
 
     let collection = cfg.collection();
     let key = Uuid::new_v4().to_string();

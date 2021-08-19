@@ -2,6 +2,7 @@ use super::{ConfigAware, TestConfig};
 use crate::util::config::CavesConfig;
 use bytes::Buf;
 use couchbase::Cluster;
+use lazy_static::lazy_static;
 use log::debug;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -19,6 +20,7 @@ use tokio::io::BufReader;
 use tokio::net::tcp::ReadHalf;
 use tokio::net::{TcpListener, TcpStream};
 
+use crate::util::features::TestFeature;
 use uuid::Uuid;
 
 #[cfg(target_os = "windows")]
@@ -30,6 +32,10 @@ const CAVES_BINARY: &str = "gocaves-linux";
 
 const CAVES_URL: &str = "https://github.com/couchbaselabs/gocaves/releases/download";
 const CAVES_VERSION: &str = "v0.0.1-40";
+
+lazy_static! {
+    static ref SUPPORTS: Vec<TestFeature> = vec![TestFeature::KeyValue];
+}
 
 #[derive(Serialize, Deserialize)]
 struct CreateConfig {
@@ -116,6 +122,7 @@ impl MockCluster {
                 bucket,
                 scope,
                 collection,
+                support_matrix: SUPPORTS.to_vec(),
             }),
             stream,
         }

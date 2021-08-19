@@ -1,12 +1,15 @@
 mod config;
+mod features;
 mod mock;
 mod standalone;
 
 use mock::MockCluster;
 use standalone::StandaloneCluster;
 
+pub use crate::util::features::TestFeature;
 use config::{ClusterType, Config};
 use couchbase::{Bucket, Cluster, Collection, Scope};
+use env_logger::Env;
 use lazy_static::lazy_static;
 use std::sync::{Arc, Mutex};
 
@@ -24,7 +27,7 @@ pub async fn setup() -> Arc<TestConfig> {
         return (*guard).as_ref().unwrap().config();
     }
 
-    env_logger::init();
+    env_logger::from_env(Env::default().default_filter_or("warn")).init();
 
     let loaded_config = Config::try_load_config();
     let server = match loaded_config {
@@ -65,6 +68,7 @@ pub struct TestConfig {
     bucket: Bucket,
     scope: Scope,
     collection: Collection,
+    support_matrix: Vec<TestFeature>,
 }
 
 impl TestConfig {
@@ -79,6 +83,9 @@ impl TestConfig {
     }
     pub fn collection(&self) -> &Collection {
         &self.collection
+    }
+    pub fn supports_feature(&self, feature: TestFeature) -> bool {
+        self.support_matrix.contains(&feature)
     }
 }
 
