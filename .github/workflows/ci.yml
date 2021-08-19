@@ -102,6 +102,9 @@ jobs:
           OPENSSL_INCLUDE_DIR: /usr/local/opt/openssl/include
         if: matrix.os == 'macos-latest'
 
+      - name: Test
+        run: cargo test
+
   rustfmt:
     name: Rustfmt
     runs-on: ubuntu-18.04

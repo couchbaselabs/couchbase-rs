@@ -1,7 +1,13 @@
 use super::{ConfigAware, TestConfig};
 use crate::util::config::StandaloneConfig;
+use crate::util::features::TestFeature;
 use couchbase::Cluster;
+use lazy_static::lazy_static;
 use std::sync::Arc;
+
+lazy_static! {
+    static ref SUPPORTS: Vec<TestFeature> = vec![TestFeature::KeyValue, TestFeature::Query];
+}
 
 pub(crate) struct StandaloneCluster {
     config: Arc<TestConfig>,
@@ -21,6 +27,7 @@ impl StandaloneCluster {
                 bucket,
                 scope,
                 collection,
+                support_matrix: SUPPORTS.to_vec(),
             }),
         }
     }

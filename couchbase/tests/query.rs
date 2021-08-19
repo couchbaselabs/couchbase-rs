@@ -1,11 +1,17 @@
+use crate::util::TestFeature;
 use couchbase::{CouchbaseError, QueryOptions};
 use futures::stream::StreamExt;
+use log::warn;
 
 mod util;
 
 #[tokio::test]
 async fn query() -> Result<(), CouchbaseError> {
     let cfg = util::setup().await;
+    if !cfg.supports_feature(TestFeature::Query) {
+        warn!("Skipped...");
+        return Ok(());
+    }
 
     let cluster = cfg.cluster();
 
