@@ -13,6 +13,7 @@ use env_logger::Env;
 use lazy_static::lazy_static;
 use std::sync::{Arc, Mutex};
 
+// TODO: lazy_static is, well, static so does a comprehensive drop of preventing the entire drop chain.
 lazy_static! {
     static ref CLUSTER: Mutex<Option<ClusterUnderTest>> = Mutex::new(None);
 }
