@@ -604,12 +604,15 @@ pub fn encode_search(
 
     let (meta_sender, meta_receiver) = futures::channel::oneshot::channel();
     let (rows_sender, rows_receiver) = futures::channel::mpsc::unbounded();
+    let (facet_sender, facet_receiver) = futures::channel::oneshot::channel();
     let cookie = Box::into_raw(Box::new(SearchCookie {
         sender: Some(request.sender),
         meta_sender,
         meta_receiver: Some(meta_receiver),
         rows_sender,
         rows_receiver: Some(rows_receiver),
+        facet_sender,
+        facet_receiver: Some(facet_receiver),
     }));
 
     let mut command: *mut lcb_CMDSEARCH = ptr::null_mut();

@@ -240,7 +240,10 @@ impl Cluster {
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::Search(SearchRequest {
             index: index.into(),
-            query: query.to_json()?,
+            query: query.to_json().map_err(|e| CouchbaseError::EncodingFailure {
+                source: std::io::Error::new(std::io::ErrorKind::InvalidData, e),
+                ctx: ErrorContext::default(),
+            })?,
             options,
             sender,
         }));

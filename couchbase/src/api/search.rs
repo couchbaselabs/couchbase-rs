@@ -1,18 +1,24 @@
-use crate::CouchbaseError;
-use serde_json::json;
 
+use serde_json::{json};
+use serde_derive::{Serialize};
+use std::fmt::Debug;
+use serde::{Serialize};
+
+
+// TODO: Is this weird?
 pub trait SearchQuery {
-    fn to_json(&self) -> Result<serde_json::Value, CouchbaseError>;
+    fn to_json(&self) -> Result<serde_json::Value, serde_json::Error>;
 }
 
+#[derive(Debug)]
 pub struct QueryStringQuery {
     query: String,
     boost: Option<f32>,
 }
 
 impl QueryStringQuery {
-    pub fn new(query: String) -> Self {
-        Self { query, boost: None }
+    pub fn new(query: impl Into<String>) -> Self {
+        Self { query: query.into(), boost: None }
     }
 
     pub fn boost(mut self, boost: f32) -> QueryStringQuery {
@@ -22,17 +28,18 @@ impl QueryStringQuery {
 }
 
 impl SearchQuery for QueryStringQuery {
-    fn to_json(&self) -> Result<serde_json::Value, CouchbaseError> {
+    fn to_json(&self) -> Result<serde_json::Value, serde_json::Error> {
         let mut v = json!({
             "query": &self.query.clone(),
         });
         if let Some(b) = self.boost {
-            v["boost"] = json!(b);
+            v["boost"] = serde_json::to_value(b)?;
         }
         Ok(v)
     }
 }
 
+#[derive(Debug)]
 pub struct MatchQuery {
     match_query: String,
     boost: Option<f32>,
@@ -43,9 +50,9 @@ pub struct MatchQuery {
 }
 
 impl MatchQuery {
-    pub fn new(match_query: String) -> Self {
+    pub fn new(match_query: impl Into<String>) -> Self {
         Self {
-            match_query,
+            match_query: match_query.into(),
             boost: None,
             field: None,
             analyzer: None,
@@ -59,13 +66,13 @@ impl MatchQuery {
         self
     }
 
-    pub fn field(mut self, field: String) -> MatchQuery {
-        self.field = Some(field);
+    pub fn field(mut self, field: impl Into<String>) -> MatchQuery {
+        self.field = Some(field.into());
         self
     }
 
-    pub fn analyzer(mut self, analyzer: String) -> MatchQuery {
-        self.analyzer = Some(analyzer);
+    pub fn analyzer(mut self, analyzer: impl Into<String>) -> MatchQuery {
+        self.analyzer = Some(analyzer.into());
         self
     }
 
@@ -81,31 +88,32 @@ impl MatchQuery {
 }
 
 impl SearchQuery for MatchQuery {
-    fn to_json(&self) -> Result<serde_json::Value, CouchbaseError> {
+    fn to_json(&self) -> Result<serde_json::Value, serde_json::Error> {
         let mut v = json!({
             "match": &self.match_query.clone(),
         });
         if let Some(b) = self.boost {
-            v["boost"] = json!(b);
+            v["boost"] = serde_json::to_value(b)?;
         }
         if let Some(val) = self.field.clone() {
-            v["field"] = json!(val);
+            v["field"] = serde_json::to_value(val)?;
         }
         if let Some(val) = self.analyzer.clone() {
-            v["analyzer"] = json!(val);
+            v["analyzer"] = serde_json::to_value(val)?;
         }
         if let Some(val) = self.prefix_length {
-            v["prefix_length"] = json!(val);
+            v["prefix_length"] = serde_json::to_value(val)?;
         }
         if let Some(val) = self.fuzziness {
-            v["fuzziness"] = json!(val);
+            v["fuzziness"] = serde_json::to_value(val)?;
         }
         Ok(v)
     }
 }
 
+#[derive(Debug)]
 pub struct MatchPhraseQuery {
-    phrase: String,
+    match_phrase: String,
     boost: Option<f32>,
     field: Option<String>,
     analyzer: Option<String>,
@@ -114,7 +122,7 @@ pub struct MatchPhraseQuery {
 impl MatchPhraseQuery {
     pub fn new(phrase: String) -> Self {
         Self {
-            phrase,
+            match_phrase: phrase,
             boost: None,
             field: None,
             analyzer: None,
@@ -126,35 +134,36 @@ impl MatchPhraseQuery {
         self
     }
 
-    pub fn field(mut self, field: String) -> MatchPhraseQuery {
-        self.field = Some(field);
+    pub fn field(mut self, field: impl Into<String>) -> MatchPhraseQuery {
+        self.field = Some(field.into());
         self
     }
 
-    pub fn analyzer(mut self, analyzer: String) -> MatchPhraseQuery {
-        self.analyzer = Some(analyzer);
+    pub fn analyzer(mut self, analyzer: impl Into<String>) -> MatchPhraseQuery {
+        self.analyzer = Some(analyzer.into());
         self
     }
 }
 
 impl SearchQuery for MatchPhraseQuery {
-    fn to_json(&self) -> Result<serde_json::Value, CouchbaseError> {
+    fn to_json(&self) -> Result<serde_json::Value, serde_json::Error> {
         let mut v = json!({
-            "match_phrase": &self.phrase.clone(),
+            "match_phrase": &self.match_phrase.clone(),
         });
         if let Some(b) = self.boost {
-            v["boost"] = json!(b);
+            v["boost"] = serde_json::to_value(b)?;
         }
         if let Some(val) = self.field.clone() {
-            v["field"] = json!(val);
+            v["field"] = serde_json::to_value(val)?;
         }
         if let Some(val) = self.analyzer.clone() {
-            v["analyzer"] = json!(val);
+            v["analyzer"] = serde_json::to_value(val)?;
         }
         Ok(v)
     }
 }
 
+#[derive(Debug)]
 pub struct RegexpQuery {
     regexp: String,
     boost: Option<f32>,
@@ -162,9 +171,9 @@ pub struct RegexpQuery {
 }
 
 impl RegexpQuery {
-    pub fn new(regexp: String) -> Self {
+    pub fn new(regexp: impl Into<String>) -> Self {
         Self {
-            regexp,
+            regexp: regexp.into(),
             boost: None,
             field: None,
         }
@@ -175,27 +184,28 @@ impl RegexpQuery {
         self
     }
 
-    pub fn field(mut self, field: String) -> RegexpQuery {
-        self.field = Some(field);
+    pub fn field(mut self, field: impl Into<String>) -> RegexpQuery {
+        self.field = Some(field.into());
         self
     }
 }
 
 impl SearchQuery for RegexpQuery {
-    fn to_json(&self) -> Result<serde_json::Value, CouchbaseError> {
+    fn to_json(&self) -> Result<serde_json::Value, serde_json::Error> {
         let mut v = json!({
             "regexp": &self.regexp.clone(),
         });
         if let Some(b) = self.boost {
-            v["boost"] = json!(b);
+            v["boost"] = serde_json::to_value(b)?;
         }
         if let Some(val) = self.field.clone() {
-            v["field"] = json!(val);
+            v["field"] = serde_json::to_value(val)?;
         }
         Ok(v)
     }
 }
 
+#[derive(Debug)]
 pub struct NumericRangeQuery {
     min: Option<f32>,
     max: Option<f32>,
@@ -222,8 +232,8 @@ impl NumericRangeQuery {
         self
     }
 
-    pub fn field(mut self, field: String) -> NumericRangeQuery {
-        self.field = Some(field);
+    pub fn field(mut self, field: impl Into<String>) -> NumericRangeQuery {
+        self.field = Some(field.into());
         self
     }
 
@@ -241,36 +251,37 @@ impl NumericRangeQuery {
 }
 
 impl SearchQuery for NumericRangeQuery {
-    fn to_json(&self) -> Result<serde_json::Value, CouchbaseError> {
+    fn to_json(&self) -> Result<serde_json::Value, serde_json::Error> {
         let mut v = json!({});
         if let Some(val) = self.min {
-            v["min"] = json!(val);
+            v["min"] = serde_json::to_value(val)?;
         }
         if let Some(val) = self.max {
-            v["max"] = json!(val);
+            v["max"] = serde_json::to_value(val)?;
         }
         if let Some(val) = self.inclusive_min {
-            v["inclusive_min"] = json!(val);
+            v["inclusive_min"] = serde_json::to_value(val)?;
         }
         if let Some(val) = self.inclusive_max {
-            v["inclusive_max"] = json!(val);
+            v["inclusive_max"] = serde_json::to_value(val)?;
         }
         if let Some(b) = self.boost {
-            v["boost"] = json!(b);
+            v["boost"] = serde_json::to_value(b)?;
         }
         if let Some(val) = self.field.clone() {
-            v["field"] = json!(val);
+            v["field"] = serde_json::to_value(val)?;
         }
         Ok(v)
     }
 }
 
+#[derive(Debug)]
 pub struct DateRangeQuery {
     start: Option<String>,
     end: Option<String>,
     inclusive_start: Option<bool>,
     inclusive_end: Option<bool>,
-    parser: Option<String>,
+    datetime_parser: Option<String>,
     boost: Option<f32>,
     field: Option<String>,
 }
@@ -282,7 +293,7 @@ impl DateRangeQuery {
             end: None,
             inclusive_start: None,
             inclusive_end: None,
-            parser: None,
+            datetime_parser: None,
             boost: None,
             field: None,
         }
@@ -293,8 +304,8 @@ impl DateRangeQuery {
         self
     }
 
-    pub fn field(mut self, field: String) -> DateRangeQuery {
-        self.field = Some(field);
+    pub fn field(mut self, field: impl Into<String>) -> DateRangeQuery {
+        self.field = Some(field.into());
         self
     }
 
@@ -310,35 +321,35 @@ impl DateRangeQuery {
         self
     }
 
-    pub fn datetime_parser(mut self, parser: String) -> DateRangeQuery {
-        self.parser = Some(parser);
+    pub fn datetime_parser(mut self, parser: impl Into<String>) -> DateRangeQuery {
+        self.datetime_parser = Some(parser.into());
         self
     }
 }
 
 impl SearchQuery for DateRangeQuery {
-    fn to_json(&self) -> Result<serde_json::Value, CouchbaseError> {
+    fn to_json(&self) -> Result<serde_json::Value, serde_json::Error> {
         let mut v = json!({});
         if let Some(val) = self.start.clone() {
-            v["start"] = json!(val);
+            v["start"] = serde_json::to_value(val)?;
         }
         if let Some(val) = self.end.clone() {
-            v["end"] = json!(val);
+            v["end"] = serde_json::to_value(val)?;
         }
         if let Some(val) = self.inclusive_start {
-            v["inclusive_start"] = json!(val);
+            v["inclusive_start"] = serde_json::to_value(val)?;
         }
         if let Some(val) = self.inclusive_end {
-            v["inclusive_end"] = json!(val);
+            v["inclusive_end"] = serde_json::to_value(val)?;
         }
-        if let Some(val) = self.parser.clone() {
-            v["datetime_parser"] = json!(val);
+        if let Some(val) = self.datetime_parser.clone() {
+            v["datetime_parser"] = serde_json::to_value(val)?;
         }
         if let Some(b) = self.boost {
-            v["boost"] = json!(b);
+            v["boost"] = serde_json::to_value(b)?;
         }
         if let Some(val) = self.field.clone() {
-            v["field"] = json!(val);
+            v["field"] = serde_json::to_value(val)?;
         }
         Ok(v)
     }
@@ -369,15 +380,15 @@ impl ConjunctionQuery {
 }
 
 impl SearchQuery for ConjunctionQuery {
-    fn to_json(&self) -> Result<serde_json::Value, CouchbaseError> {
+    fn to_json(&self) -> Result<serde_json::Value, serde_json::Error> {
         let mut v = json!({});
         let mut queries = vec![];
         for query in &self.conjuncts {
             queries.push(query.to_json()?);
         }
-        v["conjuncts"] = json!(queries);
+        v["conjuncts"] = serde_json::to_value(queries)?;
         if let Some(b) = self.boost {
-            v["boost"] = json!(b);
+            v["boost"] = serde_json::to_value(b)?;
         }
         Ok(v)
     }
@@ -415,18 +426,18 @@ impl DisjunctionQuery {
 }
 
 impl SearchQuery for DisjunctionQuery {
-    fn to_json(&self) -> Result<serde_json::Value, CouchbaseError> {
+    fn to_json(&self) -> Result<serde_json::Value, serde_json::Error> {
         let mut v = json!({});
         let mut queries = vec![];
         for query in &self.disjuncts {
             queries.push(query.to_json()?);
         }
-        v["disjuncts"] = json!(queries);
+        v["disjuncts"] = serde_json::to_value(queries)?;
         if let Some(b) = self.boost {
-            v["boost"] = json!(b);
+            v["boost"] = serde_json::to_value(b)?;
         }
         if let Some(b) = self.min {
-            v["min"] = json!(b);
+            v["min"] = serde_json::to_value(b)?;
         }
         Ok(v)
     }
@@ -479,7 +490,7 @@ impl BooleanQuery {
 }
 
 impl SearchQuery for BooleanQuery {
-    fn to_json(&self) -> Result<serde_json::Value, CouchbaseError> {
+    fn to_json(&self) -> Result<serde_json::Value, serde_json::Error> {
         let mut v = json!({});
         if let Some(query) = &self.must {
             v["must"] = query.to_json()?;
@@ -490,17 +501,18 @@ impl SearchQuery for BooleanQuery {
         if let Some(query) = &self.should {
             let mut payload = query.to_json()?;
             if let Some(min) = self.should_min {
-                payload["min"] = json!(min);
+                payload["min"] = serde_json::to_value(min)?;
             }
             v["should"] = payload;
         }
         if let Some(b) = self.boost {
-            v["boost"] = json!(b);
+            v["boost"] = serde_json::to_value(b)?;
         }
         Ok(v)
     }
 }
 
+#[derive(Debug)]
 pub struct WildcardQuery {
     wildcard: String,
 
@@ -517,8 +529,8 @@ impl WildcardQuery {
         }
     }
 
-    pub fn field(mut self, field: String) -> WildcardQuery {
-        self.field = Some(field);
+    pub fn field(mut self, field: impl Into<String>) -> WildcardQuery {
+        self.field = Some(field.into());
         self
     }
 
@@ -529,43 +541,52 @@ impl WildcardQuery {
 }
 
 impl SearchQuery for WildcardQuery {
-    fn to_json(&self) -> Result<serde_json::Value, CouchbaseError> {
+    fn to_json(&self) -> Result<serde_json::Value, serde_json::Error> {
         let mut v = json!({
             "wildcard": self.wildcard
         });
         if let Some(val) = self.field.clone() {
-            v["field"] = json!(val);
+            v["field"] = serde_json::to_value(val)?;
         }
         if let Some(b) = self.boost {
-            v["boost"] = json!(b);
+            v["boost"] = serde_json::to_value(b)?;
         }
         Ok(v)
     }
 }
 
+#[derive(Debug, Serialize)]
 pub struct DocIDQuery {
-    doc_ids: Vec<String>,
+    ids: Vec<String>,
 
     field: Option<String>,
     boost: Option<f32>,
 }
 
 impl DocIDQuery {
-    pub fn new(doc_ids: Vec<String>) -> Self {
+    pub fn new<I, T>(doc_ids: Vec<String>) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<String>
+    {
         Self {
-            doc_ids,
+            ids: doc_ids.into_iter().map(Into::into).collect::<Vec<String>>(),
             field: None,
             boost: None,
         }
     }
 
-    pub fn add_doc_ids(mut self, doc_ids: Vec<String>) -> DocIDQuery {
-        self.doc_ids.extend(doc_ids);
+    pub fn add_doc_ids<I, T>(mut self, doc_ids: I) -> DocIDQuery
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<String>
+    {
+        self.ids.extend(doc_ids.into_iter().map(Into::into).collect::<Vec<String>>());
         self
     }
 
-    pub fn field(mut self, field: String) -> DocIDQuery {
-        self.field = Some(field);
+    pub fn field(mut self, field: impl Into<String>) -> DocIDQuery {
+        self.field = Some(field.into());
         self
     }
 
@@ -576,21 +597,23 @@ impl DocIDQuery {
 }
 
 impl SearchQuery for DocIDQuery {
-    fn to_json(&self) -> Result<serde_json::Value, CouchbaseError> {
+    fn to_json(&self) -> Result<serde_json::Value, serde_json::Error> {
         let mut v = json!({
-            "ids": self.doc_ids
+            "ids": self.ids
         });
         if let Some(val) = self.field.clone() {
-            v["field"] = json!(val);
+            v["field"] = serde_json::to_value(val)?;
         }
         if let Some(b) = self.boost {
-            v["boost"] = json!(b);
+            v["boost"] = serde_json::to_value(b)?;
         }
         Ok(v)
     }
 }
 
+#[derive(Debug, Serialize)]
 pub struct BooleanFieldQuery {
+    #[serde(rename = "bool")]
     val: bool,
 
     field: Option<String>,
@@ -606,8 +629,8 @@ impl BooleanFieldQuery {
         }
     }
 
-    pub fn field(mut self, field: String) -> BooleanFieldQuery {
-        self.field = Some(field);
+    pub fn field(mut self, field: impl Into<String>) -> BooleanFieldQuery {
+        self.field = Some(field.into());
         self
     }
 
@@ -618,20 +641,21 @@ impl BooleanFieldQuery {
 }
 
 impl SearchQuery for BooleanFieldQuery {
-    fn to_json(&self) -> Result<serde_json::Value, CouchbaseError> {
+    fn to_json(&self) -> Result<serde_json::Value, serde_json::Error> {
         let mut v = json!({
             "bool": self.val
         });
         if let Some(val) = self.field.clone() {
-            v["field"] = json!(val);
+            v["field"] = serde_json::to_value(val)?;
         }
         if let Some(b) = self.boost {
-            v["boost"] = json!(b);
+            v["boost"] = serde_json::to_value(b)?;
         }
         Ok(v)
     }
 }
 
+#[derive(Debug, Serialize)]
 pub struct TermQuery {
     term: String,
 
@@ -642,9 +666,9 @@ pub struct TermQuery {
 }
 
 impl TermQuery {
-    pub fn new(term: String) -> Self {
+    pub fn new(term: impl Into<String>) -> Self {
         Self {
-            term,
+            term: term.into(),
             field: None,
             fuzziness: None,
             prefix_length: None,
@@ -662,8 +686,8 @@ impl TermQuery {
         self
     }
 
-    pub fn field(mut self, field: String) -> TermQuery {
-        self.field = Some(field);
+    pub fn field(mut self, field: impl Into<String>) -> TermQuery {
+        self.field = Some(field.into());
         self
     }
 
@@ -674,26 +698,27 @@ impl TermQuery {
 }
 
 impl SearchQuery for TermQuery {
-    fn to_json(&self) -> Result<serde_json::Value, CouchbaseError> {
+    fn to_json(&self) -> Result<serde_json::Value, serde_json::Error> {
         let mut v = json!({
             "term": self.term.clone()
         });
         if let Some(val) = self.field.clone() {
-            v["field"] = json!(val);
+            v["field"] = serde_json::to_value(val)?;
         }
         if let Some(val) = self.prefix_length.clone() {
-            v["prefix_length"] = json!(val);
+            v["prefix_length"] = serde_json::to_value(val)?;
         }
         if let Some(val) = self.fuzziness.clone() {
-            v["fuzziness"] = json!(val);
+            v["fuzziness"] = serde_json::to_value(val)?;
         }
         if let Some(b) = self.boost {
-            v["boost"] = json!(b);
+            v["boost"] = serde_json::to_value(b)?;
         }
         Ok(v)
     }
 }
 
+#[derive(Debug)]
 pub struct PhraseQuery {
     terms: Vec<String>,
 
@@ -702,16 +727,20 @@ pub struct PhraseQuery {
 }
 
 impl PhraseQuery {
-    pub fn new(terms: Vec<String>) -> Self {
+    pub fn new<I, T>(terms: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<String>
+    {
         Self {
-            terms,
+            terms: terms.into_iter().map(Into::into).collect::<Vec<String>>(),
             field: None,
             boost: None,
         }
     }
 
-    pub fn field(mut self, field: String) -> PhraseQuery {
-        self.field = Some(field);
+    pub fn field(mut self, field: impl Into<String>) -> PhraseQuery {
+        self.field = Some(field.into());
         self
     }
 
@@ -722,20 +751,21 @@ impl PhraseQuery {
 }
 
 impl SearchQuery for PhraseQuery {
-    fn to_json(&self) -> Result<serde_json::Value, CouchbaseError> {
+    fn to_json(&self) -> Result<serde_json::Value, serde_json::Error> {
         let mut v = json!({
             "terms": self.terms
         });
         if let Some(val) = self.field.clone() {
-            v["field"] = json!(val);
+            v["field"] = serde_json::to_value(val)?;
         }
         if let Some(b) = self.boost {
-            v["boost"] = json!(b);
+            v["boost"] = serde_json::to_value(b)?;
         }
         Ok(v)
     }
 }
 
+#[derive(Debug)]
 pub struct PrefixQuery {
     prefix: String,
 
@@ -744,16 +774,16 @@ pub struct PrefixQuery {
 }
 
 impl PrefixQuery {
-    pub fn new(prefix: String) -> Self {
+    pub fn new(prefix: impl Into<String>) -> Self {
         Self {
-            prefix,
+            prefix: prefix.into(),
             field: None,
             boost: None,
         }
     }
 
-    pub fn field(mut self, field: String) -> PrefixQuery {
-        self.field = Some(field);
+    pub fn field(mut self, field: impl Into<String>) -> PrefixQuery {
+        self.field = Some(field.into());
         self
     }
 
@@ -764,20 +794,21 @@ impl PrefixQuery {
 }
 
 impl SearchQuery for PrefixQuery {
-    fn to_json(&self) -> Result<serde_json::Value, CouchbaseError> {
+    fn to_json(&self) -> Result<serde_json::Value, serde_json::Error> {
         let mut v = json!({
             "prefix": self.prefix.clone()
         });
         if let Some(val) = self.field.clone() {
-            v["field"] = json!(val);
+            v["field"] = serde_json::to_value(val)?;
         }
         if let Some(b) = self.boost {
-            v["boost"] = json!(b);
+            v["boost"] = serde_json::to_value(b)?;
         }
         Ok(v)
     }
 }
 
+#[derive(Debug)]
 pub struct MatchAllQuery {}
 
 impl MatchAllQuery {
@@ -787,13 +818,14 @@ impl MatchAllQuery {
 }
 
 impl SearchQuery for MatchAllQuery {
-    fn to_json(&self) -> Result<serde_json::Value, CouchbaseError> {
+    fn to_json(&self) -> Result<serde_json::Value, serde_json::Error> {
         Ok(json!({
             "match_all":  serde_json::Value::Null,
         }))
     }
 }
 
+#[derive(Debug)]
 pub struct MatchNoneQuery {}
 
 impl MatchNoneQuery {
@@ -803,13 +835,14 @@ impl MatchNoneQuery {
 }
 
 impl SearchQuery for MatchNoneQuery {
-    fn to_json(&self) -> Result<serde_json::Value, CouchbaseError> {
+    fn to_json(&self) -> Result<serde_json::Value, serde_json::Error> {
         Ok(json!({
             "match_none": serde_json::Value::Null,
         }))
     }
 }
 
+#[derive(Debug, Serialize)]
 pub struct TermRangeQuery {
     term: String,
 
@@ -822,9 +855,9 @@ pub struct TermRangeQuery {
 }
 
 impl TermRangeQuery {
-    pub fn new(term: String) -> Self {
+    pub fn new(term: impl Into<String>) -> Self {
         Self {
-            term,
+            term: term.into(),
             field: None,
             boost: None,
             min: None,
@@ -834,8 +867,8 @@ impl TermRangeQuery {
         }
     }
 
-    pub fn field(mut self, field: String) -> TermRangeQuery {
-        self.field = Some(field);
+    pub fn field(mut self, field: impl Into<String>) -> TermRangeQuery {
+        self.field = Some(field.into());
         self
     }
 
@@ -844,46 +877,47 @@ impl TermRangeQuery {
         self
     }
 
-    pub fn min(mut self, min: String, inclusive: bool) -> TermRangeQuery {
-        self.min = Some(min);
+    pub fn min(mut self, min: impl Into<String>, inclusive: bool) -> TermRangeQuery {
+        self.min = Some(min.into());
         self.inclusive_min = Some(inclusive);
         self
     }
 
-    pub fn max(mut self, max: String, inclusive: bool) -> TermRangeQuery {
-        self.max = Some(max);
+    pub fn max(mut self, max: impl Into<String>, inclusive: bool) -> TermRangeQuery {
+        self.max = Some(max.into());
         self.inclusive_max = Some(inclusive);
         self
     }
 }
 
 impl SearchQuery for TermRangeQuery {
-    fn to_json(&self) -> Result<serde_json::Value, CouchbaseError> {
+    fn to_json(&self) -> Result<serde_json::Value, serde_json::Error> {
         let mut v = json!({
             "term": self.term.clone()
         });
         if let Some(val) = self.min.clone() {
-            v["min"] = json!(val);
+            v["min"] = serde_json::to_value(val)?;
         }
         if let Some(val) = self.max.clone() {
-            v["max"] = json!(val);
+            v["max"] = serde_json::to_value(val)?;
         }
         if let Some(val) = self.inclusive_min {
-            v["inclusive_min"] = json!(val);
+            v["inclusive_min"] = serde_json::to_value(val)?;
         }
         if let Some(val) = self.inclusive_max {
-            v["inclusive_max"] = json!(val);
+            v["inclusive_max"] = serde_json::to_value(val)?;
         }
         if let Some(val) = self.field.clone() {
-            v["field"] = json!(val);
+            v["field"] = serde_json::to_value(val)?;
         }
         if let Some(b) = self.boost {
-            v["boost"] = json!(b);
+            v["boost"] = serde_json::to_value(b)?;
         }
         Ok(v)
     }
 }
 
+#[derive(Debug)]
 pub struct GeoDistanceQuery {
     location: [f64; 2],
     distance: String,
@@ -893,17 +927,17 @@ pub struct GeoDistanceQuery {
 }
 
 impl GeoDistanceQuery {
-    pub fn new(lon: f64, lat: f64, distance: String) -> Self {
+    pub fn new(lon: f64, lat: f64, distance: impl Into<String>) -> Self {
         Self {
             location: [lon, lat],
-            distance,
+            distance: distance.into(),
             field: None,
             boost: None,
         }
     }
 
-    pub fn field(mut self, field: String) -> GeoDistanceQuery {
-        self.field = Some(field);
+    pub fn field(mut self, field: impl Into<String>) -> GeoDistanceQuery {
+        self.field = Some(field.into());
         self
     }
 
@@ -914,21 +948,22 @@ impl GeoDistanceQuery {
 }
 
 impl SearchQuery for GeoDistanceQuery {
-    fn to_json(&self) -> Result<serde_json::Value, CouchbaseError> {
+    fn to_json(&self) -> Result<serde_json::Value, serde_json::Error> {
         let mut v = json!({
             "location": self.location,
             "distance": self.distance.clone()
         });
         if let Some(val) = self.field.clone() {
-            v["field"] = json!(val);
+            v["field"] = serde_json::to_value(val)?;
         }
         if let Some(b) = self.boost {
-            v["boost"] = json!(b);
+            v["boost"] = serde_json::to_value(b)?;
         }
         Ok(v)
     }
 }
 
+#[derive(Debug)]
 pub struct GeoBoundingBoxQuery {
     top_left: [f64; 2],
     bottom_right: [f64; 2],
@@ -952,8 +987,8 @@ impl GeoBoundingBoxQuery {
         }
     }
 
-    pub fn field(mut self, field: String) -> GeoBoundingBoxQuery {
-        self.field = Some(field);
+    pub fn field(mut self, field: impl Into<String>) -> GeoBoundingBoxQuery {
+        self.field = Some(field.into());
         self
     }
 
@@ -964,21 +999,22 @@ impl GeoBoundingBoxQuery {
 }
 
 impl SearchQuery for GeoBoundingBoxQuery {
-    fn to_json(&self) -> Result<serde_json::Value, CouchbaseError> {
+    fn to_json(&self) -> Result<serde_json::Value, serde_json::Error> {
         let mut v = json!({
             "top_left": self.top_left,
             "bottom_right": self.bottom_right,
         });
         if let Some(val) = self.field.clone() {
-            v["field"] = json!(val);
+            v["field"] = serde_json::to_value(val)?;
         }
         if let Some(b) = self.boost {
-            v["boost"] = json!(b);
+            v["boost"] = serde_json::to_value(b)?;
         }
         Ok(v)
     }
 }
 
+#[derive(Debug, Default, Clone, Copy, Serialize)]
 pub struct Coordinate {
     lon: f64,
     lat: f64,
@@ -990,6 +1026,7 @@ impl Coordinate {
     }
 }
 
+#[derive(Debug)]
 pub struct GeoPolygonQuery {
     coordinates: Vec<Coordinate>,
 
@@ -998,16 +1035,19 @@ pub struct GeoPolygonQuery {
 }
 
 impl GeoPolygonQuery {
-    pub fn new(coordinates: Vec<Coordinate>) -> Self {
+    pub fn new<I>(coordinates: I) -> Self
+    where
+        I: IntoIterator<Item = Coordinate>,
+    {
         Self {
-            coordinates,
+            coordinates: coordinates.into_iter().collect(),
             field: None,
             boost: None,
         }
     }
 
-    pub fn field(mut self, field: String) -> GeoPolygonQuery {
-        self.field = Some(field);
+    pub fn field(mut self, field: impl Into<String>) -> GeoPolygonQuery {
+        self.field = Some(field.into());
         self
     }
 
@@ -1018,7 +1058,7 @@ impl GeoPolygonQuery {
 }
 
 impl SearchQuery for GeoPolygonQuery {
-    fn to_json(&self) -> Result<serde_json::Value, CouchbaseError> {
+    fn to_json(&self) -> Result<serde_json::Value, serde_json::Error> {
         let mut points = vec![];
         for coord in &self.coordinates {
             points.push([coord.lon, coord.lat]);
@@ -1027,11 +1067,336 @@ impl SearchQuery for GeoPolygonQuery {
             "polygon_points": points,
         });
         if let Some(val) = self.field.clone() {
-            v["field"] = json!(val);
+            v["field"] = serde_json::to_value(val)?;
         }
         if let Some(b) = self.boost {
-            v["boost"] = json!(b);
+            v["boost"] = serde_json::to_value(b)?;
         }
         Ok(v)
     }
 }
+
+pub trait SearchSort: Serialize {
+}
+
+#[derive(Debug, Serialize)]
+pub struct SearchSortScore {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    desc: Option<bool>,
+    by: String,
+}
+
+impl SearchSortScore {
+    pub fn desc(mut self, desc: bool) -> Self {
+        self.desc = Some(desc);
+        self
+    }
+}
+
+impl Default for SearchSortScore {
+    fn default() -> Self {
+        Self {
+            by: "score".into(),
+            desc: None,
+        }
+    }
+}
+
+impl SearchSort for SearchSortScore {
+}
+
+#[derive(Debug, Serialize)]
+pub struct SearchSortId {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    desc: Option<bool>,
+    by: String,
+}
+
+impl SearchSortId {
+    pub fn desc(mut self, desc: bool) -> Self {
+        self.desc = Some(desc);
+        self
+    }
+}
+
+impl Default for SearchSortId {
+    fn default() -> Self {
+        Self {
+            by: "id".into(),
+            desc: None,
+        }
+    }
+}
+
+impl SearchSort for SearchSortId {
+}
+
+#[derive(Debug, Serialize)]
+pub enum SearchSortFieldType {
+    #[serde(rename = "auto")]
+    Auto,
+    #[serde(rename = "string")]
+    String,
+    #[serde(rename = "number")]
+    Number,
+    #[serde(rename = "date")]
+    Date,
+}
+
+#[derive(Debug, Serialize)]
+pub enum SearchSortFieldMode {
+    #[serde(rename = "default")]
+    Default,
+    #[serde(rename = "min")]
+    Min,
+    #[serde(rename = "max")]
+    Max,
+}
+
+#[derive(Debug, Serialize)]
+pub enum SearchSortFieldMissing {
+    #[serde(rename = "first")]
+    First,
+    #[serde(rename = "last")]
+    Last,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SearchSortField {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    desc: Option<bool>,
+    by: String,
+    field: String,
+    #[serde(rename = "type")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    field_type: Option<SearchSortFieldType>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    mode: Option<SearchSortFieldMode>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    missing: Option<SearchSortFieldMissing>,
+}
+
+impl SearchSortField {
+    pub fn new(field: impl Into<String>) -> Self {
+        Self {
+            desc: None,
+            by: "field".into(),
+            field: field.into(),
+            field_type: None,
+            mode: None,
+            missing: None
+        }
+    }
+    pub fn desc(mut self, desc: bool) -> Self {
+        self.desc = Some(desc);
+        self
+    }
+    pub fn field_type(mut self, field_type: SearchSortFieldType) -> Self {
+        self.field_type = Some(field_type);
+        self
+    }
+    pub fn mode(mut self, mode: SearchSortFieldMode) -> Self {
+        self.mode = Some(mode);
+        self
+    }
+    pub fn missing(mut self, missing: SearchSortFieldMissing) -> Self {
+        self.missing = Some(missing);
+        self
+    }
+}
+
+impl SearchSort for SearchSortField {
+}
+
+#[derive(Debug, Serialize)]
+pub enum SearchSortGeoDistanceUnit {
+    #[serde(rename = "meters")]
+    Meters,
+    #[serde(rename = "miles")]
+    Miles,
+    #[serde(rename = "centimeters")]
+    Centimeters,
+    #[serde(rename = "millimeters")]
+    Millimeters,
+    #[serde(rename = "nauticalmiles")]
+    NauticalMiles,
+    #[serde(rename = "kilometers")]
+    Kilometers,
+    #[serde(rename = "feet")]
+    Feet,
+    #[serde(rename = "yards")]
+    Yards,
+    #[serde(rename = "inch")]
+    Inches,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SearchSortGeoDistance {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    desc: Option<bool>,
+    by: String,
+    field: String,
+    location: [f32;2],
+    #[serde(skip_serializing_if = "Option::is_none")]
+    unit: Option<SearchSortGeoDistanceUnit>,
+}
+
+impl SearchSortGeoDistance {
+    pub fn new(field: impl Into<String>, location: [f32;2]) -> Self {
+        Self {
+            desc: None,
+            by: "field".into(),
+            field: field.into(),
+            location,
+            unit: None
+        }
+    }
+    pub fn desc(mut self, desc: bool) -> Self {
+        self.desc = Some(desc);
+        self
+    }
+    pub fn unit(mut self, unit: SearchSortGeoDistanceUnit) -> Self {
+        self.unit = Some(unit);
+        self
+    }
+}
+
+impl SearchSort for SearchSortGeoDistance {
+}
+
+pub trait SearchFacet: Serialize {
+}
+
+#[derive(Debug, Serialize)]
+pub struct TermFacet {
+    field: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    size: Option<u32>,
+}
+
+impl TermFacet {
+    pub fn new(field: impl Into<String>) -> Self {
+        Self {
+            field: field.into(),
+            size: None,
+        }
+    }
+    pub fn size(mut self, size: u32) -> Self {
+        self.size = Some(size);
+        self
+    }
+}
+
+impl SearchFacet for TermFacet {}
+
+#[derive(Debug, Serialize)]
+pub struct SearchNumericRange {
+    name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    min: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    max: Option<f32>,
+}
+
+impl SearchNumericRange {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            min: None,
+            max: None,
+        }
+    }
+
+    pub fn min(mut self, min: f32) -> Self {
+        self.min = Some(min);
+        self
+    }
+
+    pub fn max(mut self, max: f32) -> Self {
+        self.max = Some(max);
+        self
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct NumericRangeFacet {
+    field: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    size: Option<u32>,
+    numeric_ranges: Vec<SearchNumericRange>,
+}
+
+impl NumericRangeFacet {
+    pub fn new<I>(field: impl Into<String>, numeric_ranges: I) -> Self
+    where
+        I: IntoIterator<Item = SearchNumericRange>
+    {
+        Self {
+            field: field.into(),
+            size: None,
+            numeric_ranges: numeric_ranges.into_iter().collect()
+        }
+    }
+    pub fn size(mut self, size: u32) -> Self {
+        self.size = Some(size);
+        self
+    }
+}
+
+impl SearchFacet for NumericRangeFacet {}
+
+#[derive(Debug, Serialize)]
+pub struct SearchDateRange {
+    name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    start: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    end: Option<String>,
+}
+
+impl SearchDateRange {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            start: None,
+            end: None,
+        }
+    }
+
+    pub fn start(mut self, start: impl Into<String>) -> Self {
+        self.start = Some(start.into());
+        self
+    }
+
+    pub fn end(mut self, end: impl Into<String>) -> Self {
+        self.end = Some(end.into());
+        self
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct DateRangeFacet {
+    field: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    size: Option<u32>,
+    date_ranges: Vec<SearchDateRange>,
+}
+
+impl DateRangeFacet {
+    pub fn new<I>(field: impl Into<String>, date_ranges: I) -> Self
+        where
+            I: IntoIterator<Item = SearchDateRange>
+    {
+        Self {
+            field: field.into(),
+            size: None,
+            date_ranges: date_ranges.into_iter().collect()
+        }
+    }
+    pub fn size(mut self, size: u32) -> Self {
+        self.size = Some(size);
+        self
+    }
+}
+
+impl SearchFacet for DateRangeFacet {}

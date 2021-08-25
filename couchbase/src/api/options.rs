@@ -1,11 +1,13 @@
 use crate::api::MutationState;
-use crate::CouchbaseResult;
-use serde::Serializer;
+use crate::{CouchbaseResult, SearchSort, CouchbaseError, ErrorContext, SearchFacet};
+use serde::{Serializer};
 use serde_derive::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::time::Duration;
 use uuid::Uuid;
+use std::fmt::{Display, Formatter};
+
 
 /// Macro to DRY up the repetitive timeout setter.
 macro_rules! timeout {
@@ -407,6 +409,50 @@ pub enum AnalyticsScanConsistency {
     RequestPlus,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub enum SearchHighlightStyle {
+    #[serde(rename = "html")]
+    HTML,
+    #[serde(rename = "ansi")]
+    ANSI
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct SearchHighLight {
+    #[serde(rename = "style")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    style: Option<SearchHighlightStyle>,
+    #[serde(rename = "fields")]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    fields: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub enum SearchScanConsistency {
+    NotBounded
+}
+
+// No idea why it won't let me do this as derive
+impl Display for SearchScanConsistency {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            SearchScanConsistency::NotBounded => write!(f, "not_bounded"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct SearchCtlConsistency {
+    level: String,
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    vectors: HashMap<String, HashMap<String, u64>>
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct SearchCtl {
+    ctl: SearchCtlConsistency
+}
+
 #[derive(Debug, Default, Serialize)]
 pub struct SearchOptions {
     #[serde(rename = "size")]
@@ -421,10 +467,20 @@ pub struct SearchOptions {
     #[serde(serialize_with = "convert_duration_for_golang")]
     pub(crate) timeout: Option<Duration>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) highlight: Option<SearchHighLight>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub(crate) fields: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    consistency: Option<SearchCtl>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sort: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    facets: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(flatten)]
     pub(crate) raw: Option<serde_json::Map<String, Value>>,
     // The query and index are not part of the public API, but added here
-    // as a convenience so we can conver the whole block into the
+    // as a convenience so we can convert the whole block into the
     // JSON payload the search engine expects. DO NOT ADD A PUBLIC
     // SETTER!
     #[serde(rename = "indexName")]
@@ -447,6 +503,77 @@ impl SearchOptions {
 
     pub fn explain(mut self, explain: bool) -> Self {
         self.explain = Some(explain);
+        self
+    }
+
+    pub fn highlight(mut self, style: Option<SearchHighlightStyle>, fields: Vec<String>) -> Self {
+        self.highlight = Some(SearchHighLight{
+            style,
+            fields,
+        });
+        self
+    }
+
+    pub fn fields<I, T>(mut self, fields: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<String>
+    {
+        self.fields = fields.into_iter().map(Into::into).collect();
+        self
+    }
+
+    pub fn scan_consistency(mut self, level: SearchScanConsistency) -> Self {
+        self.consistency = Some(SearchCtl{
+            ctl: SearchCtlConsistency{
+                level: level.to_string(),
+                vectors: HashMap::new(),
+            }
+        });
+        self
+    }
+
+    pub fn consistent_with(mut self, state: MutationState) -> Self {
+        let mut vectors = HashMap::new();
+        for token in state.tokens.into_iter().next() {
+            let bucket  = token.bucket_name().to_string();
+            if !vectors.contains_key(&bucket) {
+                vectors.insert(bucket.clone(), HashMap::new());
+            }
+
+            let vector = vectors.get_mut(&bucket).unwrap();
+            vector.insert(format!("{}/{}", token.partition_uuid(), token.partition_id()), token.sequence_number());
+        }
+        self.consistency = Some(SearchCtl{
+            ctl: SearchCtlConsistency{
+                level: "at_plus".into(),
+                vectors,
+            }
+        });
+        self
+    }
+
+    pub fn sort<T>(mut self, sort: Vec<T>) -> Self
+    where
+        T: SearchSort
+    {
+        let jsonified = serde_json::to_value(sort).map_err(|e| CouchbaseError::EncodingFailure {
+            source: std::io::Error::new(std::io::ErrorKind::Other, e),
+            ctx: ErrorContext::default(),
+        }).unwrap();
+        self.sort = Some(jsonified);
+        self
+    }
+
+    pub fn facets<T>(mut self, facets: HashMap<String, T>) -> Self
+        where
+            T: SearchFacet
+    {
+        let jsonified = serde_json::to_value(facets).map_err(|e| CouchbaseError::EncodingFailure {
+            source: std::io::Error::new(std::io::ErrorKind::Other, e),
+            ctx: ErrorContext::default(),
+        }).unwrap();
+        self.facets = Some(jsonified);
         self
     }
 

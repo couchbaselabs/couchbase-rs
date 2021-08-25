@@ -221,6 +221,8 @@ struct SearchCookie {
     rows_receiver: Option<futures::channel::mpsc::UnboundedReceiver<Vec<u8>>>,
     meta_sender: futures::channel::oneshot::Sender<SearchMetaData>,
     meta_receiver: Option<futures::channel::oneshot::Receiver<SearchMetaData>>,
+    facet_sender: futures::channel::oneshot::Sender<serde_json::Value>,
+    facet_receiver: Option<futures::channel::oneshot::Receiver<serde_json::Value>>,
 }
 
 struct ViewCookie {
