@@ -7,6 +7,7 @@ pub mod results;
 pub mod search;
 pub mod search_indexes;
 pub mod users;
+pub mod view_indexes;
 
 use crate::api::buckets::BucketManager;
 use crate::api::error::{CouchbaseError, CouchbaseResult, ErrorContext};

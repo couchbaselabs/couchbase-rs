@@ -12,6 +12,7 @@ pub use api::results::*;
 pub use api::search::*;
 pub use api::search_indexes::*;
 pub use api::users::*;
+pub use api::view_indexes::*;
 pub use api::{
     Bucket, Cluster, Collection, DurabilityLevel, LookupInSpec, MutateInSpec, MutationState,
     MutationToken,

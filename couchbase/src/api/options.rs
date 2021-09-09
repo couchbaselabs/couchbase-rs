@@ -1495,3 +1495,48 @@ pub struct AnalyzeDocumentSearchIndexOptions {
 impl AnalyzeDocumentSearchIndexOptions {
     timeout!();
 }
+
+#[derive(Debug, Default)]
+pub struct GetDesignDocumentOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl GetDesignDocumentOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct GetAllDesignDocumentsOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl GetAllDesignDocumentsOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct UpsertDesignDocumentOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl UpsertDesignDocumentOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct DropDesignDocumentsOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl DropDesignDocumentsOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct PublishDesignDocumentsOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl PublishDesignDocumentsOptions {
+    timeout!();
+}
