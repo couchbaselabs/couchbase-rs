@@ -7,8 +7,10 @@ pub use api::buckets::*;
 pub use api::collections::*;
 pub use api::error::*;
 pub use api::options::*;
+pub use api::query_indexes::*;
 pub use api::results::*;
 pub use api::search::*;
+pub use api::search_indexes::*;
 pub use api::users::*;
 pub use api::{
     Bucket, Cluster, Collection, DurabilityLevel, LookupInSpec, MutateInSpec, MutationState,

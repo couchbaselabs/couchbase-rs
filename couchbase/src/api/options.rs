@@ -1,13 +1,12 @@
 use crate::api::MutationState;
-use crate::{CouchbaseResult, SearchSort, CouchbaseError, ErrorContext, SearchFacet};
-use serde::{Serializer};
+use crate::{CouchbaseError, CouchbaseResult, ErrorContext, SearchFacet, SearchSort};
+use serde::Serializer;
 use serde_derive::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
 use std::time::Duration;
 use uuid::Uuid;
-use std::fmt::{Display, Formatter};
-
 
 /// Macro to DRY up the repetitive timeout setter.
 macro_rules! timeout {
@@ -414,7 +413,7 @@ pub enum SearchHighlightStyle {
     #[serde(rename = "html")]
     HTML,
     #[serde(rename = "ansi")]
-    ANSI
+    ANSI,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -429,7 +428,7 @@ pub(crate) struct SearchHighLight {
 
 #[derive(Debug, Clone)]
 pub enum SearchScanConsistency {
-    NotBounded
+    NotBounded,
 }
 
 // No idea why it won't let me do this as derive
@@ -445,12 +444,12 @@ impl Display for SearchScanConsistency {
 pub(crate) struct SearchCtlConsistency {
     level: String,
     #[serde(skip_serializing_if = "HashMap::is_empty")]
-    vectors: HashMap<String, HashMap<String, u64>>
+    vectors: HashMap<String, HashMap<String, u64>>,
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct SearchCtl {
-    ctl: SearchCtlConsistency
+    ctl: SearchCtlConsistency,
 }
 
 #[derive(Debug, Default, Serialize)]
@@ -507,28 +506,25 @@ impl SearchOptions {
     }
 
     pub fn highlight(mut self, style: Option<SearchHighlightStyle>, fields: Vec<String>) -> Self {
-        self.highlight = Some(SearchHighLight{
-            style,
-            fields,
-        });
+        self.highlight = Some(SearchHighLight { style, fields });
         self
     }
 
     pub fn fields<I, T>(mut self, fields: I) -> Self
     where
         I: IntoIterator<Item = T>,
-        T: Into<String>
+        T: Into<String>,
     {
         self.fields = fields.into_iter().map(Into::into).collect();
         self
     }
 
     pub fn scan_consistency(mut self, level: SearchScanConsistency) -> Self {
-        self.consistency = Some(SearchCtl{
-            ctl: SearchCtlConsistency{
+        self.consistency = Some(SearchCtl {
+            ctl: SearchCtlConsistency {
                 level: level.to_string(),
                 vectors: HashMap::new(),
-            }
+            },
         });
         self
     }
@@ -536,43 +532,50 @@ impl SearchOptions {
     pub fn consistent_with(mut self, state: MutationState) -> Self {
         let mut vectors = HashMap::new();
         for token in state.tokens.into_iter().next() {
-            let bucket  = token.bucket_name().to_string();
+            let bucket = token.bucket_name().to_string();
             if !vectors.contains_key(&bucket) {
                 vectors.insert(bucket.clone(), HashMap::new());
             }
 
             let vector = vectors.get_mut(&bucket).unwrap();
-            vector.insert(format!("{}/{}", token.partition_uuid(), token.partition_id()), token.sequence_number());
+            vector.insert(
+                format!("{}/{}", token.partition_uuid(), token.partition_id()),
+                token.sequence_number(),
+            );
         }
-        self.consistency = Some(SearchCtl{
-            ctl: SearchCtlConsistency{
+        self.consistency = Some(SearchCtl {
+            ctl: SearchCtlConsistency {
                 level: "at_plus".into(),
                 vectors,
-            }
+            },
         });
         self
     }
 
     pub fn sort<T>(mut self, sort: Vec<T>) -> Self
     where
-        T: SearchSort
+        T: SearchSort,
     {
-        let jsonified = serde_json::to_value(sort).map_err(|e| CouchbaseError::EncodingFailure {
-            source: std::io::Error::new(std::io::ErrorKind::Other, e),
-            ctx: ErrorContext::default(),
-        }).unwrap();
+        let jsonified = serde_json::to_value(sort)
+            .map_err(|e| CouchbaseError::EncodingFailure {
+                source: std::io::Error::new(std::io::ErrorKind::Other, e),
+                ctx: ErrorContext::default(),
+            })
+            .unwrap();
         self.sort = Some(jsonified);
         self
     }
 
     pub fn facets<T>(mut self, facets: HashMap<String, T>) -> Self
-        where
-            T: SearchFacet
+    where
+        T: SearchFacet,
     {
-        let jsonified = serde_json::to_value(facets).map_err(|e| CouchbaseError::EncodingFailure {
-            source: std::io::Error::new(std::io::ErrorKind::Other, e),
-            ctx: ErrorContext::default(),
-        }).unwrap();
+        let jsonified = serde_json::to_value(facets)
+            .map_err(|e| CouchbaseError::EncodingFailure {
+                source: std::io::Error::new(std::io::ErrorKind::Other, e),
+                ctx: ErrorContext::default(),
+            })
+            .unwrap();
         self.facets = Some(jsonified);
         self
     }
@@ -1382,5 +1385,113 @@ pub struct BuildDeferredQueryIndexOptions {
 }
 
 impl BuildDeferredQueryIndexOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct GetSearchIndexOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl GetSearchIndexOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct GetAllSearchIndexesOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl GetAllSearchIndexesOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct UpsertSearchIndexOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl UpsertSearchIndexOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct DropSearchIndexOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl DropSearchIndexOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct GetSearchIndexedDocumentsCountOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl GetSearchIndexedDocumentsCountOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct PauseIngestSearchIndexOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl PauseIngestSearchIndexOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct ResumeIngestSearchIndexOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl ResumeIngestSearchIndexOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct AllowQueryingSearchIndexOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl AllowQueryingSearchIndexOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct DisallowQueryingSearchIndexOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl DisallowQueryingSearchIndexOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct FreezePlanSearchIndexOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl FreezePlanSearchIndexOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct UnfreezePlanSearchIndexOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl UnfreezePlanSearchIndexOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct AnalyzeDocumentSearchIndexOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl AnalyzeDocumentSearchIndexOptions {
     timeout!();
 }

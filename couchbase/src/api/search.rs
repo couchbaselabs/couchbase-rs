@@ -1,9 +1,7 @@
-
-use serde_json::{json};
-use serde_derive::{Serialize};
+use serde::Serialize;
+use serde_derive::Serialize;
+use serde_json::json;
 use std::fmt::Debug;
-use serde::{Serialize};
-
 
 // TODO: Is this weird?
 pub trait SearchQuery {
@@ -18,7 +16,10 @@ pub struct QueryStringQuery {
 
 impl QueryStringQuery {
     pub fn new(query: impl Into<String>) -> Self {
-        Self { query: query.into(), boost: None }
+        Self {
+            query: query.into(),
+            boost: None,
+        }
     }
 
     pub fn boost(mut self, boost: f32) -> QueryStringQuery {
@@ -567,7 +568,7 @@ impl DocIDQuery {
     pub fn new<I, T>(doc_ids: Vec<String>) -> Self
     where
         I: IntoIterator<Item = T>,
-        T: Into<String>
+        T: Into<String>,
     {
         Self {
             ids: doc_ids.into_iter().map(Into::into).collect::<Vec<String>>(),
@@ -579,9 +580,10 @@ impl DocIDQuery {
     pub fn add_doc_ids<I, T>(mut self, doc_ids: I) -> DocIDQuery
     where
         I: IntoIterator<Item = T>,
-        T: Into<String>
+        T: Into<String>,
     {
-        self.ids.extend(doc_ids.into_iter().map(Into::into).collect::<Vec<String>>());
+        self.ids
+            .extend(doc_ids.into_iter().map(Into::into).collect::<Vec<String>>());
         self
     }
 
@@ -730,7 +732,7 @@ impl PhraseQuery {
     pub fn new<I, T>(terms: I) -> Self
     where
         I: IntoIterator<Item = T>,
-        T: Into<String>
+        T: Into<String>,
     {
         Self {
             terms: terms.into_iter().map(Into::into).collect::<Vec<String>>(),
@@ -1076,8 +1078,7 @@ impl SearchQuery for GeoPolygonQuery {
     }
 }
 
-pub trait SearchSort: Serialize {
-}
+pub trait SearchSort: Serialize {}
 
 #[derive(Debug, Serialize)]
 pub struct SearchSortScore {
@@ -1102,8 +1103,7 @@ impl Default for SearchSortScore {
     }
 }
 
-impl SearchSort for SearchSortScore {
-}
+impl SearchSort for SearchSortScore {}
 
 #[derive(Debug, Serialize)]
 pub struct SearchSortId {
@@ -1128,8 +1128,7 @@ impl Default for SearchSortId {
     }
 }
 
-impl SearchSort for SearchSortId {
-}
+impl SearchSort for SearchSortId {}
 
 #[derive(Debug, Serialize)]
 pub enum SearchSortFieldType {
@@ -1184,7 +1183,7 @@ impl SearchSortField {
             field: field.into(),
             field_type: None,
             mode: None,
-            missing: None
+            missing: None,
         }
     }
     pub fn desc(mut self, desc: bool) -> Self {
@@ -1205,8 +1204,7 @@ impl SearchSortField {
     }
 }
 
-impl SearchSort for SearchSortField {
-}
+impl SearchSort for SearchSortField {}
 
 #[derive(Debug, Serialize)]
 pub enum SearchSortGeoDistanceUnit {
@@ -1236,19 +1234,19 @@ pub struct SearchSortGeoDistance {
     desc: Option<bool>,
     by: String,
     field: String,
-    location: [f32;2],
+    location: [f32; 2],
     #[serde(skip_serializing_if = "Option::is_none")]
     unit: Option<SearchSortGeoDistanceUnit>,
 }
 
 impl SearchSortGeoDistance {
-    pub fn new(field: impl Into<String>, location: [f32;2]) -> Self {
+    pub fn new(field: impl Into<String>, location: [f32; 2]) -> Self {
         Self {
             desc: None,
             by: "field".into(),
             field: field.into(),
             location,
-            unit: None
+            unit: None,
         }
     }
     pub fn desc(mut self, desc: bool) -> Self {
@@ -1261,11 +1259,9 @@ impl SearchSortGeoDistance {
     }
 }
 
-impl SearchSort for SearchSortGeoDistance {
-}
+impl SearchSort for SearchSortGeoDistance {}
 
-pub trait SearchFacet: Serialize {
-}
+pub trait SearchFacet: Serialize {}
 
 #[derive(Debug, Serialize)]
 pub struct TermFacet {
@@ -1329,12 +1325,12 @@ pub struct NumericRangeFacet {
 impl NumericRangeFacet {
     pub fn new<I>(field: impl Into<String>, numeric_ranges: I) -> Self
     where
-        I: IntoIterator<Item = SearchNumericRange>
+        I: IntoIterator<Item = SearchNumericRange>,
     {
         Self {
             field: field.into(),
             size: None,
-            numeric_ranges: numeric_ranges.into_iter().collect()
+            numeric_ranges: numeric_ranges.into_iter().collect(),
         }
     }
     pub fn size(mut self, size: u32) -> Self {
@@ -1384,13 +1380,13 @@ pub struct DateRangeFacet {
 
 impl DateRangeFacet {
     pub fn new<I>(field: impl Into<String>, date_ranges: I) -> Self
-        where
-            I: IntoIterator<Item = SearchDateRange>
+    where
+        I: IntoIterator<Item = SearchDateRange>,
     {
         Self {
             field: field.into(),
             size: None,
-            date_ranges: date_ranges.into_iter().collect()
+            date_ranges: date_ranges.into_iter().collect(),
         }
     }
     pub fn size(mut self, size: u32) -> Self {

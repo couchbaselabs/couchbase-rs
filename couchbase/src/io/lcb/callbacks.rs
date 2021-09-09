@@ -7,7 +7,7 @@ use crate::api::MutationToken;
 use crate::io::lcb::{HttpCookie, ViewCookie};
 use couchbase_sys::*;
 use log::{debug, trace};
-use serde_json::{Value};
+use serde_json::Value;
 use std::convert::TryInto;
 use std::ffi::CStr;
 use std::os::raw::{c_char, c_int, c_uint, c_void};
@@ -683,14 +683,9 @@ pub unsafe extern "C" fn search_callback(
         if status == 0 {
             let meta = serde_json::from_slice::<Value>(row).unwrap();
             match meta.as_object().unwrap().get("facets") {
-                Some(f) => {
-                    match cookie
-                        .facet_sender
-                        .send(f.clone())
-                    {
-                        Ok(_) => {}
-                        Err(e) => trace!("Failed to send search meta data ecause of {:?}", e),
-                    }
+                Some(f) => match cookie.facet_sender.send(f.clone()) {
+                    Ok(_) => {}
+                    Err(e) => trace!("Failed to send search meta data ecause of {:?}", e),
                 },
                 None => {}
             }

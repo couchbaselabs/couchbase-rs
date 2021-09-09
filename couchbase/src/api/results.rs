@@ -5,15 +5,14 @@ use futures::channel::oneshot::Receiver;
 use futures::{Stream, StreamExt};
 use serde::de::DeserializeOwned;
 
-use serde_json::{Value};
-use std::collections::{HashMap, HashSet};
-use std::fmt;
-use std::time::{Duration};
 use serde_derive::Deserialize;
-use std::io::{Error, ErrorKind};
+use serde_json::Value;
+use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
+use std::fmt;
+use std::io::{Error, ErrorKind};
 use std::iter::FromIterator;
-
+use std::time::Duration;
 
 #[derive(Debug)]
 pub struct QueryResult {
@@ -220,7 +219,7 @@ pub struct SearchRowLocations {
 
 impl SearchRowLocations {
     pub fn get_all(&self) -> Vec<&SearchRowLocation> {
-        let mut locations  = vec![];
+        let mut locations = vec![];
         for f in &self.locations {
             for t in f.1 {
                 locations.extend(t.1.iter());
@@ -233,29 +232,31 @@ impl SearchRowLocations {
     pub fn get(&self, field: impl Into<String>) -> Vec<&SearchRowLocation> {
         match self.locations.get(&field.into()) {
             Some(fl) => {
-                let mut locations  = vec![];
+                let mut locations = vec![];
                 for t in fl {
                     locations.extend(t.1.iter());
                 }
 
                 locations
-            },
+            }
             None => vec![],
         }
     }
 
-    pub fn get_by_term(&self, field: impl Into<String>, term: impl Into<String>) -> Vec<&SearchRowLocation> {
+    pub fn get_by_term(
+        &self,
+        field: impl Into<String>,
+        term: impl Into<String>,
+    ) -> Vec<&SearchRowLocation> {
         match self.locations.get(&field.into()) {
-            Some(fl) => {
-                match fl.get(&term.into()) {
-                    Some(tl) => {
-                        let mut locations  = vec![];
-                        locations.extend(tl);
+            Some(fl) => match fl.get(&term.into()) {
+                Some(tl) => {
+                    let mut locations = vec![];
+                    locations.extend(tl);
 
-                        locations
-                    },
-                    None => Vec::new(),
+                    locations
                 }
+                None => Vec::new(),
             },
             None => vec![],
         }
@@ -279,13 +280,13 @@ impl SearchRowLocations {
     pub fn terms_for(&self, field: impl Into<String>) -> Vec<String> {
         match self.locations.get(&field.into()) {
             Some(fl) => {
-                let mut locations  = vec![];
+                let mut locations = vec![];
                 for t in fl {
                     locations.push(t.0.clone());
                 }
 
                 locations
-            },
+            }
             None => vec![],
         }
     }
@@ -298,7 +299,10 @@ impl TryFrom<&Value> for SearchRowLocations {
         if !value.is_object() {
             return Err(CouchbaseError::DecodingFailure {
                 ctx: ErrorContext::default(),
-                source: Error::new(ErrorKind::InvalidData, "locations in result is not expected type, expected top level to be an object")
+                source: Error::new(
+                    ErrorKind::InvalidData,
+                    "locations in result is not expected type, expected top level to be an object",
+                ),
             });
         }
 
@@ -311,7 +315,10 @@ impl TryFrom<&Value> for SearchRowLocations {
             if !terms.is_object() {
                 return Err(CouchbaseError::DecodingFailure {
                     ctx: ErrorContext::default(),
-                    source: Error::new(ErrorKind::InvalidData, "locations in result is not expected type, expected field to be an object")
+                    source: Error::new(
+                        ErrorKind::InvalidData,
+                        "locations in result is not expected type, expected field to be an object",
+                    ),
                 });
             }
 
@@ -377,19 +384,19 @@ impl TryFrom<&Value> for SearchRowLocations {
                         }),
                     };
 
-                    let array_positions =  match location.get("array_positions") {
-                        Some(v) =>  {
-                            match v.as_array() {
-                                Some(p) => {
-                                    Some(p.into_iter().map(|item| item.as_u64().unwrap() as u32).collect())
-                                },
-                                None => None,
-                            }
+                    let array_positions = match location.get("array_positions") {
+                        Some(v) => match v.as_array() {
+                            Some(p) => Some(
+                                p.into_iter()
+                                    .map(|item| item.as_u64().unwrap() as u32)
+                                    .collect(),
+                            ),
+                            None => None,
                         },
                         None => None,
                     };
 
-                    term_locations.push( SearchRowLocation{
+                    term_locations.push(SearchRowLocation {
                         field: field.clone(),
                         term: term_name.clone(),
                         position,
@@ -404,9 +411,7 @@ impl TryFrom<&Value> for SearchRowLocations {
             locations.insert(field.clone(), field_terms);
         }
 
-        Ok(Self {
-            locations,
-        })
+        Ok(Self { locations })
     }
 }
 
@@ -418,7 +423,6 @@ pub struct SearchRow {
     fields: Option<Value>,
     locations: Option<SearchRowLocations>,
     fragments: Option<Value>,
-
 }
 
 impl SearchRow {
@@ -436,22 +440,24 @@ impl SearchRow {
 
     pub fn fields<T>(&mut self) -> Option<impl IntoIterator<Item = CouchbaseResult<T>>>
     where
-        T: DeserializeOwned
+        T: DeserializeOwned,
     {
         if self.fields.is_some() {
-            return Some(self.fields.take().into_iter().map(
-                |v| {
-                    match serde_json::from_value(v) {
+            return Some(
+                self.fields
+                    .take()
+                    .into_iter()
+                    .map(|v| match serde_json::from_value(v) {
                         Ok(decoded) => Ok(decoded),
                         Err(e) => Err(CouchbaseError::DecodingFailure {
                             ctx: ErrorContext::default(),
                             source: e.into(),
                         }),
-                    }
-                }));
+                    }),
+            );
         }
 
-        return None
+        return None;
     }
 
     pub fn locations(&self) -> Option<&SearchRowLocations> {
@@ -460,13 +466,15 @@ impl SearchRow {
 
     pub fn fragments<T>(&self) -> Option<Result<T, CouchbaseError>>
     where
-        T: DeserializeOwned
+        T: DeserializeOwned,
     {
         let fragments = self.fragments.as_ref()?.clone();
-        Some(serde_json::from_value(fragments).map_err(|e|CouchbaseError::DecodingFailure {
-            ctx: ErrorContext::default(),
-            source: e.into(),
-        }))
+        Some(
+            serde_json::from_value(fragments).map_err(|e| CouchbaseError::DecodingFailure {
+                ctx: ErrorContext::default(),
+                source: e.into(),
+            }),
+        )
     }
 }
 
@@ -507,7 +515,7 @@ pub struct DateRangeSearchFacetResult {
     total: u64,
     missing: u64,
     other: u64,
-    date_ranges: Vec<SearchDateRangeResult>
+    date_ranges: Vec<SearchDateRangeResult>,
 }
 
 impl DateRangeSearchFacetResult {
@@ -526,7 +534,7 @@ impl DateRangeSearchFacetResult {
     pub fn other(&self) -> u64 {
         self.other
     }
-    pub fn date_ranges(&self) -> impl Iterator<Item=&SearchDateRangeResult> {
+    pub fn date_ranges(&self) -> impl Iterator<Item = &SearchDateRangeResult> {
         self.date_ranges.iter()
     }
 }
@@ -535,10 +543,11 @@ impl TryFrom<(&String, &Value)> for DateRangeSearchFacetResult {
     type Error = CouchbaseError;
 
     fn try_from(value: (&String, &Value)) -> Result<Self, Self::Error> {
-        let mut facet: DateRangeSearchFacetResult = serde_json::from_value(value.1.clone()).map_err(|e|CouchbaseError::DecodingFailure {
-            ctx: ErrorContext::default(),
-            source: e.into(),
-        })?;
+        let mut facet: DateRangeSearchFacetResult = serde_json::from_value(value.1.clone())
+            .map_err(|e| CouchbaseError::DecodingFailure {
+                ctx: ErrorContext::default(),
+                source: e.into(),
+            })?;
         facet.name = value.0.clone();
         Ok(facet)
     }
@@ -574,17 +583,18 @@ pub struct NumericRangeSearchFacetResult {
     total: u64,
     missing: u64,
     other: u64,
-    numeric_ranges: Vec<SearchNumericRangeResult>
+    numeric_ranges: Vec<SearchNumericRangeResult>,
 }
 
 impl TryFrom<(&String, &Value)> for NumericRangeSearchFacetResult {
     type Error = CouchbaseError;
 
     fn try_from(value: (&String, &Value)) -> Result<Self, Self::Error> {
-        let mut facet: NumericRangeSearchFacetResult = serde_json::from_value(value.1.clone()).map_err(|e|CouchbaseError::DecodingFailure {
-            ctx: ErrorContext::default(),
-            source: e.into(),
-        })?;
+        let mut facet: NumericRangeSearchFacetResult = serde_json::from_value(value.1.clone())
+            .map_err(|e| CouchbaseError::DecodingFailure {
+                ctx: ErrorContext::default(),
+                source: e.into(),
+            })?;
         facet.name = value.0.clone();
         Ok(facet)
     }
@@ -606,7 +616,7 @@ impl NumericRangeSearchFacetResult {
     pub fn other(&self) -> u64 {
         self.other
     }
-    pub fn numeric_ranges(&self) -> impl Iterator<Item=&SearchNumericRangeResult> {
+    pub fn numeric_ranges(&self) -> impl Iterator<Item = &SearchNumericRangeResult> {
         self.numeric_ranges.iter()
     }
 }
@@ -635,17 +645,20 @@ pub struct TermSearchFacetResult {
     missing: u64,
     other: u64,
     #[serde(default)]
-    terms: Vec<SearchTermResult>
+    terms: Vec<SearchTermResult>,
 }
 
 impl TryFrom<(&String, &Value)> for TermSearchFacetResult {
     type Error = CouchbaseError;
 
     fn try_from(value: (&String, &Value)) -> Result<Self, Self::Error> {
-        let mut facet: TermSearchFacetResult = serde_json::from_value(value.1.clone()).map_err(|e|CouchbaseError::DecodingFailure {
-            ctx: ErrorContext::default(),
-            source: e.into(),
-        })?;
+        let mut facet: TermSearchFacetResult =
+            serde_json::from_value(value.1.clone()).map_err(|e| {
+                CouchbaseError::DecodingFailure {
+                    ctx: ErrorContext::default(),
+                    source: e.into(),
+                }
+            })?;
         facet.name = value.0.clone();
         Ok(facet)
     }
@@ -667,7 +680,7 @@ impl TermSearchFacetResult {
     pub fn other(&self) -> u64 {
         self.other
     }
-    pub fn terms(&self) -> impl Iterator<Item=&SearchTermResult> {
+    pub fn terms(&self) -> impl Iterator<Item = &SearchTermResult> {
         self.terms.iter()
     }
 }
@@ -680,7 +693,11 @@ pub struct SearchResult {
 }
 
 impl SearchResult {
-    pub fn new(rows: UnboundedReceiver<Vec<u8>>, meta: Receiver<SearchMetaData>, facets: Receiver<Value>) -> Self {
+    pub fn new(
+        rows: UnboundedReceiver<Vec<u8>>,
+        meta: Receiver<SearchMetaData>,
+        facets: Receiver<Value>,
+    ) -> Self {
         Self {
             rows: Some(rows),
             meta: Some(meta),
@@ -688,66 +705,70 @@ impl SearchResult {
         }
     }
 
-    pub fn rows(&mut self) -> impl Stream<Item = CouchbaseResult<SearchRow>>
-    {
+    pub fn rows(&mut self) -> impl Stream<Item = CouchbaseResult<SearchRow>> {
         self.rows.take().expect("Can not consume rows twice!").map(
             |v| match serde_json::from_slice::<Value>(v.as_slice()) {
                 Ok(decoded) => {
                     let index = match decoded.get("index") {
                         Some(i) => i.to_string(),
-                        None => return Err(CouchbaseError::DecodingFailure {
-                            ctx: ErrorContext::default(),
-                            source: Error::new(ErrorKind::InvalidData, "missing field `index`")
-                        })
+                        None => {
+                            return Err(CouchbaseError::DecodingFailure {
+                                ctx: ErrorContext::default(),
+                                source: Error::new(ErrorKind::InvalidData, "missing field `index`"),
+                            })
+                        }
                     };
                     let id = match decoded.get("id") {
                         Some(i) => i.to_string(),
-                        None => return Err(CouchbaseError::DecodingFailure {
-                            ctx: ErrorContext::default(),
-                            source: Error::new(ErrorKind::InvalidData, "missing field `id`")
-                        })
+                        None => {
+                            return Err(CouchbaseError::DecodingFailure {
+                                ctx: ErrorContext::default(),
+                                source: Error::new(ErrorKind::InvalidData, "missing field `id`"),
+                            })
+                        }
                     };
                     let score = match decoded.get("score") {
-                        Some(i) => {
-                            match i.as_f64() {
-                                Some(f) => f as f32,
-                                None => return Err(CouchbaseError::DecodingFailure {
+                        Some(i) => match i.as_f64() {
+                            Some(f) => f as f32,
+                            None => {
+                                return Err(CouchbaseError::DecodingFailure {
                                     ctx: ErrorContext::default(),
-                                    source: Error::new(ErrorKind::InvalidData, "locations in result is not expected type")
-                                }),
+                                    source: Error::new(
+                                        ErrorKind::InvalidData,
+                                        "locations in result is not expected type",
+                                    ),
+                                })
                             }
                         },
-                        None => return Err(CouchbaseError::DecodingFailure {
-                            ctx: ErrorContext::default(),
-                            source: Error::new(ErrorKind::InvalidData, "missing field `score`")
-                        })
+                        None => {
+                            return Err(CouchbaseError::DecodingFailure {
+                                ctx: ErrorContext::default(),
+                                source: Error::new(ErrorKind::InvalidData, "missing field `score`"),
+                            })
+                        }
                     };
                     let fields = match decoded.get("fields") {
                         Some(i) => Some(i.clone()),
-                        None => None
+                        None => None,
                     };
                     let locations = match decoded.get("locations") {
-                        Some(i) => {
-                            Some(SearchRowLocations::try_from(i)?)
-                        },
-                        None => None
+                        Some(i) => Some(SearchRowLocations::try_from(i)?),
+                        None => None,
                     };
                     let fragments = match decoded.get("fragments") {
-                        Some(i) => {
-                            Some(i.clone())
-                        },
-                        None => None
+                        Some(i) => Some(i.clone()),
+                        None => None,
                     };
 
-                    Ok(SearchRow{
+                    Ok(SearchRow {
                         index,
                         id,
                         score,
                         fields,
                         locations,
-                        fragments
+                        fragments,
                     })
-                },
+                }
                 Err(e) => Err(CouchbaseError::DecodingFailure {
                     ctx: ErrorContext::default(),
                     source: e.into(),
@@ -760,8 +781,7 @@ impl SearchResult {
         self.meta.take().unwrap().await.unwrap()
     }
 
-    pub async fn facets(&mut self) -> CouchbaseResult<HashMap<String, SearchFacetResult>>
-    {
+    pub async fn facets(&mut self) -> CouchbaseResult<HashMap<String, SearchFacetResult>> {
         match self.facets.take().unwrap().await {
             Ok(val) => {
                 if val.is_null() {
@@ -771,18 +791,33 @@ impl SearchResult {
                 let mut res: HashMap<String, SearchFacetResult> = HashMap::new();
                 for item in val.iter() {
                     if item.1.get("date_ranges").is_some() {
-                        res.insert(item.0.clone(), SearchFacetResult::DateRangeSearchFacetResult(DateRangeSearchFacetResult::try_from(item)?));
+                        res.insert(
+                            item.0.clone(),
+                            SearchFacetResult::DateRangeSearchFacetResult(
+                                DateRangeSearchFacetResult::try_from(item)?,
+                            ),
+                        );
                     } else if item.1.get("numeric_ranges").is_some() {
-                        res.insert(item.0.clone(), SearchFacetResult::NumericRangeSearchFacetResult(NumericRangeSearchFacetResult::try_from(item)?));
+                        res.insert(
+                            item.0.clone(),
+                            SearchFacetResult::NumericRangeSearchFacetResult(
+                                NumericRangeSearchFacetResult::try_from(item)?,
+                            ),
+                        );
                     } else {
-                        res.insert(item.0.clone(), SearchFacetResult::TermSearchFacetResult(TermSearchFacetResult::try_from(item)?));
+                        res.insert(
+                            item.0.clone(),
+                            SearchFacetResult::TermSearchFacetResult(
+                                TermSearchFacetResult::try_from(item)?,
+                            ),
+                        );
                     }
                 }
                 Ok(res)
-            },
+            }
             Err(_e) => Err(CouchbaseError::RequestCanceled {
                 ctx: ErrorContext::default(),
-            })
+            }),
         }
     }
 }

@@ -5,6 +5,7 @@ pub mod options;
 pub mod query_indexes;
 pub mod results;
 pub mod search;
+pub mod search_indexes;
 pub mod users;
 
 use crate::api::buckets::BucketManager;
@@ -12,6 +13,7 @@ use crate::api::error::{CouchbaseError, CouchbaseResult, ErrorContext};
 use crate::api::options::*;
 use crate::api::query_indexes::QueryIndexManager;
 use crate::api::results::*;
+use crate::api::search_indexes::SearchIndexManager;
 use crate::io::request::*;
 use crate::io::Core;
 use crate::CouchbaseError::Generic;
@@ -240,10 +242,12 @@ impl Cluster {
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::Search(SearchRequest {
             index: index.into(),
-            query: query.to_json().map_err(|e| CouchbaseError::EncodingFailure {
-                source: std::io::Error::new(std::io::ErrorKind::InvalidData, e),
-                ctx: ErrorContext::default(),
-            })?,
+            query: query
+                .to_json()
+                .map_err(|e| CouchbaseError::EncodingFailure {
+                    source: std::io::Error::new(std::io::ErrorKind::InvalidData, e),
+                    ctx: ErrorContext::default(),
+                })?,
             options,
             sender,
         }));
@@ -293,6 +297,21 @@ impl Cluster {
     /// ```
     pub fn query_indexes(&self) -> QueryIndexManager {
         QueryIndexManager::new(self.core.clone())
+    }
+
+    /// Returns a new `SearchIndexManager`
+    ///
+    /// # Arguments
+    ///
+    /// # Examples
+    ///
+    /// Connect and open the `travel-sample` bucket.
+    /// ```no_run
+    /// let cluster = couchbase::Cluster::connect("127.0.0.1", "username", "password");
+    /// let indexes = cluster.search_indexes();
+    /// ```
+    pub fn search_indexes(&self) -> SearchIndexManager {
+        SearchIndexManager::new(self.core.clone())
     }
 
     /// Returns a reference to the underlying core.

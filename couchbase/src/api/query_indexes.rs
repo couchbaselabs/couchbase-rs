@@ -32,6 +32,33 @@ pub struct QueryIndex {
     partition: Option<String>,
 }
 
+impl QueryIndex {
+    pub fn name(&self) -> String {
+        self.name.to_string()
+    }
+    pub fn is_primary(&self) -> bool {
+        self.is_primary
+    }
+    pub fn using(&self) -> QueryIndexType {
+        self.using
+    }
+    pub fn state(&self) -> String {
+        self.name.to_string()
+    }
+    pub fn keyspace(&self) -> String {
+        self.name.to_string()
+    }
+    pub fn index_key(&self) -> &Vec<String> {
+        &self.index_key
+    }
+    pub fn condition(&self) -> Option<String> {
+        self.condition.clone()
+    }
+    pub fn partition(&self) -> Option<String> {
+        self.partition.clone()
+    }
+}
+
 pub struct QueryIndexManager {
     core: Arc<Core>,
 }
