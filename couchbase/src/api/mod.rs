@@ -18,7 +18,7 @@ use crate::api::search_indexes::SearchIndexManager;
 use crate::io::request::*;
 use crate::io::Core;
 use crate::CouchbaseError::Generic;
-use crate::{CollectionManager, SearchQuery, UserManager};
+use crate::{CollectionManager, SearchQuery, UserManager, ViewIndexManager};
 use futures::channel::oneshot;
 use serde::Serialize;
 use serde_json::{to_vec, Value};
@@ -424,6 +424,22 @@ impl Bucket {
     /// ```
     pub fn collections(&self) -> CollectionManager {
         CollectionManager::new(self.core.clone(), self.name.clone())
+    }
+
+    /// Returns a new `QueryIndexManager`
+    ///
+    /// # Arguments
+    ///
+    /// # Examples
+    ///
+    /// Connect and open the `travel-sample` bucket.
+    /// ```no_run
+    /// let cluster = couchbase::Cluster::connect("127.0.0.1", "username", "password");
+    /// let bucket = cluster.bucket("travel-sample");
+    /// let manager = bucket.view_indexes();
+    /// ```
+    pub fn view_indexes(&self) -> ViewIndexManager {
+        ViewIndexManager::new(self.core.clone(), self.name.clone())
     }
 
     /// Executes a view query
