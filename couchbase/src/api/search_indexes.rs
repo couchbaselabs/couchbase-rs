@@ -5,7 +5,7 @@ use crate::{
     CouchbaseResult, DisallowQueryingSearchIndexOptions, DropSearchIndexOptions, ErrorContext,
     FreezePlanSearchIndexOptions, GenericManagementResult, GetAllSearchIndexesOptions,
     GetSearchIndexOptions, GetSearchIndexedDocumentsCountOptions, PauseIngestSearchIndexOptions,
-    UnfreezePlanSearchIndexOptions, UpsertSearchIndexOptions,
+    ServiceType, UnfreezePlanSearchIndexOptions, UpsertSearchIndexOptions,
 };
 use futures::channel::oneshot;
 use serde::de::DeserializeOwned;
@@ -307,6 +307,7 @@ impl SearchIndexManager {
                 payload,
                 content_type,
                 timeout,
+                service_type: Some(ServiceType::Search),
             },
         ));
 

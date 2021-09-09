@@ -192,6 +192,7 @@ pub struct GenericManagementRequest {
     pub(crate) content_type: Option<String>,
     pub(crate) timeout: Option<Duration>,
     pub(crate) sender: Sender<CouchbaseResult<GenericManagementResult>>,
+    pub(crate) service_type: Option<ServiceType>,
 }
 
 impl GenericManagementRequest {
@@ -208,6 +209,7 @@ impl GenericManagementRequest {
             payload,
             content_type: None,
             timeout: None,
+            service_type: None,
         }
     }
 
@@ -217,6 +219,10 @@ impl GenericManagementRequest {
 
     pub fn timeout(&mut self, timeout: Duration) {
         self.timeout = Some(timeout)
+    }
+
+    pub fn service_type(&mut self, service_type: ServiceType) {
+        self.service_type = Some(service_type)
     }
 }
 

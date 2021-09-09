@@ -4,7 +4,7 @@ use crate::CouchbaseError::{CollectionExists, CollectionNotFound, ScopeExists, S
 use crate::{
     CouchbaseError, CouchbaseResult, CreateCollectionOptions, CreateScopeOptions,
     DropCollectionOptions, DropScopeOptions, ErrorContext, GenericManagementResult,
-    GetAllScopesOptions,
+    GetAllScopesOptions, ServiceType,
 };
 use futures::channel::oneshot;
 use serde_derive::Deserialize;
@@ -106,6 +106,7 @@ impl CollectionManager {
                 payload: None,
                 content_type: None,
                 timeout: options.timeout,
+                service_type: Some(ServiceType::Management),
             },
         ));
 
@@ -165,6 +166,7 @@ impl CollectionManager {
                 payload: Some(form_encoded),
                 content_type: Some(content_type),
                 timeout: options.timeout,
+                service_type: Some(ServiceType::Management),
             },
         ));
 
@@ -209,6 +211,7 @@ impl CollectionManager {
                 payload: Some(form_encoded),
                 content_type: Some(content_type),
                 timeout: options.timeout,
+                service_type: Some(ServiceType::Management),
             },
         ));
 
@@ -246,6 +249,7 @@ impl CollectionManager {
                 payload: None,
                 content_type: None,
                 timeout: options.timeout,
+                service_type: Some(ServiceType::Management),
             },
         ));
 
@@ -281,6 +285,7 @@ impl CollectionManager {
                 payload: None,
                 content_type: None,
                 timeout: options.timeout,
+                service_type: Some(ServiceType::Management),
             },
         ));
 

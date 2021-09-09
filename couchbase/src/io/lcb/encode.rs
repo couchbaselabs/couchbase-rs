@@ -4,7 +4,7 @@ use crate::io::lcb::callbacks::{
 };
 use crate::io::lcb::{AnalyticsCookie, HttpCookie, QueryCookie, SearchCookie, ViewCookie};
 use crate::io::request::*;
-use crate::{api::options::StoreSemantics, CouchbaseResult, ErrorContext};
+use crate::{api::options::StoreSemantics, CouchbaseResult, ErrorContext, ServiceType};
 use futures::channel::oneshot::Sender;
 use log::{debug, warn};
 use serde_json::Value;
@@ -1157,12 +1157,29 @@ pub fn encode_generic_management_request(
     let (content_type_len, content_type) =
         into_cstring(request.content_type.unwrap_or(String::from("")));
 
+    let service_type = match request.service_type {
+        Some(s) => match s {
+            ServiceType::Management => lcb_HTTP_TYPE_LCB_HTTP_TYPE_MANAGEMENT,
+            ServiceType::KeyValue => {
+                panic!("Not supported yet!")
+            }
+            ServiceType::Views => {
+                panic!("Not supported yet!")
+            }
+            ServiceType::Query => {
+                panic!("Not supported yet!")
+            }
+            ServiceType::Search => lcb_HTTP_TYPE_LCB_HTTP_TYPE_SEARCH,
+            ServiceType::Analytics => {
+                panic!("Not supported yet!")
+            }
+        },
+        None => lcb_HTTP_TYPE_LCB_HTTP_TYPE_MANAGEMENT,
+    };
+
     let mut command: *mut lcb_CMDHTTP = ptr::null_mut();
     unsafe {
-        verify_http(
-            lcb_cmdhttp_create(&mut command, lcb_HTTP_TYPE_LCB_HTTP_TYPE_MANAGEMENT),
-            cookie,
-        )?;
+        verify_http(lcb_cmdhttp_create(&mut command, service_type), cookie)?;
         let method = match request.method.as_str() {
             "get" => lcb_HTTP_METHOD_LCB_HTTP_METHOD_GET,
             "put" => lcb_HTTP_METHOD_LCB_HTTP_METHOD_PUT,

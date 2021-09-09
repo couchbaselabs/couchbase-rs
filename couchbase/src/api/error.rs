@@ -158,6 +158,21 @@ pub enum CouchbaseError {
     },
 }
 
+impl CouchbaseError {
+    pub(crate) fn decoding_failure_from_serde(e: serde_json::Error) -> CouchbaseError {
+        CouchbaseError::DecodingFailure {
+            source: std::io::Error::new(std::io::ErrorKind::InvalidData, e),
+            ctx: ErrorContext::default(),
+        }
+    }
+    pub(crate) fn encoding_failure_from_serde(e: serde_json::Error) -> CouchbaseError {
+        CouchbaseError::EncodingFailure {
+            source: std::io::Error::new(std::io::ErrorKind::InvalidData, e),
+            ctx: ErrorContext::default(),
+        }
+    }
+}
+
 pub type CouchbaseResult<T, E = CouchbaseError> = std::result::Result<T, E>;
 
 pub struct ErrorContext {

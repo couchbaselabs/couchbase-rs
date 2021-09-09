@@ -7,7 +7,7 @@ use crate::CouchbaseError::{
 use crate::{
     CouchbaseError, CouchbaseResult, CreateBucketOptions, DropBucketOptions, ErrorContext,
     FlushBucketOptions, GenericManagementResult, GetAllBucketsOptions, GetBucketOptions,
-    UpdateBucketOptions,
+    ServiceType, UpdateBucketOptions,
 };
 use futures::channel::oneshot;
 use serde_derive::Deserialize;
@@ -553,6 +553,7 @@ impl BucketManager {
                 payload: Some(form_encoded),
                 content_type: Some(content_type),
                 timeout: options.timeout,
+                service_type: Some(ServiceType::Management),
             },
         ));
 
@@ -591,6 +592,7 @@ impl BucketManager {
                 payload: Some(form_encoded),
                 content_type: Some(content_type),
                 timeout: options.timeout,
+                service_type: Some(ServiceType::Management),
             },
         ));
 
@@ -624,6 +626,7 @@ impl BucketManager {
                 payload: None,
                 content_type: None,
                 timeout: options.timeout,
+                service_type: Some(ServiceType::Management),
             },
         ));
 
@@ -657,6 +660,7 @@ impl BucketManager {
                 payload: None,
                 content_type: None,
                 timeout: options.timeout,
+                service_type: Some(ServiceType::Management),
             },
         ));
 
@@ -695,6 +699,7 @@ impl BucketManager {
                 payload: None,
                 content_type: None,
                 timeout: options.timeout,
+                service_type: Some(ServiceType::Management),
             },
         ));
 
@@ -741,6 +746,7 @@ impl BucketManager {
                 payload: None,
                 content_type: None,
                 timeout: options.timeout,
+                service_type: Some(ServiceType::Management),
             },
         ));
 

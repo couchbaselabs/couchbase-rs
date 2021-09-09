@@ -1,7 +1,7 @@
 use crate::api::options::*;
 use crate::io::request::*;
 use crate::io::Core;
-use crate::{CouchbaseError, CouchbaseResult, ErrorContext, GenericManagementResult};
+use crate::{CouchbaseError, CouchbaseResult, ErrorContext, GenericManagementResult, ServiceType};
 use futures::channel::oneshot;
 use serde_derive::{Deserialize, Serialize};
 use std::borrow::Borrow;
@@ -315,6 +315,7 @@ impl UserManager {
                 payload: None,
                 content_type: None,
                 timeout: options.timeout,
+                service_type: Some(ServiceType::Management),
             },
         ));
 
@@ -355,6 +356,7 @@ impl UserManager {
                 payload: None,
                 content_type: None,
                 timeout: options.timeout,
+                service_type: Some(ServiceType::Management),
             },
         ));
 
@@ -418,6 +420,7 @@ impl UserManager {
                 payload: Some(user_encoded),
                 content_type: Some(content_type),
                 timeout: options.timeout,
+                service_type: Some(ServiceType::Management),
             },
         ));
 
@@ -454,6 +457,7 @@ impl UserManager {
                 payload: None,
                 content_type: None,
                 timeout: options.timeout,
+                service_type: Some(ServiceType::Management),
             },
         ));
 
@@ -484,6 +488,7 @@ impl UserManager {
                 payload: None,
                 content_type: None,
                 timeout: options.timeout,
+                service_type: Some(ServiceType::Management),
             },
         ));
 
@@ -520,6 +525,7 @@ impl UserManager {
                 payload: None,
                 content_type: None,
                 timeout: options.timeout,
+                service_type: Some(ServiceType::Management),
             },
         ));
 
@@ -555,6 +561,7 @@ impl UserManager {
                 payload: None,
                 content_type: None,
                 timeout: options.timeout,
+                service_type: Some(ServiceType::Management),
             },
         ));
 
@@ -611,6 +618,7 @@ impl UserManager {
                 payload: Some(group_encoded),
                 content_type: Some(content_type),
                 timeout: options.timeout,
+                service_type: Some(ServiceType::Management),
             },
         ));
 
@@ -638,6 +646,7 @@ impl UserManager {
                 payload: None,
                 content_type: None,
                 timeout: options.timeout,
+                service_type: Some(ServiceType::Management),
             },
         ));
 
