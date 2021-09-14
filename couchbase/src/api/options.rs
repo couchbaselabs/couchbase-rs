@@ -1391,6 +1391,18 @@ impl BuildDeferredQueryIndexOptions {
 }
 
 #[derive(Debug, Default)]
+pub struct WatchIndexesQueryIndexOptions {
+    pub(crate) watch_primary: Option<bool>,
+}
+
+impl WatchIndexesQueryIndexOptions {
+    pub fn watch_primary(mut self, watch: bool) -> Self {
+        self.watch_primary = Some(watch);
+        self
+    }
+}
+
+#[derive(Debug, Default)]
 pub struct GetSearchIndexOptions {
     pub(crate) timeout: Option<Duration>,
 }

@@ -1,9 +1,10 @@
 use couchbase::{
     BuildDeferredQueryIndexOptions, Cluster, CreatePrimaryQueryIndexOptions,
     CreateQueryIndexOptions, DropPrimaryQueryIndexOptions, DropQueryIndexOptions,
-    GetAllQueryIndexOptions,
+    GetAllQueryIndexOptions, WatchIndexesQueryIndexOptions,
 };
 use futures::executor::block_on;
+use std::time::Duration;
 
 /// Query Index Examples
 pub fn main() {
@@ -21,7 +22,7 @@ pub fn main() {
     match block_on(index_manager.create_index(
         "travel-sample",
         "example",
-        vec!["`type`".into(), "country".into()],
+        vec!["`type`", "country"],
         CreateQueryIndexOptions::default().deferred(true),
     )) {
         Ok(_result) => {
@@ -63,6 +64,18 @@ pub fn main() {
             }
         }
         Err(e) => println!("got error! {}", e),
+    }
+
+    match block_on(index_manager.watch_indexes(
+        "travel-sample",
+        vec!["example", "my_primary"],
+        Duration::new(15, 0),
+        WatchIndexesQueryIndexOptions::default(),
+    )) {
+        Ok(_result) => {
+            println!("watched ok!");
+        }
+        Err(e) => println!("got error whilst watching! {}", e),
     }
 
     match block_on(

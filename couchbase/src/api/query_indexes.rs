@@ -3,12 +3,16 @@ use crate::io::Core;
 use crate::{
     BuildDeferredQueryIndexOptions, CouchbaseError, CouchbaseResult,
     CreatePrimaryQueryIndexOptions, CreateQueryIndexOptions, DropPrimaryQueryIndexOptions,
-    DropQueryIndexOptions, GetAllQueryIndexOptions, QueryOptions,
+    DropQueryIndexOptions, ErrorContext, GetAllQueryIndexOptions, QueryOptions,
+    WatchIndexesQueryIndexOptions,
 };
 use futures::channel::oneshot;
 use futures::StreamExt;
 use serde_derive::Deserialize;
+use std::ops::Add;
 use std::sync::Arc;
+use std::thread::sleep;
+use std::time::{Duration, Instant};
 
 #[derive(Debug, Copy, Clone, Deserialize)]
 pub enum QueryIndexType {
@@ -43,7 +47,7 @@ impl QueryIndex {
         self.using
     }
     pub fn state(&self) -> String {
-        self.name.to_string()
+        self.state.to_string()
     }
     pub fn keyspace(&self) -> String {
         self.name.to_string()
@@ -72,7 +76,7 @@ impl QueryIndexManager {
         &self,
         bucket_name: impl Into<String>,
         opts: GetAllQueryIndexOptions,
-    ) -> CouchbaseResult<Vec<QueryIndex>> {
+    ) -> CouchbaseResult<impl IntoIterator<Item = QueryIndex>> {
         let statement = format!("SELECT idx.* FROM system:indexes AS idx WHERE keyspace_id = \"{}\" AND `using`=\"gsi\" ORDER BY is_primary DESC, name ASC", bucket_name.into());
 
         let (sender, receiver) = oneshot::channel();
@@ -98,14 +102,18 @@ impl QueryIndexManager {
         &self,
         bucket_name: impl Into<String>,
         index_name: impl Into<String>,
-        fields: Vec<String>,
+        fields: impl IntoIterator<Item = impl Into<String>>,
         opts: CreateQueryIndexOptions,
     ) -> CouchbaseResult<()> {
         let mut statement = format!(
             "CREATE INDEX  `{}` ON `{}` ({})",
             index_name.into(),
             bucket_name.into(),
-            fields.join(",")
+            fields
+                .into_iter()
+                .map(|field| field.into())
+                .collect::<Vec<String>>()
+                .join(",")
         );
 
         let with = opts.with.to_string();
@@ -250,11 +258,59 @@ impl QueryIndexManager {
         Ok(())
     }
 
+    pub async fn watch_indexes(
+        &self,
+        bucket_name: impl Into<String>,
+        index_names: impl IntoIterator<Item = impl Into<String>>,
+        timeout: Duration,
+        opts: WatchIndexesQueryIndexOptions,
+    ) -> CouchbaseResult<()> {
+        let bucket_name = bucket_name.into();
+        let mut indexes: Vec<String> = index_names.into_iter().map(|index| index.into()).collect();
+        if let Some(w) = opts.watch_primary {
+            if w {
+                indexes.push(String::from("#primary"));
+            }
+        }
+        let interval = Duration::from_millis(50);
+        let deadline = Instant::now().add(timeout);
+        loop {
+            if Instant::now() > deadline {
+                return Err(CouchbaseError::Timeout {
+                    ambiguous: false,
+                    ctx: ErrorContext::default(),
+                });
+            }
+
+            let all_indexes = self
+                .get_all_indexes(
+                    bucket_name.clone(),
+                    GetAllQueryIndexOptions::default().timeout(deadline - Instant::now()),
+                )
+                .await?;
+
+            let all_online = self.check_indexes_online(all_indexes, &indexes)?;
+            if all_online {
+                break;
+            }
+
+            let now = Instant::now();
+            let mut sleep_deadline = now.add(interval);
+            if sleep_deadline > deadline {
+                sleep_deadline = deadline;
+            }
+
+            sleep(sleep_deadline - now);
+        }
+
+        Ok(())
+    }
+
     pub async fn build_deferred_indexes(
         &self,
         bucket_name: impl Into<String>,
         opts: BuildDeferredQueryIndexOptions,
-    ) -> CouchbaseResult<Vec<String>> {
+    ) -> CouchbaseResult<impl IntoIterator<Item = String>> {
         let bucket_name = bucket_name.into();
         let indexes = self
             .get_all_indexes(bucket_name.clone(), GetAllQueryIndexOptions::from(&opts))
@@ -289,5 +345,35 @@ impl QueryIndexManager {
         receiver.await.unwrap()?;
 
         Ok(deferred_list)
+    }
+
+    fn check_indexes_online(
+        &self,
+        all_indexes: impl IntoIterator<Item = QueryIndex>,
+        watch_indexes: &Vec<String>,
+    ) -> CouchbaseResult<bool> {
+        let mut checked_indexes = vec![];
+        for index in all_indexes.into_iter() {
+            for watch in watch_indexes {
+                if index.name() == watch.clone() {
+                    checked_indexes.push(index);
+                    break;
+                }
+            }
+        }
+
+        if checked_indexes.len() != watch_indexes.len() {
+            return Err(CouchbaseError::IndexNotFound {
+                ctx: ErrorContext::default(),
+            });
+        }
+
+        for index in checked_indexes {
+            if index.state() != String::from("online") {
+                return Ok(false);
+            }
+        }
+
+        Ok(true)
     }
 }
