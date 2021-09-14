@@ -1170,9 +1170,7 @@ pub fn encode_generic_management_request(
                 panic!("Not supported yet!")
             }
             ServiceType::Search => lcb_HTTP_TYPE_LCB_HTTP_TYPE_SEARCH,
-            ServiceType::Analytics => {
-                panic!("Not supported yet!")
-            }
+            ServiceType::Analytics => lcb_HTTP_TYPE_LCB_HTTP_TYPE_ANALYTICS,
         },
         None => lcb_HTTP_TYPE_LCB_HTTP_TYPE_MANAGEMENT,
     };

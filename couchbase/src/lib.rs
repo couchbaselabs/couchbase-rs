@@ -3,6 +3,7 @@
 mod api;
 mod io;
 
+pub use api::analytics_indexes::*;
 pub use api::buckets::*;
 pub use api::collections::*;
 pub use api::error::*;

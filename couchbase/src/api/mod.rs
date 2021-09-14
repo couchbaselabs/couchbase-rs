@@ -1,3 +1,4 @@
+pub mod analytics_indexes;
 pub mod buckets;
 pub mod collections;
 pub mod error;
@@ -9,6 +10,7 @@ pub mod search_indexes;
 pub mod users;
 pub mod view_indexes;
 
+use crate::api::analytics_indexes::AnalyticsIndexManager;
 use crate::api::buckets::BucketManager;
 use crate::api::error::{CouchbaseError, CouchbaseResult, ErrorContext};
 use crate::api::options::*;
@@ -283,6 +285,21 @@ impl Cluster {
     /// ```
     pub fn buckets(&self) -> BucketManager {
         BucketManager::new(self.core.clone())
+    }
+
+    /// Returns a new `AnalyticsIndexManager`
+    ///
+    /// # Arguments
+    ///
+    /// # Examples
+    ///
+    /// Connect and open the `travel-sample` bucket.
+    /// ```no_run
+    /// let cluster = couchbase::Cluster::connect("127.0.0.1", "username", "password");
+    /// let indexes = cluster.analytics_indexes();
+    /// ```
+    pub fn analytics_indexes(&self) -> AnalyticsIndexManager {
+        AnalyticsIndexManager::new(self.core.clone())
     }
 
     /// Returns a new `QueryIndexManager`
