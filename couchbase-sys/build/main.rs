@@ -1,7 +1,5 @@
 //! Build script for `couchbase-sys` to bind to `libcouchbase`.
 
-mod cmake;
-
 use std::env;
 use std::path::PathBuf;
 
@@ -54,7 +52,10 @@ fn main() {
     }
 
     if cfg!(target_os = "windows") {
-        build_cfg.no_c_flags(true);
+        build_cfg.define("CMAKE_C_FLAGS_DEBUG", "/MDd /Zi /Od /Ob0");
+        build_cfg.define("CMAKE_CXX_FLAGS_DEBUG", "/MDd /Zi /Od /Ob0");
+        build_cfg.define("CMAKE_C_FLAGS", "--nologo --Brepro");
+        build_cfg.define("CMAKE_CXX_FLAGS", "--nologo --Brepro");
     }
 
     let build_dst = build_cfg.build();
