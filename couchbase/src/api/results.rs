@@ -48,7 +48,35 @@ impl QueryResult {
     }
 }
 
-// TODO: add status, signature, profile, warnings
+#[derive(Debug, Copy, Clone, Deserialize, Eq, PartialEq)]
+pub enum QueryStatus {
+    #[serde(rename = "running")]
+    Running,
+    #[serde(rename = "success")]
+    Success,
+    #[serde(rename = "errors")]
+    Errors,
+    #[serde(rename = "completed")]
+    Completed,
+    #[serde(rename = "stopped")]
+    Stopped,
+    #[serde(rename = "timeout")]
+    Timeout,
+    #[serde(rename = "closed")]
+    Closed,
+    #[serde(rename = "fatal")]
+    Fatal,
+    #[serde(rename = "aborted")]
+    Aborted,
+    #[serde(rename = "unknown")]
+    Unknown,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct QueryWarning {
+    code: i32,
+    message: String,
+}
 
 #[derive(Debug, Deserialize)]
 pub struct QueryMetaData {
@@ -56,12 +84,16 @@ pub struct QueryMetaData {
     request_id: String,
     #[serde(rename = "clientContextID")]
     client_context_id: String,
-    metrics: QueryMetrics,
+    metrics: Option<QueryMetrics>,
+    status: QueryStatus,
+    warnings: Vec<QueryWarning>,
+    signature: Option<Value>,
+    profile: Option<Value>,
 }
 
 impl QueryMetaData {
-    pub fn metrics(&self) -> &QueryMetrics {
-        &self.metrics
+    pub fn metrics(&self) -> Option<&QueryMetrics> {
+        self.metrics.as_ref()
     }
 
     pub fn request_id(&self) -> &str {
@@ -70,6 +102,34 @@ impl QueryMetaData {
 
     pub fn client_context_id(&self) -> &str {
         self.client_context_id.as_ref()
+    }
+
+    pub fn status(&self) -> QueryStatus {
+        self.status
+    }
+
+    pub fn warnings<T>(&self) -> impl IntoIterator<Item = &QueryWarning> {
+        self.warnings.as_slice()
+    }
+
+    pub fn signature<T>(&self) -> Option<CouchbaseResult<T>>
+    where
+        T: DeserializeOwned,
+    {
+        Some(
+            serde_json::from_value(self.signature.clone()?)
+                .map_err(|e| CouchbaseError::decoding_failure_from_serde(e)),
+        )
+    }
+
+    pub fn profile<T>(&self) -> Option<CouchbaseResult<T>>
+    where
+        T: DeserializeOwned,
+    {
+        Some(
+            serde_json::from_value(self.signature.clone()?)
+                .map_err(|e| CouchbaseError::decoding_failure_from_serde(e)),
+        )
     }
 }
 
