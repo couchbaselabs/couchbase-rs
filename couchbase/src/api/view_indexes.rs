@@ -2,8 +2,8 @@ use crate::io::request::*;
 use crate::io::Core;
 use crate::{
     CouchbaseError, CouchbaseResult, DropDesignDocumentsOptions, GenericManagementResult,
-    GetAllDesignDocumentsOptions, GetDesignDocumentOptions, ServiceType,
-    UpsertDesignDocumentOptions,
+    GetAllDesignDocumentsOptions, GetDesignDocumentOptions, PublishDesignDocumentsOptions,
+    ServiceType, UpsertDesignDocumentOptions,
 };
 use futures::channel::oneshot;
 use serde::de::DeserializeOwned;
@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, Eq, PartialEq)]
 pub enum DesignDocumentNamespace {
     Production,
     Development,
@@ -21,13 +21,78 @@ pub enum DesignDocumentNamespace {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct View {
     map: String,
-    reduce: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reduce: Option<String>,
+}
+
+impl View {
+    pub fn map(&self) -> &str {
+        &self.map
+    }
+    pub fn reduce(&self) -> Option<&String> {
+        self.reduce.as_ref()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ViewBuilder {
+    map: String,
+    reduce: Option<String>,
+}
+
+impl ViewBuilder {
+    pub fn new(map: impl Into<String>) -> Self {
+        Self {
+            map: map.into(),
+            reduce: None,
+        }
+    }
+    pub fn reduce(mut self, reduce: impl Into<String>) -> Self {
+        self.reduce = Some(reduce.into());
+        self
+    }
+    pub fn build(self) -> View {
+        View {
+            map: self.map,
+            reduce: self.reduce,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct DesignDocumentBuilder {
+    name: String,
+    views: HashMap<String, View>,
+}
+
+impl DesignDocumentBuilder {
+    pub fn new(name: impl Into<String>, views: HashMap<String, View>) -> Self {
+        Self {
+            name: name.into(),
+            views,
+        }
+    }
+    pub fn build(self) -> DesignDocument {
+        DesignDocument {
+            name: self.name,
+            views: self.views,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct DesignDocument {
     name: String,
     views: HashMap<String, View>,
+}
+
+impl DesignDocument {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    pub fn views(&self) -> &HashMap<String, View> {
+        &self.views
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -52,8 +117,13 @@ struct AllDesignDocumentDoc {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+struct AllDesignDocumentsRow {
+    doc: AllDesignDocumentDoc,
+}
+
+#[derive(Debug, Clone, Deserialize)]
 struct AllDesignDocuments {
-    rows: Vec<AllDesignDocumentDoc>,
+    rows: Vec<AllDesignDocumentsRow>,
 }
 
 pub struct ViewIndexManager {
@@ -66,17 +136,15 @@ impl ViewIndexManager {
         Self { core, bucket }
     }
 
-    async fn do_request<T>(
+    async fn mutation_request(
         &self,
         path: String,
         method: String,
         payload: Option<String>,
         content_type: Option<String>,
         timeout: Option<Duration>,
-    ) -> CouchbaseResult<T>
-    where
-        T: DeserializeOwned,
-    {
+        service: ServiceType,
+    ) -> CouchbaseResult<()> {
         let (sender, receiver) = oneshot::channel();
 
         self.core.send(Request::GenericManagementRequest(
@@ -87,7 +155,44 @@ impl ViewIndexManager {
                 payload,
                 content_type,
                 timeout,
-                service_type: Some(ServiceType::Views),
+                service_type: Some(service),
+            },
+        ));
+
+        let result: GenericManagementResult = receiver.await.unwrap().unwrap();
+        match result.http_status() {
+            200 => Ok(()),
+            201 => Ok(()),
+            _ => Err(CouchbaseError::GenericHTTP {
+                ctx: Default::default(),
+                status: result.http_status(),
+                message: String::from_utf8(result.payload().unwrap().to_owned())
+                    .unwrap()
+                    .to_lowercase(),
+            }),
+        }
+    }
+
+    async fn get_request<T>(
+        &self,
+        path: String,
+        timeout: Option<Duration>,
+        service: ServiceType,
+    ) -> CouchbaseResult<T>
+    where
+        T: DeserializeOwned,
+    {
+        let (sender, receiver) = oneshot::channel();
+
+        self.core.send(Request::GenericManagementRequest(
+            GenericManagementRequest {
+                sender,
+                path,
+                method: String::from("get"),
+                payload: None,
+                content_type: None,
+                timeout,
+                service_type: Some(service),
             },
         ));
 
@@ -115,12 +220,10 @@ impl ViewIndexManager {
     ) -> CouchbaseResult<DesignDocument> {
         let ddoc_name = self.build_ddoc_name(name.into(), namespace);
         let res: JSONDesignDocument = self
-            .do_request(
-                format!("/{}/_design/{}", self.bucket.clone(), ddoc_name),
-                String::from("get"),
-                None,
-                None,
+            .get_request(
+                format!("/_design/{}", ddoc_name),
                 opts.timeout,
+                ServiceType::Views,
             )
             .await?;
 
@@ -141,18 +244,16 @@ impl ViewIndexManager {
         opts: GetAllDesignDocumentsOptions,
     ) -> CouchbaseResult<impl IntoIterator<Item = DesignDocument>> {
         let res: AllDesignDocuments = self
-            .do_request(
+            .get_request(
                 format!("/pools/default/buckets/{}/ddocs", self.bucket.clone()),
-                String::from("get"),
-                None,
-                None,
                 opts.timeout,
+                ServiceType::Management,
             )
             .await?;
 
         let mut ddocs = vec![];
         for row in res.rows {
-            let name = row.meta.id;
+            let name = row.doc.meta.id;
             match namespace {
                 DesignDocumentNamespace::Production => {
                     if name.starts_with("dev_") {
@@ -161,7 +262,7 @@ impl ViewIndexManager {
 
                     ddocs.push(DesignDocument {
                         name,
-                        views: row.json.views,
+                        views: row.doc.json.views,
                     });
                 }
                 DesignDocumentNamespace::Development => {
@@ -172,7 +273,7 @@ impl ViewIndexManager {
 
                     ddocs.push(DesignDocument {
                         name: trimmed,
-                        views: row.json.views,
+                        views: row.doc.json.views,
                     });
                 }
             }
@@ -191,10 +292,9 @@ impl ViewIndexManager {
             views: design_doc.views,
         };
         Ok(self
-            .do_request(
+            .mutation_request(
                 format!(
-                    "/{}/design/{}",
-                    self.bucket,
+                    "/_design/{}",
                     self.build_ddoc_name(design_doc.name, namespace)
                 ),
                 String::from("put"),
@@ -204,6 +304,7 @@ impl ViewIndexManager {
                 ),
                 Some(String::from("application/json")),
                 opts.timeout,
+                ServiceType::Views,
             )
             .await?)
     }
@@ -215,16 +316,13 @@ impl ViewIndexManager {
         opts: DropDesignDocumentsOptions,
     ) -> CouchbaseResult<()> {
         Ok(self
-            .do_request(
-                format!(
-                    "/{}/design/{}",
-                    self.bucket,
-                    self.build_ddoc_name(name.into(), namespace)
-                ),
+            .mutation_request(
+                format!("/_design/{}", self.build_ddoc_name(name.into(), namespace)),
                 String::from("delete"),
                 None,
                 None,
                 opts.timeout,
+                ServiceType::Views,
             )
             .await?)
     }
@@ -232,13 +330,12 @@ impl ViewIndexManager {
     pub async fn publish_design_document(
         &self,
         name: impl Into<String>,
-        namespace: DesignDocumentNamespace,
-        opts: DropDesignDocumentsOptions,
+        opts: PublishDesignDocumentsOptions,
     ) -> CouchbaseResult<()> {
         let ddoc = self
             .get_design_document(
                 name.into(),
-                namespace.clone(),
+                DesignDocumentNamespace::Development,
                 GetDesignDocumentOptions {
                     timeout: opts.timeout.clone(),
                 },
@@ -247,7 +344,7 @@ impl ViewIndexManager {
 
         self.upsert_design_document(
             ddoc,
-            namespace.clone(),
+            DesignDocumentNamespace::Production,
             UpsertDesignDocumentOptions {
                 timeout: opts.timeout.clone(),
             },

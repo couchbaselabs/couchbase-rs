@@ -1163,9 +1163,7 @@ pub fn encode_generic_management_request(
             ServiceType::KeyValue => {
                 panic!("Not supported yet!")
             }
-            ServiceType::Views => {
-                panic!("Not supported yet!")
-            }
+            ServiceType::Views => lcb_HTTP_TYPE_LCB_HTTP_TYPE_VIEW,
             ServiceType::Query => {
                 panic!("Not supported yet!")
             }

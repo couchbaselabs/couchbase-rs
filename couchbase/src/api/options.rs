@@ -1,6 +1,7 @@
 use crate::api::MutationState;
 use crate::{
-    AnalyticsLinkType, CouchbaseError, CouchbaseResult, ErrorContext, SearchFacet, SearchSort,
+    AnalyticsLinkType, CouchbaseError, CouchbaseResult, DesignDocumentNamespace, ErrorContext,
+    SearchFacet, SearchSort,
 };
 use serde::Serializer;
 use serde_derive::Serialize;
@@ -1054,12 +1055,6 @@ pub enum ViewErrorMode {
     Stop,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum DesignDocumentNamespace {
-    Production,
-    Development,
-}
-
 #[derive(Debug, Default)]
 pub struct ViewOptions {
     pub(crate) timeout: Option<Duration>,
@@ -1160,9 +1155,11 @@ impl ViewOptions {
                 form.push(("debug", "true".into()));
             }
         }
-        // if let Some(r) = &self.raw {
-        //
-        // }
+        if let Some(r) = &self.raw {
+            for item in r {
+                form.push((item.0, item.1.to_string()));
+            }
+        }
 
         Ok(form)
     }
