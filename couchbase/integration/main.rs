@@ -1,0 +1,142 @@
+mod test_functions;
+mod tests;
+pub mod util;
+
+use crate::util::mock::MockCluster;
+use crate::util::standalone::StandaloneCluster;
+use couchbase::CouchbaseError;
+use env_logger::Env;
+use std::fmt::{Display, Formatter};
+use std::io::ErrorKind;
+use std::sync::Arc;
+use util::*;
+
+async fn setup() -> (ClusterUnderTest, Arc<TestConfig>) {
+    let loaded_config = Config::try_load_config();
+    let server = match loaded_config {
+        Some(c) => match c.cluster_type() {
+            ClusterType::Standalone => ClusterUnderTest::Standalone(StandaloneCluster::start(
+                c.standalone_config()
+                    .expect("Standalone config required when standalone type used."),
+            )),
+            ClusterType::Mock => {
+                ClusterUnderTest::Mocked(MockCluster::start(c.mock_config()).await)
+            }
+        },
+        None => ClusterUnderTest::Mocked(MockCluster::start(None).await),
+    };
+    let config = server.config();
+
+    (server, config)
+}
+
+fn teardown() {}
+
+#[derive(Debug, Copy, Clone)]
+enum TestResultStatus {
+    Success,
+    Failure,
+    Skipped,
+}
+
+impl Display for TestResultStatus {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let alias = match *self {
+            TestResultStatus::Success => "success",
+            TestResultStatus::Failure => "failure",
+            TestResultStatus::Skipped => "skipped",
+        };
+
+        write!(f, "{}", alias)
+    }
+}
+
+#[derive(Debug)]
+struct TestResult {
+    name: String,
+    result: TestResultStatus,
+    error: Option<CouchbaseError>,
+}
+
+impl Display for TestResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut out = format!("{} -> {}", self.name.clone(), self.result);
+        if let Some(e) = &self.error {
+            out = format!("{}: {}", out, e);
+        }
+        write!(f, "{}", out)
+    }
+}
+
+#[tokio::main]
+async fn main() -> Result<(), std::io::Error> {
+    env_logger::from_env(Env::default().default_filter_or("debug")).init();
+
+    let config = setup().await;
+
+    let mut success = 0;
+    let mut failures = 0;
+    let mut skipped = 0;
+    for t in test_functions::tests(config.1) {
+        println!();
+        println!("Running {}", t.name.clone());
+        let handle = tokio::spawn(t.func);
+        let result = match handle.await {
+            Ok(r) => match r {
+                Ok(was_skipped) => {
+                    if was_skipped {
+                        skipped += 1;
+                        TestResult {
+                            name: t.name.to_string(),
+                            result: TestResultStatus::Skipped,
+                            error: None,
+                        }
+                    } else {
+                        success += 1;
+                        TestResult {
+                            name: t.name.to_string(),
+                            result: TestResultStatus::Success,
+                            error: None,
+                        }
+                    }
+                }
+                Err(e) => {
+                    failures += 1;
+                    TestResult {
+                        name: t.name.to_string(),
+                        result: TestResultStatus::Failure,
+                        error: Some(e),
+                    }
+                }
+            },
+            Err(_e) => {
+                // The JoinError here doesn't tell us anything interesting but the panic will be
+                // output to stderr anyway.
+                failures += 1;
+                TestResult {
+                    name: t.name.to_string(),
+                    result: TestResultStatus::Failure,
+                    error: None,
+                }
+            }
+        };
+
+        println!("{}", result);
+        println!();
+    }
+
+    teardown();
+
+    println!();
+    println!(
+        "Success: {}, Failures: {}, Skipped: {}",
+        success, failures, skipped
+    );
+    println!();
+
+    if failures == 0 {
+        Ok(())
+    } else {
+        Err(std::io::Error::new(ErrorKind::Other, "test failures"))
+    }
+}

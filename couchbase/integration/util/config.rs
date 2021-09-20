@@ -1,9 +1,9 @@
-use serde::Deserialize;
+use serde_derive::Deserialize;
 use std::fs;
 use std::path::PathBuf;
 
 #[derive(Debug, Copy, Clone, Deserialize)]
-pub(crate) enum ClusterType {
+pub enum ClusterType {
     #[serde(rename(deserialize = "standalone"))]
     Standalone,
     #[serde(rename(deserialize = "mock"))]
@@ -11,7 +11,7 @@ pub(crate) enum ClusterType {
 }
 
 #[derive(Debug, Deserialize)]
-pub(crate) struct Config {
+pub struct Config {
     #[serde(rename(deserialize = "type"))]
     cluster_type: ClusterType,
     #[serde(rename(deserialize = "standalone"))]
@@ -48,7 +48,7 @@ impl Config {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-pub(crate) struct StandaloneConfig {
+pub struct StandaloneConfig {
     username: String,
     password: String,
     #[serde(alias = "conn-string")]
@@ -83,7 +83,7 @@ impl StandaloneConfig {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-pub(crate) struct CavesConfig {
+pub struct CavesConfig {
     version: String,
 }
 

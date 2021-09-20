@@ -4,13 +4,13 @@ use bytes::Buf;
 use couchbase::Cluster;
 use lazy_static::lazy_static;
 use log::debug;
-use serde::{Deserialize, Serialize};
+use serde_derive::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fs;
 #[cfg(not(target_os = "windows"))]
 use std::os::unix::fs::PermissionsExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::Arc;
 use tokio::fs::File;
@@ -44,10 +44,10 @@ struct CreateConfig {
     id: String,
 }
 
-pub(crate) struct MockCluster {
+pub struct MockCluster {
     caves: Child,
     config: Arc<TestConfig>,
-    stream: TcpStream,
+    _stream: TcpStream,
 }
 
 impl MockCluster {
@@ -61,9 +61,22 @@ impl MockCluster {
         if let Some(cc) = c {
             version = cc.version();
         }
-        debug!("Fetching caves {}", CAVES_VERSION);
-        fetch_caves(version).await;
-        debug!("Fetched caves");
+        let path = std::env::temp_dir().join(Path::new(CAVES_BINARY));
+        if path.exists() {
+            debug!(
+                "Found existing caves binary for {} at {}",
+                CAVES_VERSION,
+                path.to_string_lossy()
+            );
+        } else {
+            debug!(
+                "Fetching caves {} to {}",
+                CAVES_VERSION,
+                path.to_string_lossy()
+            );
+            fetch_caves(&path, version).await;
+            debug!("Fetched caves");
+        }
 
         let listener = TcpListener::bind("127.0.0.1:0")
             .await
@@ -74,7 +87,7 @@ impl MockCluster {
             .port();
 
         debug!("Caves starting");
-        let caves = start_caves_process(port);
+        let caves = start_caves_process(&path, port);
         debug!("Caves started");
 
         let (mut stream, _) = listener
@@ -124,7 +137,7 @@ impl MockCluster {
                 collection,
                 support_matrix: SUPPORTS.to_vec(),
             }),
-            stream,
+            _stream: stream,
         }
     }
 }
@@ -135,7 +148,6 @@ impl ConfigAware for MockCluster {
     }
 }
 
-// TODO: I don't think that this is running
 impl Drop for MockCluster {
     fn drop(&mut self) {
         debug!("killing caves");
@@ -148,7 +160,7 @@ impl Drop for MockCluster {
     }
 }
 
-async fn fetch_caves(version: String) {
+async fn fetch_caves(path: &PathBuf, version: String) {
     let response = reqwest::get(format!("{}/{}/{}", CAVES_URL, version, CAVES_BINARY).as_str())
         .await
         .unwrap();
@@ -157,7 +169,6 @@ async fn fetch_caves(version: String) {
         panic!("Response failed: {}", response.status())
     }
 
-    let path = Path::new(CAVES_BINARY);
     let mut file = File::create(path).await.expect("Failed to create file");
 
     let content = response
@@ -170,18 +181,18 @@ async fn fetch_caves(version: String) {
         .expect("Failed to write response data to file");
     drop(file);
 
-    set_permissions();
+    set_permissions(path);
 }
 
 #[cfg(target_os = "windows")]
 fn set_permissions() {}
 
 #[cfg(not(target_os = "windows"))]
-fn set_permissions() {
-    let meta = fs::metadata(CAVES_BINARY).expect("Failed to get file metadata");
+fn set_permissions(path: &PathBuf) {
+    let meta = fs::metadata(path).expect("Failed to get file metadata");
     let mut perms = meta.permissions();
     perms.set_mode(0o744);
-    fs::set_permissions(CAVES_BINARY, perms).expect("Failed to set file permissions");
+    fs::set_permissions(&path, perms).expect("Failed to set file permissions");
 }
 
 fn parse_create_cluster_response(msg: String) -> String {
@@ -210,12 +221,8 @@ async fn read_from_stream(buf_reader: &mut BufReader<ReadHalf<'_>>) -> String {
     msg.into()
 }
 
-fn start_caves_process(port: u16) -> Child {
-    let mut cmd = if cfg!(target_os = "windows") {
-        Command::new(CAVES_BINARY)
-    } else {
-        Command::new(format!("./{}", CAVES_BINARY))
-    };
+fn start_caves_process(path: &PathBuf, port: u16) -> Child {
+    let mut cmd = Command::new(path);
 
     // Caves outputs a lot of info, we need to redirect this so that our tests don't pick it up
     // on stdout.

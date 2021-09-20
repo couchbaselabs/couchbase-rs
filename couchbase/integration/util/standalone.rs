@@ -9,7 +9,7 @@ lazy_static! {
     static ref SUPPORTS: Vec<TestFeature> = vec![TestFeature::KeyValue, TestFeature::Query];
 }
 
-pub(crate) struct StandaloneCluster {
+pub struct StandaloneCluster {
     config: Arc<TestConfig>,
 }
 
