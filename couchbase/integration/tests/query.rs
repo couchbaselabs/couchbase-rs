@@ -4,7 +4,7 @@ use futures::StreamExt;
 
 use std::sync::Arc;
 
-pub async fn query(config: Arc<TestConfig>) -> CouchbaseResult<bool> {
+pub async fn test_query(config: Arc<TestConfig>) -> CouchbaseResult<bool> {
     if !config.supports_feature(TestFeature::Query) {
         return Ok(true);
     }

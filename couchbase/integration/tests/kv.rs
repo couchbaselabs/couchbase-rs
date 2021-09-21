@@ -7,7 +7,7 @@ use uuid::Uuid;
 use crate::util;
 use std::sync::Arc;
 
-pub async fn upsert_get(config: Arc<TestConfig>) -> CouchbaseResult<bool> {
+pub async fn test_upsert_get(config: Arc<TestConfig>) -> CouchbaseResult<bool> {
     if !config.supports_feature(util::TestFeature::KeyValue) {
         return Ok(true);
     }
@@ -29,7 +29,7 @@ pub async fn upsert_get(config: Arc<TestConfig>) -> CouchbaseResult<bool> {
     Ok(false)
 }
 
-pub async fn upsert_replace_get(config: Arc<TestConfig>) -> CouchbaseResult<bool> {
+pub async fn test_upsert_replace_get(config: Arc<TestConfig>) -> CouchbaseResult<bool> {
     if !config.supports_feature(util::TestFeature::KeyValue) {
         return Ok(true);
     }
