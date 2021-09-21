@@ -29,17 +29,17 @@ pub struct AnalyticsDataset {
 }
 
 impl AnalyticsDataset {
-    pub fn name(&self) -> String {
-        self.name.to_string()
+    pub fn name(&self) -> &str {
+        &self.name
     }
-    pub fn dataverse_name(&self) -> String {
-        self.dataverse_name.to_string()
+    pub fn dataverse_name(&self) -> &str {
+        &self.dataverse_name
     }
-    pub fn link_name(&self) -> String {
-        self.link_name.to_string()
+    pub fn link_name(&self) -> &str {
+        &self.link_name
     }
-    pub fn bucket_name(&self) -> String {
-        self.bucket_name.to_string()
+    pub fn bucket_name(&self) -> &str {
+        &self.bucket_name
     }
 }
 
@@ -56,21 +56,21 @@ pub struct AnalyticsIndex {
 }
 
 impl AnalyticsIndex {
-    pub fn name(&self) -> String {
-        self.name.to_string()
+    pub fn name(&self) -> &str {
+        &self.name
     }
-    pub fn dataverse_name(&self) -> String {
-        self.dataverse_name.to_string()
+    pub fn dataverse_name(&self) -> &str {
+        &self.dataverse_name
     }
-    pub fn dataset_name(&self) -> String {
-        self.dataset_name.to_string()
+    pub fn dataset_name(&self) -> &str {
+        &self.dataset_name
     }
     pub fn is_primary(&self) -> bool {
         self.is_primary
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum AnalyticsLinkType {
     CouchbaseRemote,
@@ -101,7 +101,7 @@ pub enum AnalyticsLink {
     AzureBlobExternal(AzureBlobExternalAnalyticsLink),
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub enum AnalyticsEncryptionLevel {
     None,
     Half,
@@ -197,11 +197,11 @@ impl CouchbaseAnalyticsEncryptionSettings {
     pub fn encryption_level(&self) -> AnalyticsEncryptionLevel {
         self.encryption_level
     }
-    pub fn certificate(&self) -> Option<String> {
-        self.certificate.clone()
+    pub fn certificate(&self) -> Option<&String> {
+        self.certificate.as_ref()
     }
-    pub fn client_certificate(&self) -> Option<String> {
-        self.client_certificate.clone()
+    pub fn client_certificate(&self) -> Option<&String> {
+        self.client_certificate.as_ref()
     }
     pub fn set_encryption_level(&mut self, level: AnalyticsEncryptionLevel) {
         self.encryption_level = level;
@@ -290,20 +290,20 @@ pub struct CouchbaseRemoteAnalyticsLink {
 }
 
 impl CouchbaseRemoteAnalyticsLink {
-    pub fn name(&self) -> String {
-        self.name.clone()
+    pub fn name(&self) -> &str {
+        &self.name
     }
-    pub fn dataverse_name(&self) -> String {
-        self.dataverse_name.clone()
+    pub fn dataverse_name(&self) -> &str {
+        &self.dataverse_name
     }
-    pub fn hostname(&self) -> String {
-        self.hostname.clone()
+    pub fn hostname(&self) -> &str {
+        &self.hostname
     }
-    pub fn username(&self) -> Option<String> {
-        self.username.clone()
+    pub fn username(&self) -> Option<&String> {
+        self.username.as_ref()
     }
-    pub fn encryption(&self) -> Option<CouchbaseAnalyticsEncryptionSettings> {
-        self.encryption.clone()
+    pub fn encryption(&self) -> Option<&CouchbaseAnalyticsEncryptionSettings> {
+        self.encryption.as_ref()
     }
     pub fn set_hostname(&mut self, hostname: impl Into<String>) {
         self.hostname = hostname.into();
@@ -554,20 +554,20 @@ impl From<Value> for S3ExternalAnalyticsLink {
 }
 
 impl S3ExternalAnalyticsLink {
-    pub fn name(&self) -> String {
-        self.name.clone()
+    pub fn name(&self) -> &str {
+        &self.name
     }
-    pub fn dataverse_name(&self) -> String {
-        self.dataverse_name.clone()
+    pub fn dataverse_name(&self) -> &str {
+        &self.dataverse_name
     }
-    pub fn access_key_id(&self) -> String {
-        self.access_key_id.clone()
+    pub fn access_key_id(&self) -> &str {
+        &self.access_key_id
     }
-    pub fn region(&self) -> String {
-        self.region.clone()
+    pub fn region(&self) -> &str {
+        &self.region
     }
-    pub fn service_endpoint(&self) -> Option<String> {
-        self.service_endpoint.clone()
+    pub fn service_endpoint(&self) -> Option<&String> {
+        self.service_endpoint.as_ref()
     }
     pub fn set_access_key_id(&mut self, access_key_id: impl Into<String>) {
         self.access_key_id = access_key_id.into();
@@ -755,20 +755,20 @@ impl From<Value> for AzureBlobExternalAnalyticsLink {
 
 #[cfg(feature = "volatile")]
 impl AzureBlobExternalAnalyticsLink {
-    pub fn name(&self) -> String {
-        self.name.clone()
+    pub fn name(&self) -> &str {
+        &self.name
     }
-    pub fn dataverse_name(&self) -> String {
-        self.dataverse_name.clone()
+    pub fn dataverse_name(&self) -> &str {
+        &self.dataverse_name
     }
-    pub fn account_name(&self) -> Option<String> {
-        self.account_name.clone()
+    pub fn account_name(&self) -> Option<&String> {
+        self.account_name.as_ref()
     }
-    pub fn blob_endpoint(&self) -> Option<String> {
-        self.blob_endpoint.clone()
+    pub fn blob_endpoint(&self) -> Option<&String> {
+        self.blob_endpoint.as_ref()
     }
-    pub fn endpoint_suffix(&self) -> Option<String> {
-        self.endpoint_suffix.clone()
+    pub fn endpoint_suffix(&self) -> Option<&String> {
+        self.endpoint_suffix.as_ref()
     }
     pub fn set_connection_string(&mut self, connection_string: impl Into<String>) {
         self.connection_string = Some(connection_string.into());

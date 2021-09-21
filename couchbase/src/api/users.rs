@@ -8,7 +8,7 @@ use std::borrow::Borrow;
 use std::fmt::{self, Debug};
 use std::sync::Arc;
 
-#[derive(Debug, Deserialize, Clone, Copy)]
+#[derive(Debug, Deserialize, Clone, Copy, Eq, PartialEq)]
 pub enum AuthDomain {
     #[serde(rename = "local")]
     Local,
@@ -22,7 +22,7 @@ impl fmt::Display for AuthDomain {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct Role {
     #[serde(rename = "role")]
     name: String,
@@ -38,12 +38,12 @@ impl Role {
         &self.name
     }
 
-    pub fn bucket(&self) -> Option<String> {
-        self.bucket_name.clone()
+    pub fn bucket(&self) -> Option<&String> {
+        self.bucket_name.as_ref()
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone, Eq, PartialEq)]
 pub struct RoleAndDescription {
     #[serde(flatten)]
     role: Role,
@@ -65,7 +65,7 @@ impl RoleAndDescription {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone, Eq, PartialEq)]
 pub struct Origin {
     #[serde(rename = "type")]
     origin_type: String,
@@ -81,19 +81,19 @@ impl Origin {
         self.origin_type.as_str()
     }
 
-    pub fn name(&self) -> Option<String> {
-        self.name.clone()
+    pub fn name(&self) -> Option<&String> {
+        self.name.as_ref()
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone, Eq, PartialEq)]
 pub struct RoleAndOrigins {
     #[serde(flatten)]
     role: Role,
     origins: Vec<Origin>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Group {
     #[serde(rename = "id")]
     name: String,
@@ -118,8 +118,8 @@ impl Group {
         &self.name
     }
 
-    pub fn description(&self) -> Option<String> {
-        self.description.clone()
+    pub fn description(&self) -> Option<&String> {
+        self.description.as_ref()
     }
 
     pub fn set_description(&mut self, description: String) {
@@ -157,12 +157,12 @@ pub struct User {
 }
 
 impl User {
-    pub fn username(&self) -> String {
-        self.username.clone()
+    pub fn username(&self) -> &str {
+        &self.username
     }
 
-    pub fn display_name(&self) -> Option<String> {
-        self.display_name.clone()
+    pub fn display_name(&self) -> Option<&String> {
+        self.display_name.as_ref()
     }
 
     pub fn set_display_name(&mut self, display_name: String) {
@@ -266,8 +266,8 @@ impl UserAndMetadata {
         self.roles.as_ref()
     }
 
-    pub fn password_changed(&self) -> Option<String> {
-        self.password_change_date.clone()
+    pub fn password_changed(&self) -> Option<&String> {
+        self.password_change_date.as_ref()
     }
 
     pub fn external_groups(&self) -> Option<&Vec<String>> {

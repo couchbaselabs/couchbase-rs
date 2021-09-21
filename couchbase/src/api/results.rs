@@ -251,11 +251,11 @@ pub struct SearchRowLocation {
 }
 
 impl SearchRowLocation {
-    pub fn field(&self) -> String {
-        self.field.clone()
+    pub fn field(&self) -> &str {
+        &self.field
     }
-    pub fn term(&self) -> String {
-        self.term.clone()
+    pub fn term(&self) -> &str {
+        &self.term
     }
     pub fn position(&self) -> u32 {
         self.position
@@ -266,8 +266,8 @@ impl SearchRowLocation {
     pub fn end(&self) -> u32 {
         self.end
     }
-    pub fn array_positions(&self) -> Option<Vec<u32>> {
-        self.array_positions.clone()
+    pub fn array_positions(&self) -> Option<&Vec<u32>> {
+        self.array_positions.as_ref()
     }
 }
 
@@ -322,27 +322,27 @@ impl SearchRowLocations {
         }
     }
 
-    pub fn fields(&self) -> Vec<String> {
-        self.locations.keys().cloned().collect()
+    pub fn fields(&self) -> Vec<&String> {
+        self.locations.keys().collect()
     }
 
-    pub fn terms(&self) -> Vec<String> {
+    pub fn terms(&self) -> Vec<&String> {
         let mut set = HashSet::new();
         for fl in &self.locations {
             for tl in fl.1 {
-                set.insert(tl.0.clone());
+                set.insert(tl.0);
             }
         }
 
         Vec::from_iter(set)
     }
 
-    pub fn terms_for(&self, field: impl Into<String>) -> Vec<String> {
+    pub fn terms_for(&self, field: impl Into<String>) -> Vec<&String> {
         match self.locations.get(&field.into()) {
             Some(fl) => {
                 let mut locations = vec![];
                 for t in fl {
-                    locations.push(t.0.clone());
+                    locations.push(t.0);
                 }
 
                 locations
@@ -524,7 +524,7 @@ impl SearchRow {
         self.locations.as_ref()
     }
 
-    pub fn fragments<T>(&self) -> Option<Result<T, CouchbaseError>>
+    pub fn fragments<T>(&self) -> Option<CouchbaseResult<T>>
     where
         T: DeserializeOwned,
     {
@@ -554,14 +554,14 @@ pub struct SearchDateRangeResult {
 }
 
 impl SearchDateRangeResult {
-    pub fn name(&self) -> String {
-        self.name.clone()
+    pub fn name(&self) -> &str {
+        &self.name
     }
-    pub fn start(&self) -> String {
-        self.start.clone()
+    pub fn start(&self) -> &str {
+        &self.start
     }
-    pub fn end(&self) -> String {
-        self.end.clone()
+    pub fn end(&self) -> &str {
+        &self.end
     }
     pub fn count(&self) -> u64 {
         self.count
@@ -579,11 +579,11 @@ pub struct DateRangeSearchFacetResult {
 }
 
 impl DateRangeSearchFacetResult {
-    pub fn field(&self) -> String {
-        self.field.clone()
+    pub fn field(&self) -> &str {
+        &self.field
     }
-    pub fn name(&self) -> String {
-        self.name.clone()
+    pub fn name(&self) -> &str {
+        &self.name
     }
     pub fn total(&self) -> u64 {
         self.total
@@ -594,7 +594,7 @@ impl DateRangeSearchFacetResult {
     pub fn other(&self) -> u64 {
         self.other
     }
-    pub fn date_ranges(&self) -> impl Iterator<Item = &SearchDateRangeResult> {
+    pub fn date_ranges(&self) -> impl IntoIterator<Item = &SearchDateRangeResult> {
         self.date_ranges.iter()
     }
 }
@@ -622,14 +622,14 @@ pub struct SearchNumericRangeResult {
 }
 
 impl SearchNumericRangeResult {
-    pub fn name(&self) -> String {
-        self.name.clone()
+    pub fn name(&self) -> &str {
+        &self.name
     }
-    pub fn start(&self) -> String {
-        self.start.clone()
+    pub fn start(&self) -> &str {
+        &self.start
     }
-    pub fn end(&self) -> String {
-        self.end.clone()
+    pub fn end(&self) -> &str {
+        &self.end
     }
     pub fn count(&self) -> u64 {
         self.count
@@ -661,11 +661,11 @@ impl TryFrom<(&String, &Value)> for NumericRangeSearchFacetResult {
 }
 
 impl NumericRangeSearchFacetResult {
-    pub fn field(&self) -> String {
-        self.field.clone()
+    pub fn field(&self) -> &str {
+        &self.field
     }
-    pub fn name(&self) -> String {
-        self.name.clone()
+    pub fn name(&self) -> &str {
+        &self.name
     }
     pub fn total(&self) -> u64 {
         self.total
@@ -676,7 +676,7 @@ impl NumericRangeSearchFacetResult {
     pub fn other(&self) -> u64 {
         self.other
     }
-    pub fn numeric_ranges(&self) -> impl Iterator<Item = &SearchNumericRangeResult> {
+    pub fn numeric_ranges(&self) -> impl IntoIterator<Item = &SearchNumericRangeResult> {
         self.numeric_ranges.iter()
     }
 }
@@ -725,11 +725,11 @@ impl TryFrom<(&String, &Value)> for TermSearchFacetResult {
 }
 
 impl TermSearchFacetResult {
-    pub fn field(&self) -> String {
-        self.field.clone()
+    pub fn field(&self) -> &str {
+        &self.field
     }
-    pub fn name(&self) -> String {
-        self.name.clone()
+    pub fn name(&self) -> &str {
+        &self.name
     }
     pub fn total(&self) -> u64 {
         self.total
@@ -943,8 +943,8 @@ impl ExistsResult {
         self.exists
     }
 
-    pub fn cas(&self) -> &Option<u64> {
-        &self.cas
+    pub fn cas(&self) -> Option<u64> {
+        self.cas
     }
 }
 
@@ -1167,31 +1167,31 @@ impl EndpointPingReport {
     }
 
     pub fn service_type(&self) -> ServiceType {
-        self.typ.clone()
+        self.typ
     }
 
-    pub fn id(&self) -> String {
-        self.id.clone()
+    pub fn id(&self) -> &str {
+        &self.id
     }
 
-    pub fn local(&self) -> Option<String> {
-        self.local.clone()
+    pub fn local(&self) -> Option<&String> {
+        self.local.as_ref()
     }
 
-    pub fn remote(&self) -> Option<String> {
-        self.remote.clone()
+    pub fn remote(&self) -> Option<&String> {
+        self.remote.as_ref()
     }
 
     pub fn state(&self) -> PingState {
-        self.status.clone()
+        self.status
     }
 
-    pub fn error(&self) -> Option<String> {
-        self.error.clone()
+    pub fn error(&self) -> Option<&String> {
+        self.error.as_ref()
     }
 
-    pub fn namespace(&self) -> Option<String> {
-        self.scope.clone()
+    pub fn namespace(&self) -> Option<&String> {
+        self.scope.as_ref()
     }
 
     pub fn latency(&self) -> Duration {
@@ -1243,8 +1243,8 @@ pub struct ViewRow {
 }
 
 impl ViewRow {
-    pub fn id(&self) -> Option<&str> {
-        self.id.as_deref()
+    pub fn id(&self) -> Option<&String> {
+        self.id.as_ref()
     }
 
     pub fn key<T>(&self) -> CouchbaseResult<T>

@@ -141,20 +141,20 @@ pub struct SearchIndex {
 }
 
 impl SearchIndex {
-    pub fn uuid(&self) -> Option<String> {
-        self.uuid.clone()
+    pub fn uuid(&self) -> Option<&String> {
+        self.uuid.as_ref()
     }
 
-    pub fn name(&self) -> String {
-        self.name.clone()
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
-    pub fn source_name(&self) -> String {
-        self.source_name.clone()
+    pub fn source_name(&self) -> &str {
+        &self.source_name
     }
 
-    pub fn index_type(&self) -> Option<String> {
-        self.index_type.clone()
+    pub fn index_type(&self) -> Option<&String> {
+        self.index_type.as_ref()
     }
 
     pub fn params<T>(&self) -> CouchbaseResult<HashMap<String, T>>
@@ -162,18 +162,14 @@ impl SearchIndex {
         T: DeserializeOwned,
     {
         match &self.params {
-            Some(p) => {
-                serde_json::from_value(p.clone()).map_err(|e| CouchbaseError::DecodingFailure {
-                    source: std::io::Error::new(std::io::ErrorKind::InvalidData, e),
-                    ctx: ErrorContext::default(),
-                })
-            }
+            Some(p) => serde_json::from_value(p.clone())
+                .map_err(|e| CouchbaseError::decoding_failure_from_serde(e)),
             None => Ok(HashMap::new()),
         }
     }
 
-    pub fn source_uuid(&self) -> Option<String> {
-        self.source_uuid.clone()
+    pub fn source_uuid(&self) -> Option<&String> {
+        self.source_uuid.as_ref()
     }
 
     pub fn source_params<T>(&self) -> CouchbaseResult<HashMap<String, T>>
@@ -191,8 +187,8 @@ impl SearchIndex {
         }
     }
 
-    pub fn source_type(&self) -> Option<String> {
-        self.source_type.clone()
+    pub fn source_type(&self) -> Option<&String> {
+        self.source_type.as_ref()
     }
 
     pub fn plan_params<T>(&self) -> CouchbaseResult<HashMap<String, T>>
@@ -222,13 +218,10 @@ impl SearchIndex {
     where
         T: Serialize,
     {
-        self.params =
-            Some(
-                serde_json::to_value(params).map_err(|e| CouchbaseError::EncodingFailure {
-                    source: std::io::Error::new(std::io::ErrorKind::InvalidData, e),
-                    ctx: ErrorContext::default(),
-                })?,
-            );
+        self.params = Some(
+            serde_json::to_value(params)
+                .map_err(|e| CouchbaseError::encoding_failure_from_serde(e))?,
+        );
 
         Ok(())
     }
@@ -241,13 +234,10 @@ impl SearchIndex {
     where
         T: Serialize,
     {
-        self.source_params =
-            Some(
-                serde_json::to_value(params).map_err(|e| CouchbaseError::EncodingFailure {
-                    source: std::io::Error::new(std::io::ErrorKind::InvalidData, e),
-                    ctx: ErrorContext::default(),
-                })?,
-            );
+        self.source_params = Some(
+            serde_json::to_value(params)
+                .map_err(|e| CouchbaseError::encoding_failure_from_serde(e))?,
+        );
 
         Ok(())
     }
@@ -260,13 +250,10 @@ impl SearchIndex {
     where
         T: Serialize,
     {
-        self.plan_params =
-            Some(
-                serde_json::to_value(params).map_err(|e| CouchbaseError::EncodingFailure {
-                    source: std::io::Error::new(std::io::ErrorKind::InvalidData, e),
-                    ctx: ErrorContext::default(),
-                })?,
-            );
+        self.plan_params = Some(
+            serde_json::to_value(params)
+                .map_err(|e| CouchbaseError::encoding_failure_from_serde(e))?,
+        );
 
         Ok(())
     }

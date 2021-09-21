@@ -37,8 +37,8 @@ pub struct QueryIndex {
 }
 
 impl QueryIndex {
-    pub fn name(&self) -> String {
-        self.name.to_string()
+    pub fn name(&self) -> &str {
+        &self.name
     }
     pub fn is_primary(&self) -> bool {
         self.is_primary
@@ -46,20 +46,20 @@ impl QueryIndex {
     pub fn using(&self) -> QueryIndexType {
         self.using
     }
-    pub fn state(&self) -> String {
-        self.state.to_string()
+    pub fn state(&self) -> &str {
+        &self.state
     }
-    pub fn keyspace(&self) -> String {
-        self.name.to_string()
+    pub fn keyspace(&self) -> &str {
+        &self.name
     }
     pub fn index_key(&self) -> &Vec<String> {
         &self.index_key
     }
-    pub fn condition(&self) -> Option<String> {
-        self.condition.clone()
+    pub fn condition(&self) -> Option<&String> {
+        self.condition.as_ref()
     }
-    pub fn partition(&self) -> Option<String> {
-        self.partition.clone()
+    pub fn partition(&self) -> Option<&String> {
+        self.partition.as_ref()
     }
 }
 

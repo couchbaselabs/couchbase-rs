@@ -27,8 +27,12 @@ impl ScopeSpec {
         &self.name
     }
 
-    pub fn collections(&self) -> &[CollectionSpec] {
-        self.collections.as_slice()
+    pub fn collections(&self) -> &Vec<CollectionSpec> {
+        &self.collections
+    }
+
+    pub fn collections_mut(&mut self) -> &mut Vec<CollectionSpec> {
+        self.collections.as_mut()
     }
 }
 
@@ -57,7 +61,7 @@ impl CollectionSpec {
     }
 
     pub fn max_expiry(&self) -> Duration {
-        self.max_expiry.clone()
+        self.max_expiry
     }
 }
 

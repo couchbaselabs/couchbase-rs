@@ -19,7 +19,7 @@ use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 use std::time::Duration;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum BucketType {
     Couchbase,
     Memcached,
@@ -55,7 +55,7 @@ impl Display for BucketType {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum ConflictResolutionType {
     Timestamp,
     SequenceNumber,
@@ -88,7 +88,7 @@ impl Display for ConflictResolutionType {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum EvictionPolicy {
     Full,
     ValueOnly,
@@ -126,7 +126,7 @@ impl Display for EvictionPolicy {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum CompressionMode {
     Off,
     Passive,

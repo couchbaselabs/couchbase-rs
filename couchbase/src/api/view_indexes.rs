@@ -8,6 +8,7 @@ use crate::{
 use futures::channel::oneshot;
 use serde::de::DeserializeOwned;
 use serde_derive::{Deserialize, Serialize};
+use std::borrow::BorrowMut;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
@@ -92,6 +93,9 @@ impl DesignDocument {
     }
     pub fn views(&self) -> &HashMap<String, View> {
         &self.views
+    }
+    pub fn views_mut(&mut self) -> &mut HashMap<String, View> {
+        self.views.borrow_mut()
     }
 }
 
