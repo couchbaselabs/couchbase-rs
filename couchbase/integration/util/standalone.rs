@@ -40,7 +40,5 @@ impl ConfigAware for StandaloneCluster {
 }
 
 impl Drop for StandaloneCluster {
-    fn drop(&mut self) {
-        todo!();
-    }
+    fn drop(&mut self) {}
 }

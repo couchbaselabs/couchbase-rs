@@ -1,13 +1,13 @@
-use couchbase::{CouchbaseResult, GetOptions, ReplaceOptions, UpsertOptions};
+use couchbase::{GetOptions, ReplaceOptions, UpsertOptions};
 
 use crate::util::TestConfig;
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use crate::util;
+use crate::{util, TestResult};
 use std::sync::Arc;
 
-pub async fn test_upsert_get(config: Arc<TestConfig>) -> CouchbaseResult<bool> {
+pub async fn test_upsert_get(config: Arc<TestConfig>) -> TestResult<bool> {
     if !config.supports_feature(util::TestFeature::KeyValue) {
         return Ok(true);
     }
@@ -29,7 +29,7 @@ pub async fn test_upsert_get(config: Arc<TestConfig>) -> CouchbaseResult<bool> {
     Ok(false)
 }
 
-pub async fn test_upsert_replace_get(config: Arc<TestConfig>) -> CouchbaseResult<bool> {
+pub async fn test_upsert_replace_get(config: Arc<TestConfig>) -> TestResult<bool> {
     if !config.supports_feature(util::TestFeature::KeyValue) {
         return Ok(true);
     }

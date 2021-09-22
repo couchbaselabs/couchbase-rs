@@ -1,6 +1,6 @@
 use crate::tests::*;
 use crate::util::TestConfig;
-use couchbase::CouchbaseResult;
+use crate::TestResult;
 use futures::Future;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -22,13 +22,13 @@ pub fn tests(config: Arc<TestConfig>) -> Vec<TestFn> {
 
 pub struct TestFn {
     pub name: String,
-    pub func: Pin<Box<dyn Future<Output = CouchbaseResult<bool>> + Send + 'static>>,
+    pub func: Pin<Box<dyn Future<Output = TestResult<bool>> + Send + 'static>>,
 }
 
 impl TestFn {
     pub fn new(
         name: impl Into<String>,
-        func: Pin<Box<dyn Future<Output = CouchbaseResult<bool>> + Send + 'static>>,
+        func: Pin<Box<dyn Future<Output = TestResult<bool>> + Send + 'static>>,
     ) -> Self {
         Self {
             name: name.into(),

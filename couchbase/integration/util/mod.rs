@@ -7,9 +7,19 @@ use mock::MockCluster;
 use standalone::StandaloneCluster;
 
 pub use crate::util::features::TestFeature;
+use crate::{TestError, TestResult};
 pub use config::{ClusterType, Config};
-use couchbase::{Bucket, Cluster, Collection, Scope};
+use couchbase::{Bucket, Cluster, Collection, Scope, UpsertOptions};
+use log::warn;
+use serde::de::DeserializeOwned;
+use serde_derive::{Deserialize, Serialize};
+use std::fmt::Debug;
+use std::fs;
+use std::future::Future;
+use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Instant;
+use tokio::time::{sleep, Duration};
 
 #[derive(Debug)]
 pub struct TestConfig {
@@ -56,7 +66,83 @@ pub trait ConfigAware {
     fn config(&self) -> Arc<TestConfig>;
 }
 
-// pub fn block_on<F: Future>(future: F) -> F::Output {
-//     let rt = Runtime::new().unwrap();
-//     rt.spawn(future).
-// }
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct BreweryDocumentGeo {
+    pub accuracy: String,
+    pub lat: f32,
+    pub lon: f32,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct BreweryDocument {
+    pub address: Vec<String>,
+    pub city: String,
+    pub code: String,
+    pub description: String,
+    pub geo: BreweryDocumentGeo,
+    pub name: String,
+    pub test: Option<String>,
+}
+
+pub async fn try_until<T, U>(deadline: Instant, future: impl Fn() -> T) -> TestResult<()>
+where
+    T: Future<Output = TestResult<U>>,
+{
+    loop {
+        if Instant::now() > deadline {
+            return Err(TestError {
+                reason: String::from("deadline exceeded during try_util"),
+            });
+        }
+
+        match future().await {
+            Ok(_) => return Ok(()),
+            Err(e) => {
+                warn!("Error received during try_until: {}", e);
+            }
+        }
+
+        sleep(Duration::from_millis(100)).await;
+    }
+}
+
+pub async fn upsert_brewery_dataset(
+    test_name: &str,
+    collection: &Collection,
+) -> TestResult<Vec<BreweryDocument>> {
+    // TODO: this just feels wrong
+    let dataset: Vec<BreweryDocument> = load_dataset("beer_sample_brewery_five.json")?;
+    let mut result = vec![];
+    for doc in &dataset {
+        let mut new_doc = doc.clone();
+        new_doc.test = Some(String::from(test_name));
+        collection
+            .upsert(&new_doc.name, &new_doc, UpsertOptions::default())
+            .await?;
+        result.push(new_doc);
+    }
+
+    Ok(result)
+}
+
+fn load_dataset<I, T>(file_path: impl Into<PathBuf>) -> TestResult<I>
+where
+    I: IntoIterator<Item = T> + DeserializeOwned,
+    T: DeserializeOwned,
+{
+    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    path.push("integration");
+    path.push("resources");
+    path.push(file_path.into());
+
+    Ok(serde_json::from_slice(
+        fs::read(path)
+            .map_err(|e| TestError {
+                reason: e.to_string(),
+            })?
+            .as_slice(),
+    )
+    .map_err(|e| TestError {
+        reason: e.to_string(),
+    })?)
+}

@@ -86,7 +86,7 @@ pub struct QueryMetaData {
     client_context_id: String,
     metrics: Option<QueryMetrics>,
     status: QueryStatus,
-    warnings: Vec<QueryWarning>,
+    warnings: Option<Vec<QueryWarning>>,
     signature: Option<Value>,
     profile: Option<Value>,
 }
@@ -108,8 +108,8 @@ impl QueryMetaData {
         self.status
     }
 
-    pub fn warnings<T>(&self) -> impl IntoIterator<Item = &QueryWarning> {
-        self.warnings.as_slice()
+    pub fn warnings<T>(&self) -> Option<impl IntoIterator<Item = &QueryWarning>> {
+        self.warnings.as_ref()
     }
 
     pub fn signature<T>(&self) -> Option<CouchbaseResult<T>>

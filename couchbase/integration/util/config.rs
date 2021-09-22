@@ -33,8 +33,8 @@ impl Config {
 
     pub fn try_load_config() -> Option<Config> {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        path.push("tests");
-        path.push("config");
+        path.push("integration");
+        path.push("config.toml");
         match fs::read_to_string(&path) {
             Ok(r) => match toml::from_str(&r) {
                 Ok(i) => Some(i),

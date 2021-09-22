@@ -6,6 +6,7 @@ use crate::util::mock::MockCluster;
 use crate::util::standalone::StandaloneCluster;
 use couchbase::CouchbaseError;
 use env_logger::Env;
+use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::io::ErrorKind;
 use std::sync::Arc;
@@ -52,13 +53,36 @@ impl Display for TestResultStatus {
 }
 
 #[derive(Debug)]
-struct TestResult {
-    name: String,
-    result: TestResultStatus,
-    error: Option<CouchbaseError>,
+pub struct TestError {
+    reason: String,
 }
 
-impl Display for TestResult {
+impl Display for TestError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.reason.clone())
+    }
+}
+
+impl Error for TestError {}
+
+impl From<CouchbaseError> for TestError {
+    fn from(e: CouchbaseError) -> Self {
+        Self {
+            reason: e.to_string(),
+        }
+    }
+}
+
+pub type TestResult<T, E = TestError> = std::result::Result<T, E>;
+
+#[derive(Debug)]
+struct TestOutcome {
+    name: String,
+    result: TestResultStatus,
+    error: Option<TestError>,
+}
+
+impl Display for TestOutcome {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut out = format!("{} -> {}", self.name.clone(), self.result);
         if let Some(e) = &self.error {
@@ -86,14 +110,14 @@ async fn main() -> Result<(), std::io::Error> {
                 Ok(was_skipped) => {
                     if was_skipped {
                         skipped += 1;
-                        TestResult {
+                        TestOutcome {
                             name: t.name.to_string(),
                             result: TestResultStatus::Skipped,
                             error: None,
                         }
                     } else {
                         success += 1;
-                        TestResult {
+                        TestOutcome {
                             name: t.name.to_string(),
                             result: TestResultStatus::Success,
                             error: None,
@@ -102,7 +126,7 @@ async fn main() -> Result<(), std::io::Error> {
                 }
                 Err(e) => {
                     failures += 1;
-                    TestResult {
+                    TestOutcome {
                         name: t.name.to_string(),
                         result: TestResultStatus::Failure,
                         error: Some(e),
@@ -113,7 +137,7 @@ async fn main() -> Result<(), std::io::Error> {
                 // The JoinError here doesn't tell us anything interesting but the panic will be
                 // output to stderr anyway.
                 failures += 1;
-                TestResult {
+                TestOutcome {
                     name: t.name.to_string(),
                     result: TestResultStatus::Failure,
                     error: None,
