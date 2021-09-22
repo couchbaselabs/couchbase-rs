@@ -108,7 +108,7 @@ impl QueryMetaData {
         self.status
     }
 
-    pub fn warnings<T>(&self) -> Option<impl IntoIterator<Item = &QueryWarning>> {
+    pub fn warnings(&self) -> Option<impl IntoIterator<Item = &QueryWarning>> {
         self.warnings.as_ref()
     }
 

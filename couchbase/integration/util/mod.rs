@@ -84,7 +84,7 @@ pub struct BreweryDocument {
     pub test: Option<String>,
 }
 
-pub async fn try_until<T, U>(deadline: Instant, future: impl Fn() -> T) -> TestResult<()>
+pub async fn try_until<T, U>(deadline: Instant, future: impl Fn() -> T) -> TestResult<U>
 where
     T: Future<Output = TestResult<U>>,
 {
@@ -96,7 +96,7 @@ where
         }
 
         match future().await {
-            Ok(_) => return Ok(()),
+            Ok(r) => return Ok(r),
             Err(e) => {
                 warn!("Error received during try_until: {}", e);
             }

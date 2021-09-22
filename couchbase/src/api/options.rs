@@ -292,7 +292,7 @@ impl QueryOptions {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone, Copy)]
 pub enum QueryScanConsistency {
     #[serde(rename = "not_bounded")]
     NotBounded,
@@ -300,7 +300,7 @@ pub enum QueryScanConsistency {
     RequestPlus,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone, Copy)]
 pub enum QueryProfile {
     #[serde(rename = "off")]
     Off,
