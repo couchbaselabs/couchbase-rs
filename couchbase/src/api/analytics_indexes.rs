@@ -206,23 +206,14 @@ impl CouchbaseAnalyticsEncryptionSettings {
     pub fn set_encryption_level(&mut self, level: AnalyticsEncryptionLevel) {
         self.encryption_level = level;
     }
-    pub fn set_certificate(&mut self, certificate: impl Into<String>) {
-        self.certificate = Some(certificate.into());
+    pub fn set_certificate(&mut self, certificate: impl Into<Option<String>>) {
+        self.certificate = certificate.into();
     }
-    pub fn unset_certificate(&mut self) {
-        self.certificate = None;
+    pub fn set_client_certificate(&mut self, certificate: impl Into<Option<String>>) {
+        self.client_certificate = certificate.into();
     }
-    pub fn set_client_certificate(&mut self, certificate: impl Into<String>) {
-        self.client_certificate = Some(certificate.into());
-    }
-    pub fn unset_client_certificate(&mut self) {
-        self.client_certificate = None;
-    }
-    pub fn set_client_key(&mut self, key: impl Into<String>) {
-        self.client_key = Some(key.into());
-    }
-    pub fn unset_client_key(&mut self) {
-        self.client_key = None;
+    pub fn set_client_key(&mut self, key: impl Into<Option<String>>) {
+        self.client_key = key.into();
     }
 }
 
@@ -308,23 +299,17 @@ impl CouchbaseRemoteAnalyticsLink {
     pub fn set_hostname(&mut self, hostname: impl Into<String>) {
         self.hostname = hostname.into();
     }
-    pub fn set_username(&mut self, username: impl Into<String>) {
-        self.username = Some(username.into());
+    pub fn set_username(&mut self, username: impl Into<Option<String>>) {
+        self.username = username.into();
     }
-    pub fn unset_username(&mut self) {
-        self.username = None;
+    pub fn set_password(&mut self, password: impl Into<Option<String>>) {
+        self.password = password.into();
     }
-    pub fn set_password(&mut self, password: impl Into<String>) {
-        self.password = Some(password.into());
-    }
-    pub fn unset_password(&mut self) {
-        self.password = None;
-    }
-    pub fn set_encryption(&mut self, encryption: CouchbaseAnalyticsEncryptionSettings) {
-        self.encryption = Some(encryption);
-    }
-    pub fn unset_encryption(&mut self) {
-        self.encryption = None;
+    pub fn set_encryption(
+        &mut self,
+        encryption: impl Into<Option<CouchbaseAnalyticsEncryptionSettings>>,
+    ) {
+        self.encryption = encryption.into();
     }
 
     fn validate(&self) -> CouchbaseResult<()> {
@@ -578,17 +563,11 @@ impl S3ExternalAnalyticsLink {
     pub fn set_region(&mut self, region: impl Into<String>) {
         self.region = region.into();
     }
-    pub fn set_session_token(&mut self, session_token: impl Into<String>) {
-        self.session_token = Some(session_token.into());
+    pub fn set_session_token(&mut self, session_token: impl Into<Option<String>>) {
+        self.session_token = session_token.into();
     }
-    pub fn unset_session_token(&mut self) {
-        self.session_token = None;
-    }
-    pub fn set_service_endpoint(&mut self, service_endpoint: impl Into<String>) {
-        self.service_endpoint = Some(service_endpoint.into());
-    }
-    pub fn unset_service_endpoint(&mut self) {
-        self.service_endpoint = None;
+    pub fn set_service_endpoint(&mut self, service_endpoint: impl Into<Option<String>>) {
+        self.service_endpoint = service_endpoint.into();
     }
 
     fn validate(&self) -> CouchbaseResult<()> {
@@ -770,41 +749,23 @@ impl AzureBlobExternalAnalyticsLink {
     pub fn endpoint_suffix(&self) -> Option<&String> {
         self.endpoint_suffix.as_ref()
     }
-    pub fn set_connection_string(&mut self, connection_string: impl Into<String>) {
-        self.connection_string = Some(connection_string.into());
+    pub fn set_connection_string(&mut self, connection_string: impl Into<Option<String>>) {
+        self.connection_string = connection_string.into();
     }
-    pub fn unset_connection_string(&mut self) {
-        self.connection_string = None;
+    pub fn set_account_name(&mut self, name: impl Into<Option<String>>) {
+        self.account_name = name.into();
     }
-    pub fn set_account_name(&mut self, name: impl Into<String>) {
-        self.account_name = Some(name.into());
+    pub fn set_account_key(&mut self, account_key: impl Into<Option<String>>) {
+        self.account_key = account_key.into();
     }
-    pub fn unset_account_name(&mut self) {
-        self.account_name = None;
+    pub fn set_shared_access_signature(&mut self, signature: impl Into<Option<String>>) {
+        self.shared_access_signature = signature.into();
     }
-    pub fn set_account_key(&mut self, account_key: impl Into<String>) {
-        self.account_key = Some(account_key.into());
+    pub fn set_blob_endpoint(&mut self, blob_endpoint: impl Into<Option<String>>) {
+        self.blob_endpoint = blob_endpoint.into();
     }
-    pub fn unset_account_key(&mut self) {
-        self.account_key = None;
-    }
-    pub fn set_shared_access_signature(&mut self, signature: impl Into<String>) {
-        self.shared_access_signature = Some(signature.into());
-    }
-    pub fn unset_shared_access_signature(&mut self) {
-        self.shared_access_signature = None;
-    }
-    pub fn set_blob_endpoint(&mut self, blob_endpoint: impl Into<String>) {
-        self.blob_endpoint = Some(blob_endpoint.into());
-    }
-    pub fn unset_blob_endpoint(&mut self) {
-        self.blob_endpoint = None;
-    }
-    pub fn set_endpoint_suffix(&mut self, endpoint_suffix: impl Into<String>) {
-        self.endpoint_suffix = Some(endpoint_suffix.into());
-    }
-    pub fn unset_endpoint_suffix(&mut self) {
-        self.endpoint_suffix = None;
+    pub fn set_endpoint_suffix(&mut self, endpoint_suffix: impl Into<Option<String>>) {
+        self.endpoint_suffix = endpoint_suffix.into();
     }
 
     fn validate(&self) -> CouchbaseResult<()> {

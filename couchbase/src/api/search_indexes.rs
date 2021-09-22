@@ -206,12 +206,8 @@ impl SearchIndex {
         }
     }
 
-    pub fn set_uuid(&mut self, uuid: impl Into<String>) {
-        self.uuid = Some(uuid.into());
-    }
-
-    pub fn unset_uuid(&mut self) {
-        self.uuid = None;
+    pub fn set_uuid(&mut self, uuid: impl Into<Option<String>>) {
+        self.uuid = uuid.into();
     }
 
     pub fn set_params<T>(&mut self, params: HashMap<String, T>) -> CouchbaseResult<()>
