@@ -26,7 +26,7 @@ use serde::Serialize;
 use serde_json::{to_vec, Value};
 use std::convert::TryFrom;
 use std::fmt;
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -62,9 +62,44 @@ impl Cluster {
         Cluster {
             core: Arc::new(Core::new(
                 connection_string.into(),
-                username.into(),
-                password.into(),
+                Some(username.into()),
+                Some(password.into()),
             )),
+        }
+    }
+
+    // This will likely move to become the actual connect function before beta.
+    pub fn connect_with_options(
+        connection_string: impl Into<String>,
+        opts: ClusterOptions,
+    ) -> Self {
+        let mut connection_string = connection_string.into();
+        let to_append = opts.to_conn_string();
+        if !to_append.is_empty() {}
+        if connection_string.contains("?") {
+            connection_string = format!("{}&{}", connection_string, to_append);
+        } else {
+            connection_string = format!("{}?{}", connection_string, to_append);
+        }
+        let mut username = opts.username;
+        let mut password = opts.password;
+        if let Some(auth) = opts.authenticator {
+            if let Some(u) = auth.username() {
+                username = Some(u.clone());
+            }
+            if let Some(p) = auth.password() {
+                password = Some(p.clone());
+            }
+            if let Some(path) = auth.certificate_path() {
+                connection_string = format!("{}&certpath={}", connection_string, path.clone());
+            }
+            if let Some(path) = auth.key_path() {
+                connection_string = format!("{}&keypath={}", connection_string, path.clone());
+            }
+        }
+
+        Cluster {
+            core: Arc::new(Core::new(connection_string.into(), username, password)),
         }
     }
 
@@ -1288,5 +1323,81 @@ impl TryFrom<&str> for DurabilityLevel {
                 Err(Generic { ctx })
             }
         }
+    }
+}
+
+// Internal: Do not implement.
+// The only supported implementations of Authenticator are PasswordAuthenticator and
+// CertificateAuthenticator.
+pub trait Authenticator: Debug {
+    fn username(&self) -> Option<&String>;
+    fn password(&self) -> Option<&String>;
+    fn certificate_path(&self) -> Option<&String>;
+    fn key_path(&self) -> Option<&String>;
+}
+
+#[derive(Debug, Clone)]
+pub struct PasswordAuthenticator {
+    username: String,
+    password: String,
+}
+
+impl PasswordAuthenticator {
+    pub fn new(username: impl Into<String>, password: impl Into<String>) -> Self {
+        Self {
+            username: username.into(),
+            password: password.into(),
+        }
+    }
+}
+
+impl Authenticator for PasswordAuthenticator {
+    fn username(&self) -> Option<&String> {
+        Some(&self.username)
+    }
+
+    fn password(&self) -> Option<&String> {
+        Some(&self.password)
+    }
+
+    fn certificate_path(&self) -> Option<&String> {
+        None
+    }
+
+    fn key_path(&self) -> Option<&String> {
+        None
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct CertificateAuthenticator {
+    cert_path: String,
+    key_path: String,
+}
+
+impl CertificateAuthenticator {
+    pub fn new(cert_path: impl Into<String>, key_path: impl Into<String>) -> Self {
+        Self {
+            cert_path: cert_path.into(),
+            key_path: key_path.into(),
+        }
+    }
+}
+
+impl Authenticator for CertificateAuthenticator {
+    fn username(&self) -> Option<&String> {
+        None
+    }
+
+    fn password(&self) -> Option<&String> {
+        None
+    }
+
+    fn certificate_path(&self) -> Option<&String> {
+        Some(&self.cert_path)
+    }
+
+    fn key_path(&self) -> Option<&String> {
+        Some(&self.key_path)
     }
 }

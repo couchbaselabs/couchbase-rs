@@ -1,4 +1,4 @@
-use crate::api::MutationState;
+use crate::api::{Authenticator, MutationState};
 use crate::{
     AnalyticsLinkType, CouchbaseError, CouchbaseResult, DesignDocumentNamespace, ErrorContext,
     SearchFacet, SearchSort,
@@ -1789,5 +1789,226 @@ impl GetAllAnalyticsLinksOptions {
     pub fn link_type(mut self, link_type: AnalyticsLinkType) -> Self {
         self.link_type = Some(link_type);
         self
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct TimeoutOptions {
+    pub(crate) kv_connect_timeout: Option<Duration>,
+    pub(crate) kv_timeout: Option<Duration>,
+    pub(crate) kv_durable_timeout: Option<Duration>,
+    pub(crate) view_timeout: Option<Duration>,
+    pub(crate) query_timeout: Option<Duration>,
+    pub(crate) analytics_timeout: Option<Duration>,
+    pub(crate) search_timeout: Option<Duration>,
+    pub(crate) management_timeout: Option<Duration>,
+}
+
+impl TimeoutOptions {
+    pub fn new() -> Self {
+        TimeoutOptions::default()
+    }
+
+    pub fn kv_connect_timeout(mut self, timeout: Duration) -> Self {
+        self.kv_connect_timeout = Some(timeout);
+        self
+    }
+
+    pub fn kv_timeout(mut self, timeout: Duration) -> Self {
+        self.kv_timeout = Some(timeout);
+        self
+    }
+
+    pub fn kv_durable_timeout(mut self, timeout: Duration) -> Self {
+        self.kv_durable_timeout = Some(timeout);
+        self
+    }
+
+    pub fn view_timeout(mut self, timeout: Duration) -> Self {
+        self.view_timeout = Some(timeout);
+        self
+    }
+
+    pub fn query_timeout(mut self, timeout: Duration) -> Self {
+        self.query_timeout = Some(timeout);
+        self
+    }
+
+    pub fn analytics_timeout(mut self, timeout: Duration) -> Self {
+        self.analytics_timeout = Some(timeout);
+        self
+    }
+
+    pub fn search_timeout(mut self, timeout: Duration) -> Self {
+        self.query_timeout = Some(timeout);
+        self
+    }
+
+    pub fn management_timeout(mut self, timeout: Duration) -> Self {
+        self.query_timeout = Some(timeout);
+        self
+    }
+}
+
+fn duration_to_conn_str_format(t: Duration) -> String {
+    let v = (t.as_millis() as f32) / (1000 as f32);
+    v.to_string()
+}
+
+impl Display for TimeoutOptions {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut timeouts = vec![];
+        if let Some(t) = self.kv_connect_timeout {
+            timeouts.push(format!(
+                "kv_connect_timeout={}",
+                duration_to_conn_str_format(t)
+            ));
+        }
+        if let Some(t) = self.kv_timeout {
+            timeouts.push(format!("kv_timeout={}", duration_to_conn_str_format(t)));
+        }
+        if let Some(t) = self.kv_durable_timeout {
+            timeouts.push(format!(
+                "kv_durable_timeout={}",
+                duration_to_conn_str_format(t)
+            ));
+        }
+        if let Some(t) = self.view_timeout {
+            timeouts.push(format!("view_timeout={}", duration_to_conn_str_format(t)));
+        }
+        if let Some(t) = self.query_timeout {
+            timeouts.push(format!("query_timeout={}", duration_to_conn_str_format(t)));
+        }
+        if let Some(t) = self.analytics_timeout {
+            timeouts.push(format!(
+                "analytics_timeout={}",
+                duration_to_conn_str_format(t)
+            ));
+        }
+        if let Some(t) = self.search_timeout {
+            timeouts.push(format!("search_timeout={}", duration_to_conn_str_format(t)));
+        }
+        if let Some(t) = self.management_timeout {
+            timeouts.push(format!("http_timeout={}", duration_to_conn_str_format(t)));
+        }
+
+        if timeouts.len() > 0 {
+            write!(f, "{}", timeouts.join("&"))
+        } else {
+            write!(f, "")
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct SecurityOptions {
+    pub(crate) trust_store_path: Option<String>,
+    pub(crate) skip_verify: Option<bool>,
+    pub(crate) ciphers: Option<Vec<String>>,
+}
+
+impl SecurityOptions {
+    pub fn trust_store_path(mut self, trust_store_path: impl Into<String>) -> Self {
+        self.trust_store_path = Some(trust_store_path.into());
+        self
+    }
+    pub fn skip_verify(mut self, skip_verify: bool) -> Self {
+        self.skip_verify = Some(skip_verify);
+        self
+    }
+    pub fn ciphers(mut self, ciphers: Vec<String>) -> Self {
+        self.ciphers = Some(ciphers);
+        self
+    }
+}
+
+impl Display for SecurityOptions {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut opts = vec![];
+        if let Some(t) = &self.trust_store_path {
+            opts.push(format!("truststorepath={}", t));
+        }
+        if let Some(skip) = self.skip_verify {
+            if skip {
+                opts.push(String::from("ssl=no_verify"));
+            }
+        }
+        if let Some(ciphers) = &self.ciphers {
+            opts.push(format!("sasl_mech_force={}", ciphers.join(",")));
+        }
+
+        if opts.len() > 0 {
+            write!(f, "{}", opts.join("&"))
+        } else {
+            write!(f, "")
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct ClusterOptions {
+    pub(crate) authenticator: Option<Box<dyn Authenticator>>,
+    pub(crate) username: Option<String>,
+    pub(crate) password: Option<String>,
+    pub(crate) timeouts: Option<TimeoutOptions>,
+    pub(crate) security: Option<SecurityOptions>,
+}
+
+impl Default for ClusterOptions {
+    fn default() -> Self {
+        Self {
+            authenticator: None,
+            username: None,
+            password: None,
+            timeouts: None,
+            security: None,
+        }
+    }
+}
+
+impl ClusterOptions {
+    pub fn new() -> Self {
+        ClusterOptions::default()
+    }
+
+    pub fn authenticator(mut self, authenticator: Box<dyn Authenticator>) -> Self {
+        self.authenticator = Some(authenticator);
+        self
+    }
+
+    pub fn username(mut self, username: impl Into<String>) -> Self {
+        self.username = Some(username.into());
+        self
+    }
+
+    pub fn password(mut self, password: impl Into<String>) -> Self {
+        self.password = Some(password.into());
+        self
+    }
+
+    pub fn timeouts(mut self, timeouts: TimeoutOptions) -> Self {
+        self.timeouts = Some(timeouts);
+        self
+    }
+
+    pub fn security_config(mut self, security: SecurityOptions) -> Self {
+        self.security = Some(security);
+        self
+    }
+
+    pub(crate) fn to_conn_string(&self) -> String {
+        let mut opts = vec![];
+        if let Some(t) = &self.timeouts {
+            opts.push(t.to_string());
+        }
+        if let Some(t) = &self.security {
+            opts.push(t.to_string());
+        }
+
+        if opts.len() > 0 {
+            format!("{}", opts.join("&"))
+        } else {
+            String::from("")
+        }
     }
 }

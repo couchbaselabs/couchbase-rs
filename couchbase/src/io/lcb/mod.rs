@@ -29,12 +29,16 @@ pub struct IoCore {
     thread_handle: Option<JoinHandle<()>>,
     queue_tx: Sender<IoRequest>,
     connection_string: String,
-    username: String,
-    password: String,
+    username: Option<String>,
+    password: Option<String>,
 }
 
 impl IoCore {
-    pub fn new(connection_string: String, username: String, password: String) -> Self {
+    pub fn new(
+        connection_string: String,
+        username: Option<String>,
+        password: Option<String>,
+    ) -> Self {
         debug!("Using libcouchbase IO transport");
 
         let (queue_tx, queue_rx) = unbounded();
@@ -88,16 +92,21 @@ impl Drop for IoCore {
 fn run_lcb_loop(
     queue_rx: Receiver<IoRequest>,
     connection_string: String,
-    username: String,
-    password: String,
+    username: Option<String>,
+    password: Option<String>,
 ) {
     let mut instances = LcbInstances::default();
 
-    match LcbInstance::new(
-        connection_string.into_bytes(),
-        username.into_bytes(),
-        password.into_bytes(),
-    ) {
+    let user_bytes = match username {
+        Some(u) => Some(u.into_bytes()),
+        None => None,
+    };
+    let pass_bytes = match password {
+        Some(p) => Some(p.into_bytes()),
+        None => None,
+    };
+
+    match LcbInstance::new(connection_string.into_bytes(), user_bytes, pass_bytes) {
         Ok(i) => instances.set_unbound(i),
         Err(e) => warn!("Could not open libcouchbase instance {}", e),
     };
@@ -171,8 +180,8 @@ pub enum IoRequest {
     OpenBucket {
         name: String,
         connection_string: String,
-        username: String,
-        password: String,
+        username: Option<String>,
+        password: Option<String>,
     },
     Shutdown,
 }

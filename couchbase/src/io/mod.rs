@@ -14,7 +14,11 @@ pub struct Core {
 }
 
 impl Core {
-    pub fn new(connection_string: String, username: String, password: String) -> Self {
+    pub fn new(
+        connection_string: String,
+        username: Option<String>,
+        password: Option<String>,
+    ) -> Self {
         Self {
             io_core: IoCore::new(connection_string, username, password),
         }

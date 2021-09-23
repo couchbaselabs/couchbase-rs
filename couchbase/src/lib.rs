@@ -15,8 +15,8 @@ pub use api::search_indexes::*;
 pub use api::users::*;
 pub use api::view_indexes::*;
 pub use api::{
-    Bucket, Cluster, Collection, DurabilityLevel, LookupInSpec, MutateInSpec, MutationState,
-    MutationToken,
+    Authenticator, Bucket, CertificateAuthenticator, Cluster, Collection, DurabilityLevel,
+    LookupInSpec, MutateInSpec, MutationState, MutationToken, PasswordAuthenticator,
 };
 
 pub use api::Scope;

@@ -7,6 +7,7 @@ use couchbase_sys::*;
 use log::{debug, warn};
 use serde_json::Value;
 use std::collections::HashMap;
+use std::ffi::CString;
 use std::os::raw::c_void;
 use std::ptr;
 
@@ -19,8 +20,8 @@ pub struct LcbInstance {
 impl LcbInstance {
     pub fn new<S: Into<Vec<u8>>>(
         connection_string: S,
-        username: S,
-        password: S,
+        username: Option<S>,
+        password: Option<S>,
     ) -> Result<Self, lcb_STATUS> {
         let mut inner: *mut lcb_INSTANCE = ptr::null_mut();
         let mut create_options: *mut lcb_CREATEOPTS = ptr::null_mut();
@@ -28,8 +29,20 @@ impl LcbInstance {
         let instance_cookie = Box::new(InstanceCookie::new());
 
         let (connection_string_len, connection_string) = into_cstring(connection_string);
-        let (username_len, username) = into_cstring(username);
-        let (password_len, password) = into_cstring(password);
+        let (username_len, username) = match username {
+            Some(u) => {
+                let (len, val) = into_cstring(u);
+                (len, val)
+            }
+            None => (0, CString::new(vec![]).unwrap()),
+        };
+        let (password_len, password) = match password {
+            Some(u) => {
+                let (len, val) = into_cstring(u);
+                (len, val)
+            }
+            None => (0, CString::new(vec![]).unwrap()),
+        };
 
         unsafe {
             check_lcb_status(lcb_createopts_create(
@@ -46,13 +59,31 @@ impl LcbInstance {
                 connection_string_len,
             ))?;
 
-            check_lcb_status(lcb_createopts_credentials(
-                create_options,
-                username.as_ptr(),
-                username_len,
-                password.as_ptr(),
-                password_len,
-            ))?;
+            if username_len > 0 && password_len > 0 {
+                check_lcb_status(lcb_createopts_credentials(
+                    create_options,
+                    username.as_ptr(),
+                    username_len,
+                    password.as_ptr(),
+                    password_len,
+                ))?;
+            } else if username_len > 0 {
+                check_lcb_status(lcb_createopts_credentials(
+                    create_options,
+                    username.as_ptr(),
+                    username_len,
+                    ptr::null_mut(),
+                    0,
+                ))?;
+            } else if password_len > 0 {
+                check_lcb_status(lcb_createopts_credentials(
+                    create_options,
+                    ptr::null_mut(),
+                    0,
+                    password.as_ptr(),
+                    password_len,
+                ))?;
+            }
 
             check_lcb_status(lcb_create(&mut inner, create_options))?;
             check_lcb_status(lcb_createopts_destroy(create_options))?;
