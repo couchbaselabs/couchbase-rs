@@ -536,11 +536,8 @@ impl SearchOptions {
         let mut vectors = HashMap::new();
         for token in state.tokens.into_iter().next() {
             let bucket = token.bucket_name().to_string();
-            if !vectors.contains_key(&bucket) {
-                vectors.insert(bucket.clone(), HashMap::new());
-            }
+            let vector = vectors.entry(bucket).or_insert(HashMap::new());
 
-            let vector = vectors.get_mut(&bucket).unwrap();
             vector.insert(
                 format!("{}/{}", token.partition_uuid(), token.partition_id()),
                 token.sequence_number(),
@@ -555,45 +552,39 @@ impl SearchOptions {
         self
     }
 
-    pub fn sort<T>(mut self, sort: Vec<T>) -> Self
+    pub fn sort<T>(mut self, sort: Vec<T>) -> CouchbaseResult<Self>
     where
         T: SearchSort,
     {
-        let jsonified = serde_json::to_value(sort)
-            .map_err(|e| CouchbaseError::EncodingFailure {
-                source: std::io::Error::new(std::io::ErrorKind::Other, e),
-                ctx: ErrorContext::default(),
-            })
-            .unwrap();
+        let jsonified =
+            serde_json::to_value(sort).map_err(CouchbaseError::encoding_failure_from_serde)?;
         self.sort = Some(jsonified);
-        self
+        Ok(self)
     }
 
-    pub fn facets<T>(mut self, facets: HashMap<String, T>) -> Self
+    pub fn facets<T>(mut self, facets: HashMap<String, T>) -> CouchbaseResult<Self>
     where
         T: SearchFacet,
     {
-        let jsonified = serde_json::to_value(facets)
-            .map_err(|e| CouchbaseError::EncodingFailure {
-                source: std::io::Error::new(std::io::ErrorKind::Other, e),
-                ctx: ErrorContext::default(),
-            })
-            .unwrap();
+        let jsonified =
+            serde_json::to_value(facets).map_err(CouchbaseError::encoding_failure_from_serde)?;
         self.facets = Some(jsonified);
-        self
+        Ok(self)
     }
 
-    pub fn raw<T>(mut self, raw: T) -> Self
+    pub fn raw<T>(mut self, raw: T) -> CouchbaseResult<Self>
     where
         T: serde::Serialize,
     {
         let raw = match serde_json::to_value(raw) {
-            Ok(Value::Object(a)) => a,
-            Ok(_) => panic!("Only objects are allowed"),
-            _ => panic!("Could not encode raw parameters"),
-        };
+            Ok(Value::Object(a)) => Ok(a),
+            Ok(_) => Err(CouchbaseError::InvalidArgument {
+                ctx: ErrorContext::from(("raw", "Only objects are allowed")),
+            }),
+            Err(e) => Err(CouchbaseError::encoding_failure_from_serde(e)),
+        }?;
         self.raw = Some(raw);
-        self
+        Ok(self)
     }
 }
 

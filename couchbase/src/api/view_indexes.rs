@@ -163,16 +163,14 @@ impl ViewIndexManager {
             },
         ));
 
-        let result: GenericManagementResult = receiver.await.unwrap().unwrap();
+        let result: GenericManagementResult = receiver.await.unwrap()?;
         match result.http_status() {
             200 => Ok(()),
             201 => Ok(()),
             _ => Err(CouchbaseError::GenericHTTP {
                 ctx: Default::default(),
                 status: result.http_status(),
-                message: String::from_utf8(result.payload().unwrap().to_owned())
-                    .unwrap()
-                    .to_lowercase(),
+                message: String::from_utf8(result.payload_or_error()?.to_owned())?.to_lowercase(),
             }),
         }
     }
@@ -200,16 +198,14 @@ impl ViewIndexManager {
             },
         ));
 
-        let result: GenericManagementResult = receiver.await.unwrap().unwrap();
+        let result: GenericManagementResult = receiver.await.unwrap()?;
         let content: T = match result.http_status() {
-            200 => serde_json::from_slice(result.payload().unwrap())
+            200 => serde_json::from_slice(result.payload_or_error()?)
                 .map_err(CouchbaseError::decoding_failure_from_serde),
             _ => Err(CouchbaseError::GenericHTTP {
                 ctx: Default::default(),
                 status: result.http_status(),
-                message: String::from_utf8(result.payload().unwrap().to_owned())
-                    .unwrap()
-                    .to_lowercase(),
+                message: String::from_utf8(result.payload_or_error()?.to_owned())?.to_lowercase(),
             }),
         }?;
 

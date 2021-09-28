@@ -3,6 +3,7 @@ use snafu::Snafu;
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::fmt::{Debug, Error, Formatter};
+use std::string::FromUtf8Error;
 
 #[derive(Debug, Snafu)]
 #[non_exhaustive]
@@ -158,6 +159,24 @@ pub enum CouchbaseError {
     },
 }
 
+impl From<FromUtf8Error> for CouchbaseError {
+    fn from(e: FromUtf8Error) -> Self {
+        CouchbaseError::DecodingFailure {
+            source: std::io::Error::new(std::io::ErrorKind::InvalidData, e),
+            ctx: ErrorContext::default(),
+        }
+    }
+}
+
+impl From<serde_urlencoded::ser::Error> for CouchbaseError {
+    fn from(e: serde_urlencoded::ser::Error) -> Self {
+        CouchbaseError::EncodingFailure {
+            source: std::io::Error::new(std::io::ErrorKind::InvalidData, e),
+            ctx: ErrorContext::default(),
+        }
+    }
+}
+
 impl CouchbaseError {
     pub(crate) fn decoding_failure_from_serde(e: serde_json::Error) -> CouchbaseError {
         CouchbaseError::DecodingFailure {
@@ -177,6 +196,14 @@ pub type CouchbaseResult<T, E = CouchbaseError> = std::result::Result<T, E>;
 
 pub struct ErrorContext {
     inner: HashMap<String, Value>,
+}
+
+impl From<(&str, &str)> for ErrorContext {
+    fn from(msg: (&str, &str)) -> Self {
+        let mut ctx = ErrorContext::default();
+        ctx.insert(msg.0.to_string(), Value::String(msg.1.to_string()));
+        ctx
+    }
 }
 
 impl ErrorContext {

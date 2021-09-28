@@ -114,20 +114,14 @@ impl CollectionManager {
             },
         ));
 
-        let result: GenericManagementResult = receiver.await.unwrap().unwrap();
+        let result: GenericManagementResult = receiver.await.unwrap()?;
         let manifest: Manifest = match result.http_status() {
-            200 => serde_json::from_slice(result.payload().unwrap()).map_err(|e| {
-                CouchbaseError::DecodingFailure {
-                    ctx: ErrorContext::default(),
-                    source: e.into(),
-                }
-            }),
+            200 => serde_json::from_slice(result.payload_or_error()?)
+                .map_err(CouchbaseError::decoding_failure_from_serde),
             _ => Err(CouchbaseError::GenericHTTP {
                 ctx: Default::default(),
                 status: result.http_status(),
-                message: String::from_utf8(result.payload().unwrap().to_owned())
-                    .unwrap()
-                    .to_lowercase(),
+                message: String::from_utf8(result.payload_or_error()?.to_owned())?.to_lowercase(),
             }),
         }?;
 
@@ -158,7 +152,7 @@ impl CollectionManager {
 
         let form = &[("name", scope.clone())];
 
-        let form_encoded = serde_urlencoded::to_string(&form).unwrap();
+        let form_encoded = serde_urlencoded::to_string(&form)?;
         let content_type = String::from("application/x-www-form-urlencoded");
         let (sender, receiver) = oneshot::channel();
 
@@ -174,15 +168,13 @@ impl CollectionManager {
             },
         ));
 
-        let result: GenericManagementResult = receiver.await.unwrap().unwrap();
+        let result: GenericManagementResult = receiver.await.unwrap()?;
 
         match result.http_status() {
             200 => Ok(()),
             _ => Err(self.parse_error(
                 result.http_status(),
-                String::from_utf8(result.payload().unwrap().to_owned())
-                    .unwrap()
-                    .to_lowercase(),
+                String::from_utf8(result.payload_or_error()?.to_owned())?.to_lowercase(),
                 scope,
             )),
         }
@@ -200,7 +192,7 @@ impl CollectionManager {
             form.push(("maxTTL", collection.max_expiry.as_secs().to_string()));
         }
 
-        let form_encoded = serde_urlencoded::to_string(&form).unwrap();
+        let form_encoded = serde_urlencoded::to_string(&form)?;
         let content_type = String::from("application/x-www-form-urlencoded");
         let (sender, receiver) = oneshot::channel();
 
@@ -219,15 +211,13 @@ impl CollectionManager {
             },
         ));
 
-        let result: GenericManagementResult = receiver.await.unwrap().unwrap();
+        let result: GenericManagementResult = receiver.await.unwrap()?;
 
         match result.http_status() {
             200 => Ok(()),
             _ => Err(self.parse_error(
                 result.http_status(),
-                String::from_utf8(result.payload().unwrap().to_owned())
-                    .unwrap()
-                    .to_lowercase(),
+                String::from_utf8(result.payload_or_error()?.to_owned())?.to_lowercase(),
                 collection.name,
             )),
         }
@@ -257,15 +247,13 @@ impl CollectionManager {
             },
         ));
 
-        let result: GenericManagementResult = receiver.await.unwrap().unwrap();
+        let result: GenericManagementResult = receiver.await.unwrap()?;
 
         match result.http_status() {
             200 => Ok(()),
             _ => Err(self.parse_error(
                 result.http_status(),
-                String::from_utf8(result.payload().unwrap().to_owned())
-                    .unwrap()
-                    .to_lowercase(),
+                String::from_utf8(result.payload_or_error()?.to_owned())?.to_lowercase(),
                 scope,
             )),
         }
@@ -293,15 +281,13 @@ impl CollectionManager {
             },
         ));
 
-        let result: GenericManagementResult = receiver.await.unwrap().unwrap();
+        let result: GenericManagementResult = receiver.await.unwrap()?;
 
         match result.http_status() {
             200 => Ok(()),
             _ => Err(self.parse_error(
                 result.http_status(),
-                String::from_utf8(result.payload().unwrap().to_owned())
-                    .unwrap()
-                    .to_lowercase(),
+                String::from_utf8(result.payload_or_error()?.to_owned())?.to_lowercase(),
                 collection.name,
             )),
         }

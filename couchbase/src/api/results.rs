@@ -1106,6 +1106,15 @@ impl GenericManagementResult {
         self.payload.as_ref()
     }
 
+    pub fn payload_or_error(&self) -> CouchbaseResult<&Vec<u8>> {
+        match &self.payload {
+            Some(p) => Ok(p),
+            None => Err(CouchbaseError::Generic {
+                ctx: ErrorContext::from(("", "result missing payload")),
+            }),
+        }
+    }
+
     pub fn http_status(&self) -> u16 {
         self.status
     }

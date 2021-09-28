@@ -177,12 +177,8 @@ impl SearchIndex {
         T: DeserializeOwned,
     {
         match &self.source_params {
-            Some(p) => {
-                serde_json::from_value(p.clone()).map_err(|e| CouchbaseError::DecodingFailure {
-                    source: std::io::Error::new(std::io::ErrorKind::InvalidData, e),
-                    ctx: ErrorContext::default(),
-                })
-            }
+            Some(p) => serde_json::from_value(p.clone())
+                .map_err(CouchbaseError::decoding_failure_from_serde),
             None => Ok(HashMap::new()),
         }
     }
@@ -196,12 +192,8 @@ impl SearchIndex {
         T: DeserializeOwned,
     {
         match &self.plan_params {
-            Some(p) => {
-                serde_json::from_value(p.clone()).map_err(|e| CouchbaseError::DecodingFailure {
-                    source: std::io::Error::new(std::io::ErrorKind::InvalidData, e),
-                    ctx: ErrorContext::default(),
-                })
-            }
+            Some(p) => serde_json::from_value(p.clone())
+                .map_err(CouchbaseError::decoding_failure_from_serde),
             None => Ok(HashMap::new()),
         }
     }
@@ -294,20 +286,14 @@ impl SearchIndexManager {
             },
         ));
 
-        let result: GenericManagementResult = receiver.await.unwrap().unwrap();
+        let result: GenericManagementResult = receiver.await.unwrap()?;
         let content: T = match result.http_status() {
-            200 => serde_json::from_slice(result.payload().unwrap()).map_err(|e| {
-                CouchbaseError::DecodingFailure {
-                    ctx: ErrorContext::default(),
-                    source: e.into(),
-                }
-            }),
+            200 => serde_json::from_slice(result.payload_or_error()?)
+                .map_err(CouchbaseError::decoding_failure_from_serde),
             _ => Err(CouchbaseError::GenericHTTP {
                 ctx: Default::default(),
                 status: result.http_status(),
-                message: String::from_utf8(result.payload().unwrap().to_owned())
-                    .unwrap()
-                    .to_lowercase(),
+                message: String::from_utf8(result.payload_or_error()?.to_owned())?.to_lowercase(),
             }),
         }?;
 
@@ -358,12 +344,10 @@ impl SearchIndexManager {
             .do_request(
                 format!("/api/index/{}", index_definition.name()),
                 String::from("put"),
-                Some(serde_json::to_string(&index_definition).map_err(|e| {
-                    CouchbaseError::DecodingFailure {
-                        ctx: ErrorContext::default(),
-                        source: e.into(),
-                    }
-                })?),
+                Some(
+                    serde_json::to_string(&index_definition)
+                        .map_err(CouchbaseError::decoding_failure_from_serde)?,
+                ),
                 Some(String::from("application/json")),
                 opts.timeout,
             )
@@ -518,12 +502,10 @@ impl SearchIndexManager {
             .do_request(
                 format!("/api/index/{}/analyzeDoc", index_name.into()),
                 String::from("post"),
-                Some(serde_json::to_string(&document).map_err(|e| {
-                    CouchbaseError::DecodingFailure {
-                        ctx: ErrorContext::default(),
-                        source: e.into(),
-                    }
-                })?),
+                Some(
+                    serde_json::to_string(&document)
+                        .map_err(CouchbaseError::decoding_failure_from_serde)?,
+                ),
                 Some(String::from("application/json")),
                 opts.timeout,
             )

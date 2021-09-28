@@ -541,7 +541,7 @@ impl BucketManager {
         // Option.
         let form = settings.as_form(false)?;
 
-        let form_encoded = serde_urlencoded::to_string(&form).unwrap();
+        let form_encoded = serde_urlencoded::to_string(&form)?;
         let content_type = String::from("application/x-www-form-urlencoded");
         let (sender, receiver) = oneshot::channel();
 
@@ -557,15 +557,13 @@ impl BucketManager {
             },
         ));
 
-        let result: GenericManagementResult = receiver.await.unwrap().unwrap();
+        let result: GenericManagementResult = receiver.await.unwrap()?;
 
         match result.http_status() {
             202 => Ok(()),
             _ => Err(self.parse_error(
                 result.http_status(),
-                String::from_utf8(result.payload().unwrap().to_owned())
-                    .unwrap()
-                    .to_lowercase(),
+                String::from_utf8(result.payload_or_error()?.to_owned())?.to_lowercase(),
                 settings.name,
             )),
         }
@@ -580,7 +578,7 @@ impl BucketManager {
         // Option.
         let form = settings.as_form(true)?;
 
-        let form_encoded = serde_urlencoded::to_string(&form).unwrap();
+        let form_encoded = serde_urlencoded::to_string(&form)?;
         let content_type = String::from("application/x-www-form-urlencoded");
         let (sender, receiver) = oneshot::channel();
 
@@ -596,15 +594,13 @@ impl BucketManager {
             },
         ));
 
-        let result: GenericManagementResult = receiver.await.unwrap().unwrap();
+        let result: GenericManagementResult = receiver.await.unwrap()?;
 
         match result.http_status() {
             200 => Ok(()),
             _ => Err(self.parse_error(
                 result.http_status(),
-                String::from_utf8(result.payload().unwrap().to_owned())
-                    .unwrap()
-                    .to_lowercase(),
+                String::from_utf8(result.payload_or_error()?.to_owned())?.to_lowercase(),
                 settings.name,
             )),
         }
@@ -630,15 +626,13 @@ impl BucketManager {
             },
         ));
 
-        let result: GenericManagementResult = receiver.await.unwrap().unwrap();
+        let result: GenericManagementResult = receiver.await.unwrap()?;
 
         match result.http_status() {
             200 => Ok(()),
             _ => Err(self.parse_error(
                 result.http_status(),
-                String::from_utf8(result.payload().unwrap().to_owned())
-                    .unwrap()
-                    .to_lowercase(),
+                String::from_utf8(result.payload_or_error()?.to_owned())?.to_lowercase(),
                 bucket_name,
             )),
         }
@@ -664,20 +658,14 @@ impl BucketManager {
             },
         ));
 
-        let result: GenericManagementResult = receiver.await.unwrap().unwrap();
+        let result: GenericManagementResult = receiver.await.unwrap()?;
 
         let bucket_data: JSONBucketSettings = match result.http_status() {
-            200 => serde_json::from_slice(result.payload().unwrap()).map_err(|e| {
-                CouchbaseError::DecodingFailure {
-                    ctx: ErrorContext::default(),
-                    source: e.into(),
-                }
-            }),
+            200 => serde_json::from_slice(result.payload_or_error()?)
+                .map_err(CouchbaseError::decoding_failure_from_serde),
             _ => Err(self.parse_error(
                 result.http_status(),
-                String::from_utf8(result.payload().unwrap().to_owned())
-                    .unwrap()
-                    .to_lowercase(),
+                String::from_utf8(result.payload_or_error()?.to_owned())?.to_lowercase(),
                 bucket_name,
             )),
         }?;
@@ -703,20 +691,14 @@ impl BucketManager {
             },
         ));
 
-        let result: GenericManagementResult = receiver.await.unwrap().unwrap();
+        let result: GenericManagementResult = receiver.await.unwrap()?;
 
         let bucket_data: Vec<JSONBucketSettings> = match result.http_status() {
-            200 => serde_json::from_slice(result.payload().unwrap()).map_err(|e| {
-                CouchbaseError::DecodingFailure {
-                    ctx: ErrorContext::default(),
-                    source: e.into(),
-                }
-            }),
+            200 => serde_json::from_slice(result.payload_or_error()?)
+                .map_err(CouchbaseError::decoding_failure_from_serde),
             _ => Err(self.parse_error(
                 result.http_status(),
-                String::from_utf8(result.payload().unwrap().to_owned())
-                    .unwrap()
-                    .to_lowercase(),
+                String::from_utf8(result.payload_or_error()?.to_owned())?.to_lowercase(),
                 "",
             )),
         }?;
@@ -750,15 +732,13 @@ impl BucketManager {
             },
         ));
 
-        let result: GenericManagementResult = receiver.await.unwrap().unwrap();
+        let result: GenericManagementResult = receiver.await.unwrap()?;
 
         match result.http_status() {
             200 => Ok(()),
             _ => Err(self.parse_error(
                 result.http_status(),
-                String::from_utf8(result.payload().unwrap().to_owned())
-                    .unwrap()
-                    .to_lowercase(),
+                String::from_utf8(result.payload_or_error()?.to_owned())?.to_lowercase(),
                 bucket_name,
             )),
         }

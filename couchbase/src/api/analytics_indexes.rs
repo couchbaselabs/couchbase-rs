@@ -315,17 +315,17 @@ impl CouchbaseRemoteAnalyticsLink {
     fn validate(&self) -> CouchbaseResult<()> {
         if self.name.is_empty() {
             return Err(CouchbaseError::InvalidArgument {
-                ctx: ErrorContext::default(),
+                ctx: ErrorContext::from(("name", "Name cannot be empty")),
             });
         }
         if self.dataverse_name.is_empty() {
             return Err(CouchbaseError::InvalidArgument {
-                ctx: ErrorContext::default(),
+                ctx: ErrorContext::from(("dataverse_name", "Dataverse name cannot be empty")),
             });
         }
         if self.hostname.is_empty() {
             return Err(CouchbaseError::InvalidArgument {
-                ctx: ErrorContext::default(),
+                ctx: ErrorContext::from(("hostname", "Hostname cannot be empty")),
             });
         }
         if let Some(e) = &self.encryption {
@@ -333,7 +333,10 @@ impl CouchbaseRemoteAnalyticsLink {
                 AnalyticsEncryptionLevel::Full => {
                     if e.certificate.is_none() {
                         return Err(CouchbaseError::InvalidArgument {
-                            ctx: ErrorContext::default(),
+                            ctx: ErrorContext::from((
+                                "certificate",
+                                "Certificate must be set when full encryption is used",
+                            )),
                         });
                     }
 
@@ -341,19 +344,25 @@ impl CouchbaseRemoteAnalyticsLink {
                     let cert_creds_bad = e.client_certificate.is_none() || e.client_key.is_none();
                     if basic_creds_bad && cert_creds_bad {
                         return Err(CouchbaseError::InvalidArgument {
-                            ctx: ErrorContext::default(),
+                            ctx: ErrorContext::from(("credentials", "Either username and password or client certificate and client key must be provided")),
                         });
                     }
                 }
                 _ => {
                     if self.username.is_none() {
                         return Err(CouchbaseError::InvalidArgument {
-                            ctx: ErrorContext::default(),
+                            ctx: ErrorContext::from((
+                                "username",
+                                "Username must be provided when encryption is not set to full",
+                            )),
                         });
                     }
                     if self.password.is_none() {
                         return Err(CouchbaseError::InvalidArgument {
-                            ctx: ErrorContext::default(),
+                            ctx: ErrorContext::from((
+                                "password",
+                                "Password must be provided when encryption is not set to full",
+                            )),
                         });
                     }
                 }
@@ -361,12 +370,18 @@ impl CouchbaseRemoteAnalyticsLink {
         } else {
             if self.username.is_none() {
                 return Err(CouchbaseError::InvalidArgument {
-                    ctx: ErrorContext::default(),
+                    ctx: ErrorContext::from((
+                        "username",
+                        "Username must be provided when encryption is not used",
+                    )),
                 });
             }
             if self.password.is_none() {
                 return Err(CouchbaseError::InvalidArgument {
-                    ctx: ErrorContext::default(),
+                    ctx: ErrorContext::from((
+                        "password",
+                        "Password must be provided when encryption is not used",
+                    )),
                 });
             }
         }
@@ -573,27 +588,30 @@ impl S3ExternalAnalyticsLink {
     fn validate(&self) -> CouchbaseResult<()> {
         if self.name.is_empty() {
             return Err(CouchbaseError::InvalidArgument {
-                ctx: ErrorContext::default(),
+                ctx: ErrorContext::from(("name", "Name must be provided")),
             });
         }
         if self.dataverse_name.is_empty() {
             return Err(CouchbaseError::InvalidArgument {
-                ctx: ErrorContext::default(),
+                ctx: ErrorContext::from(("dataverse_name", "Dataverse name must be provided")),
             });
         }
         if self.access_key_id.is_empty() {
             return Err(CouchbaseError::InvalidArgument {
-                ctx: ErrorContext::default(),
+                ctx: ErrorContext::from(("access_key_id", "Access key ID must be provided")),
             });
         }
         if self.secret_access_key.is_empty() {
             return Err(CouchbaseError::InvalidArgument {
-                ctx: ErrorContext::default(),
+                ctx: ErrorContext::from((
+                    "secret_access_key",
+                    "Secret access key must be provided",
+                )),
             });
         }
         if self.region.is_empty() {
             return Err(CouchbaseError::InvalidArgument {
-                ctx: ErrorContext::default(),
+                ctx: ErrorContext::from(("region", "Region must be provided")),
             });
         }
         Ok(())
@@ -771,12 +789,12 @@ impl AzureBlobExternalAnalyticsLink {
     fn validate(&self) -> CouchbaseResult<()> {
         if self.name.is_empty() {
             return Err(CouchbaseError::InvalidArgument {
-                ctx: ErrorContext::default(),
+                ctx: ErrorContext::from(("name", "Field cannot be empty")),
             });
         }
         if self.dataverse_name.is_empty() {
             return Err(CouchbaseError::InvalidArgument {
-                ctx: ErrorContext::default(),
+                ctx: ErrorContext::from(("name", "Dataverse name cannot be empty")),
             });
         }
         let account_name_key_ok = self.account_name.is_some() && self.account_key.is_some();
@@ -784,7 +802,7 @@ impl AzureBlobExternalAnalyticsLink {
             self.account_name.is_some() && self.shared_access_signature.is_some();
         if self.connection_string.is_none() && !account_name_key_ok && !account_name_sig_ok {
             return Err(CouchbaseError::InvalidArgument {
-                ctx: ErrorContext::default(),
+                ctx: ErrorContext::from(("credentials", "Must provide one of account name and account key or account name and shared access signature or connection string")),
             });
         }
 
@@ -1191,17 +1209,15 @@ impl AnalyticsIndexManager {
             },
         ));
 
-        let result: GenericManagementResult = receiver.await.unwrap().unwrap();
+        let result: GenericManagementResult = receiver.await.unwrap()?;
 
         let content: HashMap<String, HashMap<String, i64>> = match result.http_status() {
-            200 => serde_json::from_slice(result.payload().unwrap())
+            200 => serde_json::from_slice(result.payload_or_error()?)
                 .map_err(CouchbaseError::decoding_failure_from_serde),
             _ => Err(CouchbaseError::GenericHTTP {
                 ctx: Default::default(),
                 status: result.http_status(),
-                message: String::from_utf8(result.payload().unwrap().to_owned())
-                    .unwrap()
-                    .to_lowercase(),
+                message: String::from_utf8(result.payload_or_error()?.to_owned())?.to_lowercase(),
             }),
         }?;
 
@@ -1260,16 +1276,14 @@ impl AnalyticsIndexManager {
             },
         ));
 
-        let result: GenericManagementResult = receiver.await.unwrap().unwrap();
+        let result: GenericManagementResult = receiver.await.unwrap()?;
 
         match result.http_status() {
             200 => Ok(()),
             _ => Err(CouchbaseError::GenericHTTP {
                 ctx: Default::default(),
                 status: result.http_status(),
-                message: String::from_utf8(result.payload().unwrap().to_owned())
-                    .unwrap()
-                    .to_lowercase(),
+                message: String::from_utf8(result.payload_or_error()?.to_owned())?.to_lowercase(),
             }),
         }
     }
@@ -1282,33 +1296,18 @@ impl AnalyticsIndexManager {
         let (endpoint, form) = match link {
             AnalyticsLink::CouchbaseRemote(l) => {
                 l.validate()?;
-                let form = serde_urlencoded::to_string(l.encode()?).map_err(|e| {
-                    CouchbaseError::EncodingFailure {
-                        source: std::io::Error::new(std::io::ErrorKind::InvalidData, e),
-                        ctx: ErrorContext::default(),
-                    }
-                })?;
+                let form = serde_urlencoded::to_string(l.encode()?)?;
                 (self.endpoint_for_link(l.dataverse_name, l.name), form)
             }
             AnalyticsLink::S3External(l) => {
                 l.validate()?;
-                let form = serde_urlencoded::to_string(l.encode()?).map_err(|e| {
-                    CouchbaseError::EncodingFailure {
-                        source: std::io::Error::new(std::io::ErrorKind::InvalidData, e),
-                        ctx: ErrorContext::default(),
-                    }
-                })?;
+                let form = serde_urlencoded::to_string(l.encode()?)?;
                 (self.endpoint_for_link(l.dataverse_name, l.name), form)
             }
             #[cfg(feature = "volatile")]
             AnalyticsLink::AzureBlobExternal(l) => {
                 l.validate()?;
-                let form = serde_urlencoded::to_string(l.encode()?).map_err(|e| {
-                    CouchbaseError::EncodingFailure {
-                        source: std::io::Error::new(std::io::ErrorKind::InvalidData, e),
-                        ctx: ErrorContext::default(),
-                    }
-                })?;
+                let form = serde_urlencoded::to_string(l.encode()?)?;
                 (self.endpoint_for_link(l.dataverse_name, l.name), form)
             }
         };
@@ -1326,16 +1325,14 @@ impl AnalyticsIndexManager {
             },
         ));
 
-        let result: GenericManagementResult = receiver.await.unwrap().unwrap();
+        let result: GenericManagementResult = receiver.await.unwrap()?;
 
         match result.http_status() {
             200 => Ok(()),
             _ => Err(CouchbaseError::GenericHTTP {
                 ctx: Default::default(),
                 status: result.http_status(),
-                message: String::from_utf8(result.payload().unwrap().to_owned())
-                    .unwrap()
-                    .to_lowercase(),
+                message: String::from_utf8(result.payload_or_error()?.to_owned())?.to_lowercase(),
             }),
         }
     }
@@ -1349,16 +1346,10 @@ impl AnalyticsIndexManager {
         let dataverse_name = dataverse_name.into();
         let link_name = link_name.into();
         let payload = if dataverse_name.contains("/") {
-            Some(
-                serde_urlencoded::to_string(vec![
-                    ("name", link_name.clone()),
-                    ("dataverse", dataverse_name.clone()),
-                ])
-                .map_err(|e| CouchbaseError::EncodingFailure {
-                    source: std::io::Error::new(std::io::ErrorKind::InvalidData, e),
-                    ctx: ErrorContext::default(),
-                })?,
-            )
+            Some(serde_urlencoded::to_string(vec![
+                ("name", link_name.clone()),
+                ("dataverse", dataverse_name.clone()),
+            ])?)
         } else {
             None
         };
@@ -1375,16 +1366,14 @@ impl AnalyticsIndexManager {
             },
         ));
 
-        let result: GenericManagementResult = receiver.await.unwrap().unwrap();
+        let result: GenericManagementResult = receiver.await.unwrap()?;
 
         match result.http_status() {
             200 => Ok(()),
             _ => Err(CouchbaseError::GenericHTTP {
                 ctx: Default::default(),
                 status: result.http_status(),
-                message: String::from_utf8(result.payload().unwrap().to_owned())
-                    .unwrap()
-                    .to_lowercase(),
+                message: String::from_utf8(result.payload_or_error()?.to_owned())?.to_lowercase(),
             }),
         }
     }
@@ -1395,7 +1384,7 @@ impl AnalyticsIndexManager {
     ) -> CouchbaseResult<impl IntoIterator<Item = AnalyticsLink>> {
         if opts.name.is_some() && opts.dataverse.is_none() {
             return Err(CouchbaseError::InvalidArgument {
-                ctx: ErrorContext::default(),
+                ctx: ErrorContext::from(("", "Dataverse must be set if name is set")),
             });
         }
 
@@ -1438,22 +1427,24 @@ impl AnalyticsIndexManager {
             },
         ));
 
-        let result: GenericManagementResult = receiver.await.unwrap().unwrap();
+        let result: GenericManagementResult = receiver.await.unwrap()?;
         let content: Vec<Value> = match result.http_status() {
-            200 => serde_json::from_slice(result.payload().unwrap())
+            200 => serde_json::from_slice(result.payload_or_error()?)
                 .map_err(CouchbaseError::decoding_failure_from_serde),
             _ => Err(CouchbaseError::GenericHTTP {
                 ctx: Default::default(),
                 status: result.http_status(),
-                message: String::from_utf8(result.payload().unwrap().to_owned())
-                    .unwrap()
-                    .to_lowercase(),
+                message: String::from_utf8(result.payload_or_error()?.to_owned())?.to_lowercase(),
             }),
         }?;
 
         let mut links = vec![];
         for link_value in content {
-            let link_type = link_value["type"].as_str().unwrap();
+            let link_type = link_value["type"]
+                .as_str()
+                .ok_or_else(|| CouchbaseError::Generic {
+                    ctx: ErrorContext::from(("type", "Field missing or not string value")),
+                })?;
             let link = match link_type {
                 "s3" => Some(AnalyticsLink::S3External(S3ExternalAnalyticsLink::from(
                     link_value,

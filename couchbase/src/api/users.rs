@@ -1,7 +1,7 @@
 use crate::api::options::*;
 use crate::io::request::*;
 use crate::io::Core;
-use crate::{CouchbaseError, CouchbaseResult, ErrorContext, GenericManagementResult, ServiceType};
+use crate::{CouchbaseError, CouchbaseResult, GenericManagementResult, ServiceType};
 use futures::channel::oneshot;
 use serde_derive::{Deserialize, Serialize};
 use std::borrow::Borrow;
@@ -319,21 +319,15 @@ impl UserManager {
             },
         ));
 
-        let result: GenericManagementResult = receiver.await.unwrap().unwrap();
+        let result: GenericManagementResult = receiver.await.unwrap()?;
 
         match result.http_status() {
-            200 => serde_json::from_slice(result.payload().unwrap()).map_err(|e| {
-                CouchbaseError::DecodingFailure {
-                    ctx: ErrorContext::default(),
-                    source: e.into(),
-                }
-            }),
+            200 => serde_json::from_slice(result.payload_or_error()?)
+                .map_err(CouchbaseError::decoding_failure_from_serde),
             _ => Err(CouchbaseError::GenericHTTP {
                 ctx: Default::default(),
                 status: result.http_status(),
-                message: String::from_utf8(result.payload().unwrap().to_owned())
-                    .unwrap()
-                    .to_lowercase(),
+                message: String::from_utf8(result.payload_or_error()?.to_owned())?.to_lowercase(),
             }),
         }
     }
@@ -360,21 +354,15 @@ impl UserManager {
             },
         ));
 
-        let result: GenericManagementResult = receiver.await.unwrap().unwrap();
+        let result: GenericManagementResult = receiver.await.unwrap()?;
 
         match result.http_status() {
-            200 => serde_json::from_slice(result.payload().unwrap()).map_err(|e| {
-                CouchbaseError::DecodingFailure {
-                    ctx: ErrorContext::default(),
-                    source: e.into(),
-                }
-            }),
+            200 => serde_json::from_slice(result.payload_or_error()?)
+                .map_err(CouchbaseError::decoding_failure_from_serde),
             _ => Err(CouchbaseError::GenericHTTP {
                 ctx: Default::default(),
                 status: result.http_status(),
-                message: String::from_utf8(result.payload().unwrap().to_owned())
-                    .unwrap()
-                    .to_lowercase(),
+                message: String::from_utf8(result.payload_or_error()?.to_owned())?.to_lowercase(),
             }),
         }
     }
@@ -408,7 +396,7 @@ impl UserManager {
             Some(name) => name,
             None => AuthDomain::Local.to_string().to_lowercase(),
         };
-        let user_encoded = serde_urlencoded::to_string(&user_form).unwrap();
+        let user_encoded = serde_urlencoded::to_string(&user_form)?;
         let content_type = String::from("application/x-www-form-urlencoded");
         let (sender, receiver) = oneshot::channel();
 
@@ -424,16 +412,14 @@ impl UserManager {
             },
         ));
 
-        let result: GenericManagementResult = receiver.await.unwrap().unwrap();
+        let result: GenericManagementResult = receiver.await.unwrap()?;
 
         match result.http_status() {
             200 => Ok(()),
             _ => Err(CouchbaseError::GenericHTTP {
                 ctx: Default::default(),
                 status: result.http_status(),
-                message: String::from_utf8(result.payload().unwrap().to_owned())
-                    .unwrap()
-                    .to_lowercase(),
+                message: String::from_utf8(result.payload_or_error()?.to_owned())?.to_lowercase(),
             }),
         }
     }
@@ -461,16 +447,14 @@ impl UserManager {
             },
         ));
 
-        let result: GenericManagementResult = receiver.await.unwrap().unwrap();
+        let result: GenericManagementResult = receiver.await.unwrap()?;
 
         match result.http_status() {
             200 => Ok(()),
             _ => Err(CouchbaseError::GenericHTTP {
                 ctx: Default::default(),
                 status: result.http_status(),
-                message: String::from_utf8(result.payload().unwrap().to_owned())
-                    .unwrap()
-                    .to_lowercase(),
+                message: String::from_utf8(result.payload_or_error()?.to_owned())?.to_lowercase(),
             }),
         }
     }
@@ -492,21 +476,15 @@ impl UserManager {
             },
         ));
 
-        let result: GenericManagementResult = receiver.await.unwrap().unwrap();
+        let result: GenericManagementResult = receiver.await.unwrap()?;
 
         match result.http_status() {
-            200 => serde_json::from_slice(result.payload().unwrap()).map_err(|e| {
-                CouchbaseError::DecodingFailure {
-                    ctx: ErrorContext::default(),
-                    source: e.into(),
-                }
-            }),
+            200 => serde_json::from_slice(result.payload_or_error()?)
+                .map_err(CouchbaseError::decoding_failure_from_serde),
             _ => Err(CouchbaseError::GenericHTTP {
                 ctx: Default::default(),
                 status: result.http_status(),
-                message: String::from_utf8(result.payload().unwrap().to_owned())
-                    .unwrap()
-                    .to_lowercase(),
+                message: String::from_utf8(result.payload_or_error()?.to_owned())?.to_lowercase(),
             }),
         }
     }
@@ -529,21 +507,15 @@ impl UserManager {
             },
         ));
 
-        let result: GenericManagementResult = receiver.await.unwrap().unwrap();
+        let result: GenericManagementResult = receiver.await.unwrap()?;
 
         match result.http_status() {
-            200 => serde_json::from_slice(result.payload().unwrap()).map_err(|e| {
-                CouchbaseError::DecodingFailure {
-                    ctx: ErrorContext::default(),
-                    source: e.into(),
-                }
-            }),
+            200 => serde_json::from_slice(result.payload_or_error()?)
+                .map_err(CouchbaseError::decoding_failure_from_serde),
             _ => Err(CouchbaseError::GenericHTTP {
                 ctx: Default::default(),
                 status: result.http_status(),
-                message: String::from_utf8(result.payload().unwrap().to_owned())
-                    .unwrap()
-                    .to_lowercase(),
+                message: String::from_utf8(result.payload_or_error()?.to_owned())?.to_lowercase(),
             }),
         }
     }
@@ -565,21 +537,15 @@ impl UserManager {
             },
         ));
 
-        let result: GenericManagementResult = receiver.await.unwrap().unwrap();
+        let result: GenericManagementResult = receiver.await.unwrap()?;
 
         match result.http_status() {
-            200 => serde_json::from_slice(result.payload().unwrap()).map_err(|e| {
-                CouchbaseError::DecodingFailure {
-                    ctx: ErrorContext::default(),
-                    source: e.into(),
-                }
-            }),
+            200 => serde_json::from_slice(result.payload_or_error()?)
+                .map_err(CouchbaseError::decoding_failure_from_serde),
             _ => Err(CouchbaseError::GenericHTTP {
                 ctx: Default::default(),
                 status: result.http_status(),
-                message: String::from_utf8(result.payload().unwrap().to_owned())
-                    .unwrap()
-                    .to_lowercase(),
+                message: String::from_utf8(result.payload_or_error()?.to_owned())?.to_lowercase(),
             }),
         }
     }
@@ -606,7 +572,7 @@ impl UserManager {
             ("ldap_group_ref", group.ldap_group),
         ];
 
-        let group_encoded = serde_urlencoded::to_string(&group_form).unwrap();
+        let group_encoded = serde_urlencoded::to_string(&group_form)?;
         let content_type = String::from("application/x-www-form-urlencoded");
         let (sender, receiver) = oneshot::channel();
 
@@ -622,16 +588,14 @@ impl UserManager {
             },
         ));
 
-        let result: GenericManagementResult = receiver.await.unwrap().unwrap();
+        let result: GenericManagementResult = receiver.await.unwrap()?;
 
         match result.http_status() {
             200 => Ok(()),
             _ => Err(CouchbaseError::GenericHTTP {
                 ctx: Default::default(),
                 status: result.http_status(),
-                message: String::from_utf8(result.payload().unwrap().to_owned())
-                    .unwrap()
-                    .to_lowercase(),
+                message: String::from_utf8(result.payload_or_error()?.to_owned())?.to_lowercase(),
             }),
         }
     }
@@ -650,16 +614,14 @@ impl UserManager {
             },
         ));
 
-        let result: GenericManagementResult = receiver.await.unwrap().unwrap();
+        let result: GenericManagementResult = receiver.await.unwrap()?;
 
         match result.http_status() {
             200 => Ok(()),
             _ => Err(CouchbaseError::GenericHTTP {
                 ctx: Default::default(),
                 status: result.http_status(),
-                message: String::from_utf8(result.payload().unwrap().to_owned())
-                    .unwrap()
-                    .to_lowercase(),
+                message: String::from_utf8(result.payload_or_error()?.to_owned())?.to_lowercase(),
             }),
         }
     }
