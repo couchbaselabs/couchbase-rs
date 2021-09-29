@@ -43,8 +43,16 @@ impl QueryResult {
         )
     }
 
-    pub async fn meta_data(&mut self) -> QueryMetaData {
-        self.meta.take().unwrap().await.unwrap()
+    pub async fn meta_data(&mut self) -> CouchbaseResult<QueryMetaData> {
+        self.meta
+            .take()
+            .expect("Can not consume metadata twice!")
+            .await
+            .map_err(|e| {
+                let mut ctx = ErrorContext::default();
+                ctx.insert("error", Value::String(e.to_string()));
+                CouchbaseError::RequestCanceled { ctx }
+            })
     }
 }
 
@@ -222,8 +230,16 @@ impl AnalyticsResult {
         )
     }
 
-    pub async fn meta_data(&mut self) -> AnalyticsMetaData {
-        self.meta.take().unwrap().await.unwrap()
+    pub async fn meta_data(&mut self) -> CouchbaseResult<AnalyticsMetaData> {
+        self.meta
+            .take()
+            .expect("Can not consume metadata twice!")
+            .await
+            .map_err(|e| {
+                let mut ctx = ErrorContext::default();
+                ctx.insert("error", Value::String(e.to_string()));
+                CouchbaseError::RequestCanceled { ctx }
+            })
     }
 }
 
@@ -837,8 +853,16 @@ impl SearchResult {
         )
     }
 
-    pub async fn meta_data(&mut self) -> SearchMetaData {
-        self.meta.take().unwrap().await.unwrap()
+    pub async fn meta_data(&mut self) -> CouchbaseResult<SearchMetaData> {
+        self.meta
+            .take()
+            .expect("Can not consume metadata twice!")
+            .await
+            .map_err(|e| {
+                let mut ctx = ErrorContext::default();
+                ctx.insert("error", Value::String(e.to_string()));
+                CouchbaseError::RequestCanceled { ctx }
+            })
     }
 
     pub async fn facets(&mut self) -> CouchbaseResult<HashMap<String, SearchFacetResult>> {
@@ -1307,7 +1331,15 @@ impl ViewResult {
         // )
     }
 
-    pub async fn meta_data(&mut self) -> ViewMetaData {
-        self.meta.take().unwrap().await.unwrap()
+    pub async fn meta_data(&mut self) -> CouchbaseResult<ViewMetaData> {
+        self.meta
+            .take()
+            .expect("Can not consume metadata twice!")
+            .await
+            .map_err(|e| {
+                let mut ctx = ErrorContext::default();
+                ctx.insert("error", Value::String(e.to_string()));
+                CouchbaseError::RequestCanceled { ctx }
+            })
     }
 }
