@@ -11,7 +11,8 @@ lazy_static! {
         TestFeature::Query,
         TestFeature::Subdoc,
         TestFeature::Xattrs,
-        TestFeature::ExpandMacros
+        TestFeature::ExpandMacros,
+        TestFeature::PreserveExpiry,
     ];
 }
 

@@ -39,6 +39,15 @@ macro_rules! xattr {
     };
 }
 
+macro_rules! preserve_expiry {
+    () => {
+        pub fn preserve_expiry(mut self, preserve: bool) -> Self {
+            self.preserve_expiry = preserve;
+            self
+        }
+    };
+}
+
 #[derive(Debug, Default, Serialize)]
 pub struct QueryOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -628,11 +637,13 @@ impl GetAndLockOptions {
 pub struct UpsertOptions {
     pub(crate) timeout: Option<Duration>,
     pub(crate) expiry: Option<Duration>,
+    pub(crate) preserve_expiry: bool,
 }
 
 impl UpsertOptions {
     timeout!();
     expiry!();
+    preserve_expiry!();
 }
 
 #[derive(Debug, Default)]
@@ -651,11 +662,13 @@ pub struct ReplaceOptions {
     pub(crate) timeout: Option<Duration>,
     pub(crate) cas: Option<u64>,
     pub(crate) expiry: Option<Duration>,
+    pub(crate) preserve_expiry: bool,
 }
 
 impl ReplaceOptions {
     timeout!();
     expiry!();
+    preserve_expiry!();
 
     pub fn cas(mut self, cas: u64) -> Self {
         self.cas = Some(cas);
@@ -779,11 +792,13 @@ pub struct MutateInOptions {
     pub(crate) store_semantics: Option<StoreSemantics>,
     pub(crate) expiry: Option<Duration>,
     pub(crate) access_deleted: Option<bool>,
+    pub(crate) preserve_expiry: bool,
 }
 
 impl MutateInOptions {
     timeout!();
     expiry!();
+    preserve_expiry!();
 
     pub fn cas(mut self, cas: u64) -> Self {
         self.cas = Some(cas);

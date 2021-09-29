@@ -306,6 +306,9 @@ pub fn encode_mutate(
                         cookie,
                     )?;
                 }
+                if options.preserve_expiry {
+                    verify(lcb_cmdstore_preserve_expiry(command, 1), cookie)?;
+                }
             }
             MutateRequestType::Insert { options } => {
                 verify(
@@ -344,6 +347,9 @@ pub fn encode_mutate(
                         lcb_cmdstore_expiry(command, expiry.as_secs() as u32),
                         cookie,
                     )?;
+                }
+                if options.preserve_expiry {
+                    verify(lcb_cmdstore_preserve_expiry(command, 1), cookie)?;
                 }
             }
             MutateRequestType::Append { options } => {
@@ -1293,6 +1299,9 @@ pub fn encode_mutate_in(
                 lcb_cmdsubdoc_access_deleted(command, if access_deleted { 1 } else { 0 }),
                 cookie,
             )?;
+        }
+        if request.options.preserve_expiry {
+            verify(lcb_cmdsubdoc_preserve_expiry(command, 1), cookie)?;
         }
 
         verify(lcb_cmdsubdoc_specs(command, specs), cookie)?;

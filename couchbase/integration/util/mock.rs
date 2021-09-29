@@ -38,7 +38,8 @@ lazy_static! {
         TestFeature::KeyValue,
         TestFeature::Subdoc,
         TestFeature::Xattrs,
-        TestFeature::ExpandMacros
+        TestFeature::ExpandMacros,
+        TestFeature::PreserveExpiry,
     ];
 }
 

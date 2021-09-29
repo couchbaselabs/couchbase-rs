@@ -5,4 +5,5 @@ pub enum TestFeature {
     Subdoc,
     Xattrs,
     ExpandMacros,
+    PreserveExpiry,
 }
