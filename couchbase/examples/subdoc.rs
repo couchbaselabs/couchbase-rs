@@ -2,7 +2,7 @@ use couchbase::*;
 use futures::executor::block_on;
 
 /// Key Value Subdoc Examples.
-pub fn main() {
+pub fn main() -> CouchbaseResult<()> {
     env_logger::init();
 
     // Connect to the cluster with a connection string and credentials
@@ -24,10 +24,12 @@ pub fn main() {
     let mutate_in_result = block_on(collection.mutate_in(
         "airline_10",
         vec![
-            MutateInSpec::replace("name", "52-Mile Air"),
-            MutateInSpec::upsert("foo", "bar"),
+            MutateInSpec::replace("name", "52-Mile Air")?,
+            MutateInSpec::upsert("foo", "bar")?,
         ],
         MutateInOptions::default(),
     ));
     println!("{:?}", mutate_in_result);
+
+    Ok(())
 }

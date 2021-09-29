@@ -5,6 +5,7 @@ use futures::channel::oneshot::Receiver;
 use futures::{Stream, StreamExt};
 use serde::de::DeserializeOwned;
 
+use crate::io::couchbase_error_from_lcb_status;
 use serde_derive::Deserialize;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
@@ -1094,24 +1095,37 @@ impl LookupInResult {
     where
         T: serde::Deserialize<'a>,
     {
-        match serde_json::from_slice(
-            &self
-                .content
-                .get(index)
-                .expect("index not found")
-                .value
-                .as_slice(),
-        ) {
+        let content = match self.content.get(index) {
+            Some(c) => c,
+            None => {
+                return Err(CouchbaseError::InvalidArgument {
+                    ctx: ErrorContext::from((index.to_string().as_str(), "index not found")),
+                })
+            }
+        };
+
+        match content.status {
+            0 => {}
+            _ => {
+                return Err(couchbase_error_from_lcb_status(
+                    content.status,
+                    ErrorContext::default(),
+                ))
+            }
+        }
+
+        match serde_json::from_slice(content.value.as_slice()) {
             Ok(v) => Ok(v),
-            Err(e) => Err(CouchbaseError::DecodingFailure {
-                ctx: ErrorContext::default(),
-                source: e.into(),
-            }),
+            Err(e) => Err(CouchbaseError::decoding_failure_from_serde(e)),
         }
     }
 
     pub fn exists(&self, index: usize) -> bool {
-        self.content.get(index).expect("index not found").status == 0
+        let content = match self.content.get(index) {
+            Some(c) => c,
+            None => return false,
+        };
+        content.status == 0
     }
 }
 

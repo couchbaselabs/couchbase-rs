@@ -899,16 +899,16 @@ impl Collection {
         receiver.await.unwrap()
     }
 
-    pub async fn lookup_in<S: Into<String>>(
+    pub async fn lookup_in(
         &self,
-        id: S,
-        specs: Vec<LookupInSpec>,
+        id: impl Into<String>,
+        specs: impl IntoIterator<Item = LookupInSpec>,
         options: LookupInOptions,
     ) -> CouchbaseResult<LookupInResult> {
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::LookupIn(LookupInRequest {
             id: id.into(),
-            specs,
+            specs: specs.into_iter().collect::<Vec<LookupInSpec>>(),
             sender,
             bucket: self.bucket_name.clone(),
             options,
@@ -918,16 +918,16 @@ impl Collection {
         receiver.await.unwrap()
     }
 
-    pub async fn mutate_in<S: Into<String>>(
+    pub async fn mutate_in(
         &self,
-        id: S,
-        specs: Vec<MutateInSpec>,
+        id: impl Into<String>,
+        specs: impl IntoIterator<Item = MutateInSpec>,
         options: MutateInOptions,
     ) -> CouchbaseResult<MutateInResult> {
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::MutateIn(MutateInRequest {
             id: id.into(),
-            specs,
+            specs: specs.into_iter().collect::<Vec<MutateInSpec>>(),
             sender,
             bucket: self.bucket_name.clone(),
             options,
@@ -1006,136 +1006,145 @@ pub enum MutateInSpec {
 }
 
 impl MutateInSpec {
-    pub fn replace<S: Into<String>, T>(path: S, content: T) -> Self
+    pub fn replace<S: Into<String>, T>(path: S, content: T) -> CouchbaseResult<Self>
     where
-        T: Into<Value>,
+        T: Serialize,
     {
-        let value = match to_vec(&content.into()) {
-            Ok(v) => v,
-            Err(_e) => panic!("Could not encode the value :-("),
-        };
-        MutateInSpec::Replace {
+        let value = to_vec(&content).map_err(CouchbaseError::encoding_failure_from_serde)?;
+        Ok(MutateInSpec::Replace {
             path: path.into(),
             value,
-        }
+        })
     }
 
-    pub fn insert<S: Into<String>, T>(path: S, content: T) -> Self
+    pub fn insert<S: Into<String>, T>(path: S, content: T) -> CouchbaseResult<Self>
     where
-        T: Into<Value>,
+        T: Serialize,
     {
-        let value = match to_vec(&content.into()) {
-            Ok(v) => v,
-            Err(_e) => panic!("Could not encode the value :-("),
-        };
-        MutateInSpec::Insert {
+        let value = to_vec(&content).map_err(CouchbaseError::encoding_failure_from_serde)?;
+        Ok(MutateInSpec::Insert {
             path: path.into(),
             value,
-        }
+        })
     }
 
-    pub fn upsert<S: Into<String>, T>(path: S, content: T) -> Self
+    pub fn upsert<S: Into<String>, T>(path: S, content: T) -> CouchbaseResult<Self>
     where
-        T: Into<Value>,
+        T: Serialize,
     {
-        let value = match to_vec(&content.into()) {
-            Ok(v) => v,
-            Err(_e) => panic!("Could not encode the value :-("),
-        };
-        MutateInSpec::Upsert {
+        let value = to_vec(&content).map_err(CouchbaseError::encoding_failure_from_serde)?;
+        Ok(MutateInSpec::Upsert {
             path: path.into(),
             value,
-        }
+        })
     }
 
-    pub fn array_add_unique<S: Into<String>, T>(path: S, content: T) -> Self
+    pub fn array_add_unique<S: Into<String>, T>(path: S, content: T) -> CouchbaseResult<Self>
     where
-        T: Into<Value>,
+        T: Serialize,
     {
-        let value = match to_vec(&content.into()) {
-            Ok(v) => v,
-            Err(_e) => panic!("Could not encode the value :-("),
-        };
-        MutateInSpec::ArrayAddUnique {
+        let value = to_vec(&content).map_err(CouchbaseError::encoding_failure_from_serde)?;
+        Ok(MutateInSpec::ArrayAddUnique {
             path: path.into(),
             value,
-        }
+        })
     }
 
-    pub fn array_append<S: Into<String>, T>(path: S, content: Vec<T>) -> Self
+    pub fn array_append<S: Into<String>, T>(
+        path: S,
+        content: impl IntoIterator<Item = T>,
+    ) -> CouchbaseResult<Self>
     where
-        T: Into<Value>,
+        T: Serialize,
     {
-        let mut value = content
-            .into_iter()
-            .map(|v| {
-                let mut encoded = match to_vec(&v.into()) {
-                    Ok(v) => v,
-                    Err(_e) => panic!("Could not encode the value :-("),
-                };
-                encoded.push(b',');
-                encoded
-            })
-            .flatten()
-            .collect::<Vec<_>>();
-        value.pop().unwrap();
+        let mut value = vec![];
+        content.into_iter().try_for_each(|v| {
+            match to_vec(&v) {
+                Ok(v) => value.extend(v),
+                Err(e) => return Err(CouchbaseError::encoding_failure_from_serde(e)),
+            };
+            value.push(b',');
+            Ok(())
+        })?;
+        if value.pop().is_none() {
+            let mut ctx = ErrorContext::default();
+            ctx.insert(
+                "content",
+                Value::String(String::from("content must contain at least one item")),
+            );
+            return Err(CouchbaseError::InvalidArgument { ctx });
+        }
 
-        MutateInSpec::ArrayAppend {
+        Ok(MutateInSpec::ArrayAppend {
             path: path.into(),
             value,
-        }
+        })
     }
 
-    pub fn array_prepend<S: Into<String>, T>(path: S, content: Vec<T>) -> Self
+    pub fn array_prepend<S: Into<String>, T>(
+        path: S,
+        content: impl IntoIterator<Item = T>,
+    ) -> CouchbaseResult<Self>
     where
-        T: Into<Value>,
+        T: Serialize,
     {
-        let mut value = content
-            .into_iter()
-            .map(|v| {
-                let mut encoded = match to_vec(&v.into()) {
-                    Ok(v) => v,
-                    Err(_e) => panic!("Could not encode the value :-("),
-                };
-                encoded.push(b',');
-                encoded
-            })
-            .flatten()
-            .collect::<Vec<_>>();
-        value.pop().unwrap();
+        let mut value = vec![];
+        content.into_iter().try_for_each(|v| {
+            match to_vec(&v) {
+                Ok(v) => value.extend(v),
+                Err(e) => return Err(CouchbaseError::encoding_failure_from_serde(e)),
+            };
+            value.push(b',');
+            Ok(())
+        })?;
+        if value.pop().is_none() {
+            let mut ctx = ErrorContext::default();
+            ctx.insert(
+                "content",
+                Value::String(String::from("content must contain at least one item")),
+            );
+            return Err(CouchbaseError::InvalidArgument { ctx });
+        }
 
-        MutateInSpec::ArrayPrepend {
+        Ok(MutateInSpec::ArrayPrepend {
             path: path.into(),
             value,
-        }
+        })
     }
 
-    pub fn array_insert<S: Into<String>, T>(path: S, content: Vec<T>) -> Self
+    pub fn array_insert<S: Into<String>, T>(
+        path: S,
+        content: impl IntoIterator<Item = T>,
+    ) -> CouchbaseResult<Self>
     where
-        T: Into<Value>,
+        T: Serialize,
     {
-        let mut value = content
-            .into_iter()
-            .map(|v| {
-                let mut encoded = match to_vec(&v.into()) {
-                    Ok(v) => v,
-                    Err(_e) => panic!("Could not encode the value :-("),
-                };
-                encoded.push(b',');
-                encoded
-            })
-            .flatten()
-            .collect::<Vec<_>>();
-        value.pop().unwrap();
+        let mut value = vec![];
+        content.into_iter().try_for_each(|v| {
+            match to_vec(&v) {
+                Ok(v) => value.extend(v),
+                Err(e) => return Err(CouchbaseError::encoding_failure_from_serde(e)),
+            };
+            value.push(b',');
+            Ok(())
+        })?;
+        if value.pop().is_none() {
+            let mut ctx = ErrorContext::default();
+            ctx.insert(
+                "content",
+                Value::String(String::from("content must contain at least one item")),
+            );
+            return Err(CouchbaseError::InvalidArgument { ctx });
+        }
 
-        MutateInSpec::ArrayInsert {
+        Ok(MutateInSpec::ArrayInsert {
             path: path.into(),
             value,
-        }
+        })
     }
 
-    pub fn remove<S: Into<String>>(path: S) -> Self {
-        MutateInSpec::Remove { path: path.into() }
+    pub fn remove<S: Into<String>>(path: S) -> CouchbaseResult<Self> {
+        Ok(MutateInSpec::Remove { path: path.into() })
     }
 }
 

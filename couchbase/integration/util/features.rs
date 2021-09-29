@@ -2,4 +2,5 @@
 pub enum TestFeature {
     KeyValue,
     Query,
+    Subdoc,
 }

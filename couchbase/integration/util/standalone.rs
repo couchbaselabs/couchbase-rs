@@ -6,7 +6,11 @@ use lazy_static::lazy_static;
 use std::sync::Arc;
 
 lazy_static! {
-    static ref SUPPORTS: Vec<TestFeature> = vec![TestFeature::KeyValue, TestFeature::Query];
+    static ref SUPPORTS: Vec<TestFeature> = vec![
+        TestFeature::KeyValue,
+        TestFeature::Query,
+        TestFeature::Subdoc
+    ];
 }
 
 pub struct StandaloneCluster {

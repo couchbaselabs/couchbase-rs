@@ -84,6 +84,19 @@ pub struct BreweryDocument {
     pub test: Option<String>,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct BeerDocument {
+    pub abv: f32,
+    pub brewery_id: String,
+    pub category: String,
+    pub description: String,
+    pub ibu: u32,
+    pub name: String,
+    pub srm: u32,
+    pub ingredients: Vec<String>,
+    pub style: String,
+}
+
 pub async fn try_until<T, U>(deadline: Instant, future: impl Fn() -> T) -> TestResult<U>
 where
     T: Future<Output = TestResult<U>>,
@@ -125,9 +138,30 @@ pub async fn upsert_brewery_dataset(
     Ok(result)
 }
 
-fn load_dataset<I, T>(file_path: impl Into<PathBuf>) -> TestResult<I>
+pub fn load_dataset<I, T>(file_path: impl Into<PathBuf>) -> TestResult<I>
 where
     I: IntoIterator<Item = T> + DeserializeOwned,
+    T: DeserializeOwned,
+{
+    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    path.push("integration");
+    path.push("resources");
+    path.push(file_path.into());
+
+    Ok(serde_json::from_slice(
+        fs::read(path)
+            .map_err(|e| TestError {
+                reason: e.to_string(),
+            })?
+            .as_slice(),
+    )
+    .map_err(|e| TestError {
+        reason: e.to_string(),
+    })?)
+}
+
+pub fn load_dataset_single<T>(file_path: impl Into<PathBuf>) -> TestResult<T>
+where
     T: DeserializeOwned,
 {
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));

@@ -29,6 +29,18 @@ pub fn tests(config: Arc<TestConfig>) -> Vec<TestFn> {
             "test_query_prepared",
             Box::pin(query::test_query_prepared(config.clone())),
         ),
+        TestFn::new(
+            "test_upsert_lookupin",
+            Box::pin(subdoc::test_upsert_lookupin(config.clone())),
+        ),
+        TestFn::new(
+            "test_mutatein_basic",
+            Box::pin(subdoc::test_mutatein_basic(config.clone())),
+        ),
+        TestFn::new(
+            "test_mutatein_arrays",
+            Box::pin(subdoc::test_mutatein_arrays(config.clone())),
+        ),
     ]
 }
 

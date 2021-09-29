@@ -1038,7 +1038,7 @@ pub fn encode_mutate_in(
                     value,
                 } => {
                     verify(
-                        lcb_subdocspecs_array_add_last(
+                        lcb_subdocspecs_array_add_first(
                             specs,
                             idx,
                             0,

@@ -2,6 +2,8 @@ mod callbacks;
 mod encode;
 mod instance;
 
+pub(crate) use callbacks::couchbase_error_from_lcb_status;
+
 use crate::api::error::CouchbaseResult;
 use crate::api::results::{
     AnalyticsMetaData, AnalyticsResult, GenericManagementResult, QueryMetaData, QueryResult,

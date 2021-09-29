@@ -7,6 +7,7 @@ mod lcb;
 use crate::io::lcb::IoCore;
 
 pub mod request;
+pub(crate) use lcb::couchbase_error_from_lcb_status;
 
 #[derive(Debug)]
 pub struct Core {

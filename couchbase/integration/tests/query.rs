@@ -73,7 +73,7 @@ pub async fn test_query(config: Arc<TestConfig>) -> TestResult<bool> {
         while let Some(row) = rows.next().await {
             docs.push(row?);
         }
-        let meta = result.meta_data().await;
+        let meta = result.meta_data().await?;
 
         if docs.len() == expected_docs.len() {
             Ok::<(Vec<BreweryDocument>, QueryMetaData), TestError>((docs, meta))
@@ -125,7 +125,7 @@ pub async fn test_query_named_params(config: Arc<TestConfig>) -> TestResult<bool
         while let Some(row) = rows.next().await {
             docs.push(row?);
         }
-        let meta = result.meta_data().await;
+        let meta = result.meta_data().await?;
 
         if docs.len() == expected_docs.len() {
             Ok::<(Vec<BreweryDocument>, QueryMetaData), TestError>((docs, meta))
@@ -176,7 +176,7 @@ pub async fn test_query_positional_params(config: Arc<TestConfig>) -> TestResult
         while let Some(row) = rows.next().await {
             docs.push(row?);
         }
-        let meta = result.meta_data().await;
+        let meta = result.meta_data().await?;
 
         if docs.len() == expected_docs.len() {
             Ok::<(Vec<BreweryDocument>, QueryMetaData), TestError>((docs, meta))
@@ -227,7 +227,7 @@ pub async fn test_query_prepared(config: Arc<TestConfig>) -> TestResult<bool> {
         while let Some(row) = rows.next().await {
             docs.push(row?);
         }
-        let meta = result.meta_data().await;
+        let meta = result.meta_data().await?;
 
         if docs.len() == expected_docs.len() {
             Ok::<(Vec<BreweryDocument>, QueryMetaData), TestError>((docs, meta))
