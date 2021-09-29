@@ -132,7 +132,7 @@ pub async fn test_mutatein_basic(config: Arc<TestConfig>) -> TestResult<bool> {
     Ok(false)
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct ArrayDoc {
     fish: Vec<String>,
 }
@@ -193,6 +193,54 @@ pub async fn test_mutatein_arrays(config: Arc<TestConfig>) -> TestResult<bool> {
     let actual = result.content::<Vec<&str>>(0)?;
 
     assert_eq!(expected, actual);
+
+    Ok(false)
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct CounterDoc {
+    counter: u32,
+}
+
+pub async fn test_mutatein_counters(config: Arc<TestConfig>) -> TestResult<bool> {
+    if !config.supports_feature(util::TestFeature::KeyValue) {
+        return Ok(true);
+    }
+    if !config.supports_feature(util::TestFeature::Subdoc) {
+        return Ok(true);
+    }
+
+    let collection = config.collection();
+    let key = Uuid::new_v4().to_string();
+    let doc = CounterDoc { counter: 20 };
+
+    let result = collection
+        .upsert(&key, &doc, UpsertOptions::default())
+        .await?;
+    assert_ne!(0, result.cas());
+
+    let mutate_result = collection
+        .mutate_in(
+            &key,
+            vec![
+                MutateInSpec::increment("counter", 10)?,
+                MutateInSpec::decrement("counter", 5)?,
+            ],
+            MutateInOptions::default(),
+        )
+        .await?;
+    assert_ne!(0, mutate_result.cas());
+
+    let result = collection
+        .lookup_in(
+            key,
+            vec![LookupInSpec::get("counter")],
+            LookupInOptions::default(),
+        )
+        .await?;
+    assert_ne!(0, result.cas());
+
+    assert_eq!(25, result.content::<i32>(0)?);
 
     Ok(false)
 }

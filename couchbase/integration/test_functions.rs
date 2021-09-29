@@ -41,6 +41,10 @@ pub fn tests(config: Arc<TestConfig>) -> Vec<TestFn> {
             "test_mutatein_arrays",
             Box::pin(subdoc::test_mutatein_arrays(config.clone())),
         ),
+        TestFn::new(
+            "test_mutatein_counters",
+            Box::pin(subdoc::test_mutatein_counters(config.clone())),
+        ),
     ]
 }
 

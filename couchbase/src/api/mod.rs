@@ -1146,6 +1146,20 @@ impl MutateInSpec {
     pub fn remove<S: Into<String>>(path: S) -> CouchbaseResult<Self> {
         Ok(MutateInSpec::Remove { path: path.into() })
     }
+
+    pub fn increment<S: Into<String>>(path: S, delta: u64) -> CouchbaseResult<Self> {
+        Ok(MutateInSpec::Counter {
+            path: path.into(),
+            delta: delta as i64,
+        })
+    }
+
+    pub fn decrement<S: Into<String>>(path: S, delta: u64) -> CouchbaseResult<Self> {
+        Ok(MutateInSpec::Counter {
+            path: path.into(),
+            delta: -(delta as i64),
+        })
+    }
 }
 
 #[derive(Debug)]
