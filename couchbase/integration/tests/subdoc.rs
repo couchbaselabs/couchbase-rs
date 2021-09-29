@@ -1,8 +1,8 @@
 use crate::util::{BeerDocument, TestConfig};
 use crate::{util, TestResult};
 use couchbase::{
-    CouchbaseError, CouchbaseResult, LookupInOptions, LookupInSpec, MutateInOptions, MutateInSpec,
-    UpsertOptions,
+    CouchbaseError, CouchbaseResult, GetOptions, LookupInOptions, LookupInSpec, MutateInOptions,
+    MutateInSpec, UpsertOptions,
 };
 use serde_derive::{Deserialize, Serialize};
 use serde_json::Value;
@@ -241,6 +241,42 @@ pub async fn test_mutatein_counters(config: Arc<TestConfig>) -> TestResult<bool>
     assert_ne!(0, result.cas());
 
     assert_eq!(25, result.content::<i32>(0)?);
+
+    Ok(false)
+}
+
+pub async fn test_mutatein_blank_path_remove(config: Arc<TestConfig>) -> TestResult<bool> {
+    if !config.supports_feature(util::TestFeature::KeyValue) {
+        return Ok(true);
+    }
+    if !config.supports_feature(util::TestFeature::Subdoc) {
+        return Ok(true);
+    }
+
+    let collection = config.collection();
+    let key = Uuid::new_v4().to_string();
+    let doc: BeerDocument = util::load_dataset_single("beer_sample_beer_single.json")?;
+
+    let result = collection
+        .upsert(&key, &doc, UpsertOptions::default())
+        .await?;
+    assert_ne!(0, result.cas());
+
+    let mutate_result = collection
+        .mutate_in(
+            &key,
+            vec![MutateInSpec::remove("")?],
+            MutateInOptions::default(),
+        )
+        .await?;
+    assert_ne!(0, mutate_result.cas());
+
+    let result = collection.get(key, GetOptions::default()).await;
+    assert!(result.is_err());
+    match result.unwrap_err() {
+        CouchbaseError::DocumentNotFound { .. } => {}
+        _ => panic!("Expected document not found error"),
+    }
 
     Ok(false)
 }
