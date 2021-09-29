@@ -216,10 +216,7 @@ pub fn encode_get(instance: *mut lcb_INSTANCE, request: GetRequest) -> Result<()
                 }
             }
             GetRequestType::GetAndTouch { expiry, options } => {
-                verify(
-                    lcb_cmdget_expiry(command, expiry.as_micros() as u32),
-                    cookie,
-                )?;
+                verify(lcb_cmdget_expiry(command, expiry.as_secs() as u32), cookie)?;
 
                 if let Some(timeout) = options.timeout {
                     verify(
@@ -673,9 +670,21 @@ pub fn encode_view(instance: *mut lcb_INSTANCE, request: ViewRequest) -> Result<
 }
 
 enum EncodedLookupSpec {
-    Get { path_len: usize, path: CString },
-    Exists { path_len: usize, path: CString },
-    Count { path_len: usize, path: CString },
+    Get {
+        path_len: usize,
+        path: CString,
+        flags: u32,
+    },
+    Exists {
+        path_len: usize,
+        path: CString,
+        flags: u32,
+    },
+    Count {
+        path_len: usize,
+        path: CString,
+        flags: u32,
+    },
 }
 
 /// Encodes a `LookupInRequest` into its libcouchbase `lcb_CMDSUBDOC` representation.
@@ -692,17 +701,32 @@ pub fn encode_lookup_in(
         .specs
         .into_iter()
         .map(|spec| match spec {
-            LookupInSpec::Get { path } => {
+            LookupInSpec::Get { path, xattr } => {
+                let flags = make_subdoc_flags(None, xattr, false);
                 let (path_len, path) = into_cstring(path);
-                EncodedLookupSpec::Get { path_len, path }
+                EncodedLookupSpec::Get {
+                    path_len,
+                    path,
+                    flags,
+                }
             }
-            LookupInSpec::Exists { path } => {
+            LookupInSpec::Exists { path, xattr } => {
+                let flags = make_subdoc_flags(None, xattr, false);
                 let (path_len, path) = into_cstring(path);
-                EncodedLookupSpec::Exists { path_len, path }
+                EncodedLookupSpec::Exists {
+                    path_len,
+                    path,
+                    flags,
+                }
             }
-            LookupInSpec::Count { path } => {
+            LookupInSpec::Count { path, xattr } => {
+                let flags = make_subdoc_flags(None, xattr, false);
                 let (path_len, path) = into_cstring(path);
-                EncodedLookupSpec::Count { path_len, path }
+                EncodedLookupSpec::Count {
+                    path_len,
+                    path,
+                    flags,
+                }
             }
         })
         .collect::<Vec<_>>();
@@ -718,21 +742,33 @@ pub fn encode_lookup_in(
         let mut idx = 0;
         for lookup_spec in &lookup_specs {
             match lookup_spec {
-                EncodedLookupSpec::Get { path_len, path } => {
+                EncodedLookupSpec::Get {
+                    path_len,
+                    path,
+                    flags,
+                } => {
                     verify(
-                        lcb_subdocspecs_get(specs, idx, 0, path.as_ptr(), *path_len),
+                        lcb_subdocspecs_get(specs, idx, *flags, path.as_ptr(), *path_len),
                         cookie,
                     )?;
                 }
-                EncodedLookupSpec::Exists { path_len, path } => {
+                EncodedLookupSpec::Exists {
+                    path_len,
+                    path,
+                    flags,
+                } => {
                     verify(
-                        lcb_subdocspecs_exists(specs, idx, 0, path.as_ptr(), *path_len),
+                        lcb_subdocspecs_exists(specs, idx, *flags, path.as_ptr(), *path_len),
                         cookie,
                     )?;
                 }
-                EncodedLookupSpec::Count { path_len, path } => {
+                EncodedLookupSpec::Count {
+                    path_len,
+                    path,
+                    flags,
+                } => {
                     verify(
-                        lcb_subdocspecs_get_count(specs, idx, 0, path.as_ptr(), *path_len),
+                        lcb_subdocspecs_get_count(specs, idx, *flags, path.as_ptr(), *path_len),
                         cookie,
                     )?;
                 }
@@ -781,52 +817,101 @@ pub enum EncodedMutateSpec {
         path: CString,
         value_len: usize,
         value: CString,
+        flags: u32,
     },
     Insert {
         path_len: usize,
         path: CString,
         value_len: usize,
         value: CString,
+        flags: u32,
     },
     Upsert {
         path_len: usize,
         path: CString,
         value_len: usize,
         value: CString,
+        flags: u32,
     },
     ArrayAddUnique {
         path_len: usize,
         path: CString,
         value_len: usize,
         value: CString,
+        flags: u32,
     },
     Remove {
         path_len: usize,
         path: CString,
+        flags: u32,
     },
     Counter {
         path_len: usize,
         path: CString,
         delta: i64,
+        flags: u32,
     },
     ArrayAppend {
         path_len: usize,
         path: CString,
         value_len: usize,
         value: CString,
+        flags: u32,
     },
     ArrayPrepend {
         path_len: usize,
         path: CString,
         value_len: usize,
         value: CString,
+        flags: u32,
     },
     ArrayInsert {
         path_len: usize,
         path: CString,
         value_len: usize,
         value: CString,
+        flags: u32,
     },
+}
+
+pub(crate) const MUTATION_MACRO_CAS: &str = "${Mutation.CAS}";
+pub(crate) const MUTATION_MACRO_SEQNO: &str = "${Mutation.seqno}";
+pub(crate) const MUTATION_MACRO_VALUE_CRC32C: &str = "${Mutation.value_crc32c}";
+pub(crate) const MUTATION_MACRO_CAS_MATCHER: &str = "\"${Mutation.CAS}\"";
+pub(crate) const MUTATION_MACRO_SEQNO_MATCHER: &str = "\"${Mutation.seqno}\"";
+pub(crate) const MUTATION_MACRO_VALUE_CRC32C_MATCHER: &str = "\"${Mutation.value_crc32c}\"";
+
+fn make_subdoc_flags(value: Option<&Vec<u8>>, xattr: bool, create_path: bool) -> u32 {
+    let mut flags: u32 = 0;
+    if xattr {
+        flags |= LCB_SUBDOCSPECS_F_XATTRPATH;
+    }
+    if create_path {
+        flags |= LCB_SUBDOCSPECS_F_MKINTERMEDIATES;
+    }
+    match value {
+        Some(v) => match std::str::from_utf8(v.as_slice()) {
+            Ok(str_val) => match str_val {
+                MUTATION_MACRO_CAS_MATCHER => {
+                    flags |= LCB_SUBDOCSPECS_F_XATTR_MACROVALUES;
+                    flags |= LCB_SUBDOCSPECS_F_XATTRPATH;
+                }
+                MUTATION_MACRO_SEQNO_MATCHER => {
+                    flags |= LCB_SUBDOCSPECS_F_XATTR_MACROVALUES;
+                    flags |= LCB_SUBDOCSPECS_F_XATTRPATH;
+                }
+                MUTATION_MACRO_VALUE_CRC32C_MATCHER => {
+                    flags |= LCB_SUBDOCSPECS_F_XATTR_MACROVALUES;
+                    flags |= LCB_SUBDOCSPECS_F_XATTRPATH;
+                }
+                _ => {}
+            },
+            Err(_e) => {}
+        },
+        None => {}
+    }
+
+    flags
 }
 
 /// Encodes a `MutateInRequest` into its libcouchbase `lcb_CMDSUBDOC` representation.
@@ -843,7 +928,8 @@ pub fn encode_mutate_in(
         .specs
         .into_iter()
         .map(|spec| match spec {
-            MutateInSpec::Replace { path, value } => {
+            MutateInSpec::Replace { path, value, xattr } => {
+                let flags = make_subdoc_flags(Some(&value), xattr, false);
                 let (path_len, path) = into_cstring(path);
                 let (value_len, value) = into_cstring(value);
                 EncodedMutateSpec::Replace {
@@ -851,9 +937,16 @@ pub fn encode_mutate_in(
                     path,
                     value_len,
                     value,
+                    flags,
                 }
             }
-            MutateInSpec::Insert { path, value } => {
+            MutateInSpec::Insert {
+                path,
+                value,
+                xattr,
+                create_path,
+            } => {
+                let flags = make_subdoc_flags(Some(&value), xattr, create_path);
                 let (path_len, path) = into_cstring(path);
                 let (value_len, value) = into_cstring(value);
                 EncodedMutateSpec::Insert {
@@ -861,9 +954,16 @@ pub fn encode_mutate_in(
                     path,
                     value_len,
                     value,
+                    flags,
                 }
             }
-            MutateInSpec::Upsert { path, value } => {
+            MutateInSpec::Upsert {
+                path,
+                value,
+                xattr,
+                create_path,
+            } => {
+                let flags = make_subdoc_flags(Some(&value), xattr, create_path);
                 let (path_len, path) = into_cstring(path);
                 let (value_len, value) = into_cstring(value);
                 EncodedMutateSpec::Upsert {
@@ -871,9 +971,16 @@ pub fn encode_mutate_in(
                     path,
                     value_len,
                     value,
+                    flags,
                 }
             }
-            MutateInSpec::ArrayAddUnique { path, value } => {
+            MutateInSpec::ArrayAddUnique {
+                path,
+                value,
+                xattr,
+                create_path,
+            } => {
+                let flags = make_subdoc_flags(Some(&value), xattr, create_path);
                 let (path_len, path) = into_cstring(path);
                 let (value_len, value) = into_cstring(value);
                 EncodedMutateSpec::ArrayAddUnique {
@@ -881,21 +988,40 @@ pub fn encode_mutate_in(
                     path,
                     value_len,
                     value,
+                    flags,
                 }
             }
-            MutateInSpec::Remove { path } => {
+            MutateInSpec::Remove { path, xattr } => {
+                let flags = make_subdoc_flags(None, xattr, false);
                 let (path_len, path) = into_cstring(path);
-                EncodedMutateSpec::Remove { path_len, path }
+                EncodedMutateSpec::Remove {
+                    path_len,
+                    path,
+                    flags,
+                }
             }
-            MutateInSpec::Counter { path, delta } => {
+            MutateInSpec::Counter {
+                path,
+                delta,
+                xattr,
+                create_path,
+            } => {
+                let flags = make_subdoc_flags(None, xattr, create_path);
                 let (path_len, path) = into_cstring(path);
                 EncodedMutateSpec::Counter {
                     path_len,
                     path,
                     delta,
+                    flags,
                 }
             }
-            MutateInSpec::ArrayAppend { path, value } => {
+            MutateInSpec::ArrayAppend {
+                path,
+                value,
+                xattr,
+                create_path,
+            } => {
+                let flags = make_subdoc_flags(Some(&value), xattr, create_path);
                 let (path_len, path) = into_cstring(path);
                 let (value_len, value) = into_cstring(value);
                 EncodedMutateSpec::ArrayAppend {
@@ -903,9 +1029,16 @@ pub fn encode_mutate_in(
                     path,
                     value_len,
                     value,
+                    flags,
                 }
             }
-            MutateInSpec::ArrayPrepend { path, value } => {
+            MutateInSpec::ArrayPrepend {
+                path,
+                value,
+                xattr,
+                create_path,
+            } => {
+                let flags = make_subdoc_flags(Some(&value), xattr, create_path);
                 let (path_len, path) = into_cstring(path);
                 let (value_len, value) = into_cstring(value);
                 EncodedMutateSpec::ArrayPrepend {
@@ -913,9 +1046,16 @@ pub fn encode_mutate_in(
                     path,
                     value_len,
                     value,
+                    flags,
                 }
             }
-            MutateInSpec::ArrayInsert { path, value } => {
+            MutateInSpec::ArrayInsert {
+                path,
+                value,
+                xattr,
+                create_path,
+            } => {
+                let flags = make_subdoc_flags(Some(&value), xattr, create_path);
                 let (path_len, path) = into_cstring(path);
                 let (value_len, value) = into_cstring(value);
                 EncodedMutateSpec::ArrayInsert {
@@ -923,6 +1063,7 @@ pub fn encode_mutate_in(
                     path,
                     value_len,
                     value,
+                    flags,
                 }
             }
         })
@@ -944,12 +1085,13 @@ pub fn encode_mutate_in(
                     path,
                     value_len,
                     value,
+                    flags,
                 } => {
                     verify(
                         lcb_subdocspecs_dict_add(
                             specs,
                             idx,
-                            0,
+                            *flags,
                             path.as_ptr(),
                             *path_len,
                             value.as_ptr(),
@@ -963,12 +1105,13 @@ pub fn encode_mutate_in(
                     path,
                     value_len,
                     value,
+                    flags,
                 } => {
                     verify(
                         lcb_subdocspecs_dict_upsert(
                             specs,
                             idx,
-                            0,
+                            *flags,
                             path.as_ptr(),
                             *path_len,
                             value.as_ptr(),
@@ -982,12 +1125,13 @@ pub fn encode_mutate_in(
                     path,
                     value_len,
                     value,
+                    flags,
                 } => {
                     verify(
                         lcb_subdocspecs_replace(
                             specs,
                             idx,
-                            0,
+                            *flags,
                             path.as_ptr(),
                             *path_len,
                             value.as_ptr(),
@@ -996,9 +1140,13 @@ pub fn encode_mutate_in(
                         cookie,
                     )?;
                 }
-                EncodedMutateSpec::Remove { path_len, path } => {
+                EncodedMutateSpec::Remove {
+                    path_len,
+                    path,
+                    flags,
+                } => {
                     verify(
-                        lcb_subdocspecs_remove(specs, idx, 0, path.as_ptr(), *path_len),
+                        lcb_subdocspecs_remove(specs, idx, *flags, path.as_ptr(), *path_len),
                         cookie,
                     )?;
                 }
@@ -1006,9 +1154,17 @@ pub fn encode_mutate_in(
                     path_len,
                     path,
                     delta,
+                    flags,
                 } => {
                     verify(
-                        lcb_subdocspecs_counter(specs, idx, 0, path.as_ptr(), *path_len, *delta),
+                        lcb_subdocspecs_counter(
+                            specs,
+                            idx,
+                            *flags,
+                            path.as_ptr(),
+                            *path_len,
+                            *delta,
+                        ),
                         cookie,
                     )?;
                 }
@@ -1017,12 +1173,13 @@ pub fn encode_mutate_in(
                     path,
                     value_len,
                     value,
+                    flags,
                 } => {
                     verify(
                         lcb_subdocspecs_array_add_last(
                             specs,
                             idx,
-                            0,
+                            *flags,
                             path.as_ptr(),
                             *path_len,
                             value.as_ptr(),
@@ -1036,12 +1193,13 @@ pub fn encode_mutate_in(
                     path,
                     value_len,
                     value,
+                    flags,
                 } => {
                     verify(
                         lcb_subdocspecs_array_add_first(
                             specs,
                             idx,
-                            0,
+                            *flags,
                             path.as_ptr(),
                             *path_len,
                             value.as_ptr(),
@@ -1055,12 +1213,13 @@ pub fn encode_mutate_in(
                     path,
                     value_len,
                     value,
+                    flags,
                 } => {
                     verify(
                         lcb_subdocspecs_array_add_unique(
                             specs,
                             idx,
-                            0,
+                            *flags,
                             path.as_ptr(),
                             *path_len,
                             value.as_ptr(),
@@ -1074,12 +1233,13 @@ pub fn encode_mutate_in(
                     path,
                     value_len,
                     value,
+                    flags,
                 } => {
                     verify(
                         lcb_subdocspecs_array_insert(
                             specs,
                             idx,
-                            0,
+                            *flags,
                             path.as_ptr(),
                             *path_len,
                             value.as_ptr(),
@@ -1124,7 +1284,7 @@ pub fn encode_mutate_in(
         }
         if let Some(expiry) = request.options.expiry {
             verify(
-                lcb_cmdsubdoc_expiry(command, expiry.as_micros() as u32),
+                lcb_cmdsubdoc_expiry(command, expiry.as_secs() as u32),
                 cookie,
             )?;
         }

@@ -18,11 +18,11 @@ use crate::api::query_indexes::QueryIndexManager;
 use crate::api::results::*;
 use crate::api::search_indexes::SearchIndexManager;
 use crate::io::request::*;
-use crate::io::Core;
+use crate::io::{Core, MUTATION_MACRO_CAS, MUTATION_MACRO_SEQNO, MUTATION_MACRO_VALUE_CRC32C};
 use crate::CouchbaseError::Generic;
 use crate::{CollectionManager, SearchQuery, UserManager, ViewIndexManager};
 use futures::channel::oneshot;
-use serde::Serialize;
+use serde::{Serialize, Serializer};
 use serde_json::{to_vec, Value};
 use std::convert::TryFrom;
 use std::fmt;
@@ -992,21 +992,112 @@ impl MutationToken {
     }
 }
 
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub enum MutationMacro {
+    CAS,
+    SeqNo,
+    CRC32c,
+}
+
+impl Serialize for MutationMacro {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let alias = match *self {
+            MutationMacro::CAS => MUTATION_MACRO_CAS,
+            MutationMacro::SeqNo => MUTATION_MACRO_SEQNO,
+            MutationMacro::CRC32c => MUTATION_MACRO_VALUE_CRC32C,
+        };
+        serializer.serialize_str(alias)
+    }
+}
+
+impl Display for MutationMacro {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let alias = match *self {
+            MutationMacro::CAS => MUTATION_MACRO_CAS,
+            MutationMacro::SeqNo => MUTATION_MACRO_SEQNO,
+            MutationMacro::CRC32c => MUTATION_MACRO_VALUE_CRC32C,
+        };
+
+        write!(f, "{}", alias)
+    }
+}
+
+impl Debug for MutationMacro {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let alias = match *self {
+            MutationMacro::CAS => MUTATION_MACRO_CAS,
+            MutationMacro::SeqNo => MUTATION_MACRO_SEQNO,
+            MutationMacro::CRC32c => MUTATION_MACRO_VALUE_CRC32C,
+        };
+
+        write!(f, "{}", alias)
+    }
+}
+
 #[derive(Debug)]
 pub enum MutateInSpec {
-    Replace { path: String, value: Vec<u8> },
-    Insert { path: String, value: Vec<u8> },
-    Upsert { path: String, value: Vec<u8> },
-    ArrayAddUnique { path: String, value: Vec<u8> },
-    Remove { path: String },
-    Counter { path: String, delta: i64 },
-    ArrayAppend { path: String, value: Vec<u8> },
-    ArrayPrepend { path: String, value: Vec<u8> },
-    ArrayInsert { path: String, value: Vec<u8> },
+    Replace {
+        path: String,
+        value: Vec<u8>,
+        xattr: bool,
+    },
+    Insert {
+        path: String,
+        value: Vec<u8>,
+        create_path: bool,
+        xattr: bool,
+    },
+    Upsert {
+        path: String,
+        value: Vec<u8>,
+        create_path: bool,
+        xattr: bool,
+    },
+    ArrayAddUnique {
+        path: String,
+        value: Vec<u8>,
+        create_path: bool,
+        xattr: bool,
+    },
+    Remove {
+        path: String,
+        xattr: bool,
+    },
+    Counter {
+        path: String,
+        delta: i64,
+        create_path: bool,
+        xattr: bool,
+    },
+    ArrayAppend {
+        path: String,
+        value: Vec<u8>,
+        create_path: bool,
+        xattr: bool,
+    },
+    ArrayPrepend {
+        path: String,
+        value: Vec<u8>,
+        create_path: bool,
+        xattr: bool,
+    },
+    ArrayInsert {
+        path: String,
+        value: Vec<u8>,
+        create_path: bool,
+        xattr: bool,
+    },
 }
 
 impl MutateInSpec {
-    pub fn replace<S: Into<String>, T>(path: S, content: T) -> CouchbaseResult<Self>
+    pub fn replace<S: Into<String>, T>(
+        path: S,
+        content: T,
+        opts: ReplaceSpecOptions,
+    ) -> CouchbaseResult<Self>
     where
         T: Serialize,
     {
@@ -1014,10 +1105,15 @@ impl MutateInSpec {
         Ok(MutateInSpec::Replace {
             path: path.into(),
             value,
+            xattr: opts.xattr,
         })
     }
 
-    pub fn insert<S: Into<String>, T>(path: S, content: T) -> CouchbaseResult<Self>
+    pub fn insert<S: Into<String>, T>(
+        path: S,
+        content: T,
+        opts: InsertSpecOptions,
+    ) -> CouchbaseResult<Self>
     where
         T: Serialize,
     {
@@ -1025,10 +1121,16 @@ impl MutateInSpec {
         Ok(MutateInSpec::Insert {
             path: path.into(),
             value,
+            create_path: opts.create_path,
+            xattr: opts.xattr,
         })
     }
 
-    pub fn upsert<S: Into<String>, T>(path: S, content: T) -> CouchbaseResult<Self>
+    pub fn upsert<S: Into<String>, T>(
+        path: S,
+        content: T,
+        opts: UpsertSpecOptions,
+    ) -> CouchbaseResult<Self>
     where
         T: Serialize,
     {
@@ -1036,10 +1138,16 @@ impl MutateInSpec {
         Ok(MutateInSpec::Upsert {
             path: path.into(),
             value,
+            create_path: opts.create_path,
+            xattr: opts.xattr,
         })
     }
 
-    pub fn array_add_unique<S: Into<String>, T>(path: S, content: T) -> CouchbaseResult<Self>
+    pub fn array_add_unique<S: Into<String>, T>(
+        path: S,
+        content: T,
+        opts: ArrayAddUniqueSpecOptions,
+    ) -> CouchbaseResult<Self>
     where
         T: Serialize,
     {
@@ -1047,12 +1155,15 @@ impl MutateInSpec {
         Ok(MutateInSpec::ArrayAddUnique {
             path: path.into(),
             value,
+            create_path: opts.create_path,
+            xattr: opts.xattr,
         })
     }
 
     pub fn array_append<S: Into<String>, T>(
         path: S,
         content: impl IntoIterator<Item = T>,
+        opts: ArrayAppendSpecOptions,
     ) -> CouchbaseResult<Self>
     where
         T: Serialize,
@@ -1078,12 +1189,15 @@ impl MutateInSpec {
         Ok(MutateInSpec::ArrayAppend {
             path: path.into(),
             value,
+            create_path: opts.create_path,
+            xattr: opts.xattr,
         })
     }
 
     pub fn array_prepend<S: Into<String>, T>(
         path: S,
         content: impl IntoIterator<Item = T>,
+        opts: ArrayPrependSpecOptions,
     ) -> CouchbaseResult<Self>
     where
         T: Serialize,
@@ -1109,12 +1223,15 @@ impl MutateInSpec {
         Ok(MutateInSpec::ArrayPrepend {
             path: path.into(),
             value,
+            create_path: opts.create_path,
+            xattr: opts.xattr,
         })
     }
 
     pub fn array_insert<S: Into<String>, T>(
         path: S,
         content: impl IntoIterator<Item = T>,
+        opts: ArrayInsertSpecOptions,
     ) -> CouchbaseResult<Self>
     where
         T: Serialize,
@@ -1140,46 +1257,72 @@ impl MutateInSpec {
         Ok(MutateInSpec::ArrayInsert {
             path: path.into(),
             value,
+            create_path: opts.create_path,
+            xattr: opts.xattr,
         })
     }
 
-    pub fn remove<S: Into<String>>(path: S) -> CouchbaseResult<Self> {
-        Ok(MutateInSpec::Remove { path: path.into() })
+    pub fn remove<S: Into<String>>(path: S, opts: RemoveSpecOptions) -> CouchbaseResult<Self> {
+        Ok(MutateInSpec::Remove {
+            path: path.into(),
+            xattr: opts.xattr,
+        })
     }
 
-    pub fn increment<S: Into<String>>(path: S, delta: u64) -> CouchbaseResult<Self> {
+    pub fn increment<S: Into<String>>(
+        path: S,
+        delta: u64,
+        opts: IncrementSpecOptions,
+    ) -> CouchbaseResult<Self> {
         Ok(MutateInSpec::Counter {
             path: path.into(),
             delta: delta as i64,
+            create_path: opts.create_path,
+            xattr: opts.xattr,
         })
     }
 
-    pub fn decrement<S: Into<String>>(path: S, delta: u64) -> CouchbaseResult<Self> {
+    pub fn decrement<S: Into<String>>(
+        path: S,
+        delta: u64,
+        opts: DecrementSpecOptions,
+    ) -> CouchbaseResult<Self> {
         Ok(MutateInSpec::Counter {
             path: path.into(),
             delta: -(delta as i64),
+            create_path: opts.create_path,
+            xattr: opts.xattr,
         })
     }
 }
 
 #[derive(Debug)]
 pub enum LookupInSpec {
-    Get { path: String },
-    Exists { path: String },
-    Count { path: String },
+    Get { path: String, xattr: bool },
+    Exists { path: String, xattr: bool },
+    Count { path: String, xattr: bool },
 }
 
 impl LookupInSpec {
-    pub fn get<S: Into<String>>(path: S) -> Self {
-        LookupInSpec::Get { path: path.into() }
+    pub fn get<S: Into<String>>(path: S, opts: GetSpecOptions) -> Self {
+        LookupInSpec::Get {
+            path: path.into(),
+            xattr: opts.xattr,
+        }
     }
 
-    pub fn exists<S: Into<String>>(path: S) -> Self {
-        LookupInSpec::Exists { path: path.into() }
+    pub fn exists<S: Into<String>>(path: S, opts: ExistsSpecOptions) -> Self {
+        LookupInSpec::Exists {
+            path: path.into(),
+            xattr: opts.xattr,
+        }
     }
 
-    pub fn count<S: Into<String>>(path: S) -> Self {
-        LookupInSpec::Count { path: path.into() }
+    pub fn count<S: Into<String>>(path: S, opts: CountSpecOptions) -> Self {
+        LookupInSpec::Count {
+            path: path.into(),
+            xattr: opts.xattr,
+        }
     }
 }
 

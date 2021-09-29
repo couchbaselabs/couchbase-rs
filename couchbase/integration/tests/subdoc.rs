@@ -1,12 +1,16 @@
 use crate::util::{BeerDocument, TestConfig};
 use crate::{util, TestResult};
 use couchbase::{
-    CouchbaseError, CouchbaseResult, GetOptions, LookupInOptions, LookupInSpec, MutateInOptions,
-    MutateInSpec, UpsertOptions,
+    ArrayAppendSpecOptions, ArrayInsertSpecOptions, ArrayPrependSpecOptions, CouchbaseError,
+    CouchbaseResult, CountSpecOptions, DecrementSpecOptions, ExistsSpecOptions, GetOptions,
+    GetSpecOptions, IncrementSpecOptions, InsertSpecOptions, LookupInOptions, LookupInSpec,
+    MutateInOptions, MutateInSpec, MutationMacro, RemoveSpecOptions, ReplaceSpecOptions,
+    StoreSemantics, UpsertOptions, UpsertSpecOptions,
 };
 use serde_derive::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::Arc;
+use std::time::Duration;
 use uuid::Uuid;
 
 pub async fn test_upsert_lookupin(config: Arc<TestConfig>) -> TestResult<bool> {
@@ -30,12 +34,12 @@ pub async fn test_upsert_lookupin(config: Arc<TestConfig>) -> TestResult<bool> {
         .lookup_in(
             key,
             vec![
-                LookupInSpec::get("name"),
-                LookupInSpec::get("description"),
-                LookupInSpec::exists("itdoesnt"),
-                LookupInSpec::exists("category"),
-                LookupInSpec::get("italsodoesnt"),
-                LookupInSpec::count("ingredients"),
+                LookupInSpec::get("name", GetSpecOptions::default()),
+                LookupInSpec::get("description", GetSpecOptions::default()),
+                LookupInSpec::exists("itdoesnt", ExistsSpecOptions::default()),
+                LookupInSpec::exists("category", ExistsSpecOptions::default()),
+                LookupInSpec::get("italsodoesnt", GetSpecOptions::default()),
+                LookupInSpec::count("ingredients", CountSpecOptions::default()),
             ],
             LookupInOptions::default(),
         )
@@ -91,13 +95,13 @@ pub async fn test_mutatein_basic(config: Arc<TestConfig>) -> TestResult<bool> {
         .mutate_in(
             &key,
             vec![
-                MutateInSpec::insert("fish", &fish_name)?,
-                MutateInSpec::upsert("name", &new_name)?,
-                MutateInSpec::upsert("newName", &new_name)?,
-                MutateInSpec::upsert("description", Value::Null)?,
-                MutateInSpec::replace("style", &new_style)?,
-                MutateInSpec::replace("category", Value::Null)?,
-                MutateInSpec::remove("ibu")?,
+                MutateInSpec::insert("fish", &fish_name, InsertSpecOptions::default())?,
+                MutateInSpec::upsert("name", &new_name, UpsertSpecOptions::default())?,
+                MutateInSpec::upsert("newName", &new_name, UpsertSpecOptions::default())?,
+                MutateInSpec::upsert("description", Value::Null, UpsertSpecOptions::default())?,
+                MutateInSpec::replace("style", &new_style, ReplaceSpecOptions::default())?,
+                MutateInSpec::replace("category", Value::Null, ReplaceSpecOptions::default())?,
+                MutateInSpec::remove("ibu", RemoveSpecOptions::default())?,
             ],
             MutateInOptions::default(),
         )
@@ -108,13 +112,13 @@ pub async fn test_mutatein_basic(config: Arc<TestConfig>) -> TestResult<bool> {
         .lookup_in(
             key,
             vec![
-                LookupInSpec::get("fish"),
-                LookupInSpec::get("name"),
-                LookupInSpec::get("newName"),
-                LookupInSpec::get("description"),
-                LookupInSpec::get("style"),
-                LookupInSpec::get("category"),
-                LookupInSpec::exists("ibu"),
+                LookupInSpec::get("fish", GetSpecOptions::default()),
+                LookupInSpec::get("name", GetSpecOptions::default()),
+                LookupInSpec::get("newName", GetSpecOptions::default()),
+                LookupInSpec::get("description", GetSpecOptions::default()),
+                LookupInSpec::get("style", GetSpecOptions::default()),
+                LookupInSpec::get("category", GetSpecOptions::default()),
+                LookupInSpec::exists("ibu", ExistsSpecOptions::default()),
             ],
             LookupInOptions::default(),
         )
@@ -158,12 +162,36 @@ pub async fn test_mutatein_arrays(config: Arc<TestConfig>) -> TestResult<bool> {
         .mutate_in(
             &key,
             vec![
-                MutateInSpec::array_append("fish", vec!["clownfish"])?,
-                MutateInSpec::array_prepend("fish", vec!["whaleshark"])?,
-                MutateInSpec::array_insert("fish[1]", vec!["catfish"])?,
-                MutateInSpec::array_append("fish", vec!["manta ray", "stingray"])?,
-                MutateInSpec::array_prepend("fish", vec!["carp", "goldfish"])?,
-                MutateInSpec::array_insert("fish[1]", vec!["eel", "stonefish"])?,
+                MutateInSpec::array_append(
+                    "fish",
+                    vec!["clownfish"],
+                    ArrayAppendSpecOptions::default(),
+                )?,
+                MutateInSpec::array_prepend(
+                    "fish",
+                    vec!["whaleshark"],
+                    ArrayPrependSpecOptions::default(),
+                )?,
+                MutateInSpec::array_insert(
+                    "fish[1]",
+                    vec!["catfish"],
+                    ArrayInsertSpecOptions::default(),
+                )?,
+                MutateInSpec::array_append(
+                    "fish",
+                    vec!["manta ray", "stingray"],
+                    ArrayAppendSpecOptions::default(),
+                )?,
+                MutateInSpec::array_prepend(
+                    "fish",
+                    vec!["carp", "goldfish"],
+                    ArrayPrependSpecOptions::default(),
+                )?,
+                MutateInSpec::array_insert(
+                    "fish[1]",
+                    vec!["eel", "stonefish"],
+                    ArrayInsertSpecOptions::default(),
+                )?,
             ],
             MutateInOptions::default(),
         )
@@ -173,7 +201,7 @@ pub async fn test_mutatein_arrays(config: Arc<TestConfig>) -> TestResult<bool> {
     let result = collection
         .lookup_in(
             key,
-            vec![LookupInSpec::get("fish")],
+            vec![LookupInSpec::get("fish", GetSpecOptions::default())],
             LookupInOptions::default(),
         )
         .await?;
@@ -223,8 +251,8 @@ pub async fn test_mutatein_counters(config: Arc<TestConfig>) -> TestResult<bool>
         .mutate_in(
             &key,
             vec![
-                MutateInSpec::increment("counter", 10)?,
-                MutateInSpec::decrement("counter", 5)?,
+                MutateInSpec::increment("counter", 10, IncrementSpecOptions::default())?,
+                MutateInSpec::decrement("counter", 5, DecrementSpecOptions::default())?,
             ],
             MutateInOptions::default(),
         )
@@ -234,7 +262,7 @@ pub async fn test_mutatein_counters(config: Arc<TestConfig>) -> TestResult<bool>
     let result = collection
         .lookup_in(
             key,
-            vec![LookupInSpec::get("counter")],
+            vec![LookupInSpec::get("counter", GetSpecOptions::default())],
             LookupInOptions::default(),
         )
         .await?;
@@ -265,7 +293,7 @@ pub async fn test_mutatein_blank_path_remove(config: Arc<TestConfig>) -> TestRes
     let mutate_result = collection
         .mutate_in(
             &key,
-            vec![MutateInSpec::remove("")?],
+            vec![MutateInSpec::remove("", RemoveSpecOptions::default())?],
             MutateInOptions::default(),
         )
         .await?;
@@ -277,6 +305,160 @@ pub async fn test_mutatein_blank_path_remove(config: Arc<TestConfig>) -> TestRes
         CouchbaseError::DocumentNotFound { .. } => {}
         _ => panic!("Expected document not found error"),
     }
+
+    Ok(false)
+}
+
+pub async fn test_mutatein_blank_path_get(config: Arc<TestConfig>) -> TestResult<bool> {
+    if !config.supports_feature(util::TestFeature::KeyValue) {
+        return Ok(true);
+    }
+    if !config.supports_feature(util::TestFeature::Subdoc) {
+        return Ok(true);
+    }
+    if !config.supports_feature(util::TestFeature::Xattrs) {
+        return Ok(true);
+    }
+
+    let collection = config.collection();
+    let key = Uuid::new_v4().to_string();
+    let doc: BeerDocument = util::load_dataset_single("beer_sample_beer_single.json")?;
+
+    let result = collection
+        .upsert(&key, &doc, UpsertOptions::default())
+        .await?;
+    assert_ne!(0, result.cas());
+
+    let mutate_result = collection
+        .mutate_in(
+            &key,
+            vec![
+                MutateInSpec::insert(
+                    "xattrpath",
+                    "xattrvalue",
+                    InsertSpecOptions::default().xattr(true),
+                )?,
+                MutateInSpec::replace("", &doc, ReplaceSpecOptions::default())?,
+            ],
+            MutateInOptions::default()
+                .store_semantics(StoreSemantics::Upsert)
+                .expiry(Duration::from_secs(20)),
+        )
+        .await?;
+    assert_ne!(0, mutate_result.cas());
+
+    let result = collection
+        .lookup_in(
+            key,
+            vec![
+                LookupInSpec::get("$document.exptime", GetSpecOptions::default().xattr(true)),
+                LookupInSpec::get("", GetSpecOptions::default()),
+            ],
+            LookupInOptions::default(),
+        )
+        .await?;
+    assert_ne!(0, result.cas());
+
+    assert!(result.content::<u64>(0)? > 0);
+    assert_eq!(doc, result.content::<BeerDocument>(1)?);
+
+    Ok(false)
+}
+
+pub async fn test_xattrs(config: Arc<TestConfig>) -> TestResult<bool> {
+    if !config.supports_feature(util::TestFeature::KeyValue) {
+        return Ok(true);
+    }
+    if !config.supports_feature(util::TestFeature::Subdoc) {
+        return Ok(true);
+    }
+    if !config.supports_feature(util::TestFeature::Xattrs) {
+        return Ok(true);
+    }
+
+    let collection = config.collection();
+    let key = Uuid::new_v4().to_string();
+    let doc: BeerDocument = util::load_dataset_single("beer_sample_beer_single.json")?;
+
+    let result = collection
+        .upsert(&key, &doc, UpsertOptions::default())
+        .await?;
+    assert_ne!(0, result.cas());
+
+    let fish_name = "flounder";
+    let mutate_result = collection
+        .mutate_in(
+            &key,
+            vec![
+                MutateInSpec::insert("fish", &fish_name, InsertSpecOptions::default().xattr(true))?,
+                MutateInSpec::replace("", &doc, ReplaceSpecOptions::default())?,
+            ],
+            MutateInOptions::default().store_semantics(StoreSemantics::Upsert),
+        )
+        .await?;
+    assert_ne!(0, mutate_result.cas());
+
+    let result = collection
+        .lookup_in(
+            key,
+            vec![
+                LookupInSpec::get("fish", GetSpecOptions::default().xattr(true)),
+                LookupInSpec::get("name", GetSpecOptions::default()),
+            ],
+            LookupInOptions::default(),
+        )
+        .await?;
+    assert_ne!(0, result.cas());
+
+    assert_eq!(fish_name, result.content::<&str>(0)?);
+    assert_eq!(doc.name, result.content::<&str>(1)?);
+
+    Ok(false)
+}
+
+pub async fn test_macros(config: Arc<TestConfig>) -> TestResult<bool> {
+    if !config.supports_feature(util::TestFeature::KeyValue) {
+        return Ok(true);
+    }
+    if !config.supports_feature(util::TestFeature::Subdoc) {
+        return Ok(true);
+    }
+    if !config.supports_feature(util::TestFeature::Xattrs) {
+        return Ok(true);
+    }
+    if !config.supports_feature(util::TestFeature::ExpandMacros) {
+        return Ok(true);
+    }
+
+    let collection = config.collection();
+    let key = Uuid::new_v4().to_string();
+
+    let mutate_result = collection
+        .mutate_in(
+            &key,
+            vec![MutateInSpec::insert(
+                "caspath",
+                MutationMacro::CAS,
+                InsertSpecOptions::default(),
+            )?],
+            MutateInOptions::default().store_semantics(StoreSemantics::Upsert),
+        )
+        .await?;
+    assert_ne!(0, mutate_result.cas());
+
+    let result = collection
+        .lookup_in(
+            key,
+            vec![LookupInSpec::get(
+                "caspath",
+                GetSpecOptions::default().xattr(true),
+            )],
+            LookupInOptions::default(),
+        )
+        .await?;
+    assert_ne!(0, result.cas());
+
+    assert!(result.content::<&str>(0)?.starts_with("0x"));
 
     Ok(false)
 }

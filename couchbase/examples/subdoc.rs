@@ -14,7 +14,10 @@ pub fn main() -> CouchbaseResult<()> {
 
     let lookup_in_result = block_on(collection.lookup_in(
         "airline_10",
-        vec![LookupInSpec::get("country"), LookupInSpec::exists("iata")],
+        vec![
+            LookupInSpec::get("country", GetSpecOptions::default()),
+            LookupInSpec::exists("iata", ExistsSpecOptions::default()),
+        ],
         LookupInOptions::default(),
     ));
     println!("{:?}", lookup_in_result);
@@ -24,8 +27,8 @@ pub fn main() -> CouchbaseResult<()> {
     let mutate_in_result = block_on(collection.mutate_in(
         "airline_10",
         vec![
-            MutateInSpec::replace("name", "52-Mile Air")?,
-            MutateInSpec::upsert("foo", "bar")?,
+            MutateInSpec::replace("name", "52-Mile Air", ReplaceSpecOptions::default())?,
+            MutateInSpec::upsert("foo", "bar", UpsertSpecOptions::default())?,
         ],
         MutateInOptions::default(),
     ));

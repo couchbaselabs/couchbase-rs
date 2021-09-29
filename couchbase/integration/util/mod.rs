@@ -84,9 +84,8 @@ pub struct BreweryDocument {
     pub test: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub struct BeerDocument {
-    pub abv: f32,
     pub brewery_id: String,
     pub category: String,
     pub description: String,

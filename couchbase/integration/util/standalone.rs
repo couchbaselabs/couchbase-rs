@@ -9,7 +9,9 @@ lazy_static! {
     static ref SUPPORTS: Vec<TestFeature> = vec![
         TestFeature::KeyValue,
         TestFeature::Query,
-        TestFeature::Subdoc
+        TestFeature::Subdoc,
+        TestFeature::Xattrs,
+        TestFeature::ExpandMacros
     ];
 }
 

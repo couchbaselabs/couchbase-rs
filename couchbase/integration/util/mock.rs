@@ -34,7 +34,12 @@ const CAVES_URL: &str = "https://github.com/couchbaselabs/gocaves/releases/downl
 const CAVES_VERSION: &str = "v0.0.1-40";
 
 lazy_static! {
-    static ref SUPPORTS: Vec<TestFeature> = vec![TestFeature::KeyValue, TestFeature::Subdoc];
+    static ref SUPPORTS: Vec<TestFeature> = vec![
+        TestFeature::KeyValue,
+        TestFeature::Subdoc,
+        TestFeature::Xattrs,
+        TestFeature::ExpandMacros
+    ];
 }
 
 #[derive(Serialize, Deserialize)]

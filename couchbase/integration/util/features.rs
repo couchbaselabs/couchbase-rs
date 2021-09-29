@@ -3,4 +3,6 @@ pub enum TestFeature {
     KeyValue,
     Query,
     Subdoc,
+    Xattrs,
+    ExpandMacros,
 }
