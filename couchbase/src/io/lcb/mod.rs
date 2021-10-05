@@ -3,7 +3,10 @@ mod encode;
 mod instance;
 
 pub(crate) use callbacks::couchbase_error_from_lcb_status;
-pub(crate) use encode::{MUTATION_MACRO_CAS, MUTATION_MACRO_SEQNO, MUTATION_MACRO_VALUE_CRC32C};
+pub(crate) use encode::{
+    LOOKUPIN_MACRO_CAS, LOOKUPIN_MACRO_EXPIRYTIME, LOOKUPIN_MACRO_FLAGS, MUTATION_MACRO_CAS,
+    MUTATION_MACRO_SEQNO, MUTATION_MACRO_VALUE_CRC32C,
+};
 
 use crate::api::error::CouchbaseResult;
 use crate::api::results::{

@@ -18,9 +18,13 @@ use crate::api::query_indexes::QueryIndexManager;
 use crate::api::results::*;
 use crate::api::search_indexes::SearchIndexManager;
 use crate::io::request::*;
-use crate::io::{Core, MUTATION_MACRO_CAS, MUTATION_MACRO_SEQNO, MUTATION_MACRO_VALUE_CRC32C};
+use crate::io::{
+    Core, LOOKUPIN_MACRO_CAS, LOOKUPIN_MACRO_EXPIRYTIME, LOOKUPIN_MACRO_FLAGS, MUTATION_MACRO_CAS,
+    MUTATION_MACRO_SEQNO, MUTATION_MACRO_VALUE_CRC32C,
+};
 use crate::CouchbaseError::Generic;
 use crate::{CollectionManager, SearchQuery, UserManager, ViewIndexManager};
+use chrono::NaiveDateTime;
 use futures::channel::oneshot;
 use serde::{Serialize, Serializer};
 use serde_json::{to_vec, Value};
@@ -746,6 +750,49 @@ impl Collection {
         id: S,
         options: GetOptions,
     ) -> CouchbaseResult<GetResult> {
+        if options.with_expiry {
+            return self.get_with_expiry(id).await;
+        }
+        return self.get_direct(id, options).await;
+    }
+
+    async fn get_with_expiry<S: Into<String>>(&self, id: S) -> CouchbaseResult<GetResult> {
+        let (sender, receiver) = oneshot::channel();
+
+        // TODO: stuff with flags once supported
+        let specs = vec![
+            LookupInSpec::get(
+                LOOKUPIN_MACRO_EXPIRYTIME,
+                GetSpecOptions::default().xattr(true),
+            ),
+            LookupInSpec::get("", GetSpecOptions::default()),
+        ];
+
+        self.core.send(Request::LookupIn(LookupInRequest {
+            id: id.into(),
+            specs,
+            sender,
+            bucket: self.bucket_name.clone(),
+            options: LookupInOptions::default(),
+            scope: self.scope_name.clone(),
+            collection: self.name.clone(),
+        }));
+        let lookup_result = receiver.await.unwrap()?;
+
+        let expiry = NaiveDateTime::from_timestamp(lookup_result.content::<i64>(0)?, 0);
+        let content = lookup_result.raw(1)?.to_vec();
+
+        let mut result = GetResult::new(content, lookup_result.cas(), 0);
+        result.set_expiry_time(expiry);
+
+        Ok(result)
+    }
+
+    async fn get_direct<S: Into<String>>(
+        &self,
+        id: S,
+        options: GetOptions,
+    ) -> CouchbaseResult<GetResult> {
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::Get(GetRequest {
             id: id.into(),
@@ -1293,6 +1340,51 @@ impl MutateInSpec {
             create_path: opts.create_path,
             xattr: opts.xattr,
         })
+    }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub enum LookupinMacro {
+    CAS,
+    ExpiryTime,
+    Flags,
+}
+
+impl Serialize for LookupinMacro {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let alias = match *self {
+            LookupinMacro::CAS => LOOKUPIN_MACRO_CAS,
+            LookupinMacro::ExpiryTime => LOOKUPIN_MACRO_EXPIRYTIME,
+            LookupinMacro::Flags => LOOKUPIN_MACRO_FLAGS,
+        };
+        serializer.serialize_str(alias)
+    }
+}
+
+impl Display for LookupinMacro {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let alias = match *self {
+            LookupinMacro::CAS => LOOKUPIN_MACRO_CAS,
+            LookupinMacro::ExpiryTime => LOOKUPIN_MACRO_EXPIRYTIME,
+            LookupinMacro::Flags => LOOKUPIN_MACRO_FLAGS,
+        };
+
+        write!(f, "{}", alias)
+    }
+}
+
+impl Debug for LookupinMacro {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let alias = match *self {
+            LookupinMacro::CAS => LOOKUPIN_MACRO_CAS,
+            LookupinMacro::ExpiryTime => LOOKUPIN_MACRO_EXPIRYTIME,
+            LookupinMacro::Flags => LOOKUPIN_MACRO_FLAGS,
+        };
+
+        write!(f, "{}", alias)
     }
 }
 

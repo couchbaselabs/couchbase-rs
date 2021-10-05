@@ -6,6 +6,7 @@ use futures::{Stream, StreamExt};
 use serde::de::DeserializeOwned;
 
 use crate::io::couchbase_error_from_lcb_status;
+use chrono::NaiveDateTime;
 use serde_derive::Deserialize;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
@@ -911,6 +912,7 @@ pub struct GetResult {
     content: Vec<u8>,
     cas: u64,
     flags: u32,
+    expiry_time: Option<NaiveDateTime>,
 }
 
 impl GetResult {
@@ -919,7 +921,12 @@ impl GetResult {
             content,
             cas,
             flags,
+            expiry_time: None,
         }
+    }
+
+    pub(crate) fn set_expiry_time(&mut self, expiry: NaiveDateTime) {
+        self.expiry_time = Some(expiry);
     }
 
     pub fn cas(&self) -> u64 {
@@ -937,6 +944,11 @@ impl GetResult {
                 source: e.into(),
             }),
         }
+    }
+
+    // TODO: Pretty unconvinced that this returns the correct type, forcing users to use chrono here.
+    pub fn expiry_time(&self) -> Option<&NaiveDateTime> {
+        self.expiry_time.as_ref()
     }
 }
 
@@ -1087,14 +1099,7 @@ impl LookupInResult {
         Self { content, cas }
     }
 
-    pub fn cas(&self) -> u64 {
-        self.cas
-    }
-
-    pub fn content<'a, T>(&'a self, index: usize) -> CouchbaseResult<T>
-    where
-        T: serde::Deserialize<'a>,
-    {
+    pub(crate) fn raw(&self, index: usize) -> CouchbaseResult<&Vec<u8>> {
         let content = match self.content.get(index) {
             Some(c) => c,
             None => {
@@ -1114,10 +1119,21 @@ impl LookupInResult {
             }
         }
 
-        match serde_json::from_slice(content.value.as_slice()) {
-            Ok(v) => Ok(v),
-            Err(e) => Err(CouchbaseError::decoding_failure_from_serde(e)),
-        }
+        Ok(&content.value)
+    }
+
+    pub fn cas(&self) -> u64 {
+        self.cas
+    }
+
+    pub fn content<'a, T>(&'a self, index: usize) -> CouchbaseResult<T>
+    where
+        T: serde::Deserialize<'a>,
+    {
+        let content = self.raw(index)?;
+
+        serde_json::from_slice(content.as_slice())
+            .map_err(CouchbaseError::decoding_failure_from_serde)
     }
 
     pub fn exists(&self, index: usize) -> bool {

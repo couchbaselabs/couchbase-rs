@@ -1,6 +1,6 @@
 use crate::util::{BeerDocument, TestConfig};
 use crate::{util, TestResult};
-use chrono::{DateTime, Local, NaiveDateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use couchbase::{
     ArrayAppendSpecOptions, ArrayInsertSpecOptions, ArrayPrependSpecOptions, CouchbaseError,
     CouchbaseResult, CountSpecOptions, DecrementSpecOptions, ExistsSpecOptions, GetOptions,
@@ -482,12 +482,13 @@ pub async fn test_mutatein_preserve_expiry(config: Arc<TestConfig>) -> TestResul
     let key = Uuid::new_v4().to_string();
     let doc: BeerDocument = util::load_dataset_single("beer_sample_beer_single.json")?;
 
-    let start = Local::now();
+    let start = Utc::now();
+    let duration = Duration::from_secs(25);
     let result = collection
         .upsert(
             &key,
             &doc,
-            UpsertOptions::default().expiry(Duration::from_secs(25)),
+            UpsertOptions::default().expiry(duration.clone()),
         )
         .await?;
     assert_ne!(0, result.cas());
@@ -519,9 +520,22 @@ pub async fn test_mutatein_preserve_expiry(config: Arc<TestConfig>) -> TestResul
 
     let expiry_timestamp = result.content(0)?;
     let expires_at = NaiveDateTime::from_timestamp(expiry_timestamp, 0);
+    let expires_since_start =
+        DateTime::<Utc>::from_utc(expires_at, Utc).signed_duration_since(start);
+    let chrono_duration = chrono::Duration::from_std(duration).unwrap();
     assert!(
-        start.signed_duration_since(DateTime::<Utc>::from_utc(expires_at, Utc))
-            < chrono::Duration::from_std(Duration::from_secs(5)).unwrap()
+        expires_since_start <= chrono_duration,
+        "{} should be less than {}",
+        expires_since_start.to_string(),
+        chrono_duration.to_string()
+    );
+    let min_chrono_duration =
+        chrono::Duration::from_std(duration - Duration::from_secs(5)).unwrap();
+    assert!(
+        expires_since_start > min_chrono_duration,
+        "{} should be greater than {}",
+        expires_since_start,
+        min_chrono_duration
     );
 
     Ok(false)

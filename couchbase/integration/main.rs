@@ -99,7 +99,7 @@ async fn main() -> Result<(), std::io::Error> {
     let config = setup().await;
 
     let mut success = 0;
-    let mut failures = 0;
+    let mut failures = vec![];
     let mut skipped = 0;
     for t in test_functions::tests(config.1) {
         println!();
@@ -125,7 +125,7 @@ async fn main() -> Result<(), std::io::Error> {
                     }
                 }
                 Err(e) => {
-                    failures += 1;
+                    failures.push(t.name.clone());
                     TestOutcome {
                         name: t.name.to_string(),
                         result: TestResultStatus::Failure,
@@ -136,7 +136,7 @@ async fn main() -> Result<(), std::io::Error> {
             Err(_e) => {
                 // The JoinError here doesn't tell us anything interesting but the panic will be
                 // output to stderr anyway.
-                failures += 1;
+                failures.push(t.name.clone());
                 TestOutcome {
                     name: t.name.to_string(),
                     result: TestResultStatus::Failure,
@@ -154,11 +154,16 @@ async fn main() -> Result<(), std::io::Error> {
     println!();
     println!(
         "Success: {}, Failures: {}, Skipped: {}",
-        success, failures, skipped
+        success,
+        failures.len(),
+        skipped
     );
+    if failures.len() > 0 {
+        println!("Failed: {}", failures.join(", "));
+    }
     println!();
 
-    if failures == 0 {
+    if failures.len() == 0 {
         Ok(())
     } else {
         Err(std::io::Error::new(ErrorKind::Other, "test failures"))

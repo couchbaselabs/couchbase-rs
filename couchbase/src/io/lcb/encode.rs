@@ -880,6 +880,10 @@ pub enum EncodedMutateSpec {
     },
 }
 
+pub(crate) const LOOKUPIN_MACRO_CAS: &str = "$document.CAS";
+pub(crate) const LOOKUPIN_MACRO_EXPIRYTIME: &str = "$document.exptime";
+pub(crate) const LOOKUPIN_MACRO_FLAGS: &str = "$document.flags";
+
 pub(crate) const MUTATION_MACRO_CAS: &str = "${Mutation.CAS}";
 pub(crate) const MUTATION_MACRO_SEQNO: &str = "${Mutation.seqno}";
 pub(crate) const MUTATION_MACRO_VALUE_CRC32C: &str = "${Mutation.value_crc32c}";

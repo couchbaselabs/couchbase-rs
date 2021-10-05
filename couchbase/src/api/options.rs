@@ -609,10 +609,15 @@ impl SearchOptions {
 #[derive(Debug, Default)]
 pub struct GetOptions {
     pub(crate) timeout: Option<Duration>,
+    pub(crate) with_expiry: bool,
 }
 
 impl GetOptions {
     timeout!();
+    pub fn with_expiry(mut self, with: bool) -> Self {
+        self.with_expiry = with;
+        self
+    }
 }
 
 #[derive(Debug, Default)]
