@@ -1,10 +1,9 @@
 use crate::api::error::{CouchbaseError, CouchbaseResult, ErrorContext};
-use crate::api::results::{
+use crate::io::lcb::{HttpCookie, ViewCookie};
+use crate::{
     AnalyticsResult, ExistsResult, GenericManagementResult, GetResult, LookupInResult,
     MutateInResult, MutationResult, PingResult, PingState, QueryResult, SearchResult, SubDocField,
 };
-use crate::api::MutationToken;
-use crate::io::lcb::{HttpCookie, ViewCookie};
 use couchbase_sys::*;
 use log::{debug, trace};
 use serde_json::Value;
@@ -21,7 +20,7 @@ use crate::io::lcb::{
 };
 
 use crate::io::lcb::instance::decrement_outstanding_requests;
-use crate::{CounterResult, EndpointPingReport, ServiceType, ViewResult, ViewRow};
+use crate::{CounterResult, EndpointPingReport, MutationToken, ServiceType, ViewResult, ViewRow};
 use std::collections::HashMap;
 
 fn decode_and_own_str(ptr: *const c_char, len: usize) -> String {

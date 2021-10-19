@@ -1,7 +1,12 @@
 use crate::api::error::{CouchbaseError, CouchbaseResult};
-use crate::api::options::*;
+use crate::api::keyvalue_options::*;
+use crate::api::keyvalue_results::*;
 use crate::api::results::*;
-use crate::api::{LookupInSpec, MutateInSpec};
+use crate::{
+    AnalyticsOptions, AnalyticsResult, LookupInOptions, LookupInResult, LookupInSpec,
+    MutateInOptions, MutateInResult, MutateInSpec, QueryOptions, QueryResult, SearchOptions,
+    SearchResult, ServiceType, ViewResult,
+};
 use futures::channel::oneshot::Sender;
 use std::time::Duration;
 

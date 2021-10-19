@@ -1,14 +1,11 @@
+use crate::api::query_options::QueryOptions;
 use crate::io::request::*;
 use crate::io::Core;
-use crate::{
-    BuildDeferredQueryIndexOptions, CouchbaseError, CouchbaseResult,
-    CreatePrimaryQueryIndexOptions, CreateQueryIndexOptions, DropPrimaryQueryIndexOptions,
-    DropQueryIndexOptions, ErrorContext, GetAllQueryIndexOptions, QueryOptions,
-    WatchIndexesQueryIndexOptions,
-};
+use crate::{CouchbaseError, CouchbaseResult, ErrorContext};
 use futures::channel::oneshot;
 use futures::StreamExt;
 use serde_derive::Deserialize;
+use serde_json::Value;
 use std::ops::Add;
 use std::sync::Arc;
 use std::thread::sleep;
@@ -375,5 +372,196 @@ impl QueryIndexManager {
         }
 
         Ok(true)
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct CreateQueryIndexOptions {
+    pub(crate) timeout: Option<Duration>,
+    pub(crate) ignore_exists: Option<bool>,
+    pub(crate) with: Value,
+}
+
+impl CreateQueryIndexOptions {
+    timeout!();
+    pub fn ignore_if_exists(mut self, ignore_exists: bool) -> Self {
+        self.ignore_exists = Some(ignore_exists);
+        self
+    }
+    pub fn num_replicas(mut self, num_replicas: i32) -> Self {
+        self.with["num_replica"] = Value::from(num_replicas);
+        self
+    }
+    pub fn deferred(mut self, deferred: bool) -> Self {
+        self.with["defer_build"] = Value::from(deferred);
+        self
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct GetAllQueryIndexOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl GetAllQueryIndexOptions {
+    timeout!();
+}
+
+impl From<&BuildDeferredQueryIndexOptions> for GetAllQueryIndexOptions {
+    fn from(opts: &BuildDeferredQueryIndexOptions) -> Self {
+        let mut us = Self::default();
+        if let Some(t) = opts.timeout {
+            us = us.timeout(t);
+        }
+
+        us
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct CreatePrimaryQueryIndexOptions {
+    pub(crate) timeout: Option<Duration>,
+    pub(crate) ignore_exists: Option<bool>,
+    pub(crate) name: Option<String>,
+    pub(crate) with: Value,
+}
+
+impl CreatePrimaryQueryIndexOptions {
+    timeout!();
+    pub fn ignore_if_exists(mut self, ignore_exists: bool) -> Self {
+        self.ignore_exists = Some(ignore_exists);
+        self
+    }
+    pub fn num_replicas(mut self, num_replicas: i32) -> Self {
+        self.with["num_replica"] = Value::from(num_replicas);
+        self
+    }
+    pub fn index_name(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+    pub fn deferred(mut self, deferred: bool) -> Self {
+        self.with["defer_build"] = Value::from(deferred);
+        self
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct DropQueryIndexOptions {
+    pub(crate) timeout: Option<Duration>,
+    pub(crate) ignore_not_exists: Option<bool>,
+}
+
+impl DropQueryIndexOptions {
+    timeout!();
+    pub fn ignore_if_not_exists(mut self, ignore_not_exists: bool) -> Self {
+        self.ignore_not_exists = Some(ignore_not_exists);
+        self
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct DropPrimaryQueryIndexOptions {
+    pub(crate) timeout: Option<Duration>,
+    pub(crate) ignore_not_exists: Option<bool>,
+    pub(crate) name: Option<String>,
+}
+
+impl DropPrimaryQueryIndexOptions {
+    timeout!();
+    pub fn ignore_if_not_exists(mut self, ignore_not_exists: bool) -> Self {
+        self.ignore_not_exists = Some(ignore_not_exists);
+        self
+    }
+    pub fn index_name(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct BuildDeferredQueryIndexOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl BuildDeferredQueryIndexOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct WatchIndexesQueryIndexOptions {
+    pub(crate) watch_primary: Option<bool>,
+}
+
+impl WatchIndexesQueryIndexOptions {
+    pub fn watch_primary(mut self, watch: bool) -> Self {
+        self.watch_primary = Some(watch);
+        self
+    }
+}
+
+impl From<&GetAllQueryIndexOptions> for QueryOptions {
+    fn from(opts: &GetAllQueryIndexOptions) -> Self {
+        let mut us = Self::default();
+        if let Some(t) = opts.timeout {
+            us = us.timeout(t);
+        }
+
+        us
+    }
+}
+
+impl From<&CreateQueryIndexOptions> for QueryOptions {
+    fn from(opts: &CreateQueryIndexOptions) -> Self {
+        let mut us = Self::default();
+        if let Some(t) = opts.timeout {
+            us = us.timeout(t);
+        }
+
+        us
+    }
+}
+
+impl From<&CreatePrimaryQueryIndexOptions> for QueryOptions {
+    fn from(opts: &CreatePrimaryQueryIndexOptions) -> Self {
+        let mut us = Self::default();
+        if let Some(t) = opts.timeout {
+            us = us.timeout(t);
+        }
+
+        us
+    }
+}
+
+impl From<&DropQueryIndexOptions> for QueryOptions {
+    fn from(opts: &DropQueryIndexOptions) -> Self {
+        let mut us = Self::default();
+        if let Some(t) = opts.timeout {
+            us = us.timeout(t);
+        }
+
+        us
+    }
+}
+
+impl From<&DropPrimaryQueryIndexOptions> for QueryOptions {
+    fn from(opts: &DropPrimaryQueryIndexOptions) -> Self {
+        let mut us = Self::default();
+        if let Some(t) = opts.timeout {
+            us = us.timeout(t);
+        }
+
+        us
+    }
+}
+
+impl From<&BuildDeferredQueryIndexOptions> for QueryOptions {
+    fn from(opts: &BuildDeferredQueryIndexOptions) -> Self {
+        let mut us = Self::default();
+        if let Some(t) = opts.timeout {
+            us = us.timeout(t);
+        }
+
+        us
     }
 }

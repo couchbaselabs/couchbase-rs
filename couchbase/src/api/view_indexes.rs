@@ -1,10 +1,7 @@
+use crate::api::view_options::DesignDocumentNamespace;
 use crate::io::request::*;
 use crate::io::Core;
-use crate::{
-    CouchbaseError, CouchbaseResult, DropDesignDocumentsOptions, GenericManagementResult,
-    GetAllDesignDocumentsOptions, GetDesignDocumentOptions, PublishDesignDocumentsOptions,
-    ServiceType, UpsertDesignDocumentOptions,
-};
+use crate::{CouchbaseError, CouchbaseResult, GenericManagementResult, ServiceType};
 use futures::channel::oneshot;
 use serde::de::DeserializeOwned;
 use serde_derive::{Deserialize, Serialize};
@@ -12,12 +9,6 @@ use std::borrow::BorrowMut;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
-
-#[derive(Debug, Clone, Deserialize, Serialize, Eq, PartialEq)]
-pub enum DesignDocumentNamespace {
-    Production,
-    Development,
-}
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct View {
@@ -370,4 +361,49 @@ impl ViewIndexManager {
 
         new_name
     }
+}
+
+#[derive(Debug, Default)]
+pub struct GetDesignDocumentOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl GetDesignDocumentOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct GetAllDesignDocumentsOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl GetAllDesignDocumentsOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct UpsertDesignDocumentOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl UpsertDesignDocumentOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct DropDesignDocumentsOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl DropDesignDocumentsOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct PublishDesignDocumentsOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl PublishDesignDocumentsOptions {
+    timeout!();
 }

@@ -1,11 +1,7 @@
 use crate::io::request::*;
 use crate::io::Core;
 use crate::CouchbaseError::{CollectionExists, CollectionNotFound, ScopeExists, ScopeNotFound};
-use crate::{
-    CouchbaseError, CouchbaseResult, CreateCollectionOptions, CreateScopeOptions,
-    DropCollectionOptions, DropScopeOptions, ErrorContext, GenericManagementResult,
-    GetAllScopesOptions, ServiceType,
-};
+use crate::{CouchbaseError, CouchbaseResult, ErrorContext, GenericManagementResult, ServiceType};
 use futures::channel::oneshot;
 use serde_derive::Deserialize;
 use serde_json::Value;
@@ -320,4 +316,49 @@ impl CollectionManager {
             message,
         }
     }
+}
+
+#[derive(Debug, Default)]
+pub struct GetAllScopesOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl GetAllScopesOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct CreateScopeOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl CreateScopeOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct CreateCollectionOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl CreateCollectionOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct DropScopeOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl DropScopeOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct DropCollectionOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl DropCollectionOptions {
+    timeout!();
 }
