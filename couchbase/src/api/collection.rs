@@ -2,13 +2,11 @@ use crate::api::keyvalue_options::*;
 use crate::api::keyvalue_results::*;
 use crate::api::subdoc::*;
 use crate::api::subdoc_options::*;
+use crate::api::subdoc_results::*;
 use crate::io::request::*;
 use crate::io::{Core, LOOKUPIN_MACRO_EXPIRYTIME};
 use crate::CouchbaseError::Generic;
-use crate::{
-    BinaryCollection, CouchbaseError, CouchbaseResult, ErrorContext, GetOptions, LookupInResult,
-    MutateInResult,
-};
+use crate::{BinaryCollection, CouchbaseError, CouchbaseResult, ErrorContext};
 use chrono::NaiveDateTime;
 use futures::channel::oneshot;
 use serde::Serialize;
@@ -48,18 +46,19 @@ impl Collection {
         self.name.as_str()
     }
 
-    pub async fn get<S: Into<String>>(
+    pub async fn get(
         &self,
-        id: S,
-        options: GetOptions,
+        id: impl Into<String>,
+        options: impl Into<Option<GetOptions>>,
     ) -> CouchbaseResult<GetResult> {
+        let options = unwrap_or_default!(options.into());
         if options.with_expiry {
             return self.get_with_expiry(id).await;
         }
         return self.get_direct(id, options).await;
     }
 
-    async fn get_with_expiry<S: Into<String>>(&self, id: S) -> CouchbaseResult<GetResult> {
+    async fn get_with_expiry(&self, id: impl Into<String>) -> CouchbaseResult<GetResult> {
         let (sender, receiver) = oneshot::channel();
 
         // TODO: stuff with flags once supported
@@ -91,9 +90,9 @@ impl Collection {
         Ok(result)
     }
 
-    async fn get_direct<S: Into<String>>(
+    async fn get_direct(
         &self,
-        id: S,
+        id: impl Into<String>,
         options: GetOptions,
     ) -> CouchbaseResult<GetResult> {
         let (sender, receiver) = oneshot::channel();
@@ -108,12 +107,13 @@ impl Collection {
         receiver.await.unwrap()
     }
 
-    pub async fn get_and_lock<S: Into<String>>(
+    pub async fn get_and_lock(
         &self,
-        id: S,
+        id: impl Into<String>,
         lock_time: Duration,
-        options: GetAndLockOptions,
+        options: impl Into<Option<GetAndLockOptions>>,
     ) -> CouchbaseResult<GetResult> {
+        let options = unwrap_or_default!(options.into());
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::Get(GetRequest {
             id: id.into(),
@@ -126,12 +126,13 @@ impl Collection {
         receiver.await.unwrap()
     }
 
-    pub async fn get_and_touch<S: Into<String>>(
+    pub async fn get_and_touch(
         &self,
-        id: S,
+        id: impl Into<String>,
         expiry: Duration,
-        options: GetAndTouchOptions,
+        options: impl Into<Option<GetAndTouchOptions>>,
     ) -> CouchbaseResult<GetResult> {
+        let options = unwrap_or_default!(options.into());
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::Get(GetRequest {
             id: id.into(),
@@ -144,11 +145,12 @@ impl Collection {
         receiver.await.unwrap()
     }
 
-    pub async fn exists<S: Into<String>>(
+    pub async fn exists(
         &self,
-        id: S,
-        options: ExistsOptions,
+        id: impl Into<String>,
+        options: impl Into<Option<ExistsOptions>>,
     ) -> CouchbaseResult<ExistsResult> {
+        let options = unwrap_or_default!(options.into());
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::Exists(ExistsRequest {
             id: id.into(),
@@ -161,48 +163,51 @@ impl Collection {
         receiver.await.unwrap()
     }
 
-    pub async fn upsert<S: Into<String>, T>(
+    pub async fn upsert<T>(
         &self,
-        id: S,
+        id: impl Into<String>,
         content: T,
-        options: UpsertOptions,
+        options: impl Into<Option<UpsertOptions>>,
     ) -> CouchbaseResult<MutationResult>
     where
         T: Serialize,
     {
+        let options = unwrap_or_default!(options.into());
         self.mutate(id, content, MutateRequestType::Upsert { options })
             .await
     }
 
-    pub async fn insert<S: Into<String>, T>(
+    pub async fn insert<T>(
         &self,
-        id: S,
+        id: impl Into<String>,
         content: T,
-        options: InsertOptions,
+        options: impl Into<Option<InsertOptions>>,
     ) -> CouchbaseResult<MutationResult>
     where
         T: Serialize,
     {
+        let options = unwrap_or_default!(options.into());
         self.mutate(id, content, MutateRequestType::Insert { options })
             .await
     }
 
-    pub async fn replace<S: Into<String>, T>(
+    pub async fn replace<T>(
         &self,
-        id: S,
+        id: impl Into<String>,
         content: T,
-        options: ReplaceOptions,
+        options: impl Into<Option<ReplaceOptions>>,
     ) -> CouchbaseResult<MutationResult>
     where
         T: Serialize,
     {
+        let options = unwrap_or_default!(options.into());
         self.mutate(id, content, MutateRequestType::Replace { options })
             .await
     }
 
-    async fn mutate<S: Into<String>, T>(
+    async fn mutate<T>(
         &self,
-        id: S,
+        id: impl Into<String>,
         content: T,
         ty: MutateRequestType,
     ) -> CouchbaseResult<MutationResult>
@@ -232,11 +237,12 @@ impl Collection {
         receiver.await.unwrap()
     }
 
-    pub async fn remove<S: Into<String>>(
+    pub async fn remove(
         &self,
-        id: S,
-        options: RemoveOptions,
+        id: impl Into<String>,
+        options: impl Into<Option<RemoveOptions>>,
     ) -> CouchbaseResult<MutationResult> {
+        let options = unwrap_or_default!(options.into());
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::Remove(RemoveRequest {
             id: id.into(),
@@ -253,8 +259,9 @@ impl Collection {
         &self,
         id: impl Into<String>,
         specs: impl IntoIterator<Item = LookupInSpec>,
-        options: LookupInOptions,
+        options: impl Into<Option<LookupInOptions>>,
     ) -> CouchbaseResult<LookupInResult> {
+        let options = unwrap_or_default!(options.into());
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::LookupIn(LookupInRequest {
             id: id.into(),
@@ -272,8 +279,9 @@ impl Collection {
         &self,
         id: impl Into<String>,
         specs: impl IntoIterator<Item = MutateInSpec>,
-        options: MutateInOptions,
+        options: impl Into<Option<MutateInOptions>>,
     ) -> CouchbaseResult<MutateInResult> {
+        let options = unwrap_or_default!(options.into());
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::MutateIn(MutateInRequest {
             id: id.into(),

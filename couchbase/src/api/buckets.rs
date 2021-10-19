@@ -531,8 +531,9 @@ impl BucketManager {
     pub async fn create_bucket(
         &self,
         settings: BucketSettings,
-        options: CreateBucketOptions,
+        options: impl Into<Option<CreateBucketOptions>>,
     ) -> CouchbaseResult<()> {
+        let options = unwrap_or_default!(options.into());
         // The server expects form data so we need to build that, serde expects each value to be an
         // Option.
         let form = settings.as_form(false)?;
@@ -568,8 +569,9 @@ impl BucketManager {
     pub async fn update_bucket(
         &self,
         settings: BucketSettings,
-        options: UpdateBucketOptions,
+        options: impl Into<Option<UpdateBucketOptions>>,
     ) -> CouchbaseResult<()> {
+        let options = unwrap_or_default!(options.into());
         // The server expects form data so we need to build that, serde expects each value to be an
         // Option.
         let form = settings.as_form(true)?;
@@ -602,11 +604,12 @@ impl BucketManager {
         }
     }
 
-    pub async fn drop_bucket<S: Into<String>>(
+    pub async fn drop_bucket(
         &self,
-        name: S,
-        options: DropBucketOptions,
+        name: impl Into<String>,
+        options: impl Into<Option<DropBucketOptions>>,
     ) -> CouchbaseResult<()> {
+        let options = unwrap_or_default!(options.into());
         let (sender, receiver) = oneshot::channel();
 
         let bucket_name = name.into();
@@ -634,11 +637,12 @@ impl BucketManager {
         }
     }
 
-    pub async fn get_bucket<S: Into<String>>(
+    pub async fn get_bucket(
         &self,
-        name: S,
-        options: GetBucketOptions,
+        name: impl Into<String>,
+        options: impl Into<Option<GetBucketOptions>>,
     ) -> CouchbaseResult<BucketSettings> {
+        let options = unwrap_or_default!(options.into());
         let (sender, receiver) = oneshot::channel();
 
         let bucket_name = name.into();
@@ -671,8 +675,9 @@ impl BucketManager {
 
     pub async fn get_all_buckets(
         &self,
-        options: GetAllBucketsOptions,
+        options: impl Into<Option<GetAllBucketsOptions>>,
     ) -> CouchbaseResult<HashMap<String, BucketSettings>> {
+        let options = unwrap_or_default!(options.into());
         let (sender, receiver) = oneshot::channel();
 
         self.core.send(Request::GenericManagementRequest(
@@ -708,11 +713,12 @@ impl BucketManager {
         Ok(settings)
     }
 
-    pub async fn flush_bucket<S: Into<String>>(
+    pub async fn flush_bucket(
         &self,
-        name: S,
-        options: FlushBucketOptions,
+        name: impl Into<String>,
+        options: impl Into<Option<FlushBucketOptions>>,
     ) -> CouchbaseResult<()> {
+        let options = unwrap_or_default!(options.into());
         let (sender, receiver) = oneshot::channel();
 
         let bucket_name = name.into();

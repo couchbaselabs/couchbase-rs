@@ -40,7 +40,11 @@ pub struct CollectionSpec {
 }
 
 impl CollectionSpec {
-    pub fn new<S: Into<String>>(name: S, scope_name: S, max_expiry: Duration) -> Self {
+    pub fn new(
+        name: impl Into<String>,
+        scope_name: impl Into<String>,
+        max_expiry: Duration,
+    ) -> Self {
         Self {
             name: name.into(),
             scope_name: scope_name.into(),
@@ -94,8 +98,9 @@ impl CollectionManager {
 
     pub async fn get_all_scopes(
         &self,
-        options: GetAllScopesOptions,
+        options: impl Into<Option<GetAllScopesOptions>>,
     ) -> CouchbaseResult<Vec<ScopeSpec>> {
+        let options = unwrap_or_default!(options.into());
         let (sender, receiver) = oneshot::channel();
 
         self.core.send(Request::GenericManagementRequest(
@@ -179,8 +184,9 @@ impl CollectionManager {
     pub async fn create_collection(
         &self,
         collection: CollectionSpec,
-        options: CreateCollectionOptions,
+        options: impl Into<Option<CreateCollectionOptions>>,
     ) -> CouchbaseResult<()> {
+        let options = unwrap_or_default!(options.into());
         // The server expects form data so we need to build that, serde expects each value to be an
         // Option.
         let mut form = vec![("name", collection.name.clone())];
@@ -219,11 +225,12 @@ impl CollectionManager {
         }
     }
 
-    pub async fn drop_scope<S: Into<String>>(
+    pub async fn drop_scope(
         &self,
-        scope_name: S,
-        options: DropScopeOptions,
+        scope_name: impl Into<String>,
+        options: impl Into<Option<DropScopeOptions>>,
     ) -> CouchbaseResult<()> {
+        let options = unwrap_or_default!(options.into());
         let (sender, receiver) = oneshot::channel();
 
         let scope = scope_name.into();
@@ -258,8 +265,9 @@ impl CollectionManager {
     pub async fn drop_collection(
         &self,
         collection: CollectionSpec,
-        options: DropCollectionOptions,
+        options: impl Into<Option<DropCollectionOptions>>,
     ) -> CouchbaseResult<()> {
+        let options = unwrap_or_default!(options.into());
         let (sender, receiver) = oneshot::channel();
 
         self.core.send(Request::GenericManagementRequest(

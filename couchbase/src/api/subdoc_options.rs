@@ -65,9 +65,6 @@ pub struct InsertSpecOptions {
 
 impl InsertSpecOptions {
     xattr!();
-    pub fn new() -> Self {
-        InsertSpecOptions::default()
-    }
 
     pub fn create_path(mut self, create: bool) -> Self {
         self.create_path = create;
@@ -83,9 +80,6 @@ pub struct UpsertSpecOptions {
 
 impl UpsertSpecOptions {
     xattr!();
-    pub fn new() -> Self {
-        UpsertSpecOptions::default()
-    }
 
     pub fn create_path(mut self, create: bool) -> Self {
         self.create_path = create;
@@ -100,9 +94,6 @@ pub struct ReplaceSpecOptions {
 
 impl ReplaceSpecOptions {
     xattr!();
-    pub fn new() -> Self {
-        ReplaceSpecOptions::default()
-    }
 }
 
 #[derive(Debug, Default)]
@@ -112,9 +103,6 @@ pub struct RemoveSpecOptions {
 
 impl RemoveSpecOptions {
     xattr!();
-    pub fn new() -> Self {
-        RemoveSpecOptions::default()
-    }
 }
 
 #[derive(Debug, Default)]
@@ -125,9 +113,6 @@ pub struct ArrayAppendSpecOptions {
 
 impl ArrayAppendSpecOptions {
     xattr!();
-    pub fn new() -> Self {
-        ArrayAppendSpecOptions::default()
-    }
 
     pub fn create_path(mut self, create: bool) -> Self {
         self.create_path = create;
@@ -143,9 +128,6 @@ pub struct ArrayPrependSpecOptions {
 
 impl ArrayPrependSpecOptions {
     xattr!();
-    pub fn new() -> Self {
-        ArrayPrependSpecOptions::default()
-    }
 
     pub fn create_path(mut self, create: bool) -> Self {
         self.create_path = create;
@@ -161,9 +143,6 @@ pub struct ArrayInsertSpecOptions {
 
 impl ArrayInsertSpecOptions {
     xattr!();
-    pub fn new() -> Self {
-        ArrayInsertSpecOptions::default()
-    }
 
     pub fn create_path(mut self, create: bool) -> Self {
         self.create_path = create;
@@ -179,9 +158,6 @@ pub struct ArrayAddUniqueSpecOptions {
 
 impl ArrayAddUniqueSpecOptions {
     xattr!();
-    pub fn new() -> Self {
-        ArrayAddUniqueSpecOptions::default()
-    }
 
     pub fn create_path(mut self, create: bool) -> Self {
         self.create_path = create;
@@ -197,9 +173,6 @@ pub struct IncrementSpecOptions {
 
 impl IncrementSpecOptions {
     xattr!();
-    pub fn new() -> Self {
-        IncrementSpecOptions::default()
-    }
 
     pub fn create_path(mut self, create: bool) -> Self {
         self.create_path = create;
@@ -215,9 +188,6 @@ pub struct DecrementSpecOptions {
 
 impl DecrementSpecOptions {
     xattr!();
-    pub fn new() -> Self {
-        DecrementSpecOptions::default()
-    }
 
     pub fn create_path(mut self, create: bool) -> Self {
         self.create_path = create;
@@ -232,9 +202,6 @@ pub struct GetSpecOptions {
 
 impl GetSpecOptions {
     xattr!();
-    pub fn new() -> Self {
-        GetSpecOptions::default()
-    }
 }
 
 #[derive(Debug, Default)]
@@ -244,9 +211,6 @@ pub struct ExistsSpecOptions {
 
 impl ExistsSpecOptions {
     xattr!();
-    pub fn new() -> Self {
-        ExistsSpecOptions::default()
-    }
 }
 
 #[derive(Debug, Default)]
@@ -256,7 +220,4 @@ pub struct CountSpecOptions {
 
 impl CountSpecOptions {
     xattr!();
-    pub fn new() -> Self {
-        CountSpecOptions::default()
-    }
 }

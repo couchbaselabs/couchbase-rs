@@ -110,14 +110,15 @@ pub enum MutateInSpec {
 }
 
 impl MutateInSpec {
-    pub fn replace<S: Into<String>, T>(
-        path: S,
+    pub fn replace<T>(
+        path: impl Into<String>,
         content: T,
-        opts: ReplaceSpecOptions,
+        opts: impl Into<Option<ReplaceSpecOptions>>,
     ) -> CouchbaseResult<Self>
     where
         T: Serialize,
     {
+        let opts = unwrap_or_default!(opts.into());
         let value = to_vec(&content).map_err(CouchbaseError::encoding_failure_from_serde)?;
         Ok(MutateInSpec::Replace {
             path: path.into(),
@@ -126,14 +127,15 @@ impl MutateInSpec {
         })
     }
 
-    pub fn insert<S: Into<String>, T>(
-        path: S,
+    pub fn insert<T>(
+        path: impl Into<String>,
         content: T,
-        opts: InsertSpecOptions,
+        opts: impl Into<Option<InsertSpecOptions>>,
     ) -> CouchbaseResult<Self>
     where
         T: Serialize,
     {
+        let opts = unwrap_or_default!(opts.into());
         let value = to_vec(&content).map_err(CouchbaseError::encoding_failure_from_serde)?;
         Ok(MutateInSpec::Insert {
             path: path.into(),
@@ -143,14 +145,15 @@ impl MutateInSpec {
         })
     }
 
-    pub fn upsert<S: Into<String>, T>(
-        path: S,
+    pub fn upsert<T>(
+        path: impl Into<String>,
         content: T,
-        opts: UpsertSpecOptions,
+        opts: impl Into<Option<UpsertSpecOptions>>,
     ) -> CouchbaseResult<Self>
     where
         T: Serialize,
     {
+        let opts = unwrap_or_default!(opts.into());
         let value = to_vec(&content).map_err(CouchbaseError::encoding_failure_from_serde)?;
         Ok(MutateInSpec::Upsert {
             path: path.into(),
@@ -160,14 +163,15 @@ impl MutateInSpec {
         })
     }
 
-    pub fn array_add_unique<S: Into<String>, T>(
-        path: S,
+    pub fn array_add_unique<T>(
+        path: impl Into<String>,
         content: T,
-        opts: ArrayAddUniqueSpecOptions,
+        opts: impl Into<Option<ArrayAddUniqueSpecOptions>>,
     ) -> CouchbaseResult<Self>
     where
         T: Serialize,
     {
+        let opts = unwrap_or_default!(opts.into());
         let value = to_vec(&content).map_err(CouchbaseError::encoding_failure_from_serde)?;
         Ok(MutateInSpec::ArrayAddUnique {
             path: path.into(),
@@ -177,14 +181,15 @@ impl MutateInSpec {
         })
     }
 
-    pub fn array_append<S: Into<String>, T>(
-        path: S,
+    pub fn array_append<T>(
+        path: impl Into<String>,
         content: impl IntoIterator<Item = T>,
-        opts: ArrayAppendSpecOptions,
+        opts: impl Into<Option<ArrayAppendSpecOptions>>,
     ) -> CouchbaseResult<Self>
     where
         T: Serialize,
     {
+        let opts = unwrap_or_default!(opts.into());
         let mut value = vec![];
         content.into_iter().try_for_each(|v| {
             match to_vec(&v) {
@@ -211,14 +216,15 @@ impl MutateInSpec {
         })
     }
 
-    pub fn array_prepend<S: Into<String>, T>(
-        path: S,
+    pub fn array_prepend<T>(
+        path: impl Into<String>,
         content: impl IntoIterator<Item = T>,
-        opts: ArrayPrependSpecOptions,
+        opts: impl Into<Option<ArrayPrependSpecOptions>>,
     ) -> CouchbaseResult<Self>
     where
         T: Serialize,
     {
+        let opts = unwrap_or_default!(opts.into());
         let mut value = vec![];
         content.into_iter().try_for_each(|v| {
             match to_vec(&v) {
@@ -245,14 +251,15 @@ impl MutateInSpec {
         })
     }
 
-    pub fn array_insert<S: Into<String>, T>(
-        path: S,
+    pub fn array_insert<T>(
+        path: impl Into<String>,
         content: impl IntoIterator<Item = T>,
-        opts: ArrayInsertSpecOptions,
+        opts: impl Into<Option<ArrayInsertSpecOptions>>,
     ) -> CouchbaseResult<Self>
     where
         T: Serialize,
     {
+        let opts = unwrap_or_default!(opts.into());
         let mut value = vec![];
         content.into_iter().try_for_each(|v| {
             match to_vec(&v) {
@@ -279,18 +286,23 @@ impl MutateInSpec {
         })
     }
 
-    pub fn remove<S: Into<String>>(path: S, opts: RemoveSpecOptions) -> CouchbaseResult<Self> {
+    pub fn remove(
+        path: impl Into<String>,
+        opts: impl Into<Option<RemoveSpecOptions>>,
+    ) -> CouchbaseResult<Self> {
+        let opts = unwrap_or_default!(opts.into());
         Ok(MutateInSpec::Remove {
             path: path.into(),
             xattr: opts.xattr,
         })
     }
 
-    pub fn increment<S: Into<String>>(
-        path: S,
+    pub fn increment(
+        path: impl Into<String>,
         delta: u64,
-        opts: IncrementSpecOptions,
+        opts: impl Into<Option<IncrementSpecOptions>>,
     ) -> CouchbaseResult<Self> {
+        let opts = unwrap_or_default!(opts.into());
         Ok(MutateInSpec::Counter {
             path: path.into(),
             delta: delta as i64,
@@ -299,11 +311,12 @@ impl MutateInSpec {
         })
     }
 
-    pub fn decrement<S: Into<String>>(
-        path: S,
+    pub fn decrement(
+        path: impl Into<String>,
         delta: u64,
-        opts: DecrementSpecOptions,
+        opts: impl Into<Option<DecrementSpecOptions>>,
     ) -> CouchbaseResult<Self> {
+        let opts = unwrap_or_default!(opts.into());
         Ok(MutateInSpec::Counter {
             path: path.into(),
             delta: -(delta as i64),
@@ -366,21 +379,24 @@ pub enum LookupInSpec {
 }
 
 impl LookupInSpec {
-    pub fn get<S: Into<String>>(path: S, opts: GetSpecOptions) -> Self {
+    pub fn get(path: impl Into<String>, opts: impl Into<Option<GetSpecOptions>>) -> Self {
+        let opts = unwrap_or_default!(opts.into());
         LookupInSpec::Get {
             path: path.into(),
             xattr: opts.xattr,
         }
     }
 
-    pub fn exists<S: Into<String>>(path: S, opts: ExistsSpecOptions) -> Self {
+    pub fn exists(path: impl Into<String>, opts: impl Into<Option<ExistsSpecOptions>>) -> Self {
+        let opts = unwrap_or_default!(opts.into());
         LookupInSpec::Exists {
             path: path.into(),
             xattr: opts.xattr,
         }
     }
 
-    pub fn count<S: Into<String>>(path: S, opts: CountSpecOptions) -> Self {
+    pub fn count(path: impl Into<String>, opts: impl Into<Option<CountSpecOptions>>) -> Self {
+        let opts = unwrap_or_default!(opts.into());
         LookupInSpec::Count {
             path: path.into(),
             xattr: opts.xattr,

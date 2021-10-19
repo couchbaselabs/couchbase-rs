@@ -846,8 +846,9 @@ impl AnalyticsIndexManager {
     pub async fn create_dataverse(
         &self,
         name: impl Into<String>,
-        opts: CreateAnalyticsDataverseOptions,
+        opts: impl Into<Option<CreateAnalyticsDataverseOptions>>,
     ) -> CouchbaseResult<()> {
+        let opts = unwrap_or_default!(opts.into());
         let ignore_if_exists = if opts.ignore_if_exists.unwrap_or_else(|| false) {
             String::from("IF NOT EXISTS")
         } else {
@@ -878,8 +879,9 @@ impl AnalyticsIndexManager {
     pub async fn drop_dataverse(
         &self,
         name: impl Into<String>,
-        opts: DropAnalyticsDataverseOptions,
+        opts: impl Into<Option<DropAnalyticsDataverseOptions>>,
     ) -> CouchbaseResult<()> {
+        let opts = unwrap_or_default!(opts.into());
         let ignore_if_not_exists = if opts.ignore_if_not_exists.unwrap_or_else(|| false) {
             String::from("IF EXISTS")
         } else {
@@ -911,8 +913,9 @@ impl AnalyticsIndexManager {
         &self,
         dataset_name: impl Into<String>,
         bucket_name: impl Into<String>,
-        opts: CreateAnalyticsDatasetOptions,
+        opts: impl Into<Option<CreateAnalyticsDatasetOptions>>,
     ) -> CouchbaseResult<()> {
+        let opts = unwrap_or_default!(opts.into());
         let ignore_if_exists = if opts.ignore_if_exists.unwrap_or_else(|| false) {
             String::from("IF NOT EXISTS")
         } else {
@@ -955,8 +958,9 @@ impl AnalyticsIndexManager {
     pub async fn drop_dataset(
         &self,
         dataset_name: impl Into<String>,
-        opts: DropAnalyticsDatasetOptions,
+        opts: impl Into<Option<DropAnalyticsDatasetOptions>>,
     ) -> CouchbaseResult<()> {
+        let opts = unwrap_or_default!(opts.into());
         let ignore_if_not_exists = if opts.ignore_if_not_exists.unwrap_or_else(|| false) {
             String::from("IF EXISTS")
         } else {
@@ -987,8 +991,9 @@ impl AnalyticsIndexManager {
 
     pub async fn get_all_datasets(
         &self,
-        opts: GetAllAnalyticsDatasetsOptions,
+        opts: impl Into<Option<GetAllAnalyticsDatasetsOptions>>,
     ) -> CouchbaseResult<impl IntoIterator<Item = AnalyticsDataset>> {
+        let opts = unwrap_or_default!(opts.into());
         let statement =
             "SELECT d.* FROM Metadata.`Dataset` d WHERE d.DataverseName <> \"Metadata\"";
 
@@ -1021,8 +1026,9 @@ impl AnalyticsIndexManager {
         index_name: impl Into<String>,
         dataset_name: impl Into<String>,
         fields: HashMap<String, String>,
-        opts: CreateAnalyticsIndexOptions,
+        opts: impl Into<Option<CreateAnalyticsIndexOptions>>,
     ) -> CouchbaseResult<()> {
+        let opts = unwrap_or_default!(opts.into());
         let ignore_if_exists = if opts.ignore_if_exists.unwrap_or_else(|| false) {
             String::from("IF NOT EXISTS")
         } else {
@@ -1066,8 +1072,9 @@ impl AnalyticsIndexManager {
         &self,
         index_name: impl Into<String>,
         dataset_name: impl Into<String>,
-        opts: DropAnalyticsIndexOptions,
+        opts: impl Into<Option<DropAnalyticsIndexOptions>>,
     ) -> CouchbaseResult<()> {
+        let opts = unwrap_or_default!(opts.into());
         let ignore_if_not_exists = if opts.ignore_if_not_exists.unwrap_or_else(|| false) {
             String::from("IF EXISTS")
         } else {
@@ -1103,8 +1110,9 @@ impl AnalyticsIndexManager {
 
     pub async fn get_all_indexes(
         &self,
-        opts: GetAllAnalyticsDatasetsOptions,
+        opts: impl Into<Option<GetAllAnalyticsDatasetsOptions>>,
     ) -> CouchbaseResult<impl IntoIterator<Item = AnalyticsIndex>> {
+        let opts = unwrap_or_default!(opts.into());
         let statement = "SELECT d.* FROM Metadata.`Index` d WHERE d.DataverseName <> \"Metadata\"";
 
         let mut req_opts = AnalyticsOptions::default();
@@ -1131,7 +1139,11 @@ impl AnalyticsIndexManager {
         Ok(indexes)
     }
 
-    pub async fn connect_link(&self, opts: ConnectAnalyticsLinkOptions) -> CouchbaseResult<()> {
+    pub async fn connect_link(
+        &self,
+        opts: impl Into<Option<ConnectAnalyticsLinkOptions>>,
+    ) -> CouchbaseResult<()> {
+        let opts = unwrap_or_default!(opts.into());
         let mut link_name = match opts.link_name {
             Some(l) => l,
             None => String::from("Local"),
@@ -1160,8 +1172,9 @@ impl AnalyticsIndexManager {
 
     pub async fn disconnect_link(
         &self,
-        opts: DisconnectAnalyticsLinkOptions,
+        opts: impl Into<Option<DisconnectAnalyticsLinkOptions>>,
     ) -> CouchbaseResult<()> {
+        let opts = unwrap_or_default!(opts.into());
         let mut link_name = match opts.link_name {
             Some(l) => l,
             None => String::from("Local"),
@@ -1190,8 +1203,9 @@ impl AnalyticsIndexManager {
 
     pub async fn get_pending_mutations(
         &self,
-        opts: GetAllAnalyticsDatasetsOptions,
+        opts: impl Into<Option<GetAllAnalyticsDatasetsOptions>>,
     ) -> CouchbaseResult<HashMap<String, HashMap<String, i64>>> {
+        let opts = unwrap_or_default!(opts.into());
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::GenericManagementRequest(
             GenericManagementRequest {
@@ -1223,8 +1237,9 @@ impl AnalyticsIndexManager {
     pub async fn create_link(
         &self,
         link: AnalyticsLink,
-        opts: CreateAnalyticsLinkOptions,
+        opts: impl Into<Option<CreateAnalyticsLinkOptions>>,
     ) -> CouchbaseResult<()> {
+        let opts = unwrap_or_default!(opts.into());
         let (endpoint, form) = match link {
             AnalyticsLink::CouchbaseRemote(l) => {
                 l.validate()?;
@@ -1287,8 +1302,9 @@ impl AnalyticsIndexManager {
     pub async fn replace_link(
         &self,
         link: AnalyticsLink,
-        opts: ReplaceAnalyticsLinkOptions,
+        opts: impl Into<Option<ReplaceAnalyticsLinkOptions>>,
     ) -> CouchbaseResult<()> {
+        let opts = unwrap_or_default!(opts.into());
         let (endpoint, form) = match link {
             AnalyticsLink::CouchbaseRemote(l) => {
                 l.validate()?;
@@ -1337,8 +1353,9 @@ impl AnalyticsIndexManager {
         &self,
         link_name: impl Into<String>,
         dataverse_name: impl Into<String>,
-        opts: DropAnalyticsLinkOptions,
+        opts: impl Into<Option<DropAnalyticsLinkOptions>>,
     ) -> CouchbaseResult<()> {
+        let opts = unwrap_or_default!(opts.into());
         let dataverse_name = dataverse_name.into();
         let link_name = link_name.into();
         let payload = if dataverse_name.contains("/") {
@@ -1376,8 +1393,9 @@ impl AnalyticsIndexManager {
 
     pub async fn get_links(
         &self,
-        opts: GetAllAnalyticsLinksOptions,
+        opts: impl Into<Option<GetAllAnalyticsLinksOptions>>,
     ) -> CouchbaseResult<impl IntoIterator<Item = AnalyticsLink>> {
+        let opts = unwrap_or_default!(opts.into());
         if opts.name.is_some() && opts.dataverse.is_none() {
             return Err(CouchbaseError::InvalidArgument {
                 ctx: ErrorContext::from(("", "Dataverse must be set if name is set")),

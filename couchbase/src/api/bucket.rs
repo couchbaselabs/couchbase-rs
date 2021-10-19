@@ -85,7 +85,11 @@ impl Bucket {
     /// # }
     /// ```
     /// See the [PingResult](struct.PingResult.html) for more information on what and how it can be consumed.
-    pub async fn ping(&self, options: PingOptions) -> CouchbaseResult<PingResult> {
+    pub async fn ping(
+        &self,
+        options: impl Into<Option<PingOptions>>,
+    ) -> CouchbaseResult<PingResult> {
+        let options = unwrap_or_default!(options.into());
         let (sender, receiver) = oneshot::channel();
         self.core
             .send(Request::Ping(PingRequest { options, sender }));
@@ -175,8 +179,9 @@ impl Bucket {
         &self,
         design_document: impl Into<String>,
         view_name: impl Into<String>,
-        options: ViewOptions,
+        options: impl Into<Option<ViewOptions>>,
     ) -> CouchbaseResult<ViewResult> {
+        let options = unwrap_or_default!(options.into());
         let form_data = options.form_data()?;
         let payload = match serde_urlencoded::to_string(form_data) {
             Ok(p) => p,

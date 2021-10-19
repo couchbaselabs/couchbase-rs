@@ -72,8 +72,9 @@ impl QueryIndexManager {
     pub async fn get_all_indexes(
         &self,
         bucket_name: impl Into<String>,
-        opts: GetAllQueryIndexOptions,
+        opts: impl Into<Option<GetAllQueryIndexOptions>>,
     ) -> CouchbaseResult<impl IntoIterator<Item = QueryIndex>> {
+        let opts = unwrap_or_default!(opts.into());
         let statement = format!("SELECT idx.* FROM system:indexes AS idx WHERE keyspace_id = \"{}\" AND `using`=\"gsi\" ORDER BY is_primary DESC, name ASC", bucket_name.into());
 
         let (sender, receiver) = oneshot::channel();
@@ -100,8 +101,9 @@ impl QueryIndexManager {
         bucket_name: impl Into<String>,
         index_name: impl Into<String>,
         fields: impl IntoIterator<Item = impl Into<String>>,
-        opts: CreateQueryIndexOptions,
+        opts: impl Into<Option<CreateQueryIndexOptions>>,
     ) -> CouchbaseResult<()> {
+        let opts = unwrap_or_default!(opts.into());
         let mut statement = format!(
             "CREATE INDEX  `{}` ON `{}` ({})",
             index_name.into(),
@@ -145,8 +147,9 @@ impl QueryIndexManager {
     pub async fn create_primary_index(
         &self,
         bucket_name: impl Into<String>,
-        opts: CreatePrimaryQueryIndexOptions,
+        opts: impl Into<Option<CreatePrimaryQueryIndexOptions>>,
     ) -> CouchbaseResult<()> {
+        let opts = unwrap_or_default!(opts.into());
         let mut statement = match &opts.name {
             Some(n) => {
                 format!("CREATE PRiMARY INDEX `{}` ON `{}`", n, bucket_name.into())
@@ -187,8 +190,9 @@ impl QueryIndexManager {
         &self,
         bucket_name: impl Into<String>,
         index_name: impl Into<String>,
-        opts: DropQueryIndexOptions,
+        opts: impl Into<Option<DropQueryIndexOptions>>,
     ) -> CouchbaseResult<()> {
+        let opts = unwrap_or_default!(opts.into());
         let statement = format!(
             "DROP INDEX  `{}` ON `{}`",
             index_name.into(),
@@ -222,8 +226,9 @@ impl QueryIndexManager {
     pub async fn drop_primary_index(
         &self,
         bucket_name: impl Into<String>,
-        opts: DropPrimaryQueryIndexOptions,
+        opts: impl Into<Option<DropPrimaryQueryIndexOptions>>,
     ) -> CouchbaseResult<()> {
+        let opts = unwrap_or_default!(opts.into());
         let statement = match &opts.name {
             Some(n) => {
                 format!("DROP INDEX `{}` ON `{}`", n, bucket_name.into())
@@ -260,8 +265,9 @@ impl QueryIndexManager {
         bucket_name: impl Into<String>,
         index_names: impl IntoIterator<Item = impl Into<String>>,
         timeout: Duration,
-        opts: WatchIndexesQueryIndexOptions,
+        opts: impl Into<Option<WatchIndexesQueryIndexOptions>>,
     ) -> CouchbaseResult<()> {
+        let opts = unwrap_or_default!(opts.into());
         let bucket_name = bucket_name.into();
         let mut indexes: Vec<String> = index_names.into_iter().map(|index| index.into()).collect();
         if let Some(w) = opts.watch_primary {
@@ -306,8 +312,9 @@ impl QueryIndexManager {
     pub async fn build_deferred_indexes(
         &self,
         bucket_name: impl Into<String>,
-        opts: BuildDeferredQueryIndexOptions,
+        opts: impl Into<Option<BuildDeferredQueryIndexOptions>>,
     ) -> CouchbaseResult<impl IntoIterator<Item = String>> {
+        let opts = unwrap_or_default!(opts.into());
         let bucket_name = bucket_name.into();
         let indexes = self
             .get_all_indexes(bucket_name.clone(), GetAllQueryIndexOptions::from(&opts))

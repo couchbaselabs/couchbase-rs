@@ -1,5 +1,5 @@
 #[macro_use]
-pub mod options;
+pub mod macros;
 pub mod analytics_indexes;
 pub mod analytics_options;
 pub mod analytics_result;
@@ -13,6 +13,7 @@ pub mod collections;
 pub mod error;
 pub mod keyvalue_options;
 pub mod keyvalue_results;
+pub mod options;
 pub mod query_indexes;
 pub mod query_options;
 pub mod query_result;

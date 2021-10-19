@@ -141,11 +141,12 @@ impl Cluster {
     /// # }
     /// ```
     /// See the [QueryResult](struct.QueryResult.html) for more information on what and how it can be consumed.
-    pub async fn query<S: Into<String>>(
+    pub async fn query(
         &self,
-        statement: S,
-        options: QueryOptions,
+        statement: impl Into<String>,
+        options: impl Into<Option<QueryOptions>>,
     ) -> CouchbaseResult<QueryResult> {
+        let options = unwrap_or_default!(options.into());
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::Query(QueryRequest {
             statement: statement.into(),
@@ -193,11 +194,12 @@ impl Cluster {
     /// # }
     /// ```
     /// See the [AnalyticsResult](struct.AnalyticsResult.html) for more information on what and how it can be consumed.
-    pub async fn analytics_query<S: Into<String>>(
+    pub async fn analytics_query(
         &self,
-        statement: S,
-        options: AnalyticsOptions,
+        statement: impl Into<String>,
+        options: impl Into<Option<AnalyticsOptions>>,
     ) -> CouchbaseResult<AnalyticsResult> {
+        let options = unwrap_or_default!(options.into());
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::Analytics(AnalyticsRequest {
             statement: statement.into(),
@@ -253,12 +255,13 @@ impl Cluster {
     /// # }
     /// ```
     /// See the [SearchResult](struct.SearchResult.html) for more information on what and how it can be consumed.
-    pub async fn search_query<S: Into<String>, T: SearchQuery>(
+    pub async fn search_query(
         &self,
-        index: S,
-        query: T,
-        options: SearchOptions,
+        index: impl Into<String>,
+        query: impl SearchQuery,
+        options: impl Into<Option<SearchOptions>>,
     ) -> CouchbaseResult<SearchResult> {
+        let options = unwrap_or_default!(options.into());
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::Search(SearchRequest {
             index: index.into(),
@@ -372,10 +375,6 @@ pub struct TimeoutOptions {
 }
 
 impl TimeoutOptions {
-    pub fn new() -> Self {
-        TimeoutOptions::default()
-    }
-
     pub fn kv_connect_timeout(mut self, timeout: Duration) -> Self {
         self.kv_connect_timeout = Some(timeout);
         self
@@ -534,10 +533,6 @@ impl Default for ClusterOptions {
 }
 
 impl ClusterOptions {
-    pub fn new() -> Self {
-        ClusterOptions::default()
-    }
-
     pub fn authenticator(mut self, authenticator: Box<dyn Authenticator>) -> Self {
         self.authenticator = Some(authenticator);
         self

@@ -1,5 +1,5 @@
 use couchbase::*;
-use env_logger::Env;
+
 use futures::executor::block_on;
 use std::collections::HashMap;
 

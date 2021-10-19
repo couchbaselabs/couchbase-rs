@@ -33,7 +33,7 @@ impl Scope {
     /// # Arguments
     ///
     /// * `name` - the collection name
-    pub fn collection<S: Into<String>>(&self, name: S) -> Collection {
+    pub fn collection(&self, name: impl Into<String>) -> Collection {
         Collection::new(
             self.core.clone(),
             name.into(),
@@ -81,11 +81,12 @@ impl Scope {
     /// # }
     /// ```
     /// See the [QueryResult](struct.QueryResult.html) for more information on what and how it can be consumed.
-    pub async fn query<S: Into<String>>(
+    pub async fn query(
         &self,
-        statement: S,
-        options: QueryOptions,
+        statement: impl Into<String>,
+        options: impl Into<Option<QueryOptions>>,
     ) -> CouchbaseResult<QueryResult> {
+        let options = unwrap_or_default!(options.into());
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::Query(QueryRequest {
             statement: statement.into(),
@@ -133,11 +134,12 @@ impl Scope {
     /// # }
     /// ```
     /// See the [AnalyticsResult](struct.AnalyticsResult.html) for more information on what and how it can be consumed.
-    pub async fn analytics_query<S: Into<String>>(
+    pub async fn analytics_query(
         &self,
-        statement: S,
-        options: AnalyticsOptions,
+        statement: impl Into<String>,
+        options: impl Into<Option<AnalyticsOptions>>,
     ) -> CouchbaseResult<AnalyticsResult> {
+        let options = unwrap_or_default!(options.into());
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::Analytics(AnalyticsRequest {
             statement: statement.into(),

@@ -5,43 +5,6 @@ use std::collections::HashMap;
 use std::time::Duration;
 use uuid::Uuid;
 
-/// Macro to DRY up the repetitive timeout setter.
-macro_rules! timeout {
-    () => {
-        pub fn timeout(mut self, timeout: Duration) -> Self {
-            self.timeout = Some(timeout);
-            self
-        }
-    };
-}
-
-macro_rules! expiry {
-    () => {
-        pub fn expiry(mut self, expiry: Duration) -> Self {
-            self.expiry = Some(expiry);
-            self
-        }
-    };
-}
-
-macro_rules! xattr {
-    () => {
-        pub fn xattr(mut self, xattr: bool) -> Self {
-            self.xattr = xattr;
-            self
-        }
-    };
-}
-
-macro_rules! preserve_expiry {
-    () => {
-        pub fn preserve_expiry(mut self, preserve: bool) -> Self {
-            self.preserve_expiry = preserve;
-            self
-        }
-    };
-}
-
 pub(crate) fn convert_mutation_state<S>(
     _x: &Option<MutationState>,
     _s: S,

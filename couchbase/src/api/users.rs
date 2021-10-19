@@ -298,9 +298,10 @@ impl UserManager {
 
     pub async fn get_user(
         &self,
-        username: String,
-        options: GetUserOptions,
+        username: impl Into<String>,
+        options: impl Into<Option<GetUserOptions>>,
     ) -> CouchbaseResult<UserAndMetadata> {
+        let options = unwrap_or_default!(options.into());
         let (sender, receiver) = oneshot::channel();
         let domain = match options.domain_name {
             Some(name) => name,
@@ -310,7 +311,7 @@ impl UserManager {
         self.core.send(Request::GenericManagementRequest(
             GenericManagementRequest {
                 sender,
-                path: format!("/settings/rbac/users/{}/{}", domain, username),
+                path: format!("/settings/rbac/users/{}/{}", domain, username.into()),
                 method: String::from("get"),
                 payload: None,
                 content_type: None,
@@ -334,8 +335,9 @@ impl UserManager {
 
     pub async fn get_all_users(
         &self,
-        options: GetAllUsersOptions,
+        options: impl Into<Option<GetAllUsersOptions>>,
     ) -> CouchbaseResult<Vec<UserAndMetadata>> {
+        let options = unwrap_or_default!(options.into());
         let (sender, receiver) = oneshot::channel();
         let domain = match options.domain_name {
             Some(name) => name,
@@ -367,7 +369,12 @@ impl UserManager {
         }
     }
 
-    pub async fn upsert_user(&self, user: User, options: UpsertUserOptions) -> CouchbaseResult<()> {
+    pub async fn upsert_user(
+        &self,
+        user: User,
+        options: impl Into<Option<UpsertUserOptions>>,
+    ) -> CouchbaseResult<()> {
+        let options = unwrap_or_default!(options.into());
         let roles: Vec<String> = user
             .roles
             .into_iter()
@@ -426,9 +433,10 @@ impl UserManager {
 
     pub async fn drop_user(
         &self,
-        username: String,
-        options: DropUserOptions,
+        username: impl Into<String>,
+        options: impl Into<Option<DropUserOptions>>,
     ) -> CouchbaseResult<()> {
+        let options = unwrap_or_default!(options.into());
         let (sender, receiver) = oneshot::channel();
         let domain = match options.domain_name {
             Some(name) => name,
@@ -438,7 +446,7 @@ impl UserManager {
         self.core.send(Request::GenericManagementRequest(
             GenericManagementRequest {
                 sender,
-                path: format!("/settings/rbac/users/{}/{}", domain, username),
+                path: format!("/settings/rbac/users/{}/{}", domain, username.into()),
                 method: String::from("delete"),
                 payload: None,
                 content_type: None,
@@ -461,8 +469,9 @@ impl UserManager {
 
     pub async fn get_roles(
         &self,
-        options: GetRolesOptions,
+        options: impl Into<Option<GetRolesOptions>>,
     ) -> CouchbaseResult<Vec<RoleAndDescription>> {
+        let options = unwrap_or_default!(options.into());
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::GenericManagementRequest(
             GenericManagementRequest {
@@ -491,14 +500,15 @@ impl UserManager {
 
     pub async fn get_group(
         &self,
-        name: String,
-        options: GetGroupOptions,
+        name: impl Into<String>,
+        options: impl Into<Option<GetGroupOptions>>,
     ) -> CouchbaseResult<Vec<Group>> {
+        let options = unwrap_or_default!(options.into());
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::GenericManagementRequest(
             GenericManagementRequest {
                 sender,
-                path: format!("/settings/rbac/groups/{}", name),
+                path: format!("/settings/rbac/groups/{}", name.into()),
                 method: String::from("get"),
                 payload: None,
                 content_type: None,
@@ -553,8 +563,9 @@ impl UserManager {
     pub async fn upsert_group(
         &self,
         group: Group,
-        options: UpsertGroupOptions,
+        options: impl Into<Option<UpsertGroupOptions>>,
     ) -> CouchbaseResult<()> {
+        let options = unwrap_or_default!(options.into());
         let roles: Vec<String> = group
             .roles
             .into_iter()
@@ -600,12 +611,17 @@ impl UserManager {
         }
     }
 
-    pub async fn drop_group(&self, name: String, options: DropGroupOptions) -> CouchbaseResult<()> {
+    pub async fn drop_group(
+        &self,
+        name: impl Into<String>,
+        options: impl Into<Option<DropGroupOptions>>,
+    ) -> CouchbaseResult<()> {
+        let options = unwrap_or_default!(options.into());
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::GenericManagementRequest(
             GenericManagementRequest {
                 sender,
-                path: format!("/settings/rbac/groups/{}", name),
+                path: format!("/settings/rbac/groups/{}", name.into()),
                 method: String::from("delete"),
                 payload: None,
                 content_type: None,

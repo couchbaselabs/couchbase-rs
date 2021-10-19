@@ -207,8 +207,9 @@ impl ViewIndexManager {
         &self,
         name: impl Into<String>,
         namespace: DesignDocumentNamespace,
-        opts: GetDesignDocumentOptions,
+        opts: impl Into<Option<GetDesignDocumentOptions>>,
     ) -> CouchbaseResult<DesignDocument> {
+        let opts = unwrap_or_default!(opts.into());
         let ddoc_name = self.build_ddoc_name(name.into(), namespace);
         let res: JSONDesignDocument = self
             .get_request(
@@ -232,8 +233,9 @@ impl ViewIndexManager {
     pub async fn get_all_design_documents(
         &self,
         namespace: DesignDocumentNamespace,
-        opts: GetAllDesignDocumentsOptions,
+        opts: impl Into<Option<GetAllDesignDocumentsOptions>>,
     ) -> CouchbaseResult<impl IntoIterator<Item = DesignDocument>> {
+        let opts = unwrap_or_default!(opts.into());
         let res: AllDesignDocuments = self
             .get_request(
                 format!("/pools/default/buckets/{}/ddocs", self.bucket.clone()),
@@ -277,8 +279,9 @@ impl ViewIndexManager {
         &self,
         design_doc: DesignDocument,
         namespace: DesignDocumentNamespace,
-        opts: UpsertDesignDocumentOptions,
+        opts: impl Into<Option<UpsertDesignDocumentOptions>>,
     ) -> CouchbaseResult<()> {
+        let opts = unwrap_or_default!(opts.into());
         let json_ddoc = JSONDesignDocument {
             views: design_doc.views,
         };
@@ -304,8 +307,9 @@ impl ViewIndexManager {
         &self,
         name: impl Into<String>,
         namespace: DesignDocumentNamespace,
-        opts: DropDesignDocumentsOptions,
+        opts: impl Into<Option<DropDesignDocumentsOptions>>,
     ) -> CouchbaseResult<()> {
+        let opts = unwrap_or_default!(opts.into());
         Ok(self
             .mutation_request(
                 format!("/_design/{}", self.build_ddoc_name(name.into(), namespace)),
@@ -321,8 +325,9 @@ impl ViewIndexManager {
     pub async fn publish_design_document(
         &self,
         name: impl Into<String>,
-        opts: PublishDesignDocumentsOptions,
+        opts: impl Into<Option<PublishDesignDocumentsOptions>>,
     ) -> CouchbaseResult<()> {
+        let opts = unwrap_or_default!(opts.into());
         let ddoc = self
             .get_design_document(
                 name.into(),

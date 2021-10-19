@@ -297,8 +297,9 @@ impl SearchIndexManager {
     pub async fn get_index(
         &self,
         index_name: impl Into<String>,
-        opts: GetSearchIndexOptions,
+        opts: impl Into<Option<GetSearchIndexOptions>>,
     ) -> CouchbaseResult<SearchIndex> {
+        let opts = unwrap_or_default!(opts.into());
         let res: SearchIndex = self
             .do_request(
                 format!("/api/index/{}", index_name.into()),
@@ -314,8 +315,9 @@ impl SearchIndexManager {
 
     pub async fn get_all_indexes(
         &self,
-        opts: GetAllSearchIndexesOptions,
+        opts: impl Into<Option<GetAllSearchIndexesOptions>>,
     ) -> CouchbaseResult<impl IntoIterator<Item = SearchIndex>> {
+        let opts = unwrap_or_default!(opts.into());
         let res: Vec<SearchIndex> = self
             .do_request(
                 String::from("/api/index"),
@@ -332,8 +334,9 @@ impl SearchIndexManager {
     pub async fn upsert_index(
         &self,
         index_definition: SearchIndex,
-        opts: UpsertSearchIndexOptions,
+        opts: impl Into<Option<UpsertSearchIndexOptions>>,
     ) -> CouchbaseResult<()> {
+        let opts = unwrap_or_default!(opts.into());
         Ok(self
             .do_request(
                 format!("/api/index/{}", index_definition.name()),
@@ -351,8 +354,9 @@ impl SearchIndexManager {
     pub async fn drop_index(
         &self,
         index_name: impl Into<String>,
-        opts: DropSearchIndexOptions,
+        opts: impl Into<Option<DropSearchIndexOptions>>,
     ) -> CouchbaseResult<()> {
+        let opts = unwrap_or_default!(opts.into());
         Ok(self
             .do_request(
                 format!("/api/index/{}", index_name.into()),
@@ -367,8 +371,9 @@ impl SearchIndexManager {
     pub async fn get_indexed_documents_count(
         &self,
         index_name: impl Into<String>,
-        opts: GetSearchIndexedDocumentsCountOptions,
+        opts: impl Into<Option<GetSearchIndexedDocumentsCountOptions>>,
     ) -> CouchbaseResult<u32> {
+        let opts = unwrap_or_default!(opts.into());
         let res: SearchIndexDocumentsCount = self
             .do_request(
                 format!("/api/index/{}/count", index_name.into()),
@@ -385,8 +390,9 @@ impl SearchIndexManager {
     pub async fn pause_ingest(
         &self,
         index_name: impl Into<String>,
-        opts: PauseIngestSearchIndexOptions,
+        opts: impl Into<Option<PauseIngestSearchIndexOptions>>,
     ) -> CouchbaseResult<()> {
+        let opts = unwrap_or_default!(opts.into());
         Ok(self
             .do_request(
                 format!("/api/index/{}/ingestControl/pause", index_name.into()),
@@ -401,8 +407,9 @@ impl SearchIndexManager {
     pub async fn resume_ingest(
         &self,
         index_name: impl Into<String>,
-        opts: PauseIngestSearchIndexOptions,
+        opts: impl Into<Option<PauseIngestSearchIndexOptions>>,
     ) -> CouchbaseResult<()> {
+        let opts = unwrap_or_default!(opts.into());
         Ok(self
             .do_request(
                 format!("/api/index/{}/ingestControl/resume", index_name.into()),
@@ -417,8 +424,9 @@ impl SearchIndexManager {
     pub async fn allow_querying(
         &self,
         index_name: impl Into<String>,
-        opts: AllowQueryingSearchIndexOptions,
+        opts: impl Into<Option<AllowQueryingSearchIndexOptions>>,
     ) -> CouchbaseResult<()> {
+        let opts = unwrap_or_default!(opts.into());
         Ok(self
             .do_request(
                 format!("/api/index/{}/queryControl/allow", index_name.into()),
@@ -433,8 +441,9 @@ impl SearchIndexManager {
     pub async fn disallow_querying(
         &self,
         index_name: impl Into<String>,
-        opts: DisallowQueryingSearchIndexOptions,
+        opts: impl Into<Option<DisallowQueryingSearchIndexOptions>>,
     ) -> CouchbaseResult<()> {
+        let opts = unwrap_or_default!(opts.into());
         Ok(self
             .do_request(
                 format!("/api/index/{}/queryControl/disallow", index_name.into()),
@@ -449,8 +458,9 @@ impl SearchIndexManager {
     pub async fn freeze_plan(
         &self,
         index_name: impl Into<String>,
-        opts: FreezePlanSearchIndexOptions,
+        opts: impl Into<Option<FreezePlanSearchIndexOptions>>,
     ) -> CouchbaseResult<()> {
+        let opts = unwrap_or_default!(opts.into());
         Ok(self
             .do_request(
                 format!("/api/index/{}/planFreezeControl/freeze", index_name.into()),
@@ -465,8 +475,9 @@ impl SearchIndexManager {
     pub async fn unfreeze_plan(
         &self,
         index_name: impl Into<String>,
-        opts: UnfreezePlanSearchIndexOptions,
+        opts: impl Into<Option<UnfreezePlanSearchIndexOptions>>,
     ) -> CouchbaseResult<()> {
+        let opts = unwrap_or_default!(opts.into());
         Ok(self
             .do_request(
                 format!(
@@ -486,12 +497,13 @@ impl SearchIndexManager {
         &self,
         index_name: impl Into<String>,
         document: I,
-        opts: AnalyzeDocumentSearchIndexOptions,
+        opts: impl Into<Option<AnalyzeDocumentSearchIndexOptions>>,
     ) -> CouchbaseResult<T>
     where
         I: Serialize,
         T: DeserializeOwned,
     {
+        let opts = unwrap_or_default!(opts.into());
         let res: T = self
             .do_request(
                 format!("/api/index/{}/analyzeDoc", index_name.into()),

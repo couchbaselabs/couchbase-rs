@@ -34,8 +34,9 @@ impl BinaryCollection {
         &self,
         id: S,
         content: Vec<u8>,
-        options: AppendOptions,
+        options: impl Into<Option<AppendOptions>>,
     ) -> CouchbaseResult<MutationResult> {
+        let options = unwrap_or_default!(options.into());
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::Mutate(MutateRequest {
             id: id.into(),
@@ -53,8 +54,9 @@ impl BinaryCollection {
         &self,
         id: S,
         content: Vec<u8>,
-        options: PrependOptions,
+        options: impl Into<Option<PrependOptions>>,
     ) -> CouchbaseResult<MutationResult> {
+        let options = unwrap_or_default!(options.into());
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::Mutate(MutateRequest {
             id: id.into(),
@@ -71,8 +73,9 @@ impl BinaryCollection {
     pub async fn increment<S: Into<String>>(
         &self,
         id: S,
-        options: IncrementOptions,
+        options: impl Into<Option<IncrementOptions>>,
     ) -> CouchbaseResult<CounterResult> {
+        let options = unwrap_or_default!(options.into());
         let delta = match options.delta {
             Some(d) => i64::try_from(d).map_err(|_e| CouchbaseError::Generic {
                 // TODO: we shouldn't swallow the error detail.
@@ -100,8 +103,9 @@ impl BinaryCollection {
     pub async fn decrement<S: Into<String>>(
         &self,
         id: S,
-        options: DecrementOptions,
+        options: impl Into<Option<DecrementOptions>>,
     ) -> CouchbaseResult<CounterResult> {
+        let options = unwrap_or_default!(options.into());
         let delta = match options.delta {
             Some(d) => {
                 -(i64::try_from(d).map_err(|_e| CouchbaseError::Generic {
