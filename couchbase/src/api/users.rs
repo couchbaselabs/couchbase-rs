@@ -30,8 +30,11 @@ pub struct Role {
 }
 
 impl Role {
-    pub fn new(name: String, bucket_name: Option<String>) -> Self {
-        Self { name, bucket_name }
+    pub fn new(name: String, bucket_name: impl Into<Option<String>>) -> Self {
+        Self {
+            name,
+            bucket_name: bucket_name.into(),
+        }
     }
 
     pub fn name(&self) -> &str {
@@ -73,8 +76,11 @@ pub struct Origin {
 }
 
 impl Origin {
-    pub fn new(origin_type: String, name: Option<String>) -> Self {
-        Self { origin_type, name }
+    pub fn new(origin_type: impl Into<String>, name: impl Into<Option<String>>) -> Self {
+        Self {
+            origin_type: origin_type.into(),
+            name: name.into(),
+        }
     }
 
     pub fn origin_type(&self) -> &str {
