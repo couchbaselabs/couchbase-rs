@@ -157,7 +157,7 @@ impl SearchIndex {
     {
         match &self.params {
             Some(p) => serde_json::from_value(p.clone())
-                .map_err(|e| CouchbaseError::decoding_failure_from_serde(e)),
+                .map_err(CouchbaseError::decoding_failure_from_serde),
             None => Ok(HashMap::new()),
         }
     }
@@ -201,8 +201,7 @@ impl SearchIndex {
         T: Serialize,
     {
         self.params = Some(
-            serde_json::to_value(params)
-                .map_err(|e| CouchbaseError::encoding_failure_from_serde(e))?,
+            serde_json::to_value(params).map_err(CouchbaseError::encoding_failure_from_serde)?,
         );
 
         Ok(())
@@ -217,8 +216,7 @@ impl SearchIndex {
         T: Serialize,
     {
         self.source_params = Some(
-            serde_json::to_value(params)
-                .map_err(|e| CouchbaseError::encoding_failure_from_serde(e))?,
+            serde_json::to_value(params).map_err(CouchbaseError::encoding_failure_from_serde)?,
         );
 
         Ok(())
@@ -233,8 +231,7 @@ impl SearchIndex {
         T: Serialize,
     {
         self.plan_params = Some(
-            serde_json::to_value(params)
-                .map_err(|e| CouchbaseError::encoding_failure_from_serde(e))?,
+            serde_json::to_value(params).map_err(CouchbaseError::encoding_failure_from_serde)?,
         );
 
         Ok(())
@@ -268,8 +265,8 @@ impl SearchIndexManager {
     {
         let (sender, receiver) = oneshot::channel();
 
-        self.core.send(Request::GenericManagementRequest(
-            GenericManagementRequest {
+        self.core
+            .send(Request::GenericManagement(GenericManagementRequest {
                 sender,
                 path,
                 method,
@@ -277,8 +274,7 @@ impl SearchIndexManager {
                 content_type,
                 timeout,
                 service_type: Some(ServiceType::Search),
-            },
-        ));
+            }));
 
         let result: GenericManagementResult = receiver.await.unwrap()?;
         let content: T = match result.http_status() {

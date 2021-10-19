@@ -142,8 +142,8 @@ impl ViewIndexManager {
     ) -> CouchbaseResult<()> {
         let (sender, receiver) = oneshot::channel();
 
-        self.core.send(Request::GenericManagementRequest(
-            GenericManagementRequest {
+        self.core
+            .send(Request::GenericManagement(GenericManagementRequest {
                 sender,
                 path,
                 method,
@@ -151,8 +151,7 @@ impl ViewIndexManager {
                 content_type,
                 timeout,
                 service_type: Some(service),
-            },
-        ));
+            }));
 
         let result: GenericManagementResult = receiver.await.unwrap()?;
         match result.http_status() {
@@ -177,8 +176,8 @@ impl ViewIndexManager {
     {
         let (sender, receiver) = oneshot::channel();
 
-        self.core.send(Request::GenericManagementRequest(
-            GenericManagementRequest {
+        self.core
+            .send(Request::GenericManagement(GenericManagementRequest {
                 sender,
                 path,
                 method: String::from("get"),
@@ -186,8 +185,7 @@ impl ViewIndexManager {
                 content_type: None,
                 timeout,
                 service_type: Some(service),
-            },
-        ));
+            }));
 
         let result: GenericManagementResult = receiver.await.unwrap()?;
         let content: T = match result.http_status() {
@@ -333,7 +331,7 @@ impl ViewIndexManager {
                 name.into(),
                 DesignDocumentNamespace::Development,
                 GetDesignDocumentOptions {
-                    timeout: opts.timeout.clone(),
+                    timeout: opts.timeout,
                 },
             )
             .await?;
@@ -342,7 +340,7 @@ impl ViewIndexManager {
             ddoc,
             DesignDocumentNamespace::Production,
             UpsertDesignDocumentOptions {
-                timeout: opts.timeout.clone(),
+                timeout: opts.timeout,
             },
         )
         .await

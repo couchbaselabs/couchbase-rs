@@ -37,6 +37,6 @@ macro_rules! preserve_expiry {
 
 macro_rules! unwrap_or_default {
     ($opt:expr) => {
-        $opt.unwrap_or_else(|| Default::default())
+        $opt.unwrap_or_else(Default::default)
     };
 }

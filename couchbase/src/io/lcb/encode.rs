@@ -47,7 +47,7 @@ fn verify<T>(
             ctx.insert("msg", Value::String(msg.to_string()));
         }
         let err = couchbase_error_from_lcb_status(status, ctx);
-        if let Err(_) = sender.send(Err(err)) {
+        if sender.send(Err(err)).is_err() {
             debug!("Failed to notify request of encode failure, because the listener has been already dropped.");
         }
         return Err(EncodeFailure(status));
@@ -67,7 +67,7 @@ fn verify_query(status: lcb_STATUS, sender: *mut QueryCookie) -> Result<(), Enco
             ctx.insert("msg", Value::String(msg.to_string()));
         }
         let err = couchbase_error_from_lcb_status(status, ctx);
-        if let Err(_) = sender.sender.take().unwrap().send(Err(err)) {
+        if sender.sender.take().unwrap().send(Err(err)).is_err() {
             debug!("Failed to notify request of encode failure, because the listener has been already dropped.");
         }
         // Close the rest that needs to be closed
@@ -89,7 +89,7 @@ fn verify_analytics(status: lcb_STATUS, sender: *mut AnalyticsCookie) -> Result<
             ctx.insert("msg", Value::String(msg.to_string()));
         }
         let err = couchbase_error_from_lcb_status(status, ctx);
-        if let Err(_) = sender.sender.take().unwrap().send(Err(err)) {
+        if sender.sender.take().unwrap().send(Err(err)).is_err() {
             debug!("Failed to notify request of encode failure, because the listener has been already dropped.");
         }
         // Close the rest that needs to be closed
@@ -111,7 +111,7 @@ fn verify_search(status: lcb_STATUS, sender: *mut SearchCookie) -> Result<(), En
             ctx.insert("msg", Value::String(msg.to_string()));
         }
         let err = couchbase_error_from_lcb_status(status, ctx);
-        if let Err(_) = sender.sender.take().unwrap().send(Err(err)) {
+        if sender.sender.take().unwrap().send(Err(err)).is_err() {
             debug!("Failed to notify request of encode failure, because the listener has been already dropped.");
         }
         // Close the rest that needs to be closed
@@ -133,7 +133,7 @@ fn verify_view(status: lcb_STATUS, sender: *mut ViewCookie) -> Result<(), Encode
             ctx.insert("msg", Value::String(msg.to_string()));
         }
         let err = couchbase_error_from_lcb_status(status, ctx);
-        if let Err(_) = sender.sender.take().unwrap().send(Err(err)) {
+        if sender.sender.take().unwrap().send(Err(err)).is_err() {
             debug!("Failed to notify request of encode failure, because the listener has been already dropped.");
         }
         // Close the rest that needs to be closed
@@ -157,7 +157,7 @@ fn verify_http(status: lcb_STATUS, sender: *mut HttpCookie) -> Result<(), Encode
         let err = couchbase_error_from_lcb_status(status, ctx);
         match *sender {
             HttpCookie::GenericManagementRequest { sender } => {
-                if let Err(_) = sender.send(Err(err)) {
+                if sender.send(Err(err)).is_err() {
                     debug!("Failed to notify request of encode failure, because the listener has been already dropped.");
                 }
             }
@@ -746,8 +746,7 @@ pub fn encode_lookup_in(
             cookie,
         )?;
 
-        let mut idx = 0;
-        for lookup_spec in &lookup_specs {
+        for (idx, lookup_spec) in lookup_specs.iter().enumerate() {
             match lookup_spec {
                 EncodedLookupSpec::Get {
                     path_len,
@@ -780,7 +779,6 @@ pub fn encode_lookup_in(
                     )?;
                 }
             }
-            idx += 1;
         }
 
         verify(lcb_cmdsubdoc_create(&mut command), cookie)?;
@@ -900,8 +898,8 @@ fn make_subdoc_flags(value: Option<&Vec<u8>>, xattr: bool, create_path: bool) ->
     if create_path {
         flags |= LCB_SUBDOCSPECS_F_MKINTERMEDIATES;
     }
-    match value {
-        Some(v) => match std::str::from_utf8(v.as_slice()) {
+    if let Some(v) = value {
+        match std::str::from_utf8(v.as_slice()) {
             Ok(str_val) => match str_val {
                 MUTATION_MACRO_CAS_MATCHER => {
                     flags |= LCB_SUBDOCSPECS_F_XATTR_MACROVALUES;
@@ -918,8 +916,7 @@ fn make_subdoc_flags(value: Option<&Vec<u8>>, xattr: bool, create_path: bool) ->
                 _ => {}
             },
             Err(_e) => {}
-        },
-        None => {}
+        }
     }
 
     flags
@@ -1088,8 +1085,7 @@ pub fn encode_mutate_in(
             cookie,
         )?;
 
-        let mut idx = 0;
-        for mutate_spec in &mutate_specs {
+        for (idx, mutate_spec) in mutate_specs.iter().enumerate() {
             match mutate_spec {
                 EncodedMutateSpec::Insert {
                     path_len,
@@ -1260,7 +1256,6 @@ pub fn encode_mutate_in(
                     )?;
                 }
             }
-            idx += 1;
         }
 
         verify(lcb_cmdsubdoc_create(&mut command), cookie)?;
@@ -1327,9 +1322,9 @@ pub fn encode_generic_management_request(
         sender: request.sender,
     }));
 
-    let (body_len, body) = into_cstring(request.payload.unwrap_or(String::from("")));
+    let (body_len, body) = into_cstring(request.payload.unwrap_or_else(|| String::from("")));
     let (content_type_len, content_type) =
-        into_cstring(request.content_type.unwrap_or(String::from("")));
+        into_cstring(request.content_type.unwrap_or_else(|| String::from("")));
 
     let service_type = match request.service_type {
         Some(s) => match s {
@@ -1392,7 +1387,7 @@ pub fn encode_ping(instance: *mut lcb_INSTANCE, request: PingRequest) -> Result<
     let report_id = request
         .options
         .report_id
-        .unwrap_or(Uuid::new_v4().to_hyphenated().to_string());
+        .unwrap_or_else(|| Uuid::new_v4().to_hyphenated().to_string());
     let (report_id_len, c_report_id) = into_cstring(report_id);
 
     let mut command: *mut lcb_CMDPING = ptr::null_mut();

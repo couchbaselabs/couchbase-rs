@@ -63,7 +63,7 @@ impl ViewResult {
         self.rows
             .take()
             .expect("Can not consume rows twice!")
-            .map(|v| Ok(v))
+            .map(Ok)
         // .map(
         // |v| match serde_json::from_slice(v.as_slice()) {
         //     Ok(decoded) => Ok(decoded),

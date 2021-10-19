@@ -315,7 +315,7 @@ impl BucketSettings {
         Ok(BucketSettings {
             name: settings.name,
             ram_quota_mb: settings.quota.raw_ram / 1024 / 1024,
-            flush_enabled: settings.controllers.flush != "",
+            flush_enabled: !settings.controllers.flush.is_empty(),
             num_replicas: settings.num_replicas,
             replica_indexes: settings.replica_indexes,
             bucket_type: BucketType::try_from(settings.bucket_type.as_str())?,
@@ -542,17 +542,16 @@ impl BucketManager {
         let content_type = String::from("application/x-www-form-urlencoded");
         let (sender, receiver) = oneshot::channel();
 
-        self.core.send(Request::GenericManagementRequest(
-            GenericManagementRequest {
+        self.core
+            .send(Request::GenericManagement(GenericManagementRequest {
                 sender,
-                path: format!("/pools/default/buckets/"),
+                path: "/pools/default/buckets/".into(),
                 method: String::from("post"),
                 payload: Some(form_encoded),
                 content_type: Some(content_type),
                 timeout: options.timeout,
                 service_type: Some(ServiceType::Management),
-            },
-        ));
+            }));
 
         let result: GenericManagementResult = receiver.await.unwrap()?;
 
@@ -580,8 +579,8 @@ impl BucketManager {
         let content_type = String::from("application/x-www-form-urlencoded");
         let (sender, receiver) = oneshot::channel();
 
-        self.core.send(Request::GenericManagementRequest(
-            GenericManagementRequest {
+        self.core
+            .send(Request::GenericManagement(GenericManagementRequest {
                 sender,
                 path: format!("/pools/default/buckets/{}", settings.name),
                 method: String::from("post"),
@@ -589,8 +588,7 @@ impl BucketManager {
                 content_type: Some(content_type),
                 timeout: options.timeout,
                 service_type: Some(ServiceType::Management),
-            },
-        ));
+            }));
 
         let result: GenericManagementResult = receiver.await.unwrap()?;
 
@@ -613,8 +611,8 @@ impl BucketManager {
         let (sender, receiver) = oneshot::channel();
 
         let bucket_name = name.into();
-        self.core.send(Request::GenericManagementRequest(
-            GenericManagementRequest {
+        self.core
+            .send(Request::GenericManagement(GenericManagementRequest {
                 sender,
                 path: format!("/pools/default/buckets/{}", &bucket_name),
                 method: String::from("delete"),
@@ -622,8 +620,7 @@ impl BucketManager {
                 content_type: None,
                 timeout: options.timeout,
                 service_type: Some(ServiceType::Management),
-            },
-        ));
+            }));
 
         let result: GenericManagementResult = receiver.await.unwrap()?;
 
@@ -646,8 +643,8 @@ impl BucketManager {
         let (sender, receiver) = oneshot::channel();
 
         let bucket_name = name.into();
-        self.core.send(Request::GenericManagementRequest(
-            GenericManagementRequest {
+        self.core
+            .send(Request::GenericManagement(GenericManagementRequest {
                 sender,
                 path: format!("/pools/default/buckets/{}", &bucket_name),
                 method: String::from("get"),
@@ -655,8 +652,7 @@ impl BucketManager {
                 content_type: None,
                 timeout: options.timeout,
                 service_type: Some(ServiceType::Management),
-            },
-        ));
+            }));
 
         let result: GenericManagementResult = receiver.await.unwrap()?;
 
@@ -680,17 +676,16 @@ impl BucketManager {
         let options = unwrap_or_default!(options.into());
         let (sender, receiver) = oneshot::channel();
 
-        self.core.send(Request::GenericManagementRequest(
-            GenericManagementRequest {
+        self.core
+            .send(Request::GenericManagement(GenericManagementRequest {
                 sender,
-                path: format!("/pools/default/buckets"),
+                path: "/pools/default/buckets".into(),
                 method: String::from("get"),
                 payload: None,
                 content_type: None,
                 timeout: options.timeout,
                 service_type: Some(ServiceType::Management),
-            },
-        ));
+            }));
 
         let result: GenericManagementResult = receiver.await.unwrap()?;
 
@@ -722,8 +717,8 @@ impl BucketManager {
         let (sender, receiver) = oneshot::channel();
 
         let bucket_name = name.into();
-        self.core.send(Request::GenericManagementRequest(
-            GenericManagementRequest {
+        self.core
+            .send(Request::GenericManagement(GenericManagementRequest {
                 sender,
                 path: format!("/pools/default/buckets/{}/controller/doFlush", &bucket_name),
                 method: String::from("post"),
@@ -731,8 +726,7 @@ impl BucketManager {
                 content_type: None,
                 timeout: options.timeout,
                 service_type: Some(ServiceType::Management),
-            },
-        ));
+            }));
 
         let result: GenericManagementResult = receiver.await.unwrap()?;
 

@@ -22,7 +22,7 @@ pub enum Request {
     Analytics(AnalyticsRequest),
     Search(SearchRequest),
     View(ViewRequest),
-    GenericManagementRequest(GenericManagementRequest),
+    GenericManagement(GenericManagementRequest),
     Ping(PingRequest),
     Counter(CounterRequest),
 }
@@ -54,7 +54,7 @@ impl Request {
             Self::Search(r) => r.sender.send(Err(reason)).unwrap(),
             Self::View(r) => r.sender.send(Err(reason)).unwrap(),
             Self::Ping(r) => r.sender.send(Err(reason)).unwrap(),
-            Self::GenericManagementRequest(r) => r.sender.send(Err(reason)).unwrap(),
+            Self::GenericManagement(r) => r.sender.send(Err(reason)).unwrap(),
             Self::Counter(r) => r.sender.send(Err(reason)).unwrap(),
         };
     }

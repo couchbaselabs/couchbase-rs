@@ -220,14 +220,9 @@ impl TryFrom<&Value> for SearchRowLocations {
                     };
 
                     let array_positions = match location.get("array_positions") {
-                        Some(v) => match v.as_array() {
-                            Some(p) => Some(
-                                p.into_iter()
-                                    .map(|item| item.as_u64().unwrap() as u32)
-                                    .collect(),
-                            ),
-                            None => None,
-                        },
+                        Some(v) => v
+                            .as_array()
+                            .map(|p| p.iter().map(|item| item.as_u64().unwrap() as u32).collect()),
                         None => None,
                     };
 
@@ -292,7 +287,7 @@ impl SearchRow {
             );
         }
 
-        return None;
+        None
     }
 
     pub fn locations(&self) -> Option<&SearchRowLocations> {
@@ -582,18 +577,12 @@ impl SearchResult {
                             })
                         }
                     };
-                    let fields = match decoded.get("fields") {
-                        Some(i) => Some(i.clone()),
-                        None => None,
-                    };
+                    let fields = decoded.get("fields").cloned();
                     let locations = match decoded.get("locations") {
                         Some(i) => Some(SearchRowLocations::try_from(i)?),
                         None => None,
                     };
-                    let fragments = match decoded.get("fragments") {
-                        Some(i) => Some(i.clone()),
-                        None => None,
-                    };
+                    let fragments = decoded.get("fragments").cloned();
 
                     Ok(SearchRow {
                         index,

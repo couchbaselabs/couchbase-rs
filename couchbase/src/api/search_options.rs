@@ -129,9 +129,9 @@ impl SearchOptions {
 
     pub fn consistent_with(mut self, state: MutationState) -> Self {
         let mut vectors = HashMap::new();
-        for token in state.tokens.into_iter().next() {
+        for token in state.tokens {
             let bucket = token.bucket_name().to_string();
-            let vector = vectors.entry(bucket).or_insert(HashMap::new());
+            let vector = vectors.entry(bucket).or_insert_with(HashMap::new);
 
             vector.insert(
                 format!("{}/{}", token.partition_uuid(), token.partition_id()),

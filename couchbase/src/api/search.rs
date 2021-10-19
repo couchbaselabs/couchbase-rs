@@ -707,10 +707,10 @@ impl SearchQuery for TermQuery {
         if let Some(val) = self.field.clone() {
             v["field"] = serde_json::to_value(val)?;
         }
-        if let Some(val) = self.prefix_length.clone() {
+        if let Some(val) = self.prefix_length {
             v["prefix_length"] = serde_json::to_value(val)?;
         }
-        if let Some(val) = self.fuzziness.clone() {
+        if let Some(val) = self.fuzziness {
             v["fuzziness"] = serde_json::to_value(val)?;
         }
         if let Some(b) = self.boost {

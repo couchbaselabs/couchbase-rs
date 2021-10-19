@@ -103,8 +103,8 @@ impl CollectionManager {
         let options = unwrap_or_default!(options.into());
         let (sender, receiver) = oneshot::channel();
 
-        self.core.send(Request::GenericManagementRequest(
-            GenericManagementRequest {
+        self.core
+            .send(Request::GenericManagement(GenericManagementRequest {
                 sender,
                 path: format!("/pools/default/buckets/{}/scopes", self.bucket_name),
                 method: String::from("get"),
@@ -112,8 +112,7 @@ impl CollectionManager {
                 content_type: None,
                 timeout: options.timeout,
                 service_type: Some(ServiceType::Management),
-            },
-        ));
+            }));
 
         let result: GenericManagementResult = receiver.await.unwrap()?;
         let manifest: Manifest = match result.http_status() {
@@ -157,8 +156,8 @@ impl CollectionManager {
         let content_type = String::from("application/x-www-form-urlencoded");
         let (sender, receiver) = oneshot::channel();
 
-        self.core.send(Request::GenericManagementRequest(
-            GenericManagementRequest {
+        self.core
+            .send(Request::GenericManagement(GenericManagementRequest {
                 sender,
                 path: format!("/pools/default/buckets/{}/scopes", self.bucket_name),
                 method: String::from("post"),
@@ -166,8 +165,7 @@ impl CollectionManager {
                 content_type: Some(content_type),
                 timeout: options.timeout,
                 service_type: Some(ServiceType::Management),
-            },
-        ));
+            }));
 
         let result: GenericManagementResult = receiver.await.unwrap()?;
 
@@ -198,8 +196,8 @@ impl CollectionManager {
         let content_type = String::from("application/x-www-form-urlencoded");
         let (sender, receiver) = oneshot::channel();
 
-        self.core.send(Request::GenericManagementRequest(
-            GenericManagementRequest {
+        self.core
+            .send(Request::GenericManagement(GenericManagementRequest {
                 sender,
                 path: format!(
                     "/pools/default/buckets/{}/scopes/{}/collections/",
@@ -210,8 +208,7 @@ impl CollectionManager {
                 content_type: Some(content_type),
                 timeout: options.timeout,
                 service_type: Some(ServiceType::Management),
-            },
-        ));
+            }));
 
         let result: GenericManagementResult = receiver.await.unwrap()?;
 
@@ -235,8 +232,8 @@ impl CollectionManager {
 
         let scope = scope_name.into();
 
-        self.core.send(Request::GenericManagementRequest(
-            GenericManagementRequest {
+        self.core
+            .send(Request::GenericManagement(GenericManagementRequest {
                 sender,
                 path: format!(
                     "/pools/default/buckets/{}/scopes/{}",
@@ -247,8 +244,7 @@ impl CollectionManager {
                 content_type: None,
                 timeout: options.timeout,
                 service_type: Some(ServiceType::Management),
-            },
-        ));
+            }));
 
         let result: GenericManagementResult = receiver.await.unwrap()?;
 
@@ -270,8 +266,8 @@ impl CollectionManager {
         let options = unwrap_or_default!(options.into());
         let (sender, receiver) = oneshot::channel();
 
-        self.core.send(Request::GenericManagementRequest(
-            GenericManagementRequest {
+        self.core
+            .send(Request::GenericManagement(GenericManagementRequest {
                 sender,
                 path: format!(
                     "/pools/default/buckets/{}/scopes/{}/collections/{}",
@@ -282,8 +278,7 @@ impl CollectionManager {
                 content_type: None,
                 timeout: options.timeout,
                 service_type: Some(ServiceType::Management),
-            },
-        ));
+            }));
 
         let result: GenericManagementResult = receiver.await.unwrap()?;
 

@@ -389,7 +389,7 @@ impl CouchbaseRemoteAnalyticsLink {
             ("type", String::from("couchbase")),
         ];
 
-        if self.dataverse_name.contains("/") {
+        if self.dataverse_name.contains('/') {
             form.push(("name", self.name.clone()));
             form.push(("dataverse", self.dataverse_name.clone()));
         }
@@ -423,23 +423,11 @@ impl From<Value> for CouchbaseRemoteAnalyticsLink {
         } else {
             v["scope"].to_string()
         };
-        let username = if let Some(u) = v.get("username") {
-            Some(u.to_string())
-        } else {
-            None
-        };
+        let username = v.get("username").map(|u| u.to_string());
         let encryption = match v.get("encryption") {
             Some(level) => {
-                let certificate = if let Some(val) = v.get("certificate") {
-                    Some(val.to_string())
-                } else {
-                    None
-                };
-                let client_certificate = if let Some(val) = v.get("clientCertificate") {
-                    Some(val.to_string())
-                } else {
-                    None
-                };
+                let certificate = v.get("certificate").map(|val| val.to_string());
+                let client_certificate = v.get("clientCertificate").map(|val| val.to_string());
                 Some(CouchbaseAnalyticsEncryptionSettings {
                     encryption_level: AnalyticsEncryptionLevel::from(level.to_string()),
                     certificate,
@@ -531,11 +519,7 @@ impl From<Value> for S3ExternalAnalyticsLink {
         } else {
             v["scope"].to_string()
         };
-        let service_endpoint = if let Some(u) = v.get("serviceEndpoint") {
-            Some(u.to_string())
-        } else {
-            None
-        };
+        let service_endpoint = v.get("serviceEndpoint").map(|u| u.to_string());
 
         S3ExternalAnalyticsLink {
             name: v["name"].to_string(),
@@ -620,7 +604,7 @@ impl S3ExternalAnalyticsLink {
             ("type", String::from("s3")),
         ];
 
-        if self.dataverse_name.contains("/") {
+        if self.dataverse_name.contains('/') {
             form.push(("name", self.name.clone()));
             form.push(("dataverse", self.dataverse_name.clone()));
         }
@@ -807,7 +791,7 @@ impl AzureBlobExternalAnalyticsLink {
     fn encode(&self) -> CouchbaseResult<Vec<(&str, String)>> {
         let mut form = vec![("type", String::from("azureblob"))];
 
-        if self.dataverse_name.contains("/") {
+        if self.dataverse_name.contains('/') {
             form.push(("name", self.name.clone()));
             form.push(("dataverse", self.dataverse_name.clone()));
         }
@@ -849,7 +833,7 @@ impl AnalyticsIndexManager {
         opts: impl Into<Option<CreateAnalyticsDataverseOptions>>,
     ) -> CouchbaseResult<()> {
         let opts = unwrap_or_default!(opts.into());
-        let ignore_if_exists = if opts.ignore_if_exists.unwrap_or_else(|| false) {
+        let ignore_if_exists = if opts.ignore_if_exists.unwrap_or(false) {
             String::from("IF NOT EXISTS")
         } else {
             String::from("")
@@ -868,7 +852,7 @@ impl AnalyticsIndexManager {
 
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::Analytics(AnalyticsRequest {
-            statement: statement.into(),
+            statement,
             options: req_opts,
             sender,
             scope: None,
@@ -882,7 +866,7 @@ impl AnalyticsIndexManager {
         opts: impl Into<Option<DropAnalyticsDataverseOptions>>,
     ) -> CouchbaseResult<()> {
         let opts = unwrap_or_default!(opts.into());
-        let ignore_if_not_exists = if opts.ignore_if_not_exists.unwrap_or_else(|| false) {
+        let ignore_if_not_exists = if opts.ignore_if_not_exists.unwrap_or(false) {
             String::from("IF EXISTS")
         } else {
             String::from("")
@@ -901,7 +885,7 @@ impl AnalyticsIndexManager {
 
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::Analytics(AnalyticsRequest {
-            statement: statement.into(),
+            statement,
             options: req_opts,
             sender,
             scope: None,
@@ -916,7 +900,7 @@ impl AnalyticsIndexManager {
         opts: impl Into<Option<CreateAnalyticsDatasetOptions>>,
     ) -> CouchbaseResult<()> {
         let opts = unwrap_or_default!(opts.into());
-        let ignore_if_exists = if opts.ignore_if_exists.unwrap_or_else(|| false) {
+        let ignore_if_exists = if opts.ignore_if_exists.unwrap_or(false) {
             String::from("IF NOT EXISTS")
         } else {
             String::from("")
@@ -947,7 +931,7 @@ impl AnalyticsIndexManager {
 
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::Analytics(AnalyticsRequest {
-            statement: statement.into(),
+            statement,
             options: req_opts,
             sender,
             scope: None,
@@ -961,7 +945,7 @@ impl AnalyticsIndexManager {
         opts: impl Into<Option<DropAnalyticsDatasetOptions>>,
     ) -> CouchbaseResult<()> {
         let opts = unwrap_or_default!(opts.into());
-        let ignore_if_not_exists = if opts.ignore_if_not_exists.unwrap_or_else(|| false) {
+        let ignore_if_not_exists = if opts.ignore_if_not_exists.unwrap_or(false) {
             String::from("IF EXISTS")
         } else {
             String::from("")
@@ -981,7 +965,7 @@ impl AnalyticsIndexManager {
 
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::Analytics(AnalyticsRequest {
-            statement: statement.into(),
+            statement,
             options: req_opts,
             sender,
             scope: None,
@@ -1029,7 +1013,7 @@ impl AnalyticsIndexManager {
         opts: impl Into<Option<CreateAnalyticsIndexOptions>>,
     ) -> CouchbaseResult<()> {
         let opts = unwrap_or_default!(opts.into());
-        let ignore_if_exists = if opts.ignore_if_exists.unwrap_or_else(|| false) {
+        let ignore_if_exists = if opts.ignore_if_exists.unwrap_or(false) {
             String::from("IF NOT EXISTS")
         } else {
             String::from("")
@@ -1060,7 +1044,7 @@ impl AnalyticsIndexManager {
 
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::Analytics(AnalyticsRequest {
-            statement: statement.into(),
+            statement,
             options: req_opts,
             sender,
             scope: None,
@@ -1075,7 +1059,7 @@ impl AnalyticsIndexManager {
         opts: impl Into<Option<DropAnalyticsIndexOptions>>,
     ) -> CouchbaseResult<()> {
         let opts = unwrap_or_default!(opts.into());
-        let ignore_if_not_exists = if opts.ignore_if_not_exists.unwrap_or_else(|| false) {
+        let ignore_if_not_exists = if opts.ignore_if_not_exists.unwrap_or(false) {
             String::from("IF EXISTS")
         } else {
             String::from("")
@@ -1100,7 +1084,7 @@ impl AnalyticsIndexManager {
 
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::Analytics(AnalyticsRequest {
-            statement: statement.into(),
+            statement,
             options: req_opts,
             sender,
             scope: None,
@@ -1162,7 +1146,7 @@ impl AnalyticsIndexManager {
 
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::Analytics(AnalyticsRequest {
-            statement: statement.into(),
+            statement,
             options: req_opts,
             sender,
             scope: None,
@@ -1193,7 +1177,7 @@ impl AnalyticsIndexManager {
 
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::Analytics(AnalyticsRequest {
-            statement: statement.into(),
+            statement,
             options: req_opts,
             sender,
             scope: None,
@@ -1207,8 +1191,8 @@ impl AnalyticsIndexManager {
     ) -> CouchbaseResult<HashMap<String, HashMap<String, i64>>> {
         let opts = unwrap_or_default!(opts.into());
         let (sender, receiver) = oneshot::channel();
-        self.core.send(Request::GenericManagementRequest(
-            GenericManagementRequest {
+        self.core
+            .send(Request::GenericManagement(GenericManagementRequest {
                 sender,
                 path: String::from("/analytics/node/agg/stats/remaining"),
                 method: String::from("get"),
@@ -1216,8 +1200,7 @@ impl AnalyticsIndexManager {
                 content_type: None,
                 timeout: opts.timeout,
                 service_type: Some(ServiceType::Analytics),
-            },
-        ));
+            }));
 
         let result: GenericManagementResult = receiver.await.unwrap()?;
 
@@ -1275,8 +1258,8 @@ impl AnalyticsIndexManager {
         };
 
         let (sender, receiver) = oneshot::channel();
-        self.core.send(Request::GenericManagementRequest(
-            GenericManagementRequest {
+        self.core
+            .send(Request::GenericManagement(GenericManagementRequest {
                 sender,
                 path: endpoint,
                 method: String::from("post"),
@@ -1284,8 +1267,7 @@ impl AnalyticsIndexManager {
                 content_type: Some(String::from("application/x-www-form-urlencoded")),
                 timeout: opts.timeout,
                 service_type: Some(ServiceType::Analytics),
-            },
-        ));
+            }));
 
         let result: GenericManagementResult = receiver.await.unwrap()?;
 
@@ -1325,8 +1307,8 @@ impl AnalyticsIndexManager {
         };
 
         let (sender, receiver) = oneshot::channel();
-        self.core.send(Request::GenericManagementRequest(
-            GenericManagementRequest {
+        self.core
+            .send(Request::GenericManagement(GenericManagementRequest {
                 sender,
                 path: endpoint,
                 method: String::from("put"),
@@ -1334,8 +1316,7 @@ impl AnalyticsIndexManager {
                 content_type: Some(String::from("application/x-www-form-urlencoded")),
                 timeout: opts.timeout,
                 service_type: Some(ServiceType::Analytics),
-            },
-        ));
+            }));
 
         let result: GenericManagementResult = receiver.await.unwrap()?;
 
@@ -1358,7 +1339,7 @@ impl AnalyticsIndexManager {
         let opts = unwrap_or_default!(opts.into());
         let dataverse_name = dataverse_name.into();
         let link_name = link_name.into();
-        let payload = if dataverse_name.contains("/") {
+        let payload = if dataverse_name.contains('/') {
             Some(serde_urlencoded::to_string(vec![
                 ("name", link_name.clone()),
                 ("dataverse", dataverse_name.clone()),
@@ -1367,8 +1348,8 @@ impl AnalyticsIndexManager {
             None
         };
         let (sender, receiver) = oneshot::channel();
-        self.core.send(Request::GenericManagementRequest(
-            GenericManagementRequest {
+        self.core
+            .send(Request::GenericManagement(GenericManagementRequest {
                 sender,
                 path: self.endpoint_for_link(dataverse_name, link_name),
                 method: String::from("delete"),
@@ -1376,8 +1357,7 @@ impl AnalyticsIndexManager {
                 content_type: None,
                 timeout: opts.timeout,
                 service_type: Some(ServiceType::Analytics),
-            },
-        ));
+            }));
 
         let result: GenericManagementResult = receiver.await.unwrap()?;
 
@@ -1405,7 +1385,7 @@ impl AnalyticsIndexManager {
         let mut endpoint = String::from("/analytics/link");
         let mut query_string = vec![];
         if let Some(d) = opts.dataverse {
-            if d.contains("/") {
+            if d.contains('/') {
                 endpoint = format!(
                     "{}/{}",
                     endpoint,
@@ -1429,8 +1409,8 @@ impl AnalyticsIndexManager {
         }
 
         let (sender, receiver) = oneshot::channel();
-        self.core.send(Request::GenericManagementRequest(
-            GenericManagementRequest {
+        self.core
+            .send(Request::GenericManagement(GenericManagementRequest {
                 sender,
                 path: endpoint,
                 method: String::from("get"),
@@ -1438,8 +1418,7 @@ impl AnalyticsIndexManager {
                 content_type: None,
                 timeout: opts.timeout,
                 service_type: Some(ServiceType::Analytics),
-            },
-        ));
+            }));
 
         let result: GenericManagementResult = receiver.await.unwrap()?;
         let content: Vec<Value> = match result.http_status() {
@@ -1485,12 +1464,12 @@ impl AnalyticsIndexManager {
     }
 
     fn uncompound_name(&self, name: String) -> String {
-        let pieces: Vec<String> = name.split("/").map(String::from).collect();
+        let pieces: Vec<String> = name.split('/').map(String::from).collect();
         format!("`{}`", pieces.join("`.`"))
     }
 
     fn endpoint_for_link(&self, dataverse_name: String, name: String) -> String {
-        if dataverse_name.contains("/") {
+        if dataverse_name.contains('/') {
             format!(
                 "/analytics/link/{}/{}",
                 urlencoding::encode(dataverse_name.as_str()).to_string(),

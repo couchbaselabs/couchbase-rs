@@ -79,7 +79,7 @@ impl QueryIndexManager {
 
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::Query(QueryRequest {
-            statement: statement.into(),
+            statement,
             options: QueryOptions::from(&opts),
             sender,
             scope: None,
@@ -122,14 +122,14 @@ impl QueryIndexManager {
 
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::Query(QueryRequest {
-            statement: statement.into(),
+            statement,
             options: QueryOptions::from(&opts),
             sender,
             scope: None,
         }));
         let result_err = receiver.await.unwrap().err();
         if let Some(e) = result_err {
-            if opts.ignore_exists.unwrap_or_else(|| false) {
+            if opts.ignore_exists.unwrap_or(false) {
                 match e {
                     CouchbaseError::IndexExists { ctx: _ } => Ok(()),
                     _ => Err(e),
@@ -164,14 +164,14 @@ impl QueryIndexManager {
 
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::Query(QueryRequest {
-            statement: statement.into(),
+            statement,
             options: QueryOptions::from(&opts),
             sender,
             scope: None,
         }));
         let result_err = receiver.await.unwrap().err();
         if let Some(e) = result_err {
-            if opts.ignore_exists.unwrap_or_else(|| false) {
+            if opts.ignore_exists.unwrap_or(false) {
                 match e {
                     CouchbaseError::IndexExists { ctx: _ctx } => Ok(()),
                     _ => Err(e),
@@ -201,14 +201,14 @@ impl QueryIndexManager {
 
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::Query(QueryRequest {
-            statement: statement.into(),
+            statement,
             options: QueryOptions::from(&opts),
             sender,
             scope: None,
         }));
         let result_err = receiver.await.unwrap().err();
         if let Some(e) = result_err {
-            if opts.ignore_not_exists.unwrap_or_else(|| false) {
+            if opts.ignore_not_exists.unwrap_or(false) {
                 match e {
                     CouchbaseError::IndexNotFound { ctx: _ctx } => Ok(()),
                     _ => Err(e),
@@ -238,14 +238,14 @@ impl QueryIndexManager {
 
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::Query(QueryRequest {
-            statement: statement.into(),
+            statement,
             options: QueryOptions::from(&opts),
             sender,
             scope: None,
         }));
         let result_err = receiver.await.unwrap().err();
         if let Some(e) = result_err {
-            if opts.ignore_not_exists.unwrap_or_else(|| false) {
+            if opts.ignore_not_exists.unwrap_or(false) {
                 match e {
                     CouchbaseError::IndexNotFound { ctx: _ctx } => Ok(()),
                     _ => Err(e),
@@ -341,7 +341,7 @@ impl QueryIndexManager {
 
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::Query(QueryRequest {
-            statement: statement.into(),
+            statement,
             options: QueryOptions::from(&opts),
             sender,
             scope: None,
@@ -354,7 +354,7 @@ impl QueryIndexManager {
     fn check_indexes_online(
         &self,
         all_indexes: impl IntoIterator<Item = QueryIndex>,
-        watch_indexes: &Vec<String>,
+        watch_indexes: &[String],
     ) -> CouchbaseResult<bool> {
         let mut checked_indexes = vec![];
         for index in all_indexes.into_iter() {
@@ -373,7 +373,7 @@ impl QueryIndexManager {
         }
 
         for index in checked_indexes {
-            if index.state() != String::from("online") {
+            if index.state() != "online" {
                 return Ok(false);
             }
         }

@@ -253,7 +253,7 @@ pub struct UserAndMetadata {
 
 impl UserAndMetadata {
     pub fn domain(&self) -> AuthDomain {
-        self.domain.clone()
+        self.domain
     }
 
     pub fn user(&self) -> User {
@@ -314,8 +314,8 @@ impl UserManager {
             None => AuthDomain::Local.to_string().to_lowercase(),
         };
 
-        self.core.send(Request::GenericManagementRequest(
-            GenericManagementRequest {
+        self.core
+            .send(Request::GenericManagement(GenericManagementRequest {
                 sender,
                 path: format!("/settings/rbac/users/{}/{}", domain, username.into()),
                 method: String::from("get"),
@@ -323,8 +323,7 @@ impl UserManager {
                 content_type: None,
                 timeout: options.timeout,
                 service_type: Some(ServiceType::Management),
-            },
-        ));
+            }));
 
         let result: GenericManagementResult = receiver.await.unwrap()?;
 
@@ -350,8 +349,8 @@ impl UserManager {
             None => AuthDomain::Local.to_string().to_lowercase(),
         };
 
-        self.core.send(Request::GenericManagementRequest(
-            GenericManagementRequest {
+        self.core
+            .send(Request::GenericManagement(GenericManagementRequest {
                 sender,
                 path: format!("/settings/rbac/users/{}/", domain),
                 method: String::from("get"),
@@ -359,8 +358,7 @@ impl UserManager {
                 content_type: None,
                 timeout: options.timeout,
                 service_type: Some(ServiceType::Management),
-            },
-        ));
+            }));
 
         let result: GenericManagementResult = receiver.await.unwrap()?;
 
@@ -394,13 +392,7 @@ impl UserManager {
         // Option.
         let user_form = &[
             ("name", user.display_name),
-            (
-                "groups",
-                match user.groups {
-                    Some(groups) => Some(groups.join(",")),
-                    None => None,
-                },
-            ),
+            ("groups", user.groups.map(|groups| groups.join(","))),
             ("roles", Some(roles.join(","))),
             ("password", user.password),
         ];
@@ -413,8 +405,8 @@ impl UserManager {
         let content_type = String::from("application/x-www-form-urlencoded");
         let (sender, receiver) = oneshot::channel();
 
-        self.core.send(Request::GenericManagementRequest(
-            GenericManagementRequest {
+        self.core
+            .send(Request::GenericManagement(GenericManagementRequest {
                 sender,
                 path: format!("/settings/rbac/users/{}/{}", domain, user.username),
                 method: String::from("put"),
@@ -422,8 +414,7 @@ impl UserManager {
                 content_type: Some(content_type),
                 timeout: options.timeout,
                 service_type: Some(ServiceType::Management),
-            },
-        ));
+            }));
 
         let result: GenericManagementResult = receiver.await.unwrap()?;
 
@@ -449,8 +440,8 @@ impl UserManager {
             None => AuthDomain::Local.to_string().to_lowercase(),
         };
 
-        self.core.send(Request::GenericManagementRequest(
-            GenericManagementRequest {
+        self.core
+            .send(Request::GenericManagement(GenericManagementRequest {
                 sender,
                 path: format!("/settings/rbac/users/{}/{}", domain, username.into()),
                 method: String::from("delete"),
@@ -458,8 +449,7 @@ impl UserManager {
                 content_type: None,
                 timeout: options.timeout,
                 service_type: Some(ServiceType::Management),
-            },
-        ));
+            }));
 
         let result: GenericManagementResult = receiver.await.unwrap()?;
 
@@ -479,8 +469,8 @@ impl UserManager {
     ) -> CouchbaseResult<Vec<RoleAndDescription>> {
         let options = unwrap_or_default!(options.into());
         let (sender, receiver) = oneshot::channel();
-        self.core.send(Request::GenericManagementRequest(
-            GenericManagementRequest {
+        self.core
+            .send(Request::GenericManagement(GenericManagementRequest {
                 sender,
                 path: String::from("/settings/rbac/roles"),
                 method: String::from("get"),
@@ -488,8 +478,7 @@ impl UserManager {
                 content_type: None,
                 timeout: options.timeout,
                 service_type: Some(ServiceType::Management),
-            },
-        ));
+            }));
 
         let result: GenericManagementResult = receiver.await.unwrap()?;
 
@@ -511,8 +500,8 @@ impl UserManager {
     ) -> CouchbaseResult<Vec<Group>> {
         let options = unwrap_or_default!(options.into());
         let (sender, receiver) = oneshot::channel();
-        self.core.send(Request::GenericManagementRequest(
-            GenericManagementRequest {
+        self.core
+            .send(Request::GenericManagement(GenericManagementRequest {
                 sender,
                 path: format!("/settings/rbac/groups/{}", name.into()),
                 method: String::from("get"),
@@ -520,8 +509,7 @@ impl UserManager {
                 content_type: None,
                 timeout: options.timeout,
                 service_type: Some(ServiceType::Management),
-            },
-        ));
+            }));
 
         let result: GenericManagementResult = receiver.await.unwrap()?;
 
@@ -541,8 +529,8 @@ impl UserManager {
         options: GetAllGroupsOptions,
     ) -> CouchbaseResult<Vec<Group>> {
         let (sender, receiver) = oneshot::channel();
-        self.core.send(Request::GenericManagementRequest(
-            GenericManagementRequest {
+        self.core
+            .send(Request::GenericManagement(GenericManagementRequest {
                 sender,
                 path: String::from("/settings/rbac/groups"),
                 method: String::from("get"),
@@ -550,8 +538,7 @@ impl UserManager {
                 content_type: None,
                 timeout: options.timeout,
                 service_type: Some(ServiceType::Management),
-            },
-        ));
+            }));
 
         let result: GenericManagementResult = receiver.await.unwrap()?;
 
@@ -593,8 +580,8 @@ impl UserManager {
         let content_type = String::from("application/x-www-form-urlencoded");
         let (sender, receiver) = oneshot::channel();
 
-        self.core.send(Request::GenericManagementRequest(
-            GenericManagementRequest {
+        self.core
+            .send(Request::GenericManagement(GenericManagementRequest {
                 sender,
                 path: format!("/settings/rbac/groups/{}", group.name),
                 method: String::from("put"),
@@ -602,8 +589,7 @@ impl UserManager {
                 content_type: Some(content_type),
                 timeout: options.timeout,
                 service_type: Some(ServiceType::Management),
-            },
-        ));
+            }));
 
         let result: GenericManagementResult = receiver.await.unwrap()?;
 
@@ -624,8 +610,8 @@ impl UserManager {
     ) -> CouchbaseResult<()> {
         let options = unwrap_or_default!(options.into());
         let (sender, receiver) = oneshot::channel();
-        self.core.send(Request::GenericManagementRequest(
-            GenericManagementRequest {
+        self.core
+            .send(Request::GenericManagement(GenericManagementRequest {
                 sender,
                 path: format!("/settings/rbac/groups/{}", name.into()),
                 method: String::from("delete"),
@@ -633,8 +619,7 @@ impl UserManager {
                 content_type: None,
                 timeout: options.timeout,
                 service_type: Some(ServiceType::Management),
-            },
-        ));
+            }));
 
         let result: GenericManagementResult = receiver.await.unwrap()?;
 

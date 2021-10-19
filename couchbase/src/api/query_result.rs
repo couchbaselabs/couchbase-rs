@@ -119,7 +119,7 @@ impl QueryMetaData {
     {
         Some(
             serde_json::from_value(self.signature.clone()?)
-                .map_err(|e| CouchbaseError::decoding_failure_from_serde(e)),
+                .map_err(CouchbaseError::decoding_failure_from_serde),
         )
     }
 
@@ -129,7 +129,7 @@ impl QueryMetaData {
     {
         Some(
             serde_json::from_value(self.signature.clone()?)
-                .map_err(|e| CouchbaseError::decoding_failure_from_serde(e)),
+                .map_err(CouchbaseError::decoding_failure_from_serde),
         )
     }
 }

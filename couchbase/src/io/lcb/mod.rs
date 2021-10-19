@@ -102,14 +102,8 @@ fn run_lcb_loop(
 ) {
     let mut instances = LcbInstances::default();
 
-    let user_bytes = match username {
-        Some(u) => Some(u.into_bytes()),
-        None => None,
-    };
-    let pass_bytes = match password {
-        Some(p) => Some(p.into_bytes()),
-        None => None,
-    };
+    let user_bytes = username.map(|u| u.into_bytes());
+    let pass_bytes = password.map(|p| p.into_bytes());
 
     match LcbInstance::new(connection_string.into_bytes(), user_bytes, pass_bytes) {
         Ok(i) => instances.set_unbound(i),
@@ -203,9 +197,7 @@ fn encode_request(instance: *mut lcb_INSTANCE, request: Request) -> Result<(), E
         Request::Remove(r) => encode::encode_remove(instance, r)?,
         Request::LookupIn(r) => encode::encode_lookup_in(instance, r)?,
         Request::MutateIn(r) => encode::encode_mutate_in(instance, r)?,
-        Request::GenericManagementRequest(r) => {
-            encode::encode_generic_management_request(instance, r)?
-        }
+        Request::GenericManagement(r) => encode::encode_generic_management_request(instance, r)?,
         Request::Ping(r) => encode::encode_ping(instance, r)?,
         Request::Counter(r) => encode::encode_counter(instance, r)?,
     }

@@ -58,7 +58,7 @@ impl Cluster {
         let mut connection_string = connection_string.into();
         let to_append = opts.to_conn_string();
         if !to_append.is_empty() {}
-        if connection_string.contains("?") {
+        if connection_string.contains('?') {
             connection_string = format!("{}&{}", connection_string, to_append);
         } else {
             connection_string = format!("{}?{}", connection_string, to_append);
@@ -81,7 +81,7 @@ impl Cluster {
         }
 
         Cluster {
-            core: Arc::new(Core::new(connection_string.into(), username, password)),
+            core: Arc::new(Core::new(connection_string, username, password)),
         }
     }
 
@@ -417,7 +417,7 @@ impl TimeoutOptions {
 }
 
 fn duration_to_conn_str_format(t: Duration) -> String {
-    let v = (t.as_millis() as f32) / (1000 as f32);
+    let v = (t.as_millis() as f32) / (1000_f32);
     v.to_string()
 }
 
@@ -458,10 +458,10 @@ impl Display for TimeoutOptions {
             timeouts.push(format!("http_timeout={}", duration_to_conn_str_format(t)));
         }
 
-        if timeouts.len() > 0 {
-            write!(f, "{}", timeouts.join("&"))
-        } else {
+        if timeouts.is_empty() {
             write!(f, "")
+        } else {
+            write!(f, "{}", timeouts.join("&"))
         }
     }
 }
@@ -503,10 +503,10 @@ impl Display for SecurityOptions {
             opts.push(format!("sasl_mech_force={}", ciphers.join(",")));
         }
 
-        if opts.len() > 0 {
-            write!(f, "{}", opts.join("&"))
-        } else {
+        if opts.is_empty() {
             write!(f, "")
+        } else {
+            write!(f, "{}", opts.join("&"))
         }
     }
 }
@@ -567,10 +567,10 @@ impl ClusterOptions {
             opts.push(t.to_string());
         }
 
-        if opts.len() > 0 {
-            format!("{}", opts.join("&"))
-        } else {
+        if opts.is_empty() {
             String::from("")
+        } else {
+            opts.join("&")
         }
     }
 }

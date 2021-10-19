@@ -33,7 +33,7 @@ impl GetResult {
     where
         T: serde::Deserialize<'a>,
     {
-        match serde_json::from_slice(&self.content.as_slice()) {
+        match serde_json::from_slice(self.content.as_slice()) {
             Ok(v) => Ok(v),
             Err(e) => Err(CouchbaseError::DecodingFailure {
                 ctx: ErrorContext::default(),

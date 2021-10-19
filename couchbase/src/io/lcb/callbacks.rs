@@ -7,7 +7,6 @@ use crate::{
 use couchbase_sys::*;
 use log::{debug, trace};
 use serde_json::Value;
-use std::convert::TryInto;
 use std::ffi::CStr;
 use std::os::raw::{c_char, c_int, c_uint, c_void};
 use std::ptr;
@@ -241,7 +240,7 @@ pub unsafe extern "C" fn lookup_in_callback(
             lcb_respsubdoc_result_value(subdoc_res, i, &mut value_ptr, &mut value_len);
             let value = from_raw_parts(value_ptr as *const u8, value_len);
             fields.push(SubDocField {
-                status: status.try_into().unwrap(),
+                status,
                 value: value.into(),
             });
         }
@@ -286,7 +285,7 @@ pub unsafe extern "C" fn mutate_in_callback(
             lcb_respsubdoc_result_value(subdoc_res, i, &mut value_ptr, &mut value_len);
             let value = from_raw_parts(value_ptr as *const u8, value_len);
             fields.push(SubDocField {
-                status: status.try_into().unwrap(),
+                status,
                 value: value.into(),
             });
         }
@@ -681,12 +680,11 @@ pub unsafe extern "C" fn search_callback(
 
         if status == 0 {
             let meta = serde_json::from_slice::<Value>(row).unwrap();
-            match meta.as_object().unwrap().get("facets") {
-                Some(f) => match cookie.facet_sender.send(f.clone()) {
+            if let Some(f) = meta.as_object().unwrap().get("facets") {
+                match cookie.facet_sender.send(f.clone()) {
                     Ok(_) => {}
                     Err(e) => trace!("Failed to send search meta data ecause of {:?}", e),
-                },
-                None => {}
+                }
             }
 
             match cookie
@@ -774,7 +772,7 @@ pub unsafe extern "C" fn view_callback(
         decrement_outstanding_requests(instance);
     } else {
         let mut id: Option<String> = None;
-        if doc_id.len() > 0 {
+        if !doc_id.is_empty() {
             id = Some(str::from_utf8(doc_id).unwrap().to_string());
         }
         match cookie.rows_sender.unbounded_send(ViewRow {
@@ -1064,10 +1062,7 @@ pub unsafe extern "C" fn ping_callback(
             let mut latency: u64 = 0;
             lcb_respping_result_latency(ping_res, i, &mut latency);
 
-            if !services.contains_key(&service_type) {
-                services.insert(service_type.clone(), Vec::new());
-            }
-            let service = services.get_mut(&service_type).unwrap();
+            let service = services.entry(service_type).or_insert_with(Vec::new);
 
             service.push(EndpointPingReport::new(
                 local,
