@@ -1,10 +1,11 @@
-use crate::api::{LookupInSpec, MutateInSpec};
 use crate::io::lcb::callbacks::{
     analytics_callback, query_callback, search_callback, view_callback,
 };
 use crate::io::lcb::{AnalyticsCookie, HttpCookie, QueryCookie, SearchCookie, ViewCookie};
 use crate::io::request::*;
-use crate::{api::options::StoreSemantics, CouchbaseResult, ErrorContext, ServiceType};
+use crate::{
+    CouchbaseResult, ErrorContext, LookupInSpec, MutateInSpec, ServiceType, StoreSemantics,
+};
 use futures::channel::oneshot::Sender;
 use log::{debug, warn};
 use serde_json::Value;

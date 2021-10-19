@@ -1,12 +1,6 @@
 use crate::io::request::*;
 use crate::io::Core;
-use crate::{
-    AllowQueryingSearchIndexOptions, AnalyzeDocumentSearchIndexOptions, CouchbaseError,
-    CouchbaseResult, DisallowQueryingSearchIndexOptions, DropSearchIndexOptions, ErrorContext,
-    FreezePlanSearchIndexOptions, GenericManagementResult, GetAllSearchIndexesOptions,
-    GetSearchIndexOptions, GetSearchIndexedDocumentsCountOptions, PauseIngestSearchIndexOptions,
-    ServiceType, UnfreezePlanSearchIndexOptions, UpsertSearchIndexOptions,
-};
+use crate::{CouchbaseError, CouchbaseResult, ErrorContext, GenericManagementResult, ServiceType};
 use futures::channel::oneshot;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -513,4 +507,112 @@ impl SearchIndexManager {
 
         Ok(res)
     }
+}
+
+#[derive(Debug, Default)]
+pub struct GetSearchIndexOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl GetSearchIndexOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct GetAllSearchIndexesOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl GetAllSearchIndexesOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct UpsertSearchIndexOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl UpsertSearchIndexOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct DropSearchIndexOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl DropSearchIndexOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct GetSearchIndexedDocumentsCountOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl GetSearchIndexedDocumentsCountOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct PauseIngestSearchIndexOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl PauseIngestSearchIndexOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct ResumeIngestSearchIndexOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl ResumeIngestSearchIndexOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct AllowQueryingSearchIndexOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl AllowQueryingSearchIndexOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct DisallowQueryingSearchIndexOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl DisallowQueryingSearchIndexOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct FreezePlanSearchIndexOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl FreezePlanSearchIndexOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct UnfreezePlanSearchIndexOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl UnfreezePlanSearchIndexOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct AnalyzeDocumentSearchIndexOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl AnalyzeDocumentSearchIndexOptions {
+    timeout!();
 }

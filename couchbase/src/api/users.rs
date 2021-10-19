@@ -1,4 +1,3 @@
-use crate::api::options::*;
 use crate::io::request::*;
 use crate::io::Core;
 use crate::{CouchbaseError, CouchbaseResult, GenericManagementResult, ServiceType};
@@ -7,6 +6,7 @@ use serde_derive::{Deserialize, Serialize};
 use std::borrow::Borrow;
 use std::fmt::{self, Debug};
 use std::sync::Arc;
+use std::time::Duration;
 
 #[derive(Debug, Deserialize, Clone, Copy, Eq, PartialEq)]
 pub enum AuthDomain {
@@ -625,4 +625,102 @@ impl UserManager {
             }),
         }
     }
+}
+
+macro_rules! domain_name {
+    () => {
+        pub fn domain_name(mut self, domain_name: String) -> Self {
+            self.domain_name = Some(domain_name);
+            self
+        }
+    };
+}
+
+#[derive(Debug, Default)]
+pub struct GetUserOptions {
+    pub(crate) timeout: Option<Duration>,
+    pub(crate) domain_name: Option<String>,
+}
+
+impl GetUserOptions {
+    timeout!();
+    domain_name!();
+}
+
+#[derive(Debug, Default)]
+pub struct GetAllUsersOptions {
+    pub(crate) timeout: Option<Duration>,
+    pub(crate) domain_name: Option<String>,
+}
+
+impl GetAllUsersOptions {
+    timeout!();
+    domain_name!();
+}
+
+#[derive(Debug, Default)]
+pub struct UpsertUserOptions {
+    pub(crate) timeout: Option<Duration>,
+    pub(crate) domain_name: Option<String>,
+}
+
+impl UpsertUserOptions {
+    timeout!();
+    domain_name!();
+}
+
+#[derive(Debug, Default)]
+pub struct DropUserOptions {
+    pub(crate) timeout: Option<Duration>,
+    pub(crate) domain_name: Option<String>,
+}
+
+impl DropUserOptions {
+    timeout!();
+    domain_name!();
+}
+
+#[derive(Debug, Default)]
+pub struct GetRolesOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl GetRolesOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct GetGroupOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl GetGroupOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct GetAllGroupsOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl GetAllGroupsOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct UpsertGroupOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl UpsertGroupOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct DropGroupOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl DropGroupOptions {
+    timeout!();
 }

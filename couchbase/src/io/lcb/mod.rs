@@ -9,9 +9,9 @@ pub(crate) use encode::{
 };
 
 use crate::api::error::CouchbaseResult;
-use crate::api::results::{
+use crate::{
     AnalyticsMetaData, AnalyticsResult, GenericManagementResult, QueryMetaData, QueryResult,
-    SearchMetaData, SearchResult,
+    SearchMetaData, SearchResult, ViewMetaData, ViewResult, ViewRow,
 };
 
 use encode::EncodeFailure;
@@ -19,7 +19,6 @@ use encode::EncodeFailure;
 use crate::io::request::Request;
 use instance::{LcbInstance, LcbInstances};
 
-use crate::{ViewMetaData, ViewResult, ViewRow};
 use couchbase_sys::*;
 use crossbeam_channel::RecvTimeoutError;
 use crossbeam_channel::{unbounded, Receiver, Sender};

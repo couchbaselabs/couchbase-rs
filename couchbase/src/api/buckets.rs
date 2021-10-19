@@ -1,14 +1,10 @@
-use crate::api::DurabilityLevel;
+use crate::api::collection::DurabilityLevel;
 use crate::io::request::*;
 use crate::io::Core;
 use crate::CouchbaseError::{
     BucketExists, BucketNotFlushable, BucketNotFound, Generic, InvalidArgument,
 };
-use crate::{
-    CouchbaseError, CouchbaseResult, CreateBucketOptions, DropBucketOptions, ErrorContext,
-    FlushBucketOptions, GenericManagementResult, GetAllBucketsOptions, GetBucketOptions,
-    ServiceType, UpdateBucketOptions,
-};
+use crate::{CouchbaseError, CouchbaseResult, ErrorContext, GenericManagementResult, ServiceType};
 use futures::channel::oneshot;
 use serde_derive::Deserialize;
 use serde_json::Value;
@@ -772,4 +768,58 @@ impl BucketManager {
             message,
         }
     }
+}
+
+#[derive(Debug, Default)]
+pub struct CreateBucketOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl CreateBucketOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct DropBucketOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl DropBucketOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct UpdateBucketOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl UpdateBucketOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct GetBucketOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl GetBucketOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct GetAllBucketsOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl GetAllBucketsOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct FlushBucketOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl FlushBucketOptions {
+    timeout!();
 }

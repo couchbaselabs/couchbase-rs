@@ -1,13 +1,8 @@
+use crate::api::analytics_options::AnalyticsOptions;
+use crate::api::cluster::ServiceType;
 use crate::io::request::*;
 use crate::io::Core;
-use crate::{
-    AnalyticsOptions, ConnectAnalyticsLinkOptions, CouchbaseError, CouchbaseResult,
-    CreateAnalyticsDatasetOptions, CreateAnalyticsDataverseOptions, CreateAnalyticsIndexOptions,
-    CreateAnalyticsLinkOptions, DisconnectAnalyticsLinkOptions, DropAnalyticsDatasetOptions,
-    DropAnalyticsDataverseOptions, DropAnalyticsIndexOptions, DropAnalyticsLinkOptions,
-    ErrorContext, GenericManagementResult, GetAllAnalyticsDatasetsOptions,
-    GetAllAnalyticsLinksOptions, ReplaceAnalyticsLinkOptions, ServiceType,
-};
+use crate::{CouchbaseError, CouchbaseResult, ErrorContext, GenericManagementResult};
 use futures::channel::oneshot;
 use futures::StreamExt;
 use serde_derive::Deserialize;
@@ -15,6 +10,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
+use std::time::Duration;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct AnalyticsDataset {
@@ -1485,5 +1481,245 @@ impl AnalyticsIndexManager {
         } else {
             String::from("/analytics/link")
         }
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct CreateAnalyticsDataverseOptions {
+    pub(crate) timeout: Option<Duration>,
+    pub(crate) ignore_if_exists: Option<bool>,
+}
+
+impl CreateAnalyticsDataverseOptions {
+    timeout!();
+
+    pub fn ignore_if_exists(mut self, ignore: bool) -> Self {
+        self.ignore_if_exists = Some(ignore);
+        self
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct DropAnalyticsDataverseOptions {
+    pub(crate) timeout: Option<Duration>,
+    pub(crate) ignore_if_not_exists: Option<bool>,
+}
+
+impl DropAnalyticsDataverseOptions {
+    timeout!();
+
+    pub fn ignore_if_not_exists(mut self, ignore: bool) -> Self {
+        self.ignore_if_not_exists = Some(ignore);
+        self
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct CreateAnalyticsDatasetOptions {
+    pub(crate) timeout: Option<Duration>,
+    pub(crate) ignore_if_exists: Option<bool>,
+    pub(crate) condition: Option<String>,
+    pub(crate) dataverse_name: Option<String>,
+}
+
+impl CreateAnalyticsDatasetOptions {
+    timeout!();
+
+    pub fn ignore_if_exists(mut self, ignore: bool) -> Self {
+        self.ignore_if_exists = Some(ignore);
+        self
+    }
+
+    pub fn condition(mut self, condition: impl Into<String>) -> Self {
+        self.condition = Some(condition.into());
+        self
+    }
+
+    pub fn dataverse_name(mut self, dataverse_name: impl Into<String>) -> Self {
+        self.dataverse_name = Some(dataverse_name.into());
+        self
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct DropAnalyticsDatasetOptions {
+    pub(crate) timeout: Option<Duration>,
+    pub(crate) ignore_if_not_exists: Option<bool>,
+    pub(crate) dataverse_name: Option<String>,
+}
+
+impl DropAnalyticsDatasetOptions {
+    timeout!();
+
+    pub fn ignore_if_not_exists(mut self, ignore: bool) -> Self {
+        self.ignore_if_not_exists = Some(ignore);
+        self
+    }
+
+    pub fn dataverse_name(mut self, dataverse_name: impl Into<String>) -> Self {
+        self.dataverse_name = Some(dataverse_name.into());
+        self
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct GetAllAnalyticsDatasetsOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl GetAllAnalyticsDatasetsOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct CreateAnalyticsIndexOptions {
+    pub(crate) timeout: Option<Duration>,
+    pub(crate) ignore_if_exists: Option<bool>,
+    pub(crate) dataverse_name: Option<String>,
+}
+
+impl CreateAnalyticsIndexOptions {
+    timeout!();
+
+    pub fn ignore_if_exists(mut self, ignore: bool) -> Self {
+        self.ignore_if_exists = Some(ignore);
+        self
+    }
+
+    pub fn dataverse_name(mut self, dataverse_name: impl Into<String>) -> Self {
+        self.dataverse_name = Some(dataverse_name.into());
+        self
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct DropAnalyticsIndexOptions {
+    pub(crate) timeout: Option<Duration>,
+    pub(crate) ignore_if_not_exists: Option<bool>,
+    pub(crate) dataverse_name: Option<String>,
+}
+
+impl DropAnalyticsIndexOptions {
+    timeout!();
+
+    pub fn ignore_if_not_exists(mut self, ignore: bool) -> Self {
+        self.ignore_if_not_exists = Some(ignore);
+        self
+    }
+
+    pub fn dataverse_name(mut self, dataverse_name: impl Into<String>) -> Self {
+        self.dataverse_name = Some(dataverse_name.into());
+        self
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct GetAllAnalyticsIndexesOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl GetAllAnalyticsIndexesOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct ConnectAnalyticsLinkOptions {
+    pub(crate) timeout: Option<Duration>,
+    pub(crate) dataverse_name: Option<String>,
+    pub(crate) link_name: Option<String>,
+    pub(crate) force: Option<bool>,
+}
+
+impl ConnectAnalyticsLinkOptions {
+    timeout!();
+
+    pub fn dataverse_name(mut self, dataverse_name: impl Into<String>) -> Self {
+        self.dataverse_name = Some(dataverse_name.into());
+        self
+    }
+
+    pub fn link_name(mut self, link_name: impl Into<String>) -> Self {
+        self.link_name = Some(link_name.into());
+        self
+    }
+
+    pub fn force(mut self, force: bool) -> Self {
+        self.force = Some(force);
+        self
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct DisconnectAnalyticsLinkOptions {
+    pub(crate) timeout: Option<Duration>,
+    pub(crate) dataverse_name: Option<String>,
+    pub(crate) link_name: Option<String>,
+}
+
+impl DisconnectAnalyticsLinkOptions {
+    timeout!();
+
+    pub fn dataverse_name(mut self, dataverse_name: impl Into<String>) -> Self {
+        self.dataverse_name = Some(dataverse_name.into());
+        self
+    }
+
+    pub fn link_name(mut self, link_name: impl Into<String>) -> Self {
+        self.link_name = Some(link_name.into());
+        self
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct CreateAnalyticsLinkOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl CreateAnalyticsLinkOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct ReplaceAnalyticsLinkOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl ReplaceAnalyticsLinkOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct DropAnalyticsLinkOptions {
+    pub(crate) timeout: Option<Duration>,
+}
+
+impl DropAnalyticsLinkOptions {
+    timeout!();
+}
+
+#[derive(Debug, Default)]
+pub struct GetAllAnalyticsLinksOptions {
+    pub(crate) timeout: Option<Duration>,
+    pub(crate) dataverse: Option<String>,
+    pub(crate) name: Option<String>,
+    pub(crate) link_type: Option<AnalyticsLinkType>,
+}
+
+impl GetAllAnalyticsLinksOptions {
+    timeout!();
+
+    pub fn dataverse(mut self, dataverse: impl Into<String>) -> Self {
+        self.dataverse = Some(dataverse.into());
+        self
+    }
+
+    pub fn name(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+
+    pub fn link_type(mut self, link_type: AnalyticsLinkType) -> Self {
+        self.link_type = Some(link_type);
+        self
     }
 }
