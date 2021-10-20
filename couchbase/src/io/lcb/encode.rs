@@ -205,7 +205,7 @@ pub fn encode_get(instance: *mut lcb_INSTANCE, request: GetRequest) -> Result<()
             }
             GetRequestType::GetAndLock { lock_time, options } => {
                 verify(
-                    lcb_cmdget_locktime(command, lock_time.as_micros() as u32),
+                    lcb_cmdget_locktime(command, lock_time.as_secs() as u32),
                     cookie,
                 )?;
 
