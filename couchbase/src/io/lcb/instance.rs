@@ -128,6 +128,11 @@ impl LcbInstance {
         );
         lcb_install_callback(
             instance,
+            lcb_CALLBACK_TYPE_LCB_CALLBACK_TOUCH as i32,
+            Some(touch_callback),
+        );
+        lcb_install_callback(
+            instance,
             lcb_CALLBACK_TYPE_LCB_CALLBACK_UNLOCK as i32,
             Some(unlock_callback),
         );

@@ -448,6 +448,50 @@ pub fn encode_remove(
 
     Ok(())
 }
+
+/// Encodes a `TouchRequest` into its libcouchbase `lcb_CMDTOUCH` representation.
+pub fn encode_touch(
+    instance: *mut lcb_INSTANCE,
+    request: TouchRequest,
+) -> Result<(), EncodeFailure> {
+    let (id_len, id) = into_cstring(request.id);
+    let cookie = Box::into_raw(Box::new(request.sender));
+    let (scope_len, scope) = into_cstring(request.scope);
+    let (collection_len, collection) = into_cstring(request.collection);
+
+    let mut command: *mut lcb_CMDTOUCH = ptr::null_mut();
+    unsafe {
+        verify(lcb_cmdtouch_create(&mut command), cookie)?;
+        verify(lcb_cmdtouch_key(command, id.as_ptr(), id_len), cookie)?;
+        verify(
+            lcb_cmdtouch_expiry(command, request.expiry.as_secs() as u32),
+            cookie,
+        )?;
+        verify(
+            lcb_cmdtouch_collection(
+                command,
+                scope.as_ptr(),
+                scope_len,
+                collection.as_ptr(),
+                collection_len,
+            ),
+            cookie,
+        )?;
+
+        if let Some(timeout) = request.options.timeout {
+            verify(
+                lcb_cmdtouch_timeout(command, timeout.as_micros() as u32),
+                cookie,
+            )?;
+        }
+
+        verify(lcb_touch(instance, cookie as *mut c_void, command), cookie)?;
+        verify(lcb_cmdtouch_destroy(command), cookie)?;
+    }
+
+    Ok(())
+}
+
 /// Encodes an `UnlockRequest` into its libcouchbase `lcb_CMDUNLOCK` representation.
 pub fn encode_unlock(
     instance: *mut lcb_INSTANCE,
@@ -462,6 +506,8 @@ pub fn encode_unlock(
     unsafe {
         verify(lcb_cmdunlock_create(&mut command), cookie)?;
         verify(lcb_cmdunlock_key(command, id.as_ptr(), id_len), cookie)?;
+        verify(lcb_cmdunlock_cas(command, request.cas), cookie)?;
+
         verify(
             lcb_cmdunlock_collection(
                 command,
@@ -472,10 +518,6 @@ pub fn encode_unlock(
             ),
             cookie,
         )?;
-
-        if let Some(cas) = request.options.cas {
-            verify(lcb_cmdunlock_cas(command, cas), cookie)?;
-        }
         if let Some(timeout) = request.options.timeout {
             verify(
                 lcb_cmdunlock_timeout(command, timeout.as_micros() as u32),

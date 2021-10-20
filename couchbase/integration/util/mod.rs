@@ -28,6 +28,7 @@ pub struct TestConfig {
     scope: Scope,
     collection: Collection,
     support_matrix: Vec<TestFeature>,
+    enabled_tests: Vec<String>,
 }
 
 impl TestConfig {
@@ -45,6 +46,13 @@ impl TestConfig {
     }
     pub fn supports_feature(&self, feature: TestFeature) -> bool {
         self.support_matrix.contains(&feature)
+    }
+    pub fn test_enabled(&self, test: String) -> bool {
+        if self.enabled_tests.is_empty() {
+            return true;
+        }
+
+        self.enabled_tests.contains(&test)
     }
 }
 

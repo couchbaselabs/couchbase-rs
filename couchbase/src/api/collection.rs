@@ -255,9 +255,30 @@ impl Collection {
         receiver.await.unwrap()
     }
 
+    pub async fn touch(
+        &self,
+        id: impl Into<String>,
+        expiry: Duration,
+        options: impl Into<Option<TouchOptions>>,
+    ) -> CouchbaseResult<MutationResult> {
+        let options = unwrap_or_default!(options.into());
+        let (sender, receiver) = oneshot::channel();
+        self.core.send(Request::Touch(TouchRequest {
+            id: id.into(),
+            sender,
+            bucket: self.bucket_name.clone(),
+            options,
+            scope: self.scope_name.clone(),
+            collection: self.name.clone(),
+            expiry,
+        }));
+        receiver.await.unwrap()
+    }
+
     pub async fn unlock(
         &self,
         id: impl Into<String>,
+        cas: u64,
         options: impl Into<Option<UnlockOptions>>,
     ) -> CouchbaseResult<()> {
         let options = unwrap_or_default!(options.into());
@@ -269,6 +290,7 @@ impl Collection {
             options,
             scope: self.scope_name.clone(),
             collection: self.name.clone(),
+            cas,
         }));
         receiver.await.unwrap()
     }

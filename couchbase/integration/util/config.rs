@@ -10,14 +10,23 @@ pub enum ClusterType {
     Mock,
 }
 
+// TODO: support disabling individual tests and also support feature flags
 #[derive(Debug, Deserialize)]
-pub struct Config {
+pub struct FileConfig {
     #[serde(rename(deserialize = "type"))]
     cluster_type: ClusterType,
     #[serde(rename(deserialize = "standalone"))]
     standalone_config: Option<StandaloneConfig>,
     #[serde(rename(deserialize = "mock"))]
     caves_config: Option<CavesConfig>,
+    tests: Option<String>,
+}
+
+pub struct Config {
+    cluster_type: ClusterType,
+    standalone_config: Option<StandaloneConfig>,
+    caves_config: Option<CavesConfig>,
+    enabled_tests: Vec<String>,
 }
 
 impl Config {
@@ -30,12 +39,15 @@ impl Config {
     pub fn mock_config(&self) -> Option<CavesConfig> {
         self.caves_config.clone()
     }
+    pub fn tests(&self) -> Vec<String> {
+        self.enabled_tests.clone()
+    }
 
     pub fn try_load_config() -> Option<Config> {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("integration");
         path.push("config.toml");
-        match fs::read_to_string(&path) {
+        let config: FileConfig = match fs::read_to_string(&path) {
             Ok(r) => match toml::from_str(&r) {
                 Ok(i) => Some(i),
                 Err(e) => {
@@ -43,7 +55,23 @@ impl Config {
                 }
             },
             Err(_e) => None,
-        }
+        }?;
+
+        let enabled_tests = match config.tests {
+            Some(ref t) => t
+                .clone()
+                .split(",")
+                .map(|i| i.to_string())
+                .collect::<Vec<String>>(),
+            None => Vec::new(),
+        };
+
+        Some(Config {
+            enabled_tests,
+            standalone_config: config.standalone_config,
+            cluster_type: config.cluster_type,
+            caves_config: config.caves_config,
+        })
     }
 }
 

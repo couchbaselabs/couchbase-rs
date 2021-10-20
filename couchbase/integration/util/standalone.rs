@@ -21,7 +21,7 @@ pub struct StandaloneCluster {
 }
 
 impl StandaloneCluster {
-    pub fn start(c: StandaloneConfig) -> Self {
+    pub fn start(c: StandaloneConfig, tests: Vec<String>) -> Self {
         let cluster = Cluster::connect(c.conn_string(), c.username(), c.password());
         let bucket = cluster.bucket(c.default_bucket().unwrap_or_else(|| "default".into()));
         let scope = bucket.scope(c.default_scope().unwrap_or_else(|| "_default".into()));
@@ -35,6 +35,7 @@ impl StandaloneCluster {
                 scope,
                 collection,
                 support_matrix: SUPPORTS.to_vec(),
+                enabled_tests: tests,
             }),
         }
     }

@@ -19,12 +19,13 @@ async fn setup() -> (ClusterUnderTest, Arc<TestConfig>) {
             ClusterType::Standalone => ClusterUnderTest::Standalone(StandaloneCluster::start(
                 c.standalone_config()
                     .expect("Standalone config required when standalone type used."),
+                c.tests(),
             )),
             ClusterType::Mock => {
-                ClusterUnderTest::Mocked(MockCluster::start(c.mock_config()).await)
+                ClusterUnderTest::Mocked(MockCluster::start(c.mock_config(), c.tests()).await)
             }
         },
-        None => ClusterUnderTest::Mocked(MockCluster::start(None).await),
+        None => ClusterUnderTest::Mocked(MockCluster::start(None, vec![]).await),
     };
     let config = server.config();
 
@@ -101,52 +102,57 @@ async fn main() -> Result<(), std::io::Error> {
     let mut success = 0;
     let mut failures = vec![];
     let mut skipped = 0;
-    for t in test_functions::tests(config.1) {
-        println!();
-        println!("Running {}", t.name.clone());
-        let handle = tokio::spawn(t.func);
-        let result = match handle.await {
-            Ok(r) => match r {
-                Ok(was_skipped) => {
-                    if was_skipped {
-                        skipped += 1;
-                        TestOutcome {
-                            name: t.name.to_string(),
-                            result: TestResultStatus::Skipped,
-                            error: None,
-                        }
-                    } else {
-                        success += 1;
-                        TestOutcome {
-                            name: t.name.to_string(),
-                            result: TestResultStatus::Success,
-                            error: None,
+    for t in test_functions::tests(config.1.clone()) {
+        if config.1.clone().test_enabled(t.name.clone()) {
+            println!();
+            println!("Running {}", t.name.clone());
+            let handle = tokio::spawn(t.func);
+            let result = match handle.await {
+                Ok(r) => match r {
+                    Ok(was_skipped) => {
+                        if was_skipped {
+                            skipped += 1;
+                            TestOutcome {
+                                name: t.name.to_string(),
+                                result: TestResultStatus::Skipped,
+                                error: None,
+                            }
+                        } else {
+                            success += 1;
+                            TestOutcome {
+                                name: t.name.to_string(),
+                                result: TestResultStatus::Success,
+                                error: None,
+                            }
                         }
                     }
-                }
-                Err(e) => {
+                    Err(e) => {
+                        failures.push(t.name.clone());
+                        TestOutcome {
+                            name: t.name.to_string(),
+                            result: TestResultStatus::Failure,
+                            error: Some(e),
+                        }
+                    }
+                },
+                Err(_e) => {
+                    // The JoinError here doesn't tell us anything interesting but the panic will be
+                    // output to stderr anyway.
                     failures.push(t.name.clone());
                     TestOutcome {
                         name: t.name.to_string(),
                         result: TestResultStatus::Failure,
-                        error: Some(e),
+                        error: None,
                     }
                 }
-            },
-            Err(_e) => {
-                // The JoinError here doesn't tell us anything interesting but the panic will be
-                // output to stderr anyway.
-                failures.push(t.name.clone());
-                TestOutcome {
-                    name: t.name.to_string(),
-                    result: TestResultStatus::Failure,
-                    error: None,
-                }
-            }
-        };
+            };
 
-        println!("{}", result);
-        println!();
+            println!("{}", result);
+            println!();
+        } else {
+            println!("Skipping {}, not enabled", t.name.clone());
+            skipped += 1;
+        }
     }
 
     teardown();

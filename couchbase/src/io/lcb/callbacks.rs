@@ -140,6 +140,62 @@ pub unsafe extern "C" fn remove_callback(
     }
 }
 
+pub unsafe extern "C" fn touch_callback(
+    instance: *mut lcb_INSTANCE,
+    _cbtype: i32,
+    res: *const lcb_RESPBASE,
+) {
+    decrement_outstanding_requests(instance);
+    let touch_res = res as *const lcb_RESPTOUCH;
+
+    let mut cookie_ptr: *mut c_void = ptr::null_mut();
+    lcb_resptouch_cookie(touch_res, &mut cookie_ptr);
+    let sender = Box::from_raw(
+        cookie_ptr as *mut futures::channel::oneshot::Sender<CouchbaseResult<MutationResult>>,
+    );
+
+    let mut lcb_ctx: *const lcb_KEY_VALUE_ERROR_CONTEXT = ptr::null();
+    lcb_resptouch_error_context(touch_res, &mut lcb_ctx);
+
+    let status = lcb_resptouch_status(touch_res);
+    let result = if status == lcb_STATUS_LCB_SUCCESS {
+        let mut cas: u64 = 0;
+        lcb_resptouch_cas(touch_res, &mut cas);
+
+        let mut lcb_mutation_token = lcb_MUTATION_TOKEN {
+            uuid_: 0,
+            seqno_: 0,
+            vbid_: 0,
+        };
+        lcb_resptouch_mutation_token(touch_res, &mut lcb_mutation_token);
+        let mutation_token = if lcb_mutation_token.uuid_ != 0 {
+            let mut bucket_len: usize = 0;
+            let mut bucket_ptr: *const c_char = ptr::null();
+            lcb_errctx_kv_bucket(lcb_ctx, &mut bucket_ptr, &mut bucket_len);
+            let bucket = decode_and_own_str(bucket_ptr, bucket_len);
+
+            Some(MutationToken::new(
+                lcb_mutation_token.uuid_,
+                lcb_mutation_token.seqno_,
+                lcb_mutation_token.vbid_,
+                bucket,
+            ))
+        } else {
+            None
+        };
+        Ok(MutationResult::new(cas, mutation_token))
+    } else {
+        Err(couchbase_error_from_lcb_status(
+            status,
+            build_kv_error_context(lcb_ctx),
+        ))
+    };
+    match sender.send(result) {
+        Ok(_) => {}
+        Err(e) => trace!("Failed to send touch result because of {:?}", e),
+    }
+}
+
 pub unsafe extern "C" fn unlock_callback(
     instance: *mut lcb_INSTANCE,
     _cbtype: i32,
@@ -167,7 +223,7 @@ pub unsafe extern "C" fn unlock_callback(
     };
     match sender.send(result) {
         Ok(_) => {}
-        Err(e) => trace!("Failed to send remove result because of {:?}", e),
+        Err(e) => trace!("Failed to send unlock result because of {:?}", e),
     }
 }
 

@@ -201,6 +201,7 @@ fn encode_request(instance: *mut lcb_INSTANCE, request: Request) -> Result<(), E
         Request::Ping(r) => encode::encode_ping(instance, r)?,
         Request::Counter(r) => encode::encode_counter(instance, r)?,
         Request::Unlock(r) => encode::encode_unlock(instance, r)?,
+        Request::Touch(r) => encode::encode_touch(instance, r)?,
     }
 
     Ok(())

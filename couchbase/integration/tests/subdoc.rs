@@ -1,6 +1,7 @@
+use crate::tests::assert_timestamp;
 use crate::util::{BeerDocument, TestConfig};
 use crate::{util, TestResult};
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{NaiveDateTime, Utc};
 use couchbase::{
     ArrayAppendSpecOptions, ArrayInsertSpecOptions, ArrayPrependSpecOptions, CouchbaseError,
     CouchbaseResult, CountSpecOptions, DecrementSpecOptions, ExistsSpecOptions, GetOptions,
@@ -485,11 +486,7 @@ pub async fn test_mutatein_preserve_expiry(config: Arc<TestConfig>) -> TestResul
     let start = Utc::now();
     let duration = Duration::from_secs(25);
     let result = collection
-        .upsert(
-            &key,
-            &doc,
-            UpsertOptions::default().expiry(duration.clone()),
-        )
+        .upsert(&key, &doc, UpsertOptions::default().expiry(duration))
         .await?;
     assert_ne!(0, result.cas());
 
@@ -520,23 +517,7 @@ pub async fn test_mutatein_preserve_expiry(config: Arc<TestConfig>) -> TestResul
 
     let expiry_timestamp = result.content(0)?;
     let expires_at = NaiveDateTime::from_timestamp(expiry_timestamp, 0);
-    let expires_since_start =
-        DateTime::<Utc>::from_utc(expires_at, Utc).signed_duration_since(start);
-    let chrono_duration = chrono::Duration::from_std(duration).unwrap();
-    assert!(
-        expires_since_start <= chrono_duration,
-        "{} should be less than {}",
-        expires_since_start.to_string(),
-        chrono_duration.to_string()
-    );
-    let min_chrono_duration =
-        chrono::Duration::from_std(duration - Duration::from_secs(5)).unwrap();
-    assert!(
-        expires_since_start > min_chrono_duration,
-        "{} should be greater than {}",
-        expires_since_start,
-        min_chrono_duration
-    );
+    assert_timestamp(start, duration, &expires_at, Duration::from_secs(5));
 
     Ok(false)
 }

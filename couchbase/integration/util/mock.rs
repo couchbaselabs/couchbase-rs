@@ -57,12 +57,12 @@ pub struct MockCluster {
 }
 
 impl MockCluster {
-    pub async fn start(c: Option<CavesConfig>) -> Self {
-        MockCluster::start_caves(c).await
+    pub async fn start(c: Option<CavesConfig>, tests: Vec<String>) -> Self {
+        MockCluster::start_caves(c, tests).await
     }
 
     // TODO: write caves binary to something like /tmp and check if binary already exists before fetch
-    async fn start_caves(c: Option<CavesConfig>) -> Self {
+    async fn start_caves(c: Option<CavesConfig>, tests: Vec<String>) -> Self {
         let mut version = CAVES_VERSION.to_string();
         if let Some(cc) = c {
             version = cc.version();
@@ -142,6 +142,7 @@ impl MockCluster {
                 scope,
                 collection,
                 support_matrix: SUPPORTS.to_vec(),
+                enabled_tests: tests,
             }),
             _stream: stream,
         }
