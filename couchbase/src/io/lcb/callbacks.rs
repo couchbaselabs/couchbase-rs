@@ -140,6 +140,37 @@ pub unsafe extern "C" fn remove_callback(
     }
 }
 
+pub unsafe extern "C" fn unlock_callback(
+    instance: *mut lcb_INSTANCE,
+    _cbtype: i32,
+    res: *const lcb_RESPBASE,
+) {
+    decrement_outstanding_requests(instance);
+    let unlock_res = res as *const lcb_RESPUNLOCK;
+
+    let mut cookie_ptr: *mut c_void = ptr::null_mut();
+    lcb_respunlock_cookie(unlock_res, &mut cookie_ptr);
+    let sender =
+        Box::from_raw(cookie_ptr as *mut futures::channel::oneshot::Sender<CouchbaseResult<()>>);
+
+    let mut lcb_ctx: *const lcb_KEY_VALUE_ERROR_CONTEXT = ptr::null();
+    lcb_respunlock_error_context(unlock_res, &mut lcb_ctx);
+
+    let status = lcb_respunlock_status(unlock_res);
+    let result = if status == lcb_STATUS_LCB_SUCCESS {
+        Ok(())
+    } else {
+        Err(couchbase_error_from_lcb_status(
+            status,
+            build_kv_error_context(lcb_ctx),
+        ))
+    };
+    match sender.send(result) {
+        Ok(_) => {}
+        Err(e) => trace!("Failed to send remove result because of {:?}", e),
+    }
+}
+
 pub unsafe extern "C" fn get_callback(
     instance: *mut lcb_INSTANCE,
     _cbtype: i32,

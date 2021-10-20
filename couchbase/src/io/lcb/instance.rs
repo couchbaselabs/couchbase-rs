@@ -128,6 +128,11 @@ impl LcbInstance {
         );
         lcb_install_callback(
             instance,
+            lcb_CALLBACK_TYPE_LCB_CALLBACK_UNLOCK as i32,
+            Some(unlock_callback),
+        );
+        lcb_install_callback(
+            instance,
             lcb_CALLBACK_TYPE_LCB_CALLBACK_SDMUTATE as i32,
             Some(mutate_in_callback),
         );

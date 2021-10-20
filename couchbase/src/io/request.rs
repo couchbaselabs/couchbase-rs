@@ -25,6 +25,7 @@ pub enum Request {
     GenericManagement(GenericManagementRequest),
     Ping(PingRequest),
     Counter(CounterRequest),
+    Unlock(UnlockRequest),
 }
 
 impl Request {
@@ -37,6 +38,7 @@ impl Request {
             Self::MutateIn(r) => Some(&r.bucket),
             Self::LookupIn(r) => Some(&r.bucket),
             Self::Counter(r) => Some(&r.bucket),
+            Self::Unlock(r) => Some(&r.bucket),
             _ => None,
         }
     }
@@ -56,6 +58,7 @@ impl Request {
             Self::Ping(r) => r.sender.send(Err(reason)).unwrap(),
             Self::GenericManagement(r) => r.sender.send(Err(reason)).unwrap(),
             Self::Counter(r) => r.sender.send(Err(reason)).unwrap(),
+            Self::Unlock(r) => r.sender.send(Err(reason)).unwrap(),
         };
     }
 }
@@ -103,6 +106,16 @@ pub struct RemoveRequest {
     pub(crate) collection: String,
     pub(crate) sender: Sender<CouchbaseResult<MutationResult>>,
     pub(crate) options: RemoveOptions,
+}
+
+#[derive(Debug)]
+pub struct UnlockRequest {
+    pub(crate) id: String,
+    pub(crate) bucket: String,
+    pub(crate) scope: String,
+    pub(crate) collection: String,
+    pub(crate) sender: Sender<CouchbaseResult<()>>,
+    pub(crate) options: UnlockOptions,
 }
 
 #[derive(Debug)]

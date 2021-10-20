@@ -200,6 +200,7 @@ fn encode_request(instance: *mut lcb_INSTANCE, request: Request) -> Result<(), E
         Request::GenericManagement(r) => encode::encode_generic_management_request(instance, r)?,
         Request::Ping(r) => encode::encode_ping(instance, r)?,
         Request::Counter(r) => encode::encode_counter(instance, r)?,
+        Request::Unlock(r) => encode::encode_unlock(instance, r)?,
     }
 
     Ok(())

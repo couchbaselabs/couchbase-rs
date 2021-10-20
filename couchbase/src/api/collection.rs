@@ -255,6 +255,24 @@ impl Collection {
         receiver.await.unwrap()
     }
 
+    pub async fn unlock(
+        &self,
+        id: impl Into<String>,
+        options: impl Into<Option<UnlockOptions>>,
+    ) -> CouchbaseResult<()> {
+        let options = unwrap_or_default!(options.into());
+        let (sender, receiver) = oneshot::channel();
+        self.core.send(Request::Unlock(UnlockRequest {
+            id: id.into(),
+            sender,
+            bucket: self.bucket_name.clone(),
+            options,
+            scope: self.scope_name.clone(),
+            collection: self.name.clone(),
+        }));
+        receiver.await.unwrap()
+    }
+
     pub async fn lookup_in(
         &self,
         id: impl Into<String>,

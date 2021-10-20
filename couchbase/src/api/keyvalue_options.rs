@@ -195,3 +195,18 @@ impl PingOptions {
         self
     }
 }
+
+#[derive(Debug, Default)]
+pub struct UnlockOptions {
+    pub(crate) timeout: Option<Duration>,
+    pub(crate) cas: Option<u64>,
+}
+
+impl UnlockOptions {
+    timeout!();
+
+    pub fn cas(mut self, cas: u64) -> Self {
+        self.cas = Some(cas);
+        self
+    }
+}
