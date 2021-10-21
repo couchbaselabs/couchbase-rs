@@ -5,10 +5,10 @@ use std::fmt;
 use std::time::Duration;
 
 pub struct GetResult {
-    content: Vec<u8>,
-    cas: u64,
-    flags: u32,
-    expiry_time: Option<NaiveDateTime>,
+    pub(crate) content: Vec<u8>,
+    pub(crate) cas: u64,
+    pub(crate) flags: u32,
+    pub(crate) expiry_time: Option<NaiveDateTime>,
 }
 
 impl GetResult {
@@ -58,6 +58,59 @@ impl fmt::Debug for GetResult {
             f,
             "GetResult {{ cas: 0x{:x}, flags: 0x{:x}, content: {} }}",
             self.cas, self.flags, content
+        )
+    }
+}
+
+pub struct GetReplicaResult {
+    content: Vec<u8>,
+    cas: u64,
+    flags: u32,
+    is_replica: bool,
+}
+
+impl GetReplicaResult {
+    pub fn new(content: Vec<u8>, cas: u64, flags: u32, is_replica: bool) -> Self {
+        Self {
+            content,
+            cas,
+            flags,
+            is_replica,
+        }
+    }
+
+    pub fn cas(&self) -> u64 {
+        self.cas
+    }
+
+    pub fn content<'a, T>(&'a self) -> CouchbaseResult<T>
+    where
+        T: serde::Deserialize<'a>,
+    {
+        match serde_json::from_slice(self.content.as_slice()) {
+            Ok(v) => Ok(v),
+            Err(e) => Err(CouchbaseError::DecodingFailure {
+                ctx: ErrorContext::default(),
+                source: e.into(),
+            }),
+        }
+    }
+
+    pub fn is_replica(&self) -> bool {
+        self.is_replica
+    }
+}
+
+impl fmt::Debug for GetReplicaResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let content = match std::str::from_utf8(&self.content) {
+            Ok(c) => c,
+            Err(_e) => "<Not Valid/Printable UTF-8>",
+        };
+        write!(
+            f,
+            "GetReplicaResult {{ cas: 0x{:x}, flags: 0x{:x}, is_replica: {}, content: {} }}",
+            self.cas, self.flags, self.is_replica, content
         )
     }
 }

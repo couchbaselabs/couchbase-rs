@@ -123,6 +123,11 @@ impl LcbInstance {
         );
         lcb_install_callback(
             instance,
+            lcb_CALLBACK_TYPE_LCB_CALLBACK_GETREPLICA as i32,
+            Some(get_replica_callback),
+        );
+        lcb_install_callback(
+            instance,
             lcb_CALLBACK_TYPE_LCB_CALLBACK_REMOVE as i32,
             Some(remove_callback),
         );

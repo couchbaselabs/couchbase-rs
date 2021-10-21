@@ -1,3 +1,4 @@
+use crate::DurabilityLevel;
 use std::time::Duration;
 
 #[derive(Debug, Default)]
@@ -8,12 +9,14 @@ pub struct MutateInOptions {
     pub(crate) expiry: Option<Duration>,
     pub(crate) access_deleted: Option<bool>,
     pub(crate) preserve_expiry: bool,
+    pub(crate) durability: Option<DurabilityLevel>,
 }
 
 impl MutateInOptions {
     timeout!();
     expiry!();
     preserve_expiry!();
+    durability!();
 
     pub fn cas(mut self, cas: u64) -> Self {
         self.cas = Some(cas);

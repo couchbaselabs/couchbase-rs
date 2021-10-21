@@ -2,7 +2,8 @@ use crate::io::request::{CounterRequest, MutateRequest, MutateRequestType, Reque
 use crate::io::Core;
 use crate::{
     AppendOptions, CouchbaseError, CouchbaseResult, CounterOptions, CounterResult,
-    DecrementOptions, ErrorContext, IncrementOptions, MutationResult, PrependOptions,
+    DecrementOptions, DurabilityLevel, ErrorContext, IncrementOptions, MutationResult,
+    PrependOptions,
 };
 use futures::channel::oneshot;
 use std::convert::TryFrom;
@@ -76,6 +77,22 @@ impl BinaryCollection {
         options: impl Into<Option<IncrementOptions>>,
     ) -> CouchbaseResult<CounterResult> {
         let options = unwrap_or_default!(options.into());
+
+        // lcb doesn't support observe based durability for counters.
+        if let Some(durability) = options.durability {
+            match durability {
+                DurabilityLevel::ClientVerified(_) => {
+                    return Err(CouchbaseError::InvalidArgument {
+                        ctx: ErrorContext::from((
+                            "durability",
+                            "cannot use client verified durability with increment",
+                        )),
+                    })
+                }
+                _ => {}
+            }
+        }
+
         let delta = match options.delta {
             Some(d) => i64::try_from(d).map_err(|_e| CouchbaseError::Generic {
                 // TODO: we shouldn't swallow the error detail.
@@ -93,6 +110,7 @@ impl BinaryCollection {
                 cas: options.cas,
                 expiry: options.expiry,
                 delta,
+                durability: options.durability,
             },
             scope: self.scope_name.clone(),
             collection: self.name.clone(),
@@ -106,6 +124,22 @@ impl BinaryCollection {
         options: impl Into<Option<DecrementOptions>>,
     ) -> CouchbaseResult<CounterResult> {
         let options = unwrap_or_default!(options.into());
+
+        // lcb doesn't support observe based durability for counters.
+        if let Some(durability) = options.durability {
+            match durability {
+                DurabilityLevel::ClientVerified(_) => {
+                    return Err(CouchbaseError::InvalidArgument {
+                        ctx: ErrorContext::from((
+                            "durability",
+                            "cannot use client verified durability with decrement",
+                        )),
+                    })
+                }
+                _ => {}
+            }
+        }
+
         let delta = match options.delta {
             Some(d) => {
                 -(i64::try_from(d).map_err(|_e| CouchbaseError::Generic {
@@ -125,6 +159,7 @@ impl BinaryCollection {
                 cas: options.cas,
                 expiry: options.expiry,
                 delta,
+                durability: options.durability,
             },
             scope: self.scope_name.clone(),
             collection: self.name.clone(),

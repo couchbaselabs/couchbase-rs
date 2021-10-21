@@ -1,8 +1,9 @@
 use crate::api::error::{CouchbaseError, CouchbaseResult, ErrorContext};
 use crate::io::lcb::{HttpCookie, ViewCookie};
 use crate::{
-    AnalyticsResult, ExistsResult, GenericManagementResult, GetResult, LookupInResult,
-    MutateInResult, MutationResult, PingResult, PingState, QueryResult, SearchResult, SubDocField,
+    AnalyticsResult, ExistsResult, GenericManagementResult, GetReplicaResult, GetResult,
+    LookupInResult, MutateInResult, MutationResult, PingResult, PingState, QueryResult,
+    SearchResult, SubDocField,
 };
 use couchbase_sys::*;
 use log::{debug, trace};
@@ -263,6 +264,52 @@ pub unsafe extern "C" fn get_callback(
     match sender.send(result) {
         Ok(_) => {}
         Err(e) => trace!("Failed to send get result because of {:?}", e),
+    }
+}
+
+pub unsafe extern "C" fn get_replica_callback(
+    instance: *mut lcb_INSTANCE,
+    _cbtype: i32,
+    res: *const lcb_RESPBASE,
+) {
+    let getreplica_res = res as *const lcb_RESPGETREPLICA;
+    let mut cookie_ptr: *mut c_void = ptr::null_mut();
+    lcb_respgetreplica_cookie(getreplica_res, &mut cookie_ptr);
+    let sender = Box::from_raw(
+        cookie_ptr as *mut futures::channel::oneshot::Sender<CouchbaseResult<GetReplicaResult>>,
+    );
+
+    let status = lcb_respgetreplica_status(getreplica_res);
+    let result = if status == lcb_STATUS_LCB_SUCCESS {
+        let mut cas: u64 = 0;
+        let mut flags: u32 = 0;
+        let mut value_len: usize = 0;
+        let mut value_ptr: *const c_char = ptr::null();
+        lcb_respgetreplica_cas(getreplica_res, &mut cas);
+        lcb_respgetreplica_flags(getreplica_res, &mut flags);
+        lcb_respgetreplica_value(getreplica_res, &mut value_ptr, &mut value_len);
+        let is_active = lcb_respgetreplica_is_active(getreplica_res) != 0;
+        let value = from_raw_parts(value_ptr as *const u8, value_len);
+        Ok(GetReplicaResult::new(
+            value.to_vec(),
+            cas,
+            flags,
+            !is_active,
+        ))
+    } else {
+        let mut lcb_ctx: *const lcb_KEY_VALUE_ERROR_CONTEXT = ptr::null();
+        lcb_respgetreplica_error_context(getreplica_res, &mut lcb_ctx);
+        Err(couchbase_error_from_lcb_status(
+            status,
+            build_kv_error_context(lcb_ctx),
+        ))
+    };
+    if result.is_ok() || (result.is_err() && lcb_respgetreplica_is_final(getreplica_res) != 0) {
+        match sender.send(result) {
+            Ok(_) => {}
+            Err(e) => trace!("Failed to send getreplica result because of {:?}", e),
+        }
+        decrement_outstanding_requests(instance);
     }
 }
 

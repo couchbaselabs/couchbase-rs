@@ -4,11 +4,13 @@ use crate::io::lcb::callbacks::{
 use crate::io::lcb::{AnalyticsCookie, HttpCookie, QueryCookie, SearchCookie, ViewCookie};
 use crate::io::request::*;
 use crate::{
-    CouchbaseResult, ErrorContext, LookupInSpec, MutateInSpec, ServiceType, StoreSemantics,
+    CouchbaseResult, DurabilityLevel, ErrorContext, LookupInSpec, MutateInSpec, ReplicaMode,
+    ServiceType, StoreSemantics,
 };
 use futures::channel::oneshot::Sender;
 use log::{debug, warn};
 use serde_json::Value;
+use std::convert::TryInto;
 
 use couchbase_sys::*;
 use std::ffi::{CStr, CString};
@@ -29,6 +31,37 @@ pub fn into_cstring<T: Into<Vec<u8>>>(input: T) -> (usize, CString) {
         input.len(),
         CString::new(input).expect("Could not encode into CString"),
     )
+}
+
+impl TryInto<lcb_DURABILITY_LEVEL> for DurabilityLevel {
+    type Error = EncodeFailure;
+
+    fn try_into(self) -> Result<lcb_DURABILITY_LEVEL, Self::Error> {
+        let level = match self {
+            DurabilityLevel::None => lcb_DURABILITY_LEVEL_LCB_DURABILITYLEVEL_NONE,
+            DurabilityLevel::Majority => lcb_DURABILITY_LEVEL_LCB_DURABILITYLEVEL_MAJORITY,
+            DurabilityLevel::MajorityAndPersistOnMaster => {
+                lcb_DURABILITY_LEVEL_LCB_DURABILITYLEVEL_MAJORITY_AND_PERSIST_TO_ACTIVE
+            }
+            DurabilityLevel::PersistToMajority => {
+                lcb_DURABILITY_LEVEL_LCB_DURABILITYLEVEL_PERSIST_TO_MAJORITY
+            }
+            DurabilityLevel::ClientVerified(_) => {
+                panic!("Enhanced durability not supported for client verified durability, this is probably a bug :(")
+            }
+        };
+
+        Ok(level)
+    }
+}
+
+impl From<ReplicaMode> for lcb_REPLICA_MODE {
+    fn from(rm: ReplicaMode) -> Self {
+        match rm {
+            ReplicaMode::Any => lcb_REPLICA_MODE_LCB_REPLICA_MODE_ANY,
+            ReplicaMode::All => lcb_REPLICA_MODE_LCB_REPLICA_MODE_ALL,
+        }
+    }
 }
 
 /// Verifies the libcouchbase return status code and fails the original request.
@@ -234,6 +267,52 @@ pub fn encode_get(instance: *mut lcb_INSTANCE, request: GetRequest) -> Result<()
     Ok(())
 }
 
+/// Encodes a `GetReplicaRequest` into its libcouchbase `lcb_CMDGETREPLICA` representation.
+/// This is a bit odd right now but will have to change once get_all_replicas is implemented.
+pub fn encode_get_replica(
+    instance: *mut lcb_INSTANCE,
+    request: GetReplicaRequest,
+) -> Result<(), EncodeFailure> {
+    let (id_len, id) = into_cstring(request.id);
+    let cookie = Box::into_raw(Box::new(request.sender));
+    let (scope_len, scope) = into_cstring(request.scope);
+    let (collection_len, collection) = into_cstring(request.collection);
+
+    let mut command: *mut lcb_CMDGETREPLICA = ptr::null_mut();
+    unsafe {
+        verify(
+            lcb_cmdgetreplica_create(&mut command, request.mode.into()),
+            cookie,
+        )?;
+        verify(lcb_cmdgetreplica_key(command, id.as_ptr(), id_len), cookie)?;
+        verify(
+            lcb_cmdgetreplica_collection(
+                command,
+                scope.as_ptr(),
+                scope_len,
+                collection.as_ptr(),
+                collection_len,
+            ),
+            cookie,
+        )?;
+
+        if let Some(timeout) = request.options.timeout {
+            verify(
+                lcb_cmdgetreplica_timeout(command, timeout.as_micros() as u32),
+                cookie,
+            )?;
+        }
+
+        verify(
+            lcb_getreplica(instance, cookie as *mut c_void, command),
+            cookie,
+        )?;
+        verify(lcb_cmdgetreplica_destroy(command), cookie)?;
+    }
+
+    Ok(())
+}
+
 /// Encodes a `ExistsRequest` into its libcouchbase `lcb_CMDEXISTS` representation.
 pub fn encode_exists(
     instance: *mut lcb_INSTANCE,
@@ -289,6 +368,7 @@ pub fn encode_mutate(
 
     let mut command: *mut lcb_CMDSTORE = ptr::null_mut();
     unsafe {
+        let durability: Option<DurabilityLevel>;
         match request.ty {
             MutateRequestType::Upsert { options } => {
                 verify(
@@ -310,6 +390,7 @@ pub fn encode_mutate(
                 if options.preserve_expiry {
                     verify(lcb_cmdstore_preserve_expiry(command, 1), cookie)?;
                 }
+                durability = options.durability;
             }
             MutateRequestType::Insert { options } => {
                 verify(
@@ -328,6 +409,7 @@ pub fn encode_mutate(
                         cookie,
                     )?;
                 }
+                durability = options.durability;
             }
             MutateRequestType::Replace { options } => {
                 verify(
@@ -352,6 +434,7 @@ pub fn encode_mutate(
                 if options.preserve_expiry {
                     verify(lcb_cmdstore_preserve_expiry(command, 1), cookie)?;
                 }
+                durability = options.durability;
             }
             MutateRequestType::Append { options } => {
                 verify(
@@ -367,6 +450,7 @@ pub fn encode_mutate(
                         cookie,
                     )?;
                 }
+                durability = options.durability;
             }
             MutateRequestType::Prepend { options } => {
                 verify(
@@ -382,8 +466,30 @@ pub fn encode_mutate(
                         cookie,
                     )?;
                 }
+                durability = options.durability;
             }
         }
+
+        if let Some(d) = durability {
+            match d {
+                DurabilityLevel::ClientVerified(cv) => {
+                    let replicate_to = match cv.replicate_to {
+                        Some(r) => r.into(),
+                        None => 0,
+                    };
+                    let persist_to = match cv.persist_to {
+                        Some(r) => r.into(),
+                        None => 0,
+                    };
+                    lcb_cmdstore_durability_observe(command, persist_to, replicate_to);
+                }
+                _ => {
+                    let lcb_level = d.try_into()?;
+                    lcb_cmdstore_durability(command, lcb_level);
+                }
+            }
+        }
+
         verify(lcb_cmdstore_key(command, id.as_ptr(), id_len), cookie)?;
         verify(
             lcb_cmdstore_value(command, value.as_ptr(), value_len),
@@ -431,6 +537,18 @@ pub fn encode_remove(
             ),
             cookie,
         )?;
+
+        if let Some(d) = request.options.durability {
+            match d {
+                DurabilityLevel::ClientVerified(_) => {
+                    panic!("Client verified not supported with remove");
+                }
+                _ => {
+                    let lcb_level = d.try_into()?;
+                    lcb_cmdremove_durability(command, lcb_level);
+                }
+            }
+        }
 
         if let Some(cas) = request.options.cas {
             verify(lcb_cmdremove_cas(command, cas), cookie)?;
@@ -559,6 +677,18 @@ pub fn encode_counter(
             ),
             cookie,
         )?;
+
+        if let Some(d) = request.options.durability {
+            match d {
+                DurabilityLevel::ClientVerified(_) => {
+                    panic!("Client verified not supported with counter");
+                }
+                _ => {
+                    let lcb_level = d.try_into()?;
+                    lcb_cmdcounter_durability(command, lcb_level);
+                }
+            }
+        }
 
         if let Some(cas) = request.options.cas {
             verify(lcb_cmdcounter_cas(command, cas), cookie)?;

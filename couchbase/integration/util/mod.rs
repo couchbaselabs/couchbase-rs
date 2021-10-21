@@ -47,6 +47,15 @@ impl TestConfig {
     pub fn supports_feature(&self, feature: TestFeature) -> bool {
         self.support_matrix.contains(&feature)
     }
+    pub fn supports_features(&self, features: Vec<TestFeature>) -> bool {
+        for feature in features {
+            if !self.support_matrix.contains(&feature) {
+                return false;
+            }
+        }
+
+        true
+    }
     pub fn test_enabled(&self, test: String) -> bool {
         if self.enabled_tests.is_empty() {
             return true;

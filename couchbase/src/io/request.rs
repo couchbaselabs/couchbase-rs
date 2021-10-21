@@ -27,6 +27,7 @@ pub enum Request {
     Counter(CounterRequest),
     Unlock(UnlockRequest),
     Touch(TouchRequest),
+    GetReplica(GetReplicaRequest),
 }
 
 impl Request {
@@ -41,6 +42,7 @@ impl Request {
             Self::Counter(r) => Some(&r.bucket),
             Self::Unlock(r) => Some(&r.bucket),
             Self::Touch(r) => Some(&r.bucket),
+            Self::GetReplica(r) => Some(&r.bucket),
             _ => None,
         }
     }
@@ -62,6 +64,7 @@ impl Request {
             Self::Counter(r) => r.sender.send(Err(reason)).unwrap(),
             Self::Unlock(r) => r.sender.send(Err(reason)).unwrap(),
             Self::Touch(r) => r.sender.send(Err(reason)).unwrap(),
+            Self::GetReplica(r) => r.sender.send(Err(reason)).unwrap(),
         };
     }
 }
@@ -89,6 +92,17 @@ pub enum GetRequestType {
         options: GetAndTouchOptions,
         expiry: Duration,
     },
+}
+
+#[derive(Debug)]
+pub struct GetReplicaRequest {
+    pub(crate) id: String,
+    pub(crate) bucket: String,
+    pub(crate) scope: String,
+    pub(crate) collection: String,
+    pub(crate) sender: Sender<CouchbaseResult<GetReplicaResult>>,
+    pub(crate) options: GetReplicaOptions,
+    pub(crate) mode: ReplicaMode,
 }
 
 #[derive(Debug)]

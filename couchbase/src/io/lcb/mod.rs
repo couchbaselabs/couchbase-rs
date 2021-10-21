@@ -202,6 +202,7 @@ fn encode_request(instance: *mut lcb_INSTANCE, request: Request) -> Result<(), E
         Request::Counter(r) => encode::encode_counter(instance, r)?,
         Request::Unlock(r) => encode::encode_unlock(instance, r)?,
         Request::Touch(r) => encode::encode_touch(instance, r)?,
+        Request::GetReplica(r) => encode::encode_get_replica(instance, r)?,
     }
 
     Ok(())

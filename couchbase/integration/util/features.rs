@@ -6,4 +6,6 @@ pub enum TestFeature {
     Xattrs,
     ExpandMacros,
     PreserveExpiry,
+    Replicas,
+    Durability,
 }

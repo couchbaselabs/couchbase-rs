@@ -9,6 +9,8 @@ use crate::CouchbaseError::Generic;
 use crate::{BinaryCollection, CouchbaseError, CouchbaseResult, ErrorContext};
 use chrono::NaiveDateTime;
 use futures::channel::oneshot;
+use futures::select;
+use futures::FutureExt;
 use serde::Serialize;
 use serde_json::to_vec;
 use std::convert::TryFrom;
@@ -105,6 +107,52 @@ impl Collection {
             collection: self.name.clone(),
         }));
         receiver.await.unwrap()
+    }
+
+    pub async fn get_any_replica(
+        &self,
+        id: impl Into<String>,
+        options: impl Into<Option<GetAnyReplicaOptions>>,
+    ) -> CouchbaseResult<GetReplicaResult> {
+        let options = unwrap_or_default!(options.into());
+        let (get_sender, get_receiver) = oneshot::channel();
+        let (get_replica_sender, get_replica_receiver) = oneshot::channel();
+        let id = id.into();
+        self.core.send(Request::GetReplica(GetReplicaRequest {
+            id: id.clone(),
+            options: GetReplicaOptions {
+                timeout: options.timeout,
+            },
+            bucket: self.bucket_name.clone(),
+            sender: get_replica_sender,
+            scope: self.scope_name.clone(),
+            collection: self.name.clone(),
+            mode: ReplicaMode::Any,
+        }));
+        self.core.send(Request::Get(GetRequest {
+            id,
+            bucket: self.bucket_name.clone(),
+            sender: get_sender,
+            scope: self.scope_name.clone(),
+            collection: self.name.clone(),
+            ty: GetRequestType::Get {
+                options: GetOptions {
+                    timeout: options.timeout,
+                    with_expiry: false,
+                },
+            },
+        }));
+
+        // TODO: not sure this will cancel the uncompleted future.
+        let result = select! {
+            res = get_receiver.fuse() => {
+                let get_res = res.unwrap()?;
+                Ok(GetReplicaResult::new(get_res.content, get_res.cas, get_res.flags, false))
+            },
+            res = get_replica_receiver.fuse() => res.unwrap(),
+        };
+
+        result
     }
 
     pub async fn get_and_lock(
@@ -243,6 +291,22 @@ impl Collection {
         options: impl Into<Option<RemoveOptions>>,
     ) -> CouchbaseResult<MutationResult> {
         let options = unwrap_or_default!(options.into());
+
+        // lcb doesn't support observe based durability for remove.
+        if let Some(durability) = options.durability {
+            match durability {
+                DurabilityLevel::ClientVerified(_) => {
+                    return Err(CouchbaseError::InvalidArgument {
+                        ctx: ErrorContext::from((
+                            "durability",
+                            "cannot use client verified durability with remove",
+                        )),
+                    })
+                }
+                _ => {}
+            }
+        }
+
         let (sender, receiver) = oneshot::channel();
         self.core.send(Request::Remove(RemoveRequest {
             id: id.into(),
@@ -391,11 +455,83 @@ impl MutationToken {
 }
 
 #[derive(Debug, Copy, Clone)]
+pub enum PersistTo {
+    One,
+    Two,
+    Three,
+    Four,
+}
+
+impl From<PersistTo> for i32 {
+    fn from(pt: PersistTo) -> Self {
+        match pt {
+            PersistTo::One => 1,
+            PersistTo::Two => 2,
+            PersistTo::Three => 3,
+            PersistTo::Four => 4,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum ReplicateTo {
+    One,
+    Two,
+    Three,
+}
+
+impl From<ReplicateTo> for i32 {
+    fn from(rt: ReplicateTo) -> Self {
+        match rt {
+            ReplicateTo::One => 1,
+            ReplicateTo::Two => 2,
+            ReplicateTo::Three => 3,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct ClientVerifiedDurability {
+    pub(crate) persist_to: Option<PersistTo>,
+    pub(crate) replicate_to: Option<ReplicateTo>,
+}
+
+impl Default for ClientVerifiedDurability {
+    fn default() -> Self {
+        Self {
+            persist_to: None,
+            replicate_to: None,
+        }
+    }
+}
+
+impl ClientVerifiedDurability {
+    pub fn new(
+        persist_to: impl Into<Option<PersistTo>>,
+        replicate_to: impl Into<Option<ReplicateTo>>,
+    ) -> Self {
+        Self {
+            persist_to: persist_to.into(),
+            replicate_to: replicate_to.into(),
+        }
+    }
+    pub fn persist_to(mut self, persist_to: PersistTo) -> Self {
+        self.persist_to = Some(persist_to);
+        self
+    }
+    pub fn replicate_to(mut self, replicate_to: ReplicateTo) -> Self {
+        self.replicate_to = Some(replicate_to);
+        self
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
 pub enum DurabilityLevel {
-    None = 0x00,
-    Majority = 0x01,
-    MajorityAndPersistOnMaster = 0x02,
-    PersistToMajority = 0x03,
+    None,
+    Majority,
+    MajorityAndPersistOnMaster,
+    PersistToMajority,
+    ClientVerified(ClientVerifiedDurability),
 }
 
 impl Default for DurabilityLevel {
@@ -411,6 +547,7 @@ impl Display for DurabilityLevel {
             DurabilityLevel::Majority => "majority",
             DurabilityLevel::MajorityAndPersistOnMaster => "majorityAndPersistActive",
             DurabilityLevel::PersistToMajority => "persistToMajority",
+            _ => "clientVerified",
         };
 
         write!(f, "{}", alias)
@@ -428,7 +565,7 @@ impl TryFrom<&str> for DurabilityLevel {
             "persistToMajority" => Ok(DurabilityLevel::PersistToMajority),
             _ => {
                 let mut ctx = ErrorContext::default();
-                ctx.insert(alias, "invalid durability mode".into());
+                ctx.insert(alias, "invalid or unsupported durability mode".into());
                 Err(Generic { ctx })
             }
         }

@@ -40,3 +40,12 @@ macro_rules! unwrap_or_default {
         $opt.unwrap_or_else(Default::default)
     };
 }
+
+macro_rules! durability {
+    () => {
+        pub fn durability(mut self, level: DurabilityLevel) -> Self {
+            self.durability = Some(level);
+            self
+        }
+    };
+}

@@ -353,6 +353,11 @@ impl BucketSettings {
 
         match self.durability_level {
             DurabilityLevel::None => {}
+            DurabilityLevel::ClientVerified(_) => {
+                return Err(CouchbaseError::InvalidArgument {
+                    ctx: ErrorContext::from(("durability", "cannot be client verified")),
+                });
+            }
             _ => {
                 form.push(("durabilityMinLevel", self.durability_level.to_string()));
             }

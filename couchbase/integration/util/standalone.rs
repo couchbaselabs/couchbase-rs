@@ -13,6 +13,8 @@ lazy_static! {
         TestFeature::Xattrs,
         TestFeature::ExpandMacros,
         TestFeature::PreserveExpiry,
+        TestFeature::Replicas,
+        TestFeature::Durability,
     ];
 }
 

@@ -1,6 +1,7 @@
 use couchbase::{
-    CouchbaseError, GetAndLockOptions, GetOptions, GetSpecOptions, LookupInOptions, LookupInSpec,
-    RemoveOptions, ReplaceOptions, UpsertOptions,
+    ClientVerifiedDurability, CouchbaseError, DurabilityLevel, GetAndLockOptions, GetOptions,
+    GetSpecOptions, LookupInOptions, LookupInSpec, PersistTo, RemoveOptions, ReplaceOptions,
+    ReplicateTo, UpsertOptions,
 };
 
 use crate::util::{BeerDocument, TestConfig};
@@ -578,6 +579,240 @@ pub async fn test_touch(config: Arc<TestConfig>) -> TestResult<bool> {
 
     let expiry_timestamp = result.expiry_time().unwrap();
     assert_timestamp(start, duration, expiry_timestamp, Duration::from_secs(5));
+
+    Ok(false)
+}
+
+pub async fn test_replicate_to_get_any_replica(config: Arc<TestConfig>) -> TestResult<bool> {
+    if !config.supports_features(vec![
+        util::TestFeature::KeyValue,
+        util::TestFeature::Replicas,
+    ]) {
+        return Ok(true);
+    }
+
+    let collection = config.collection();
+    let key = Uuid::new_v4().to_string();
+    let mut content = HashMap::new();
+    content.insert("Hello", "Rust!");
+
+    let result = collection
+        .upsert(
+            &key,
+            &content,
+            UpsertOptions::default()
+                .durability(DurabilityLevel::ClientVerified(
+                    ClientVerifiedDurability::default().replicate_to(ReplicateTo::One),
+                ))
+                .timeout(Duration::from_secs(5)),
+        )
+        .await?;
+    assert_ne!(0, result.cas());
+
+    let result = collection.get_any_replica(key, None).await?;
+    let actual_content: HashMap<&str, &str> = result.content()?;
+    assert_eq!(content, actual_content);
+
+    Ok(false)
+}
+
+pub async fn test_persist_to_get_any_replica(config: Arc<TestConfig>) -> TestResult<bool> {
+    if !config.supports_features(vec![
+        util::TestFeature::KeyValue,
+        util::TestFeature::Replicas,
+    ]) {
+        return Ok(true);
+    }
+
+    let collection = config.collection();
+    let key = Uuid::new_v4().to_string();
+    let mut content = HashMap::new();
+    content.insert("Hello", "Rust!");
+
+    let result = collection
+        .upsert(
+            &key,
+            &content,
+            UpsertOptions::default()
+                .durability(DurabilityLevel::ClientVerified(
+                    ClientVerifiedDurability::default().persist_to(PersistTo::One),
+                ))
+                .timeout(Duration::from_secs(5)),
+        )
+        .await?;
+    assert_ne!(0, result.cas());
+
+    let result = collection.get_any_replica(key, None).await?;
+    let actual_content: HashMap<&str, &str> = result.content()?;
+    assert_eq!(content, actual_content);
+
+    Ok(false)
+}
+
+pub async fn test_durability_majority_get_any_replica(config: Arc<TestConfig>) -> TestResult<bool> {
+    if !config.supports_features(vec![
+        util::TestFeature::KeyValue,
+        util::TestFeature::Replicas,
+        util::TestFeature::Durability,
+    ]) {
+        return Ok(true);
+    }
+
+    let collection = config.collection();
+    let key = Uuid::new_v4().to_string();
+    let mut content = HashMap::new();
+    content.insert("Hello", "Rust!");
+
+    let result = collection
+        .upsert(
+            &key,
+            &content,
+            UpsertOptions::default()
+                .durability(DurabilityLevel::Majority)
+                .timeout(Duration::from_secs(5)),
+        )
+        .await?;
+    assert_ne!(0, result.cas());
+
+    let result = collection.get_any_replica(&key, None).await?;
+    let actual_content: HashMap<&str, &str> = result.content()?;
+    assert_eq!(content, actual_content);
+
+    // let result = collection
+    //     .remove(
+    //         &key,
+    //         RemoveOptions::default()
+    //             .durability(DurabilityLevel::Majority)
+    //             .timeout(Duration::from_secs(5)),
+    //     )
+    //     .await?;
+    // assert_ne!(0, result.cas());
+    //
+    // let result = collection.get(&key, None).await;
+    // assert!(result.is_err());
+    //
+    // let err = result.err().unwrap();
+    //
+    // match err {
+    //     CouchbaseError::DocumentNotFound { .. } => {}
+    //     _ => {
+    //         panic!("Expected document not found error but was {}", err)
+    //     }
+    // }
+
+    Ok(false)
+}
+
+pub async fn test_durability_persist_to_majority_get_any_replica(
+    config: Arc<TestConfig>,
+) -> TestResult<bool> {
+    if !config.supports_features(vec![
+        util::TestFeature::KeyValue,
+        util::TestFeature::Replicas,
+        util::TestFeature::Durability,
+    ]) {
+        return Ok(true);
+    }
+
+    let collection = config.collection();
+    let key = Uuid::new_v4().to_string();
+    let mut content = HashMap::new();
+    content.insert("Hello", "Rust!");
+
+    let result = collection
+        .upsert(
+            &key,
+            &content,
+            UpsertOptions::default()
+                .durability(DurabilityLevel::PersistToMajority)
+                .timeout(Duration::from_secs(5)),
+        )
+        .await?;
+    assert_ne!(0, result.cas());
+
+    let result = collection.get_any_replica(&key, None).await?;
+    let actual_content: HashMap<&str, &str> = result.content()?;
+    assert_eq!(content, actual_content);
+
+    let result = collection
+        .remove(
+            &key,
+            RemoveOptions::default()
+                .durability(DurabilityLevel::PersistToMajority)
+                .timeout(Duration::from_secs(5)),
+        )
+        .await?;
+    assert_ne!(0, result.cas());
+
+    let result = collection.get(&key, None).await;
+    assert!(result.is_err());
+
+    let err = result.err().unwrap();
+
+    match err {
+        CouchbaseError::DocumentNotFound { .. } => {}
+        _ => {
+            panic!("Expected document not found error but was {}", err)
+        }
+    }
+
+    Ok(false)
+}
+
+pub async fn test_durability_majority_persist_on_master_get_any_replica(
+    config: Arc<TestConfig>,
+) -> TestResult<bool> {
+    if !config.supports_feature(util::TestFeature::KeyValue) {
+        return Ok(true);
+    }
+    if !config.supports_feature(util::TestFeature::Replicas) {
+        return Ok(true);
+    }
+    if !config.supports_feature(util::TestFeature::Durability) {
+        return Ok(true);
+    }
+
+    let collection = config.collection();
+    let key = Uuid::new_v4().to_string();
+    let mut content = HashMap::new();
+    content.insert("Hello", "Rust!");
+
+    let result = collection
+        .upsert(
+            &key,
+            &content,
+            UpsertOptions::default()
+                .durability(DurabilityLevel::MajorityAndPersistOnMaster)
+                .timeout(Duration::from_secs(5)),
+        )
+        .await?;
+    assert_ne!(0, result.cas());
+
+    let result = collection.get_any_replica(&key, None).await?;
+    let actual_content: HashMap<&str, &str> = result.content()?;
+    assert_eq!(content, actual_content);
+
+    let result = collection
+        .remove(
+            &key,
+            RemoveOptions::default()
+                .durability(DurabilityLevel::MajorityAndPersistOnMaster)
+                .timeout(Duration::from_secs(5)),
+        )
+        .await?;
+    assert_ne!(0, result.cas());
+
+    let result = collection.get(&key, None).await;
+    assert!(result.is_err());
+
+    let err = result.err().unwrap();
+
+    match err {
+        CouchbaseError::DocumentNotFound { .. } => {}
+        _ => {
+            panic!("Expected document not found error but was {}", err)
+        }
+    }
 
     Ok(false)
 }
