@@ -9,8 +9,8 @@ use crate::CouchbaseError::Generic;
 use crate::{BinaryCollection, CouchbaseError, CouchbaseResult, ErrorContext};
 use chrono::NaiveDateTime;
 use futures::channel::oneshot;
-use futures::select;
 use futures::FutureExt;
+use futures::{pin_mut, select};
 use serde::Serialize;
 use serde_json::to_vec;
 use std::convert::TryFrom;
@@ -143,16 +143,35 @@ impl Collection {
             },
         }));
 
-        // TODO: not sure this will cancel the uncompleted future.
-        let result = select! {
-            res = get_receiver.fuse() => {
-                let get_res = res.unwrap()?;
-                Ok(GetReplicaResult::new(get_res.content, get_res.cas, get_res.flags, false))
-            },
-            res = get_replica_receiver.fuse() => res.unwrap(),
-        };
+        let get_receiver = get_receiver.fuse();
+        let get_replica_receiver = get_replica_receiver.fuse();
 
-        result
+        pin_mut!(get_receiver, get_replica_receiver);
+
+        // TODO: not sure this will cancel the uncompleted future.
+        loop {
+            let result = select! {
+                res = get_receiver=> {
+                    match res.unwrap() {
+                        Ok(gr) => Ok(GetReplicaResult::new(gr.content, gr.cas, gr.flags, false)),
+                        Err(e) => {Err(e)}
+                    }
+                },
+                res = get_replica_receiver => {
+                    match res.unwrap() {
+                        Ok(gr) => Ok(GetReplicaResult::new(gr.content, gr.cas, gr.flags, false)),
+                        Err(e) => {Err(e)}
+                    }
+                }
+                complete => {
+                    return Err(CouchbaseError::DocumentNotFound {ctx: ErrorContext::default()})
+                }
+            };
+
+            if result.is_ok() {
+                return result;
+            }
+        }
     }
 
     pub async fn get_and_lock(

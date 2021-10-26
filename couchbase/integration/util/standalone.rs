@@ -15,6 +15,7 @@ lazy_static! {
         TestFeature::PreserveExpiry,
         TestFeature::Replicas,
         TestFeature::Durability,
+        TestFeature::CollectionsQuery,
     ];
 }
 

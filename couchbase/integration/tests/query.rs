@@ -1,6 +1,6 @@
 use crate::util::{try_until, upsert_brewery_dataset, BreweryDocument, TestConfig, TestFeature};
 use couchbase::{
-    Bucket, Cluster, Collection, CreatePrimaryQueryIndexOptions, QueryMetaData, QueryOptions,
+    Bucket, Cluster, CouchbaseError, CreatePrimaryQueryIndexOptions, QueryMetaData, QueryOptions,
     QueryProfile, QueryStatus,
 };
 use futures::StreamExt;
@@ -31,9 +31,9 @@ async fn setup_query_test(
     test_name: &str,
     cluster: &Cluster,
     bucket: &Bucket,
-    collection: &Collection,
 ) -> TestResult<Vec<BreweryDocument>> {
-    let expected_docs = upsert_brewery_dataset(test_name, collection).await?;
+    let collection = bucket.default_collection();
+    let expected_docs = upsert_brewery_dataset(test_name, &collection).await?;
 
     let idx_mgr = cluster.query_indexes();
     idx_mgr
@@ -52,14 +52,13 @@ pub async fn test_query(config: Arc<TestConfig>) -> TestResult<bool> {
     }
 
     let cluster = config.cluster();
-    let expected_docs =
-        setup_query_test("test_query", cluster, config.bucket(), config.collection()).await?;
+    let expected_docs = setup_query_test("test_query", cluster, config.bucket()).await?;
 
     let result = try_until(Instant::now().add(Duration::from_secs(10)), || async {
         let mut result = cluster
             .query(
                 format!(
-                    "SELECT {}.* FROM {} WHERE `test` = \"{}\"",
+                    "SELECT {}.* FROM {} WHERE `test_name` = \"{}\"",
                     config.bucket().name(),
                     config.bucket().name(),
                     "test_query"
@@ -96,13 +95,8 @@ pub async fn test_query_named_params(config: Arc<TestConfig>) -> TestResult<bool
     }
 
     let cluster = config.cluster();
-    let expected_docs = setup_query_test(
-        "test_query_named_params",
-        cluster,
-        config.bucket(),
-        config.collection(),
-    )
-    .await?;
+    let expected_docs =
+        setup_query_test("test_query_named_params", cluster, config.bucket()).await?;
 
     let result = try_until(Instant::now().add(Duration::from_secs(10)), || async {
         let mut params = HashMap::new();
@@ -110,7 +104,7 @@ pub async fn test_query_named_params(config: Arc<TestConfig>) -> TestResult<bool
         let mut result = cluster
             .query(
                 format!(
-                    "SELECT {}.* FROM {} WHERE `test` = $testname",
+                    "SELECT {}.* FROM {} WHERE `test_name` = $testname",
                     config.bucket().name(),
                     config.bucket().name(),
                 ),
@@ -148,20 +142,15 @@ pub async fn test_query_positional_params(config: Arc<TestConfig>) -> TestResult
     }
 
     let cluster = config.cluster();
-    let expected_docs = setup_query_test(
-        "test_query_positional_params",
-        cluster,
-        config.bucket(),
-        config.collection(),
-    )
-    .await?;
+    let expected_docs =
+        setup_query_test("test_query_positional_params", cluster, config.bucket()).await?;
 
     let result = try_until(Instant::now().add(Duration::from_secs(10)), || async {
         let params = vec!["test_query_positional_params"];
         let mut result = cluster
             .query(
                 format!(
-                    "SELECT {}.* FROM {} WHERE `test` = $1",
+                    "SELECT {}.* FROM {} WHERE `test_name` = $1",
                     config.bucket().name(),
                     config.bucket().name(),
                 ),
@@ -199,19 +188,13 @@ pub async fn test_query_prepared(config: Arc<TestConfig>) -> TestResult<bool> {
     }
 
     let cluster = config.cluster();
-    let expected_docs = setup_query_test(
-        "test_query_prepared",
-        cluster,
-        config.bucket(),
-        config.collection(),
-    )
-    .await?;
+    let expected_docs = setup_query_test("test_query_prepared", cluster, config.bucket()).await?;
 
     let result = try_until(Instant::now().add(Duration::from_secs(10)), || async {
         let mut result = cluster
             .query(
                 format!(
-                    "SELECT {}.* FROM {} WHERE `test` = \"{}\"",
+                    "SELECT {}.* FROM {} WHERE `test_name` = \"{}\"",
                     config.bucket().name(),
                     config.bucket().name(),
                     "test_query_prepared"
@@ -219,6 +202,111 @@ pub async fn test_query_prepared(config: Arc<TestConfig>) -> TestResult<bool> {
                 QueryOptions::default()
                     .profile(QueryProfile::Timings)
                     .adhoc(false),
+            )
+            .await?;
+
+        let mut docs: Vec<BreweryDocument> = vec![];
+        let mut rows = result.rows::<BreweryDocument>();
+        while let Some(row) = rows.next().await {
+            docs.push(row?);
+        }
+        let meta = result.meta_data().await?;
+
+        if docs.len() == expected_docs.len() {
+            Ok::<(Vec<BreweryDocument>, QueryMetaData), TestError>((docs, meta))
+        } else {
+            Err::<(Vec<BreweryDocument>, QueryMetaData), TestError>(TestError {
+                reason: format!("Expected 5 rows but got {}", docs.len()),
+            })
+        }
+    })
+    .await?;
+
+    verify_query_result(result.1, expected_docs);
+
+    Ok(false)
+}
+
+pub async fn test_query_adhoc(config: Arc<TestConfig>) -> TestResult<bool> {
+    if !config.supports_feature(TestFeature::Query) {
+        return Ok(true);
+    }
+
+    let cluster = config.cluster();
+    let expected_docs = setup_query_test("test_query_adhoc", cluster, config.bucket()).await?;
+
+    let result = try_until(Instant::now().add(Duration::from_secs(10)), || async {
+        let mut result = cluster
+            .query(
+                format!(
+                    "SELECT {}.* FROM {} WHERE `test_name` = \"{}\"",
+                    config.bucket().name(),
+                    config.bucket().name(),
+                    "test_query_adhoc"
+                ),
+                QueryOptions::default()
+                    .profile(QueryProfile::Timings)
+                    .adhoc(true),
+            )
+            .await?;
+
+        let mut docs: Vec<BreweryDocument> = vec![];
+        let mut rows = result.rows::<BreweryDocument>();
+        while let Some(row) = rows.next().await {
+            docs.push(row?);
+        }
+        let meta = result.meta_data().await?;
+
+        if docs.len() == expected_docs.len() {
+            Ok::<(Vec<BreweryDocument>, QueryMetaData), TestError>((docs, meta))
+        } else {
+            Err::<(Vec<BreweryDocument>, QueryMetaData), TestError>(TestError {
+                reason: format!("Expected 5 rows but got {}", docs.len()),
+            })
+        }
+    })
+    .await?;
+
+    verify_query_result(result.1, expected_docs);
+
+    Ok(false)
+}
+
+pub async fn test_scope_query(config: Arc<TestConfig>) -> TestResult<bool> {
+    if !config.supports_feature(TestFeature::CollectionsQuery) {
+        return Ok(true);
+    }
+    let scope = config.scope();
+    let collection = config.collection();
+    if collection.name() == "_default" {
+        return Ok(true);
+    }
+
+    let expected_docs = upsert_brewery_dataset("test_scope_query", &collection).await?;
+    let result = scope
+        .query(
+            format!("CREATE PRIMARY INDEX ON {}", collection.name()),
+            None,
+        )
+        .await;
+    match result {
+        Ok(_) => {}
+        Err(e) => match e {
+            CouchbaseError::IndexExists { .. } => {}
+            _ => return Err(TestError::from(e)),
+        },
+    }
+
+    let result = try_until(Instant::now().add(Duration::from_secs(10)), || async {
+        let mut result = scope
+            .query(
+                format!(
+                    "SELECT {}.* FROM {} WHERE `test_name` = \"{}\"",
+                    collection.name(),
+                    collection.name(),
+                    "test_scope_query"
+                ),
+                QueryOptions::default().profile(QueryProfile::Timings),
             )
             .await?;
 

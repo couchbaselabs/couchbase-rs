@@ -98,7 +98,7 @@ pub struct BreweryDocument {
     pub description: String,
     pub geo: BreweryDocumentGeo,
     pub name: String,
-    pub test: Option<String>,
+    pub test_name: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
@@ -144,7 +144,7 @@ pub async fn upsert_brewery_dataset(
     let mut result = vec![];
     for doc in &dataset {
         let mut new_doc = doc.clone();
-        new_doc.test = Some(String::from(test_name));
+        new_doc.test_name = Some(String::from(test_name));
         collection
             .upsert(&new_doc.name, &new_doc, UpsertOptions::default())
             .await?;

@@ -8,4 +8,5 @@ pub enum TestFeature {
     PreserveExpiry,
     Replicas,
     Durability,
+    CollectionsQuery,
 }

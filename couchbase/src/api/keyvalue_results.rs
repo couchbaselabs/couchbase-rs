@@ -63,10 +63,10 @@ impl fmt::Debug for GetResult {
 }
 
 pub struct GetReplicaResult {
-    content: Vec<u8>,
-    cas: u64,
-    flags: u32,
-    is_replica: bool,
+    pub(crate) content: Vec<u8>,
+    pub(crate) cas: u64,
+    pub(crate) flags: u32,
+    pub(crate) is_replica: bool,
 }
 
 impl GetReplicaResult {
