@@ -39,6 +39,8 @@ tokio = { version = "1", features = ["full"] }
 reqwest = { version = "0.11", features = ["json"] }
 bytes = "1.0"
 structopt = "0.3.23"
+strum = "0.22.0"
+strum_macros = "0.22"
 
 [features]
 # By default, the libcouchbase (C) backend is used. More will be available in the future

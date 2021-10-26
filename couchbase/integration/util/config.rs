@@ -87,6 +87,8 @@ pub struct StandaloneConfig {
     default_scope: Option<String>,
     #[serde(alias = "default-collection")]
     default_collection: Option<String>,
+    #[serde(alias = "server-version")]
+    server_version: Option<String>,
 }
 
 impl StandaloneConfig {
@@ -107,6 +109,9 @@ impl StandaloneConfig {
     }
     pub fn default_collection(&self) -> Option<String> {
         self.default_collection.clone()
+    }
+    pub fn server_version(&self) -> Option<String> {
+        self.server_version.clone()
     }
 }
 

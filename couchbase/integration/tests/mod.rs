@@ -1,6 +1,7 @@
 use chrono::{DateTime, NaiveDateTime, Utc};
 use std::time::Duration;
 
+pub mod binary;
 pub mod kv;
 pub mod query;
 pub mod subdoc;
