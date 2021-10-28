@@ -104,11 +104,6 @@ fn main() {
         println!("cargo:rustc-link-lib=dylib=couchbase");
     }
 
-    println!(
-        "cargo:rustc-link-search=native={}",
-        build_dst.join("build/lib").display()
-    );
-
     let mut bindings_builder = bindgen::Builder::default()
         .header("headers.h")
         .clang_arg("-I")
