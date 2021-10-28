@@ -20,6 +20,7 @@
 #include "config.h"
 #include <gtest/gtest.h>
 #include <libcouchbase/couchbase.h>
+#include "testutil.h"
 
 #include <utility>
 #include "serverparams.h"
@@ -407,6 +408,8 @@ class MockEnvironment : public ::testing::Environment
     void createConnection(lcb_INSTANCE **instance);
 
     void createConnection(HandleWrap &handle, lcb_INSTANCE **instance);
+    void createConnection(HandleWrap &handle, lcb_INSTANCE **instance, const std::string &username,
+                          const std::string &password);
     void createConnection(HandleWrap &handle, lcb_INSTANCE **instance, const lcb_CREATEOPTS *options) const;
 
     /**
@@ -449,6 +452,16 @@ class MockEnvironment : public ::testing::Environment
         std::cerr << std::endl;
     }
 
+    TestTracer &getTracer()
+    {
+        return test_tracer;
+    }
+
+    TestMeter &getMeter()
+    {
+        return test_meter;
+    }
+
     explicit MockEnvironment(const char **argv, const std::string &name = "default");
     ~MockEnvironment() override;
     void postCreate(lcb_INSTANCE *instance) const;
@@ -476,9 +489,45 @@ class MockEnvironment : public ::testing::Environment
     std::string userName;
     const char **argv_{nullptr};
     void clearAndReset();
+    TestTracer test_tracer;
+    TestMeter test_meter;
 
   private:
     lcb_INSTANCE *innerClient{nullptr};
+};
+
+class tracing_guard
+{
+  public:
+    tracing_guard()
+    {
+        was_enabled_ = MockEnvironment::getInstance()->getTracer().set_enabled(true);
+    }
+
+    ~tracing_guard()
+    {
+        MockEnvironment::getInstance()->getTracer().set_enabled(was_enabled_);
+    }
+
+  private:
+    bool was_enabled_{false};
+};
+
+class metrics_guard
+{
+  public:
+    metrics_guard()
+    {
+        was_enabled_ = MockEnvironment::getInstance()->getMeter().set_enabled(true);
+    }
+
+    ~metrics_guard()
+    {
+        MockEnvironment::getInstance()->getMeter().set_enabled(was_enabled_);
+    }
+
+  private:
+    bool was_enabled_{false};
 };
 
 #define LCB_TEST_REQUIRE_CLUSTER_VERSION(v)                                                                            \

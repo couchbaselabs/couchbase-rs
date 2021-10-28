@@ -114,6 +114,12 @@ struct subdoc_spec_options {
  * This structure is provided in an array to the lcb_CMDSUBDOC::specs field.
  */
 struct subdoc_spec {
+    bool is_lookup() const
+    {
+        return opcode_ == subdoc_opcode::get || opcode_ == subdoc_opcode::get_count ||
+               opcode_ == subdoc_opcode::get_fulldoc || opcode_ == subdoc_opcode::exist;
+    }
+
     subdoc_opcode opcode() const
     {
         return opcode_;
@@ -216,11 +222,23 @@ struct lcb_SUBDOCSPECS_ {
         return specs_;
     }
 
+    bool is_lookup() const
+    {
+        return specs_.empty() || specs_[0].is_lookup();
+    }
+
   private:
     std::vector<subdoc_spec> specs_{};
 };
 
 struct lcb_CMDSUBDOC_ {
+    const std::string &operation_name() const
+    {
+        static std::string lookup_in_name = LCBTRACE_OP_LOOKUPIN;
+        static std::string mutate_in_name = LCBTRACE_OP_MUTATEIN;
+        return specs_.is_lookup() ? lookup_in_name : mutate_in_name;
+    }
+
     const subdoc_options &options() const
     {
         return options_;
@@ -421,6 +439,22 @@ struct lcb_CMDSUBDOC_ {
         return preserve_expiry_;
     }
 
+    lcb_STATUS on_behalf_of(std::string user)
+    {
+        impostor_ = std::move(user);
+        return LCB_SUCCESS;
+    }
+
+    bool want_impersonation() const
+    {
+        return !impostor_.empty();
+    }
+
+    const std::string &impostor() const
+    {
+        return impostor_;
+    }
+
   private:
     lcb::collection_qualifier collection_{};
     std::chrono::microseconds timeout_{0};
@@ -434,6 +468,7 @@ struct lcb_CMDSUBDOC_ {
     subdoc_options options_{};
     lcb_SUBDOCSPECS_ specs_{};
     bool preserve_expiry_{false};
+    std::string impostor_{};
 };
 
 /**

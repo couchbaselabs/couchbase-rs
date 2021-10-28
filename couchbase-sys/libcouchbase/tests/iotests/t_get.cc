@@ -21,6 +21,7 @@
 #include "iotests.h"
 #include "logging.h"
 #include "internal.h"
+#include "testutil.h"
 
 #define LOGARGS(instance, lvl) instance->settings, "tests-GET", LCB_LOG_##lvl, __FILE__, __LINE__
 
@@ -106,6 +107,9 @@ static void testGetHitGetCallback(lcb_INSTANCE *, lcb_CALLBACK_TYPE, const lcb_R
  */
 TEST_F(GetUnitTest, testGetHit)
 {
+    MockEnvironment *mock = MockEnvironment::getInstance();
+    tracing_guard use_tracing;
+    metrics_guard use_metrics;
     HandleWrap hw;
     lcb_INSTANCE *instance;
     createConnection(hw, &instance);
@@ -129,6 +133,16 @@ TEST_F(GetUnitTest, testGetHit)
 
     lcb_wait(instance, LCB_WAIT_DEFAULT);
     EXPECT_EQ(2, numcallbacks);
+
+    auto spans = mock->getTracer().spans;
+    ASSERT_EQ(4, spans.size());
+    auto span = spans[0];
+    assert_kv_span(span, "upsert", {});
+    span = spans[2];
+    assert_kv_span(span, "get", {});
+
+    assert_kv_metrics(METRICS_OPS_METER_NAME, "get", 2, false);
+    assert_kv_metrics(METRICS_OPS_METER_NAME, "upsert", 2, false);
 }
 
 extern "C" {
@@ -845,6 +859,7 @@ TEST_F(GetUnitTest, testPessimisticLock)
     lcb_install_callback(instance, LCB_CALLBACK_UNLOCK, reinterpret_cast<lcb_RESPCALLBACK>(pl_unlock_callback));
 
     std::string key(unique_name("testPessimisticLock"));
+    std::uint32_t lock_time_s = 10;
 
     std::uint64_t cas{0};
     {
@@ -870,7 +885,7 @@ TEST_F(GetUnitTest, testPessimisticLock)
         lcb_CMDGET *cmd = nullptr;
         lcb_cmdget_create(&cmd);
         lcb_cmdget_key(cmd, key.c_str(), key.size());
-        lcb_cmdget_locktime(cmd, 5);
+        lcb_cmdget_locktime(cmd, lock_time_s);
         lcb_get(instance, &res, cmd);
         lcb_cmdget_destroy(cmd);
         lcb_wait(instance, LCB_WAIT_DEFAULT);
@@ -902,7 +917,7 @@ TEST_F(GetUnitTest, testPessimisticLock)
         lcb_CMDGET *cmd = nullptr;
         lcb_cmdget_create(&cmd);
         lcb_cmdget_key(cmd, key.c_str(), key.size());
-        lcb_cmdget_locktime(cmd, 5);
+        lcb_cmdget_locktime(cmd, lock_time_s);
         lcb_get(instance, &res, cmd);
         lcb_cmdget_destroy(cmd);
         lcb_wait(instance, LCB_WAIT_DEFAULT);
@@ -949,7 +964,7 @@ TEST_F(GetUnitTest, testPessimisticLock)
         lcb_CMDGET *cmd = nullptr;
         lcb_cmdget_create(&cmd);
         lcb_cmdget_key(cmd, key.c_str(), key.size());
-        lcb_cmdget_locktime(cmd, 5);
+        lcb_cmdget_locktime(cmd, lock_time_s);
         lcb_get(instance, &res, cmd);
         lcb_cmdget_destroy(cmd);
         lcb_wait(instance, LCB_WAIT_DEFAULT);
@@ -1178,4 +1193,95 @@ TEST_F(GetUnitTest, testChangePassword)
         lcb_wait(instance, LCB_WAIT_DEFAULT);
     }
     EXPECT_EQ(nbCallbacks, counter);
+}
+
+struct touch_result {
+    bool called{false};
+    lcb_STATUS rc{LCB_ERR_GENERIC};
+};
+
+struct gat_result {
+    bool called{false};
+    lcb_STATUS rc{LCB_ERR_GENERIC};
+    std::string value{};
+};
+
+extern "C" {
+static void test_touch_zero_reset(lcb_INSTANCE *, lcb_CALLBACK_TYPE, const lcb_RESPTOUCH *resp)
+{
+    touch_result *result;
+    lcb_resptouch_cookie(resp, (void **)&result);
+    result->called = true;
+    result->rc = lcb_resptouch_status(resp);
+}
+
+static void test_get_and_touch_zero_reset(lcb_INSTANCE *, lcb_CALLBACK_TYPE, const lcb_RESPGET *resp)
+{
+    gat_result *result;
+    lcb_respget_cookie(resp, (void **)&result);
+    result->called = true;
+    result->rc = lcb_respget_status(resp);
+    const char *value = nullptr;
+    std::size_t value_len = 0;
+    lcb_respget_value(resp, &value, &value_len);
+    if (value_len > 0 && value != nullptr) {
+        result->value.assign(value, value_len);
+    }
+}
+}
+
+TEST_F(GetUnitTest, testTouchWithZeroExpiryResetsExpiry)
+{
+    std::string key = unique_name("gat_reset_expiry_key");
+    std::string value = unique_name("gat_reset_expiry_value");
+
+    HandleWrap hw;
+    lcb_INSTANCE *instance;
+    createConnection(hw, &instance);
+
+    (void)lcb_install_callback(instance, LCB_CALLBACK_TOUCH, (lcb_RESPCALLBACK)test_touch_zero_reset);
+    (void)lcb_install_callback(instance, LCB_CALLBACK_GET, (lcb_RESPCALLBACK)test_get_and_touch_zero_reset);
+    storeKey(instance, key, value);
+
+    {
+        touch_result res{};
+        lcb_CMDTOUCH *cmd;
+        ASSERT_STATUS_EQ(LCB_SUCCESS, lcb_cmdtouch_create(&cmd));
+        ASSERT_STATUS_EQ(LCB_SUCCESS, lcb_cmdtouch_key(cmd, key.c_str(), key.size()));
+        ASSERT_STATUS_EQ(LCB_SUCCESS, lcb_cmdtouch_expiry(cmd, 1));
+        ASSERT_STATUS_EQ(LCB_SUCCESS, lcb_touch(instance, &res, cmd));
+        ASSERT_STATUS_EQ(LCB_SUCCESS, lcb_cmdtouch_destroy(cmd));
+        ASSERT_STATUS_EQ(LCB_SUCCESS, lcb_wait(instance, LCB_WAIT_DEFAULT));
+        ASSERT_TRUE(res.called);
+        ASSERT_STATUS_EQ(LCB_SUCCESS, res.rc);
+    }
+
+    {
+        gat_result res{};
+        lcb_CMDGET *cmd;
+        ASSERT_STATUS_EQ(LCB_SUCCESS, lcb_cmdget_create(&cmd));
+        ASSERT_STATUS_EQ(LCB_SUCCESS, lcb_cmdget_key(cmd, key.c_str(), key.size()));
+        ASSERT_STATUS_EQ(LCB_SUCCESS, lcb_cmdget_expiry(cmd, 0));
+        ASSERT_STATUS_EQ(LCB_SUCCESS, lcb_get(instance, &res, cmd));
+        ASSERT_STATUS_EQ(LCB_SUCCESS, lcb_cmdget_destroy(cmd));
+        ASSERT_STATUS_EQ(LCB_SUCCESS, lcb_wait(instance, LCB_WAIT_DEFAULT));
+        ASSERT_TRUE(res.called);
+        ASSERT_STATUS_EQ(LCB_SUCCESS, res.rc);
+        ASSERT_EQ(value, res.value);
+    }
+
+    sleep(2);
+
+    {
+        gat_result res{};
+        lcb_CMDGET *cmd;
+        ASSERT_STATUS_EQ(LCB_SUCCESS, lcb_cmdget_create(&cmd));
+        ASSERT_STATUS_EQ(LCB_SUCCESS, lcb_cmdget_key(cmd, key.c_str(), key.size()));
+        ASSERT_STATUS_EQ(LCB_SUCCESS, lcb_get(instance, &res, cmd));
+        ASSERT_STATUS_EQ(LCB_SUCCESS, lcb_cmdget_destroy(cmd));
+        ASSERT_STATUS_EQ(LCB_SUCCESS, lcb_wait(instance, LCB_WAIT_DEFAULT));
+        ASSERT_TRUE(res.called);
+        ASSERT_STATUS_EQ(LCB_SUCCESS, res.rc);
+        ASSERT_EQ(value, res.value);
+    }
 }

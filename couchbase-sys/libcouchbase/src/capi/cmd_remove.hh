@@ -28,6 +28,12 @@
  * @private
  */
 struct lcb_CMDREMOVE_ {
+    static const std::string &operation_name()
+    {
+        static std::string name = LCBTRACE_OP_REMOVE;
+        return name;
+    }
+
     lcb_STATUS cas(std::uint64_t cas)
     {
         cas_ = cas;
@@ -142,6 +148,22 @@ struct lcb_CMDREMOVE_ {
         return cookie_;
     }
 
+    lcb_STATUS on_behalf_of(std::string user)
+    {
+        impostor_ = std::move(user);
+        return LCB_SUCCESS;
+    }
+
+    bool want_impersonation() const
+    {
+        return !impostor_.empty();
+    }
+
+    const std::string &impostor() const
+    {
+        return impostor_;
+    }
+
   private:
     lcb::collection_qualifier collection_{};
     std::chrono::microseconds timeout_{0};
@@ -151,6 +173,7 @@ struct lcb_CMDREMOVE_ {
     std::string key_{};
     std::uint64_t cas_{0};
     lcb_DURABILITY_LEVEL durability_level_{LCB_DURABILITYLEVEL_NONE};
+    std::string impostor_{};
 };
 
 /**

@@ -73,7 +73,7 @@ void lcb_SEARCH_HANDLE_::invoke_row(lcb_RESPSEARCH *resp)
     if (callback_) {
         if (resp->rflags & LCB_RESP_F_FINAL) {
             Json::Value meta;
-            if (Json::Reader().parse(resp->row, resp->row + resp->nrow, meta)) {
+            if (Json::Reader(Json::Features::strictMode()).parse(resp->row, resp->row + resp->nrow, meta)) {
                 const Json::Value &top_error = meta["error"];
                 if (top_error.isString()) {
                     resp->ctx.has_top_level_error = 1;
@@ -116,7 +116,10 @@ void lcb_SEARCH_HANDLE_::invoke_last()
         resp.nrow = meta.iov_len;
     }
 
-    LCBTRACE_HTTP_FINISH(span_);
+    if (span_ != nullptr) {
+        lcb::trace::finish_http_span(span_, this);
+        span_ = nullptr;
+    }
     if (http_request_ != nullptr) {
         http_request_->span = nullptr;
     }
@@ -154,8 +157,13 @@ lcb_SEARCH_HANDLE_::lcb_SEARCH_HANDLE_(lcb_INSTANCE *instance, void *cookie, con
         return;
     }
     index_name_ = j_ixname.asString();
+    {
+        char buf[32];
+        size_t nbuf = snprintf(buf, sizeof(buf), "%016" PRIx64, lcb_next_rand64());
+        client_context_id_.assign(buf, nbuf);
+    }
     if (instance_->settings->tracer) {
-        span_ = cmd->parent_span();
+        parent_span_ = cmd->parent_span();
     }
 
     std::string url;
@@ -175,12 +183,14 @@ lcb_SEARCH_HANDLE_::lcb_SEARCH_HANDLE_(lcb_INSTANCE *instance, void *cookie, con
         root["ctl"]["timeout"] = timeout / 1000; /* us -> ms */
     }
     lcb_cmdhttp_timeout(htcmd, timeout);
+    if (cmd->want_impersonation()) {
+        htcmd->set_header("cb-on-behalf-of", cmd->impostor());
+    }
 
     std::string qbody(Json::FastWriter().write(root));
     lcb_cmdhttp_body(htcmd, qbody.c_str(), qbody.size());
 
-    LCBTRACE_HTTP_START(instance_->settings, nullptr, span_, LCBTRACE_TAG_SERVICE_SEARCH, LCBTRACE_THRESHOLD_SEARCH,
-                        span_);
+    span_ = lcb::trace::start_http_span(instance_->settings, this);
     lcb_cmdhttp_parent_span(htcmd, span_);
 
     last_error_ = lcb_http(instance_, this, htcmd);

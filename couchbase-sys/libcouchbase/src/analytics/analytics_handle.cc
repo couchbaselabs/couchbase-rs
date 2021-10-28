@@ -225,7 +225,7 @@ lcb_ANALYTICS_HANDLE_::lcb_ANALYTICS_HANDLE_(lcb_INSTANCE *obj, void *user_cooki
     query_params_ = Json::FastWriter().write(cmd->root());
 
     if (instance_->settings->tracer) {
-        span_ = cmd->parent_span();
+        parent_span_ = cmd->parent_span();
     }
 
     if (ingest_options().method != LCB_INGEST_METHOD_NONE) {
@@ -236,6 +236,9 @@ lcb_ANALYTICS_HANDLE_::lcb_ANALYTICS_HANDLE_(lcb_INSTANCE *obj, void *user_cooki
         document_queue_->cb_throttle = cb_docq_throttle;
         // TODO: docq->max_pending_response;
         lcb_aspend_add(&instance_->pendops, LCB_PENDTYPE_COUNTER, nullptr);
+    }
+    if (cmd->want_impersonation()) {
+        impostor_ = cmd->impostor();
     }
 }
 
@@ -277,9 +280,11 @@ lcb_STATUS lcb_ANALYTICS_HANDLE_::issue_htreq(const std::string &body)
     if (!hostname.empty()) {
         lcb_cmdhttp_host(htcmd, hostname.c_str(), hostname.size());
     }
+    if (!impostor_.empty()) {
+        htcmd->set_header("cb-on-behalf-of", impostor_);
+    }
 
-    LCBTRACE_HTTP_START(instance_->settings, client_context_id_.c_str(), span_, LCBTRACE_TAG_SERVICE_ANALYTICS,
-                        LCBTRACE_THRESHOLD_ANALYTICS, span_);
+    span_ = lcb::trace::start_http_span_with_statement(instance_->settings, this, statement_);
     lcb_cmdhttp_parent_span(htcmd, span_);
 
     lcb_STATUS rc = lcb_http(instance_, this, htcmd);
@@ -388,7 +393,7 @@ void lcb_ANALYTICS_HANDLE_::invoke_row(lcb_RESPANALYTICS *resp, bool is_last)
             resp->rflags |= LCB_RESP_F_EXTDATA;
         }
         Json::Value meta;
-        if (Json::Reader().parse(resp->row, resp->row + resp->nrow, meta)) {
+        if (Json::Reader(Json::Features::strictMode()).parse(resp->row, resp->row + resp->nrow, meta)) {
             const Json::Value &errors = meta["errors"];
             if (errors.isArray() && !errors.empty()) {
                 const Json::Value &err = errors[0];
@@ -450,7 +455,10 @@ void lcb_ANALYTICS_HANDLE_::invoke_row(lcb_RESPANALYTICS *resp, bool is_last)
             }
         }
 
-        LCBTRACE_HTTP_FINISH(span_);
+        if (span_ != nullptr) {
+            lcb::trace::finish_http_span(span_, this);
+            span_ = nullptr;
+        }
         if (http_request_ != nullptr) {
             http_request_->span = nullptr;
         }

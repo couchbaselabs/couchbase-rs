@@ -99,7 +99,7 @@ bool lcb_QUERY_HANDLE_::parse_meta(const char *row, size_t row_len, lcb_STATUS &
     first_error_code = 0;
 
     Json::Value meta;
-    if (!Json::Reader().parse(row, row + row_len, meta)) {
+    if (!Json::Reader(Json::Features::strictMode()).parse(row, row + row_len, meta)) {
         return false;
     }
     const Json::Value &errors = meta["errors"];
@@ -195,8 +195,8 @@ void lcb_QUERY_HANDLE_::invoke_row(lcb_RESPQUERY *resp, bool is_last)
         resp->ctx.endpoint = resp->htresp->ctx.endpoint;
         resp->ctx.endpoint_len = resp->htresp->ctx.endpoint_len;
     }
-    resp->ctx.client_context_id = client_context_id.c_str();
-    resp->ctx.client_context_id_len = client_context_id.size();
+    resp->ctx.client_context_id = client_context_id_.c_str();
+    resp->ctx.client_context_id_len = client_context_id_.size();
     resp->ctx.statement = statement_.c_str();
     resp->ctx.statement_len = statement_.size();
 
@@ -213,9 +213,11 @@ void lcb_QUERY_HANDLE_::invoke_row(lcb_RESPQUERY *resp, bool is_last)
             resp->ctx.first_error_message_len = first_error_message.size();
         }
         resp->ctx.first_error_code = first_error_code;
-        LCBTRACE_ADD_RETRIES(span_, retries_);
+        if (span_ != nullptr) {
+            lcb::trace::finish_http_span(span_, this);
+            span_ = nullptr;
+        }
 
-        LCBTRACE_HTTP_FINISH(span_);
         if (http_request_ != nullptr) {
             http_request_->span = nullptr;
         }
@@ -372,6 +374,10 @@ lcb_RETRY_ACTION lcb_QUERY_HANDLE_::has_retriable_error(lcb_STATUS &rc)
             }
         }
     }
+
+    if (rc == LCB_SUCCESS) {
+        return {0, 0};
+    }
     return lcb_query_should_retry(instance_->settings, this, rc);
 }
 
@@ -393,6 +399,9 @@ lcb_STATUS lcb_QUERY_HANDLE_::issue_htreq(const std::string &body)
     lcb_cmdhttp_timeout(htcmd, timeout + LCBT_SETTING(instance_, n1ql_grace_period));
     lcb_cmdhttp_handle(htcmd, &http_request_);
     lcb_cmdhttp_host(htcmd, endpoint.data(), endpoint.size());
+    if (!impostor_.empty()) {
+        htcmd->set_header("cb-on-behalf-of", impostor_);
+    }
     if (use_multi_bucket_authentication_) {
         lcb_cmdhttp_skip_auth_header(htcmd, true);
     } else {
@@ -419,7 +428,7 @@ lcb_STATUS lcb_QUERY_HANDLE_::issue_htreq(const std::string &body)
     lcb_log(LOGARGS(this, TRACE),
             LOGFMT "execute query: %.*s, idempotent=%s, timeout=%uus, grace_period=%uus, client_context_id=\"%s\"",
             LOGID(this), (int)body.size(), body.c_str(), idempotent_ ? "true" : "false", timeout,
-            LCBT_SETTING(instance_, n1ql_grace_period), client_context_id.c_str());
+            LCBT_SETTING(instance_, n1ql_grace_period), client_context_id_.c_str());
     return rc;
 }
 
@@ -510,10 +519,10 @@ lcb_QUERY_HANDLE_::lcb_QUERY_HANDLE_(lcb_INSTANCE *obj, void *user_cookie, const
     if (ccid.isNull()) {
         char buf[32];
         size_t nbuf = snprintf(buf, sizeof(buf), "%016" PRIx64, lcb_next_rand64());
-        client_context_id.assign(buf, nbuf);
-        json["client_context_id"] = client_context_id;
+        client_context_id_.assign(buf, nbuf);
+        json["client_context_id"] = client_context_id_;
     } else {
-        client_context_id = ccid.asString();
+        client_context_id_ = ccid.asString();
     }
     if (json.isMember("readonly") && json["readonly"].asBool()) {
         idempotent_ = true;
@@ -542,10 +551,12 @@ lcb_QUERY_HANDLE_::lcb_QUERY_HANDLE_(lcb_INSTANCE *obj, void *user_cookie, const
             curCreds["pass"] = ii->second;
         }
     }
+    if (cmd->want_impersonation()) {
+        impostor_ = cmd->impostor();
+    }
     if (instance_->settings->tracer) {
         parent_span_ = cmd->parent_span();
-        LCBTRACE_HTTP_START(instance_->settings, client_context_id.c_str(), parent_span_, LCBTRACE_TAG_SERVICE_N1QL,
-                            LCBTRACE_THRESHOLD_QUERY, span_);
+        span_ = lcb::trace::start_http_span_with_statement(instance_->settings, this, statement_);
     }
 }
 

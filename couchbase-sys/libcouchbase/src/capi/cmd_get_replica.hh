@@ -36,6 +36,12 @@ enum class get_replica_mode {
  * @private
  */
 struct lcb_CMDGETREPLICA_ {
+    static const std::string &operation_name()
+    {
+        static std::string name = LCBTRACE_OP_GET_FROM_REPLICA;
+        return name;
+    }
+
     lcb_STATUS mode(get_replica_mode mode)
     {
         mode_ = mode;
@@ -150,6 +156,22 @@ struct lcb_CMDGETREPLICA_ {
         return cookie_;
     }
 
+    lcb_STATUS on_behalf_of(std::string user)
+    {
+        impostor_ = std::move(user);
+        return LCB_SUCCESS;
+    }
+
+    bool want_impersonation() const
+    {
+        return !impostor_.empty();
+    }
+
+    const std::string &impostor() const
+    {
+        return impostor_;
+    }
+
   private:
     lcb::collection_qualifier collection_{};
     std::chrono::microseconds timeout_{0};
@@ -159,6 +181,7 @@ struct lcb_CMDGETREPLICA_ {
     std::string key_{};
     get_replica_mode mode_{get_replica_mode::any};
     int select_index_{0};
+    std::string impostor_{};
 };
 
 struct lcb_RESPGETREPLICA_ {
