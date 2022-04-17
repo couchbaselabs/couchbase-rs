@@ -18,7 +18,7 @@ openssl-sys = "0.9.58"
 
 [build-dependencies]
 cc = "1.0"
-cmake = "0.1.45"
+cmake = "0.1.48"
 
 [build-dependencies.bindgen]
 version = "0.55"
