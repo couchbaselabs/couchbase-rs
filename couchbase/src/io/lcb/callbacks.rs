@@ -8,6 +8,7 @@ use crate::{
 use couchbase_sys::*;
 use log::{debug, trace};
 use serde_json::Value;
+use std::convert::TryInto;
 use std::ffi::CStr;
 use std::os::raw::{c_char, c_int, c_uint, c_void};
 use std::ptr;
@@ -373,8 +374,12 @@ pub unsafe extern "C" fn lookup_in_callback(
             let mut value_ptr: *const c_char = ptr::null();
             lcb_respsubdoc_result_value(subdoc_res, i, &mut value_ptr, &mut value_len);
             let value = from_raw_parts(value_ptr as *const u8, value_len);
+            let status_u32_check = status.try_into();
+            if status_u32_check.is_err(){
+                panic!("Could not convert status value {} into u32",status);
+            }
             fields.push(SubDocField {
-                status,
+                status: status_u32_check.unwrap(),
                 value: value.into(),
             });
         }
@@ -418,8 +423,12 @@ pub unsafe extern "C" fn mutate_in_callback(
             let mut value_ptr: *const c_char = ptr::null();
             lcb_respsubdoc_result_value(subdoc_res, i, &mut value_ptr, &mut value_len);
             let value = from_raw_parts(value_ptr as *const u8, value_len);
+            let status_u32_check = status.try_into();
+            if status_u32_check.is_err(){
+                panic!("Could not convert status value {} into u32",status);
+            }
             fields.push(SubDocField {
-                status,
+                status : status_u32_check.unwrap(),
                 value: value.into(),
             });
         }

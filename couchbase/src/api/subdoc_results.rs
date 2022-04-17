@@ -1,3 +1,5 @@
+use std::convert::TryInto;
+
 use crate::io::couchbase_error_from_lcb_status;
 use crate::{CouchbaseError, CouchbaseResult, ErrorContext};
 
@@ -47,8 +49,12 @@ impl LookupInResult {
         match content.status {
             0 => {}
             _ => {
+                let status_i32_check = content.status.try_into();
+                if status_i32_check.is_err(){
+                    panic!("could not convert content.status value of {} into i32",content.status);
+                }
                 return Err(couchbase_error_from_lcb_status(
-                    content.status,
+                    status_i32_check.unwrap(),
                     ErrorContext::default(),
                 ))
             }
