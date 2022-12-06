@@ -145,8 +145,13 @@ fn run_lcb_loop(
 /// Note that libcouchbase still wants to own the buffer, so we can only look into the
 /// returned opaque str and clone it into ownership before return.
 fn bucket_name_for_instance(instance: *mut lcb_INSTANCE) -> Option<String> {
-    let mut bucket_ptr: *mut i8 = ptr::null_mut();
-    let opaque_ptr = &mut bucket_ptr as *mut *mut i8;
+    #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
+    type Num = u8;
+    #[cfg(not(all(target_arch = "aarch64", target_os = "linux")))]
+    type Num = i8;
+
+    let mut bucket_ptr: *mut Num = ptr::null_mut();
+    let opaque_ptr = &mut bucket_ptr as *mut *mut Num;
 
     unsafe {
         let status = lcb_cntl(

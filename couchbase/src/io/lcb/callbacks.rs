@@ -1031,8 +1031,16 @@ fn gen_lcb_io_error() -> std::io::Error {
 const LOG_MSG_LENGTH: usize = 1024;
 
 // Windows disagrees with Linux and Macos on which type is available.
-#[cfg(not(target_os = "windows"))]
+#[cfg(all(
+    not(target_os = "windows"),
+    all(not(target_arch = "aarch64"), not(target_arch = "arm64"))
+))]
 pub(crate) type VaList = *mut __va_list_tag;
+#[cfg(all(
+    not(target_os = "windows"),
+    any(target_arch = "aarch64", target_arch = "arm64")
+))]
+pub(crate) type VaList = va_list;
 #[cfg(target_os = "windows")]
 pub(crate) type VaList = va_list;
 
@@ -1055,12 +1063,13 @@ pub unsafe extern "C" fn logger_callback(
     };
 
     let mut target_buffer = [0u8; LOG_MSG_LENGTH];
-    let result = wrapped_vsnprintf(
-        &mut target_buffer[0] as *mut u8 as *mut i8,
-        LOG_MSG_LENGTH as c_uint,
-        fmt,
-        ap,
-    ) as usize;
+
+    #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
+    let buf = &mut target_buffer[0] as *mut u8;
+    #[cfg(not(all(target_arch = "aarch64", target_os = "linux")))]
+    let buf = &mut target_buffer[0] as *mut u8 as *mut i8;
+
+    let result = wrapped_vsnprintf(buf, LOG_MSG_LENGTH as c_uint, fmt, ap) as usize;
     let range_end = if result < target_buffer.len() {
         result + 1
     } else {
