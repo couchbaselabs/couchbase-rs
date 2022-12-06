@@ -1,4 +1,3 @@
-use serde::Serialize;
 use serde_derive::Serialize;
 use serde_json::json;
 use std::fmt::Debug;
@@ -1078,7 +1077,7 @@ impl SearchQuery for GeoPolygonQuery {
     }
 }
 
-pub trait SearchSort: Serialize {}
+pub trait SearchSort: serde::Serialize {}
 
 #[derive(Debug, Serialize)]
 pub struct SearchSortScore {
@@ -1261,7 +1260,7 @@ impl SearchSortGeoDistance {
 
 impl SearchSort for SearchSortGeoDistance {}
 
-pub trait SearchFacet: Serialize {}
+pub trait SearchFacet: serde::Serialize {}
 
 #[derive(Debug, Serialize)]
 pub struct TermFacet {

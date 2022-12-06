@@ -3,7 +3,6 @@ use crate::io::Core;
 use crate::{CouchbaseError, CouchbaseResult, ErrorContext, GenericManagementResult, ServiceType};
 use futures::channel::oneshot;
 use serde::de::DeserializeOwned;
-use serde::Serialize;
 use serde_derive::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -41,7 +40,7 @@ impl SearchIndexBuilder {
 
     pub fn params<T>(mut self, params: HashMap<String, T>) -> CouchbaseResult<Self>
     where
-        T: Serialize,
+        T: serde::Serialize,
     {
         self.params =
             Some(
@@ -61,7 +60,7 @@ impl SearchIndexBuilder {
 
     pub fn source_params<T>(mut self, params: HashMap<String, T>) -> CouchbaseResult<Self>
     where
-        T: Serialize,
+        T: serde::Serialize,
     {
         self.source_params =
             Some(
@@ -81,7 +80,7 @@ impl SearchIndexBuilder {
 
     pub fn plan_params<T>(mut self, params: HashMap<String, T>) -> CouchbaseResult<Self>
     where
-        T: Serialize,
+        T: serde::Serialize,
     {
         self.plan_params =
             Some(
@@ -198,7 +197,7 @@ impl SearchIndex {
 
     pub fn set_params<T>(&mut self, params: HashMap<String, T>) -> CouchbaseResult<()>
     where
-        T: Serialize,
+        T: serde::Serialize,
     {
         self.params = Some(
             serde_json::to_value(params).map_err(CouchbaseError::encoding_failure_from_serde)?,
@@ -213,7 +212,7 @@ impl SearchIndex {
 
     pub fn set_source_params<T>(&mut self, params: HashMap<String, T>) -> CouchbaseResult<()>
     where
-        T: Serialize,
+        T: serde::Serialize,
     {
         self.source_params = Some(
             serde_json::to_value(params).map_err(CouchbaseError::encoding_failure_from_serde)?,
@@ -228,7 +227,7 @@ impl SearchIndex {
 
     pub fn set_plan_params<T>(&mut self, params: HashMap<String, T>) -> CouchbaseResult<()>
     where
-        T: Serialize,
+        T: serde::Serialize,
     {
         self.plan_params = Some(
             serde_json::to_value(params).map_err(CouchbaseError::encoding_failure_from_serde)?,
@@ -496,7 +495,7 @@ impl SearchIndexManager {
         opts: impl Into<Option<AnalyzeDocumentSearchIndexOptions>>,
     ) -> CouchbaseResult<T>
     where
-        I: Serialize,
+        I: serde::Serialize,
         T: DeserializeOwned,
     {
         let opts = unwrap_or_default!(opts.into());
