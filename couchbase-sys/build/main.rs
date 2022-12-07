@@ -60,6 +60,11 @@ fn main() {
 
     let build_dst = build_cfg.build();
 
+    println!(
+        "cargo:rustc-link-search=native={}",
+        build_dst.join("build/lib").display()
+    );
+
     if cfg!(feature = "link-static") {
         if cfg!(target_os = "windows") {
             if env::var("PROFILE").unwrap() == "release" {
