@@ -193,7 +193,7 @@ async fn fetch_caves(path: &PathBuf, version: String) {
 }
 
 #[cfg(target_os = "windows")]
-fn set_permissions() {}
+fn set_permissions(_path: &PathBuf) {}//have same parameterlist
 
 #[cfg(not(target_os = "windows"))]
 fn set_permissions(path: &PathBuf) {
