@@ -20,7 +20,7 @@ openssl-sys = "0.9.58"
 cc = "1.0"
 
 [build-dependencies.bindgen]
-version = "0.54"
+version = "0.63"
 default-features = false
 features = ["logging", "runtime", "which-rustfmt"]
 

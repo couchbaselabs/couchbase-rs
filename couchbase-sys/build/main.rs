@@ -111,13 +111,13 @@ fn main() {
         .header("headers.h")
         .clang_arg("-I")
         .clang_arg(format!("{}/include", env::var("OUT_DIR").unwrap()))
-        .blacklist_type("max_align_t")
+        .blocklist_type("max_align_t")
         .size_t_is_usize(true)
         .generate_comments(false)
-        .whitelist_function("lcb_.*")
-        .whitelist_type("lcb_.*")
-        .whitelist_var("LCB_.*")
-        .whitelist_type("__va_list_tag");
+        .allowlist_function("lcb_.*")
+        .allowlist_type("lcb_.*")
+        .allowlist_var("LCB_.*")
+        .allowlist_type("__va_list_tag");
 
     if cfg!(feature = "volatile") {
         bindings_builder = bindings_builder.header("internal-headers.h");
