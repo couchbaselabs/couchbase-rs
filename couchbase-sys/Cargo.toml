@@ -21,7 +21,7 @@ cc = "1.0"
 cmake = "0.1.45"
 
 [build-dependencies.bindgen]
-version = "0.55"
+version = "0.69"
 default-features = false
 features = ["logging", "runtime", "which-rustfmt"]
 
