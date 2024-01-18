@@ -8,3 +8,9 @@
 extern crate openssl_sys;
 
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+
+// Unit test
+//#[cfg[test]]
+//od tests [
+//    use super::
+//]
