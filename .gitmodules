@@ -1,0 +1,3 @@
+[submodule "couchbase-sys/libcouchbase-3.3.10"]
+	path = couchbase-sys/libcouchbase-3.3.10
+	url = https://github.com/couchbaselabs/couchbase-rs
