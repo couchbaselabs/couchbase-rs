@@ -71,9 +71,9 @@ impl MockCluster {
         let path = std::env::temp_dir().join(Path::new(CAVES_BINARY));
         if path.exists() {
             debug!(
-                "Found existing caves binary for {} at {}",
+               "Found existing caves binary for {} at {}",
                 CAVES_VERSION,
-                path.to_string_lossy()
+               path.to_string_lossy()
             );
         } else {
             debug!(

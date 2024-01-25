@@ -9,8 +9,23 @@ extern crate openssl_sys;
 
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
+// Function to test (Keep this function as is)
+pub fn add(a: i32, b: i32) -> i32 {
+    a + b
+}
+
 // Unit test
-//#[cfg[test]]
-//od tests [
-//    use super::
-//]
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_add_positive_numbers() {
+        assert_eq!(add(2, 3), 5);
+    }
+
+    #[test]
+    fn test_add_negative_numbers() {
+        assert_eq!(add(-2, -3), -5);
+    }
+}

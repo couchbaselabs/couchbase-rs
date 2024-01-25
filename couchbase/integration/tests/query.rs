@@ -58,7 +58,7 @@ pub async fn test_query(config: Arc<TestConfig>) -> TestResult<bool> {
         let mut result = cluster
             .query(
                 format!(
-                    "SELECT {}.* FROM {} WHERE `test_name` = \"{}\"",
+                    "SELECT `{}`.* FROM `{}` WHERE `test_name` = \"{}\"",
                     config.bucket().name(),
                     config.bucket().name(),
                     "test_query"
@@ -104,7 +104,7 @@ pub async fn test_query_named_params(config: Arc<TestConfig>) -> TestResult<bool
         let mut result = cluster
             .query(
                 format!(
-                    "SELECT {}.* FROM {} WHERE `test_name` = $testname",
+                    "SELECT `{}`.* FROM `{}` WHERE `test_name` = $testname",
                     config.bucket().name(),
                     config.bucket().name(),
                 ),
@@ -150,7 +150,7 @@ pub async fn test_query_positional_params(config: Arc<TestConfig>) -> TestResult
         let mut result = cluster
             .query(
                 format!(
-                    "SELECT {}.* FROM {} WHERE `test_name` = $1",
+                    "SELECT `{}`.* FROM `{}` WHERE `test_name` = $1",
                     config.bucket().name(),
                     config.bucket().name(),
                 ),
@@ -194,7 +194,7 @@ pub async fn test_query_prepared(config: Arc<TestConfig>) -> TestResult<bool> {
         let mut result = cluster
             .query(
                 format!(
-                    "SELECT {}.* FROM {} WHERE `test_name` = \"{}\"",
+                    "SELECT `{}`.* FROM `{}` WHERE `test_name` = \"{}\"",
                     config.bucket().name(),
                     config.bucket().name(),
                     "test_query_prepared"
@@ -239,7 +239,7 @@ pub async fn test_query_adhoc(config: Arc<TestConfig>) -> TestResult<bool> {
         let mut result = cluster
             .query(
                 format!(
-                    "SELECT {}.* FROM {} WHERE `test_name` = \"{}\"",
+                    "SELECT `{}`.* FROM `{}` WHERE `test_name` = \"{}\"",
                     config.bucket().name(),
                     config.bucket().name(),
                     "test_query_adhoc"
@@ -301,7 +301,7 @@ pub async fn test_scope_query(config: Arc<TestConfig>) -> TestResult<bool> {
         let mut result = scope
             .query(
                 format!(
-                    "SELECT {}.* FROM {} WHERE `test_name` = \"{}\"",
+                    "SELECT `{}`.* FROM `{}` WHERE `test_name` = \"{}\"",
                     collection.name(),
                     collection.name(),
                     "test_scope_query"

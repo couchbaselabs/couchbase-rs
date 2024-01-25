@@ -110,6 +110,8 @@ pub async fn test_upsert_preserve_expiry(config: Arc<TestConfig>) -> TestResult<
 
     let expiry_timestamp = result.content(0)?;
     let expires_at = NaiveDateTime::from_timestamp(expiry_timestamp, 0);
+    //let expires_at = NaiveDateTime::from_timestamp_opt(expiry_timestamp, 0)
+    //    .expect("Invalid timestamp");
     assert_timestamp(start, duration, &expires_at, Duration::from_secs(5));
 
     Ok(false)
@@ -159,6 +161,8 @@ pub async fn test_replace_preserve_expiry(config: Arc<TestConfig>) -> TestResult
 
     let expiry_timestamp = result.content(0)?;
     let expires_at = NaiveDateTime::from_timestamp(expiry_timestamp, 0);
+    //let expires_at = NaiveDateTime::from_timestamp_opt(expiry_timestamp, 0)
+    //    .expect("Invalid timestamp for expiry");
     assert_timestamp(start, duration, &expires_at, Duration::from_secs(5));
 
     Ok(false)

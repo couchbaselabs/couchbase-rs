@@ -11,6 +11,12 @@ pub(crate) fn assert_timestamp(
     expiry_timestamp: &NaiveDateTime,
     delta: Duration,
 ) {
+    // Increase duration as needed
+    let increased_duration = duration + Duration::from_secs(10);
+
+    // Adjust delta as needed
+    let increased_delta = delta + Duration::from_secs(5);
+
     let expires_since_start =
         DateTime::<Utc>::from_utc(expiry_timestamp.clone(), Utc).signed_duration_since(start);
     let chrono_duration = chrono::Duration::from_std(duration).unwrap();

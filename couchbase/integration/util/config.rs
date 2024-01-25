@@ -47,6 +47,7 @@ impl Config {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("integration");
         path.push("config.toml");
+        
         let config: FileConfig = match fs::read_to_string(&path) {
             Ok(r) => match toml::from_str(&r) {
                 Ok(i) => Some(i),
