@@ -20,12 +20,14 @@ serde_derive = "1.0"
 serde_urlencoded = "0.6"
 urlencoding = "2.1.0"
 futures = "0.3"
-log = "0.4"
+#log = "0.4"
+log = "0.4.19"
 parse_duration = "2.1"
 uuid = { version = "0.8", features = ["v4"] }
 couchbase-sys = { path = "../couchbase-sys", version = "=1.0.0-alpha.5", optional = true }
 crossbeam-channel = { version = "0.4", optional = true }
-chrono = "0.4.19"
+#chrono = "0.4.19"
+chrono = "0.4.29"
 
 [build-dependencies]
 cc = { version = "1.0", optional = true }
