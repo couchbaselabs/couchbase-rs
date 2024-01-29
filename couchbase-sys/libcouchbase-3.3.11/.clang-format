@@ -1,0 +1,11 @@
+# -*- mode: yaml; -*-
+
+BasedOnStyle: LLVM
+IndentWidth: 4
+BreakBeforeBraces: Linux
+ColumnLimit: 120
+AllowShortFunctionsOnASingleLine: Empty
+SortIncludes: false
+IndentCaseLabels: true
+SpacesInAngles: false
+AlwaysBreakTemplateDeclarations: Yes
