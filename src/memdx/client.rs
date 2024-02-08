@@ -5,8 +5,9 @@ use log::{debug, trace, warn};
 use std::collections::HashMap;
 use std::io;
 use std::sync::{Arc, Mutex};
-use tokio::io::{ReadHalf, WriteHalf};
+use tokio::io::{Join, ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
+use tokio::task::JoinHandle;
 use tokio_rustls::client::TlsStream;
 use tokio_util::codec::{FramedRead, FramedWrite};
 use uuid::Uuid;
@@ -72,7 +73,10 @@ impl Client {
         match self.writer.send(packet).await {
             Ok(_) => Ok(()),
             Err(e) => {
-                debug!("Failed to write packet {} {} {}", opaque, op_code, e);
+                debug!(
+                    "{} failed to write packet {} {} {}",
+                    self.client_id, opaque, op_code, e
+                );
 
                 let requests = Arc::clone(&self.opaque_map);
                 let mut map = requests.lock().unwrap();
@@ -115,13 +119,22 @@ impl Client {
                         let opaque = packet.opaque();
                         let requests = Arc::clone(&opaque_map);
                         let mut map = requests.lock().unwrap();
-                        let t = map.get_mut(&opaque);
 
-                        if let Some(sender) = t {
+                        // We remove and then re-add if there are more packets so that we don't have
+                        // to hold the mutex across the callback.
+                        let t = map.remove(&opaque);
+                        drop(map);
+                        drop(requests);
+
+                        if let Some(mut sender) = t {
                             let has_more_packets = sender(packet);
 
-                            if !has_more_packets {
-                                map.remove(&opaque);
+                            if has_more_packets {
+                                let requests = Arc::clone(&opaque_map);
+                                let mut map = requests.lock().unwrap();
+                                map.insert(opaque, sender);
+                                drop(map);
+                                drop(requests);
                             }
                         } else {
                             warn!(
@@ -130,8 +143,6 @@ impl Client {
                                 &packet.opaque()
                             );
                         }
-                        drop(map);
-                        drop(requests);
                     }
                     Err(e) => {
                         warn!("{} failed to read frame {}", client_id, e.to_string());
@@ -151,7 +162,7 @@ mod tests {
     use std::sync::mpsc;
     use tokio::net::TcpStream;
 
-    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn roundtrip_a_request() {
         let socket = TcpStream::connect("127.0.0.1:11210")
             .await
