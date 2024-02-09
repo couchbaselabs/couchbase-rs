@@ -24,26 +24,29 @@
 
 #include "contrib/lcb-jsoncpp/lcb-jsoncpp.h"
 #include "collection_qualifier.hh"
+#include "jsparse/parser.h"
 
 /**
  * @private
  */
 struct lcb_QUERY_ERROR_CONTEXT_ {
     lcb_STATUS rc;
-    uint32_t first_error_code;
-    const char *first_error_message;
-    size_t first_error_message_len;
-    const char *statement;
-    size_t statement_len;
-    const char *client_context_id;
-    size_t client_context_id_len;
-    const char *query_params;
-    size_t query_params_len;
-    uint32_t http_response_code;
-    const char *http_response_message;
-    size_t http_response_message_len;
-    const char *endpoint;
-    size_t endpoint_len;
+    uint32_t first_error_code{};
+    const char *first_error_message{};
+    size_t first_error_message_len{};
+    const char *error_response_body{};
+    size_t error_response_body_len{};
+    const char *statement{};
+    size_t statement_len{};
+    const char *client_context_id{};
+    size_t client_context_id_len{};
+    const char *query_params{};
+    size_t query_params_len{};
+    uint32_t http_response_code{};
+    const char *http_response_message{};
+    size_t http_response_message_len{};
+    const char *endpoint{};
+    size_t endpoint_len{};
 };
 
 /**
@@ -203,6 +206,12 @@ struct lcb_CMDQUERY_ {
         return LCB_SUCCESS;
     }
 
+    lcb_STATUS preserve_expiry(bool preserve_expiry)
+    {
+        root_["preserve_expiry"] = preserve_expiry;
+        return LCB_SUCCESS;
+    }
+
     lcb_STATUS callback(lcb_QUERY_CALLBACK row_callback)
     {
         callback_ = row_callback;
@@ -318,7 +327,7 @@ struct lcb_CMDQUERY_ {
     lcb_STATUS payload(const char *query, std::size_t query_len)
     {
         Json::Value value;
-        if (!Json::Reader().parse(query, query + query_len, value)) {
+        if (!lcb::jsparse::parse_json(query, query_len, value)) {
             return LCB_ERR_INVALID_ARGUMENT;
         }
         root_ = value;
@@ -345,7 +354,7 @@ struct lcb_CMDQUERY_ {
             return LCB_ERR_INVALID_ARGUMENT;
         }
         Json::Value json_value;
-        if (!Json::Reader().parse(value, value + value_len, json_value)) {
+        if (!lcb::jsparse::parse_json(value, value_len, json_value)) {
             return LCB_ERR_INVALID_ARGUMENT;
         }
         root_[std::string(name, name_len)] = json_value;
@@ -358,7 +367,7 @@ struct lcb_CMDQUERY_ {
             return LCB_ERR_INVALID_ARGUMENT;
         }
         Json::Value json_value;
-        if (!Json::Reader().parse(value, value + value_len, json_value)) {
+        if (!lcb::jsparse::parse_json(value, value_len, json_value)) {
             return LCB_ERR_INVALID_ARGUMENT;
         }
         root_[name] = json_value;
@@ -371,7 +380,7 @@ struct lcb_CMDQUERY_ {
             return LCB_ERR_INVALID_ARGUMENT;
         }
         Json::Value json_value;
-        if (!Json::Reader().parse(value, value + value_len, json_value)) {
+        if (!lcb::jsparse::parse_json(value, value_len, json_value)) {
             return LCB_ERR_INVALID_ARGUMENT;
         }
         if (json_value.type() != Json::ValueType::arrayValue) {
@@ -387,7 +396,7 @@ struct lcb_CMDQUERY_ {
             return LCB_ERR_INVALID_ARGUMENT;
         }
         Json::Value json_value;
-        if (!Json::Reader().parse(value, value + value_len, json_value)) {
+        if (!lcb::jsparse::parse_json(value, value_len, json_value)) {
             return LCB_ERR_INVALID_ARGUMENT;
         }
         root_[name].append(json_value);

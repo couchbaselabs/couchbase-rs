@@ -583,6 +583,8 @@ TEST_F(GetUnitTest, testFailoverAndGetReplica)
     lcb_cntl(instance, LCB_CNTL_SET, LCB_CNTL_OP_TIMEOUT, &tmoval);
     // Reduce configuration poll interval to get new configuration sooner
     lcb_cntl(instance, LCB_CNTL_SET, LCB_CNTL_CONFIG_POLL_INTERVAL, &tmoval);
+    std::uint32_t yes = 1;
+    lcb_cntl(instance, LCB_CNTL_SET, LCB_CNTL_WAIT_FOR_CONFIG, &yes);
 
     // store keys
     size_t counter = 0;
@@ -710,7 +712,7 @@ TEST_F(GetUnitTest, DISABLED_testFailoverAndMultiGet)
         lcb_CMDSTORE *scmd;
         lcb_cmdstore_create(&scmd, LCB_STORE_UPSERT);
         char key[6];
-        sprintf(key, "key%zu", ii);
+        snprintf(key, sizeof(key), "key%zu", ii);
         keys[ii] = std::string(key);
         lcb_cmdstore_key(scmd, key, strlen(key));
         lcb_cmdstore_value(scmd, "val", 3);
@@ -1016,6 +1018,13 @@ static void test_canceled_callback(lcb_INSTANCE *, int, const lcb_RESPGET *resp)
     lcb_respget_cookie(resp, (void **)&counter);
     ++(*counter);
 }
+static void test_ping_canceled_callback(lcb_INSTANCE *, int, const lcb_RESPPING *resp)
+{
+    int *counter;
+    ASSERT_EQ(LCB_ERR_REQUEST_CANCELED, lcb_respping_status(resp));
+    lcb_respping_cookie(resp, (void **)&counter);
+    ++(*counter);
+}
 }
 
 TEST_F(GetUnitTest, testGetCanceled)
@@ -1035,6 +1044,39 @@ TEST_F(GetUnitTest, testGetCanceled)
         lcb_cmdget_key(cmd, key.c_str(), key.size());
         EXPECT_EQ(LCB_SUCCESS, lcb_get(instance, &numcallbacks, cmd));
         lcb_cmdget_destroy(cmd);
+    }
+    hw.destroy();
+
+    auto *io_plugin = getenv("LCB_IOPS_NAME");
+    if (io_plugin != nullptr && strcmp(io_plugin, "libuv") == 0) {
+        /* for libuv it is acceptable that the IO loop might outlive the instance,
+         * in this case the callback will not be invoked
+         * TODO: update this condition once KV operations will accept callbacks directly without lookup through instance
+         */
+        EXPECT_TRUE(numcallbacks == 1 || numcallbacks == 0);
+    } else {
+        EXPECT_EQ(1, numcallbacks);
+    }
+}
+
+TEST_F(GetUnitTest, testPingCanceled)
+{
+    SKIP_UNLESS_MOCK()
+    HandleWrap hw;
+    lcb_INSTANCE *instance;
+    std::string key("keyGetCanceled");
+    MockEnvironment *mock = MockEnvironment::getInstance();
+    createConnection(hw, &instance);
+    lcb_install_callback(instance, LCB_CALLBACK_PING, (lcb_RESPCALLBACK)test_ping_canceled_callback);
+    mock->hiccupNodes(2000, 1);
+    int numcallbacks = 0;
+    {
+        lcb_CMDPING *cmd = nullptr;
+        lcb_cmdping_create(&cmd);
+        lcb_cmdping_kv(cmd, true);
+        lcb_cmdping_query(cmd, true);
+        EXPECT_EQ(LCB_SUCCESS, lcb_ping(instance, &numcallbacks, cmd));
+        lcb_cmdping_destroy(cmd);
     }
     hw.destroy();
 
@@ -1096,7 +1138,7 @@ static void change_password(lcb_INSTANCE *instance, const std::string &current_p
     EXPECT_EQ(LCB_SUCCESS, err);
 }
 
-TEST_F(GetUnitTest, testChangePassword)
+TEST_F(GetUnitTest, DISABLED_testChangePassword)
 {
     SKIP_IF_MOCK();
     MockEnvironment *mock = MockEnvironment::getInstance();
@@ -1111,10 +1153,6 @@ TEST_F(GetUnitTest, testChangePassword)
     createConnection(hwHttp, &instanceHttp);
     (void)lcb_install_callback(instanceHttp, LCB_CALLBACK_HTTP, (lcb_RESPCALLBACK)change_password_http_callback);
 
-    // Set short timeout
-    lcb_uint32_t tmoval = 100000;
-    lcb_cntl(instance, LCB_CNTL_SET, LCB_CNTL_OP_TIMEOUT, &tmoval);
-
     // store keys
     // run one set to connect to only one node
     // the goal is to change the password then try to connect others nodes
@@ -1126,7 +1164,7 @@ TEST_F(GetUnitTest, testChangePassword)
         lcb_CMDSTORE *scmd;
         lcb_cmdstore_create(&scmd, LCB_STORE_UPSERT);
         char akey[6];
-        sprintf(akey, "key%lu", ii);
+        snprintf(akey, sizeof(akey), "key%lu", ii);
         keys[ii] = std::string(akey);
         lcb_cmdstore_key(scmd, akey, strlen(akey));
         lcb_cmdstore_value(scmd, "val", 3);
@@ -1157,7 +1195,7 @@ TEST_F(GetUnitTest, testChangePassword)
         lcb_CMDSTORE *scmd;
         lcb_cmdstore_create(&scmd, LCB_STORE_UPSERT);
         char akey[6];
-        sprintf(akey, "key%lu", ii);
+        snprintf(akey, sizeof(akey), "key%lu", ii);
         keys[ii] = std::string(akey);
         lcb_cmdstore_key(scmd, akey, strlen(akey));
         lcb_cmdstore_value(scmd, "val", 3);
@@ -1183,7 +1221,7 @@ TEST_F(GetUnitTest, testChangePassword)
         lcb_CMDSTORE *scmd;
         lcb_cmdstore_create(&scmd, LCB_STORE_UPSERT);
         char akey[6];
-        sprintf(akey, "key%lu", ii);
+        snprintf(akey, sizeof(akey), "key%lu", ii);
         keys[ii] = std::string(akey);
         lcb_cmdstore_key(scmd, akey, strlen(akey));
         lcb_cmdstore_value(scmd, "val", 3);

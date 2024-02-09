@@ -26,6 +26,7 @@
 .deps/
 .libs/
 /INSTALL
+/.cache
 /Makefile
 /Makefile.in
 /aclocal.m4
@@ -105,6 +106,7 @@ cbc.dir/
 cmake_install.cmake
 core*
 couchbase.dir/
+couchbase-sys/src/lib.rs
 debug/cbc-pillowfight.ilk
 debug/cbc.ilk
 debug/libcouchbase.idb

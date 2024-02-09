@@ -19,10 +19,13 @@
 #define LCB_CLCONFIG_H
 
 #include "hostlist.h"
-#include <list>
-#include <utility>
+
 #include <lcbio/timer-ng.h>
 #include <lcbio/timer-cxx.h>
+
+#include <list>
+#include <utility>
+#include <cinttypes>
 
 /** @file */
 
@@ -142,9 +145,26 @@ enum State {
     CONFMON_S_ITERGRACE = 1 << 1
 };
 
+enum Mode {
+    /** Periodically poll for configuration */
+    CONFMON_M_POLL,
+    /** Subscribe for notifications from the server */
+    CONFMON_M_PUSH,
+};
+
 struct Provider;
 struct Listener;
 class ConfigInfo;
+
+struct config_version {
+    std::int64_t epoch;
+    std::int64_t revision;
+
+    bool operator<(const config_version &other) const
+    {
+        return epoch < other.epoch || (epoch == other.epoch && revision < other.revision);
+    }
+};
 
 /**
  * This object contains the information needed for libcouchbase to deal with
@@ -219,7 +239,7 @@ struct Confmon {
      * @see #stop()
      * @see #is_refreshing()
      */
-    void start(bool refresh = false);
+    void start(unsigned options = 0);
 
     /**
      * @brief Cancel a pending configuration refresh.
@@ -253,6 +273,8 @@ struct Confmon {
     {
         return config;
     }
+
+    config_version get_current_version() const;
 
     /**
      * Get the last error which occurred on this object
@@ -384,6 +406,8 @@ struct Confmon {
     /* CONFMON_S_* values. Used internally */
     int state;
 
+    Mode mode{CONFMON_M_POLL};
+
     /** Last time the provider was stopped. As a microsecond timestamp */
     lcb_uint64_t last_stop_us;
 
@@ -426,7 +450,7 @@ struct Provider {
      * should implement a timeout mechanism of its choice to promptly deliver
      * a success or failure.
      */
-    virtual lcb_STATUS refresh() = 0;
+    virtual lcb_STATUS refresh(unsigned options = 0) = 0;
 
     /**
      * Callback invoked to the provider to indicate that it should cease
@@ -699,11 +723,11 @@ static inline const lcb_host_t *http_get_host(Confmon *c)
  *
  * @param provider The CCCP provider
  * @param host The hostname (without the port) on which the packet was received
- * @param data The configuration JSON blob
+ * @param config_json The configuration JSON blob
  * @return LCB_SUCCESS, or an error code if the configuration could not be
  * set
  */
-lcb_STATUS cccp_update(Provider *provider, const char *host, const char *data);
+lcb_STATUS cccp_update(Provider *provider, const char *host, const std::string &config_json);
 
 /**
  * @brief Notify the CCCP provider about a configuration received from a
@@ -711,11 +735,14 @@ lcb_STATUS cccp_update(Provider *provider, const char *host, const char *data);
  *
  * @param cookie The cookie object attached to the packet
  * @param err The error code for the reply
- * @param bytes The payload pointer
- * @param nbytes Size of payload
+ * @param config_json The configuration payload
  * @param origin Host object from which the packet was received
  */
-void cccp_update(const void *cookie, lcb_STATUS err, const void *bytes, size_t nbytes, const lcb_host_t *origin);
+void cccp_update(const void *cookie, lcb_STATUS err, const lcb_host_t *origin, const std::string &config_json);
+
+lcb_STATUS schedule_get_config(Provider *provider, const lcb_host_t *origin, config_version version);
+
+lcb_STATUS schedule_get_config(Provider *provider);
 
 /**
  * @brief record status of SELECT_BUCKET command

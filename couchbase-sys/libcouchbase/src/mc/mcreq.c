@@ -20,6 +20,12 @@
 #include "sllist-inl.h"
 #include "internal.h"
 
+#define LOGARGS(pipeline, lvl)                                                                                         \
+    ((lcb_INSTANCE *)((pipeline)->parent->cqdata))->settings, "mcreq", LCB_LOG_##lvl, __FILE__, __LINE__
+
+#define LOGFMT "(SRV=%p,IX=%d) "
+#define LOGID(pipeline) (void *)(pipeline), (pipeline)->index
+
 #define PKT_HDRSIZE(pkt) (MCREQ_PKT_BASESIZE + (pkt)->extlen)
 
 lcb_STATUS mcreq_reserve_header(mc_PIPELINE *pipeline, mc_PACKET *packet, uint8_t hdrsize)
@@ -109,6 +115,7 @@ lcb_STATUS mcreq_reserve_key(mc_PIPELINE *pipeline, mc_PACKET *packet, uint8_t h
         /* copy collection ID prefix */
         if (ncid) {
             memcpy(SPAN_BUFFER(&packet->kh_span) + hdrsize, cid, ncid);
+            packet->flags |= MCREQ_F_HASCID;
         }
         /**
          * Copy the key into the packet starting at the extras end
@@ -243,10 +250,93 @@ void mcreq_reenqueue_packet(mc_PIPELINE *pipeline, mc_PACKET *packet)
     sllist_insert_sorted(reqs, &packet->slnode, pkt_tmo_compar);
 }
 
+static mc_PACKET *check_collection_id(mc_PIPELINE *pipeline, mc_PACKET *packet)
+{
+    if ((packet->flags & MCREQ_F_NOCID) != 0) {
+        return packet;
+    }
+
+    // before adding packet to pipeline lets see if we need add or remove collection id prefix
+    char *header_and_key = SPAN_BUFFER(&packet->kh_span);
+    protocol_binary_request_header *request = (protocol_binary_request_header *)header_and_key;
+
+    uint16_t key_length;
+    uint8_t flexible_extras_length = 0;
+
+    if (request->request.magic == PROTOCOL_BINARY_AREQ) {
+        flexible_extras_length = request->request.keylen & 0xff;
+        key_length = request->request.keylen >> 8;
+    } else {
+        key_length = ntohs(request->request.keylen);
+    }
+    if (key_length == 0) {
+        return packet;
+    }
+
+    char *key = header_and_key + sizeof(*request) + request->request.extlen + flexible_extras_length;
+    uint32_t collection_id = 0;
+
+    uint16_t collection_id_length = 0;
+    if ((packet->flags & MCREQ_F_HASCID) != 0) {
+        collection_id_length = (uint16_t)leb128_decode((const uint8_t *)key, key_length, &collection_id);
+    }
+
+    switch (pipeline->collections) {
+        case MCREQ_COLLECTIONS_SUPPORTED:
+            // the pipeline had negotiated collections feature with kv engine, so we have to encode collection id
+            // prefix
+            if (collection_id_length == 0) {
+                // but collection id prefix was not encoded, we should assume default collection and prepend zero as
+                // a collection identifier
+                packet = mcreq_set_cid(packet, 0);
+            }
+            break;
+
+        case MCREQ_COLLECTIONS_UNSUPPORTTED:
+            // the pipeline been told that the kv engine instance does not support collections
+            if (collection_id_length != 0) {
+                // but the packet has encoded collection id
+                if (collection_id == 0) {
+                    // strip it if it is default collection
+                    request->request.bodylen = htonl(ntohl(request->request.bodylen) - collection_id_length);
+                    uint16_t new_key_length = key_length - collection_id_length;
+                    if (request->request.magic == PROTOCOL_BINARY_AREQ) {
+                        request->request.keylen = (new_key_length << 8U) | (flexible_extras_length & 0xffU);
+                    } else {
+                        request->request.keylen = htons(new_key_length);
+                    }
+
+                    // shift the key content to the left
+                    for (int i = 0; i < new_key_length; ++i) {
+                        key[i] = key[i + collection_id_length];
+                    }
+                } else if (pipeline->parent->cqdata) {
+                    lcb_log(LOGARGS(pipeline, DEBUG),
+                            LOGFMT
+                            "Custom collection id has been dispatched to the node, that does not support collections",
+                            LOGID(pipeline));
+                }
+            }
+            break;
+
+        default:
+            // the pipeline hadn't completed handshake yet, so trust global settings, and let operation be fixed
+            // when it will be retried in case of misprediction.
+            if (pipeline->parent->cqdata) {
+                lcb_log(LOGARGS(pipeline, DEBUG), LOGFMT "Collections has not been negotiated for the pipeline yet",
+                        LOGID(pipeline));
+            }
+            break;
+    }
+    return packet;
+}
+
 void mcreq_enqueue_packet(mc_PIPELINE *pipeline, mc_PACKET *packet)
 {
     nb_SPAN *vspan = &packet->u_value.single;
     sllist_append(&pipeline->requests, &packet->slnode);
+
+    packet = check_collection_id(pipeline, packet);
     netbuf_enqueue_span(&pipeline->nbmgr, &packet->kh_span, packet);
     MC_INCR_METRIC(pipeline, bytes_queued, packet->kh_span.size);
 
@@ -274,7 +364,7 @@ GT_ENQUEUE_PDU:
 void mcreq_wipe_packet(mc_PIPELINE *pipeline, mc_PACKET *packet)
 {
     if (!(packet->flags & MCREQ_F_KEY_NOCOPY)) {
-        if (packet->flags & MCREQ_F_DETACHED) {
+        if ((packet->flags & MCREQ_F_DETACHED)) {
             free(SPAN_BUFFER(&packet->kh_span));
         } else {
             netbuf_mblock_release(&pipeline->nbmgr, &packet->kh_span);
@@ -546,56 +636,77 @@ lcb_STATUS mcreq_basic_packet(mc_CMDQUEUE *queue, const lcb_KEYBUF *key, uint32_
     return LCB_SUCCESS;
 }
 
-void mcreq_set_cid(mc_PIPELINE *pipeline, mc_PACKET *packet, uint32_t cid)
+static void mcreq_set_cid_field(mc_PACKET *packet, uint32_t cid)
 {
-    uint8_t ffext = 0;
-    uint16_t nk = 0;
-    uint8_t nbuf = 0;
-    uint8_t buf[5] = {0};
-    uint32_t old;
-    int nold;
+    nb_SPAN old_span = packet->kh_span;
+
+    // extract header
+    char *header_and_key = SPAN_BUFFER(&old_span);
     protocol_binary_request_header req;
-    char *kh = SPAN_BUFFER(&packet->kh_span);
-    char *k = NULL;
+    memcpy(&req, header_and_key, sizeof(req));
 
-    memcpy(&req, kh, sizeof(req));
+    // extract key
+    uint16_t key_length = 0;
+    uint8_t flexible_extras_length = 0;
     if (req.request.magic == PROTOCOL_BINARY_AREQ) {
-        ffext = req.request.keylen & 0xff;
-        nk = req.request.keylen >> 8;
+        flexible_extras_length = req.request.keylen & 0xff;
+        key_length = req.request.keylen >> 8;
     } else {
-        nk = ntohs(req.request.keylen);
+        key_length = ntohs(req.request.keylen);
     }
-    size_t nhdr = sizeof(req) + req.request.extlen + ffext;
-    k = kh + nhdr;
-    nold = leb128_decode((uint8_t *)k, nk, &old);
-    nbuf = leb128_encode(cid, buf);
+    size_t header_size = sizeof(req) + req.request.extlen + flexible_extras_length;
+    char *key = header_and_key + header_size;
 
-    int diff = (int)nbuf - (int)nold;
-    size_t new_size = packet->kh_span.size + diff;
+    // parse old collection id and determine its length
+    uint32_t old_collection_id = 0;
+    int old_collection_id_length = 0;
+    if ((packet->flags & MCREQ_F_HASCID) != 0) {
+        old_collection_id_length = leb128_decode((uint8_t *)key, key_length, &old_collection_id);
+    }
+
+    // encode new collection id
+    uint8_t collection_id[5] = {0};
+    int collection_id_length = leb128_encode(cid, collection_id);
+
+    // fix field lengths in the packet
+    int diff = collection_id_length - old_collection_id_length;
     req.request.bodylen = htonl(ntohl(req.request.bodylen) + diff);
-    size_t new_klen = nk + diff;
+    size_t new_key_length = key_length + diff;
     if (req.request.magic == PROTOCOL_BINARY_AREQ) {
-        req.request.keylen = (new_klen << 8) | (ffext & 0xff);
+        req.request.keylen = (new_key_length << 8) | (flexible_extras_length & 0xff);
     } else {
-        req.request.keylen = htons(new_klen);
+        req.request.keylen = htons(new_key_length);
     }
-    char *kdata = (char *)calloc(new_size, sizeof(char));
-    char *ptr = kh;
-    memcpy(kdata, ptr, nhdr);
-    memcpy(kdata, req.bytes, sizeof(req.bytes));
-    ptr += nhdr + nold;
-    memcpy(kdata + nhdr, buf, nbuf);
-    memcpy(kdata + nhdr + nbuf, ptr, new_size - nbuf - nhdr);
-    if (packet->kh_span.offset == NETBUF_INVALID_OFFSET) {
-        /* standalone buffer */
-        free(SPAN_BUFFER(&packet->kh_span));
-    } else {
-        netbuf_mblock_release(&pipeline->nbmgr, &packet->kh_span);
-    }
-    CREATE_STANDALONE_SPAN(&packet->kh_span, kdata, new_size);
+
+    // copy old header fields, with only collection id updated
+    char *new_header_and_key = malloc(old_span.size + diff);
+    CREATE_STANDALONE_SPAN(&packet->kh_span, new_header_and_key, old_span.size + diff);
+
+    const char *ptr = header_and_key;
+    memcpy(new_header_and_key, ptr, header_size);
+    // update header with new length values
+    memcpy(new_header_and_key, req.bytes, sizeof(req.bytes));
+    memcpy(new_header_and_key + header_size, collection_id, collection_id_length);
+    ptr += header_size + old_collection_id_length;
+    memcpy(new_header_and_key + header_size + collection_id_length, ptr, key_length - old_collection_id_length);
+
+    // deallocate the old span
+    lcb_assert(IS_STANDALONE_SPAN(&old_span));
+    free(SPAN_BUFFER(&old_span));
+
+    packet->flags |= MCREQ_F_HASCID;
 }
 
-uint32_t mcreq_get_cid(lcb_INSTANCE *instance, const mc_PACKET *packet)
+mc_PACKET *mcreq_set_cid(mc_PACKET *packet, uint32_t cid)
+{
+    if ((packet->flags & MCREQ_F_DETACHED) == 0) {
+        packet = mcreq_renew_packet(packet);
+    }
+    mcreq_set_cid_field(packet, cid);
+    return packet;
+}
+
+uint32_t mcreq_get_cid(lcb_INSTANCE *instance, const mc_PACKET *packet, int *cid_set)
 {
     uint8_t ffext = 0;
     uint16_t nk = 0;
@@ -604,6 +715,10 @@ uint32_t mcreq_get_cid(lcb_INSTANCE *instance, const mc_PACKET *packet)
     protocol_binary_request_header req;
     char *kh = SPAN_BUFFER(&packet->kh_span);
     char *k = NULL;
+
+    if (cid_set != NULL) {
+        *cid_set = 0;
+    }
 
     memcpy(&req, kh, sizeof(req));
     if (req.request.magic == PROTOCOL_BINARY_AREQ) {
@@ -616,13 +731,16 @@ uint32_t mcreq_get_cid(lcb_INSTANCE *instance, const mc_PACKET *packet)
     if ((packet->flags & MCREQ_F_NOCID) == 0 && instance && LCBT_SETTING(instance, use_collections)) {
         ncid = leb128_decode((uint8_t *)k, nk, &cid);
         if (ncid) {
+            if (cid_set != NULL) {
+                *cid_set = 1;
+            }
             return cid;
         }
     }
     return 0;
 }
 
-void mcreq_get_key(lcb_INSTANCE *instance, const mc_PACKET *packet, const char **key, size_t *nkey)
+void mcreq_get_key(const mc_PACKET *packet, const char **key, size_t *nkey)
 {
     uint8_t ffext = 0;
     uint16_t nk = 0;
@@ -640,7 +758,7 @@ void mcreq_get_key(lcb_INSTANCE *instance, const mc_PACKET *packet, const char *
         nk = ntohs(req.request.keylen);
     }
     k = kh + sizeof(req) + req.request.extlen + ffext;
-    if ((packet->flags & MCREQ_F_NOCID) == 0 && instance && LCBT_SETTING(instance, use_collections)) {
+    if ((packet->flags & MCREQ_F_HASCID) != 0) {
         ncid = leb128_decode((uint8_t *)k, nk, &cid);
         (void)cid;
     }
@@ -702,6 +820,7 @@ int mcreq_pipeline_init(mc_PIPELINE *pipeline)
     pipeline->index = 0;
     memset(&pipeline->ctxqueued, 0, sizeof pipeline->ctxqueued);
     pipeline->buf_done_callback = NULL;
+    pipeline->collections = MCREQ_COLLECTIONS_UNKNOWN;
 
     netbuf_default_settings(&settings);
 

@@ -30,6 +30,7 @@
 
 #include "sllist.h"
 #include "sllist-inl.h"
+#include "mc/compress.h"
 
 #define LOGARGS(c, lvl) (c)->settings, "server", LCB_LOG_##lvl, __FILE__, __LINE__
 #define LOGARGS_T(lvl) LOGARGS(this, lvl)
@@ -141,15 +142,17 @@ bool Server::handle_nmv(MemcachedResponse &resinfo, mc_PACKET *oldpkt)
 
     mcreq_read_hdr(oldpkt, &hdr);
     vbid = ntohs(hdr.request.vbucket);
-    lcb_log(LOGARGS_T(WARN), LOGFMT "NOT_MY_VBUCKET. Packet=%p (S=%u). VBID=%u", LOGID_T(), (void *)oldpkt,
-            oldpkt->opaque, vbid);
+    lcb_log(LOGARGS_T(WARN), LOGFMT "NOT_MY_VBUCKET. Packet=%p (S=%u). VBID=%u, has_config=%s", LOGID_T(),
+            (void *)oldpkt, oldpkt->opaque, vbid, resinfo.vallen() ? "yes" : "no");
 
     /* Notify of new map */
     lcb_vbguess_remap(instance, vbid, index);
 
     if (resinfo.vallen() && cccp->enabled) {
-        std::string s(resinfo.value(), resinfo.vallen());
-        err = lcb::clconfig::cccp_update(cccp, curhost->host, s.c_str());
+        /*
+         * apply new configuration, so that when the command will be retried, it will be routed using new vbucket map
+         */
+        err = lcb::clconfig::cccp_update(cccp, curhost->host, resinfo.inflated_value());
     }
 
     if (err != LCB_SUCCESS) {
@@ -270,11 +273,24 @@ bool Server::handle_unknown_collection(MemcachedResponse &resp, mc_PACKET *oldpk
         return true;
     }
 
-    uint32_t cid = mcreq_get_cid(instance, oldpkt);
+    int cid_set = 0;
+    uint32_t cid = mcreq_get_cid(instance, oldpkt, &cid_set);
+    if ((collections == MCREQ_COLLECTIONS_UNSUPPORTTED && cid_set) /* we need to strip collection and retry */
+        || (collections == MCREQ_COLLECTIONS_SUPPORTED && !cid_set) /* we need to prepend collection and retry */) {
+        lcb_log(LOGARGS_T(WARN),
+                LOGFMT
+                "UNKNOWN_COLLECTION. Packet=%p (M=0x%x, S=%u, OP=0x%x), CID=%u, collections=%d (set=%d). Retrying",
+                LOGID_T(), (void *)oldpkt, (int)req.request.magic, oldpkt->opaque, (int)req.request.opcode,
+                (unsigned)cid, (int)collections, cid_set);
+        mc_PACKET *newpkt = mcreq_renew_packet(oldpkt);
+        newpkt->flags &= ~MCREQ_STATE_FLAGS;
+        instance->retryq->ucadd((mc_EXPACKET *)newpkt, LCB_ERR_TIMEOUT, orig_status);
+        return true;
+    }
     std::string name = instance->collcache->id_to_name(cid);
 
     packet_wrapper wrapper;
-    mcreq_get_key(instance, oldpkt, (const char **)&wrapper.key.contig.bytes, &wrapper.key.contig.nbytes);
+    mcreq_get_key(oldpkt, (const char **)&wrapper.key.contig.bytes, &wrapper.key.contig.nbytes);
 
     lcb_log(LOGARGS_T(WARN), LOGFMT "UNKNOWN_COLLECTION. Packet=%p (M=0x%x, S=%u, OP=0x%x), CID=%u, CNAME=%s",
             LOGID_T(), (void *)oldpkt, (int)req.request.magic, oldpkt->opaque, (int)req.request.opcode, (unsigned)cid,
@@ -283,9 +299,9 @@ bool Server::handle_unknown_collection(MemcachedResponse &resp, mc_PACKET *oldpk
     wrapper.pkt = mcreq_renew_packet(oldpkt);
     wrapper.instance = instance;
     wrapper.timeout = LCB_NS2US(MCREQ_PKT_RDATA(wrapper.pkt)->deadline - now);
-    auto operation = [this, orig_status](const lcb_RESPGETCID *, packet_wrapper *wrp) {
+    auto operation = [orig_status](const lcb_RESPGETCID *, packet_wrapper *wrp) {
         if ((wrp->pkt->flags & MCREQ_F_NOCID) == 0) {
-            mcreq_set_cid(this, wrp->pkt, wrp->cid);
+            wrp->pkt = mcreq_set_cid(wrp->pkt, wrp->cid);
         }
         /** Reschedule the packet again .. */
         wrp->pkt->flags &= ~MCREQ_STATE_FLAGS;
@@ -341,6 +357,11 @@ static bool is_fastpath_error(uint16_t rc)
         case PROTOCOL_BINARY_RESPONSE_SYNC_WRITE_IN_PROGRESS:
         case PROTOCOL_BINARY_RESPONSE_SYNC_WRITE_AMBIGUOUS:
         case PROTOCOL_BINARY_RESPONSE_LOCKED:
+        case PROTOCOL_BINARY_RATE_LIMITED_NETWORK_INGRESS:
+        case PROTOCOL_BINARY_RATE_LIMITED_NETWORK_EGRESS:
+        case PROTOCOL_BINARY_RATE_LIMITED_MAX_CONNECTIONS:
+        case PROTOCOL_BINARY_RATE_LIMITED_MAX_COMMANDS:
+        case PROTOCOL_BINARY_SCOPE_SIZE_LIMIT_EXCEEDED:
             return true;
         default:
             if (rc >= 0xc0 && rc <= 0xcc) {
@@ -395,10 +416,6 @@ int Server::handle_unknown_error(const mc_PACKET *request, const MemcachedRespon
         newerr = LCB_ERR_TEMPORARY_FAILURE;
     }
 
-    if (err.hasAttribute(errmap::CONSTRAINT_FAILURE)) {
-        newerr = LCB_ERR_CAS_MISMATCH;
-    }
-
     if (err.hasAttribute(errmap::AUTH)) {
         newerr = LCB_ERR_AUTHENTICATION_FAILURE;
     }
@@ -444,6 +461,87 @@ lcb_STATUS lcb_map_error(lcb_INSTANCE *instance, int in);
 static bool is_warmup_issue(uint16_t status)
 {
     return status == PROTOCOL_BINARY_RESPONSE_NO_BUCKET || status == PROTOCOL_BINARY_RESPONSE_NOT_INITIALIZED;
+}
+
+/**
+ * The handler extracts epoch and revision from the notification message, and pass it to configuration provider to
+ * perform PROTOCOL_BINARY_CMD_GET_CLUSTER_CONFIG (0xb5) operation to fetch configuration body.
+ */
+void Server::handle_clustermap_notification(const MemcachedResponse &request)
+{
+    std::int64_t epoch{0};
+    std::int64_t revision{0};
+
+    if (request.extlen() == 2 * sizeof(std::uint64_t)) {
+        const auto *ext = request.ext();
+        memcpy(&epoch, ext, sizeof(std::uint64_t));
+        epoch = lcb_ntohll(epoch);
+        ext += sizeof(std::uint64_t);
+        memcpy(&revision, ext, sizeof(std::uint64_t));
+        revision = lcb_ntohll(revision);
+    }
+    lcb_log(LOGARGS_T(TRACE),
+            LOGFMT "Received payload clustermap notification. (key=\"%.*s\", epoch=%" PRId64 ", revision=%" PRId64 ")",
+            LOGID_T(), (int)request.keylen(), request.key(), epoch, revision);
+
+    lcb::clconfig::Provider *cccp = instance->confmon->get_provider(lcb::clconfig::CLCONFIG_CCCP);
+    if (cccp == nullptr || !cccp->enabled) {
+        lcb_log(LOGARGS_T(ERR),
+                LOGFMT
+                "CCCP configuration provider is not enabled, ignoring notification. (key=\"%.*s\", epoch=%" PRId64
+                ", revision=%" PRId64 ")",
+                LOGID_T(), (int)request.keylen(), request.key(), epoch, revision);
+        return;
+    }
+
+    /*
+     * Notify configuration provider that the connection seen notification about existence of newer configuration
+     * version.
+     */
+    lcb::clconfig::schedule_get_config(cccp, has_valid_host() ? &get_host() : nullptr,
+                                       lcb::clconfig::config_version{epoch, revision});
+}
+
+void Server::handle_config_only(const mc_PACKET *oldpkt)
+{
+    const auto *address = has_valid_host() ? &get_host() : nullptr;
+
+    lcb_log(LOGARGS_T(DEBUG),
+            LOGFMT "The bucket is configured in config-only mode on " LCB_HOST_FMT
+                   ", refresh configuration and retry operation",
+            LOGID_T(), LCB_HOST_ARG(this->settings, address));
+
+    auto *cccp = instance->confmon->get_provider(lcb::clconfig::CLCONFIG_CCCP);
+    if (cccp != nullptr && cccp->enabled) {
+        lcb::clconfig::schedule_get_config(cccp);
+    } else {
+        lcb_log(LOGARGS_T(DEBUG), LOGFMT "CCCP configuration provider is not enabled, using next available provider",
+                LOGID_T());
+        instance->confmon->do_next_provider();
+    }
+
+    mc_PACKET *newpkt = mcreq_renew_packet(oldpkt);
+    newpkt->flags &= ~MCREQ_STATE_FLAGS;
+    instance->retryq->config_only_add((mc_EXPACKET *)newpkt);
+}
+
+/**
+ * Handles requests that are initiated by the KV engine. It only happens when PROTOCOL_BINARY_FEATURE_DUPLEX (0x0c) is
+ * enabled for the connection.
+ */
+void Server::handle_server_request(const MemcachedResponse &request)
+{
+    switch (request.opcode()) {
+        case PROTOCOL_BINARY_CMD_CLUSTERMAP_CHANGE_NOTIFICATION:
+            handle_clustermap_notification(request);
+            break;
+
+        default:
+            lcb_log(LOGARGS_T(DEBUG),
+                    LOGFMT "Server sent us unknown notification packet, ignoring it. (OP=0x%x, RC=0x%x, SEQ=%u)",
+                    LOGID_T(), request.opcode(), request.status(), request.opaque());
+            break;
+    }
 }
 
 /* This function is called within a loop to process a single packet.
@@ -492,6 +590,17 @@ Server::ReadState Server::try_read(lcbio_CTX *ctx, rdb_IOROPE *ior)
     pktsize += mcresp.bodylen();
     if (rdb_get_nused(ior) < pktsize) {
         RETURN_NEED_MORE(pktsize);
+    }
+
+    if (mcresp.res.response.magic == PROTOCOL_BINARY_SREQ) {
+        /*
+         * Server-initiated request, we don't need to look for SDK-request object here.
+         * Handle and return from the function.
+         */
+        DO_ASSIGN_PAYLOAD()
+        handle_server_request(mcresp);
+        DO_SWALLOW_PAYLOAD()
+        return PKT_READ_COMPLETE;
     }
 
     /* Find the packet */
@@ -559,6 +668,12 @@ Server::ReadState Server::try_read(lcbio_CTX *ctx, rdb_IOROPE *ior)
         if (!handle_nmv(mcresp, request)) {
             mcreq_dispatch_response(this, request, &mcresp, LCB_ERR_NOT_MY_VBUCKET);
         }
+        DO_SWALLOW_PAYLOAD()
+        goto GT_DONE;
+    } else if (status == PROTOCOL_BINARY_RESPONSE_CONFIG_ONLY) {
+        /* consume the header */
+        DO_ASSIGN_PAYLOAD()
+        handle_config_only(request);
         DO_SWALLOW_PAYLOAD()
         goto GT_DONE;
     } else if (status == PROTOCOL_BINARY_RESPONSE_UNKNOWN_COLLECTION ||
@@ -914,7 +1029,8 @@ void Server::io_timeout()
     int npurged = purge(LCB_ERR_TIMEOUT, now, Server::REFRESH_ONFAILED);
     if (npurged) {
         MC_INCR_METRIC(this, packets_timeout, npurged);
-        lcb_log(LOGARGS_T(DEBUG), LOGFMT "Server timed out. Some commands have failed", LOGID_T());
+        lcb_log(LOGARGS_T(DEBUG), LOGFMT "Server timed out. Some commands have failed (npurged=%d)", LOGID_T(),
+                npurged);
     }
 
     uint32_t next_us = next_timeout();
@@ -984,11 +1100,16 @@ void Server::handle_connected(lcbio_SOCKET *sock, lcb_STATUS err, lcbio_OSERR sy
     /** Do we need sasl? */
     SessionInfo *sessinfo = SessionInfo::get(sock);
     if (sessinfo == nullptr) {
-        lcb_log(LOGARGS_T(TRACE), "<%s:%s> (SRV=%p) Session not yet negotiated. Negotiating", curhost->host,
-                curhost->port, (void *)this);
+        lcb_log(LOGARGS_T(TRACE), "<%s:%s> (SRV=%p, SOCK=%016" PRIx64 ") Session not yet negotiated. Negotiating",
+                curhost->host, curhost->port, (void *)this, sock->id);
         connreq = SessionRequest::start(sock, settings, settings->config_node_timeout, on_connected, this);
         return;
     } else {
+        if (settings->use_collections && !sessinfo->has_feature(PROTOCOL_BINARY_FEATURE_COLLECTIONS)) {
+            settings->use_collections = 0;
+            lcb_log(LOGARGS_T(DEBUG), "<%s:%s> (SRV=%p) Disable collections support as not every node support it",
+                    curhost->host, curhost->port, (void *)this);
+        }
         jsonsupport = sessinfo->has_feature(PROTOCOL_BINARY_FEATURE_JSON);
         compsupport = sessinfo->has_feature(PROTOCOL_BINARY_FEATURE_SNAPPY);
         mutation_tokens = sessinfo->has_feature(PROTOCOL_BINARY_FEATURE_MUTATION_SEQNO);
@@ -1000,11 +1121,19 @@ void Server::handle_connected(lcbio_SOCKET *sock, lcb_STATUS err, lcbio_OSERR sy
         } else if (settings->conntype == LCB_TYPE_BUCKET && settings->bucket) {
             try_to_select_bucket = true;
         }
+        clustermap_change_notification =
+            sessinfo->has_feature(PROTOCOL_BINARY_FEATURE_CLUSTERMAP_CHANGE_NOTIFICATION_BRIEF);
+        config_with_known_version =
+            sessinfo->has_feature(PROTOCOL_BINARY_FEATURE_GET_CLUSTER_CONFIG_WITH_KNOWN_VERSION);
+        collections = sessinfo->has_feature(PROTOCOL_BINARY_FEATURE_COLLECTIONS) ? MCREQ_COLLECTIONS_SUPPORTED
+                                                                                 : MCREQ_COLLECTIONS_UNSUPPORTTED;
         lcb_log(
             LOGARGS_T(TRACE),
-            R"(<%s:%s> (SRV=%p) Got new KV connection (json=%s, snappy=%s, mt=%s, durability=%s, bucket=%s "%s"%s%s))",
-            curhost->host, curhost->port, (void *)this, jsonsupport ? "yes" : "no", compsupport ? "yes" : "no",
-            mutation_tokens ? "yes" : "no", new_durability ? "yes" : "no", selected_bucket ? "yes" : "no",
+            R"(<%s:%s> (SRV=%p) Got new KV connection (collections=%s, json=%s, snappy=%s, mt=%s, durability=%s, config_push=%s, config_ver=%s, bucket=%s "%s"%s%s))",
+            curhost->host, curhost->port, (void *)this, collections == MCREQ_COLLECTIONS_SUPPORTED ? "yes" : "no",
+            jsonsupport ? "yes" : "no", compsupport ? "yes" : "no", mutation_tokens ? "yes" : "no",
+            new_durability ? "yes" : "no", clustermap_change_notification ? "yes" : "no",
+            config_with_known_version ? "yes" : "no", selected_bucket ? "yes" : "no",
             selected_bucket ? bucket.c_str() : "-", try_to_select_bucket ? " selecting " : "",
             try_to_select_bucket ? settings->bucket : "");
     }
@@ -1014,8 +1143,7 @@ void Server::handle_connected(lcbio_SOCKET *sock, lcb_STATUS err, lcbio_OSERR sy
     procs.cb_read = on_read;
     procs.cb_flush_done = on_flush_done;
     procs.cb_flush_ready = on_flush_ready;
-    connctx = lcbio_ctx_new(sock, this, &procs);
-    connctx->subsys = "memcached";
+    connctx = lcbio_ctx_new(sock, this, &procs, "memcached");
     sock->service = LCBIO_SERVICE_KV;
     flush_start = (mcreq_flushstart_fn)mcserver_flush;
     if (try_to_select_bucket) {
@@ -1253,4 +1381,31 @@ bool Server::check_closed()
             connctx->npending);
     finalize_errored_ctx();
     return true;
+}
+
+bool Server::has_pending(bool ignore_cfgreq) const
+{
+    if (ignore_cfgreq) {
+        sllist_node *ll;
+        SLLIST_FOREACH(&requests, ll)
+        {
+            const mc_PACKET *pkt = SLLIST_ITEM(ll, mc_PACKET, slnode);
+            protocol_binary_request_header hdr = {};
+            mcreq_read_hdr(pkt, &hdr);
+            /*
+             * return true immediately if there is a pending request, that is not related to
+             * configuration updates
+             */
+            if (hdr.request.opcode != PROTOCOL_BINARY_CMD_GET_CLUSTER_CONFIG &&
+                hdr.request.opcode != PROTOCOL_BINARY_CMD_SELECT_BUCKET) {
+                return true;
+            }
+        }
+        /*
+         * the pending requests list is empty or contains only configuration update requests
+         * in any case consider it empty, because of ignore_cfgreq flag
+         */
+        return false;
+    }
+    return !SLLIST_IS_EMPTY(&requests);
 }

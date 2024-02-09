@@ -18,6 +18,7 @@
 #include "contrib/lcb-jsoncpp/lcb-jsoncpp.h"
 #include "placeholders.h"
 #include <algorithm>
+#include <memory>
 #include <stdexcept>
 
 namespace Pillowfight
@@ -78,8 +79,8 @@ class DocGeneratorBase
      * @param cur_gen The index of the current generator thread
      * @return An opaque state object. This should be deleted by the caller
      */
-    virtual GeneratorState *createState(int total_gens, int cur_gen) const = 0;
-    virtual SubdocGeneratorState *createSubdocState(int, int) const
+    virtual std::unique_ptr<GeneratorState> createState(int total_gens, int cur_gen) const = 0;
+    virtual std::unique_ptr<SubdocGeneratorState> createSubdocState(int, int) const
     {
         return NULL;
     }
@@ -164,9 +165,9 @@ class RawDocGenerator : public DocGeneratorBase
         }
     };
 
-    GeneratorState *createState(int, int) const
+    std::unique_ptr<GeneratorState> createState(int, int) const
     {
-        return new MyState(this);
+        return std::unique_ptr<GeneratorState>(new MyState(this));
     }
 
   private:
@@ -207,9 +208,9 @@ class PresetDocGenerator : public DocGeneratorBase
         const PresetDocGenerator *m_parent;
     };
 
-    GeneratorState *createState(int, int) const
+    std::unique_ptr<GeneratorState> createState(int, int) const
     {
-        return new MyState(this);
+        return std::unique_ptr<GeneratorState>(new MyState(this));
     }
 
   protected:
@@ -258,18 +259,18 @@ class JsonDocGenerator : public PresetDocGenerator
      * @param minsz Minimum JSON document size
      * @param maxsz Maximum JSON document size
      */
-    JsonDocGenerator(uint32_t minsz, uint32_t maxsz, int rnd)
+    JsonDocGenerator(uint32_t minsz, uint32_t maxsz, int rnd, uint32_t pool_size)
     {
-        genDocuments(minsz, maxsz, m_docs, rnd);
+        genDocuments(minsz, maxsz, m_docs, rnd, pool_size);
         for (size_t ii = 0; ii < m_docs.size(); ++ii) {
             m_bufs.push_back(m_docs[ii].m_doc);
         }
     }
 
-    static void genDocuments(uint32_t minsz, uint32_t maxsz, std::vector< std::string > &out, int rnd)
+    static void genDocuments(uint32_t minsz, uint32_t maxsz, std::vector< std::string > &out, int rnd, uint32_t pool_size)
     {
         std::vector< Doc > docs;
-        genDocuments(minsz, maxsz, docs, rnd);
+        genDocuments(minsz, maxsz, docs, rnd, pool_size);
         for (size_t ii = 0; ii < docs.size(); ++ii) {
             out.push_back(docs[ii].m_doc);
         }
@@ -289,11 +290,13 @@ class JsonDocGenerator : public PresetDocGenerator
         *orig = std::max(0, *orig - static_cast< int >(toDecr));
     }
 
-    static void genDocuments(uint32_t minsz, uint32_t maxsz, std::vector< Doc > &out, int rnd)
+    static void genDocuments(uint32_t minsz, uint32_t maxsz, std::vector< Doc > &out, int rnd, uint32_t pool_size)
     {
         std::vector< size_t > sizes = RawDocGenerator::gen_graded_sizes(minsz, maxsz);
-        for (std::vector< size_t >::iterator ii = sizes.begin(); ii != sizes.end(); ++ii) {
-            out.push_back(generate(*ii, rnd));
+        for (const auto &size : sizes) {
+            for (uint32_t ii = 0; ii < pool_size; ++ii) {
+                out.push_back(generate(size, rnd));
+            }
         }
     }
 
@@ -312,7 +315,7 @@ class JsonDocGenerator : public PresetDocGenerator
         Doc ret;
 
         while (docsize > 0) {
-            decrSize(&docsize, sprintf(keybuf, "Field_%d", ++counter) + 3);
+            decrSize(&docsize, snprintf(keybuf, sizeof(keybuf), "Field_%d", ++counter) + 3);
             size_t valsize = std::min(JSON_VALUE_SIZE, docsize);
             if (!valsize) {
                 valsize = 1;
@@ -371,9 +374,9 @@ class JsonDocGenerator : public PresetDocGenerator
     };
 
   public:
-    virtual SubdocGeneratorState *createSubdocState(int, int) const
+    virtual std::unique_ptr<SubdocGeneratorState> createSubdocState(int, int) const
     {
-        return new SDGenstate(m_docs);
+        return std::unique_ptr<SubdocGeneratorState>(new SDGenstate(m_docs));
     }
 };
 
@@ -424,9 +427,9 @@ class PlaceholderDocGenerator : public DocGeneratorBase
     }
 
   public:
-    GeneratorState *createState(int total, int cur) const
+    std::unique_ptr<GeneratorState> createState(int total, int cur) const
     {
-        return new MyState(this, total, cur);
+        return std::unique_ptr<GeneratorState>(new MyState(this, total, cur));
     }
 
   private:
@@ -486,11 +489,12 @@ class PlaceholderJsonGenerator : public PlaceholderDocGenerator
      * @param minsz Minimum document size
      * @param maxsz Maximum document size
      */
-    PlaceholderJsonGenerator(uint32_t minsz, uint32_t maxsz, const std::vector< TemplateSpec > &specs, int rnd)
+    PlaceholderJsonGenerator(uint32_t minsz, uint32_t maxsz, const std::vector<TemplateSpec> &specs, int rnd,
+                             uint32_t pool_size)
     {
 
         std::vector< std::string > jsondocs;
-        JsonDocGenerator::genDocuments(minsz, maxsz, jsondocs, rnd);
+        JsonDocGenerator::genDocuments(minsz, maxsz, jsondocs, rnd, pool_size);
         initJsonPlaceholders(specs, jsondocs);
     }
 
@@ -513,7 +517,7 @@ class PlaceholderJsonGenerator : public PlaceholderDocGenerator
             for (size_t jj = 0; jj < specs.size(); ++jj) {
                 char buf[64];
                 const TemplateSpec &spec = specs[jj];
-                sprintf(buf, "$__pillowfight_%d", serial++);
+                snprintf(buf, sizeof(buf), "$__pillowfight_%d", serial++);
                 root[spec.term] = buf;
                 TemplateSpec new_spec = spec;
 

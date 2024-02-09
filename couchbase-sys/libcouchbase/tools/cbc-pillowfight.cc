@@ -99,12 +99,14 @@ class Configuration
   public:
     Configuration()
         : o_multiSize("batch-size"), o_numItems("num-items"), o_keyPrefix("key-prefix"), o_numThreads("num-threads"),
-          o_randSeed("random-seed"), o_randomBody("random-body"), o_setPercent("set-pct"), o_minSize("min-size"),
+          o_randSeed("random-seed"), o_randomBody("random-body"), o_randomBodyPoolSize("random-body-pool-size"),
+          o_setPercent("set-pct"), o_minSize("min-size"),
           o_maxSize("max-size"), o_noPopulate("no-population"), o_numCycles("num-cycles"), o_sequential("sequential"),
           o_startAt("start-at"), o_rateLimit("rate-limit"), o_userdocs("docs"), o_writeJson("json"),
           o_templatePairs("template"), o_subdoc("subdoc"), o_noop("noop"), o_sdPathCount("pathcount"),
-          o_populateOnly("populate-only"), o_exptime("expiry"), o_collection("collection"), o_durability("durability"),
-          o_persist("persist-to"), o_replicate("replicate-to"), o_lock("lock")
+          o_populateOnly("populate-only"), o_upsertExptime("expiry"), o_getExptime("get-expiry"),
+          o_collection("collection"), o_durability("durability"), o_persist("persist-to"), o_replicate("replicate-to"),
+          o_lock("lock"), o_randSpace("rand-space-per-thread")
     {
         o_multiSize.setDefault(100).abbrev('B').description("Number of operations to batch");
         o_numItems.setDefault(1000).abbrev('I').description("Number of items to operate on");
@@ -113,6 +115,9 @@ class Configuration
         o_randSeed.setDefault(0).abbrev('s').description("Specify random seed").hide();
         o_randomBody.setDefault(false).abbrev('R').description(
             "Randomize document body (otherwise use 'x' and '*' to fill)");
+        o_randomBodyPoolSize.setDefault(100).description(
+            "How many of randomized documents should be generated for each size in the range [min-size..max-size]. "
+            "Only used if --random-body is specified.");
         o_setPercent.setDefault(33).abbrev('r').description("The percentage of operations which should be mutations");
         o_minSize.setDefault(50).abbrev('m').description("Set minimum payload size");
         o_maxSize.setDefault(5120).abbrev('M').description("Set maximum payload size");
@@ -130,7 +135,8 @@ class Configuration
         o_noop.description("Use NOOP instead of document operations").setDefault(false);
         o_sdPathCount.description("Number of subdoc paths per command").setDefault(1);
         o_populateOnly.description("Exit after documents have been populated");
-        o_exptime.description("Set TTL for items").abbrev('e');
+        o_upsertExptime.description("Set TTL for items (UPSERT operation)").abbrev('e');
+        o_getExptime.description("Set TTL for items (GET operation)");
         o_collection.description("Allowed collection full path including scope (could be specified multiple times)");
         o_durability.abbrev('d').description("Durability level").setDefault("none");
         o_persist.description("Wait until item is persisted to this number of nodes (-1 for master+replicas)")
@@ -138,6 +144,8 @@ class Configuration
         o_replicate.description("Wait until item is replicated to this number of nodes (-1 for all replicas)")
             .setDefault(0);
         o_lock.description("Lock keys for updates for given time (will not lock when set to zero)").setDefault(0);
+        o_randSpace.description("When set and --sequential is not set, threads will perform operations on different key"
+                                " spaces").setDefault(false);
         params.getTimings().description("Enable command timings (second time to dump timings automatically)");
     }
 
@@ -218,25 +226,27 @@ class Configuration
 
         if (specs.empty()) {
             if (o_writeJson.result()) {
-                docgen = new JsonDocGenerator(o_minSize.result(), o_maxSize.result(), o_randomBody.numSpecified());
+                docgen.reset(new JsonDocGenerator(o_minSize.result(), o_maxSize.result(), o_randomBody.numSpecified(),
+                                                  o_randomBodyPoolSize.result()));
             } else if (!userdocs.empty()) {
-                docgen = new PresetDocGenerator(userdocs);
+                docgen.reset(new PresetDocGenerator(userdocs));
             } else {
-                docgen = new RawDocGenerator(o_minSize.result(), o_maxSize.result(), o_randomBody.numSpecified());
+                docgen.reset(new RawDocGenerator(o_minSize.result(), o_maxSize.result(), o_randomBody.numSpecified()));
             }
         } else {
             if (o_writeJson.result()) {
                 if (userdocs.empty()) {
-                    docgen = new PlaceholderJsonGenerator(o_minSize.result(), o_maxSize.result(), specs,
-                                                          o_randomBody.numSpecified());
+                    docgen.reset(new PlaceholderJsonGenerator(o_minSize.result(), o_maxSize.result(), specs,
+                                                              o_randomBody.numSpecified(),
+                                                              o_randomBodyPoolSize.result()));
                 } else {
-                    docgen = new PlaceholderJsonGenerator(userdocs, specs);
+                    docgen.reset(new PlaceholderJsonGenerator(userdocs, specs));
                 }
             } else {
                 if (userdocs.empty()) {
                     throw std::runtime_error("Must provide documents with placeholders!");
                 }
-                docgen = new PlaceholderDocGenerator(userdocs, specs);
+                docgen.reset(new PlaceholderDocGenerator(userdocs, specs));
             }
         }
 
@@ -258,6 +268,7 @@ class Configuration
         parser.addOption(o_numThreads);
         parser.addOption(o_randSeed);
         parser.addOption(o_randomBody);
+        parser.addOption(o_randomBodyPoolSize);
         parser.addOption(o_setPercent);
         parser.addOption(o_noPopulate);
         parser.addOption(o_minSize);
@@ -273,12 +284,14 @@ class Configuration
         parser.addOption(o_noop);
         parser.addOption(o_sdPathCount);
         parser.addOption(o_populateOnly);
-        parser.addOption(o_exptime);
+        parser.addOption(o_upsertExptime);
+        parser.addOption(o_getExptime);
         parser.addOption(o_collection);
         parser.addOption(o_durability);
         parser.addOption(o_persist);
         parser.addOption(o_replicate);
         parser.addOption(o_lock);
+        parser.addOption(o_randSpace);
         params.addToParser(parser);
         depr.addOptions(parser);
     }
@@ -353,9 +366,21 @@ class Configuration
     {
         return o_rateLimit;
     }
-    unsigned getExptime()
+    unsigned getExptimeForUpsert()
     {
-        return o_exptime;
+        return o_upsertExptime;
+    }
+    bool hasExptimeForGet()
+    {
+        return o_getExptime.passed();
+    }
+    unsigned getExptimeForGet()
+    {
+        return o_getExptime;
+    }
+    bool useRandSpacePerThread()
+    {
+        return o_randSpace;
     }
 
     uint32_t opsPerCycle{};
@@ -365,7 +390,7 @@ class Configuration
     volatile int maxCycles{};
     bool shouldPopulate{};
     ConnParams params;
-    const DocGeneratorBase *docgen{};
+    std::unique_ptr<DocGeneratorBase> docgen;
     vector<string> collections{};
     lcb_DURABILITY_LEVEL durabilityLevel{LCB_DURABILITYLEVEL_NONE};
     int replicateTo{};
@@ -379,6 +404,7 @@ class Configuration
     UIntOption o_numThreads;
     UIntOption o_randSeed;
     BoolOption o_randomBody;
+    UIntOption o_randomBodyPoolSize;
     UIntOption o_setPercent;
     UIntOption o_minSize;
     UIntOption o_maxSize;
@@ -403,7 +429,8 @@ class Configuration
     // Compound option
     BoolOption o_populateOnly;
 
-    UIntOption o_exptime;
+    UIntOption o_upsertExptime;
+    UIntOption o_getExptime;
 
     ListOption o_collection;
     StringOption o_durability;
@@ -411,6 +438,7 @@ class Configuration
     IntOption o_replicate;
 
     IntOption o_lock;
+    BoolOption o_randSpace;
     DeprecatedOptions depr;
 } config;
 
@@ -420,7 +448,7 @@ void log(const char *format, ...)
     va_list args;
 
     va_start(args, format);
-    vsprintf(buffer, format, args);
+    vsnprintf(buffer, sizeof(buffer), format, args);
     if (config.numTimings() > 0) {
         std::cerr << "[" << std::fixed << lcb_nstime() / 1000000000.0 << "] ";
     }
@@ -569,12 +597,14 @@ class KeyGenerator : public OpGenerator
     explicit KeyGenerator(int ix)
         : OpGenerator(ix), m_gencount(0), m_force_sequential(false), m_in_population(config.shouldPopulate)
     {
-        srand(config.getRandomSeed());
+        if(!config.useRandSpacePerThread()) {
+            srand(config.getRandomSeed());
+        }
 
-        m_genrandom = new SeqGenerator(config.firstKeyOffset(), config.getNumItems() + config.firstKeyOffset());
+        m_genrandom.reset(new SeqGenerator(config.firstKeyOffset(), config.getNumItems() + config.firstKeyOffset()));
 
-        m_gensequence = new SeqGenerator(config.firstKeyOffset(), config.getNumItems() + config.firstKeyOffset(),
-                                         config.getNumThreads(), ix);
+        m_gensequence.reset(new SeqGenerator(config.firstKeyOffset(), config.getNumItems() + config.firstKeyOffset(),
+                                         config.getNumThreads(), ix));
 
         if (m_in_population) {
             m_force_sequential = true;
@@ -701,16 +731,16 @@ class KeyGenerator : public OpGenerator
         }
     }
 
-    SeqGenerator *m_genrandom;
-    SeqGenerator *m_gensequence;
+    std::unique_ptr<SeqGenerator> m_genrandom;
+    std::unique_ptr<SeqGenerator> m_gensequence;
     size_t m_gencount;
 
     bool m_force_sequential;
     bool m_in_population;
     NextOp::Mode m_mode_read;
     NextOp::Mode m_mode_write;
-    GeneratorState *m_local_genstate;
-    SubdocGeneratorState *m_sdgenstate;
+    std::unique_ptr<GeneratorState> m_local_genstate;
+    std::unique_ptr<SubdocGeneratorState> m_sdgenstate;
 };
 
 #define OPFLAGS_LOCKED 0x01
@@ -721,16 +751,15 @@ class ThreadContext
     ThreadContext(lcb_INSTANCE *handle, int ix) : niter(0), instance(handle)
     {
         if (config.isNoop()) {
-            gen = new NoopGenerator(ix);
+            gen.reset(new NoopGenerator(ix));
         } else {
-            gen = new KeyGenerator(ix);
+            gen.reset(new KeyGenerator(ix));
         }
     }
 
     ~ThreadContext()
     {
-        delete gen;
-        gen = nullptr;
+        lcb_destroy(instance);
     }
 
     bool inPopulation()
@@ -769,7 +798,7 @@ class ThreadContext
         InstanceCookie *cookie = InstanceCookie::get(instance);
 
         while (!retryq.empty()) {
-            unsigned exptime = config.getExptime();
+            unsigned exptime = config.getExptimeForUpsert();
             lcb_sched_enter(instance);
             while (!retryq.empty()) {
                 opinfo = retryq.front();
@@ -809,7 +838,9 @@ class ThreadContext
     bool scheduleNextOperation()
     {
         NextOp opinfo;
-        unsigned exptime = config.getExptime();
+        unsigned exptime = config.getExptimeForUpsert();
+        bool useGat = config.hasExptimeForGet();
+        unsigned getExptime = config.getExptimeForGet();
         gen->setNextOp(opinfo);
 
         switch (opinfo.m_mode) {
@@ -856,7 +887,9 @@ class ThreadContext
                                               opinfo.m_collection.c_str(), opinfo.m_collection.size());
                     }
                 }
-                lcb_cmdget_expiry(gcmd, exptime);
+                if (useGat) {
+                    lcb_cmdget_expiry(gcmd, getExptime);
+                }
                 error = lcb_get(instance, this, gcmd);
                 lcb_cmdget_destroy(gcmd);
                 break;
@@ -891,6 +924,7 @@ class ThreadContext
                 if (mutate && config.durabilityLevel != LCB_DURABILITYLEVEL_NONE) {
                     lcb_cmdsubdoc_durability(sdcmd, config.durabilityLevel);
                 }
+                lcb_cmdsubdoc_specs(sdcmd, specs);
                 error = lcb_subdoc(instance, nullptr, sdcmd);
                 lcb_subdocspecs_destroy(specs);
                 lcb_cmdsubdoc_destroy(sdcmd);
@@ -993,7 +1027,7 @@ class ThreadContext
         previous_time = now;
     }
 
-    OpGenerator *gen;
+    std::unique_ptr<OpGenerator> gen;
     size_t niter;
     lcb_STATUS error{LCB_SUCCESS};
     lcb_INSTANCE *instance{nullptr};
@@ -1104,7 +1138,7 @@ static void getCallback(lcb_INSTANCE *instance, int, const lcb_RESPGET *resp)
 
             lcb_CMDSTORE *scmd;
             lcb_cmdstore_create(&scmd, LCB_STORE_UPSERT);
-            lcb_cmdstore_expiry(scmd, config.getExptime());
+            lcb_cmdstore_expiry(scmd, config.getExptimeForUpsert());
             uint64_t cas;
             lcb_respget_cas(resp, &cas);
             lcb_cmdstore_cas(scmd, cas);
@@ -1197,7 +1231,8 @@ static void storeCallback(lcb_INSTANCE *instance, int, const lcb_RESPSTORE *resp
     updateOpsPerSecDisplay();
 }
 
-std::list<ThreadContext *> contexts;
+std::list<InstanceCookie> cookies;
+std::list<ThreadContext> contexts;
 
 extern "C" {
 typedef void (*handler_t)(int);
@@ -1205,8 +1240,8 @@ typedef void (*handler_t)(int);
 static void dump_metrics()
 {
     std::list<ThreadContext *>::iterator it;
-    for (it = contexts.begin(); it != contexts.end(); ++it) {
-        lcb_INSTANCE *instance = (*it)->getInstance();
+    for (auto& context : contexts) {
+        lcb_INSTANCE *instance = context.getInstance();
         lcb_CMDDIAG *req;
         lcb_cmddiag_create(&req);
         lcb_cmddiag_prettify(req, true);
@@ -1284,10 +1319,6 @@ static void sigint_handler(int)
         return;
     }
 
-    std::list<ThreadContext *>::iterator it;
-    for (it = contexts.begin(); it != contexts.end(); ++it) {
-        delete *it;
-    }
     contexts.clear();
     exit(EXIT_FAILURE);
 }
@@ -1315,10 +1346,10 @@ static void start_worker(ThreadContext *ctx)
         exit(EXIT_FAILURE);
     }
 }
-static void join_worker(ThreadContext *ctx)
+static void join_worker(ThreadContext& ctx)
 {
     void *arg = nullptr;
-    int rc = pthread_join(ctx->thr, &arg);
+    int rc = pthread_join(ctx.thr, &arg);
     if (rc != 0) {
         log("Couldn't join thread (%d)", errno);
         exit(EXIT_FAILURE);
@@ -1332,7 +1363,7 @@ static void start_worker(ThreadContext *ctx)
 {
     ctx->run();
 }
-static void join_worker(ThreadContext *ctx)
+static void join_worker(ThreadContext& ctx)
 {
     (void)ctx;
 }
@@ -1373,6 +1404,9 @@ int main(int argc, char **argv)
         nthreads = 1;
     }
 #endif
+    if(config.useRandSpacePerThread()) {
+        srand(config.getRandomSeed());
+    }
 
     lcb_CREATEOPTS *options = nullptr;
     ConnParams &cp = config.params;
@@ -1406,7 +1440,8 @@ int main(int argc, char **argv)
             lcb_cntl(instance, LCB_CNTL_SET, LCB_CNTL_ENABLE_COLLECTIONS, &use);
         }
 
-        auto *cookie = new InstanceCookie(instance);
+        cookies.emplace_back(instance);
+        auto* cookie = &cookies.back();
 
         lcb_connect(instance);
         lcb_wait(instance, LCB_WAIT_DEFAULT);
@@ -1418,9 +1453,9 @@ int main(int argc, char **argv)
             exit(EXIT_FAILURE);
         }
 
-        auto *ctx = new ThreadContext(instance, ii);
+        contexts.emplace_back(instance, ii);
+        auto* ctx = &contexts.back();
         cookie->setContext(ctx);
-        contexts.push_back(ctx);
         start_worker(ctx);
     }
 

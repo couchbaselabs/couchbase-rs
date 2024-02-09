@@ -19,7 +19,9 @@
 #include <lcbio/timer-cxx.h>
 #include <libcouchbase/vbucket.h>
 #include "clconfig.h"
+
 #include <cerrno>
+#include <cstdint>
 
 #define LOGARGS(mcr, lvlbase) mcr->parent->settings, "bc_static", LCB_LOG_##lvlbase, __FILE__, __LINE__
 #define LOGFMT "(STATIC=%p)> "
@@ -47,8 +49,9 @@ class StaticProvider : public Provider
         return config;
     }
 
-    lcb_STATUS refresh() override
+    lcb_STATUS refresh(unsigned options = 0) override
     {
+        (void)options;
         async.signal();
         return LCB_SUCCESS;
     }

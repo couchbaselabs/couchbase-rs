@@ -34,10 +34,9 @@ enum class get_mode {
  * @private
  */
 struct lcb_CMDGET_ {
-    static const std::string &operation_name()
+    static const char *operation_name()
     {
-        static std::string name = LCBTRACE_OP_GET;
-        return name;
+        return LCBTRACE_OP_GET;
     }
 
     lcb_STATUS with_touch(std::uint32_t expiry)
@@ -186,6 +185,17 @@ struct lcb_CMDGET_ {
         return LCB_SUCCESS;
     }
 
+    lcb_STATUS on_behalf_of_add_extra_privilege(std::string privilege)
+    {
+        extra_privileges_.emplace_back(std::move(privilege));
+        return LCB_SUCCESS;
+    }
+
+    const std::vector<std::string> &extra_privileges() const
+    {
+        return extra_privileges_;
+    }
+
     bool want_impersonation() const
     {
         return !impostor_.empty();
@@ -208,6 +218,7 @@ struct lcb_CMDGET_ {
     get_mode mode_{get_mode::normal};
     bool cookie_is_callback_{false};
     std::string impostor_{};
+    std::vector<std::string> extra_privileges_{};
 };
 
 /** @private */
