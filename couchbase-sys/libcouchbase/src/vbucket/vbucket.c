@@ -26,6 +26,7 @@
 #include "hash.h"
 #include "crc32.h"
 #include "utilities.h"
+#include "rnd.h"
 
 #define STRINGIFY_(X) #X
 #define STRINGIFY(X) STRINGIFY_(X)
@@ -364,7 +365,7 @@ static int build_server_strings(lcbvb_CONFIG *cfg, lcbvb_SERVER *server)
     server->svc.hoststrs[LCBVB_SVCTYPE_DATA] = lcb_strdup(server->authority);
     if (server->viewpath == NULL && server->svc.views && cfg->bname) {
         server->viewpath = malloc(strlen(cfg->bname) + 2);
-        sprintf(server->viewpath, "/%s", cfg->bname);
+        snprintf(server->viewpath, strlen(cfg->bname) + 2, "/%s", cfg->bname);
     }
     if (server->querypath == NULL && server->svc.n1ql) {
         server->querypath = lcb_strdup("/query/service");
@@ -803,7 +804,7 @@ void lcbvb_replace_host(lcbvb_CONFIG *cfg, const char *hoststr)
     char *replacement = (char *)hoststr;
     if (strchr(replacement, ':')) {
         size_t len = strlen(hoststr);
-        replacement = calloc(len + 2, sizeof(char));
+        replacement = calloc(len + 3 /* '[', ']', '\0' */, sizeof(char));
         replacement[0] = '[';
         memcpy(replacement + 1, hoststr, len);
         replacement[len + 1] = ']';
@@ -932,12 +933,19 @@ char *lcbvb_save_json(lcbvb_CONFIG *cfg)
     cJSON *tmp = NULL, *nodes = NULL;
     cJSON *root = cJSON_CreateObject();
 
-    if (cfg->dtype == LCBVB_DIST_VBUCKET) {
-        tmp = cJSON_CreateString("vbucket");
-    } else {
-        tmp = cJSON_CreateString("ketama");
+    switch (cfg->dtype) {
+        case LCBVB_DIST_VBUCKET:
+            tmp = cJSON_CreateString("vbucket");
+            break;
+        case LCBVB_DIST_KETAMA:
+            tmp = cJSON_CreateString("ketama");
+            break;
+        default:
+            break;
     }
-    cJSON_AddItemToObject(root, "nodeLocator", tmp);
+    if (tmp) {
+        cJSON_AddItemToObject(root, "nodeLocator", tmp);
+    }
 
     if (cfg->buuid) {
         tmp = cJSON_CreateString(cfg->buuid);
@@ -951,8 +959,10 @@ char *lcbvb_save_json(lcbvb_CONFIG *cfg)
         tmp = cJSON_CreateInt64(cfg->revid);
         cJSON_AddItemToObject(root, "rev", tmp);
     }
-    tmp = cJSON_CreateString(cfg->bname);
-    cJSON_AddItemToObject(root, "name", tmp);
+    if (cfg->bname != NULL) {
+        tmp = cJSON_CreateString(cfg->bname);
+        cJSON_AddItemToObject(root, "name", tmp);
+    }
 
     nodes = cJSON_CreateArray();
     cJSON_AddItemToObject(root, "nodesExt", nodes);
@@ -1244,8 +1254,8 @@ static void compute_vb_list_diff(lcbvb_CONFIG *from, lcbvb_CONFIG *to, char **ou
         if (!found) {
             char *infostr = malloc(strlen(newsrv->authority) + 128);
             lcb_assert(infostr);
-            sprintf(infostr, "%s(Data=%d, Index=%d, Query=%d)", newsrv->authority, newsrv->svc.data,
-                    newsrv->svc.ixquery, newsrv->svc.n1ql);
+            snprintf(infostr, strlen(newsrv->authority) + 128, "%s(Data=%d, Index=%d, Query=%d)", newsrv->authority,
+                     newsrv->svc.data, newsrv->svc.ixquery, newsrv->svc.n1ql);
             out[offset] = infostr;
             ++offset;
         }
@@ -1506,7 +1516,7 @@ int lcbvb_get_randhost_ex(const lcbvb_CONFIG *cfg, lcbvb_SVCTYPE type, lcbvb_SVC
         return -1;
     }
 
-    nn = rand();
+    nn = lcb_next_rand32();
     nn %= oix;
     return cfg->randbuf[nn];
 }

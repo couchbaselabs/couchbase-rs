@@ -23,6 +23,8 @@
 #include "search_handle.hh"
 #include "capi/cmd_http.hh"
 
+#include <regex>
+
 #define LOGFMT "(NR=%p) "
 #define LOGID(req) static_cast<const void *>(req)
 #define LOGARGS(req, lvl) (req)->instance_->settings, "searchh", LCB_LOG_##lvl, __FILE__, __LINE__
@@ -73,7 +75,7 @@ void lcb_SEARCH_HANDLE_::invoke_row(lcb_RESPSEARCH *resp)
     if (callback_) {
         if (resp->rflags & LCB_RESP_F_FINAL) {
             Json::Value meta;
-            if (Json::Reader(Json::Features::strictMode()).parse(resp->row, resp->row + resp->nrow, meta)) {
+            if (lcb::jsparse::parse_json_strict(resp->row, resp->nrow, meta)) {
                 const Json::Value &top_error = meta["error"];
                 if (top_error.isString()) {
                     resp->ctx.has_top_level_error = 1;
@@ -92,9 +94,18 @@ void lcb_SEARCH_HANDLE_::invoke_row(lcb_RESPSEARCH *resp)
                     resp->ctx.error_message_len = error_message_.size();
                     if (error_message_.find("QueryBleve parsing") != std::string::npos) {
                         resp->ctx.rc = LCB_ERR_PARSING_FAILURE;
-                    } else if (resp->ctx.http_response_code == 400 &&
-                               error_message_.find("not_found") != std::string::npos) {
-                        resp->ctx.rc = LCB_ERR_INDEX_NOT_FOUND;
+                    } else if (resp->ctx.http_response_code == 400) {
+                        if (error_message_.find("not_found") != std::string::npos) {
+                            resp->ctx.rc = LCB_ERR_INDEX_NOT_FOUND;
+                        } else if (error_message_.find("num_fts_indexes") != std::string::npos) {
+                            resp->ctx.rc = LCB_ERR_QUOTA_LIMITED;
+                        }
+                    } else if (resp->ctx.http_response_code == 429) {
+                        std::regex rate_limiting_message(
+                            "num_concurrent_requests|num_queries_per_min|ingress_mib_per_min|egress_mib_per_min");
+                        if (std::regex_search(error_message_, rate_limiting_message)) {
+                            resp->ctx.rc = LCB_ERR_RATE_LIMITED;
+                        }
                     }
                 }
             }
@@ -145,7 +156,7 @@ lcb_SEARCH_HANDLE_::lcb_SEARCH_HANDLE_(lcb_INSTANCE *instance, void *cookie, con
     lcb_cmdhttp_streaming(htcmd, true);
 
     Json::Value root;
-    if (!Json::Reader().parse(cmd->query(), root)) {
+    if (!lcb::jsparse::parse_json(cmd->query(), root)) {
         last_error_ = LCB_ERR_INVALID_ARGUMENT;
         return;
     }

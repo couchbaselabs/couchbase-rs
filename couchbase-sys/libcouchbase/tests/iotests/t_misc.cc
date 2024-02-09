@@ -447,7 +447,7 @@ TEST_F(MockUnitTest, testKeyTooLong)
     size_t counter = 0;
     for (size_t ii = 0; ii < nbCallbacks; ++ii) {
         char key[6];
-        sprintf(key, "key%lu", ii);
+        snprintf(key, sizeof(key), "key%lu", ii);
         keys[ii] = std::string(key);
         lcb_CMDSTORE *scmd;
         lcb_cmdstore_create(&scmd, LCB_STORE_UPSERT);
@@ -936,6 +936,8 @@ TEST_F(MockUnitTest, testAppendE2BIG)
     lcb_cmdstore_create(&scmd, LCB_STORE_UPSERT);
     lcb_cmdstore_key(scmd, key, nkey);
     lcb_cmdstore_value(scmd, (const char *)value1, nvalue1);
+    /* connection to cbdyncluster might be slow, and uploading 20MiB takes some time */
+    lcb_cmdstore_timeout(scmd, 60000000 /* 60 seconds */);
     err = lcb_store(instance, &res, scmd);
     ASSERT_EQ(LCB_SUCCESS, err);
     lcb_cmdstore_destroy(scmd);

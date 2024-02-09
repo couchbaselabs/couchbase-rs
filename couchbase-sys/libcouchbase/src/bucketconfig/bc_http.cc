@@ -326,8 +326,7 @@ static void on_connected(lcbio_SOCKET *sock, void *arg, lcb_STATUS err, lcbio_OS
 
     procs.cb_err = io_error_handler;
     procs.cb_read = read_common;
-    http->ioctx = lcbio_ctx_new(sock, http, &procs);
-    http->ioctx->subsys = "bc_http";
+    http->ioctx = lcbio_ctx_new(sock, http, &procs, "bc_http");
     sock->service = LCBIO_SERVICE_CFG;
 
     lcbio_ctx_put(http->ioctx, http->request_buf.c_str(), http->request_buf.size());
@@ -404,7 +403,7 @@ bool HttpProvider::pause()
     return LCB_SUCCESS;
 }
 
-lcb_STATUS HttpProvider::refresh()
+lcb_STATUS HttpProvider::refresh(unsigned /* options */)
 {
     /**
      * We want a grace interval here because we might already be fetching a
@@ -415,6 +414,7 @@ lcb_STATUS HttpProvider::refresh()
 
     /** If we need a new socket, we do connect_next. */
     if (ioctx == nullptr && creq == nullptr) {
+        lcb_log(LOGARGS(this, TRACE), "Reconnect socket to retrieve cluster map via HTTP");
         as_reconnect.signal();
     }
     disconn_timer.cancel();

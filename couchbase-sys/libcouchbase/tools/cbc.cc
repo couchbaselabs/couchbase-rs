@@ -35,6 +35,7 @@
 #include "common/options.h"
 #include "common/histogram.h"
 #include "cbc-handlers.h"
+#include "cbc-timestamp.h"
 #include "connspec.h"
 #include "rnd.h"
 #include "contrib/lcb-jsoncpp/lcb-jsoncpp.h"
@@ -229,15 +230,16 @@ static void store_callback(lcb_INSTANCE *, lcb_CALLBACK_TYPE, const lcb_RESPSTOR
         lcb_respstore_observe_num_persisted(resp, &npersisted);
         lcb_respstore_observe_num_replicated(resp, &nreplicated);
         if (rc == LCB_SUCCESS) {
-            sprintf(buf, "Stored. Persisted(%u). Replicated(%u)", npersisted, nreplicated);
+            snprintf(buf, sizeof(buf), "Stored. Persisted(%u). Replicated(%u)", npersisted, nreplicated);
             storePrintSuccess(resp, buf);
         } else {
             int store_ok;
             lcb_respstore_observe_stored(resp, &store_ok);
             if (store_ok) {
-                sprintf(buf, "Store OK, but durability failed. Persisted(%u). Replicated(%u)", npersisted, nreplicated);
+                snprintf(buf, sizeof(buf), "Store OK, but durability failed. Persisted(%u). Replicated(%u)", npersisted,
+                         nreplicated);
             } else {
-                sprintf(buf, "%s", "Store failed");
+                snprintf(buf, sizeof(buf), "%s", "Store failed");
             }
             storePrintError(resp, buf);
         }
@@ -502,7 +504,7 @@ static void ping_table_callback(lcb_INSTANCE *, int, const lcb_RESPPING *resp)
         }
         std::string report_json(json, njson);
         Json::Value report;
-        if (!Json::Reader().parse(report_json, report)) {
+        if (!parse_json(report_json, report)) {
             return;
         }
         Json::Value services = report.get("services", Json::nullValue);
@@ -1226,7 +1228,7 @@ void VersionHandler::run()
     printf("cbc:\n");
     printf("  Runtime: Version=%s, Changeset=%s\n", lcb_get_version(nullptr), changeset);
     printf("  Headers: Version=%s, Changeset=%s\n", LCB_VERSION_STRING, LCB_VERSION_CHANGESET);
-    printf("  Build Timestamp: %s\n", LCB_BUILD_TIMESTAMP);
+    printf("  Build Timestamp: %s\n", lcb_build_timestamp);
 #ifdef CMAKE_BUILD_TYPE
     printf("  CMake Build Type: %s\n", CMAKE_BUILD_TYPE);
 #endif
@@ -1254,7 +1256,7 @@ void VersionHandler::run()
 
             cio.v.v0.type = known_io[ii];
             if (lcb_create_io_ops(&io, &cio) == LCB_SUCCESS) {
-                p += sprintf(p, "%s,", iops_to_string(known_io[ii]));
+                p += snprintf(p, sizeof(buf) - strlen(p), "%s,", iops_to_string(known_io[ii]));
                 lcb_destroy_io_ops(io);
             }
         }
@@ -1273,6 +1275,13 @@ void VersionHandler::run()
 #endif
         printf("  SSL Headers: %s\n", OPENSSL_VERSION_TEXT);
 #endif
+        printf("  HAVE_PKCS5_PBKDF2_HMAC: "
+#ifdef HAVE_PKCS5_PBKDF2_HMAC
+               "yes"
+#else
+               "no"
+#endif
+               "\n");
     } else {
         printf("  SSL: NOT SUPPORTED\n");
     }
@@ -2016,6 +2025,35 @@ void AdminHandler::run()
     printf("%s\n", resbuf.c_str());
 }
 
+void BucketListHandler::run()
+{
+    fprintf(stderr, "Requesting %s\n", getURI().c_str());
+    HttpBaseHandler::run();
+    if (o_raw.result()) {
+        printf("%s\n", resbuf.c_str());
+    } else {
+        format();
+    }
+}
+
+void BucketListHandler::format()
+{
+    Json::Value json;
+    if (!parse_json(resbuf, json)) {
+        fprintf(stderr, "Failed to parse response as JSON, falling back to raw mode\n");
+        printf("%s\n", resbuf.c_str());
+    }
+
+    printf("%-20s%-10s%s\n", "Name", "Type", "Items");
+
+    for (auto &bucket : json) {
+        auto name = bucket["name"].asString();
+        auto type = bucket["bucketType"].asString();
+        const int itemCount = bucket["basicStats"]["itemCount"].asInt();
+        printf("%-20s%-10s%i\n", name.c_str(), type.c_str(), itemCount);
+    }
+}
+
 void BucketCreateHandler::run()
 {
     const string &name = getRequiredArg();
@@ -2049,7 +2087,7 @@ void RbacHandler::run()
 void RoleListHandler::format()
 {
     Json::Value json;
-    if (!Json::Reader().parse(resbuf, json)) {
+    if (!parse_json(resbuf, json)) {
         fprintf(stderr, "Failed to parse response as JSON, falling back to raw mode\n");
         printf("%s\n", resbuf.c_str());
     }
@@ -2071,7 +2109,7 @@ void RoleListHandler::format()
 void UserListHandler::format()
 {
     Json::Value json;
-    if (!Json::Reader().parse(resbuf, json)) {
+    if (!parse_json(resbuf, json)) {
         fprintf(stderr, "Failed to parse response as JSON, falling back to raw mode\n");
         printf("%s\n", resbuf.c_str());
     }
@@ -2271,6 +2309,7 @@ static const char *optionsOrder[] = {"help",
                                      "analytics",
                                      "search",
                                      "admin",
+                                     "bucket-list",
                                      "bucket-create",
                                      "bucket-delete",
                                      "bucket-flush",
@@ -2362,6 +2401,7 @@ static void setupHandlers()
     handlers_s["incr"] = new IncrHandler();
     handlers_s["decr"] = new DecrHandler();
     handlers_s["admin"] = new AdminHandler();
+    handlers_s["bucket-list"] = new BucketListHandler();
     handlers_s["bucket-create"] = new BucketCreateHandler();
     handlers_s["bucket-delete"] = new BucketDeleteHandler();
     handlers_s["bucket-flush"] = new BucketFlushHandler();

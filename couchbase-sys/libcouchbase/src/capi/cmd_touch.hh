@@ -28,10 +28,9 @@
  * @private
  */
 struct lcb_CMDTOUCH_ {
-    static const std::string &operation_name()
+    static const char *operation_name()
     {
-        static std::string name = LCBTRACE_OP_TOUCH;
-        return name;
+        return LCBTRACE_OP_TOUCH;
     }
 
     lcb_STATUS expiry(std::uint32_t expiry)
@@ -138,6 +137,17 @@ struct lcb_CMDTOUCH_ {
         return LCB_SUCCESS;
     }
 
+    lcb_STATUS on_behalf_of_add_extra_privilege(std::string privilege)
+    {
+        extra_privileges_.emplace_back(std::move(privilege));
+        return LCB_SUCCESS;
+    }
+
+    const std::vector<std::string> &extra_privileges() const
+    {
+        return extra_privileges_;
+    }
+
     bool want_impersonation() const
     {
         return !impostor_.empty();
@@ -157,6 +167,7 @@ struct lcb_CMDTOUCH_ {
     void *cookie_{nullptr};
     std::string key_{};
     std::string impostor_{};
+    std::vector<std::string> extra_privileges_{};
 };
 
 /**

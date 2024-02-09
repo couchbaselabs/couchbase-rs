@@ -173,7 +173,6 @@ void Bootstrap::check_bgpoll()
 
 void Bootstrap::bgpoll()
 {
-    lcb_log(LOGARGS(parent, TRACE), "Background-polling for new configuration");
     bootstrap(BS_REFRESH_ALWAYS);
     check_bgpoll();
 }
@@ -246,6 +245,7 @@ lcb_STATUS Bootstrap::bootstrap(unsigned options)
         tm.rearm(LCBT_SETTING(parent, config_timeout));
         lcb_aspend_add(&parent->pendops, LCB_PENDTYPE_COUNTER, nullptr);
     } else if (parent->confmon->is_refreshing()) {
+        lcb_log(LOGARGS(parent, TRACE), "already refreshing, exit");
         return LCB_SUCCESS;
     }
 
@@ -260,13 +260,20 @@ lcb_STATUS Bootstrap::bootstrap(unsigned options)
         next_ts = last_refresh;
         next_ts += LCB_US2NS(LCBT_SETTING(parent, weird_things_delay));
         if (now < next_ts && errcounter < errthresh) {
-            lcb_log(
-                LOGARGS(parent, INFO),
-                "Not requesting a config refresh because of throttling parameters. Next refresh possible in %" PRIu64
-                "ms or %u errors. "
-                "See LCB_CNTL_CONFDELAY_THRESH and LCB_CNTL_CONFERRTHRESH to modify the throttling settings",
-                LCB_NS2US(next_ts - now) / 1000, (unsigned)errthresh - errcounter);
-            return LCB_SUCCESS;
+            const auto *provider = parent->confmon->cur_provider;
+            if (provider == nullptr || !(provider->type == clconfig::CLCONFIG_CCCP &&
+                                         parent->confmon->mode == clconfig::CONFMON_M_PUSH)) {
+                lcb_log(LOGARGS(parent, INFO),
+                        "Not requesting a config refresh because of throttling parameters. Next refresh possible in "
+                        "%" PRIu64 "ms or %u errors. "
+                        "See LCB_CNTL_CONFDELAY_THRESH and LCB_CNTL_CONFERRTHRESH to modify the throttling settings",
+                        LCB_NS2US(next_ts - now) / 1000, errthresh - errcounter);
+                return LCB_SUCCESS;
+            }
+            lcb_log(LOGARGS(parent, INFO),
+                    "A config refresh requested, trigger CCCP provider. (next_ts=%" PRIu64
+                    "ms, errcounter=%u, errthresh=%u)",
+                    LCB_NS2US(next_ts - now) / 1000, errcounter, errthresh);
         }
     }
 
@@ -288,7 +295,7 @@ lcb_STATUS Bootstrap::bootstrap(unsigned options)
         last_refresh = now;
     }
     if (parent->settings->bucket) {
-        options &= BS_REFRESH_OPEN_BUCKET;
+        options |= BS_REFRESH_OPEN_BUCKET;
     }
     parent->confmon->start(options);
     return LCB_SUCCESS;

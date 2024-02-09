@@ -30,6 +30,19 @@
 /**
  * @private
  */
+namespace lcb
+{
+struct query_error {
+    std::string message{};
+    uint32_t code{};
+    bool retry{false};
+    uint32_t reason_code{0};
+};
+} // namespace lcb
+
+/**
+ * @private
+ */
 struct lcb_QUERY_HANDLE_ : lcb::jsparse::Parser::Actions {
     lcb_QUERY_HANDLE_(lcb_INSTANCE *obj, void *user_cookie, const lcb_CMDQUERY *cmd);
     ~lcb_QUERY_HANDLE_() override;
@@ -251,10 +264,9 @@ struct lcb_QUERY_HANDLE_ : lcb::jsparse::Parser::Actions {
         return LCBTRACE_THRESHOLD_QUERY;
     }
 
-    static const std::string &operation_name()
+    static const char *operation_name()
     {
-        static std::string name = LCBTRACE_OP_QUERY;
-        return name;
+        return LCBTRACE_OP_QUERY;
     }
 
     lcbtrace_SPAN *parent_span() const
@@ -296,8 +308,7 @@ struct lcb_QUERY_HANDLE_ : lcb::jsparse::Parser::Actions {
     /** String of the original statement. Cached here to avoid jsoncpp lookups */
     std::string statement_;
     std::string client_context_id_;
-    std::string first_error_message{};
-    uint32_t first_error_code{};
+    lcb::query_error first_error{};
 
     /** Whether we're retrying this */
     int retries_{0};

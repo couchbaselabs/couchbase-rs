@@ -29,6 +29,8 @@
 typedef struct packet_info_st packet_info;
 #else
 #include "contrib/lcb-jsoncpp/lcb-jsoncpp.h"
+#include "jsparse/parser.h"
+#include "snappy.h"
 #include <math.h>
 namespace lcb
 {
@@ -208,6 +210,22 @@ class MemcachedResponse
     }
 
     /**
+     * Returns copy of the value or inflated value if it has marked as compressed.
+     *
+     * @return
+     */
+    std::string inflated_value() const
+    {
+        if (datatype() & PROTOCOL_BINARY_DATATYPE_COMPRESSED) {
+            std::string output;
+            if (snappy::Uncompress(value(), vallen(), &output)) {
+                return output;
+            }
+        }
+        return {value(), vallen()};
+    }
+
+    /**
      * Gets the status of the packet
      */
     uint16_t status() const
@@ -304,7 +322,7 @@ class MemcachedResponse
             return LCB_ERR_INVALID_ARGUMENT;
         }
         Json::Value jval;
-        if (!Json::Reader().parse(value, value + nvalue, jval)) {
+        if (!lcb::jsparse::parse_json(value, nvalue, jval)) {
             return LCB_ERR_INVALID_ARGUMENT;
         }
         if (jval.empty()) {

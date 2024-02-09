@@ -8,9 +8,11 @@ ELSEIF (CMAKE_SYSTEM_NAME STREQUAL "Linux")
             OUTPUT_VARIABLE LIBM_SO_TRACE
             ERROR_QUIET
             OUTPUT_STRIP_TRAILING_WHITESPACE)
-    STRING(REGEX MATCH [-_a-z0-9/]+libm.so[.0-9]+ LIBM_SO_PATH ${LIBM_SO_TRACE})
-    IF (EXISTS "${LIBM_SO_PATH}")
-        GET_FILENAME_COMPONENT(CMAKE_TEST_SHARED_OBJECT ${LIBM_SO_PATH} NAME)
+    IF (LIBM_SO_TRACE)
+        STRING(REGEX MATCH [-_a-z0-9/]+libm.so[.0-9]+ LIBM_SO_PATH ${LIBM_SO_TRACE})
+        IF (EXISTS "${LIBM_SO_PATH}")
+            GET_FILENAME_COMPONENT(CMAKE_TEST_SHARED_OBJECT ${LIBM_SO_PATH} NAME)
+        ENDIF()
     ENDIF()
 ENDIF()
 
@@ -173,7 +175,7 @@ MACRO(DEFINE_MOCKTEST plugin test)
             --gtest_filter="ContaminatingUnitTest.*"
             --gtest_throw_on_failure=1
             --gtest_print_time=1
-            --gtest_output=xml:"${PROJECT_BINARY_DIR}/REPORT_${plugin}_${test}.xml")
+            --gtest_output=xml:"${PROJECT_BINARY_DIR}/REPORT_${plugin}_${test}_contaminating.xml")
     SET_TESTS_PROPERTIES(check-contaminating-${plugin}-${test} PROPERTIES LABELS "contaminating" )
 ENDMACRO()
 

@@ -185,6 +185,7 @@ class lcb::SessionRequestImpl : public SessionRequest
     SessionInfo *info;
     lcb_settings *settings;
     lcb_host_t host_{};
+    bool expecting_error_map{false};
 };
 
 static void handle_read(lcbio_CTX *ioctx, unsigned)
@@ -299,6 +300,8 @@ SessionRequestImpl::MechStatus SessionRequestImpl::set_chosen_mech(std::string &
         }
         mechlist.assign(forced_list);
         user_specified = true;
+    } else if (tls) {
+        mechlist = "PLAIN";
     }
 
     const char *chosenmech;
@@ -316,8 +319,9 @@ SessionRequestImpl::MechStatus SessionRequestImpl::set_chosen_mech(std::string &
                         "PLAIN, but using SCRAM methods is strongly recommended over non-encrypted transports.",
                         LOGID(this));
 #else
-                lcb_log(LOGARGS(this, WARN), LOGFMT "SASL PLAIN authentication is not allowed on non-TLS connections",
-                        LOGID(this));
+                lcb_log(LOGARGS(this, WARN),
+                        LOGFMT "SASL PLAIN authentication is not allowed on non-TLS connections (server supports: %s)",
+                        LOGID(this), mechlist.c_str());
                 return MECH_UNAVAILABLE;
 #endif
             }
@@ -412,14 +416,74 @@ bool SessionRequestImpl::check_auth(const lcb::MemcachedResponse &packet)
     return true;
 }
 
+static const char *protocol_feature_2_text(protocol_binary_hello_features feature)
+{
+    switch (feature) {
+        case PROTOCOL_BINARY_FEATURE_TLS:
+            return "TLS";
+        case PROTOCOL_BINARY_FEATURE_TCPNODELAY:
+            return "TCPNODELAY";
+        case PROTOCOL_BINARY_FEATURE_MUTATION_SEQNO:
+            return "MUTATION_SEQNO";
+        case PROTOCOL_BINARY_FEATURE_TCPDELAY:
+            return "TCPDELAY";
+        case PROTOCOL_BINARY_FEATURE_XATTR:
+            return "XATTR";
+        case PROTOCOL_BINARY_FEATURE_XERROR:
+            return "XERROR";
+        case PROTOCOL_BINARY_FEATURE_SELECT_BUCKET:
+            return "SELECT_BUCKET";
+        case PROTOCOL_BINARY_FEATURE_SNAPPY:
+            return "SNAPPY";
+        case PROTOCOL_BINARY_FEATURE_JSON:
+            return "JSON";
+        case PROTOCOL_BINARY_FEATURE_DUPLEX:
+            return "Duplex";
+        case PROTOCOL_BINARY_FEATURE_CLUSTERMAP_CHANGE_NOTIFICATION:
+            return "ClustermapChangeNotification";
+        case PROTOCOL_BINARY_FEATURE_UNORDERED_EXECUTION:
+            return "UnorderedExecution";
+        case PROTOCOL_BINARY_FEATURE_TRACING:
+            return "Tracing";
+        case PROTOCOL_BINARY_FEATURE_ALT_REQUEST_SUPPORT:
+            return "AltRequestSupport";
+        case PROTOCOL_BINARY_FEATURE_SYNC_REPLICATION:
+            return "SyncReplication";
+        case PROTOCOL_BINARY_FEATURE_COLLECTIONS:
+            return "Collections";
+        case PROTOCOL_BINARY_FEATURE_SNAPPY_EVERYWHERE:
+            return "SnappyEverywhere";
+        case PROTOCOL_BINARY_FEATURE_PRESERVE_TTL:
+            return "PreserveTtl";
+        case PROTOCOL_BINARY_FEATURE_CREATE_AS_DELETED:
+            return "SubdocCreateAsDeleted";
+        case PROTOCOL_BINARY_FEATURE_CLUSTERMAP_CHANGE_NOTIFICATION_BRIEF:
+            return "ClustermapChangeNotificationBrief";
+        case PROTOCOL_BINARY_FEATURE_DEDUPE_NOT_MY_VBUCKET_CLUSTERMAP:
+            return "DedupeNotMyVbucketClustermap";
+        case PROTOCOL_BINARY_FEATURE_GET_CLUSTER_CONFIG_WITH_KNOWN_VERSION:
+            return "GetClusterConfigWithKnownVersion";
+
+        case PROTOCOL_BINARY_FEATURE_INVALID:
+        case PROTOCOL_BINARY_FEATURE_INVALID2:
+        case MEMCACHED_TOTAL_HELLO_FEATURES:
+            return "unknown";
+    }
+    return "unknown";
+}
+
 bool SessionRequestImpl::send_hello()
 {
-    lcb_U16 features[MEMCACHED_TOTAL_HELLO_FEATURES];
+    protocol_binary_hello_features features[MEMCACHED_TOTAL_HELLO_FEATURES] = {};
 
     unsigned nfeatures = 0;
     features[nfeatures++] = PROTOCOL_BINARY_FEATURE_TLS;
     features[nfeatures++] = PROTOCOL_BINARY_FEATURE_XATTR;
     features[nfeatures++] = PROTOCOL_BINARY_FEATURE_JSON;
+    features[nfeatures++] = PROTOCOL_BINARY_FEATURE_DUPLEX;
+    features[nfeatures++] = PROTOCOL_BINARY_FEATURE_CLUSTERMAP_CHANGE_NOTIFICATION_BRIEF;
+    features[nfeatures++] = PROTOCOL_BINARY_FEATURE_GET_CLUSTER_CONFIG_WITH_KNOWN_VERSION;
+    features[nfeatures++] = PROTOCOL_BINARY_FEATURE_DEDUPE_NOT_MY_VBUCKET_CLUSTERMAP;
     if (settings->select_bucket) {
         features[nfeatures++] = PROTOCOL_BINARY_FEATURE_SELECT_BUCKET;
     }
@@ -431,6 +495,11 @@ bool SessionRequestImpl::send_hello()
     }
     if (settings->compressopts != LCB_COMPRESS_NONE) {
         features[nfeatures++] = PROTOCOL_BINARY_FEATURE_SNAPPY;
+        /**
+         * Signal the KV engine that now libcouchbase supports snappy not only in regular operation handler
+         * (handler.cc), but also in configuration handlers (bc_cccp.cc and getconfig.cc)
+         */
+        features[nfeatures++] = PROTOCOL_BINARY_FEATURE_SNAPPY_EVERYWHERE;
     }
     if (settings->fetch_mutation_tokens) {
         features[nfeatures++] = PROTOCOL_BINARY_FEATURE_MUTATION_SEQNO;
@@ -453,14 +522,14 @@ bool SessionRequestImpl::send_hello()
 
     std::string agent = generate_agent_json();
     lcb::MemcachedRequest hdr(PROTOCOL_BINARY_CMD_HELLO);
-    hdr.sizes(0, agent.size(), (sizeof features[0]) * nfeatures);
+    hdr.sizes(0, agent.size(), (sizeof(std::uint16_t)) * nfeatures);
     lcbio_ctx_put(ctx, hdr.data(), hdr.size());
     lcbio_ctx_put(ctx, agent.c_str(), agent.size());
 
     std::string fstr;
     for (size_t ii = 0; ii < nfeatures; ii++) {
         char buf[50] = {0};
-        lcb_U16 tmp = htons(features[ii]);
+        std::uint16_t tmp = htons(features[ii]);
         lcbio_ctx_put(ctx, &tmp, sizeof tmp);
         snprintf(buf, sizeof(buf), "%s0x%02x (%s)", ii > 0 ? ", " : "", features[ii],
                  protocol_feature_2_text(features[ii]));
@@ -489,10 +558,10 @@ bool SessionRequestImpl::read_hello(const lcb::MemcachedResponse &packet)
     size_t ii;
     std::string fstr;
     for (ii = 0, cur = payload; cur < limit; cur += 2, ii++) {
-        lcb_U16 tmp;
+        protocol_binary_hello_features tmp;
         char buf[50] = {0};
         memcpy(&tmp, cur, sizeof(tmp));
-        tmp = ntohs(tmp);
+        tmp = static_cast<protocol_binary_hello_features>(ntohs(tmp));
         info->server_features.push_back(tmp);
         snprintf(buf, sizeof(buf), "%s0x%02x (%s)", ii > 0 ? ", " : "", tmp, protocol_feature_2_text(tmp));
         fstr.append(buf);
@@ -642,15 +711,15 @@ GT_NEXT_PACKET:
             }
 
             if (settings->keypath) {
-                completed = !maybe_select_bucket();
+                completed = !expecting_error_map && !maybe_select_bucket();
             }
             break;
         }
 
         case PROTOCOL_BINARY_CMD_GET_ERROR_MAP: {
+            expecting_error_map = false;
             if (status == PROTOCOL_BINARY_RESPONSE_SUCCESS) {
-                if (!update_errmap(resp)) {
-                }
+                update_errmap(resp);
             } else if (isUnsupported(status)) {
                 lcb_log(LOGARGS(this, DEBUG), LOGFMT "Server does not support GET_ERRMAP (0x%x)", LOGID(this), status);
             } else {
@@ -658,32 +727,54 @@ GT_NEXT_PACKET:
                         status);
                 set_error(LCB_ERR_PROTOCOL_ERROR, "GET_ERRMAP response unexpected", &resp);
             }
+            if (settings->keypath) {
+                completed = !maybe_select_bucket();
+            }
             // Note, there is no explicit state transition here. LIST_MECHS is
             // pipelined after this request.
             break;
         }
 
         case PROTOCOL_BINARY_CMD_SELECT_BUCKET: {
-            if (status == PROTOCOL_BINARY_RESPONSE_SUCCESS) {
-                completed = true;
-                info->selected = true;
-            } else if (status == PROTOCOL_BINARY_RESPONSE_EACCESS) {
-                set_error(LCB_ERR_BUCKET_NOT_FOUND,
-                          "Provided credentials not allowed for bucket or bucket does not exist", &resp);
-            } else if (status == PROTOCOL_BINARY_RESPONSE_KEY_ENOENT) {
-                set_error(LCB_ERR_BUCKET_NOT_FOUND, "Key/Value service is not configured for given node", &resp);
-            } else {
-                lcb_log(LOGARGS(this, ERROR), LOGFMT "Unexpected status 0x%x received for SELECT_BUCKET", LOGID(this),
-                        status);
-                set_error(LCB_ERR_PROTOCOL_ERROR, "Other auth error", &resp);
+            switch (status) {
+                case PROTOCOL_BINARY_RESPONSE_SUCCESS:
+                    completed = true;
+                    info->selected = true;
+                    break;
+
+                case PROTOCOL_BINARY_RESPONSE_EACCESS:
+                    set_error(LCB_ERR_BUCKET_NOT_FOUND,
+                              "Provided credentials not allowed for bucket or bucket does not exist", &resp);
+                    break;
+
+                case PROTOCOL_BINARY_RESPONSE_KEY_ENOENT:
+                    set_error(LCB_ERR_BUCKET_NOT_FOUND, "Key/Value service is not configured for given node", &resp);
+                    break;
+
+                case PROTOCOL_BINARY_RATE_LIMITED_MAX_COMMANDS:
+                case PROTOCOL_BINARY_RATE_LIMITED_MAX_CONNECTIONS:
+                case PROTOCOL_BINARY_RATE_LIMITED_NETWORK_EGRESS:
+                case PROTOCOL_BINARY_RATE_LIMITED_NETWORK_INGRESS:
+                    set_error(LCB_ERR_RATE_LIMITED, "The tenant has reached rate limit", &resp);
+                    break;
+
+                case PROTOCOL_BINARY_SCOPE_SIZE_LIMIT_EXCEEDED:
+                    set_error(LCB_ERR_QUOTA_LIMITED, "The tenant has reached quota limit", &resp);
+                    break;
+
+                default:
+                    lcb_log(LOGARGS(this, ERROR), LOGFMT "Unexpected status 0x%x received for SELECT_BUCKET",
+                            LOGID(this), status);
+                    set_error(LCB_ERR_PROTOCOL_ERROR, "Other auth error", &resp);
+                    break;
             }
             break;
         }
 
         default: {
-            lcb_log(LOGARGS(this, ERROR), LOGFMT "Received unknown response. OP=0x%x. RC=0x%x", LOGID(this),
-                    resp.opcode(), resp.status());
-            set_error(LCB_ERR_UNSUPPORTED_OPERATION, "Received unknown response", &resp);
+            lcb_log(LOGARGS(this, ERROR), LOGFMT "Received unexpected response. OP=0x%x. RC=0x%x, completed=%d",
+                    LOGID(this), resp.opcode(), resp.status(), completed);
+            set_error(LCB_ERR_PROTOCOL_ERROR, "Received unexpected response", &resp);
             break;
         }
     }
@@ -728,8 +819,7 @@ void SessionRequestImpl::start(lcbio_SOCKET *sock)
     lcbio_CTXPROCS procs{};
     procs.cb_err = ::handle_ioerr;
     procs.cb_read = ::handle_read;
-    ctx = lcbio_ctx_new(sock, this, &procs);
-    ctx->subsys = "sasl";
+    ctx = lcbio_ctx_new(sock, this, &procs, "sasl");
 
     const lcb_host_t *curhost = lcbio_get_host(sock);
     lcbio_NAMEINFO nistrs{};
@@ -744,6 +834,7 @@ void SessionRequestImpl::start(lcbio_SOCKET *sock)
     send_hello();
     if (settings->use_errmap) {
         request_errmap();
+        expecting_error_map = true;
     } else {
         lcb_log(LOGARGS(this, TRACE), LOGFMT "GET_ERRORMAP disabled", LOGID(this));
     }

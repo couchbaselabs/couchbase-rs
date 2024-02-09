@@ -15,6 +15,9 @@ Make sure to have all [libcouchbase](https://docs.couchbase.com/c-sdk/current/st
 [dependencies]
 couchbase = "1.0.0-alpha.4"
 ```
+## Bindgen Version
+
+The project has been upgraded to use bindgen version 0.62. Make sure to check the bindgen requirements for any additional setup.
 
 ## Usage
 

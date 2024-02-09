@@ -166,7 +166,7 @@ struct lcb_st {
         return deferred_operations != nullptr && !deferred_operations->empty();
     }
     lcb::Server *find_server(const lcb_host_t &host) const;
-    lcb_STATUS request_config(void *cookie, lcb::Server *server);
+    lcb_STATUS request_config(void *cookie_, lcb::Server *server, lcb::clconfig::config_version current_version);
     lcb_STATUS select_bucket(void *cookie, lcb::Server *server);
 
     /**
@@ -259,7 +259,8 @@ lcb_STATUS lcb_initialize_socket_subsystem(void);
 lcb_STATUS lcb_reinit(lcb_INSTANCE *obj, const char *connstr);
 
 lcb_RETRY_ACTION lcb_kv_should_retry(const lcb_settings *settings, const mc_PACKET *pkt, lcb_STATUS err);
-lcb_RETRY_ACTION lcb_query_should_retry(const lcb_settings *settings, lcb_QUERY_HANDLE *query, lcb_STATUS err);
+lcb_RETRY_ACTION lcb_query_should_retry(const lcb_settings *settings, lcb_QUERY_HANDLE *query, lcb_STATUS err,
+                                        int retry_attribute);
 
 lcb_RESPCALLBACK lcb_find_callback(lcb_INSTANCE *instance, lcb_CALLBACK_TYPE cbtype);
 

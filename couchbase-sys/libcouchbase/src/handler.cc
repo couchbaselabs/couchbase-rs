@@ -157,6 +157,13 @@ lcb_STATUS lcb_map_error(lcb_INSTANCE *instance, int in)
             return LCB_ERR_DURABILITY_AMBIGUOUS;
         case PROTOCOL_BINARY_RESPONSE_LOCKED:
             return LCB_ERR_DOCUMENT_LOCKED;
+        case PROTOCOL_BINARY_RATE_LIMITED_NETWORK_INGRESS:
+        case PROTOCOL_BINARY_RATE_LIMITED_NETWORK_EGRESS:
+        case PROTOCOL_BINARY_RATE_LIMITED_MAX_CONNECTIONS:
+        case PROTOCOL_BINARY_RATE_LIMITED_MAX_COMMANDS:
+            return LCB_ERR_RATE_LIMITED;
+        case PROTOCOL_BINARY_SCOPE_SIZE_LIMIT_EXCEEDED:
+            return LCB_ERR_QUOTA_LIMITED;
         default:
             if (instance != nullptr) {
                 return instance->callbacks.errmap(instance, in);
@@ -232,7 +239,7 @@ void handle_error_info(const MemcachedResponse *mc_resp, T &resp)
     }
     const char *val = mc_resp->value();
     Json::Value jval;
-    if (!Json::Reader().parse(val, val + nval, jval)) {
+    if (!lcb::jsparse::parse_json(val, nval, jval)) {
         return;
     }
     if (jval.empty()) {
@@ -264,25 +271,24 @@ void init_resp(lcb_INSTANCE *instance, mc_PIPELINE *pipeline, const MemcachedRes
     resp->cookie = const_cast<void *>(MCREQ_PKT_COOKIE(req));
     const char *key = nullptr;
     size_t key_len = 0;
-    mcreq_get_key(instance, req, &key, &key_len);
+    mcreq_get_key(req, &key, &key_len);
     if (key != nullptr) {
         resp->ctx.key.assign(key, key_len);
     }
 
-    auto *server = static_cast<lcb::Server *>(pipeline);
+    const auto *server = static_cast<lcb::Server *>(pipeline);
     const lcb_host_t *remote = server->curhost;
     if (remote) {
-        std::stringstream ss;
+        resp->ctx.endpoint.reserve(sizeof(remote->host) + sizeof(remote->port) + 3);
         if (remote->ipv6) {
-            ss << '[';
+            resp->ctx.endpoint.append("[");
         }
-        ss << remote->host;
+        resp->ctx.endpoint.append(remote->host);
         if (remote->ipv6) {
-            ss << ']';
+            resp->ctx.endpoint.append("]");
         }
-        ss << ':';
-        ss << remote->port;
-        resp->ctx.endpoint = ss.str();
+        resp->ctx.endpoint.append(":");
+        resp->ctx.endpoint.append(remote->port);
     }
 }
 
@@ -336,7 +342,7 @@ template <typename T>
 void invoke_callback(const mc_PACKET *pkt, lcb_INSTANCE *instance, T *resp, lcb_CALLBACK_TYPE cbtype)
 {
     if (instance != nullptr) {
-        std::string collection_path = instance->collcache->id_to_name(mcreq_get_cid(instance, pkt));
+        std::string collection_path = instance->collcache->id_to_name(mcreq_get_cid(instance, pkt, NULL));
         if (!collection_path.empty()) {
             size_t dot = collection_path.find('.');
             if (dot != std::string::npos) {
@@ -700,7 +706,6 @@ static void H_observe(mc_PIPELINE *pipeline, mc_PACKET *request, MemcachedRespon
     lcb_INSTANCE *root = get_instance(pipeline);
     uint32_t ttp;
     uint32_t ttr;
-    size_t pos;
     lcbvb_CONFIG *config;
     const char *end, *ptr;
     mc_REQDATAEX *rd = request->u_rdata.exdata;
@@ -729,7 +734,7 @@ static void H_observe(mc_PIPELINE *pipeline, mc_PACKET *request, MemcachedRespon
     end = ptr + response->vallen();
     config = pipeline->parent->config;
 
-    for (pos = 0; ptr < end; pos++) {
+    while (ptr < end) {
         uint64_t cas;
         uint8_t obs;
         uint16_t nkey, vb;

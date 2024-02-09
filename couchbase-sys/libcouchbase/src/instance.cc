@@ -466,6 +466,25 @@ lcb_STATUS lcb_create(lcb_INSTANCE **instance, const lcb_CREATEOPTS *options)
         goto GT_DONE;
     }
 
+    {
+        // Warn users if they attempt to use Capella without TLS being enabled.
+        bool is_capella = false;
+        static const std::string suffix = "cloud.couchbase.com";
+        for (auto &node : spec.hosts()) {
+            auto pos = node.hostname.find(suffix);
+            if (pos != std::string::npos && pos + suffix.size() == node.hostname.size()) {
+                is_capella = true;
+                break;
+            }
+        }
+
+        if (is_capella && (spec.sslopts() & LCB_SSL_ENABLED) == 0) {
+            lcb_log(LOGARGS(obj, INFO),
+                    "TLS is required when connecting to Couchbase Capella. Please enable TLS by prefixing "
+                    "the connection string with \"couchbases://\" (note the final 's').");
+        }
+    }
+
     if ((obj = (lcb_INSTANCE *)calloc(1, sizeof(*obj))) == nullptr) {
         err = LCB_ERR_NO_MEMORY;
         goto GT_DONE;
@@ -490,13 +509,18 @@ lcb_STATUS lcb_create(lcb_INSTANCE **instance, const lcb_CREATEOPTS *options)
         settings->bucket = lcb_strdup(spec.bucket().c_str());
     }
 
-    if (!spec.username().empty()) {
-        settings->auth->set_mode(LCBAUTH_MODE_RBAC);
-        err = settings->auth->add(spec.username(), spec.password(), LCBAUTH_F_CLUSTER);
+    if (options != nullptr && options->auth != nullptr) {
+        lcbauth_unref(settings->auth);
+        settings->auth = lcbauth_clone(options->auth);
     } else {
-        if (type == LCB_TYPE_BUCKET) {
-            settings->auth->set_mode(LCBAUTH_MODE_CLASSIC);
-            err = settings->auth->add(settings->bucket, spec.password(), LCBAUTH_F_BUCKET);
+        if (!spec.username().empty()) {
+            settings->auth->set_mode(LCBAUTH_MODE_RBAC);
+            err = settings->auth->add(spec.username(), spec.password(), LCBAUTH_F_CLUSTER);
+        } else {
+            if (type == LCB_TYPE_BUCKET) {
+                settings->auth->set_mode(LCBAUTH_MODE_CLASSIC);
+                err = settings->auth->add(settings->bucket, spec.password(), LCBAUTH_F_BUCKET);
+            }
         }
     }
     if (err != LCB_SUCCESS) {
@@ -542,7 +566,7 @@ lcb_STATUS lcb_create(lcb_INSTANCE **instance, const lcb_CREATEOPTS *options)
         // Needs its own scope because there are prior GOTOs
         io::Pool::Options pool_opts;
         pool_opts.maxidle = 1;
-        pool_opts.tmoidle = LCB_MS2US(10000); // 10 seconds
+        pool_opts.tmoidle = LCB_DEFAULT_HTTP_POOL_TIMEOUT;
         obj->memd_sockpool->set_options(pool_opts);
         obj->http_sockpool->set_options(pool_opts);
     }
