@@ -1,24 +1,29 @@
 use crate::memdx::codec::KeyValueCodec;
+use crate::memdx::error::CancelledError;
 use crate::memdx::packet::{RequestPacket, ResponsePacket};
+use crate::memdx::pendingop::{ClientPendingOp, PendingOp};
 use futures::{SinkExt, StreamExt};
 use log::{debug, trace, warn};
 use std::collections::HashMap;
 use std::io;
-use std::sync::{Arc, Mutex};
-use tokio::io::{Join, ReadHalf, WriteHalf};
+use std::sync::mpsc::{Receiver, Sender};
+use std::sync::{mpsc, Arc, Mutex};
+use tokio::io::{ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
-use tokio::task::JoinHandle;
+use tokio::sync::Semaphore;
 use tokio_rustls::client::TlsStream;
 use tokio_util::codec::{FramedRead, FramedWrite};
 use uuid::Uuid;
 
-type DispatchFn = dyn (FnMut(ResponsePacket) -> bool) + Send + Sync;
-type OpaqueMap = HashMap<u32, Box<DispatchFn>>;
+type DispatchFn = dyn (Fn(Result<ResponsePacket, CancelledError>) -> bool) + Send + Sync;
+type OpaqueMap = HashMap<u32, Box<Arc<DispatchFn>>>;
 
 pub enum Connection {
     Tcp(TcpStream),
     Tls(TlsStream<TcpStream>),
 }
+
+static HANDLER_INVOKE_PERMITS: Semaphore = Semaphore::const_new(1);
 
 pub struct Client {
     current_opaque: u32,
@@ -27,6 +32,8 @@ pub struct Client {
     client_id: String,
 
     writer: FramedWrite<WriteHalf<TcpStream>, KeyValueCodec>,
+
+    cancel_tx: Sender<u32>,
 }
 
 impl Client {
@@ -45,17 +52,26 @@ impl Client {
 
         let uuid = Uuid::new_v4().to_string();
 
+        let (cancel_tx, cancel_rx) = mpsc::channel();
+
         let client = Self {
             current_opaque: 1,
             opaque_map: Arc::new(Mutex::new(OpaqueMap::default())),
             client_id: uuid.clone(),
 
+            cancel_tx,
+
             writer,
         };
 
-        let opaque_map = Arc::clone(&client.opaque_map);
+        let read_opaque_map = Arc::clone(&client.opaque_map);
         tokio::spawn(async move {
-            Client::read_loop(reader, opaque_map, uuid).await;
+            Client::read_loop(reader, read_opaque_map, uuid).await;
+        });
+
+        let cancel_opaque_map = Arc::clone(&client.opaque_map);
+        tokio::spawn(async move {
+            Client::cancel_loop(cancel_rx, cancel_opaque_map).await;
         });
 
         client
@@ -64,14 +80,15 @@ impl Client {
     pub async fn dispatch(
         &mut self,
         mut packet: RequestPacket,
-        handler: impl (FnMut(ResponsePacket) -> bool) + Send + Sync + 'static,
-    ) -> Result<(), io::Error> {
-        let opaque = self.register_handler(Box::new(handler));
+        handler: impl (Fn(Result<ResponsePacket, CancelledError>) -> bool) + Send + Sync + 'static,
+    ) -> Result<impl PendingOp, io::Error> {
+        let _unused = HANDLER_INVOKE_PERMITS.acquire().await.unwrap();
+        let opaque = self.register_handler(Box::new(Arc::new(handler)));
         packet = packet.set_opaque(opaque);
         let op_code = packet.op_code();
 
         match self.writer.send(packet).await {
-            Ok(_) => Ok(()),
+            Ok(_) => Ok(ClientPendingOp::new(opaque, self.cancel_tx.clone())),
             Err(e) => {
                 debug!(
                     "{} failed to write packet {} {} {}",
@@ -87,7 +104,7 @@ impl Client {
         }
     }
 
-    fn register_handler(&mut self, handler: Box<DispatchFn>) -> u32 {
+    fn register_handler(&mut self, handler: Box<Arc<DispatchFn>>) -> u32 {
         let requests = Arc::clone(&self.opaque_map);
         let mut map = requests.lock().unwrap();
 
@@ -97,6 +114,32 @@ impl Client {
         map.insert(opaque, handler);
 
         opaque
+    }
+
+    async fn cancel_loop(cancel_rx: Receiver<u32>, opaque_map: Arc<Mutex<OpaqueMap>>) {
+        loop {
+            match cancel_rx.recv() {
+                Ok(opaque) => {
+                    let permit = HANDLER_INVOKE_PERMITS.acquire().await.unwrap();
+                    let requests = Arc::clone(&opaque_map);
+                    let mut map = requests.lock().unwrap();
+
+                    let t = map.remove(&opaque);
+
+                    if let Some(map_entry) = t {
+                        let sender = Arc::clone(&map_entry);
+                        drop(map);
+
+                        sender(Err(CancelledError {}));
+                    }
+
+                    drop(permit);
+                }
+                Err(e) => {
+                    return;
+                }
+            }
+        }
     }
 
     async fn read_loop(
@@ -117,32 +160,36 @@ impl Client {
                         );
 
                         let opaque = packet.opaque();
+
+                        let permit = HANDLER_INVOKE_PERMITS.acquire().await.unwrap();
                         let requests = Arc::clone(&opaque_map);
-                        let mut map = requests.lock().unwrap();
+                        let map = requests.lock().unwrap();
 
                         // We remove and then re-add if there are more packets so that we don't have
-                        // to hold the mutex across the callback.
-                        let t = map.remove(&opaque);
-                        drop(map);
-                        drop(requests);
+                        // to hold the opaque map mutex across the callback.
+                        let t = map.get(&opaque);
 
-                        if let Some(mut sender) = t {
-                            let has_more_packets = sender(packet);
+                        if let Some(map_entry) = t {
+                            let sender = Arc::clone(map_entry);
+                            drop(map);
+                            let has_more_packets = sender(Ok(packet));
+                            drop(sender);
 
-                            if has_more_packets {
-                                let requests = Arc::clone(&opaque_map);
+                            if !has_more_packets {
                                 let mut map = requests.lock().unwrap();
-                                map.insert(opaque, sender);
+                                map.remove(&opaque);
                                 drop(map);
-                                drop(requests);
                             }
                         } else {
+                            drop(map);
                             warn!(
                                 "{} has no entry in request map for {}",
                                 client_id,
                                 &packet.opaque()
                             );
                         }
+                        drop(requests);
+                        drop(permit);
                     }
                     Err(e) => {
                         warn!("{} failed to read frame {}", client_id, e.to_string());
@@ -176,7 +223,9 @@ mod tests {
         let req = RequestPacket::new(Magic::Req, OpCode::Set, 0x01);
         match client
             .dispatch(req, move |resp| -> bool {
-                sender.send(resp).expect("Failed to send on channel");
+                sender
+                    .send(resp.unwrap())
+                    .expect("Failed to send on channel");
                 true
             })
             .await
