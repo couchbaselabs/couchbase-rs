@@ -82,7 +82,6 @@ impl Client {
         mut packet: RequestPacket,
         handler: impl (Fn(Result<ResponsePacket, CancelledError>) -> bool) + Send + Sync + 'static,
     ) -> Result<impl PendingOp, io::Error> {
-        let _unused = HANDLER_INVOKE_PERMITS.acquire().await.unwrap();
         let opaque = self.register_handler(Box::new(Arc::new(handler)));
         packet = packet.set_opaque(opaque);
         let op_code = packet.op_code();
