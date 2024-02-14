@@ -1,11 +1,11 @@
 use crate::memdx::codec::KeyValueCodec;
-use crate::memdx::error::CancelledError;
+use crate::memdx::dispatcher::{DispatchFn, Dispatcher};
+use crate::memdx::error::{CancellationErrorKind, Error};
 use crate::memdx::packet::{RequestPacket, ResponsePacket};
 use crate::memdx::pendingop::{ClientPendingOp, PendingOp};
 use futures::{SinkExt, StreamExt};
 use log::{debug, trace, warn};
 use std::collections::HashMap;
-use std::io;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{mpsc, Arc, Mutex};
 use tokio::io::{ReadHalf, WriteHalf};
@@ -15,8 +15,9 @@ use tokio_rustls::client::TlsStream;
 use tokio_util::codec::{FramedRead, FramedWrite};
 use uuid::Uuid;
 
-type DispatchFn = dyn (Fn(Result<ResponsePacket, CancelledError>) -> bool) + Send + Sync;
+pub type Result<T> = std::result::Result<T, Error>;
 type OpaqueMap = HashMap<u32, Box<Arc<DispatchFn>>>;
+pub(crate) type CancellationSender = Sender<(u32, CancellationErrorKind)>;
 
 pub enum Connection {
     Tcp(TcpStream),
@@ -33,7 +34,7 @@ pub struct Client {
 
     writer: FramedWrite<WriteHalf<TcpStream>, KeyValueCodec>,
 
-    cancel_tx: Sender<u32>,
+    cancel_tx: CancellationSender,
 }
 
 impl Client {
@@ -77,32 +78,6 @@ impl Client {
         client
     }
 
-    pub async fn dispatch(
-        &mut self,
-        mut packet: RequestPacket,
-        handler: impl (Fn(Result<ResponsePacket, CancelledError>) -> bool) + Send + Sync + 'static,
-    ) -> Result<impl PendingOp, io::Error> {
-        let opaque = self.register_handler(Box::new(Arc::new(handler)));
-        packet = packet.set_opaque(opaque);
-        let op_code = packet.op_code();
-
-        match self.writer.send(packet).await {
-            Ok(_) => Ok(ClientPendingOp::new(opaque, self.cancel_tx.clone())),
-            Err(e) => {
-                debug!(
-                    "{} failed to write packet {} {} {}",
-                    self.client_id, opaque, op_code, e
-                );
-
-                let requests = Arc::clone(&self.opaque_map);
-                let mut map = requests.lock().unwrap();
-                map.remove(&opaque);
-
-                Err(e)
-            }
-        }
-    }
-
     fn register_handler(&mut self, handler: Box<Arc<DispatchFn>>) -> u32 {
         let requests = Arc::clone(&self.opaque_map);
         let mut map = requests.lock().unwrap();
@@ -115,21 +90,24 @@ impl Client {
         opaque
     }
 
-    async fn cancel_loop(cancel_rx: Receiver<u32>, opaque_map: Arc<Mutex<OpaqueMap>>) {
+    async fn cancel_loop(
+        cancel_rx: Receiver<(u32, CancellationErrorKind)>,
+        opaque_map: Arc<Mutex<OpaqueMap>>,
+    ) {
         loop {
             match cancel_rx.recv() {
-                Ok(opaque) => {
+                Ok(cancel_info) => {
                     let permit = HANDLER_INVOKE_PERMITS.acquire().await.unwrap();
-                    let requests = Arc::clone(&opaque_map);
+                    let requests: Arc<Mutex<OpaqueMap>> = Arc::clone(&opaque_map);
                     let mut map = requests.lock().unwrap();
 
-                    let t = map.remove(&opaque);
+                    let t = map.remove(&cancel_info.0);
 
                     if let Some(map_entry) = t {
                         let sender = Arc::clone(&map_entry);
                         drop(map);
 
-                        sender(Err(CancelledError {}));
+                        sender(Err(Error::Cancelled(cancel_info.1)));
                     }
 
                     drop(permit);
@@ -161,7 +139,7 @@ impl Client {
                         let opaque = packet.opaque();
 
                         let permit = HANDLER_INVOKE_PERMITS.acquire().await.unwrap();
-                        let requests = Arc::clone(&opaque_map);
+                        let requests: Arc<Mutex<OpaqueMap>> = Arc::clone(&opaque_map);
                         let map = requests.lock().unwrap();
 
                         // We remove and then re-add if there are more packets so that we don't have
@@ -199,12 +177,45 @@ impl Client {
     }
 }
 
+impl Dispatcher for Client {
+    async fn dispatch(
+        &mut self,
+        mut packet: RequestPacket,
+        handler: impl (Fn(Result<ResponsePacket>) -> bool) + Send + Sync + 'static,
+    ) -> Result<ClientPendingOp> {
+        let opaque = self.register_handler(Box::new(Arc::new(handler)));
+        packet = packet.set_opaque(opaque);
+        let op_code = packet.op_code();
+
+        match self.writer.send(packet).await {
+            Ok(_) => Ok(ClientPendingOp::new(opaque, self.cancel_tx.clone())),
+            Err(e) => {
+                debug!(
+                    "{} failed to write packet {} {} {}",
+                    self.client_id, opaque, op_code, e
+                );
+
+                let requests: Arc<Mutex<OpaqueMap>> = Arc::clone(&self.opaque_map);
+                let mut map = requests.lock().unwrap();
+                map.remove(&opaque);
+
+                Err(Error::Dispatch(e))
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::memdx::client::{Client, Connection};
+    use crate::memdx::dispatcher::Dispatcher;
+    use crate::memdx::hello_feature::HelloFeature;
     use crate::memdx::magic::Magic;
+    use crate::memdx::op_bootstrap::{BootstrapOptions, OpBootstrap};
     use crate::memdx::opcode::OpCode;
+    use crate::memdx::ops_core::OpsCore;
     use crate::memdx::packet::{RequestPacket, ResponsePacket};
+    use crate::memdx::request::HelloRequest;
     use std::sync::mpsc;
     use tokio::net::TcpStream;
 
@@ -217,9 +228,30 @@ mod tests {
         let conn = Connection::Tcp(socket);
         let mut client = Client::new(conn);
 
+        let bootstrap_result = OpBootstrap::bootstrap(
+            OpsCore {},
+            &mut client,
+            BootstrapOptions {
+                hello: Some(HelloRequest {
+                    client_name: "test-client".into(),
+                    requested_features: vec![
+                        HelloFeature::AltRequests,
+                        HelloFeature::Collections,
+                        HelloFeature::Duplex,
+                    ],
+                }),
+            },
+        )
+        .await
+        .unwrap();
+        dbg!(&bootstrap_result);
+
+        let hello_result = bootstrap_result.hello.unwrap();
+        assert_eq!(3, hello_result.enabled_features.len());
+
         let (sender, recv) = mpsc::sync_channel::<ResponsePacket>(1);
 
-        let req = RequestPacket::new(Magic::Req, OpCode::Set, 0x01);
+        let req = RequestPacket::new(Magic::Req, OpCode::Set);
         match client
             .dispatch(req, move |resp| -> bool {
                 sender

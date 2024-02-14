@@ -114,11 +114,11 @@ pub struct RequestPacket {
 }
 
 impl RequestPacket {
-    pub fn new(magic: Magic, op_code: OpCode, datatype: u8) -> Self {
+    pub fn new(magic: Magic, op_code: OpCode) -> Self {
         Self {
             magic,
             op_code,
-            datatype,
+            datatype: 0,
             opaque: 0,
             vbucket_id: None,
             cas: None,
@@ -127,6 +127,11 @@ impl RequestPacket {
             value: None,
             framing_extras: None,
         }
+    }
+
+    pub fn set_datatype(mut self, datatype: u8) -> Self {
+        self.datatype = datatype;
+        self
     }
 
     pub fn set_opaque(mut self, opaque: u32) -> Self {

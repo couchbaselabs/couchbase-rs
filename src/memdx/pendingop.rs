@@ -1,9 +1,9 @@
-use crate::memdx::client::Client;
-use std::io;
-use std::sync::mpsc::Sender;
+use crate::memdx::client::CancellationSender;
+use crate::memdx::error::CancellationErrorKind;
+use log::debug;
 
 pub trait PendingOp {
-    fn cancel(&mut self, e: io::Error);
+    fn cancel(&mut self, e: CancellationErrorKind);
 }
 
 pub(crate) trait OpCanceller {
@@ -12,11 +12,11 @@ pub(crate) trait OpCanceller {
 
 pub(crate) struct ClientPendingOp {
     opaque: u32,
-    cancel_chan: Sender<u32>,
+    cancel_chan: CancellationSender,
 }
 
 impl ClientPendingOp {
-    pub fn new(opaque: u32, cancel_chan: Sender<u32>) -> Self {
+    pub fn new(opaque: u32, cancel_chan: CancellationSender) -> Self {
         ClientPendingOp {
             opaque,
             cancel_chan,
@@ -25,7 +25,12 @@ impl ClientPendingOp {
 }
 
 impl PendingOp for ClientPendingOp {
-    fn cancel(&mut self, e: io::Error) {
-        self.cancel_chan.send(self.opaque);
+    fn cancel(&mut self, e: CancellationErrorKind) {
+        match self.cancel_chan.send((self.opaque, e)) {
+            Ok(_) => {}
+            Err(e) => {
+                debug!("Failed to send cancel to channel {}", e);
+            }
+        };
     }
 }

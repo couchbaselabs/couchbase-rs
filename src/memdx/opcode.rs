@@ -6,6 +6,7 @@ pub enum OpCode {
     Get,
     Set,
     Add,
+    Hello,
 }
 
 impl Into<u8> for OpCode {
@@ -14,6 +15,7 @@ impl Into<u8> for OpCode {
             OpCode::Get => 0x00,
             OpCode::Set => 0x01,
             OpCode::Add => 0x02,
+            OpCode::Hello => 0x1f,
         }
     }
 }
@@ -26,6 +28,7 @@ impl TryFrom<u8> for OpCode {
             0x00 => OpCode::Get,
             0x01 => OpCode::Set,
             0x02 => OpCode::Add,
+            0x1f => OpCode::Hello,
             _ => {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
@@ -44,6 +47,7 @@ impl Display for OpCode {
             OpCode::Get => "Get",
             OpCode::Set => "Set",
             OpCode::Add => "Add",
+            OpCode::Hello => "Hello",
         };
         write!(f, "{}", txt)
     }

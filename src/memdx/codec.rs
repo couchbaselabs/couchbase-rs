@@ -73,31 +73,27 @@ impl Decoder for KeyValueCodec {
         let mut packet = ResponsePacket::new(magic, opcode, datatype, status, opaque);
         packet = packet.set_cas(cas);
 
+        let mut payload_pos = 0;
+
         if flexible_extras_len > 0 {
-            packet = packet
-                .set_framing_extras(buf[HEADER_SIZE..(HEADER_SIZE + flexible_extras_len)].to_vec());
+            packet = packet.set_framing_extras(
+                slice[payload_pos..(payload_pos + flexible_extras_len)].to_vec(),
+            );
+            payload_pos += flexible_extras_len;
         }
 
         if extras_len > 0 {
-            packet = packet.set_extras(
-                buf[(HEADER_SIZE + flexible_extras_len)
-                    ..(HEADER_SIZE + flexible_extras_len + extras_len)]
-                    .to_vec(),
-            );
+            packet = packet.set_extras(slice[payload_pos..(payload_pos + extras_len)].to_vec());
+            payload_pos += extras_len;
         };
 
         if key_len > 0 {
-            packet = packet.set_key(
-                buf[(HEADER_SIZE + flexible_extras_len + extras_len)
-                    ..(HEADER_SIZE + flexible_extras_len + extras_len + key_len)]
-                    .to_vec(),
-            );
+            packet = packet.set_key(slice[payload_pos..(payload_pos + key_len)].to_vec());
+            payload_pos += key_len;
         };
 
         if body_len > 0 {
-            packet = packet.set_value(
-                buf[(HEADER_SIZE + flexible_extras_len + extras_len + key_len)..].to_vec(),
-            );
+            packet = packet.set_value(slice[payload_pos..].to_vec());
         };
 
         Ok(Some(packet))
