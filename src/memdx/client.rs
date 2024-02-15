@@ -207,6 +207,7 @@ impl Dispatcher for Client {
 
 #[cfg(test)]
 mod tests {
+    use crate::memdx::auth_mechanism::AuthMechanism;
     use crate::memdx::client::{Client, Connection};
     use crate::memdx::dispatcher::Dispatcher;
     use crate::memdx::hello_feature::HelloFeature;
@@ -215,18 +216,33 @@ mod tests {
     use crate::memdx::opcode::OpCode;
     use crate::memdx::ops_core::OpsCore;
     use crate::memdx::packet::{RequestPacket, ResponsePacket};
-    use crate::memdx::request::HelloRequest;
+    use crate::memdx::request::{
+        GetErrorMapRequest, HelloRequest, SASLAuthRequest, SelectBucketRequest,
+    };
+    use bytes::BufMut;
     use std::sync::mpsc;
     use tokio::net::TcpStream;
+    use tokio_util::bytes::BytesMut;
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn roundtrip_a_request() {
+        let _ = env_logger::try_init();
+
         let socket = TcpStream::connect("127.0.0.1:11210")
             .await
             .expect("could not connect");
 
         let conn = Connection::Tcp(socket);
         let mut client = Client::new(conn);
+
+        let username = "Administrator";
+        let password = "password";
+
+        let mut auth_payload: Vec<u8> = Vec::new();
+        auth_payload.push(0);
+        auth_payload.extend_from_slice(username.as_ref());
+        auth_payload.push(0);
+        auth_payload.extend_from_slice(password.as_ref());
 
         let bootstrap_result = OpBootstrap::bootstrap(
             OpsCore {},
@@ -238,20 +254,33 @@ mod tests {
                         HelloFeature::AltRequests,
                         HelloFeature::Collections,
                         HelloFeature::Duplex,
+                        HelloFeature::SelectBucket,
                     ],
+                }),
+                get_error_map: Some(GetErrorMapRequest { version: 2 }),
+                auth: Some(SASLAuthRequest {
+                    payload: auth_payload,
+                    auth_mechanism: AuthMechanism::Plain,
+                }),
+                select_bucket: Some(SelectBucketRequest {
+                    bucket_name: "default".into(),
                 }),
             },
         )
         .await
         .unwrap();
-        dbg!(&bootstrap_result);
+        dbg!(&bootstrap_result.hello);
 
         let hello_result = bootstrap_result.hello.unwrap();
-        assert_eq!(3, hello_result.enabled_features.len());
+        assert_eq!(4, hello_result.enabled_features.len());
 
         let (sender, recv) = mpsc::sync_channel::<ResponsePacket>(1);
 
-        let req = RequestPacket::new(Magic::Req, OpCode::Set);
+        let mut req = RequestPacket::new(Magic::Req, OpCode::Set);
+        req = req.set_key(make_uleb128_32("test".as_bytes().into(), 0x00));
+
+        req = req.set_extras(vec![0, 0, 0, 0, 0, 0, 0, 0]);
+
         match client
             .dispatch(req, move |resp| -> bool {
                 sender
@@ -268,5 +297,27 @@ mod tests {
         let result = recv.recv().unwrap();
 
         dbg!(result);
+    }
+
+    fn make_uleb128_32(key: Vec<u8>, collection_id: u32) -> Vec<u8> {
+        let mut cid = collection_id;
+        let mut builder = BytesMut::with_capacity(key.len() + 5);
+        loop {
+            let mut c: u8 = (cid & 0x7f) as u8;
+            cid >>= 7;
+            if cid != 0 {
+                c |= 0x80;
+            }
+
+            builder.put_u8(c);
+            if c & 0x80 == 0 {
+                break;
+            }
+        }
+        for k in key {
+            builder.put_u8(k);
+        }
+
+        builder.freeze().to_vec()
     }
 }

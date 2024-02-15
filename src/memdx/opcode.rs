@@ -1,3 +1,4 @@
+use crate::memdx::error::Error;
 use std::fmt::{Display, Formatter};
 use std::io;
 
@@ -7,6 +8,9 @@ pub enum OpCode {
     Set,
     Add,
     Hello,
+    GetErrorMap,
+    SelectBucket,
+    SASLAuth,
 }
 
 impl Into<u8> for OpCode {
@@ -16,12 +20,15 @@ impl Into<u8> for OpCode {
             OpCode::Set => 0x01,
             OpCode::Add => 0x02,
             OpCode::Hello => 0x1f,
+            OpCode::SASLAuth => 0x21,
+            OpCode::SelectBucket => 0x89,
+            OpCode::GetErrorMap => 0xfe,
         }
     }
 }
 
 impl TryFrom<u8> for OpCode {
-    type Error = io::Error;
+    type Error = Error;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         let code = match value {
@@ -29,11 +36,11 @@ impl TryFrom<u8> for OpCode {
             0x01 => OpCode::Set,
             0x02 => OpCode::Add,
             0x1f => OpCode::Hello,
+            0x21 => OpCode::SASLAuth,
+            0x89 => OpCode::SelectBucket,
+            0xfe => OpCode::GetErrorMap,
             _ => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!("unknown opcode {}", value),
-                ));
+                return Err(Error::Protocol(format!("unknown opcode {}", value)));
             }
         };
 
@@ -48,6 +55,9 @@ impl Display for OpCode {
             OpCode::Set => "Set",
             OpCode::Add => "Add",
             OpCode::Hello => "Hello",
+            OpCode::GetErrorMap => "Get error map",
+            OpCode::SelectBucket => "Select bucket",
+            OpCode::SASLAuth => "SASL auth",
         };
         write!(f, "{}", txt)
     }

@@ -1,3 +1,4 @@
+use crate::memdx::error::Error;
 use std::fmt::{Debug, Display};
 use std::io;
 
@@ -35,7 +36,7 @@ impl Into<u8> for Magic {
 }
 
 impl TryFrom<u8> for Magic {
-    type Error = io::Error;
+    type Error = Error;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         let magic = match value {
@@ -44,10 +45,7 @@ impl TryFrom<u8> for Magic {
             0x08 => Magic::ReqExt,
             0x18 => Magic::ResExt,
             _ => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!("unknown magic {}", value),
-                ));
+                return Err(Error::Protocol(format!("unknown magic {}", value)));
             }
         };
 

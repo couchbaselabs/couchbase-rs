@@ -1,3 +1,4 @@
+use crate::memdx::status::Status;
 use std::fmt::{Display, Formatter};
 use std::io;
 
@@ -7,6 +8,14 @@ pub enum Error {
     Dispatch(io::Error),
     #[error("Request cancelled {0}")]
     Cancelled(CancellationErrorKind),
+    #[error("Not my vbucket")]
+    NotMyVbucket,
+    #[error("Protocol error {0}")]
+    Protocol(String),
+    #[error("Temporary failure")]
+    TmpFail,
+    #[error("Unknown error {0}")]
+    Unknown(String),
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -23,5 +32,12 @@ impl Display for CancellationErrorKind {
         };
 
         write!(f, "{}", txt)
+    }
+}
+
+// TODO: improve this.
+impl From<io::Error> for Error {
+    fn from(value: io::Error) -> Self {
+        Error::Unknown(value.to_string())
     }
 }

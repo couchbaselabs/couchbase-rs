@@ -1,3 +1,4 @@
+mod auth_mechanism;
 mod client;
 mod codec;
 mod dispatcher;
