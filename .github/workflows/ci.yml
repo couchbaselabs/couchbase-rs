@@ -16,13 +16,13 @@ jobs:
         build: [linux, macos, windows]
         include:
           - build: linux
-            os: ubuntu-18.04
+            os: ubuntu-latest
             rust: stable
           - build: macos
             os: macos-latest
             rust: stable
           - build: windows
-            os: windows-2016
+            os: windows-latest
             rust: stable
 
     steps:
@@ -53,7 +53,7 @@ jobs:
         if: matrix.os == 'macos-latest'
 
       - name: Install dependencies (linux)
-        if: matrix.os == 'ubuntu-18.04'
+        if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get install libevent-dev libxcb-composite0-dev libx11-dev
       - name: Install dependencies (macos)
         if: matrix.os == 'macos-latest'
@@ -67,7 +67,7 @@ jobs:
 #        run: choco install llvm
 #        if: matrix.os == 'windows-2016'
       - name: Install dependencies - Set vcpkg root (windows)
-        if: matrix.os == 'windows-2016'
+        if: matrix.os == 'windows-latest'
         run: echo "VCPKG_ROOT=$Env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Install dependencies - OpenSSL via vcpkg (windows)
         run: |
@@ -76,12 +76,12 @@ jobs:
           echo "OPENSSL_ROOT_DIR=$Env:VCPKG_ROOT\packages\openssl_x64-windows\" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           echo "OPENSSL_LIB_DIR=$Env:VCPKG_ROOT\packages\openssl_x64-windows\lib\" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           echo "OPENSSL_INCLUDE_DIR=$Env:VCPKG_ROOT\packages\openssl_x64-windows\include\" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-        if: matrix.os == 'windows-2016'
+        if: matrix.os == 'windows-latest'
 
       - name: Build
         run: |
           cargo build --verbose
-        if: matrix.os == 'ubuntu-18.04'
+        if: matrix.os == 'ubuntu-latest'
 
       - name: Build
         shell: cmd
@@ -90,7 +90,7 @@ jobs:
           cargo build --verbose
         env:
           VCPKGRS_DYNAMIC: 1
-        if: matrix.os == 'windows-2016'
+        if: matrix.os == 'windows-latest'
 
       - name: Build
         run: |
@@ -104,7 +104,7 @@ jobs:
 
   rustfmt:
     name: Rustfmt
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@master
       - name: Install Rust
