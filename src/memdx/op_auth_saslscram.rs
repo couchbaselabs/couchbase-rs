@@ -3,14 +3,14 @@ use crate::memdx::client::Result;
 use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::op_bootstrap::OpAuthEncoder;
 use crate::memdx::ops_core::OpsCore;
-use crate::memdx::pendingop::{SASLAuthScramPendingOp};
-use crate::memdx::request::{SASLAuthRequest};
+use crate::memdx::pendingop::SASLAuthScramPendingOp;
+use crate::memdx::request::SASLAuthRequest;
 
 use scram_rs::scram_sync::SyncScramClient;
 use scram_rs::{
-    ScramAuthClient, ScramCbHelper, ScramHashing, ScramKey, ScramNonce,
-    ScramSha256RustNative,
+    ScramAuthClient, ScramCbHelper, ScramHashing, ScramKey, ScramNonce, ScramSha256RustNative,
 };
+use tokio_util::sync::CancellationToken;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum SASLAuthScramHash {
@@ -92,6 +92,7 @@ impl OpsCore {
     pub async fn sasl_auth_scram<'a, D>(
         &'a mut self,
         dispatcher: &'a mut D,
+        cancellation_token: CancellationToken,
         opts: SASLAuthScramOptions,
         pipeline_cb: Option<impl (Fn()) + Send + Sync + 'static>,
     ) -> Result<SASLAuthScramPendingOp<Self, D>>
@@ -116,7 +117,7 @@ impl OpsCore {
             auth_mechanism: opts.hash.into(),
         };
 
-        let op = self.sasl_auth(dispatcher, req).await?;
+        let op = self.sasl_auth(dispatcher, cancellation_token, req).await?;
 
         if let Some(p_cb) = pipeline_cb {
             p_cb();

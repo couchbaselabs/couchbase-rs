@@ -7,7 +7,9 @@ use crate::memdx::op_bootstrap::OpAuthEncoder;
 use crate::memdx::request::SASLStepRequest;
 use crate::memdx::response::{SASLAuthResponse, TryFromClientResponse};
 use log::debug;
+use tokio::select;
 use tokio::sync::mpsc::Receiver;
+use tokio_util::sync::CancellationToken;
 
 pub trait PendingOp {
     fn cancel(&mut self, e: CancellationErrorKind);
@@ -55,17 +57,33 @@ impl PendingOp for ClientPendingOp {
 
 pub struct StandardPendingOp {
     wrapped: ClientPendingOp,
+    cancellation_token: CancellationToken,
 }
 
 impl StandardPendingOp {
-    pub fn new(op: ClientPendingOp) -> Self {
-        Self { wrapped: op }
+    pub fn new(op: ClientPendingOp, cancellation_token: CancellationToken) -> Self {
+        Self {
+            wrapped: op,
+            cancellation_token,
+        }
     }
 
     pub async fn recv<T: TryFromClientResponse>(&mut self) -> Result<T> {
-        let packet = self.wrapped.recv().await?;
+        let packet = select! {
+            packet = self.wrapped.recv() => {
+                packet
+            }
+            _ = self.cancellation_token.cancelled() => {
+                self.wrapped.cancel(CancellationErrorKind::RequestCancelled);
+                self.wrapped.recv().await
+            }
+        }?;
 
         T::try_from(packet)
+    }
+
+    pub fn cancellation_token(&self) -> CancellationToken {
+        self.cancellation_token.clone()
     }
 }
 
@@ -94,6 +112,7 @@ impl<'a, E: OpAuthEncoder, D: Dispatcher> SASLAuthScramPendingOp<'a, E, D> {
         self.encoder
             .sasl_step(
                 self.dispatcher,
+                self.initial_op.cancellation_token(),
                 SASLStepRequest {
                     auth_mechanism: AuthMechanism::Plain,
                     payload: vec![],

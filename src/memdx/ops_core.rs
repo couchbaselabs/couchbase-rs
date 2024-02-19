@@ -14,11 +14,17 @@ use crate::memdx::request::{
 use crate::memdx::status::Status;
 use byteorder::{BigEndian, WriteBytesExt};
 use std::io::Write;
+use tokio_util::sync::CancellationToken;
 
 pub struct OpsCore {}
 
 impl OpBootstrapEncoder for OpsCore {
-    async fn hello<D>(&self, dispatcher: &mut D, request: HelloRequest) -> Result<StandardPendingOp>
+    async fn hello<D>(
+        &self,
+        dispatcher: &mut D,
+        cancellation_token: CancellationToken,
+        request: HelloRequest,
+    ) -> Result<StandardPendingOp>
     where
         D: Dispatcher,
     {
@@ -31,12 +37,13 @@ impl OpBootstrapEncoder for OpsCore {
 
         let op = dispatcher.dispatch(packet).await?;
 
-        Ok(StandardPendingOp::new(op))
+        Ok(StandardPendingOp::new(op, cancellation_token))
     }
 
     async fn get_error_map<D>(
         &self,
         dispatcher: &mut D,
+        cancellation_token: CancellationToken,
         request: GetErrorMapRequest,
     ) -> Result<StandardPendingOp>
     where
@@ -50,12 +57,13 @@ impl OpBootstrapEncoder for OpsCore {
 
         let op = dispatcher.dispatch(packet).await?;
 
-        Ok(StandardPendingOp::new(op))
+        Ok(StandardPendingOp::new(op, cancellation_token))
     }
 
     async fn select_bucket<D>(
         &self,
         dispatcher: &mut D,
+        cancellation_token: CancellationToken,
         request: SelectBucketRequest,
     ) -> Result<StandardPendingOp>
     where
@@ -69,12 +77,13 @@ impl OpBootstrapEncoder for OpsCore {
 
         let op = dispatcher.dispatch(packet).await?;
 
-        Ok(StandardPendingOp::new(op))
+        Ok(StandardPendingOp::new(op, cancellation_token))
     }
 
     async fn sasl_list_mechs<D>(
         &self,
         dispatcher: &mut D,
+        cancellation_token: CancellationToken,
         _request: SASLListMechsRequest,
     ) -> Result<StandardPendingOp>
     where
@@ -84,7 +93,7 @@ impl OpBootstrapEncoder for OpsCore {
 
         let op = dispatcher.dispatch(packet).await?;
 
-        Ok(StandardPendingOp::new(op))
+        Ok(StandardPendingOp::new(op, cancellation_token))
     }
 }
 
@@ -92,6 +101,7 @@ impl OpAuthEncoder for OpsCore {
     async fn sasl_auth<D>(
         &self,
         dispatcher: &mut D,
+        cancellation_token: CancellationToken,
         request: SASLAuthRequest,
     ) -> Result<StandardPendingOp>
     where
@@ -110,12 +120,13 @@ impl OpAuthEncoder for OpsCore {
 
         let op = dispatcher.dispatch(packet).await?;
 
-        Ok(StandardPendingOp::new(op))
+        Ok(StandardPendingOp::new(op, cancellation_token))
     }
 
     async fn sasl_step<D>(
         &self,
         dispatcher: &mut D,
+        cancellation_token: CancellationToken,
         request: SASLStepRequest,
     ) -> Result<StandardPendingOp>
     where
@@ -130,7 +141,7 @@ impl OpAuthEncoder for OpsCore {
 
         let op = dispatcher.dispatch(packet).await?;
 
-        Ok(StandardPendingOp::new(op))
+        Ok(StandardPendingOp::new(op, cancellation_token))
     }
 }
 

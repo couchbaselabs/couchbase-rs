@@ -5,6 +5,7 @@ use crate::memdx::op_bootstrap::OpAuthEncoder;
 use crate::memdx::ops_core::OpsCore;
 use crate::memdx::pendingop::StandardPendingOp;
 use crate::memdx::request::SASLAuthRequest;
+use tokio_util::sync::CancellationToken;
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct SASLAuthPlainOptions {
@@ -28,6 +29,7 @@ impl OpsCore {
     pub async fn sasl_auth_plain<D>(
         &self,
         dispatcher: &mut D,
+        cancellation_token: CancellationToken,
         opts: SASLAuthPlainOptions,
         pipeline_cb: Option<impl (Fn()) + Send + Sync + 'static>,
     ) -> Result<StandardPendingOp>
@@ -45,7 +47,7 @@ impl OpsCore {
             auth_mechanism: AuthMechanism::Plain,
         };
 
-        let op = self.sasl_auth(dispatcher, req).await?;
+        let op = self.sasl_auth(dispatcher, cancellation_token, req).await?;
 
         if let Some(p_cb) = pipeline_cb {
             p_cb();

@@ -277,6 +277,7 @@ mod tests {
     use std::sync::mpsc;
     use tokio::net::TcpStream;
     use tokio_util::bytes::BytesMut;
+    use tokio_util::sync::CancellationToken;
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn roundtrip_a_request() {
@@ -285,6 +286,7 @@ mod tests {
         let socket = TcpStream::connect("127.0.0.1:11210")
             .await
             .expect("could not connect");
+        socket.set_nodelay(false).unwrap();
 
         let conn = Connection::Tcp(socket);
         let mut client = Client::new(conn);
@@ -298,9 +300,12 @@ mod tests {
         auth_payload.push(0);
         auth_payload.extend_from_slice(password.as_ref());
 
+        let cancellation_token = CancellationToken::new();
+
         let bootstrap_result = OpBootstrap::bootstrap(
             OpsCore {},
             &mut client,
+            cancellation_token,
             BootstrapOptions {
                 hello: Some(HelloRequest {
                     client_name: "test-client".into(),
