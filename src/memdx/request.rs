@@ -22,3 +22,12 @@ pub struct SASLAuthRequest {
     pub auth_mechanism: AuthMechanism,
     pub payload: Vec<u8>,
 }
+
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct SASLStepRequest {
+    pub auth_mechanism: AuthMechanism,
+    pub payload: Vec<u8>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct SASLListMechsRequest {}

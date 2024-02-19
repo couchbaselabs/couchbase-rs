@@ -1,6 +1,6 @@
 use crate::memdx::error::Error;
 use std::fmt::{Debug, Display};
-use std::io;
+
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Magic {

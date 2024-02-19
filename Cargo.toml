@@ -15,6 +15,9 @@ log = "0.4.20"
 uuid = { version = "1.7.0", features = ["v4"] }
 byteorder = "1.5"
 bytes = "1.5.0"
+hmac = "0.12"
+sha2 = "0.10"
+scram-rs = "0.10"   # In time we might want to implement our own client.
 
 [dev-dependencies]
 env_logger = "0.11"

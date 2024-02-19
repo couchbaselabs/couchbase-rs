@@ -1,6 +1,6 @@
 use crate::memdx::error::Error;
 use std::fmt::{Display, Formatter};
-use std::io;
+
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum OpCode {
@@ -11,6 +11,8 @@ pub enum OpCode {
     GetErrorMap,
     SelectBucket,
     SASLAuth,
+    SASLListMechs,
+    SASLStep,
 }
 
 impl Into<u8> for OpCode {
@@ -20,7 +22,9 @@ impl Into<u8> for OpCode {
             OpCode::Set => 0x01,
             OpCode::Add => 0x02,
             OpCode::Hello => 0x1f,
+            OpCode::SASLListMechs => 0x20,
             OpCode::SASLAuth => 0x21,
+            OpCode::SASLStep => 0x22,
             OpCode::SelectBucket => 0x89,
             OpCode::GetErrorMap => 0xfe,
         }
@@ -36,7 +40,9 @@ impl TryFrom<u8> for OpCode {
             0x01 => OpCode::Set,
             0x02 => OpCode::Add,
             0x1f => OpCode::Hello,
+            0x20 => OpCode::SASLListMechs,
             0x21 => OpCode::SASLAuth,
+            0x22 => OpCode::SASLStep,
             0x89 => OpCode::SelectBucket,
             0xfe => OpCode::GetErrorMap,
             _ => {
@@ -58,6 +64,8 @@ impl Display for OpCode {
             OpCode::GetErrorMap => "Get error map",
             OpCode::SelectBucket => "Select bucket",
             OpCode::SASLAuth => "SASL auth",
+            OpCode::SASLListMechs => "SASL list mechanisms",
+            OpCode::SASLStep => "SASL step",
         };
         write!(f, "{}", txt)
     }
