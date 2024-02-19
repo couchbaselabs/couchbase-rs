@@ -1,14 +1,14 @@
 use crate::memdx::auth_mechanism::AuthMechanism;
+use crate::memdx::client::ClientResponse;
 use crate::memdx::error::Error;
 use crate::memdx::hello_feature::HelloFeature;
 use crate::memdx::ops_core::decode_error;
-use crate::memdx::packet::ResponsePacket;
 use crate::memdx::status::Status;
 use byteorder::{BigEndian, ReadBytesExt};
 use std::io::Cursor;
 
-pub trait TryFromResponsePacket: Sized {
-    fn try_from(packet: ResponsePacket) -> Result<Self, Error>;
+pub trait TryFromClientResponse: Sized {
+    fn try_from(resp: ClientResponse) -> Result<Self, Error>;
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -16,8 +16,9 @@ pub struct HelloResponse {
     pub enabled_features: Vec<HelloFeature>,
 }
 
-impl TryFromResponsePacket for HelloResponse {
-    fn try_from(packet: ResponsePacket) -> Result<Self, Error> {
+impl TryFromClientResponse for HelloResponse {
+    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+        let packet = resp.packet();
         let status = packet.status();
         if status != Status::Success {
             return Err(decode_error(packet));
@@ -47,8 +48,9 @@ pub struct GetErrorMapResponse {
     pub error_map: Vec<u8>,
 }
 
-impl TryFromResponsePacket for GetErrorMapResponse {
-    fn try_from(packet: ResponsePacket) -> Result<Self, Error> {
+impl TryFromClientResponse for GetErrorMapResponse {
+    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+        let packet = resp.packet();
         let status = packet.status();
         if status != Status::Success {
             return Err(decode_error(packet));
@@ -65,8 +67,9 @@ impl TryFromResponsePacket for GetErrorMapResponse {
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct SelectBucketResponse {}
 
-impl TryFromResponsePacket for SelectBucketResponse {
-    fn try_from(packet: ResponsePacket) -> Result<Self, Error> {
+impl TryFromClientResponse for SelectBucketResponse {
+    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+        let packet = resp.packet();
         let status = packet.status();
         if status != Status::Success {
             return Err(decode_error(packet));
@@ -82,9 +85,19 @@ pub struct SASLAuthResponse {
     pub payload: Vec<u8>,
 }
 
-impl TryFromResponsePacket for SASLAuthResponse {
-    fn try_from(packet: ResponsePacket) -> Result<Self, Error> {
+impl TryFromClientResponse for SASLAuthResponse {
+    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+        let packet = resp.packet();
         let status = packet.status();
+        if status == Status::SASLAuthContinue {
+            // TODO: clone?
+            let value = packet.value().clone();
+            return Ok(SASLAuthResponse {
+                needs_more_steps: true,
+                payload: value.unwrap_or_default(),
+            });
+        }
+
         if status != Status::Success {
             return Err(decode_error(packet));
         }
@@ -103,8 +116,9 @@ pub struct SASLStepResponse {
     pub payload: Vec<u8>,
 }
 
-impl TryFromResponsePacket for SASLStepResponse {
-    fn try_from(packet: ResponsePacket) -> Result<Self, Error> {
+impl TryFromClientResponse for SASLStepResponse {
+    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+        let packet = resp.packet();
         let status = packet.status();
         if status != Status::Success {
             return Err(decode_error(packet));
@@ -123,8 +137,9 @@ pub struct SASLListMechsResponse {
     pub available_mechs: Vec<AuthMechanism>,
 }
 
-impl TryFromResponsePacket for SASLListMechsResponse {
-    fn try_from(packet: ResponsePacket) -> Result<Self, Error> {
+impl TryFromClientResponse for SASLListMechsResponse {
+    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+        let packet = resp.packet();
         let status = packet.status();
         if status != Status::Success {
             return Err(decode_error(packet));
@@ -138,7 +153,7 @@ impl TryFromResponsePacket for SASLListMechsResponse {
                 return Err(Error::Protocol(e.to_string()));
             }
         };
-        let mechs_list_split = mechs_list_string.split(" ");
+        let mechs_list_split = mechs_list_string.split(' ');
         let mut mechs_list = Vec::new();
         for item in mechs_list_split {
             mechs_list.push(AuthMechanism::try_from(item)?);

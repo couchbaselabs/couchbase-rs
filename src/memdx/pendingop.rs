@@ -1,12 +1,11 @@
 use crate::memdx::auth_mechanism::AuthMechanism;
-use crate::memdx::client::CancellationSender;
 use crate::memdx::client::Result;
+use crate::memdx::client::{CancellationSender, ClientResponse};
 use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::error::CancellationErrorKind;
 use crate::memdx::op_bootstrap::OpAuthEncoder;
-use crate::memdx::packet::ResponsePacket;
 use crate::memdx::request::SASLStepRequest;
-use crate::memdx::response::{SASLAuthResponse, TryFromResponsePacket};
+use crate::memdx::response::{SASLAuthResponse, TryFromClientResponse};
 use log::debug;
 use tokio::sync::mpsc::Receiver;
 
@@ -21,14 +20,14 @@ pub(crate) trait OpCanceller {
 pub(crate) struct ClientPendingOp {
     opaque: u32,
     cancel_chan: CancellationSender,
-    response_receiver: Receiver<Result<ResponsePacket>>,
+    response_receiver: Receiver<Result<ClientResponse>>,
 }
 
 impl ClientPendingOp {
     pub fn new(
         opaque: u32,
         cancel_chan: CancellationSender,
-        response_receiver: Receiver<Result<ResponsePacket>>,
+        response_receiver: Receiver<Result<ClientResponse>>,
     ) -> Self {
         ClientPendingOp {
             opaque,
@@ -37,7 +36,7 @@ impl ClientPendingOp {
         }
     }
 
-    pub async fn recv(&mut self) -> Result<ResponsePacket> {
+    pub async fn recv(&mut self) -> Result<ClientResponse> {
         // TODO: unwrap
         self.response_receiver.recv().await.unwrap()
     }
@@ -63,7 +62,7 @@ impl StandardPendingOp {
         Self { wrapped: op }
     }
 
-    pub async fn recv<T: TryFromResponsePacket>(&mut self) -> Result<T> {
+    pub async fn recv<T: TryFromClientResponse>(&mut self) -> Result<T> {
         let packet = self.wrapped.recv().await?;
 
         T::try_from(packet)

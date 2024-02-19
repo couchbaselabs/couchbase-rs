@@ -134,7 +134,7 @@ impl OpAuthEncoder for OpsCore {
     }
 }
 
-pub(crate) fn decode_error(resp: ResponsePacket) -> Error {
+pub(crate) fn decode_error(resp: &ResponsePacket) -> Error {
     let status = resp.status();
     if status == Status::NotMyVbucket {
         Error::NotMyVbucket

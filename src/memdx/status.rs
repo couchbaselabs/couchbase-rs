@@ -6,6 +6,7 @@ pub enum Status {
     NotMyVbucket,
     Success,
     TmpFail,
+    SASLAuthContinue,
 
     Unknown(u16),
 }
@@ -16,6 +17,7 @@ impl From<u16> for Status {
             0x00 => Status::Success,
             0x07 => Status::NotMyVbucket,
             0x20 => Status::AuthError,
+            0x21 => Status::SASLAuthContinue,
             0x86 => Status::TmpFail,
             _ => Status::Unknown(value),
         }
@@ -29,6 +31,7 @@ impl Display for Status {
             Status::NotMyVbucket => "not my vbucket",
             Status::Success => "success",
             Status::TmpFail => "temporary failure",
+            Status::SASLAuthContinue => "authentication continue",
             Status::Unknown(status) => {
                 // TODO: improve this.
                 let t = format!("unknown status {}", status);

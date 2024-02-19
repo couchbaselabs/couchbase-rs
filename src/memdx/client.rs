@@ -10,15 +10,43 @@ use std::sync::Arc;
 use tokio::io::{ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
 use tokio::sync::mpsc::{Sender, UnboundedReceiver, UnboundedSender};
-use tokio::sync::{mpsc, Mutex, Semaphore};
+use tokio::sync::{mpsc, oneshot, Mutex, Semaphore};
 use tokio_rustls::client::TlsStream;
 use tokio_util::codec::{FramedRead, FramedWrite};
 use uuid::Uuid;
 
 pub type Result<T> = std::result::Result<T, Error>;
-type OpaqueMap = HashMap<u32, Arc<Sender<Result<ResponsePacket>>>>;
+pub type ResponseSender = Sender<Result<ClientResponse>>;
+type OpaqueMap = HashMap<u32, Arc<ResponseSender>>;
 pub(crate) type CancellationSender = UnboundedSender<(u32, CancellationErrorKind)>;
 
+#[derive(Debug)]
+pub(crate) struct ClientResponse {
+    packet: ResponsePacket,
+    has_more_sender: oneshot::Sender<bool>,
+}
+
+impl ClientResponse {
+    pub fn new(packet: ResponsePacket, has_more_sender: oneshot::Sender<bool>) -> Self {
+        Self {
+            packet,
+            has_more_sender,
+        }
+    }
+
+    pub fn packet(&self) -> &ResponsePacket {
+        &self.packet
+    }
+
+    pub fn send_has_more(self) {
+        match self.has_more_sender.send(true) {
+            Ok(_) => {}
+            Err(_e) => {}
+        };
+    }
+}
+
+#[derive(Debug)]
 pub enum Connection {
     Tcp(TcpStream),
     Tls(TlsStream<TcpStream>),
@@ -26,6 +54,7 @@ pub enum Connection {
 
 static HANDLER_INVOKE_PERMITS: Semaphore = Semaphore::const_new(1);
 
+#[derive(Debug)]
 pub struct Client {
     current_opaque: u32,
     opaque_map: Arc<Mutex<OpaqueMap>>,
@@ -78,7 +107,7 @@ impl Client {
         client
     }
 
-    async fn register_handler(&mut self, handler: Arc<Sender<Result<ResponsePacket>>>) -> u32 {
+    async fn register_handler(&mut self, handler: Arc<ResponseSender>) -> u32 {
         let requests = Arc::clone(&self.opaque_map);
         let mut map = requests.lock().await;
 
@@ -155,7 +184,9 @@ impl Client {
                         if let Some(map_entry) = t {
                             let sender = Arc::clone(map_entry);
                             drop(map);
-                            match sender.send(Ok(packet)).await {
+                            let (more_tx, more_rx) = oneshot::channel();
+                            let resp = ClientResponse::new(packet, more_tx);
+                            match sender.send(Ok(resp)).await {
                                 Ok(_) => {}
                                 Err(e) => {
                                     debug!("Sending response to caller failed: {}", e);
@@ -163,11 +194,22 @@ impl Client {
                             };
                             drop(sender);
 
-                            // if !has_more_packets {
-                            //     let mut map = requests.lock().unwrap();
-                            //     map.remove(&opaque);
-                            //     drop(map);
-                            // }
+                            match more_rx.await {
+                                Ok(has_more_packets) => {
+                                    if !has_more_packets {
+                                        let mut map = requests.lock().await;
+                                        map.remove(&opaque);
+                                        drop(map);
+                                    }
+                                }
+                                Err(_) => {
+                                    // If the response gets dropped then the receiver will be closed,
+                                    // which we treat as an implicit !has_more_packets.
+                                    let mut map = requests.lock().await;
+                                    map.remove(&opaque);
+                                    drop(map);
+                                }
+                            }
                         } else {
                             drop(map);
                             warn!(
@@ -285,8 +327,6 @@ mod tests {
 
         let hello_result = bootstrap_result.hello.unwrap();
         assert_eq!(4, hello_result.enabled_features.len());
-
-        let (sender, recv) = mpsc::sync_channel::<ResponsePacket>(1);
 
         let mut req = RequestPacket::new(Magic::Req, OpCode::Set);
         req = req.set_key(make_uleb128_32("test".as_bytes().into(), 0x00));
