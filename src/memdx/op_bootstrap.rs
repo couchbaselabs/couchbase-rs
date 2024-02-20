@@ -1,19 +1,22 @@
 use crate::memdx::client::Result;
 use crate::memdx::dispatcher::Dispatcher;
+use crate::memdx::error::CancellationErrorKind;
 use crate::memdx::pendingop::StandardPendingOp;
 use crate::memdx::request::{
     GetErrorMapRequest, HelloRequest, SASLAuthRequest, SASLListMechsRequest, SASLStepRequest,
     SelectBucketRequest,
 };
-use crate::memdx::response::{BootstrapResult, SASLAuthResponse, SelectBucketResponse};
+use crate::memdx::response::{
+    BootstrapResult, SASLAuthResponse, SelectBucketResponse, TryFromClientResponse,
+};
 use log::warn;
-use tokio_util::sync::CancellationToken;
+use tokio::select;
+use tokio::time::Instant;
 
 pub trait OpAuthEncoder {
     async fn sasl_auth<D>(
         &self,
         dispatcher: &mut D,
-        cancellation_token: CancellationToken,
         request: SASLAuthRequest,
     ) -> Result<StandardPendingOp>
     where
@@ -22,7 +25,6 @@ pub trait OpAuthEncoder {
     async fn sasl_step<D>(
         &self,
         dispatcher: &mut D,
-        cancellation_token: CancellationToken,
         request: SASLStepRequest,
     ) -> Result<StandardPendingOp>
     where
@@ -33,7 +35,6 @@ pub trait OpBootstrapEncoder {
     async fn hello<D>(
         &self,
         dispatcher: &mut D,
-        cancellation_token: CancellationToken,
         request: HelloRequest,
     ) -> Result<StandardPendingOp>
     where
@@ -42,7 +43,6 @@ pub trait OpBootstrapEncoder {
     async fn get_error_map<D>(
         &self,
         dispatcher: &mut D,
-        cancellation_token: CancellationToken,
         request: GetErrorMapRequest,
     ) -> Result<StandardPendingOp>
     where
@@ -51,7 +51,6 @@ pub trait OpBootstrapEncoder {
     async fn select_bucket<D>(
         &self,
         dispatcher: &mut D,
-        cancellation_token: CancellationToken,
         request: SelectBucketRequest,
     ) -> Result<StandardPendingOp>
     where
@@ -60,7 +59,6 @@ pub trait OpBootstrapEncoder {
     async fn sasl_list_mechs<D>(
         &self,
         dispatcher: &mut D,
-        cancellation_token: CancellationToken,
         request: SASLListMechsRequest,
     ) -> Result<StandardPendingOp>
     where
@@ -74,13 +72,13 @@ pub struct BootstrapOptions {
     pub get_error_map: Option<GetErrorMapRequest>,
     pub auth: Option<SASLAuthRequest>,
     pub select_bucket: Option<SelectBucketRequest>,
+    pub deadline: Instant,
 }
 
 impl OpBootstrap {
     pub async fn bootstrap<E, D>(
         encoder: E,
         dispatcher: &mut D,
-        cancellation_token: CancellationToken,
         opts: BootstrapOptions,
     ) -> Result<BootstrapResult>
     where
@@ -88,38 +86,22 @@ impl OpBootstrap {
         D: Dispatcher,
     {
         let hello_op = if let Some(req) = opts.hello {
-            Some(
-                encoder
-                    .hello(dispatcher, cancellation_token.clone(), req)
-                    .await?,
-            )
+            Some(encoder.hello(dispatcher, req).await?)
         } else {
             None
         };
         let error_map_op = if let Some(req) = opts.get_error_map {
-            Some(
-                encoder
-                    .get_error_map(dispatcher, cancellation_token.clone(), req)
-                    .await?,
-            )
+            Some(encoder.get_error_map(dispatcher, req).await?)
         } else {
             None
         };
         let auth_op = if let Some(req) = opts.auth {
-            Some(
-                encoder
-                    .sasl_auth(dispatcher, cancellation_token.clone(), req)
-                    .await?,
-            )
+            Some(encoder.sasl_auth(dispatcher, req).await?)
         } else {
             None
         };
         let select_bucket_op = if let Some(req) = opts.select_bucket {
-            Some(
-                encoder
-                    .select_bucket(dispatcher, cancellation_token.clone(), req)
-                    .await?,
-            )
+            Some(encoder.select_bucket(dispatcher, req).await?)
         } else {
             None
         };
@@ -166,5 +148,18 @@ impl OpBootstrap {
         }
 
         Ok(result)
+    }
+}
+
+async fn await_bootstrap_op<R>(deadline: Instant, mut op: StandardPendingOp) -> Result<R>
+where
+    R: TryFromClientResponse,
+{
+    select! {
+        res = op.recv() => res,
+        _ = tokio::time::sleep_until(deadline) => {
+            op.cancel(CancellationErrorKind::Timeout);
+            op.recv().await
+        }
     }
 }

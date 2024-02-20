@@ -92,7 +92,6 @@ impl OpsCore {
     pub async fn sasl_auth_scram<'a, D>(
         &'a mut self,
         dispatcher: &'a mut D,
-        cancellation_token: CancellationToken,
         opts: SASLAuthScramOptions,
         pipeline_cb: Option<impl (Fn()) + Send + Sync + 'static>,
     ) -> Result<SASLAuthScramPendingOp<Self, D>>
@@ -117,7 +116,7 @@ impl OpsCore {
             auth_mechanism: opts.hash.into(),
         };
 
-        let op = self.sasl_auth(dispatcher, cancellation_token, req).await?;
+        let op = self.sasl_auth(dispatcher, req).await?;
 
         if let Some(p_cb) = pipeline_cb {
             p_cb();

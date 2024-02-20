@@ -274,8 +274,11 @@ mod tests {
         GetErrorMapRequest, HelloRequest, SASLAuthRequest, SelectBucketRequest,
     };
     use bytes::BufMut;
+    use std::ops::Add;
     use std::sync::mpsc;
+    use std::time::Duration;
     use tokio::net::TcpStream;
+    use tokio::time::Instant;
     use tokio_util::bytes::BytesMut;
     use tokio_util::sync::CancellationToken;
 
@@ -300,12 +303,11 @@ mod tests {
         auth_payload.push(0);
         auth_payload.extend_from_slice(password.as_ref());
 
-        let cancellation_token = CancellationToken::new();
+        let instant = Instant::now().add(Duration::new(7, 0));
 
         let bootstrap_result = OpBootstrap::bootstrap(
             OpsCore {},
             &mut client,
-            cancellation_token,
             BootstrapOptions {
                 hello: Some(HelloRequest {
                     client_name: "test-client".into(),
@@ -324,6 +326,7 @@ mod tests {
                 select_bucket: Some(SelectBucketRequest {
                     bucket_name: "default".into(),
                 }),
+                deadline: instant,
             },
         )
         .await
