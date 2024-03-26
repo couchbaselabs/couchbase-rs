@@ -1,11 +1,15 @@
+use std::io::Cursor;
+use std::time::Duration;
+
+use byteorder::{BigEndian, ReadBytesExt};
+
 use crate::memdx::auth_mechanism::AuthMechanism;
 use crate::memdx::client::ClientResponse;
 use crate::memdx::error::Error;
 use crate::memdx::hello_feature::HelloFeature;
-use crate::memdx::ops_core::decode_error;
+use crate::memdx::ops_core::OpsCore;
+use crate::memdx::ops_crud::{decode_res_ext_frames, OpsCrud};
 use crate::memdx::status::Status;
-use byteorder::{BigEndian, ReadBytesExt};
-use std::io::Cursor;
 
 pub trait TryFromClientResponse: Sized {
     fn try_from(resp: ClientResponse) -> Result<Self, Error>;
@@ -19,13 +23,13 @@ pub struct HelloResponse {
 impl TryFromClientResponse for HelloResponse {
     fn try_from(resp: ClientResponse) -> Result<Self, Error> {
         let packet = resp.packet();
-        let status = packet.status();
+        let status = packet.status;
         if status != Status::Success {
-            return Err(decode_error(packet));
+            return Err(OpsCore::decode_error(packet));
         }
 
         let mut features: Vec<HelloFeature> = Vec::new();
-        if let Some(value) = packet.value() {
+        if let Some(value) = &packet.value {
             if value.len() % 2 != 0 {
                 return Err(Error::Protocol("invalid hello features length".into()));
             }
@@ -51,13 +55,13 @@ pub struct GetErrorMapResponse {
 impl TryFromClientResponse for GetErrorMapResponse {
     fn try_from(resp: ClientResponse) -> Result<Self, Error> {
         let packet = resp.packet();
-        let status = packet.status();
+        let status = packet.status;
         if status != Status::Success {
-            return Err(decode_error(packet));
+            return Err(OpsCore::decode_error(packet));
         }
 
         // TODO: Clone?
-        let value = packet.value().clone().unwrap_or_default();
+        let value = packet.value.clone().unwrap_or_default();
         let response = GetErrorMapResponse { error_map: value };
 
         Ok(response)
@@ -70,9 +74,9 @@ pub struct SelectBucketResponse {}
 impl TryFromClientResponse for SelectBucketResponse {
     fn try_from(resp: ClientResponse) -> Result<Self, Error> {
         let packet = resp.packet();
-        let status = packet.status();
+        let status = packet.status;
         if status != Status::Success {
-            return Err(decode_error(packet));
+            return Err(OpsCore::decode_error(packet));
         }
 
         Ok(SelectBucketResponse {})
@@ -88,10 +92,10 @@ pub struct SASLAuthResponse {
 impl TryFromClientResponse for SASLAuthResponse {
     fn try_from(resp: ClientResponse) -> Result<Self, Error> {
         let packet = resp.packet();
-        let status = packet.status();
+        let status = packet.status;
         if status == Status::SASLAuthContinue {
             // TODO: clone?
-            let value = packet.value().clone();
+            let value = packet.value.clone();
             return Ok(SASLAuthResponse {
                 needs_more_steps: true,
                 payload: value.unwrap_or_default(),
@@ -99,13 +103,13 @@ impl TryFromClientResponse for SASLAuthResponse {
         }
 
         if status != Status::Success {
-            return Err(decode_error(packet));
+            return Err(OpsCore::decode_error(packet));
         }
 
         Ok(SASLAuthResponse {
             needs_more_steps: false,
             // TODO: clone?
-            payload: packet.value().clone().unwrap_or_default(),
+            payload: packet.value.clone().unwrap_or_default(),
         })
     }
 }
@@ -119,15 +123,15 @@ pub struct SASLStepResponse {
 impl TryFromClientResponse for SASLStepResponse {
     fn try_from(resp: ClientResponse) -> Result<Self, Error> {
         let packet = resp.packet();
-        let status = packet.status();
+        let status = packet.status;
         if status != Status::Success {
-            return Err(decode_error(packet));
+            return Err(OpsCore::decode_error(packet));
         }
 
         Ok(SASLStepResponse {
             needs_more_steps: false,
             // TODO: clone?
-            payload: packet.value().clone().unwrap_or_default(),
+            payload: packet.value.clone().unwrap_or_default(),
         })
     }
 }
@@ -140,13 +144,13 @@ pub struct SASLListMechsResponse {
 impl TryFromClientResponse for SASLListMechsResponse {
     fn try_from(resp: ClientResponse) -> Result<Self, Error> {
         let packet = resp.packet();
-        let status = packet.status();
+        let status = packet.status;
         if status != Status::Success {
-            return Err(decode_error(packet));
+            return Err(OpsCore::decode_error(packet));
         }
 
         // TODO: Clone?
-        let value = packet.value().clone().unwrap_or_default();
+        let value = packet.value.clone().unwrap_or_default();
         let mechs_list_string = match String::from_utf8(value) {
             Ok(v) => v,
             Err(e) => {
@@ -169,4 +173,120 @@ impl TryFromClientResponse for SASLListMechsResponse {
 pub struct BootstrapResult {
     pub hello: Option<HelloResponse>,
     pub error_map: Option<GetErrorMapResponse>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct MutationToken {
+    pub vbuuid: u64,
+    pub seqno: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct SetResponse {
+    pub cas: u64,
+    pub mutation_token: Option<MutationToken>,
+    pub server_duration: Option<Duration>,
+}
+
+impl TryFromClientResponse for SetResponse {
+    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+        let packet = resp.packet();
+        let status = packet.status;
+
+        if status == Status::TooBig {
+            return Err(Error::TooBig);
+        } else if status == Status::Locked {
+            return Err(Error::Locked);
+        } else if status == Status::KeyExists {
+            return Err(Error::KeyExists);
+        } else if status != Status::Success {
+            return Err(Error::Unknown(
+                OpsCrud::decode_common_error(resp.packet()).to_string(),
+            ));
+        }
+
+        let mutation_token = if let Some(extras) = &packet.extras {
+            if extras.len() != 16 {
+                return Err(Error::Protocol("Bad extras length".to_string()));
+            }
+            let mut extras = Cursor::new(extras);
+
+            Some(MutationToken {
+                vbuuid: extras
+                    .read_u64::<BigEndian>()
+                    .map_err(|e| Error::Unknown(e.to_string()))?,
+                seqno: extras
+                    .read_u64::<BigEndian>()
+                    .map_err(|e| Error::Unknown(e.to_string()))?,
+            })
+        } else {
+            None
+        };
+
+        let server_duration = if let Some(f) = &packet.framing_extras {
+            decode_res_ext_frames(f)?
+        } else {
+            None
+        };
+
+        Ok(SetResponse {
+            cas: packet.cas.unwrap_or_default(),
+            mutation_token,
+            server_duration,
+        })
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct GetResponse {
+    pub cas: u64,
+    pub flags: u32,
+    pub value: Vec<u8>,
+    pub datatype: u8,
+    pub server_duration: Option<Duration>,
+}
+
+impl TryFromClientResponse for GetResponse {
+    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+        let packet = resp.packet();
+        let status = packet.status;
+
+        if status == Status::KeyNotFound {
+            return Err(Error::KeyNotFound);
+        } else if status != Status::Success {
+            return Err(Error::Unknown(
+                OpsCrud::decode_common_error(resp.packet()).to_string(),
+            ));
+        }
+
+        let flags = if let Some(extras) = &packet.extras {
+            if extras.len() != 4 {
+                return Err(Error::Protocol("Bad extras length".to_string()));
+            }
+
+            let mut extras = Cursor::new(extras);
+            extras
+                .read_u32::<BigEndian>()
+                .map_err(|e| Error::Unknown(e.to_string()))?
+        } else {
+            return Err(Error::Protocol("Bad extras length".to_string()));
+        };
+
+        let server_duration = if let Some(f) = &packet.framing_extras {
+            decode_res_ext_frames(f)?
+        } else {
+            None
+        };
+
+        // TODO: clone
+        let value = packet.value.clone().unwrap_or_default();
+
+        Ok(GetResponse {
+            cas: packet.cas.unwrap_or_default(),
+            flags,
+            value,
+            datatype: packet.datatype,
+            server_duration,
+        })
+    }
 }

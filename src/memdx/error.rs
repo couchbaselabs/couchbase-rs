@@ -1,4 +1,3 @@
-
 use std::fmt::{Display, Formatter};
 use std::io;
 
@@ -12,8 +11,22 @@ pub enum Error {
     NotMyVbucket,
     #[error("Protocol error {0}")]
     Protocol(String),
+    #[error("Key exists")]
+    KeyExists,
+    #[error("Key not found")]
+    KeyNotFound,
     #[error("Temporary failure")]
     TmpFail,
+    #[error("Locked")]
+    Locked,
+    #[error("Too big")]
+    TooBig,
+    #[error("Collections not enabled")]
+    CollectionsNotEnabled,
+    #[error("Unknown collection id")]
+    UnknownCollectionID,
+    #[error("Access error")]
+    AccessError,
     #[error("Unknown error {0}")]
     Unknown(String),
 }

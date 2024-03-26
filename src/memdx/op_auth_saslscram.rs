@@ -1,3 +1,8 @@
+use scram_rs::{
+    ScramAuthClient, ScramCbHelper, ScramKey, ScramNonce, ScramSha256RustNative,
+};
+use scram_rs::scram_sync::SyncScramClient;
+
 use crate::memdx::auth_mechanism::AuthMechanism;
 use crate::memdx::client::Result;
 use crate::memdx::dispatcher::Dispatcher;
@@ -5,12 +10,6 @@ use crate::memdx::op_bootstrap::OpAuthEncoder;
 use crate::memdx::ops_core::OpsCore;
 use crate::memdx::pendingop::SASLAuthScramPendingOp;
 use crate::memdx::request::SASLAuthRequest;
-
-use scram_rs::scram_sync::SyncScramClient;
-use scram_rs::{
-    ScramAuthClient, ScramCbHelper, ScramHashing, ScramKey, ScramNonce, ScramSha256RustNative,
-};
-use tokio_util::sync::CancellationToken;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum SASLAuthScramHash {

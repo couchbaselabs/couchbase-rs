@@ -1,12 +1,14 @@
+use std::io;
+
+use tokio_util::bytes::{Buf, BufMut, BytesMut};
+use tokio_util::codec::{Decoder, Encoder};
+
 use crate::memdx::error::Error;
 use crate::memdx::error::Error::Protocol;
 use crate::memdx::magic::Magic;
 use crate::memdx::opcode::OpCode;
 use crate::memdx::packet::{RequestPacket, ResponsePacket};
 use crate::memdx::status::Status;
-use std::io;
-use tokio_util::bytes::{Buf, BufMut, BytesMut};
-use tokio_util::codec::{Decoder, Encoder};
 
 pub const HEADER_SIZE: usize = 24;
 
@@ -73,29 +75,28 @@ impl Decoder for KeyValueCodec {
         let body_len = total_body_len - key_len - extras_len - flexible_extras_len;
 
         let mut packet = ResponsePacket::new(magic, opcode, datatype, status, opaque);
-        packet = packet.set_cas(cas);
+        packet.cas = Some(cas);
 
         let mut payload_pos = 0;
 
         if flexible_extras_len > 0 {
-            packet = packet.set_framing_extras(
-                slice[payload_pos..(payload_pos + flexible_extras_len)].to_vec(),
-            );
+            packet.framing_extras =
+                Some(slice[payload_pos..(payload_pos + flexible_extras_len)].to_vec());
             payload_pos += flexible_extras_len;
         }
 
         if extras_len > 0 {
-            packet = packet.set_extras(slice[payload_pos..(payload_pos + extras_len)].to_vec());
+            packet.extras = Some(slice[payload_pos..(payload_pos + extras_len)].to_vec());
             payload_pos += extras_len;
         };
 
         if key_len > 0 {
-            packet = packet.set_key(slice[payload_pos..(payload_pos + key_len)].to_vec());
+            packet.key = Some(slice[payload_pos..(payload_pos + key_len)].to_vec());
             payload_pos += key_len;
         };
 
         if body_len > 0 {
-            packet = packet.set_value(slice[payload_pos..].to_vec());
+            packet.value = Some(slice[payload_pos..].to_vec());
         };
 
         Ok(Some(packet))
@@ -106,36 +107,36 @@ impl Encoder<RequestPacket> for KeyValueCodec {
     type Error = io::Error;
 
     fn encode(&mut self, item: RequestPacket, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        let key = item.key();
-        let extras = item.extras();
-        let framing_extras = item.framing_extras();
-        let body = item.value();
+        let key = item.key;
+        let extras = item.extras;
+        let framing_extras = item.framing_extras;
+        let body = item.value;
 
-        let key_size = if let Some(k) = key { k.len() } else { 0 };
-        let extras_size = if let Some(e) = extras { e.len() } else { 0 };
-        let framing_extras_size = if let Some(e) = framing_extras {
+        let key_size = if let Some(k) = &key { k.len() } else { 0 };
+        let extras_size = if let Some(e) = &extras { e.len() } else { 0 };
+        let framing_extras_size = if let Some(e) = &framing_extras {
             e.len()
         } else {
             0
         };
-        let body_size = if let Some(b) = body { b.len() } else { 0 };
+        let body_size = if let Some(b) = &body { b.len() } else { 0 };
 
         let total_body_size = key_size + extras_size + framing_extras_size + body_size;
 
         dst.reserve(HEADER_SIZE + total_body_size);
 
-        dst.put_u8(item.magic().into());
-        dst.put_u8(item.op_code().into());
+        dst.put_u8(item.magic.into());
+        dst.put_u8(item.op_code.into());
         if framing_extras.is_some() {
             dst.put_u8(framing_extras_size as u8)
         }
         dst.put_u16(key_size as u16);
         dst.put_u8(extras_size as u8);
-        dst.put_u8(item.datatype());
-        dst.put_u16(item.vbucket_id().unwrap_or_default());
+        dst.put_u8(item.datatype);
+        dst.put_u16(item.vbucket_id.unwrap_or_default());
         dst.put_u32(total_body_size as u32);
-        dst.put_u32(item.opaque());
-        dst.put_u64(item.cas().unwrap_or_default());
+        dst.put_u32(item.opaque.unwrap_or_default());
+        dst.put_u64(item.cas.unwrap_or_default());
 
         if let Some(framing_extras) = framing_extras {
             dst.extend(framing_extras);

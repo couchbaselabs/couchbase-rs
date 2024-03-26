@@ -1,19 +1,21 @@
+use std::collections::HashMap;
+use std::sync::Arc;
+
+use futures::{SinkExt, StreamExt};
+use log::{debug, trace, warn};
+use tokio::io::{ReadHalf, WriteHalf};
+use tokio::net::TcpStream;
+use tokio::sync::{mpsc, Mutex, oneshot, Semaphore};
+use tokio::sync::mpsc::{Sender, UnboundedReceiver, UnboundedSender};
+use tokio_rustls::client::TlsStream;
+use tokio_util::codec::{FramedRead, FramedWrite};
+use uuid::Uuid;
+
 use crate::memdx::codec::KeyValueCodec;
 use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::error::{CancellationErrorKind, Error};
 use crate::memdx::packet::{RequestPacket, ResponsePacket};
 use crate::memdx::pendingop::ClientPendingOp;
-use futures::{SinkExt, StreamExt};
-use log::{debug, trace, warn};
-use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::io::{ReadHalf, WriteHalf};
-use tokio::net::TcpStream;
-use tokio::sync::mpsc::{Sender, UnboundedReceiver, UnboundedSender};
-use tokio::sync::{mpsc, oneshot, Mutex, Semaphore};
-use tokio_rustls::client::TlsStream;
-use tokio_util::codec::{FramedRead, FramedWrite};
-use uuid::Uuid;
 
 pub type Result<T> = std::result::Result<T, Error>;
 pub type ResponseSender = Sender<Result<ClientResponse>>;
@@ -166,12 +168,12 @@ impl Client {
                         trace!(
                             "Resolving response on {}. Opcode={}. Opaque={}. Status={}",
                             client_id,
-                            packet.op_code(),
-                            packet.opaque(),
-                            packet.status(),
+                            packet.op_code,
+                            packet.opaque,
+                            packet.status,
                         );
 
-                        let opaque = packet.opaque();
+                        let opaque = packet.opaque;
 
                         let permit = HANDLER_INVOKE_PERMITS.acquire().await.unwrap();
                         let requests: Arc<Mutex<OpaqueMap>> = Arc::clone(&opaque_map);
@@ -214,8 +216,7 @@ impl Client {
                             drop(map);
                             warn!(
                                 "{} has no entry in request map for {}",
-                                client_id,
-                                &packet.opaque()
+                                client_id, &packet.opaque
                             );
                         }
                         drop(requests);
@@ -234,8 +235,8 @@ impl Dispatcher for Client {
     async fn dispatch(&mut self, mut packet: RequestPacket) -> Result<ClientPendingOp> {
         let (response_tx, response_rx) = mpsc::channel(1);
         let opaque = self.register_handler(Arc::new(response_tx)).await;
-        packet = packet.set_opaque(opaque);
-        let op_code = packet.op_code();
+        packet.opaque = Some(opaque);
+        let op_code = packet.op_code;
 
         match self.writer.send(packet).await {
             Ok(_) => Ok(ClientPendingOp::new(
@@ -261,32 +262,30 @@ impl Dispatcher for Client {
 
 #[cfg(test)]
 mod tests {
-    use crate::memdx::auth_mechanism::AuthMechanism;
-    use crate::memdx::client::{Client, Connection};
-    use crate::memdx::dispatcher::Dispatcher;
-    use crate::memdx::hello_feature::HelloFeature;
-    use crate::memdx::magic::Magic;
-    use crate::memdx::op_bootstrap::{BootstrapOptions, OpBootstrap};
-    use crate::memdx::opcode::OpCode;
-    use crate::memdx::ops_core::OpsCore;
-    use crate::memdx::packet::{RequestPacket, ResponsePacket};
-    use crate::memdx::request::{
-        GetErrorMapRequest, HelloRequest, SASLAuthRequest, SelectBucketRequest,
-    };
-    use bytes::BufMut;
     use std::ops::Add;
-    use std::sync::mpsc;
     use std::time::Duration;
+
     use tokio::net::TcpStream;
     use tokio::time::Instant;
-    use tokio_util::bytes::BytesMut;
-    use tokio_util::sync::CancellationToken;
+
+    use crate::memdx::auth_mechanism::AuthMechanism;
+    use crate::memdx::client::{Client, Connection};
+    use crate::memdx::hello_feature::HelloFeature;
+    use crate::memdx::op_bootstrap::{BootstrapOptions, OpBootstrap};
+    use crate::memdx::ops_core::OpsCore;
+    use crate::memdx::ops_crud::OpsCrud;
+    use crate::memdx::request::{
+        GetErrorMapRequest, GetRequest, HelloRequest, SASLAuthRequest, SelectBucketRequest,
+        SetRequest,
+    };
+    use crate::memdx::response::{GetResponse, SetResponse};
+    use crate::memdx::sync_helpers::sync_unary_call;
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn roundtrip_a_request() {
         let _ = env_logger::try_init();
 
-        let socket = TcpStream::connect("127.0.0.1:11210")
+        let socket = TcpStream::connect("192.168.107.128:11210")
             .await
             .expect("could not connect");
         socket.set_nodelay(false).unwrap();
@@ -316,6 +315,12 @@ mod tests {
                         HelloFeature::Collections,
                         HelloFeature::Duplex,
                         HelloFeature::SelectBucket,
+                        HelloFeature::Durations,
+                        HelloFeature::JSON,
+                        HelloFeature::Opentracing,
+                        HelloFeature::UnorderedExec,
+                        HelloFeature::SyncReplication,
+                        HelloFeature::SeqNo,
                     ],
                 }),
                 get_error_map: Some(GetErrorMapRequest { version: 2 }),
@@ -334,42 +339,58 @@ mod tests {
         dbg!(&bootstrap_result.hello);
 
         let hello_result = bootstrap_result.hello.unwrap();
-        assert_eq!(4, hello_result.enabled_features.len());
+        assert_eq!(9, hello_result.enabled_features.len());
 
-        let mut req = RequestPacket::new(Magic::Req, OpCode::Set);
-        req = req.set_key(make_uleb128_32("test".as_bytes().into(), 0x00));
-
-        req = req.set_extras(vec![0, 0, 0, 0, 0, 0, 0, 0]);
-
-        let mut op = match client.dispatch(req).await {
-            Ok(r) => r,
-            Err(e) => panic!("Failed to dispatch request {}", e),
-        };
-
-        let result = op.recv().await.unwrap();
+        let result: SetResponse = sync_unary_call(
+            OpsCrud {
+                collections_enabled: true,
+                durability_enabled: true,
+                preserve_expiry_enabled: false,
+                ext_frames_enabled: true,
+            }
+            .set(
+                &mut client,
+                SetRequest {
+                    collection_id: 0,
+                    key: "test".as_bytes().into(),
+                    vbucket_id: 1,
+                    flags: 0,
+                    value: "test".as_bytes().into(),
+                    datatype: 0,
+                    expiry: None,
+                    preserve_expiry: None,
+                    cas: None,
+                    on_behalf_of: None,
+                    durability_level: None,
+                    durability_level_timeout: None,
+                },
+            ),
+        )
+        .await
+        .unwrap();
 
         dbg!(result);
-    }
 
-    fn make_uleb128_32(key: Vec<u8>, collection_id: u32) -> Vec<u8> {
-        let mut cid = collection_id;
-        let mut builder = BytesMut::with_capacity(key.len() + 5);
-        loop {
-            let mut c: u8 = (cid & 0x7f) as u8;
-            cid >>= 7;
-            if cid != 0 {
-                c |= 0x80;
+        let get_result: GetResponse = sync_unary_call(
+            OpsCrud {
+                collections_enabled: true,
+                durability_enabled: true,
+                preserve_expiry_enabled: false,
+                ext_frames_enabled: true,
             }
+            .get(
+                &mut client,
+                GetRequest {
+                    collection_id: 0,
+                    key: "test".as_bytes().into(),
+                    vbucket_id: 1,
+                    on_behalf_of: None,
+                },
+            ),
+        )
+        .await
+        .unwrap();
 
-            builder.put_u8(c);
-            if c & 0x80 == 0 {
-                break;
-            }
-        }
-        for k in key {
-            builder.put_u8(k);
-        }
-
-        builder.freeze().to_vec()
+        dbg!(get_result);
     }
 }

@@ -5,7 +5,6 @@ use crate::memdx::op_bootstrap::OpAuthEncoder;
 use crate::memdx::ops_core::OpsCore;
 use crate::memdx::pendingop::StandardPendingOp;
 use crate::memdx::request::SASLAuthRequest;
-use tokio_util::sync::CancellationToken;
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct SASLAuthPlainOptions {
