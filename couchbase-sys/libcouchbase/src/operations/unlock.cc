@@ -106,6 +106,12 @@ LIBCOUCHBASE_API lcb_STATUS lcb_cmdunlock_on_behalf_of(lcb_CMDUNLOCK *cmd, const
     return cmd->on_behalf_of(std::string(data, data_len));
 }
 
+LIBCOUCHBASE_API lcb_STATUS lcb_cmdunlock_on_behalf_of_extra_privilege(lcb_CMDUNLOCK *cmd, const char *privilege,
+                                                                       size_t privilege_len)
+{
+    return cmd->on_behalf_of_add_extra_privilege(std::string(privilege, privilege_len));
+}
+
 static lcb_STATUS unlock_validate(lcb_INSTANCE *instance, const lcb_CMDUNLOCK *cmd)
 {
     if (cmd->key().empty()) {
@@ -137,6 +143,12 @@ static lcb_STATUS unlock_schedule(lcb_INSTANCE *instance, std::shared_ptr<lcb_CM
         if (err != LCB_SUCCESS) {
             return err;
         }
+        for (const auto &privilege : cmd->extra_privileges()) {
+            err = lcb::flexible_framing_extras::encode_impersonate_users_extra_privilege(privilege, framing_extras);
+            if (err != LCB_SUCCESS) {
+                return err;
+            }
+        }
     }
 
     hdr.request.magic = framing_extras.empty() ? PROTOCOL_BINARY_REQ : PROTOCOL_BINARY_AREQ;
@@ -157,7 +169,7 @@ static lcb_STATUS unlock_schedule(lcb_INSTANCE *instance, std::shared_ptr<lcb_CM
 
     hdr.request.opcode = PROTOCOL_BINARY_CMD_UNLOCK_KEY;
     hdr.request.datatype = PROTOCOL_BINARY_RAW_BYTES;
-    hdr.request.bodylen = htonl(mcreq_get_key_size(&hdr));
+    hdr.request.bodylen = htonl(mcreq_get_key_size(&hdr) + framing_extras.size());
     hdr.request.opaque = pkt->opaque;
     hdr.request.cas = lcb_htonll(cmd->cas());
 

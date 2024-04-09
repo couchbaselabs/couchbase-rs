@@ -21,6 +21,9 @@
 #include <map>
 #include <libcouchbase/utils.h>
 #include "rnd.h"
+#include "jsparse/parser.h"
+
+#include <cinttypes>
 
 /*
  * Helper functions
@@ -183,7 +186,7 @@ void genDistKeys(lcbvb_CONFIG *vbc, std::vector<std::string> &out)
     EXPECT_TRUE(servers_max > 0);
 
     for (int cur_num = 0; found_servers.size() != servers_max; cur_num++) {
-        int ksize = sprintf(buf, "VBKEY_%d", cur_num);
+        int ksize = snprintf(buf, sizeof(buf), "VBKEY_%d", cur_num);
         int vbid;
         int srvix;
         lcbvb_map_key(vbc, buf, ksize, &vbid, &srvix);
@@ -323,7 +326,7 @@ static std::uint64_t get_manifest_id(lcb_INSTANCE *instance)
     Json::Value payload;
     EXPECT_EQ(LCB_SUCCESS, result.rc);
     EXPECT_FALSE(result.value.empty());
-    EXPECT_TRUE(Json::Reader().parse(result.value, payload));
+    EXPECT_TRUE(lcb::jsparse::parse_json(result.value, payload));
     EXPECT_TRUE(payload.isMember("uid") && payload["uid"].isString());
     return std::stoull(payload["uid"].asString(), nullptr, 16);
 }
@@ -364,7 +367,7 @@ void create_scope(lcb_INSTANCE *instance, const std::string &scope, bool wait)
     ASSERT_STATUS_EQ(LCB_SUCCESS, lcb_wait(instance, LCB_WAIT_DEFAULT));
 
     Json::Value payload;
-    ASSERT_TRUE(Json::Reader().parse(result.body, payload)) << result.body;
+    ASSERT_TRUE(lcb::jsparse::parse_json(result.body, payload)) << result.body;
     ASSERT_TRUE(payload.isMember("uid") && payload["uid"].isString()) << result.body;
     std::uint64_t uid = std::stoull(payload["uid"].asString(), nullptr, 16);
     ASSERT_GT(uid, 0);
@@ -396,7 +399,7 @@ void create_collection(lcb_INSTANCE *instance, const std::string &scope, const s
     ASSERT_STATUS_EQ(LCB_SUCCESS, result.rc);
 
     Json::Value payload;
-    ASSERT_TRUE(Json::Reader().parse(result.body, payload)) << result.body;
+    ASSERT_TRUE(lcb::jsparse::parse_json(result.body, payload)) << result.body;
     ASSERT_TRUE(payload.isMember("uid") && payload["uid"].isString()) << result.body;
     std::uint64_t uid = std::stoull(payload["uid"].asString(), nullptr, 16);
     ASSERT_GT(uid, 0);
@@ -423,7 +426,7 @@ void drop_scope(lcb_INSTANCE *instance, const std::string &scope, bool wait)
     ASSERT_STATUS_EQ(LCB_SUCCESS, result.rc);
 
     Json::Value payload;
-    ASSERT_TRUE(Json::Reader().parse(result.body, payload)) << result.body;
+    ASSERT_TRUE(lcb::jsparse::parse_json(result.body, payload)) << result.body;
     ASSERT_TRUE(payload.isMember("uid") && payload["uid"].isString()) << result.body;
     std::uint64_t uid = std::stoull(payload["uid"].asString(), nullptr, 16);
     ASSERT_GT(uid, 0);
@@ -450,7 +453,7 @@ void drop_collection(lcb_INSTANCE *instance, const std::string &scope, const std
     ASSERT_STATUS_EQ(LCB_SUCCESS, result.rc);
 
     Json::Value payload;
-    ASSERT_TRUE(Json::Reader().parse(result.body, payload)) << result.body;
+    ASSERT_TRUE(lcb::jsparse::parse_json(result.body, payload)) << result.body;
     ASSERT_TRUE(payload.isMember("uid") && payload["uid"].isString()) << result.body;
     std::uint64_t uid = std::stoull(payload["uid"].asString(), nullptr, 16);
     ASSERT_GT(uid, 0);
@@ -628,4 +631,178 @@ void TestMeter::destroy_lcb_meter()
         lcbmetrics_meter_destroy(lcbmeter_);
         lcbmeter_ = nullptr;
     }
+}
+
+void enforce_rate_limits(lcb_INSTANCE *instance)
+{
+    (void)lcb_install_callback(instance, LCB_CALLBACK_HTTP, (lcb_RESPCALLBACK)http_callback);
+
+    lcb_CMDHTTP *cmd;
+    std::string path = "/internalSettings";
+    std::string body = "enforceLimits=true";
+
+    lcb_cmdhttp_create(&cmd, LCB_HTTP_TYPE_MANAGEMENT);
+    lcb_cmdhttp_method(cmd, LCB_HTTP_METHOD_POST);
+    lcb_cmdhttp_path(cmd, path.c_str(), path.size());
+    lcb_cmdhttp_body(cmd, body.c_str(), body.size());
+
+    http_result result{};
+    ASSERT_STATUS_EQ(LCB_SUCCESS, lcb_http(instance, &result, cmd));
+    lcb_cmdhttp_destroy(cmd);
+    ASSERT_STATUS_EQ(LCB_SUCCESS, lcb_wait(instance, LCB_WAIT_DEFAULT));
+    ASSERT_STATUS_EQ(LCB_SUCCESS, result.rc);
+}
+
+void create_rate_limited_user(lcb_INSTANCE *instance, const std::string &username, const rate_limits &limits)
+{
+    (void)lcb_install_callback(instance, LCB_CALLBACK_HTTP, (lcb_RESPCALLBACK)http_callback);
+
+    lcb_CMDHTTP *cmd;
+    std::string path = "/settings/rbac/users/local/" + username;
+    std::string body = "password=password&roles=admin";
+    Json::Value json_limits;
+    if (limits.kv_limits.enforce) {
+        Json::Value kv_limits;
+        if (limits.kv_limits.num_connections > 0) {
+            kv_limits["num_connections"] = limits.kv_limits.num_connections;
+        }
+        if (limits.kv_limits.num_ops_per_min > 0) {
+            kv_limits["num_ops_per_min"] = limits.kv_limits.num_ops_per_min;
+        }
+        if (limits.kv_limits.ingress_mib_per_min > 0) {
+            kv_limits["ingress_mib_per_min"] = limits.kv_limits.ingress_mib_per_min;
+        }
+        if (limits.kv_limits.egress_mib_per_min > 0) {
+            kv_limits["egress_mib_per_min"] = limits.kv_limits.egress_mib_per_min;
+        }
+        json_limits["kv"] = kv_limits;
+    }
+    if (limits.query_limits.enforce) {
+        Json::Value query_limits;
+        if (limits.query_limits.num_concurrent_requests > 0) {
+            query_limits["num_concurrent_requests"] = limits.query_limits.num_concurrent_requests;
+        }
+        if (limits.query_limits.num_queries_per_min > 0) {
+            query_limits["num_queries_per_min"] = limits.query_limits.num_queries_per_min;
+        }
+        if (limits.query_limits.ingress_mib_per_min > 0) {
+            query_limits["ingress_mib_per_min"] = limits.query_limits.ingress_mib_per_min;
+        }
+        if (limits.query_limits.egress_mib_per_min > 0) {
+            query_limits["egress_mib_per_min"] = limits.query_limits.egress_mib_per_min;
+        }
+        json_limits["query"] = query_limits;
+    }
+    if (limits.search_limits.enforce) {
+        Json::Value fts_limits;
+        if (limits.search_limits.num_concurrent_requests > 0) {
+            fts_limits["num_concurrent_requests"] = limits.search_limits.num_concurrent_requests;
+        }
+        if (limits.search_limits.num_queries_per_min > 0) {
+            fts_limits["num_queries_per_min"] = limits.search_limits.num_queries_per_min;
+        }
+        if (limits.search_limits.ingress_mib_per_min > 0) {
+            fts_limits["ingress_mib_per_min"] = limits.search_limits.ingress_mib_per_min;
+        }
+        if (limits.search_limits.egress_mib_per_min > 0) {
+            fts_limits["egress_mib_per_min"] = limits.search_limits.egress_mib_per_min;
+        }
+        json_limits["fts"] = fts_limits;
+    }
+    std::string j_limits = Json::FastWriter().write(json_limits);
+    body += "&limits=" + j_limits;
+    std::string content_type = "application/x-www-form-urlencoded";
+
+    lcb_cmdhttp_create(&cmd, LCB_HTTP_TYPE_MANAGEMENT);
+    lcb_cmdhttp_method(cmd, LCB_HTTP_METHOD_PUT);
+    lcb_cmdhttp_path(cmd, path.c_str(), path.size());
+    lcb_cmdhttp_body(cmd, body.c_str(), body.size());
+    lcb_cmdhttp_content_type(cmd, content_type.c_str(), content_type.size());
+
+    http_result result{};
+    ASSERT_STATUS_EQ(LCB_SUCCESS, lcb_http(instance, &result, cmd));
+    lcb_cmdhttp_destroy(cmd);
+    ASSERT_STATUS_EQ(LCB_SUCCESS, lcb_wait(instance, LCB_WAIT_DEFAULT));
+    ASSERT_STATUS_EQ(LCB_SUCCESS, result.rc);
+}
+
+void create_rate_limited_scope(lcb_INSTANCE *instance, const std::string &bucket, std::string &scope,
+                               const scope_rate_limits &limits)
+{
+    (void)lcb_install_callback(instance, LCB_CALLBACK_HTTP, (lcb_RESPCALLBACK)http_callback);
+
+    lcb_CMDHTTP *cmd;
+    std::string path = "/pools/default/buckets/" + bucket + "/scopes";
+    std::string body = "name=" + scope;
+    Json::Value json_limits;
+    if (limits.kv_scope_limits.enforce) {
+        Json::Value kv_limits;
+        kv_limits["data_size"] = limits.kv_scope_limits.data_size;
+        json_limits["kv"] = kv_limits;
+    }
+    if (limits.index_scope_limits.enforce) {
+        Json::Value index_limits;
+        index_limits["num_indexes"] = limits.index_scope_limits.num_indexes;
+        json_limits["index"] = index_limits;
+    }
+    std::string j_limits = Json::FastWriter().write(json_limits);
+    body += "&limits=" + j_limits;
+    std::string content_type = "application/x-www-form-urlencoded";
+
+    lcb_cmdhttp_create(&cmd, LCB_HTTP_TYPE_MANAGEMENT);
+    lcb_cmdhttp_method(cmd, LCB_HTTP_METHOD_POST);
+    lcb_cmdhttp_path(cmd, path.c_str(), path.size());
+    lcb_cmdhttp_body(cmd, body.c_str(), body.size());
+    lcb_cmdhttp_content_type(cmd, content_type.c_str(), content_type.size());
+
+    http_result result{};
+    ASSERT_STATUS_EQ(LCB_SUCCESS, lcb_http(instance, &result, cmd));
+    lcb_cmdhttp_destroy(cmd);
+    ASSERT_STATUS_EQ(LCB_SUCCESS, lcb_wait(instance, LCB_WAIT_DEFAULT));
+    ASSERT_STATUS_EQ(LCB_SUCCESS, result.rc);
+}
+
+void drop_user(lcb_INSTANCE *instance, const std::string &username)
+{
+    (void)lcb_install_callback(instance, LCB_CALLBACK_HTTP, (lcb_RESPCALLBACK)http_callback);
+
+    lcb_CMDHTTP *cmd;
+    std::string path = "/settings/rbac/users/local/" + username;
+
+    lcb_cmdhttp_create(&cmd, LCB_HTTP_TYPE_MANAGEMENT);
+    lcb_cmdhttp_method(cmd, LCB_HTTP_METHOD_DELETE);
+    lcb_cmdhttp_path(cmd, path.c_str(), path.size());
+
+    http_result result{};
+    ASSERT_STATUS_EQ(LCB_SUCCESS, lcb_http(instance, &result, cmd));
+    lcb_cmdhttp_destroy(cmd);
+    ASSERT_STATUS_EQ(LCB_SUCCESS, lcb_wait(instance, LCB_WAIT_DEFAULT));
+    ASSERT_STATUS_EQ(LCB_SUCCESS, result.rc);
+}
+
+void create_search_index(lcb_INSTANCE *instance, const std::string &index_name, const std::string &type,
+                         const std::string &source_type, const std::string &source_name)
+{
+    (void)lcb_install_callback(instance, LCB_CALLBACK_HTTP, (lcb_RESPCALLBACK)http_callback);
+
+    lcb_CMDHTTP *cmd;
+    std::string path = "/api/index/" + index_name;
+    Json::Value json_body;
+    json_body["name"] = index_name;
+    json_body["type"] = type;
+    json_body["sourceName"] = source_name;
+    json_body["sourceType"] = source_type;
+
+    auto body = Json::FastWriter().write(json_body);
+
+    lcb_cmdhttp_create(&cmd, LCB_HTTP_TYPE_SEARCH);
+    lcb_cmdhttp_method(cmd, LCB_HTTP_METHOD_PUT);
+    lcb_cmdhttp_path(cmd, path.c_str(), path.size());
+    lcb_cmdhttp_body(cmd, body.c_str(), body.size());
+
+    http_result result{};
+    ASSERT_STATUS_EQ(LCB_SUCCESS, lcb_http(instance, &result, cmd));
+    lcb_cmdhttp_destroy(cmd);
+    ASSERT_STATUS_EQ(LCB_SUCCESS, lcb_wait(instance, LCB_WAIT_DEFAULT));
+    ASSERT_STATUS_EQ(LCB_SUCCESS, result.rc);
 }
