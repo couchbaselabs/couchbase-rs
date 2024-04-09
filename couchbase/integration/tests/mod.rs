@@ -12,7 +12,7 @@ pub(crate) fn assert_timestamp(
     delta: Duration,
 ) {
     let expires_since_start =
-        DateTime::<Utc>::from_utc(expiry_timestamp.clone(), Utc).signed_duration_since(start);
+        DateTime::<Utc>::from_naive_utc_and_offset(expiry_timestamp.clone(), Utc).signed_duration_since(start);
     let chrono_duration = chrono::Duration::from_std(duration).unwrap();
     assert!(
         expires_since_start < chrono_duration,

@@ -3,8 +3,8 @@ type = "standalone"
 [standalone]
 username = "Administrator"
 password = "password"
-conn-string = "10.112.212.101"
-default_bucket = "default"
+conn-string = "couchbase://127.0.0.1"
+default_bucket = "test"
 default_scope = "_default"
 default_collection = "_default"
 
