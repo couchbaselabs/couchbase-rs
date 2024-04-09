@@ -72,7 +72,7 @@ X(LCB_ERR_REQUEST_CANCELED,         202, LCB_ERROR_TYPE_SHARED, 0, "A request is
 X(LCB_ERR_INVALID_ARGUMENT,         203, LCB_ERROR_TYPE_SHARED, LCB_ERROR_FLAG_INPUT, "It is unambiguously determined that the error was caused because of invalid arguments from the user") \
 X(LCB_ERR_SERVICE_NOT_AVAILABLE,    204, LCB_ERROR_TYPE_SHARED, 0, "It was determined from the config unambiguously that the service is not available") \
 X(LCB_ERR_INTERNAL_SERVER_FAILURE,  205, LCB_ERROR_TYPE_SHARED, 0, "Internal server error") \
-X(LCB_ERR_AUTHENTICATION_FAILURE,   206, LCB_ERROR_TYPE_SHARED, LCB_ERROR_FLAG_INPUT, "Authentication error") \
+X(LCB_ERR_AUTHENTICATION_FAILURE,   206, LCB_ERROR_TYPE_SHARED, LCB_ERROR_FLAG_INPUT, "Authentication error. Possible reasons: incorrect authentication configuration, bucket doesn't exist or bucket may be hibernated.") \
 X(LCB_ERR_TEMPORARY_FAILURE,        207, LCB_ERROR_TYPE_SHARED, LCB_ERROR_FLAG_TRANSIENT, "Temporary failure") \
 X(LCB_ERR_PARSING_FAILURE,          208, LCB_ERROR_TYPE_SHARED, 0, "Parsing failed") \
 X(LCB_ERR_CAS_MISMATCH,             209, LCB_ERROR_TYPE_SHARED, LCB_ERROR_FLAG_INPUT, "CAS mismatch") \
@@ -86,6 +86,8 @@ X(LCB_ERR_UNAMBIGUOUS_TIMEOUT,      216, LCB_ERROR_TYPE_SHARED, 0, "Unambiguous 
 X(LCB_ERR_SCOPE_NOT_FOUND,          217, LCB_ERROR_TYPE_SHARED, 0, "Scope is not found") \
 X(LCB_ERR_INDEX_NOT_FOUND,          218, LCB_ERROR_TYPE_SHARED, 0, "Index is not found") \
 X(LCB_ERR_INDEX_EXISTS,             219, LCB_ERROR_TYPE_SHARED, 0, "Index is exist already") \
+X(LCB_ERR_RATE_LIMITED,             220, LCB_ERROR_TYPE_SHARED, 0, "The service decided that the caller must be rate limited due to exceeding a rate threshold") \
+X(LCB_ERR_QUOTA_LIMITED,            221, LCB_ERROR_TYPE_SHARED, 0, "The service decided that the caller must be limited due to exceeding a quota threshold") \
 \
 /* KeyValue Error Definitions */ \
 X(LCB_ERR_DOCUMENT_NOT_FOUND,                           301, LCB_ERROR_TYPE_KEYVALUE, 0, "Document is not found") \
@@ -248,6 +250,8 @@ LIBCOUCHBASE_API lcb_STATUS lcb_errctx_query_rc(const lcb_QUERY_ERROR_CONTEXT *c
 LIBCOUCHBASE_API lcb_STATUS lcb_errctx_query_first_error_code(const lcb_QUERY_ERROR_CONTEXT *ctx, uint32_t *code);
 LIBCOUCHBASE_API lcb_STATUS lcb_errctx_query_first_error_message(const lcb_QUERY_ERROR_CONTEXT *ctx,
                                                                  const char **message, size_t *message_len);
+LIBCOUCHBASE_API lcb_STATUS lcb_errctx_query_error_response_body(const lcb_QUERY_ERROR_CONTEXT *ctx, const char **body,
+                                                                 size_t *body_len);
 LIBCOUCHBASE_API lcb_STATUS lcb_errctx_query_statement(const lcb_QUERY_ERROR_CONTEXT *ctx, const char **statement,
                                                        size_t *statement_len);
 LIBCOUCHBASE_API lcb_STATUS lcb_errctx_query_client_context_id(const lcb_QUERY_ERROR_CONTEXT *ctx, const char **id,
@@ -386,7 +390,8 @@ lcb_errmap_callback lcb_set_errmap_callback(lcb_INSTANCE *instance, lcb_errmap_c
     X(LCB_RETRY_REASON_CIRCUIT_BREAKER_OPEN,                 13,     1,                      0)              \
     X(LCB_RETRY_REASON_QUERY_PREPARED_STATEMENT_FAILURE,     14,     1,                      0)              \
     X(LCB_RETRY_REASON_ANALYTICS_TEMPORARY_FAILURE,          15,     1,                      0)              \
-    X(LCB_RETRY_REASON_SEARCH_TOO_MANY_REQUESTS,             16,     1,                      0)
+    X(LCB_RETRY_REASON_SEARCH_TOO_MANY_REQUESTS,             16,     1,                      0)              \
+    X(LCB_RETRY_REASON_QUERY_ERROR_RETRYABLE,                17,     1,                      0)
 /* clang-format on */
 
 typedef enum {

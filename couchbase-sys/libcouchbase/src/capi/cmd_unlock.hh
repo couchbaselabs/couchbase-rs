@@ -28,10 +28,9 @@
  * @private
  */
 struct lcb_CMDUNLOCK_ {
-    static const std::string &operation_name()
+    static const char *operation_name()
     {
-        static std::string name = LCBTRACE_OP_UNLOCK;
-        return name;
+        return LCBTRACE_OP_UNLOCK;
     }
 
     lcb_STATUS cas(std::uint64_t cas)
@@ -141,6 +140,17 @@ struct lcb_CMDUNLOCK_ {
         return LCB_SUCCESS;
     }
 
+    lcb_STATUS on_behalf_of_add_extra_privilege(std::string privilege)
+    {
+        extra_privileges_.emplace_back(std::move(privilege));
+        return LCB_SUCCESS;
+    }
+
+    const std::vector<std::string> &extra_privileges() const
+    {
+        return extra_privileges_;
+    }
+
     bool want_impersonation() const
     {
         return !impostor_.empty();
@@ -160,6 +170,7 @@ struct lcb_CMDUNLOCK_ {
     std::string key_{};
     std::uint64_t cas_{};
     std::string impostor_{};
+    std::vector<std::string> extra_privileges_{};
 };
 
 /**

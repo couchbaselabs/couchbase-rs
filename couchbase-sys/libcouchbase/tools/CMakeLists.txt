@@ -2,7 +2,7 @@ INCLUDE_DIRECTORIES(${SOURCE_ROOT}/contrib/cliopts)
 FILE(GLOB T_COMMONSRC common/*.cc)
 ADD_LIBRARY(lcbtools OBJECT ${T_COMMONSRC})
 
-ADD_EXECUTABLE(cbc cbc.cc
+ADD_EXECUTABLE(cbc cbc.cc cbc-timestamp.cc
     $<TARGET_OBJECTS:lcbtools> $<TARGET_OBJECTS:cliopts> $<TARGET_OBJECTS:lcb_jsoncpp>)
 TARGET_LINK_LIBRARIES(cbc couchbase)
 
@@ -75,7 +75,7 @@ IF(NOT WIN32)
     LIST(APPEND CBC_SUBCOMMANDS
         cat create observe observe-seqno incr decr hash lock
         unlock rm stats version verbosity view n1ql admin ping
-        bucket-create bucket-delete bucket-flush connstr write-config strerror
+        bucket-list bucket-create bucket-delete bucket-flush connstr write-config strerror
         touch role-list user-list user-upsert user-delete watch
         mcversion keygen collection-manifest collection-id
         )

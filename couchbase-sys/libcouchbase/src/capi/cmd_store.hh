@@ -35,14 +35,21 @@ enum class durability_mode {
  * @private
  */
 struct lcb_CMDSTORE_ {
-    const std::string &operation_name() const
+    const char *operation_name() const
     {
-        static std::map<int, std::string> names{
-            {LCB_STORE_UPSERT, LCBTRACE_OP_UPSERT}, {LCB_STORE_REPLACE, LCBTRACE_OP_REPLACE},
-            {LCB_STORE_APPEND, LCBTRACE_OP_APPEND}, {LCB_STORE_PREPEND, LCBTRACE_OP_PREPEND},
-            {LCB_STORE_INSERT, LCBTRACE_OP_INSERT},
-        };
-        return names[operation_];
+        switch (operation_) {
+            case LCB_STORE_UPSERT:
+                return LCBTRACE_OP_UPSERT;
+            case LCB_STORE_INSERT:
+                return LCBTRACE_OP_INSERT;
+            case LCB_STORE_REPLACE:
+                return LCBTRACE_OP_REPLACE;
+            case LCB_STORE_APPEND:
+                return LCBTRACE_OP_APPEND;
+            case LCB_STORE_PREPEND:
+                return LCBTRACE_OP_PREPEND;
+        }
+        return "BUG: unexpected store operation";
     }
 
     lcb_STATUS operation(lcb_STORE_OPERATION operation)
@@ -237,13 +244,16 @@ struct lcb_CMDSTORE_ {
 
     lcb_STATUS value(const lcb_IOV *iov, std::size_t iov_len)
     {
-        std::stringstream ss;
+        std::size_t total_size = 0;
+        for (std::size_t i = 0; i < iov_len; ++i) {
+            total_size += iov[i].iov_len;
+        }
+        value_.reserve(total_size);
         for (std::size_t i = 0; i < iov_len; ++i) {
             if (iov[i].iov_len > 0 && iov[i].iov_base != nullptr) {
-                ss << std::string(static_cast<const char *>(iov[i].iov_base), iov[i].iov_len);
+                value_.append(static_cast<const char *>(iov[i].iov_base), iov[i].iov_len);
             }
         }
-        value_ = ss.str();
         return LCB_SUCCESS;
     }
 
@@ -368,6 +378,17 @@ struct lcb_CMDSTORE_ {
         return LCB_SUCCESS;
     }
 
+    lcb_STATUS on_behalf_of_add_extra_privilege(std::string privilege)
+    {
+        extra_privileges_.emplace_back(std::move(privilege));
+        return LCB_SUCCESS;
+    }
+
+    const std::vector<std::string> &extra_privileges() const
+    {
+        return extra_privileges_;
+    }
+
     bool want_impersonation() const
     {
         return !impostor_.empty();
@@ -399,6 +420,7 @@ struct lcb_CMDSTORE_ {
     bool cookie_is_callback_{false};
     bool preserve_expiry_{false};
     std::string impostor_{};
+    std::vector<std::string> extra_privileges_{};
 };
 
 /**

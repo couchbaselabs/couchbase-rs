@@ -1600,7 +1600,7 @@ pub fn encode_ping(instance: *mut lcb_INSTANCE, request: PingRequest) -> Result<
     let report_id = request
         .options
         .report_id
-        .unwrap_or_else(|| Uuid::new_v4().to_hyphenated().to_string());
+        .unwrap_or_else(|| Uuid::new_v4().hyphenated().to_string());
     let (report_id_len, c_report_id) = into_cstring(report_id);
 
     let mut command: *mut lcb_CMDPING = ptr::null_mut();

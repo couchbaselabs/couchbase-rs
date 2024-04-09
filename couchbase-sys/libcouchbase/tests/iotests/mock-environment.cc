@@ -423,7 +423,19 @@ static void statsCallback(lcb_INSTANCE *instance, lcb_CALLBACK_TYPE, const lcb_R
                 }
                 break;
             case 7:
-                version = MockEnvironment::VERSION_70;
+                switch (minor) {
+                    case 0:
+                        version = MockEnvironment::VERSION_70;
+                        break;
+                    case 1:
+                        version = MockEnvironment::VERSION_71;
+                        break;
+                    case 2:
+                        version = MockEnvironment::VERSION_72;
+                        break;
+                    default:
+                        break;
+                }
                 break;
             default:
                 break;
@@ -673,7 +685,7 @@ void MockBucketCommand::finalizePayload()
 
 void MockResponse::assign(const std::string &resp)
 {
-    bool rv = Json::Reader().parse(resp, jresp);
+    bool rv = lcb::jsparse::parse_json(resp, jresp);
     assert(rv);
 }
 

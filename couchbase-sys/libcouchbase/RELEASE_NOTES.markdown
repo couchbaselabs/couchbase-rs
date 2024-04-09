@@ -1,5 +1,230 @@
 # Release Notes
 
+# 3.3.12 (2024-03-02)
+
+* CCBC-1636: Deallocate old packet when updating collection ID.
+  `mcreq_renew_packet()` requires the caller to deallocate original copy, otherwise the memory will
+  be only released by pipeline destructor.
+
+* CCBC-1634: Fix reporting unresponsive nodes in `lcb_ping()`.
+  * do not retry NOOP commands, as they might be routed to different pipeline, instead fail fast
+    NOOPs to reflect network issues more precisely.
+  * use pipeline address as ping entry identifier instead of socket address, as socket might not be
+    existing (not connected) due to network failures.
+  * `lcb_ping` still have report even when overall status is not `LCB_SUCCESS`, so cbc-ping should
+    still try to print report instead just printing overall status code.
+
+* CCBC-1630: Check collection id before storing packet to pipeline.
+  Every time `check_collection_id()` is invoked, the caller should ensure that this function
+  potentially is rewriting the packet, if it decides to insert/update encoded collection ID.
+
+* CCBC-1627: Fix `bodylen` value when `ffextlen` (flexible frame extra length) is not zero.
+
+# 3.3.11 (2023-12-21)
+
+* CCBC-1618: update query error codes for dynamic authenticator. The dynamic authenticator is part of the internal API,
+  and is not being used by default.
+
+# 3.3.10 (2023-10-10)
+
+* CCBC-1616: apply `wait_for_config` check for all pipelines. Previously, the `lcb_wait` function would wait for the
+  pending configuration updates, but don't do it if the configuration update operation is being retried for some reason.
+  Now, the operation also will not wait for pending configuration updates, and rather return from `lcb_wait` as soon as
+  the operation completes. The old behaviour still works when `wait_for_config=true` is passed in connection string (or
+  `LCB_CNTL_WAIT_FOR_CONFIG` set to non-zero value), in this case the library will wait for the configuration. This
+  setting does not affect the mode, when the event loop is executed by the application, and without `lcb_wait`.
+
+# 3.3.9 (2023-09-20)
+
+* CCBC-1608: reduce timeout for idle HTTP connections to 1 second
+
+* CCBC-1615: handle rate limit codes during bootstrap
+
+* CCBC-1612: Improve recovery time during rebalance for upcoming Server 7.6.
+    * do not throttle CCCP provider in faster failover mode.
+    * try to refresh configuration in case of network errors to speed up the recovery process during failover.
+
+* CCBC-1611: Handle `0x0d` (`ECONFIG_ONLY`) status code. Treat this status code as a signal to refresh configuration.
+  The new or failed over nodes are set into config-only mode, where all data operatios will be failed with code 0x0d. It
+  is possible that the SDK might be using stale configuration and send requests to the node, that is not part of the
+  cluster anymore, so to work around this, the library will update the configuration and retry the operation.
+
+* CCBC-1610: Fix memory issues when setting collection id in the cluster with mixed server versions, where some of the
+  nodes do not support collections.
+
+# 3.3.8 (2023-08-16)
+
+* CCBC-1584: Update documentation on how to use collections with pillowfight
+
+* CCBC-1607: Fix collection id encoding in mixed cluster
+
+* CCBC-1602: Implement Faster Failover.
+
+  This implements the set of protocol optimizations that help the SDK to save
+  network traffic when tracking cluster topology. The feature will be only
+  activated if the server supports it (7.6+).
+
+CCBC-1603: Do not log if logger is not accessible in `iotssl_log_errors`.
+
+CCBC-1599: Account NUL-byte when format IPv6 address (fixes potential invalid memory access).
+
+## 3.3.7 (2023-05-11)
+
+* CCBC-1596: replace unsafe sprintf with snprintf.
+
+* CCBC-1597: Update threading example, reduce global state.
+
+  - Json::Reader uses static global variable, this patch replaces calls
+    to it with Json::CharReaderBuilder, which is re-entrant.
+
+  - Constants for tracing system defined as mutable static strings, this
+    patch replaces it with const static strings.
+
+  - Updated examples for thread-safe usage is updated to SDK3 API and
+    added them to the build pipeline
+
+
+## 3.3.6 (2023-04-26)
+
+* CCBC-1590: Always pick random node for HTTP services.
+
+  It helps with certain edge cases, when the application might spawn a lot
+  of processes, perform queries, so that first queries will be directed to
+  the same node due to the absense of `srand()` call in the library.
+
+* CCBC-1596: Fix various compiler warnings.
+
+* CCBC-1592: Allow to generate more randomized bodies in pillowfight
+
+  By default cbc-pillowfight pre-generates only one document body per
+  selected size. New option `--random-body-pool-size` allows to control how
+  many documents will be generated (default is 100).
+
+  This fixes behaviour in the corner case when `--min-size` equals
+  `--max-size` and allow still have many random bodies in this case.
+
+* CCBC-1595: Fix building of the subdocument operation when `--subdoc`
+  switch for pillowfight was used.
+
+* pillowfight: use separate exptime switch for GET
+
+  Do not share the same value of expiry for get operations.  Also it does
+  not turn `GET` into `GET_WITH_TOUCH` if the --get-expiry is not being
+  used.
+
+## 3.3.5 (2023-03-09)
+
+* CCBC-1545: handle `LCB_ERR_REQUEST_CANCELED` in ping callback
+
+  If the instance is being destroyed, while the operations in flight, all
+  these operations will be cancelled with error code
+  `LCB_ERR_REQUEST_CANCELED`. Ping implementation should handle this error
+  code and don't assume any of the objects (except response) be in valid
+  state.
+
+* CCBC-1586: force SASL PLAIN for TLS connections
+
+* CCBC-1589: apply authenticator when passed to `lcb_create`
+
+* CCBC-1585: fix build for gcc-13
+
+* CCBC-1587: allow to disable uninstall target
+
+## 3.3.4 (2023-02-08)
+
+* CCBC-1583: disable collections support if KV does not ack it.
+
+## 3.3.3 (2022-09-09)
+* CCBC-1565: load system CAs when the trust certificate is not provided
+
+  When the user has not set any root ca provider but is using TLS then we
+  should trust both the system store and the Capella root CA.
+
+* CCBC-1564: update error message for authentication failure
+
+* CCBC-1568: skip logging for closed SSL IO contexts
+
+  OpenSSL might still invoke IO callbacks after the actual context has
+  been closed. This more likely could happen with libuv-style IO.
+
+  This patch ensures that once socket context has been closed, its pointer
+  in SSL object will be erased.
+
+* Added cbc-bucket-list command to list all buckets.
+
+## 3.3.2 (2022-08-29)
+
+* CCBC-1559: cbc-n1qlback: give time to IO loop in case of failure.
+
+  In schenario where all query nodes suddenly failed over and/or removed
+  from the cluster, all requests in cbc-n1qlback will start failing.
+  Because the libcouchbase knows that the latest config does not have any
+  query nodes, it rejects all queries immediately. The single-threaded
+  nature of libcouchbase does not allow the IO loop to run in background,
+  and the code in the tool does not run `lcb_wait` in case of failure.
+
+  As a fix, we run `lcb_tick_nowait` in case of failure, which is enough
+  for libcouchbase to give IO loop a chance to check for any pending
+  events and invoke corresponding callbacks.
+
+* CCBC-1552: Allow building with external jsoncpp
+
+* CCBC-1544: update feedback links: Jira, Forums and Discord
+
+* CCBC-1556: clarify log messages related to config cache
+
+* CCBC-1557: allow caching cluster-level configurations
+
+  The library will cache cluster-level configurations only if the
+  `config_cache= connection` string option is set to directory (ends
+  with '/' symbol), otherwise it will cache only buckets configurations
+  (note that in this case the application should use unique cache name for
+  each bucket, otherwise the library will ignore cache if the bucket name
+  will not match).
+
+## 3.3.1 (2022-05-25)
+
+* CCBC-1550: Fixed RPM packages for CentOS 7, now they will require OpenSSL 1.1 during build. Also build script will not
+automatically define `LCB_NO_SSL` option if OpenSSL is not found. For builds without TLS support, this option must be
+explicitly defined.
+
+* CCBC-1546: cbc-pillowfight: add '--rand-space-per-thread' to allow threads to work from different rand numbers.
+
+## 3.3.0 (2022-05-09)
+
+* CCBC-1538: use 64-bit integer to store time in IOCP plugin
+* CCBC-1540: bundle capella ca certificate with SDK
+* CCBC-1526: do not validate length of collection specifier. Length will be checked on the server-side.
+* CCBC-1527: pillowfight: deallocate all memory during shutdown
+
+## 3.2.5 (2022-02-08)
+
+* CCBC-1486: Add support for preserve expiry to query options
+* CCBC-1534, CCBC-1411: improve query error handling
+* CCBC-1519: pass extra privilege with KV "on-behalf-of".
+* CCBC-1521: fix bootstrap process when client cert is used and error map is supported. If client cert auth is used, once
+the error map response has been received, the negotiation is complete.
+* CCBC-1529: load authentication certificate as chain file.
+* CCBC-1525: remove stringstream in `collection_qualifier`. Constructing a stringstream object every time
+`collection_qualifier` is constructed is very expensive.
+* CCBC-1528: update parsing of "quota limit" error for FTS
+
+## 3.2.4 (2021-11-23)
+
+* CCBC-1522: Filter `DnsQuery` results on Windows by type: only use records with `DNS_TYPE_SRV` type.
+
+* CCBC-1521: Fixed bootstrap process when client certificate is used. We always pipeline error map request with `HELLO`
+request, and usually await for `hello`+`error_map` responses, because after that goes SASL authentication (and then
+optional selection of the bucket) which cannot be completely pipelined. But in case of client certificate, we might
+terminate bootstrap process too early if the bootstrap process does not require immediate selection of the bucket.
+
+* CCBC-1432: Support for rate limiting error codes: `LCB_ERR_RATE_LIMITED` and `LCB_ERR_QUOTA_LIMITED`.
+
+* CCBC-1514: Do not translate unknown error with "item-only" attribute into `LCB_ERR_CAS_MISMATCH`.
+
+* CCBC-1515: Performance optimization: replace `sstream` with string `append()`. Only if list of IO vectors supplied for
+value in mutation operations.
+
 ## 3.2.3 (2021-10-20)
 
 * CCBC-1484: Fixed tracing tags in accordance to RFC.

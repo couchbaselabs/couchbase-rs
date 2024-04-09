@@ -36,10 +36,9 @@ enum class get_replica_mode {
  * @private
  */
 struct lcb_CMDGETREPLICA_ {
-    static const std::string &operation_name()
+    static const char *operation_name()
     {
-        static std::string name = LCBTRACE_OP_GET_FROM_REPLICA;
-        return name;
+        return LCBTRACE_OP_GET_FROM_REPLICA;
     }
 
     lcb_STATUS mode(get_replica_mode mode)
@@ -60,7 +59,8 @@ struct lcb_CMDGETREPLICA_ {
         return LCB_SUCCESS;
     }
 
-    int selected_replica_index() const {
+    int selected_replica_index() const
+    {
         return select_index_;
     }
 
@@ -162,6 +162,17 @@ struct lcb_CMDGETREPLICA_ {
         return LCB_SUCCESS;
     }
 
+    lcb_STATUS on_behalf_of_add_extra_privilege(std::string privilege)
+    {
+        extra_privileges_.emplace_back(std::move(privilege));
+        return LCB_SUCCESS;
+    }
+
+    const std::vector<std::string> &extra_privileges() const
+    {
+        return extra_privileges_;
+    }
+
     bool want_impersonation() const
     {
         return !impostor_.empty();
@@ -182,6 +193,7 @@ struct lcb_CMDGETREPLICA_ {
     get_replica_mode mode_{get_replica_mode::any};
     int select_index_{0};
     std::string impostor_{};
+    std::vector<std::string> extra_privileges_{};
 };
 
 struct lcb_RESPGETREPLICA_ {
