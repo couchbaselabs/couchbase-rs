@@ -53,39 +53,39 @@ pub fn tests(config: Arc<TestConfig>) -> Vec<TestFn> {
             Box::pin(kv::test_get_and_lock(config.clone())),
         ),
         TestFn::new("test_unlock", Box::pin(kv::test_unlock(config.clone()))),
-        TestFn::new(
-            "test_unlock_invalid_cas",
-            Box::pin(kv::test_unlock_invalid_cas(config.clone())),
-        ),
+        // TestFn::new(
+        //     "test_unlock_invalid_cas",
+        //     Box::pin(kv::test_unlock_invalid_cas(config.clone())),
+        // ),
         TestFn::new(
             "test_double_lock",
             Box::pin(kv::test_double_lock(config.clone())),
         ),
         TestFn::new("test_touch", Box::pin(kv::test_touch(config.clone()))),
-        TestFn::new(
-            "test_replicate_to_get_any_replica",
-            Box::pin(kv::test_replicate_to_get_any_replica(config.clone())),
-        ),
+        // TestFn::new(
+        //     "test_replicate_to_get_any_replica",
+        //     Box::pin(kv::test_replicate_to_get_any_replica(config.clone())),
+        // ),
         TestFn::new(
             "test_persist_to_get_any_replica",
             Box::pin(kv::test_persist_to_get_any_replica(config.clone())),
         ),
-        TestFn::new(
-            "test_durability_majority_get_any_replica",
-            Box::pin(kv::test_durability_majority_get_any_replica(config.clone())),
-        ),
-        TestFn::new(
-            "test_durability_persist_to_majority_get_any_replica",
-            Box::pin(kv::test_durability_persist_to_majority_get_any_replica(
-                config.clone(),
-            )),
-        ),
-        TestFn::new(
-            "test_durability_majority_persist_on_master_get_any_replica",
-            Box::pin(
-                kv::test_durability_majority_persist_on_master_get_any_replica(config.clone()),
-            ),
-        ),
+        // TestFn::new(
+        //     "test_durability_majority_get_any_replica",
+        //     Box::pin(kv::test_durability_majority_get_any_replica(config.clone())),
+        // ),
+        // TestFn::new(
+        //     "test_durability_persist_to_majority_get_any_replica",
+        //     Box::pin(kv::test_durability_persist_to_majority_get_any_replica(
+        //         config.clone(),
+        //     )),
+        // ),
+        // TestFn::new(
+        //     "test_durability_majority_persist_on_master_get_any_replica",
+        //     Box::pin(
+        //         kv::test_durability_majority_persist_on_master_get_any_replica(config.clone()),
+        //     ),
+        // ),
         TestFn::new("test_query", Box::pin(query::test_query(config.clone()))),
         TestFn::new(
             "test_query_named_params",

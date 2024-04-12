@@ -10,7 +10,7 @@ use uuid::Uuid;
 
 use crate::tests::assert_timestamp;
 use crate::{util, TestResult};
-use chrono::{NaiveDateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -84,12 +84,13 @@ pub async fn test_upsert_preserve_expiry(config: Arc<TestConfig>) -> TestResult<
     let key = Uuid::new_v4().to_string();
     let doc: BeerDocument = util::load_dataset_single("beer_sample_beer_single.json")?;
 
-    let start = Utc::now();
     let duration = Duration::from_secs(25);
     let result = collection
         .upsert(&key, &doc, UpsertOptions::default().expiry(duration))
         .await?;
     assert_ne!(0, result.cas());
+
+    let start = DateTime::from_timestamp_nanos(result.cas() as i64);
 
     let result = collection
         .upsert(&key, &doc, UpsertOptions::default().preserve_expiry(true))
@@ -133,13 +134,12 @@ pub async fn test_replace_preserve_expiry(config: Arc<TestConfig>) -> TestResult
     let key = Uuid::new_v4().to_string();
     let doc: BeerDocument = util::load_dataset_single("beer_sample_beer_single.json")?;
 
-    let start = Utc::now();
     let duration = Duration::from_secs(25);
     let result = collection
         .upsert(&key, &doc, UpsertOptions::default().expiry(duration))
         .await?;
     assert_ne!(0, result.cas());
-
+    let start = DateTime::from_timestamp_nanos(result.cas() as i64);
     let result = collection
         .upsert(&key, &doc, UpsertOptions::default().preserve_expiry(true))
         .await?;
