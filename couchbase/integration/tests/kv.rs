@@ -479,17 +479,18 @@ pub async fn test_unlock_invalid_cas(config: Arc<TestConfig>) -> TestResult<bool
     assert_ne!(0, result.cas());
 
     let result = collection
-        .get_and_lock(&key, Duration::from_secs(1), None)
+        .get_and_lock(&key, Duration::from_secs(2), None)
         .await?;
     assert_ne!(0, result.cas());
     let actual_content: HashMap<&str, &str> = result.content()?;
     assert_eq!(content.clone(), actual_content);
 
     let result = collection.unlock(&key, result.cas() + 1, None).await;
+
+
     assert!(result.is_err());
 
     let err = result.err().unwrap();
-
     match err {
         CouchbaseError::DocumentLocked { .. } => {}
         _ => {
@@ -607,6 +608,7 @@ pub async fn test_replicate_to_get_any_replica(config: Arc<TestConfig>) -> TestR
                 .timeout(Duration::from_secs(5)),
         )
         .await?;
+
     assert_ne!(0, result.cas());
 
     let result = collection.get_any_replica(key, None).await?;
