@@ -7,7 +7,7 @@ This is the repository for the official, community supported Couchbase Rust SDK.
 
 ## Requirements
 
-Make sure to have all [libcouchbase](https://docs.couchbase.com/c-sdk/current/start-using-sdk.html) requirements satisfied to build it properly. Also [bindgen](https://rust-lang.github.io/rust-bindgen/requirements.html) requirements need to be in place. You need a rust version newer or equal to `1.77.1` because this SDK makes heavy use of `async/await`.
+Make sure to have all [libcouchbase](https://docs.couchbase.com/c-sdk/current/start-using-sdk.html) requirements satisfied to build it properly. Also [bindgen](https://rust-lang.github.io/rust-bindgen/requirements.html) requirements need to be in place. You need a rust version newer or equal to `1.77.2` because this SDK makes heavy use of `async/await`.
 
 ## Installation
 
