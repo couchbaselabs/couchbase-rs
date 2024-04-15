@@ -487,7 +487,6 @@ pub async fn test_unlock_invalid_cas(config: Arc<TestConfig>) -> TestResult<bool
 
     let result = collection.unlock(&key, result.cas() + 1, None).await;
 
-
     assert!(result.is_err());
 
     let err = result.err().unwrap();
