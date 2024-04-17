@@ -22,6 +22,7 @@ use crate::io::lcb::{
 use crate::io::lcb::instance::decrement_outstanding_requests;
 use crate::{CounterResult, EndpointPingReport, MutationToken, ServiceType, ViewResult, ViewRow};
 use std::collections::HashMap;
+use std::convert::TryInto;
 
 fn decode_and_own_str(ptr: *const c_char, len: usize) -> String {
     str::from_utf8(unsafe { from_raw_parts(ptr as *const u8, len) })
@@ -374,7 +375,7 @@ pub unsafe extern "C" fn lookup_in_callback(
             lcb_respsubdoc_result_value(subdoc_res, i, &mut value_ptr, &mut value_len);
             let value = from_raw_parts(value_ptr as *const u8, value_len);
             fields.push(SubDocField {
-                status,
+                status: status.try_into().unwrap(),
                 value: value.into(),
             });
         }
@@ -419,7 +420,7 @@ pub unsafe extern "C" fn mutate_in_callback(
             lcb_respsubdoc_result_value(subdoc_res, i, &mut value_ptr, &mut value_len);
             let value = from_raw_parts(value_ptr as *const u8, value_len);
             fields.push(SubDocField {
-                status,
+                status: status.try_into().unwrap(),
                 value: value.into(),
             });
         }
