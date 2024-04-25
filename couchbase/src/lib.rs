@@ -1,8 +1,4 @@
 #![doc(html_root_url = "https://docs.rs/couchbase/1.0.0-alpha.5")]
-
-#[cfg(test)]
-mod test;
-
 mod api;
 mod io;
 

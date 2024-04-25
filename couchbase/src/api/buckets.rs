@@ -1,6 +1,6 @@
 use crate::api::collection::DurabilityLevel;
 use crate::io::request::*;
-use crate::io::Core;
+
 use crate::CouchbaseError::{
     BucketExists, BucketNotFlushable, BucketNotFound, Generic, InvalidArgument,
 };
@@ -14,6 +14,16 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 use std::time::Duration;
+
+use cfg_if::cfg_if;
+
+cfg_if! {
+    if #[cfg(test)] {
+        use crate::api::collection::tests::MockCore as Core;
+    } else {
+        use crate::io::Core;
+    }
+}
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum BucketType {

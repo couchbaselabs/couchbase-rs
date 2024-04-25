@@ -1,6 +1,5 @@
 use crate::api::bucket::Bucket;
 use crate::io::request::{AnalyticsRequest, QueryRequest, Request, SearchRequest};
-use crate::io::Core;
 use crate::{
     AnalyticsIndexManager, AnalyticsOptions, AnalyticsResult, Authenticator, BucketManager,
     CouchbaseError, CouchbaseResult, ErrorContext, QueryIndexManager, QueryOptions, QueryResult,
@@ -11,6 +10,16 @@ use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 use std::time::Duration;
+
+use cfg_if::cfg_if;
+
+cfg_if! {
+    if #[cfg(test)] {
+        use crate::api::collection::tests::MockCore as Core;
+    } else {
+        use crate::io::Core;
+    }
+}
 
 /// Connect to a Couchbase cluster and perform cluster-level operations
 ///

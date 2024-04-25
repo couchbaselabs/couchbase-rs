@@ -1,6 +1,6 @@
 use crate::api::query_options::QueryOptions;
 use crate::io::request::*;
-use crate::io::Core;
+
 use crate::{CouchbaseError, CouchbaseResult, ErrorContext};
 use futures::channel::oneshot;
 use futures::StreamExt;
@@ -10,6 +10,16 @@ use std::ops::Add;
 use std::sync::Arc;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
+
+use cfg_if::cfg_if;
+
+cfg_if! {
+    if #[cfg(test)] {
+        use crate::api::collection::tests::MockCore as Core;
+    } else {
+        use crate::io::Core;
+    }
+}
 
 #[derive(Debug, Copy, Clone, Deserialize)]
 pub enum QueryIndexType {

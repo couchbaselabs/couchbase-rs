@@ -1,13 +1,21 @@
 use crate::io::request::{CounterRequest, MutateRequest, MutateRequestType, Request};
-use crate::io::Core;
 use crate::{
     AppendOptions, CouchbaseError, CouchbaseResult, CounterOptions, CounterResult,
     DecrementOptions, DurabilityLevel, ErrorContext, IncrementOptions, MutationResult,
     PrependOptions,
 };
+use cfg_if::cfg_if;
 use futures::channel::oneshot;
 use std::convert::TryFrom;
 use std::sync::Arc;
+
+cfg_if! {
+    if #[cfg(test)] {
+        use crate::api::collection::tests::MockCore as Core;
+    } else {
+        use crate::io::Core;
+    }
+}
 
 pub struct BinaryCollection {
     core: Arc<Core>,

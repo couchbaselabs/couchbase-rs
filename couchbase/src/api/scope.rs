@@ -1,11 +1,18 @@
 use crate::io::request::{AnalyticsRequest, QueryRequest, Request};
-use crate::io::Core;
 use crate::{
     AnalyticsOptions, AnalyticsResult, Collection, CouchbaseResult, QueryOptions, QueryResult,
 };
+use cfg_if::cfg_if;
 use futures::channel::oneshot;
 use std::sync::Arc;
 
+cfg_if! {
+    if #[cfg(test)] {
+        use crate::api::collection::tests::MockCore as Core;
+    } else {
+        use crate::io::Core;
+    }
+}
 /// Scopes provide access to a group of collections
 #[derive(Debug)]
 pub struct Scope {

@@ -7,4 +7,3 @@ CouchbaseMock.jar
 gocaves-macos
 couchbase/tests/config
 tags
-couchbase/integration/config.toml

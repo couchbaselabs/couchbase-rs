@@ -4,20 +4,30 @@ use crate::api::subdoc::*;
 use crate::api::subdoc_options::*;
 use crate::api::subdoc_results::*;
 use crate::io::request::*;
-use crate::io::{Core, LOOKUPIN_MACRO_EXPIRYTIME};
+use crate::io::LOOKUPIN_MACRO_EXPIRYTIME;
 use crate::CouchbaseError::Generic;
 use crate::{BinaryCollection, CouchbaseError, CouchbaseResult, ErrorContext};
+use cfg_if::cfg_if;
 use chrono::NaiveDateTime;
 use futures::channel::oneshot;
-use futures::FutureExt;
 use futures::{pin_mut, select};
+use futures::{FutureExt, SinkExt};
 use serde::Serialize;
 use serde_json::to_vec;
 use std::convert::TryFrom;
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
+use std::ops::Deref;
 use std::sync::Arc;
 use std::time::Duration;
+
+cfg_if! {
+    if #[cfg(test)] {
+        use tests::MockCore as Core;
+    } else {
+        use crate::io::Core;
+    }
+}
 
 /// Primary API to access Key/Value operations
 #[derive(Debug)]
@@ -57,6 +67,7 @@ impl Collection {
         if options.with_expiry {
             return self.get_with_expiry(id).await;
         }
+
         return self.get_direct(id, options).await;
     }
 
@@ -428,6 +439,134 @@ impl Collection {
     }
 }
 
+#[cfg(test)]
+pub(crate) mod tests {
+    use crate::api::subdoc_results::SubDocField;
+    use crate::io::request::{GetRequest, GetRequestType, LookupInRequest, Request};
+    use crate::io::LOOKUPIN_MACRO_EXPIRYTIME;
+    use crate::{
+        Collection, CouchbaseResult, GetOptions, GetResult, GetSpecOptions, LookupInOptions,
+        LookupInResult, LookupInSpec,
+    };
+    use futures::channel::oneshot;
+    use mockall::mock;
+    use mockall::predicate::eq;
+    use std::ops::Deref;
+    use std::sync::Arc;
+    use uuid::Uuid;
+
+    mock!(
+        #[derive(Debug)]
+        pub Core {
+            pub fn new(
+                connection_string: String,
+                username: Option<String>,
+                password: Option<String>,
+            ) -> Self ;
+            pub fn send(&self, request: Request);
+            pub fn open_bucket(&self, name: String);
+        }
+    );
+
+    const NAME: &str = "default";
+    const SCOPE: &str = "_default";
+    const BUCKET: &str = "default";
+
+    #[tokio::test]
+    async fn get_direct_works() {
+        let key = Uuid::new_v4().to_string();
+        let (sender, receiver) = oneshot::channel();
+        let request = Request::Get(GetRequest {
+            id: key.clone(),
+            ty: GetRequestType::Get {
+                options: GetOptions::default(),
+            },
+            bucket: BUCKET.to_string(),
+            sender,
+            scope: SCOPE.to_string(),
+            collection: NAME.to_string(),
+        });
+
+        let mut mock_core = MockCore::default();
+        mock_core
+            .expect_send()
+            .with(eq(request))
+            .times(1)
+            .returning(|x| {
+                if let Request::Get(r) = x {
+                    let _ = r
+                        .sender
+                        .send(Ok(GetResult::new("test".as_bytes().to_vec(), 0, 0)));
+                }
+                ()
+            });
+        let mocked_collection = Collection::new(
+            Arc::new(mock_core),
+            NAME.to_string(),
+            SCOPE.to_string(),
+            BUCKET.to_string(),
+        );
+        let result: CouchbaseResult<GetResult> = mocked_collection
+            .get_direct(key, GetOptions::default())
+            .await;
+        assert_eq!(result.unwrap().content, "test".as_bytes().to_vec());
+    }
+
+    #[tokio::test]
+    async fn get_with_expiry_works() {
+        let key = Uuid::new_v4().to_string();
+        let (sender, receiver) = oneshot::channel();
+        let specs = vec![
+            LookupInSpec::get(
+                LOOKUPIN_MACRO_EXPIRYTIME,
+                GetSpecOptions::default().xattr(true),
+            ),
+            LookupInSpec::get("", GetSpecOptions::default()),
+        ];
+        let request = Request::LookupIn(LookupInRequest {
+            id: key.clone(),
+            specs,
+            sender,
+            bucket: BUCKET.to_string(),
+            options: LookupInOptions::default(),
+            scope: SCOPE.to_string(),
+            collection: NAME.to_string(),
+        });
+
+        let mut mock_core = MockCore::default();
+        mock_core
+            .expect_send()
+            .with(eq(request))
+            .times(1)
+            .returning(|x| {
+                if let Request::LookupIn(r) = x {
+                    let _ = r.sender.send(Ok(LookupInResult::new(
+                        vec![
+                            SubDocField {
+                                status: 0,
+                                value: "1713950100".as_bytes().to_vec(),
+                            },
+                            SubDocField {
+                                status: 0,
+                                value: "test".as_bytes().to_vec(),
+                            },
+                        ],
+                        0,
+                    )));
+                }
+                ()
+            });
+        let mocked_collection = Collection::new(
+            Arc::new(mock_core),
+            NAME.to_string(),
+            SCOPE.to_string(),
+            BUCKET.to_string(),
+        );
+
+        let result: CouchbaseResult<GetResult> = mocked_collection.get_with_expiry(key).await;
+        assert_eq!(result.unwrap().content, "test".as_bytes().to_vec());
+    }
+}
 #[derive(Debug)]
 pub struct MutationState {
     pub(crate) tokens: Vec<MutationToken>,

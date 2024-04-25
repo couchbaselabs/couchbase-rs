@@ -1,5 +1,5 @@
 use crate::io::request::*;
-use crate::io::Core;
+
 use crate::CouchbaseError::{CollectionExists, CollectionNotFound, ScopeExists, ScopeNotFound};
 use crate::{CouchbaseError, CouchbaseResult, ErrorContext, GenericManagementResult, ServiceType};
 use futures::channel::oneshot;
@@ -7,6 +7,16 @@ use serde_derive::Deserialize;
 use serde_json::Value;
 use std::sync::Arc;
 use std::time::Duration;
+
+use cfg_if::cfg_if;
+
+cfg_if! {
+    if #[cfg(test)] {
+        use crate::api::collection::tests::MockCore as Core;
+    } else {
+        use crate::io::Core;
+    }
+}
 
 #[derive(Debug)]
 pub struct ScopeSpec {

@@ -1,5 +1,4 @@
 use crate::io::request::*;
-use crate::io::Core;
 use crate::{CouchbaseError, CouchbaseResult, GenericManagementResult, ServiceType};
 use futures::channel::oneshot;
 use serde_derive::{Deserialize, Serialize};
@@ -7,6 +6,16 @@ use std::borrow::Borrow;
 use std::fmt::{self, Debug};
 use std::sync::Arc;
 use std::time::Duration;
+
+use cfg_if::cfg_if;
+
+cfg_if! {
+    if #[cfg(test)] {
+        use crate::api::collection::tests::MockCore as Core;
+    } else {
+        use crate::io::Core;
+    }
+}
 
 #[derive(Debug, Deserialize, Clone, Copy, Eq, PartialEq)]
 pub enum AuthDomain {
