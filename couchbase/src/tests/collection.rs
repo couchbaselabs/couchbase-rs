@@ -1,16 +1,26 @@
-use std::collections::HashMap;
+use crate::api::keyvalue_options::{GetReplicaOptions, ReplicaMode};
 use crate::api::subdoc_results::SubDocField;
-use crate::io::request::{ExistsRequest, GetReplicaRequest, GetRequest, GetRequestType, LookupInRequest, MutateInRequest, MutateRequest, MutateRequestType, RemoveRequest, Request, TouchRequest, UnlockRequest};
+use crate::io::request::{
+    ExistsRequest, GetReplicaRequest, GetRequest, GetRequestType, LookupInRequest, MutateInRequest,
+    MutateRequest, MutateRequestType, RemoveRequest, Request, TouchRequest, UnlockRequest,
+};
 use crate::io::LOOKUPIN_MACRO_EXPIRYTIME;
-use crate::test::mock::*;
-use crate::{ClientVerifiedDurability, Collection, CouchbaseResult, DurabilityLevel, ExistsOptions, ExistsResult, GetAndLockOptions, GetAndTouchOptions, GetAnyReplicaOptions, GetOptions, GetReplicaResult, GetResult, GetSpecOptions, InsertOptions, LookupInOptions, LookupInResult, LookupInSpec, MutateInOptions, MutateInResult, MutateInSpec, MutationResult, MutationToken, PersistTo, RemoveOptions, ReplaceOptions, ReplaceSpecOptions, TouchOptions, UnlockOptions, UpsertOptions, UpsertSpecOptions};
+use crate::tests::mock::*;
+use crate::{
+    ClientVerifiedDurability, Collection, CouchbaseResult, DurabilityLevel, ExistsOptions,
+    ExistsResult, GetAndLockOptions, GetAndTouchOptions, GetAnyReplicaOptions, GetOptions,
+    GetReplicaResult, GetResult, GetSpecOptions, InsertOptions, LookupInOptions, LookupInResult,
+    LookupInSpec, MutateInOptions, MutateInResult, MutateInSpec, MutationResult, MutationToken,
+    PersistTo, RemoveOptions, ReplaceOptions, ReplaceSpecOptions, TouchOptions, UnlockOptions,
+    UpsertOptions, UpsertSpecOptions,
+};
 use futures::channel::oneshot;
 use mockall::predicate::eq;
+use serde_json::to_vec;
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
-use serde_json::to_vec;
 use uuid::Uuid;
-use crate::api::keyvalue_options::{GetReplicaOptions, ReplicaMode};
 
 #[tokio::test]
 async fn get_direct_works() {
@@ -46,9 +56,8 @@ async fn get_direct_works() {
         SCOPE.to_string(),
         BUCKET.to_string(),
     );
-    let result: CouchbaseResult<GetResult> = mocked_collection
-        .get(key, GetOptions::default())
-        .await;
+    let result: CouchbaseResult<GetResult> =
+        mocked_collection.get(key, GetOptions::default()).await;
     assert_eq!(result.unwrap().content, "test".as_bytes().to_vec());
 }
 
@@ -103,7 +112,9 @@ async fn get_with_expiry_works() {
         BUCKET.to_string(),
     );
 
-    let result: CouchbaseResult<GetResult> = mocked_collection.get(key, GetOptions::default().with_expiry(true)).await;
+    let result: CouchbaseResult<GetResult> = mocked_collection
+        .get(key, GetOptions::default().with_expiry(true))
+        .await;
     assert_eq!(result.unwrap().content, "test".as_bytes().to_vec());
 }
 
@@ -140,8 +151,6 @@ async fn get_any_replica_works() {
         collection: NAME.to_string(),
     });
 
-
-
     let mut mock_core = MockCore::default();
     mock_core
         .expect_send()
@@ -173,9 +182,8 @@ async fn get_any_replica_works() {
         SCOPE.to_string(),
         BUCKET.to_string(),
     );
-    let result: CouchbaseResult<GetReplicaResult> = mocked_collection
-        .get_any_replica(key, None)
-        .await;
+    let result: CouchbaseResult<GetReplicaResult> =
+        mocked_collection.get_any_replica(key, None).await;
 
     assert_eq!(result.unwrap().content, "replica_test".as_bytes().to_vec());
 }
@@ -214,9 +222,8 @@ async fn get_and_lock_works() {
         SCOPE.to_string(),
         BUCKET.to_string(),
     );
-    let result: CouchbaseResult<GetResult> = mocked_collection
-        .get_and_lock(key, lock_time, None)
-        .await;
+    let result: CouchbaseResult<GetResult> =
+        mocked_collection.get_and_lock(key, lock_time, None).await;
     assert_eq!(result.unwrap().content, "test".as_bytes().to_vec());
 }
 
@@ -254,9 +261,8 @@ async fn get_and_touch_works() {
         SCOPE.to_string(),
         BUCKET.to_string(),
     );
-    let result: CouchbaseResult<GetResult> = mocked_collection
-        .get_and_touch(key, expiry, None)
-        .await;
+    let result: CouchbaseResult<GetResult> =
+        mocked_collection.get_and_touch(key, expiry, None).await;
     assert_eq!(result.unwrap().content, "test".as_bytes().to_vec());
 }
 
@@ -281,9 +287,7 @@ async fn exists_works() {
         .times(1)
         .returning(|x| {
             if let Request::Exists(r) = x {
-                let _ = r
-                    .sender
-                    .send(Ok(ExistsResult::new(true, Some(0u64))));
+                let _ = r.sender.send(Ok(ExistsResult::new(true, Some(0u64))));
             }
             ()
         });
@@ -293,9 +297,7 @@ async fn exists_works() {
         SCOPE.to_string(),
         BUCKET.to_string(),
     );
-    let result: CouchbaseResult<ExistsResult> = mocked_collection
-        .exists(key, None)
-        .await;
+    let result: CouchbaseResult<ExistsResult> = mocked_collection.exists(key, None).await;
     assert!(result.unwrap().exists());
 }
 
@@ -308,7 +310,9 @@ async fn upsert_works() {
     let request = Request::Mutate(MutateRequest {
         id: key.clone(),
         content: to_vec(&content).unwrap(),
-        ty: MutateRequestType::Upsert { options: UpsertOptions::default() },
+        ty: MutateRequestType::Upsert {
+            options: UpsertOptions::default(),
+        },
         bucket: BUCKET.to_string(),
         sender,
         scope: SCOPE.to_string(),
@@ -322,9 +326,10 @@ async fn upsert_works() {
         .times(1)
         .returning(|x| {
             if let Request::Mutate(r) = x {
-                let _ = r
-                    .sender
-                    .send(Ok(MutationResult::new(1, Some(MutationToken::new(1, 1, 1,BUCKET.to_string())))));
+                let _ = r.sender.send(Ok(MutationResult::new(
+                    1,
+                    Some(MutationToken::new(1, 1, 1, BUCKET.to_string())),
+                )));
             }
             ()
         });
@@ -349,7 +354,9 @@ async fn insert_works() {
     let request = Request::Mutate(MutateRequest {
         id: key.clone(),
         content: to_vec(&content).unwrap(),
-        ty: MutateRequestType::Insert { options: InsertOptions::default() },
+        ty: MutateRequestType::Insert {
+            options: InsertOptions::default(),
+        },
         bucket: BUCKET.to_string(),
         sender,
         scope: SCOPE.to_string(),
@@ -363,9 +370,10 @@ async fn insert_works() {
         .times(1)
         .returning(|x| {
             if let Request::Mutate(r) = x {
-                let _ = r
-                    .sender
-                    .send(Ok(MutationResult::new(1, Some(MutationToken::new(1, 1, 1,BUCKET.to_string())))));
+                let _ = r.sender.send(Ok(MutationResult::new(
+                    1,
+                    Some(MutationToken::new(1, 1, 1, BUCKET.to_string())),
+                )));
             }
             ()
         });
@@ -381,7 +389,6 @@ async fn insert_works() {
     assert_eq!(result.unwrap().cas(), 1);
 }
 
-
 #[tokio::test]
 async fn replace_works() {
     let key = Uuid::new_v4().to_string();
@@ -391,7 +398,9 @@ async fn replace_works() {
     let request = Request::Mutate(MutateRequest {
         id: key.clone(),
         content: to_vec(&content).unwrap(),
-        ty: MutateRequestType::Replace { options: ReplaceOptions::default() },
+        ty: MutateRequestType::Replace {
+            options: ReplaceOptions::default(),
+        },
         bucket: BUCKET.to_string(),
         sender,
         scope: SCOPE.to_string(),
@@ -405,9 +414,10 @@ async fn replace_works() {
         .times(1)
         .returning(|x| {
             if let Request::Mutate(r) = x {
-                let _ = r
-                    .sender
-                    .send(Ok(MutationResult::new(1, Some(MutationToken::new(1, 1, 1,BUCKET.to_string())))));
+                let _ = r.sender.send(Ok(MutationResult::new(
+                    1,
+                    Some(MutationToken::new(1, 1, 1, BUCKET.to_string())),
+                )));
             }
             ()
         });
@@ -431,7 +441,9 @@ async fn get_remove_works() {
         id: key.clone(),
         sender,
         bucket: BUCKET.to_string(),
-        options: RemoveOptions::default().durability(DurabilityLevel::Majority).timeout(Duration::from_secs(5)),
+        options: RemoveOptions::default()
+            .durability(DurabilityLevel::Majority)
+            .timeout(Duration::from_secs(5)),
         scope: SCOPE.to_string(),
         collection: NAME.to_string(),
     });
@@ -443,9 +455,10 @@ async fn get_remove_works() {
         .times(1)
         .returning(|x| {
             if let Request::Remove(r) = x {
-                let _ = r
-                    .sender
-                    .send(Ok(MutationResult::new(1, Some(MutationToken::new(1, 1, 1,BUCKET.to_string())))));
+                let _ = r.sender.send(Ok(MutationResult::new(
+                    1,
+                    Some(MutationToken::new(1, 1, 1, BUCKET.to_string())),
+                )));
             }
             ()
         });
@@ -456,7 +469,12 @@ async fn get_remove_works() {
         BUCKET.to_string(),
     );
     let result: CouchbaseResult<MutationResult> = mocked_collection
-        .remove(key, RemoveOptions::default().durability(DurabilityLevel::Majority).timeout(Duration::from_secs(5)))
+        .remove(
+            key,
+            RemoveOptions::default()
+                .durability(DurabilityLevel::Majority)
+                .timeout(Duration::from_secs(5)),
+        )
         .await;
     assert_eq!(result.unwrap().cas(), 1);
 }
@@ -483,9 +501,10 @@ async fn get_remove_does_not_work_observe_based_durability() {
         .times(0)
         .returning(|x| {
             if let Request::Remove(r) = x {
-                let _ = r
-                    .sender
-                    .send(Ok(MutationResult::new(1, Some(MutationToken::new(1, 1, 1,BUCKET.to_string())))));
+                let _ = r.sender.send(Ok(MutationResult::new(
+                    1,
+                    Some(MutationToken::new(1, 1, 1, BUCKET.to_string())),
+                )));
             }
             ()
         });
@@ -496,9 +515,12 @@ async fn get_remove_does_not_work_observe_based_durability() {
         BUCKET.to_string(),
     );
     let result: CouchbaseResult<MutationResult> = mocked_collection
-        .remove(key, RemoveOptions::default().durability(DurabilityLevel::ClientVerified(
-            ClientVerifiedDurability::default().persist_to(PersistTo::One),
-        )))
+        .remove(
+            key,
+            RemoveOptions::default().durability(DurabilityLevel::ClientVerified(
+                ClientVerifiedDurability::default().persist_to(PersistTo::One),
+            )),
+        )
         .await;
     assert!(result.is_err());
 }
@@ -524,9 +546,10 @@ async fn get_touch_works() {
         .times(1)
         .returning(|x| {
             if let Request::Touch(r) = x {
-                let _ = r
-                    .sender
-                    .send(Ok(MutationResult::new(1, Some(MutationToken::new(1, 1, 1,BUCKET.to_string())))));
+                let _ = r.sender.send(Ok(MutationResult::new(
+                    1,
+                    Some(MutationToken::new(1, 1, 1, BUCKET.to_string())),
+                )));
             }
             ()
         });
@@ -563,9 +586,7 @@ async fn get_unlock_works() {
         .times(1)
         .returning(|x| {
             if let Request::Unlock(r) = x {
-                let _ = r
-                    .sender
-                    .send(Ok(()));
+                let _ = r.sender.send(Ok(()));
             }
             ()
         });
@@ -629,10 +650,14 @@ async fn lookup_in_works() {
         BUCKET.to_string(),
     );
     let result: CouchbaseResult<LookupInResult> = mocked_collection
-        .lookup_in(key, vec![LookupInSpec::get(
-            "$document.exptime",
-            GetSpecOptions::default().xattr(true),
-        )], LookupInOptions::default())
+        .lookup_in(
+            key,
+            vec![LookupInSpec::get(
+                "$document.exptime",
+                GetSpecOptions::default().xattr(true),
+            )],
+            LookupInOptions::default(),
+        )
         .await;
     assert_eq!(result.unwrap().cas(), 0);
 }
@@ -684,10 +709,15 @@ async fn mutate_in_works() {
         BUCKET.to_string(),
     );
     let result: CouchbaseResult<MutateInResult> = mocked_collection
-        .mutate_in(key, vec![
-            MutateInSpec::replace("name", "52-Mile Air", ReplaceSpecOptions::default()).unwrap(),
-            MutateInSpec::upsert("foo", "bar", UpsertSpecOptions::default()).unwrap(),
-        ], MutateInOptions::default())
+        .mutate_in(
+            key,
+            vec![
+                MutateInSpec::replace("name", "52-Mile Air", ReplaceSpecOptions::default())
+                    .unwrap(),
+                MutateInSpec::upsert("foo", "bar", UpsertSpecOptions::default()).unwrap(),
+            ],
+            MutateInOptions::default(),
+        )
         .await;
     assert_eq!(result.unwrap().cas(), 0);
 }

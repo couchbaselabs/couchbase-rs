@@ -35,7 +35,7 @@ pub use cfg_if::cfg_if;
 
 cfg_if! {
     if #[cfg(test)] {
-        pub use crate::test::mock::MockCore as Core;
+        pub use crate::tests::mock::MockCore as Core;
     } else {
         pub use crate::io::Core;
     }

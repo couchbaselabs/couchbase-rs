@@ -3,7 +3,7 @@
 mod api;
 mod io;
 #[cfg(test)]
-mod test;
+mod tests;
 
 pub use api::analytics_indexes::*;
 pub use api::analytics_options::*;
