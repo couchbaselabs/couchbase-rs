@@ -1,6 +1,7 @@
 use crate::api::view_options::DesignDocumentNamespace;
 use crate::io::request::*;
 
+use super::*;
 use crate::{CouchbaseError, CouchbaseResult, GenericManagementResult, ServiceType};
 use futures::channel::oneshot;
 use serde::de::DeserializeOwned;
@@ -9,16 +10,6 @@ use std::borrow::BorrowMut;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
-
-use cfg_if::cfg_if;
-
-cfg_if! {
-    if #[cfg(test)] {
-        use crate::api::collection::tests::MockCore as Core;
-    } else {
-        use crate::io::Core;
-    }
-}
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct View {
     map: String,

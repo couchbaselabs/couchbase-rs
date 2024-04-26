@@ -1,5 +1,6 @@
 use crate::io::request::*;
 
+use super::*;
 use crate::{CouchbaseError, CouchbaseResult, ErrorContext, GenericManagementResult, ServiceType};
 use futures::channel::oneshot;
 use serde::de::DeserializeOwned;
@@ -8,16 +9,6 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
-
-use cfg_if::cfg_if;
-
-cfg_if! {
-    if #[cfg(test)] {
-        use crate::api::collection::tests::MockCore as Core;
-    } else {
-        use crate::io::Core;
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct SearchIndexBuilder {

@@ -7,15 +7,7 @@ use crate::{
 use futures::channel::oneshot;
 use std::sync::Arc;
 
-use cfg_if::cfg_if;
-
-cfg_if! {
-    if #[cfg(test)] {
-        use crate::api::collection::tests::MockCore as Core;
-    } else {
-        use crate::io::Core;
-    }
-}
+use super::*;
 
 /// Provides bucket-level access to collections and view operations
 #[derive(Debug)]
