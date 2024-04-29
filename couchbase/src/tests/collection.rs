@@ -25,7 +25,7 @@ use uuid::Uuid;
 #[tokio::test]
 async fn get_direct_works() {
     let key = Uuid::new_v4().to_string();
-    let (sender, receiver) = oneshot::channel();
+    let (sender, _) = oneshot::channel();
     let request = Request::Get(GetRequest {
         id: key.clone(),
         ty: GetRequestType::Get {
@@ -64,7 +64,7 @@ async fn get_direct_works() {
 #[tokio::test]
 async fn get_with_expiry_works() {
     let key = Uuid::new_v4().to_string();
-    let (sender, receiver) = oneshot::channel();
+    let (sender, _) = oneshot::channel();
     let specs = vec![
         LookupInSpec::get(
             LOOKUPIN_MACRO_EXPIRYTIME,
@@ -121,8 +121,8 @@ async fn get_with_expiry_works() {
 #[tokio::test]
 async fn get_any_replica_works() {
     let key = Uuid::new_v4().to_string();
-    let (sender, receiver) = oneshot::channel();
-    let (get_replica_sender, get_replica_receiver) = oneshot::channel();
+    let (sender, _) = oneshot::channel();
+    let (get_replica_sender, _) = oneshot::channel();
     let options = GetAnyReplicaOptions::default();
 
     let replica_request = Request::GetReplica(GetReplicaRequest {
@@ -191,7 +191,7 @@ async fn get_any_replica_works() {
 #[tokio::test]
 async fn get_and_lock_works() {
     let key = Uuid::new_v4().to_string();
-    let (sender, receiver) = oneshot::channel();
+    let (sender, _) = oneshot::channel();
     let options = GetAndLockOptions::default();
     let lock_time = Duration::from_secs(2);
     let request = Request::Get(GetRequest {
@@ -230,7 +230,7 @@ async fn get_and_lock_works() {
 #[tokio::test]
 async fn get_and_touch_works() {
     let key = Uuid::new_v4().to_string();
-    let (sender, receiver) = oneshot::channel();
+    let (sender, _) = oneshot::channel();
     let options = GetAndTouchOptions::default();
     let expiry = Duration::from_secs(2);
     let request = Request::Get(GetRequest {
@@ -269,7 +269,7 @@ async fn get_and_touch_works() {
 #[tokio::test]
 async fn exists_works() {
     let key = Uuid::new_v4().to_string();
-    let (sender, receiver) = oneshot::channel();
+    let (sender, _) = oneshot::channel();
     let options = ExistsOptions::default();
     let request = Request::Exists(ExistsRequest {
         id: key.clone(),
@@ -306,7 +306,7 @@ async fn upsert_works() {
     let key = Uuid::new_v4().to_string();
     let mut content = HashMap::new();
     content.insert("Hello", "Rust!");
-    let (sender, receiver) = oneshot::channel();
+    let (sender, _) = oneshot::channel();
     let request = Request::Mutate(MutateRequest {
         id: key.clone(),
         content: to_vec(&content).unwrap(),
@@ -350,7 +350,7 @@ async fn insert_works() {
     let key = Uuid::new_v4().to_string();
     let mut content = HashMap::new();
     content.insert("Hello", "Rust!");
-    let (sender, receiver) = oneshot::channel();
+    let (sender, _) = oneshot::channel();
     let request = Request::Mutate(MutateRequest {
         id: key.clone(),
         content: to_vec(&content).unwrap(),
@@ -394,7 +394,7 @@ async fn replace_works() {
     let key = Uuid::new_v4().to_string();
     let mut content = HashMap::new();
     content.insert("Hello", "Rust!");
-    let (sender, receiver) = oneshot::channel();
+    let (sender, _) = oneshot::channel();
     let request = Request::Mutate(MutateRequest {
         id: key.clone(),
         content: to_vec(&content).unwrap(),
@@ -436,7 +436,7 @@ async fn replace_works() {
 #[tokio::test]
 async fn get_remove_works() {
     let key = Uuid::new_v4().to_string();
-    let (sender, receiver) = oneshot::channel();
+    let (sender, _) = oneshot::channel();
     let request = Request::Remove(RemoveRequest {
         id: key.clone(),
         sender,
@@ -482,7 +482,7 @@ async fn get_remove_works() {
 #[tokio::test]
 async fn get_remove_does_not_work_observe_based_durability() {
     let key = Uuid::new_v4().to_string();
-    let (sender, receiver) = oneshot::channel();
+    let (sender, _) = oneshot::channel();
     let request = Request::Remove(RemoveRequest {
         id: key.clone(),
         sender,
@@ -528,7 +528,7 @@ async fn get_remove_does_not_work_observe_based_durability() {
 #[tokio::test]
 async fn get_touch_works() {
     let key = Uuid::new_v4().to_string();
-    let (sender, receiver) = oneshot::channel();
+    let (sender, _) = oneshot::channel();
     let request = Request::Touch(TouchRequest {
         id: key.clone(),
         sender,
@@ -568,7 +568,7 @@ async fn get_touch_works() {
 #[tokio::test]
 async fn get_unlock_works() {
     let key = Uuid::new_v4().to_string();
-    let (sender, receiver) = oneshot::channel();
+    let (sender, _) = oneshot::channel();
     let request = Request::Unlock(UnlockRequest {
         id: key.clone(),
         sender,
@@ -606,7 +606,7 @@ async fn get_unlock_works() {
 #[tokio::test]
 async fn lookup_in_works() {
     let key = Uuid::new_v4().to_string();
-    let (sender, receiver) = oneshot::channel();
+    let (sender, _) = oneshot::channel();
     let request = Request::LookupIn(LookupInRequest {
         id: key.clone(),
         specs: vec![LookupInSpec::get(
@@ -665,7 +665,7 @@ async fn lookup_in_works() {
 #[tokio::test]
 async fn mutate_in_works() {
     let key = Uuid::new_v4().to_string();
-    let (sender, receiver) = oneshot::channel();
+    let (sender, _) = oneshot::channel();
     let request = Request::MutateIn(MutateInRequest {
         id: key.clone(),
         specs: vec![
