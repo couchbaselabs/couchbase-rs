@@ -20,6 +20,7 @@ use serde_json::to_vec;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
+use chrono::NaiveDateTime;
 use uuid::Uuid;
 
 #[tokio::test]
@@ -115,7 +116,7 @@ async fn get_with_expiry_works() {
     let result: CouchbaseResult<GetResult> = mocked_collection
         .get(key, GetOptions::default().with_expiry(true))
         .await;
-    assert_eq!(result.unwrap().content, "test".as_bytes().to_vec());
+    assert_eq!(result.unwrap().expiry_time, Some(NaiveDateTime::from_timestamp(1713950100, 0)));
 }
 
 #[tokio::test]
