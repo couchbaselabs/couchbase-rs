@@ -638,7 +638,7 @@ async fn lookup_in_works() {
                             value: "test".as_bytes().to_vec(),
                         },
                     ],
-                    0,
+                    1,
                 )));
             }
             ()
@@ -659,7 +659,7 @@ async fn lookup_in_works() {
             LookupInOptions::default(),
         )
         .await;
-    assert_eq!(result.unwrap().cas(), 0);
+    assert_eq!(result.unwrap().cas(), 1);
 }
 
 #[tokio::test]
@@ -697,7 +697,7 @@ async fn mutate_in_works() {
                             value: "test".as_bytes().to_vec(),
                         },
                     ],
-                    0,
+                    1,
                 )));
             }
             ()
@@ -719,5 +719,5 @@ async fn mutate_in_works() {
             MutateInOptions::default(),
         )
         .await;
-    assert_eq!(result.unwrap().cas(), 0);
+    assert_eq!(result.unwrap().cas(), 1);
 }

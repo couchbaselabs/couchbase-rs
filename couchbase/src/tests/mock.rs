@@ -18,3 +18,9 @@ mock!(
 pub const NAME: &str = "default";
 pub const SCOPE: &str = "_default";
 pub const BUCKET: &str = "default";
+
+impl PartialEq for Request {
+    fn eq(&self, other: &Request) -> bool {
+        true
+    }
+}

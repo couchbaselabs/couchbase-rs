@@ -29,11 +29,6 @@ pub enum Request {
     Touch(TouchRequest),
     GetReplica(GetReplicaRequest),
 }
-impl PartialEq for Request {
-    fn eq(&self, other: &Request) -> bool {
-        true
-    }
-}
 
 impl Request {
     pub fn bucket(&self) -> Option<&String> {
