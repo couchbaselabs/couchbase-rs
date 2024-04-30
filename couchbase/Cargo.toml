@@ -26,6 +26,8 @@ uuid = { version = "1.8.0", features = ["v4"] }
 couchbase-sys = { path = "../couchbase-sys", version = "=1.0.0-alpha.5", optional = true }
 crossbeam-channel = { version = "0.5.12", optional = true }
 chrono = "0.4.37"
+mockall = "0.12.1"
+cfg-if = "1.0.0"
 
 [build-dependencies]
 cc = { version = "1.0.92", optional = true }

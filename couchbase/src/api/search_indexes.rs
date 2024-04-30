@@ -1,5 +1,5 @@
+use super::*;
 use crate::io::request::*;
-use crate::io::Core;
 use crate::{CouchbaseError, CouchbaseResult, ErrorContext, GenericManagementResult, ServiceType};
 use futures::channel::oneshot;
 use serde::de::DeserializeOwned;
@@ -8,7 +8,6 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
-
 #[derive(Debug, Clone)]
 pub struct SearchIndexBuilder {
     uuid: Option<String>,

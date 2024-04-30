@@ -1,7 +1,7 @@
+use super::*;
 use crate::api::analytics_options::AnalyticsOptions;
 use crate::api::cluster::ServiceType;
 use crate::io::request::*;
-use crate::io::Core;
 use crate::{CouchbaseError, CouchbaseResult, ErrorContext, GenericManagementResult};
 use futures::channel::oneshot;
 use futures::StreamExt;
@@ -11,7 +11,6 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 use std::time::Duration;
-
 #[derive(Debug, Clone, Deserialize)]
 pub struct AnalyticsDataset {
     #[serde(rename = "DatasetName")]

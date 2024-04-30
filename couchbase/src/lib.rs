@@ -1,8 +1,9 @@
 #![doc(html_root_url = "https://docs.rs/couchbase/1.0.0-alpha.5")]
-
+#![allow(warnings)]
 mod api;
 mod io;
-
+#[cfg(test)]
+mod tests;
 pub use api::analytics_indexes::*;
 pub use api::analytics_options::*;
 pub use api::analytics_result::*;

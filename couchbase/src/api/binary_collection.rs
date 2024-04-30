@@ -1,5 +1,5 @@
+use super::*;
 use crate::io::request::{CounterRequest, MutateRequest, MutateRequestType, Request};
-use crate::io::Core;
 use crate::{
     AppendOptions, CouchbaseError, CouchbaseResult, CounterOptions, CounterResult,
     DecrementOptions, DurabilityLevel, ErrorContext, IncrementOptions, MutationResult,
@@ -8,7 +8,6 @@ use crate::{
 use futures::channel::oneshot;
 use std::convert::TryFrom;
 use std::sync::Arc;
-
 pub struct BinaryCollection {
     core: Arc<Core>,
     name: String,

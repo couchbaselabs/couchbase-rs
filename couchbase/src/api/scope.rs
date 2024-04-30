@@ -1,5 +1,5 @@
+use super::*;
 use crate::io::request::{AnalyticsRequest, QueryRequest, Request};
-use crate::io::Core;
 use crate::{
     AnalyticsOptions, AnalyticsResult, Collection, CouchbaseResult, QueryOptions, QueryResult,
 };
