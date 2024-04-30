@@ -1,5 +1,6 @@
 use crate::io::couchbase_error_from_lcb_status;
 use crate::{CouchbaseError, CouchbaseResult, ErrorContext};
+use std::convert::TryInto;
 
 #[derive(Debug)]
 pub(crate) struct SubDocField {
@@ -48,7 +49,7 @@ impl LookupInResult {
             0 => {}
             _ => {
                 return Err(couchbase_error_from_lcb_status(
-                    content.status,
+                    content.status.try_into().unwrap(),
                     ErrorContext::default(),
                 ))
             }

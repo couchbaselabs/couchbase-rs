@@ -1,11 +1,14 @@
-use std::collections::HashMap;
-use std::sync::Arc;
+use crate::io::request::{PingRequest, Request, ViewRequest};
+use crate::tests::mock::{MockCore, BUCKET, NAME};
+use crate::{
+    Bucket, CouchbaseResult, EndpointPingReport, ErrorContext, PingOptions, PingResult,
+    ServiceType, ViewMetaData, ViewOptions, ViewResult, ViewRow,
+};
 use futures::channel::{mpsc, oneshot};
 use futures::SinkExt;
 use mockall::predicate::eq;
-use crate::{Bucket, CouchbaseResult, EndpointPingReport, ErrorContext, PingOptions, PingResult, ServiceType, ViewMetaData, ViewOptions, ViewResult, ViewRow};
-use crate::io::request::{Request, PingRequest, ViewRequest};
-use crate::tests::mock::{BUCKET, MockCore, NAME};
+use std::collections::HashMap;
+use std::sync::Arc;
 
 #[test]
 fn create_custom_collection() {
@@ -39,17 +42,17 @@ async fn ping_works() {
         .times(1)
         .returning(|x| {
             if let Request::Ping(r) = x {
-                let _ = r
-                    .sender
-                    .send(Ok(PingResult::new(NAME.to_string(), HashMap::<ServiceType, Vec<EndpointPingReport>>::new())));
+                let _ = r.sender.send(Ok(PingResult::new(
+                    NAME.to_string(),
+                    HashMap::<ServiceType, Vec<EndpointPingReport>>::new(),
+                )));
             }
             ()
         });
 
     let mocked_bucket = Bucket::new(Arc::new(mock_core), BUCKET.to_string());
 
-    let result: CouchbaseResult<PingResult> =
-        mocked_bucket.ping(PingOptions::default()).await;
+    let result: CouchbaseResult<PingResult> = mocked_bucket.ping(PingOptions::default()).await;
     assert_eq!(result.unwrap().id(), NAME);
 }
 
@@ -75,22 +78,24 @@ async fn view_query_works() {
         .returning(|x| {
             if let Request::View(r) = x {
                 let (mut metadata_sender, metadata_receiver) = mpsc::unbounded::<ViewRow>();
-                let _ = metadata_sender.send(ViewRow{id: Some(NAME.to_string()), key: NAME.as_bytes().to_vec(), value: NAME.as_bytes().to_vec()});
-                let _ = r
-                    .sender
-                    .send(Ok(ViewResult::new(metadata_receiver, oneshot::channel::<ViewMetaData>().1)));
+                let _ = metadata_sender.send(ViewRow {
+                    id: Some(NAME.to_string()),
+                    key: NAME.as_bytes().to_vec(),
+                    value: NAME.as_bytes().to_vec(),
+                });
+                let _ = r.sender.send(Ok(ViewResult::new(
+                    metadata_receiver,
+                    oneshot::channel::<ViewMetaData>().1,
+                )));
             }
             ()
         });
 
     let mocked_bucket = Bucket::new(Arc::new(mock_core), BUCKET.to_string());
 
-
-    let result: CouchbaseResult<ViewResult> =
-        mocked_bucket.view_query("dev_test_ddoc",
-                                 "test_view",
-                                 ViewOptions::default()).await;
-
+    let result: CouchbaseResult<ViewResult> = mocked_bucket
+        .view_query("dev_test_ddoc", "test_view", ViewOptions::default())
+        .await;
 
     assert!(result.is_ok());
 }
