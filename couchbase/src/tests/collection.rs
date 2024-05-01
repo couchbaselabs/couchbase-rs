@@ -21,6 +21,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use chrono::NaiveDateTime;
+use log::debug;
 use uuid::Uuid;
 
 #[tokio::test]
@@ -47,7 +48,7 @@ async fn get_direct_works() {
             if let Request::Get(r) = x {
                 let _ = r
                     .sender
-                    .send(Ok(GetResult::new("test".as_bytes().to_vec(), 0, 0)));
+                    .send(Ok(GetResult::new(r#"{"Hello": "Rust!"}"#.as_bytes().to_vec(), 0, 0)));
             }
             ()
         });
@@ -59,7 +60,47 @@ async fn get_direct_works() {
     );
     let result: CouchbaseResult<GetResult> =
         mocked_collection.get(key, GetOptions::default()).await;
-    assert_eq!(result.unwrap().content, "test".as_bytes().to_vec());
+    assert_eq!(result.unwrap().content, r#"{"Hello": "Rust!"}"#.as_bytes().to_vec());
+}
+
+#[tokio::test]
+#[should_panic]
+async fn get_direct_panic_for_wrong_input() {
+    let key = Uuid::new_v4().to_string();
+    let (sender, _) = oneshot::channel();
+
+    let request = Request::Touch(TouchRequest {
+        id: key.clone(),
+        sender,
+        bucket: BUCKET.to_string(),
+        options: TouchOptions::default(),
+        scope: SCOPE.to_string(),
+        collection: NAME.to_string(),
+        expiry: Duration::from_secs(10),
+    });
+
+    let mut mock_core = MockCore::default();
+    mock_core
+        .expect_send()
+        .with(eq(request))
+        .times(1)
+        .returning(|x| {
+            if let Request::Touch(r) = x {
+                let _ = r.sender.send(Ok(MutationResult::new(
+                    1,
+                    Some(MutationToken::new(1, 1, 1, BUCKET.to_string())),
+                )));
+            }
+            ()
+        });
+
+    let mocked_collection = Collection::new(
+        Arc::new(mock_core),
+        NAME.to_string(),
+        SCOPE.to_string(),
+        BUCKET.to_string(),
+    );
+        mocked_collection.get(key, GetOptions::default()).await;
 }
 
 #[tokio::test]
@@ -120,6 +161,49 @@ async fn get_with_expiry_works() {
 }
 
 #[tokio::test]
+#[should_panic]
+async fn get_with_expiry_panic_for_wrong_input() {
+    let key = Uuid::new_v4().to_string();
+    let (sender, _) = oneshot::channel();
+    let request = Request::Touch(TouchRequest {
+        id: key.clone(),
+        sender,
+        bucket: BUCKET.to_string(),
+        options: TouchOptions::default(),
+        scope: SCOPE.to_string(),
+        collection: NAME.to_string(),
+        expiry: Duration::from_secs(10),
+    });
+
+    let mut mock_core = MockCore::default();
+    mock_core
+        .expect_send()
+        .with(eq(request))
+        .times(1)
+        .returning(|x| {
+            if let Request::Touch(r) = x {
+                let _ = r.sender.send(Ok(MutationResult::new(
+                    1,
+                    Some(MutationToken::new(1, 1, 1, BUCKET.to_string())),
+                )));
+            }
+            ()
+        });
+
+    let mocked_collection = Collection::new(
+        Arc::new(mock_core),
+        NAME.to_string(),
+        SCOPE.to_string(),
+        BUCKET.to_string(),
+    );
+
+    mocked_collection
+        .get(key, GetOptions::default().with_expiry(true))
+        .await;
+
+}
+
+#[tokio::test]
 async fn get_any_replica_works() {
     let key = Uuid::new_v4().to_string();
     let (sender, _) = oneshot::channel();
@@ -161,7 +245,7 @@ async fn get_any_replica_works() {
             if let Request::Get(r) = x {
                 let _ = r
                     .sender
-                    .send(Ok(GetResult::new("test".as_bytes().to_vec(), 0, 0)));
+                    .send(Ok(GetResult::new(r#"{"Hello": "Rust!"}"#.as_bytes().to_vec(), 1, 0)));
             }
             ()
         });
@@ -173,7 +257,7 @@ async fn get_any_replica_works() {
             if let Request::Get(r) = x {
                 let _ = r
                     .sender
-                    .send(Ok(GetResult::new("replica_test".as_bytes().to_vec(), 0, 0)));
+                    .send(Ok(GetResult::new(r#"{"ReplicaHello": "Rust!"}"#.as_bytes().to_vec(), 1, 0)));
             }
             ()
         });
@@ -186,7 +270,7 @@ async fn get_any_replica_works() {
     let result: CouchbaseResult<GetReplicaResult> =
         mocked_collection.get_any_replica(key, None).await;
 
-    assert_eq!(result.unwrap().content, "replica_test".as_bytes().to_vec());
+    assert_eq!(result.unwrap().content, r#"{"ReplicaHello": "Rust!"}"#.as_bytes().to_vec());
 }
 
 #[tokio::test]
@@ -213,7 +297,7 @@ async fn get_and_lock_works() {
             if let Request::Get(r) = x {
                 let _ = r
                     .sender
-                    .send(Ok(GetResult::new("test".as_bytes().to_vec(), 0, 0)));
+                    .send(Ok(GetResult::new(r#"{"Hello": "Rust!"}"#.as_bytes().to_vec(), 1, 0)));
             }
             ()
         });
@@ -225,7 +309,7 @@ async fn get_and_lock_works() {
     );
     let result: CouchbaseResult<GetResult> =
         mocked_collection.get_and_lock(key, lock_time, None).await;
-    assert_eq!(result.unwrap().content, "test".as_bytes().to_vec());
+    assert_eq!(result.unwrap().content, r#"{"Hello": "Rust!"}"#.as_bytes().to_vec());
 }
 
 #[tokio::test]
@@ -252,7 +336,7 @@ async fn get_and_touch_works() {
             if let Request::Get(r) = x {
                 let _ = r
                     .sender
-                    .send(Ok(GetResult::new("test".as_bytes().to_vec(), 0, 0)));
+                    .send(Ok(GetResult::new(r#"{"Hello": "Rust!"}"#.as_bytes().to_vec(), 1, 0)));
             }
             ()
         });
@@ -264,7 +348,7 @@ async fn get_and_touch_works() {
     );
     let result: CouchbaseResult<GetResult> =
         mocked_collection.get_and_touch(key, expiry, None).await;
-    assert_eq!(result.unwrap().content, "test".as_bytes().to_vec());
+    assert_eq!(result.unwrap().content, r#"{"Hello": "Rust!"}"#.as_bytes().to_vec());
 }
 
 #[tokio::test]
@@ -288,7 +372,7 @@ async fn exists_works() {
         .times(1)
         .returning(|x| {
             if let Request::Exists(r) = x {
-                let _ = r.sender.send(Ok(ExistsResult::new(true, Some(0u64))));
+                let _ = r.sender.send(Ok(ExistsResult::new(true, Some(1u64))));
             }
             ()
         });
