@@ -1,6 +1,6 @@
+use super::*;
 use crate::api::query_options::QueryOptions;
 use crate::io::request::*;
-use crate::io::Core;
 use crate::{CouchbaseError, CouchbaseResult, ErrorContext};
 use futures::channel::oneshot;
 use futures::StreamExt;

@@ -30,3 +30,13 @@ pub mod users;
 pub mod view_indexes;
 pub mod view_options;
 pub mod view_result;
+
+pub use cfg_if::cfg_if;
+
+cfg_if! {
+    if #[cfg(test)] {
+        pub use crate::tests::mock::MockCore as Core;
+    } else {
+        pub use crate::io::Core;
+    }
+}

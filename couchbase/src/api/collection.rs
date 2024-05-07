@@ -1,10 +1,11 @@
+use super::*;
 use crate::api::keyvalue_options::*;
 use crate::api::keyvalue_results::*;
 use crate::api::subdoc::*;
 use crate::api::subdoc_options::*;
 use crate::api::subdoc_results::*;
 use crate::io::request::*;
-use crate::io::{Core, LOOKUPIN_MACRO_EXPIRYTIME};
+use crate::io::LOOKUPIN_MACRO_EXPIRYTIME;
 use crate::CouchbaseError::Generic;
 use crate::{BinaryCollection, CouchbaseError, CouchbaseResult, ErrorContext};
 use chrono::NaiveDateTime;
@@ -18,7 +19,6 @@ use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 use std::time::Duration;
-
 /// Primary API to access Key/Value operations
 #[derive(Debug)]
 pub struct Collection {

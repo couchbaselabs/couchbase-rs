@@ -1,6 +1,6 @@
+use super::*;
 use crate::api::view_options::DesignDocumentNamespace;
 use crate::io::request::*;
-use crate::io::Core;
 use crate::{CouchbaseError, CouchbaseResult, GenericManagementResult, ServiceType};
 use futures::channel::oneshot;
 use serde::de::DeserializeOwned;
@@ -9,7 +9,6 @@ use std::borrow::BorrowMut;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
-
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct View {
     map: String,

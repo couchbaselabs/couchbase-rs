@@ -1,12 +1,11 @@
+use super::*;
 use crate::io::request::{PingRequest, Request, ViewRequest};
-use crate::io::Core;
 use crate::{
     Collection, CollectionManager, CouchbaseError, CouchbaseResult, ErrorContext, PingOptions,
     PingResult, Scope, ViewIndexManager, ViewOptions, ViewResult,
 };
 use futures::channel::oneshot;
 use std::sync::Arc;
-
 /// Provides bucket-level access to collections and view operations
 #[derive(Debug)]
 pub struct Bucket {

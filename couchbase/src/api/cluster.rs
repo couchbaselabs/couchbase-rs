@@ -1,6 +1,6 @@
+use super::*;
 use crate::api::bucket::Bucket;
 use crate::io::request::{AnalyticsRequest, QueryRequest, Request, SearchRequest};
-use crate::io::Core;
 use crate::{
     AnalyticsIndexManager, AnalyticsOptions, AnalyticsResult, Authenticator, BucketManager,
     CouchbaseError, CouchbaseResult, ErrorContext, QueryIndexManager, QueryOptions, QueryResult,
@@ -11,7 +11,6 @@ use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 use std::time::Duration;
-
 /// Connect to a Couchbase cluster and perform cluster-level operations
 ///
 /// This `Cluster` object is also your main and only entry point into the SDK.
@@ -21,6 +20,10 @@ pub struct Cluster {
 }
 
 impl Cluster {
+    #[cfg(test)]
+    pub(crate) fn new(core: Arc<crate::api::Core>) -> Self {
+        Self { core }
+    }
     /// Connect to a couchbase cluster
     ///
     /// # Arguments

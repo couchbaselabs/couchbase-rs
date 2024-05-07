@@ -1,6 +1,6 @@
+use super::*;
 use crate::api::collection::DurabilityLevel;
 use crate::io::request::*;
-use crate::io::Core;
 use crate::CouchbaseError::{
     BucketExists, BucketNotFlushable, BucketNotFound, Generic, InvalidArgument,
 };
@@ -14,7 +14,6 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 use std::time::Duration;
-
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum BucketType {
     Couchbase,
