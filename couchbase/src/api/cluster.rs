@@ -20,6 +20,10 @@ pub struct Cluster {
 }
 
 impl Cluster {
+    #[cfg(test)]
+    pub(crate) fn new(core: Arc<crate::api::Core>) -> Self {
+        Self { core }
+    }
     /// Connect to a couchbase cluster
     ///
     /// # Arguments

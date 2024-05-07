@@ -1,5 +1,6 @@
 use crate::io::request::Request;
 
+use crate::MutateInSpec;
 use mockall::mock;
 
 mock!(
@@ -21,6 +22,12 @@ pub const BUCKET: &str = "default";
 
 impl PartialEq for Request {
     fn eq(&self, other: &Request) -> bool {
+        true
+    }
+}
+
+impl PartialEq for MutateInSpec {
+    fn eq(&self, other: &MutateInSpec) -> bool {
         true
     }
 }
