@@ -1,13 +1,17 @@
+use std::marker::PhantomData;
+
+use log::debug;
+use tokio::sync::mpsc::Receiver;
+
 use crate::memdx::auth_mechanism::AuthMechanism;
-use crate::memdx::client::Result;
 use crate::memdx::client::{CancellationSender, ClientResponse};
+use crate::memdx::client::Result;
 use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::error::CancellationErrorKind;
+use crate::memdx::error::Error::Closed;
 use crate::memdx::op_bootstrap::OpAuthEncoder;
 use crate::memdx::request::SASLStepRequest;
 use crate::memdx::response::{SASLAuthResponse, TryFromClientResponse};
-use log::debug;
-use tokio::sync::mpsc::Receiver;
 
 pub trait PendingOp {
     fn cancel(&mut self, e: CancellationErrorKind);
@@ -37,8 +41,10 @@ impl ClientPendingOp {
     }
 
     pub async fn recv(&mut self) -> Result<ClientResponse> {
-        // TODO: unwrap
-        self.response_receiver.recv().await.unwrap()
+        match self.response_receiver.recv().await {
+            Some(r) => r,
+            None => Err(Closed),
+        }
     }
 
     pub fn cancel(&mut self, e: CancellationErrorKind) {
@@ -51,16 +57,20 @@ impl ClientPendingOp {
     }
 }
 
-pub struct StandardPendingOp {
+pub struct StandardPendingOp<TryFromClientResponse> {
     wrapped: ClientPendingOp,
+    _target: PhantomData<TryFromClientResponse>,
 }
 
-impl StandardPendingOp {
+impl<T: TryFromClientResponse> StandardPendingOp<T> {
     pub fn new(op: ClientPendingOp) -> Self {
-        Self { wrapped: op }
+        Self {
+            wrapped: op,
+            _target: PhantomData,
+        }
     }
 
-    pub async fn recv<T: TryFromClientResponse>(&mut self) -> Result<T> {
+    pub async fn recv(&mut self) -> Result<T> {
         let packet = self.wrapped.recv().await?;
 
         T::try_from(packet)
@@ -72,13 +82,17 @@ impl StandardPendingOp {
 }
 
 pub(crate) struct SASLAuthScramPendingOp<'a, E: OpAuthEncoder, D: Dispatcher> {
-    initial_op: StandardPendingOp,
+    initial_op: StandardPendingOp<SASLAuthResponse>,
     dispatcher: &'a mut D,
     encoder: &'a E,
 }
 
 impl<'a, E: OpAuthEncoder, D: Dispatcher> SASLAuthScramPendingOp<'a, E, D> {
-    pub fn new(initial_op: StandardPendingOp, encoder: &'a E, dispatcher: &'a mut D) -> Self {
+    pub fn new(
+        initial_op: StandardPendingOp<SASLAuthResponse>,
+        encoder: &'a E,
+        dispatcher: &'a mut D,
+    ) -> Self {
         Self {
             initial_op,
             dispatcher,
@@ -87,7 +101,7 @@ impl<'a, E: OpAuthEncoder, D: Dispatcher> SASLAuthScramPendingOp<'a, E, D> {
     }
 
     pub async fn recv(&mut self) -> Result<()> {
-        let resp = self.initial_op.recv::<SASLAuthResponse>().await?;
+        let resp = self.initial_op.recv().await?;
 
         if !resp.needs_more_steps {
             return Ok(());

@@ -339,7 +339,7 @@ mod tests {
         dbg!(&bootstrap_result.hello);
 
         let hello_result = bootstrap_result.hello.unwrap();
-        assert_eq!(9, hello_result.enabled_features.len());
+        assert_eq!(10, hello_result.enabled_features.len());
 
         let result: SetResponse = sync_unary_call(
             OpsCrud {

@@ -5,6 +5,7 @@ use crate::memdx::op_bootstrap::OpAuthEncoder;
 use crate::memdx::ops_core::OpsCore;
 use crate::memdx::pendingop::StandardPendingOp;
 use crate::memdx::request::SASLAuthRequest;
+use crate::memdx::response::SASLAuthResponse;
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct SASLAuthPlainOptions {
@@ -30,7 +31,7 @@ impl OpsCore {
         dispatcher: &mut D,
         opts: SASLAuthPlainOptions,
         pipeline_cb: Option<impl (Fn()) + Send + Sync + 'static>,
-    ) -> Result<StandardPendingOp>
+    ) -> Result<StandardPendingOp<SASLAuthResponse>>
     where
         D: Dispatcher,
     {

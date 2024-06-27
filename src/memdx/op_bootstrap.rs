@@ -1,3 +1,7 @@
+use log::warn;
+use tokio::select;
+use tokio::time::Instant;
+
 use crate::memdx::client::Result;
 use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::error::CancellationErrorKind;
@@ -7,18 +11,16 @@ use crate::memdx::request::{
     SelectBucketRequest,
 };
 use crate::memdx::response::{
-    BootstrapResult, SASLAuthResponse, SelectBucketResponse, TryFromClientResponse,
+    BootstrapResult, GetErrorMapResponse, HelloResponse, SASLAuthResponse, SASLListMechsResponse,
+    SASLStepResponse, SelectBucketResponse, TryFromClientResponse,
 };
-use log::warn;
-use tokio::select;
-use tokio::time::Instant;
 
 pub trait OpAuthEncoder {
     async fn sasl_auth<D>(
         &self,
         dispatcher: &mut D,
         request: SASLAuthRequest,
-    ) -> Result<StandardPendingOp>
+    ) -> Result<StandardPendingOp<SASLAuthResponse>>
     where
         D: Dispatcher;
 
@@ -26,7 +28,7 @@ pub trait OpAuthEncoder {
         &self,
         dispatcher: &mut D,
         request: SASLStepRequest,
-    ) -> Result<StandardPendingOp>
+    ) -> Result<StandardPendingOp<SASLStepResponse>>
     where
         D: Dispatcher;
 }
@@ -36,7 +38,7 @@ pub trait OpBootstrapEncoder {
         &self,
         dispatcher: &mut D,
         request: HelloRequest,
-    ) -> Result<StandardPendingOp>
+    ) -> Result<StandardPendingOp<HelloResponse>>
     where
         D: Dispatcher;
 
@@ -44,7 +46,7 @@ pub trait OpBootstrapEncoder {
         &self,
         dispatcher: &mut D,
         request: GetErrorMapRequest,
-    ) -> Result<StandardPendingOp>
+    ) -> Result<StandardPendingOp<GetErrorMapResponse>>
     where
         D: Dispatcher;
 
@@ -52,7 +54,7 @@ pub trait OpBootstrapEncoder {
         &self,
         dispatcher: &mut D,
         request: SelectBucketRequest,
-    ) -> Result<StandardPendingOp>
+    ) -> Result<StandardPendingOp<SelectBucketResponse>>
     where
         D: Dispatcher;
 
@@ -60,7 +62,7 @@ pub trait OpBootstrapEncoder {
         &self,
         dispatcher: &mut D,
         request: SASLListMechsRequest,
-    ) -> Result<StandardPendingOp>
+    ) -> Result<StandardPendingOp<SASLListMechsResponse>>
     where
         D: Dispatcher;
 }
@@ -129,7 +131,7 @@ impl OpBootstrap {
             };
         }
         if let Some(mut op) = auth_op {
-            match op.recv::<SASLAuthResponse>().await {
+            match op.recv().await {
                 Ok(_r) => {}
                 Err(e) => {
                     warn!("Auth failed {}", e);
@@ -138,7 +140,7 @@ impl OpBootstrap {
             }
         }
         if let Some(mut op) = select_bucket_op {
-            match op.recv::<SelectBucketResponse>().await {
+            match op.recv().await {
                 Ok(_r) => {}
                 Err(e) => {
                     warn!("Select bucket failed {}", e);
@@ -151,10 +153,10 @@ impl OpBootstrap {
     }
 }
 
-async fn await_bootstrap_op<R>(deadline: Instant, mut op: StandardPendingOp) -> Result<R>
-where
-    R: TryFromClientResponse,
-{
+async fn await_bootstrap_op<T: TryFromClientResponse>(
+    deadline: Instant,
+    mut op: StandardPendingOp<T>,
+) -> Result<T> {
     select! {
         res = op.recv() => res,
         _ = tokio::time::sleep_until(deadline) => {

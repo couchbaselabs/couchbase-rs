@@ -14,6 +14,7 @@ use crate::memdx::ops_core::OpsCore;
 use crate::memdx::packet::{RequestPacket, ResponsePacket};
 use crate::memdx::pendingop::StandardPendingOp;
 use crate::memdx::request::{GetRequest, SetRequest};
+use crate::memdx::response::{GetResponse, SetResponse};
 use crate::memdx::status::Status;
 
 #[derive(Debug)]
@@ -25,7 +26,11 @@ pub struct OpsCrud {
 }
 
 impl OpsCrud {
-    pub async fn set<D>(&self, dispatcher: &mut D, request: SetRequest) -> Result<StandardPendingOp>
+    pub async fn set<D>(
+        &self,
+        dispatcher: &mut D,
+        request: SetRequest,
+    ) -> Result<StandardPendingOp<SetResponse>>
     where
         D: Dispatcher,
     {
@@ -67,7 +72,11 @@ impl OpsCrud {
 
         Ok(StandardPendingOp::new(pending_op))
     }
-    pub async fn get<D>(&self, dispatcher: &mut D, request: GetRequest) -> Result<StandardPendingOp>
+    pub async fn get<D>(
+        &self,
+        dispatcher: &mut D,
+        request: GetRequest,
+    ) -> Result<StandardPendingOp<GetResponse>>
     where
         D: Dispatcher,
     {

@@ -15,6 +15,10 @@ use crate::memdx::request::{
     GetErrorMapRequest, HelloRequest, SASLAuthRequest, SASLListMechsRequest, SASLStepRequest,
     SelectBucketRequest,
 };
+use crate::memdx::response::{
+    GetErrorMapResponse, HelloResponse, SASLAuthResponse, SASLListMechsResponse, SASLStepResponse,
+    SelectBucketResponse,
+};
 use crate::memdx::status::Status;
 
 pub struct OpsCore {}
@@ -35,7 +39,11 @@ impl OpsCore {
 }
 
 impl OpBootstrapEncoder for OpsCore {
-    async fn hello<D>(&self, dispatcher: &mut D, request: HelloRequest) -> Result<StandardPendingOp>
+    async fn hello<D>(
+        &self,
+        dispatcher: &mut D,
+        request: HelloRequest,
+    ) -> Result<StandardPendingOp<HelloResponse>>
     where
         D: Dispatcher,
     {
@@ -66,7 +74,7 @@ impl OpBootstrapEncoder for OpsCore {
         &self,
         dispatcher: &mut D,
         request: GetErrorMapRequest,
-    ) -> Result<StandardPendingOp>
+    ) -> Result<StandardPendingOp<GetErrorMapResponse>>
     where
         D: Dispatcher,
     {
@@ -95,7 +103,7 @@ impl OpBootstrapEncoder for OpsCore {
         &self,
         dispatcher: &mut D,
         request: SelectBucketRequest,
-    ) -> Result<StandardPendingOp>
+    ) -> Result<StandardPendingOp<SelectBucketResponse>>
     where
         D: Dispatcher,
     {
@@ -124,7 +132,7 @@ impl OpBootstrapEncoder for OpsCore {
         &self,
         dispatcher: &mut D,
         _request: SASLListMechsRequest,
-    ) -> Result<StandardPendingOp>
+    ) -> Result<StandardPendingOp<SASLListMechsResponse>>
     where
         D: Dispatcher,
     {
@@ -152,7 +160,7 @@ impl OpAuthEncoder for OpsCore {
         &self,
         dispatcher: &mut D,
         request: SASLAuthRequest,
-    ) -> Result<StandardPendingOp>
+    ) -> Result<StandardPendingOp<SASLAuthResponse>>
     where
         D: Dispatcher,
     {
@@ -185,7 +193,7 @@ impl OpAuthEncoder for OpsCore {
         &self,
         dispatcher: &mut D,
         request: SASLStepRequest,
-    ) -> Result<StandardPendingOp>
+    ) -> Result<StandardPendingOp<SASLStepResponse>>
     where
         D: Dispatcher,
     {

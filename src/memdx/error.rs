@@ -27,6 +27,10 @@ pub enum Error {
     UnknownCollectionID,
     #[error("Access error")]
     AccessError,
+    #[error("Auth error")]
+    AuthError(String),
+    #[error("Connection closed")]
+    Closed,
     #[error("Unknown error {0}")]
     Unknown(String),
 }
