@@ -3,9 +3,8 @@ use tokio::time::Instant;
 
 use crate::memdx::client::Result;
 use crate::memdx::dispatcher::Dispatcher;
-use crate::memdx::op_auth_saslauto::{OpSASLAutoEncoder, SASLAuthAutoOptions};
+use crate::memdx::op_auth_saslauto::{OpSASLAutoEncoder, OpsSASLAuthAuto, SASLAuthAutoOptions};
 use crate::memdx::op_auth_saslplain::OpSASLPlainEncoder;
-use crate::memdx::op_auth_saslscram::OpSASLScramEncoder;
 use crate::memdx::pendingop::StandardPendingOp;
 use crate::memdx::request::{
     GetErrorMapRequest, HelloRequest, SASLAuthRequest, SASLListMechsRequest, SASLStepRequest,
@@ -15,25 +14,6 @@ use crate::memdx::response::{
     BootstrapResult, GetErrorMapResponse, HelloResponse, SASLAuthResponse, SASLListMechsResponse,
     SASLStepResponse, SelectBucketResponse,
 };
-
-// TODO: The Encoder concept has very confused.
-pub trait OpAuthEncoder {
-    async fn sasl_auth<D>(
-        &self,
-        dispatcher: &mut D,
-        request: SASLAuthRequest,
-    ) -> Result<StandardPendingOp<SASLAuthResponse>>
-    where
-        D: Dispatcher;
-
-    async fn sasl_step<D>(
-        &self,
-        dispatcher: &mut D,
-        request: SASLStepRequest,
-    ) -> Result<StandardPendingOp<SASLStepResponse>>
-    where
-        D: Dispatcher;
-}
 
 pub trait OpBootstrapEncoder {
     async fn hello<D>(
@@ -59,14 +39,6 @@ pub trait OpBootstrapEncoder {
     ) -> Result<StandardPendingOp<SelectBucketResponse>>
     where
         D: Dispatcher;
-
-    async fn sasl_list_mechs<D>(
-        &self,
-        dispatcher: &mut D,
-        request: SASLListMechsRequest,
-    ) -> Result<StandardPendingOp<SASLListMechsResponse>>
-    where
-        D: Dispatcher;
 }
 
 pub struct OpBootstrap {}
@@ -89,11 +61,7 @@ impl OpBootstrap {
         opts: BootstrapOptions,
     ) -> Result<BootstrapResult>
     where
-        E: OpBootstrapEncoder
-            + OpAuthEncoder
-            + OpSASLScramEncoder
-            + OpSASLPlainEncoder
-            + OpSASLAutoEncoder,
+        E: OpBootstrapEncoder + OpSASLAutoEncoder,
         D: Dispatcher,
     {
         let mut result = BootstrapResult {
@@ -132,7 +100,9 @@ impl OpBootstrap {
         }
 
         if let Some(req) = opts.auth {
-            encoder.sasl_auth_auto(dispatcher, req).await?;
+            OpsSASLAuthAuto {}
+                .sasl_auth_auto(&encoder, dispatcher, req)
+                .await?;
         }
 
         let select_bucket_op = if let Some(req) = opts.select_bucket {

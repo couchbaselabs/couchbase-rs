@@ -6,10 +6,12 @@ use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::error::CancellationErrorKind::{RequestCancelled, Timeout};
 use crate::memdx::error::Error;
 use crate::memdx::error::Error::Generic;
-use crate::memdx::op_auth_saslbyname::{OpSASLAuthByNameEncoder, SASLAuthByNameOptions};
-use crate::memdx::op_bootstrap::OpBootstrapEncoder;
-use crate::memdx::ops_core::OpsCore;
+use crate::memdx::op_auth_saslbyname::{
+    OpSASLAuthByNameEncoder, OpsSASLAuthByName, SASLAuthByNameOptions,
+};
+use crate::memdx::pendingop::StandardPendingOp;
 use crate::memdx::request::SASLListMechsRequest;
+use crate::memdx::response::SASLListMechsResponse;
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct SASLAuthAutoOptions {
@@ -23,22 +25,27 @@ pub struct SASLAuthAutoOptions {
 pub struct SASLListMechsOptions {}
 
 pub trait OpSASLAutoEncoder: OpSASLAuthByNameEncoder {
-    async fn sasl_auth_auto<D>(&self, dispatcher: &mut D, opts: SASLAuthAutoOptions) -> Result<()>
+    async fn sasl_list_mechs<D>(
+        &self,
+        dispatcher: &mut D,
+        request: SASLListMechsRequest,
+    ) -> Result<StandardPendingOp<SASLListMechsResponse>>
     where
         D: Dispatcher;
-
-    // async fn sasl_list_mechs<D>(
-    //     &self,
-    //     dispatcher: &mut D,
-    //     opts: SASLListMechsOptions,
-    // ) -> Result<StandardPendingOp<SASLListMechsResponse>>
-    // where
-    //     D: Dispatcher;
 }
 
-impl OpSASLAutoEncoder for OpsCore {
-    async fn sasl_auth_auto<D>(&self, dispatcher: &mut D, opts: SASLAuthAutoOptions) -> Result<()>
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct OpsSASLAuthAuto {}
+
+impl OpsSASLAuthAuto {
+    pub async fn sasl_auth_auto<E, D>(
+        &self,
+        encoder: &E,
+        dispatcher: &mut D,
+        opts: SASLAuthAutoOptions,
+    ) -> Result<()>
     where
+        E: OpSASLAutoEncoder,
         D: Dispatcher,
     {
         if opts.enabled_mechs.is_empty() {
@@ -47,7 +54,7 @@ impl OpSASLAutoEncoder for OpsCore {
             ));
         }
 
-        let mut op = self
+        let mut op = encoder
             .sasl_list_mechs(dispatcher, SASLListMechsRequest {})
             .await?;
         let server_mechs = op.recv().await?.available_mechs;
@@ -55,8 +62,10 @@ impl OpSASLAutoEncoder for OpsCore {
         // This unwrap is safe, we know it can't be None;
         let default_mech = opts.enabled_mechs.first().unwrap();
 
-        return match self
+        let by_name = OpsSASLAuthByName {};
+        return match by_name
             .sasl_auth_by_name(
+                encoder,
                 dispatcher,
                 SASLAuthByNameOptions {
                     username: opts.username.clone(),
@@ -97,15 +106,17 @@ impl OpSASLAutoEncoder for OpsCore {
                     }
                 };
 
-                self.sasl_auth_by_name(
-                    dispatcher,
-                    SASLAuthByNameOptions {
-                        username: opts.username.clone(),
-                        password: opts.password.clone(),
-                        auth_mechanism: selected_mech.clone(),
-                    },
-                )
-                .await
+                OpsSASLAuthByName {}
+                    .sasl_auth_by_name(
+                        encoder,
+                        dispatcher,
+                        SASLAuthByNameOptions {
+                            username: opts.username.clone(),
+                            password: opts.password.clone(),
+                            auth_mechanism: selected_mech.clone(),
+                        },
+                    )
+                    .await
             }
         };
     }

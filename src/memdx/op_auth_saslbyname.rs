@@ -1,9 +1,8 @@
 use crate::memdx::auth_mechanism::AuthMechanism;
 use crate::memdx::client::Result;
 use crate::memdx::dispatcher::Dispatcher;
-use crate::memdx::op_auth_saslplain::{OpSASLPlainEncoder, SASLAuthPlainOptions};
-use crate::memdx::op_auth_saslscram::{OpSASLScramEncoder, SASLAuthScramOptions};
-use crate::memdx::ops_core::OpsCore;
+use crate::memdx::op_auth_saslplain::{OpSASLPlainEncoder, OpsSASLAuthPlain, SASLAuthPlainOptions};
+use crate::memdx::op_auth_saslscram::{OpSASLScramEncoder, OpsSASLAuthScram, SASLAuthScramOptions};
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct SASLAuthByNameOptions {
@@ -13,29 +12,27 @@ pub struct SASLAuthByNameOptions {
     pub auth_mechanism: AuthMechanism,
 }
 
-pub trait OpSASLAuthByNameEncoder: OpSASLScramEncoder + OpSASLPlainEncoder {
-    async fn sasl_auth_by_name<D>(
-        &self,
-        dispatcher: &mut D,
-        opts: SASLAuthByNameOptions,
-    ) -> Result<()>
-    where
-        D: Dispatcher;
-}
+pub trait OpSASLAuthByNameEncoder: OpSASLScramEncoder + OpSASLPlainEncoder {}
 
-impl OpSASLAuthByNameEncoder for OpsCore {
-    async fn sasl_auth_by_name<D>(
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct OpsSASLAuthByName {}
+
+impl OpsSASLAuthByName {
+    pub async fn sasl_auth_by_name<E, D>(
         &self,
+        encoder: &E,
         dispatcher: &mut D,
         opts: SASLAuthByNameOptions,
     ) -> Result<()>
     where
+        E: OpSASLAuthByNameEncoder,
         D: Dispatcher,
     {
         match opts.auth_mechanism {
             AuthMechanism::Plain => {
-                let mut op = self
+                let mut op = OpsSASLAuthPlain {}
                     .sasl_auth_plain(
+                        encoder,
                         dispatcher,
                         SASLAuthPlainOptions::new(opts.username, opts.password),
                     )
@@ -44,25 +41,31 @@ impl OpSASLAuthByNameEncoder for OpsCore {
                 Ok(())
             }
             AuthMechanism::ScramSha1 => {
-                self.sasl_auth_scram_1(
-                    dispatcher,
-                    SASLAuthScramOptions::new(opts.username, opts.password),
-                )
-                .await
+                OpsSASLAuthScram {}
+                    .sasl_auth_scram_1(
+                        encoder,
+                        dispatcher,
+                        SASLAuthScramOptions::new(opts.username, opts.password),
+                    )
+                    .await
             }
             AuthMechanism::ScramSha256 => {
-                self.sasl_auth_scram_256(
-                    dispatcher,
-                    SASLAuthScramOptions::new(opts.username, opts.password),
-                )
-                .await
+                OpsSASLAuthScram {}
+                    .sasl_auth_scram_256(
+                        encoder,
+                        dispatcher,
+                        SASLAuthScramOptions::new(opts.username, opts.password),
+                    )
+                    .await
             }
             AuthMechanism::ScramSha512 => {
-                self.sasl_auth_scram_512(
-                    dispatcher,
-                    SASLAuthScramOptions::new(opts.username, opts.password),
-                )
-                .await
+                OpsSASLAuthScram {}
+                    .sasl_auth_scram_512(
+                        encoder,
+                        dispatcher,
+                        SASLAuthScramOptions::new(opts.username, opts.password),
+                    )
+                    .await
             }
         }
     }

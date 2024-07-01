@@ -6,7 +6,11 @@ use crate::memdx::client::Result;
 use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::error::Error;
 use crate::memdx::magic::Magic;
-use crate::memdx::op_bootstrap::{OpAuthEncoder, OpBootstrapEncoder};
+use crate::memdx::op_auth_saslauto::OpSASLAutoEncoder;
+use crate::memdx::op_auth_saslbyname::OpSASLAuthByNameEncoder;
+use crate::memdx::op_auth_saslplain::OpSASLPlainEncoder;
+use crate::memdx::op_auth_saslscram::OpSASLScramEncoder;
+use crate::memdx::op_bootstrap::OpBootstrapEncoder;
 use crate::memdx::opcode::OpCode;
 use crate::memdx::packet::{RequestPacket, ResponsePacket};
 use crate::memdx::pendingop::StandardPendingOp;
@@ -126,35 +130,9 @@ impl OpBootstrapEncoder for OpsCore {
 
         Ok(StandardPendingOp::new(op))
     }
-
-    async fn sasl_list_mechs<D>(
-        &self,
-        dispatcher: &mut D,
-        _request: SASLListMechsRequest,
-    ) -> Result<StandardPendingOp<SASLListMechsResponse>>
-    where
-        D: Dispatcher,
-    {
-        let op = dispatcher
-            .dispatch(RequestPacket {
-                magic: Magic::Req,
-                op_code: OpCode::SASLListMechs,
-                datatype: 0,
-                vbucket_id: None,
-                cas: None,
-                extras: None,
-                key: None,
-                value: None,
-                framing_extras: None,
-                opaque: None,
-            })
-            .await?;
-
-        Ok(StandardPendingOp::new(op))
-    }
 }
 
-impl OpAuthEncoder for OpsCore {
+impl OpSASLPlainEncoder for OpsCore {
     async fn sasl_auth<D>(
         &self,
         dispatcher: &mut D,
@@ -183,7 +161,39 @@ impl OpAuthEncoder for OpsCore {
 
         Ok(StandardPendingOp::new(op))
     }
+}
 
+impl OpSASLAuthByNameEncoder for OpsCore {}
+
+impl OpSASLAutoEncoder for OpsCore {
+    async fn sasl_list_mechs<D>(
+        &self,
+        dispatcher: &mut D,
+        _request: SASLListMechsRequest,
+    ) -> Result<StandardPendingOp<SASLListMechsResponse>>
+    where
+        D: Dispatcher,
+    {
+        let op = dispatcher
+            .dispatch(RequestPacket {
+                magic: Magic::Req,
+                op_code: OpCode::SASLListMechs,
+                datatype: 0,
+                vbucket_id: None,
+                cas: None,
+                extras: None,
+                key: None,
+                value: None,
+                framing_extras: None,
+                opaque: None,
+            })
+            .await?;
+
+        Ok(StandardPendingOp::new(op))
+    }
+}
+
+impl OpSASLScramEncoder for OpsCore {
     async fn sasl_step<D>(
         &self,
         dispatcher: &mut D,

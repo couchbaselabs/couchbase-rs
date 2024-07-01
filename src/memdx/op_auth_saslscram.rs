@@ -6,37 +6,19 @@ use crate::memdx::auth_mechanism::AuthMechanism;
 use crate::memdx::client::Result;
 use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::error::Error;
-use crate::memdx::op_bootstrap::OpAuthEncoder;
-use crate::memdx::ops_core::OpsCore;
+use crate::memdx::op_auth_saslplain::OpSASLPlainEncoder;
+use crate::memdx::pendingop::StandardPendingOp;
 use crate::memdx::request::{SASLAuthRequest, SASLStepRequest};
+use crate::memdx::response::SASLStepResponse;
 use crate::scram;
 
-pub trait OpSASLScramEncoder {
-    async fn sasl_auth_scram_512<D>(
+pub trait OpSASLScramEncoder: OpSASLPlainEncoder {
+    async fn sasl_step<D>(
         &self,
         dispatcher: &mut D,
-        opts: SASLAuthScramOptions,
-    ) -> Result<()>
+        request: SASLStepRequest,
+    ) -> Result<StandardPendingOp<SASLStepResponse>>
     where
-        Self: OpAuthEncoder,
-        D: Dispatcher;
-
-    async fn sasl_auth_scram_256<D>(
-        &self,
-        dispatcher: &mut D,
-        opts: SASLAuthScramOptions,
-    ) -> Result<()>
-    where
-        Self: OpAuthEncoder,
-        D: Dispatcher;
-
-    async fn sasl_auth_scram_1<D>(
-        &self,
-        dispatcher: &mut D,
-        opts: SASLAuthScramOptions,
-    ) -> Result<()>
-    where
-        Self: OpAuthEncoder,
         D: Dispatcher;
 }
 
@@ -57,15 +39,19 @@ impl SASLAuthScramOptions {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct OpsSASLAuthScram {}
+
 // TODO: this is ugly, but I can't work out how to be generic over the digest algorithm.
-impl OpSASLScramEncoder for OpsCore {
-    async fn sasl_auth_scram_512<D>(
+impl OpsSASLAuthScram {
+    pub async fn sasl_auth_scram_512<E, D>(
         &self,
+        encoder: &E,
         dispatcher: &mut D,
         opts: SASLAuthScramOptions,
     ) -> Result<()>
     where
-        Self: OpAuthEncoder,
+        E: OpSASLScramEncoder,
         D: Dispatcher,
     {
         let mut client =
@@ -79,7 +65,7 @@ impl OpSASLScramEncoder for OpsCore {
             auth_mechanism: AuthMechanism::ScramSha512,
         };
 
-        let mut op = self.sasl_auth(dispatcher, req).await?;
+        let mut op = encoder.sasl_auth(dispatcher, req).await?;
 
         let resp = op.recv().await?;
 
@@ -94,7 +80,7 @@ impl OpSASLScramEncoder for OpsCore {
             auth_mechanism: AuthMechanism::ScramSha512,
         };
 
-        let mut op = self.sasl_step(dispatcher, req).await?;
+        let mut op = encoder.sasl_step(dispatcher, req).await?;
 
         let resp = op.recv().await?;
 
@@ -107,13 +93,14 @@ impl OpSASLScramEncoder for OpsCore {
         Ok(())
     }
 
-    async fn sasl_auth_scram_256<D>(
+    pub async fn sasl_auth_scram_256<E, D>(
         &self,
+        encoder: &E,
         dispatcher: &mut D,
         opts: SASLAuthScramOptions,
     ) -> Result<()>
     where
-        Self: OpAuthEncoder,
+        E: OpSASLScramEncoder,
         D: Dispatcher,
     {
         let mut client =
@@ -127,7 +114,7 @@ impl OpSASLScramEncoder for OpsCore {
             auth_mechanism: AuthMechanism::ScramSha256,
         };
 
-        let mut op = self.sasl_auth(dispatcher, req).await?;
+        let mut op = encoder.sasl_auth(dispatcher, req).await?;
 
         let resp = op.recv().await?;
 
@@ -142,7 +129,7 @@ impl OpSASLScramEncoder for OpsCore {
             auth_mechanism: AuthMechanism::ScramSha256,
         };
 
-        let mut op = self.sasl_step(dispatcher, req).await?;
+        let mut op = encoder.sasl_step(dispatcher, req).await?;
 
         let resp = op.recv().await?;
 
@@ -155,13 +142,14 @@ impl OpSASLScramEncoder for OpsCore {
         Ok(())
     }
 
-    async fn sasl_auth_scram_1<D>(
+    pub async fn sasl_auth_scram_1<E, D>(
         &self,
+        encoder: &E,
         dispatcher: &mut D,
         opts: SASLAuthScramOptions,
     ) -> Result<()>
     where
-        Self: OpAuthEncoder,
+        E: OpSASLScramEncoder,
         D: Dispatcher,
     {
         let mut client = scram::Client::<Hmac<Sha1>, Sha1>::new(opts.username, opts.password, None);
@@ -174,7 +162,7 @@ impl OpSASLScramEncoder for OpsCore {
             auth_mechanism: AuthMechanism::ScramSha1,
         };
 
-        let mut op = self.sasl_auth(dispatcher, req).await?;
+        let mut op = encoder.sasl_auth(dispatcher, req).await?;
 
         let resp = op.recv().await?;
 
@@ -189,7 +177,7 @@ impl OpSASLScramEncoder for OpsCore {
             auth_mechanism: AuthMechanism::ScramSha1,
         };
 
-        let mut op = self.sasl_step(dispatcher, req).await?;
+        let mut op = encoder.sasl_step(dispatcher, req).await?;
 
         let resp = op.recv().await?;
 
