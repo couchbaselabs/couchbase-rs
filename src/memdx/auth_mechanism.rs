@@ -27,9 +27,9 @@ impl TryFrom<&str> for AuthMechanism {
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         let mech = match value {
             "PLAIN" => AuthMechanism::Plain,
-            "SCRAM_SHA1" => AuthMechanism::ScramSha1,
-            "SCRAM_SHA256" => AuthMechanism::ScramSha256,
-            "SCRAM_SHA512" => AuthMechanism::ScramSha512,
+            "SCRAM-SHA1" => AuthMechanism::ScramSha1,
+            "SCRAM-SHA256" => AuthMechanism::ScramSha256,
+            "SCRAM-SHA512" => AuthMechanism::ScramSha512,
             _ => {
                 return Err(Error::Protocol(format!("Unknown auth mechanism {}", value)));
             }

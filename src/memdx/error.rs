@@ -1,10 +1,12 @@
 use std::fmt::{Display, Formatter};
 use std::io;
 
-#[derive(thiserror::Error, Debug)]
+use crate::scram::ScramError;
+
+#[derive(thiserror::Error, Debug, Eq, PartialEq)]
 pub enum Error {
     #[error("Dispatch failed {0}")]
-    Dispatch(io::Error),
+    Dispatch(io::ErrorKind),
     #[error("Request cancelled {0}")]
     Cancelled(CancellationErrorKind),
     #[error("Not my vbucket")]
@@ -31,6 +33,8 @@ pub enum Error {
     AuthError(String),
     #[error("Connection closed")]
     Closed,
+    #[error("{0}")]
+    Generic(String),
     #[error("Unknown error {0}")]
     Unknown(String),
 }
@@ -56,5 +60,11 @@ impl Display for CancellationErrorKind {
 impl From<io::Error> for Error {
     fn from(value: io::Error) -> Self {
         Error::Unknown(value.to_string())
+    }
+}
+
+impl From<ScramError> for Error {
+    fn from(value: ScramError) -> Self {
+        Self::AuthError(value.to_string())
     }
 }

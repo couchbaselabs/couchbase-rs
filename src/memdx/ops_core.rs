@@ -2,7 +2,6 @@ use std::io::Write;
 
 use byteorder::{BigEndian, WriteBytesExt};
 
-use crate::memdx::auth_mechanism::AuthMechanism;
 use crate::memdx::client::Result;
 use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::error::Error;
@@ -164,10 +163,6 @@ impl OpAuthEncoder for OpsCore {
     where
         D: Dispatcher,
     {
-        // TODO: Support more than PLAIN
-        if request.auth_mechanism != AuthMechanism::Plain {
-            return Err(Error::Unknown("not implemented".into()));
-        }
         let mut value = Vec::new();
         value.write_all(request.payload.as_slice()).unwrap();
 

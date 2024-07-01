@@ -7,6 +7,16 @@ use crate::memdx::pendingop::StandardPendingOp;
 use crate::memdx::request::SASLAuthRequest;
 use crate::memdx::response::SASLAuthResponse;
 
+pub trait OpSASLPlainEncoder {
+    async fn sasl_auth_plain<D>(
+        &self,
+        dispatcher: &mut D,
+        opts: SASLAuthPlainOptions,
+    ) -> Result<StandardPendingOp<SASLAuthResponse>>
+    where
+        D: Dispatcher;
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct SASLAuthPlainOptions {
     username: String,
@@ -25,12 +35,11 @@ impl SASLAuthPlainOptions {
     }
 }
 
-impl OpsCore {
-    pub async fn sasl_auth_plain<D>(
+impl OpSASLPlainEncoder for OpsCore {
+    async fn sasl_auth_plain<D>(
         &self,
         dispatcher: &mut D,
         opts: SASLAuthPlainOptions,
-        pipeline_cb: Option<impl (Fn()) + Send + Sync + 'static>,
     ) -> Result<StandardPendingOp<SASLAuthResponse>>
     where
         D: Dispatcher,
@@ -47,10 +56,6 @@ impl OpsCore {
         };
 
         let op = self.sasl_auth(dispatcher, req).await?;
-
-        if let Some(p_cb) = pipeline_cb {
-            p_cb();
-        }
 
         Ok(op)
     }

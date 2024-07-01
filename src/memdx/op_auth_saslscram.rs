@@ -1,126 +1,204 @@
-use scram_rs::{
-    ScramAuthClient, ScramCbHelper, ScramKey, ScramNonce, ScramSha256RustNative,
-};
-use scram_rs::scram_sync::SyncScramClient;
+use hmac::Hmac;
+use sha1::Sha1;
+use sha2::{Sha256, Sha512};
 
 use crate::memdx::auth_mechanism::AuthMechanism;
 use crate::memdx::client::Result;
 use crate::memdx::dispatcher::Dispatcher;
+use crate::memdx::error::Error;
 use crate::memdx::op_bootstrap::OpAuthEncoder;
 use crate::memdx::ops_core::OpsCore;
-use crate::memdx::pendingop::SASLAuthScramPendingOp;
-use crate::memdx::request::SASLAuthRequest;
+use crate::memdx::request::{SASLAuthRequest, SASLStepRequest};
+use crate::scram;
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub enum SASLAuthScramHash {
-    ScramSha1,
-    ScramSha256,
-    ScramSha512,
-}
+pub trait OpSASLScramEncoder {
+    async fn sasl_auth_scram_512<D>(
+        &self,
+        dispatcher: &mut D,
+        opts: SASLAuthScramOptions,
+    ) -> Result<()>
+    where
+        Self: OpAuthEncoder,
+        D: Dispatcher;
 
-impl Into<AuthMechanism> for SASLAuthScramHash {
-    fn into(self) -> AuthMechanism {
-        match self {
-            SASLAuthScramHash::ScramSha1 => AuthMechanism::ScramSha1,
-            SASLAuthScramHash::ScramSha256 => AuthMechanism::ScramSha256,
-            SASLAuthScramHash::ScramSha512 => AuthMechanism::ScramSha512,
-        }
-    }
+    async fn sasl_auth_scram_256<D>(
+        &self,
+        dispatcher: &mut D,
+        opts: SASLAuthScramOptions,
+    ) -> Result<()>
+    where
+        Self: OpAuthEncoder,
+        D: Dispatcher;
+
+    async fn sasl_auth_scram_1<D>(
+        &self,
+        dispatcher: &mut D,
+        opts: SASLAuthScramOptions,
+    ) -> Result<()>
+    where
+        Self: OpAuthEncoder,
+        D: Dispatcher;
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct SASLAuthScramOptions {
-    username: String,
-    password: String,
-    hash: SASLAuthScramHash,
+    pub username: String,
+    pub password: String,
+    // pub hash: SASLAuthScramHash,
 }
 
 impl SASLAuthScramOptions {
-    pub fn new(username: String, password: String, hash: SASLAuthScramHash) -> Self {
-        Self {
-            username,
-            password,
-            hash,
-        }
-    }
-    pub fn username(&self) -> String {
-        self.username.clone()
-    }
-    pub fn password(&self) -> String {
-        self.password.clone()
-    }
-    pub fn hash(&self) -> SASLAuthScramHash {
-        self.hash
-    }
-}
-
-struct AuthClient {
-    username: String,
-    password: String,
-    key: ScramKey,
-}
-
-impl AuthClient {
     pub fn new(username: String, password: String) -> Self {
         Self {
             username,
             password,
-            key: ScramKey::new(),
+            // hash,
         }
     }
 }
 
-impl ScramAuthClient for AuthClient {
-    fn get_username(&self) -> &str {
-        return &self.username;
-    }
-
-    fn get_password(&self) -> &str {
-        return &self.password;
-    }
-
-    fn get_scram_keys(&self) -> &ScramKey {
-        return &self.key;
-    }
-}
-
-impl ScramCbHelper for AuthClient {}
-
-// TODO: this is basically POC that this approach will actually compile.
-impl OpsCore {
-    pub async fn sasl_auth_scram<'a, D>(
-        &'a mut self,
-        dispatcher: &'a mut D,
+// TODO: this is ugly, but I can't work out how to be generic over the digest algorithm.
+impl OpSASLScramEncoder for OpsCore {
+    async fn sasl_auth_scram_512<D>(
+        &self,
+        dispatcher: &mut D,
         opts: SASLAuthScramOptions,
-        pipeline_cb: Option<impl (Fn()) + Send + Sync + 'static>,
-    ) -> Result<SASLAuthScramPendingOp<Self, D>>
+    ) -> Result<()>
     where
-        D: Dispatcher + Send + Sync,
+        Self: OpAuthEncoder,
+        D: Dispatcher,
     {
-        let auth_client = AuthClient::new(opts.username(), opts.password());
+        let mut client =
+            scram::Client::<Hmac<Sha512>, Sha512>::new(opts.username, opts.password, None);
 
-        let mut client = SyncScramClient::<ScramSha256RustNative, AuthClient, AuthClient>::new(
-            &auth_client,
-            ScramNonce::None,
-            scram_rs::ChannelBindType::None,
-            &auth_client,
-        )
-        .unwrap();
-
-        // This will only return an error when the client is already completed so safe to unwrap.
-        let ci = client.init_client().encode_output_base64().unwrap();
+        // Perform the initial SASL step
+        let payload = client.step1()?;
 
         let req = SASLAuthRequest {
-            payload: ci.into_bytes(),
-            auth_mechanism: opts.hash.into(),
+            payload,
+            auth_mechanism: AuthMechanism::ScramSha512,
         };
 
-        let op = self.sasl_auth(dispatcher, req).await?;
+        let mut op = self.sasl_auth(dispatcher, req).await?;
 
-        if let Some(p_cb) = pipeline_cb {
-            p_cb();
+        let resp = op.recv().await?;
+
+        if !resp.needs_more_steps {
+            return Ok(());
         }
 
-        Ok(SASLAuthScramPendingOp::new(op, self, dispatcher))
+        let payload = client.step2(resp.payload.as_slice())?;
+
+        let req = SASLStepRequest {
+            payload,
+            auth_mechanism: AuthMechanism::ScramSha512,
+        };
+
+        let mut op = self.sasl_step(dispatcher, req).await?;
+
+        let resp = op.recv().await?;
+
+        if resp.needs_more_steps {
+            return Err(Error::Protocol(
+                "Server did not accept auth when the client expected".to_string(),
+            ));
+        }
+
+        Ok(())
+    }
+
+    async fn sasl_auth_scram_256<D>(
+        &self,
+        dispatcher: &mut D,
+        opts: SASLAuthScramOptions,
+    ) -> Result<()>
+    where
+        Self: OpAuthEncoder,
+        D: Dispatcher,
+    {
+        let mut client =
+            scram::Client::<Hmac<Sha256>, Sha256>::new(opts.username, opts.password, None);
+
+        // Perform the initial SASL step
+        let payload = client.step1()?;
+
+        let req = SASLAuthRequest {
+            payload,
+            auth_mechanism: AuthMechanism::ScramSha256,
+        };
+
+        let mut op = self.sasl_auth(dispatcher, req).await?;
+
+        let resp = op.recv().await?;
+
+        if !resp.needs_more_steps {
+            return Ok(());
+        }
+
+        let payload = client.step2(resp.payload.as_slice())?;
+
+        let req = SASLStepRequest {
+            payload,
+            auth_mechanism: AuthMechanism::ScramSha256,
+        };
+
+        let mut op = self.sasl_step(dispatcher, req).await?;
+
+        let resp = op.recv().await?;
+
+        if resp.needs_more_steps {
+            return Err(Error::Protocol(
+                "Server did not accept auth when the client expected".to_string(),
+            ));
+        }
+
+        Ok(())
+    }
+
+    async fn sasl_auth_scram_1<D>(
+        &self,
+        dispatcher: &mut D,
+        opts: SASLAuthScramOptions,
+    ) -> Result<()>
+    where
+        Self: OpAuthEncoder,
+        D: Dispatcher,
+    {
+        let mut client = scram::Client::<Hmac<Sha1>, Sha1>::new(opts.username, opts.password, None);
+
+        // Perform the initial SASL step
+        let payload = client.step1()?;
+
+        let req = SASLAuthRequest {
+            payload,
+            auth_mechanism: AuthMechanism::ScramSha1,
+        };
+
+        let mut op = self.sasl_auth(dispatcher, req).await?;
+
+        let resp = op.recv().await?;
+
+        if !resp.needs_more_steps {
+            return Ok(());
+        }
+
+        let payload = client.step2(resp.payload.as_slice())?;
+
+        let req = SASLStepRequest {
+            payload,
+            auth_mechanism: AuthMechanism::ScramSha1,
+        };
+
+        let mut op = self.sasl_step(dispatcher, req).await?;
+
+        let resp = op.recv().await?;
+
+        if resp.needs_more_steps {
+            return Err(Error::Protocol(
+                "Server did not accept auth when the client expected".to_string(),
+            ));
+        }
+
+        Ok(())
     }
 }

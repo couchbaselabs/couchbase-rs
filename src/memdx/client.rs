@@ -254,7 +254,7 @@ impl Dispatcher for Client {
                 let mut map = requests.lock().await;
                 map.remove(&opaque);
 
-                Err(Error::Dispatch(e))
+                Err(Error::Dispatch(e.kind()))
             }
         }
     }
@@ -268,15 +268,15 @@ mod tests {
     use tokio::net::TcpStream;
     use tokio::time::Instant;
 
-    use crate::memdx::auth_mechanism::AuthMechanism;
+    use crate::memdx::auth_mechanism::AuthMechanism::{ScramSha1, ScramSha256, ScramSha512};
     use crate::memdx::client::{Client, Connection};
     use crate::memdx::hello_feature::HelloFeature;
+    use crate::memdx::op_auth_saslauto::SASLAuthAutoOptions;
     use crate::memdx::op_bootstrap::{BootstrapOptions, OpBootstrap};
     use crate::memdx::ops_core::OpsCore;
     use crate::memdx::ops_crud::OpsCrud;
     use crate::memdx::request::{
-        GetErrorMapRequest, GetRequest, HelloRequest, SASLAuthRequest, SelectBucketRequest,
-        SetRequest,
+        GetErrorMapRequest, GetRequest, HelloRequest, SelectBucketRequest, SetRequest,
     };
     use crate::memdx::response::{GetResponse, SetResponse};
     use crate::memdx::sync_helpers::sync_unary_call;
@@ -293,14 +293,8 @@ mod tests {
         let conn = Connection::Tcp(socket);
         let mut client = Client::new(conn);
 
-        let username = "Administrator";
-        let password = "password";
-
-        let mut auth_payload: Vec<u8> = Vec::new();
-        auth_payload.push(0);
-        auth_payload.extend_from_slice(username.as_ref());
-        auth_payload.push(0);
-        auth_payload.extend_from_slice(password.as_ref());
+        let username = "Administrator".to_string();
+        let password = "password".to_string();
 
         let instant = Instant::now().add(Duration::new(7, 0));
 
@@ -324,9 +318,10 @@ mod tests {
                     ],
                 }),
                 get_error_map: Some(GetErrorMapRequest { version: 2 }),
-                auth: Some(SASLAuthRequest {
-                    payload: auth_payload,
-                    auth_mechanism: AuthMechanism::Plain,
+                auth: Some(SASLAuthAutoOptions {
+                    username,
+                    password,
+                    enabled_mechs: vec![ScramSha512, ScramSha256, ScramSha1],
                 }),
                 select_bucket: Some(SelectBucketRequest {
                     bucket_name: "default".into(),

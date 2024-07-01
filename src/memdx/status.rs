@@ -13,6 +13,7 @@ pub enum Status {
     CollectionUnknown,
     AccessError,
     KeyNotFound,
+    InvalidArgs,
 
     Unknown(u16),
 }
@@ -24,6 +25,7 @@ impl From<u16> for Status {
             0x01 => Status::KeyNotFound,
             0x02 => Status::KeyExists,
             0x03 => Status::TooBig,
+            0x04 => Status::InvalidArgs,
             0x09 => Status::Locked,
             0x07 => Status::NotMyVbucket,
             0x20 => Status::AuthError,
@@ -51,6 +53,7 @@ impl Display for Status {
             Status::CollectionUnknown => "collection unknown",
             Status::AccessError => "access error",
             Status::KeyNotFound => "key not found",
+            Status::InvalidArgs => "invalid args",
             Status::Unknown(status) => {
                 // TODO: improve this.
                 let t = format!("unknown status {}", status);
