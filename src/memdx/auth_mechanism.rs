@@ -8,9 +8,9 @@ pub enum AuthMechanism {
     ScramSha512,
 }
 
-impl Into<Vec<u8>> for AuthMechanism {
-    fn into(self) -> Vec<u8> {
-        let txt = match self {
+impl From<AuthMechanism> for Vec<u8> {
+    fn from(value: AuthMechanism) -> Vec<u8> {
+        let txt = match value {
             AuthMechanism::Plain => "PLAIN",
             AuthMechanism::ScramSha1 => "SCRAM-SHA1",
             AuthMechanism::ScramSha256 => "SCRAM-SHA256",

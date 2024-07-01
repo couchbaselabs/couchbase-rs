@@ -1,6 +1,6 @@
-use crate::memdx::error::Error;
 use std::fmt::{Display, Formatter};
 
+use crate::memdx::error::Error;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum OpCode {
@@ -15,9 +15,9 @@ pub enum OpCode {
     SASLStep,
 }
 
-impl Into<u8> for OpCode {
-    fn into(self) -> u8 {
-        match self {
+impl From<OpCode> for u8 {
+    fn from(value: OpCode) -> Self {
+        match value {
             OpCode::Get => 0x00,
             OpCode::Set => 0x01,
             OpCode::Add => 0x02,

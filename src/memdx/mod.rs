@@ -12,7 +12,6 @@ mod op_auth_saslbyname;
 mod op_auth_saslplain;
 mod op_auth_saslscram;
 mod op_bootstrap;
-mod op_pipeline;
 mod opcode;
 mod ops_core;
 mod ops_crud;

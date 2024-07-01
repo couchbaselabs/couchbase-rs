@@ -310,7 +310,7 @@ mod tests {
                         HelloFeature::Duplex,
                         HelloFeature::SelectBucket,
                         HelloFeature::Durations,
-                        HelloFeature::JSON,
+                        HelloFeature::Json,
                         HelloFeature::Opentracing,
                         HelloFeature::UnorderedExec,
                         HelloFeature::SyncReplication,

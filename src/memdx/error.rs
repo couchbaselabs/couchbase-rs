@@ -28,9 +28,9 @@ pub enum Error {
     #[error("Unknown collection id")]
     UnknownCollectionID,
     #[error("Access error")]
-    AccessError,
+    Access,
     #[error("Auth error")]
-    AuthError(String),
+    Auth(String),
     #[error("Connection closed")]
     Closed,
     #[error("{0}")]
@@ -65,6 +65,6 @@ impl From<io::Error> for Error {
 
 impl From<ScramError> for Error {
     fn from(value: ScramError) -> Self {
-        Self::AuthError(value.to_string())
+        Self::Auth(value.to_string())
     }
 }

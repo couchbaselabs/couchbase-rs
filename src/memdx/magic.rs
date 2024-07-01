@@ -1,6 +1,6 @@
-use crate::memdx::error::Error;
 use std::fmt::{Debug, Display};
 
+use crate::memdx::error::Error;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Magic {
@@ -24,9 +24,9 @@ impl Magic {
     }
 }
 
-impl Into<u8> for Magic {
-    fn into(self) -> u8 {
-        match self {
+impl From<Magic> for u8 {
+    fn from(value: Magic) -> u8 {
+        match value {
             Magic::Req => 0x80,
             Magic::Res => 0x81,
             Magic::ReqExt => 0x08,

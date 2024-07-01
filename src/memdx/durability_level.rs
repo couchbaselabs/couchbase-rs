@@ -8,9 +8,9 @@ pub enum DurabilityLevel {
     Unknown,
 }
 
-impl Into<u8> for DurabilityLevel {
-    fn into(self) -> u8 {
-        match self {
+impl From<DurabilityLevel> for u8 {
+    fn from(value: DurabilityLevel) -> u8 {
+        match value {
             DurabilityLevel::Majority => 1,
             DurabilityLevel::MajorityAndPersistToActive => 2,
             DurabilityLevel::PersistToMajority => 3,

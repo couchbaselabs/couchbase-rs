@@ -41,31 +41,28 @@ impl OpSASLAuthByNameEncoder for OpsCore {
                     )
                     .await?;
                 op.recv().await?;
-                return Ok(());
+                Ok(())
             }
             AuthMechanism::ScramSha1 => {
-                return self
-                    .sasl_auth_scram_1(
-                        dispatcher,
-                        SASLAuthScramOptions::new(opts.username, opts.password),
-                    )
-                    .await
+                self.sasl_auth_scram_1(
+                    dispatcher,
+                    SASLAuthScramOptions::new(opts.username, opts.password),
+                )
+                .await
             }
             AuthMechanism::ScramSha256 => {
-                return self
-                    .sasl_auth_scram_256(
-                        dispatcher,
-                        SASLAuthScramOptions::new(opts.username, opts.password),
-                    )
-                    .await
+                self.sasl_auth_scram_256(
+                    dispatcher,
+                    SASLAuthScramOptions::new(opts.username, opts.password),
+                )
+                .await
             }
             AuthMechanism::ScramSha512 => {
-                return self
-                    .sasl_auth_scram_512(
-                        dispatcher,
-                        SASLAuthScramOptions::new(opts.username, opts.password),
-                    )
-                    .await
+                self.sasl_auth_scram_512(
+                    dispatcher,
+                    SASLAuthScramOptions::new(opts.username, opts.password),
+                )
+                .await
             }
         }
     }

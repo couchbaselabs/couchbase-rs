@@ -11,9 +11,9 @@ pub enum ExtReqFrameCode {
     Unknown(u16),
 }
 
-impl Into<u16> for ExtReqFrameCode {
-    fn into(self) -> u16 {
-        match self {
+impl From<ExtReqFrameCode> for u16 {
+    fn from(value: ExtReqFrameCode) -> u16 {
+        match value {
             ExtReqFrameCode::Barrier => 0x00,
             ExtReqFrameCode::Durability => 0x01,
             ExtReqFrameCode::StreamID => 0x02,
@@ -37,9 +37,9 @@ pub enum ExtResFrameCode {
     Unknown(u16),
 }
 
-impl Into<u16> for ExtResFrameCode {
-    fn into(self) -> u16 {
-        match self {
+impl From<ExtResFrameCode> for u16 {
+    fn from(value: ExtResFrameCode) -> u16 {
+        match value {
             ExtResFrameCode::ServerDuration => 0x00,
             ExtResFrameCode::ReadUnits => 0x01,
             ExtResFrameCode::WriteUnits => 0x02,

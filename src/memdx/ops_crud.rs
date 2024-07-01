@@ -43,7 +43,7 @@ impl OpsCrud {
             &mut ext_frame_buf,
         )?;
 
-        let framing_extras = if ext_frame_buf.len() > 0 {
+        let framing_extras = if !ext_frame_buf.is_empty() {
             Some(ext_frame_buf)
         } else {
             None
@@ -86,7 +86,7 @@ impl OpsCrud {
 
         let key = self.encode_collection_and_key(request.collection_id, request.key)?;
 
-        let framing_extras = if ext_frame_buf.len() > 0 {
+        let framing_extras = if !ext_frame_buf.is_empty() {
             Some(ext_frame_buf)
         } else {
             None
@@ -150,7 +150,7 @@ impl OpsCrud {
             ));
         }
 
-        if let Some(_) = preserve_expiry {
+        if preserve_expiry.is_some() {
             if !self.preserve_expiry_enabled {
                 return Err(Error::Protocol(
                     "Cannot use preserve expiry when its not enabled".to_string(),
@@ -160,7 +160,7 @@ impl OpsCrud {
             append_ext_frame(ExtReqFrameCode::PreserveTTL, vec![], buf)?;
         }
 
-        let magic = if buf.len() > 0 {
+        let magic = if !buf.is_empty() {
             if !self.ext_frames_enabled {
                 return Err(Error::Protocol(
                     "Cannot use framing extras when its not enabled".to_string(),
@@ -178,7 +178,7 @@ impl OpsCrud {
     pub(crate) fn decode_common_status(status: Status) -> Result<()> {
         let err = match status {
             Status::CollectionUnknown => Error::UnknownCollectionID,
-            Status::AccessError => Error::AccessError,
+            Status::AccessError => Error::Access,
             _ => {
                 return Ok(());
             }
@@ -196,7 +196,7 @@ impl OpsCrud {
     }
 }
 
-pub(crate) fn decode_res_ext_frames(buf: &Vec<u8>) -> Result<Option<Duration>> {
+pub(crate) fn decode_res_ext_frames(buf: &[u8]) -> Result<Option<Duration>> {
     let mut server_duration_data = None;
 
     iter_ext_frames(buf, |code, data| {
@@ -212,8 +212,8 @@ pub(crate) fn decode_res_ext_frames(buf: &Vec<u8>) -> Result<Option<Duration>> {
     Ok(None)
 }
 
-pub fn decode_ext_frame(buf: &Vec<u8>) -> Result<(ExtResFrameCode, Vec<u8>, usize)> {
-    if buf.len() < 1 {
+pub fn decode_ext_frame(buf: &[u8]) -> Result<(ExtResFrameCode, Vec<u8>, usize)> {
+    if buf.is_empty() {
         return Err(Error::Protocol("Framing extras protocol error".to_string()));
     }
 
@@ -222,7 +222,7 @@ pub fn decode_ext_frame(buf: &Vec<u8>) -> Result<(ExtResFrameCode, Vec<u8>, usiz
     let frame_header = buf[buf_pos];
     let mut u_frame_code = (frame_header & 0xF0) >> 4;
     let mut frame_code = ExtResFrameCode::from(u_frame_code as u16);
-    let mut frame_len = (frame_header & 0x0F) >> 0;
+    let mut frame_len = frame_header & 0x0F;
     buf_pos += 1;
 
     if u_frame_code == 15 {
@@ -257,17 +257,16 @@ pub fn decode_ext_frame(buf: &Vec<u8>) -> Result<(ExtResFrameCode, Vec<u8>, usiz
     Ok((frame_code, frame_body.to_vec(), buf_pos))
 }
 
-fn iter_ext_frames(buf: &Vec<u8>, mut cb: impl FnMut(ExtResFrameCode, Vec<u8>)) -> Result<Vec<u8>> {
-    if buf.len() > 0 {
-        let (frame_code, frame_body, buf_pos) = decode_ext_frame(&buf)?;
+fn iter_ext_frames(buf: &[u8], mut cb: impl FnMut(ExtResFrameCode, Vec<u8>)) -> Result<Vec<u8>> {
+    if !buf.is_empty() {
+        let (frame_code, frame_body, buf_pos) = decode_ext_frame(buf)?;
 
         cb(frame_code, frame_body);
 
         return Ok(buf[buf_pos..].to_vec());
     }
 
-    // TODO: clone
-    Ok(buf.clone())
+    Ok(Vec::from(buf))
 }
 
 pub fn append_ext_frame(

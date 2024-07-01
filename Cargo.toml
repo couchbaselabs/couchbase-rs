@@ -23,3 +23,7 @@ base64 = "0.22.1"
 
 [dev-dependencies]
 env_logger = "0.11"
+
+[lints.rust]
+# This is temporary whilst we build out the root modules.
+unused = "allow"
