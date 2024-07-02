@@ -1,6 +1,6 @@
-rscbcorex
+rscbx
 ----------
 
-A core Couchbase SDK implementation written in Rust.
+A Couchbase SDK implementation written in Rust.
 
 More information coming soon!
