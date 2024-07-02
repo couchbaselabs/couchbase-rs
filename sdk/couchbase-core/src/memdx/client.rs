@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::env;
 use std::sync::Arc;
 
 use futures::{SinkExt, StreamExt};
@@ -12,6 +13,7 @@ use tokio_util::codec::{FramedRead, FramedWrite};
 use uuid::Uuid;
 
 use crate::memdx::codec::KeyValueCodec;
+use crate::memdx::connection::Connection;
 use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::error::{CancellationErrorKind, Error};
 use crate::memdx::packet::{RequestPacket, ResponsePacket};
@@ -46,12 +48,6 @@ impl ClientResponse {
             Err(_e) => {}
         };
     }
-}
-
-#[derive(Debug)]
-pub enum Connection {
-    Tcp(TcpStream),
-    Tls(TlsStream<TcpStream>),
 }
 
 static HANDLER_INVOKE_PERMITS: Semaphore = Semaphore::const_new(1);
@@ -265,11 +261,11 @@ mod tests {
     use std::ops::Add;
     use std::time::Duration;
 
-    use tokio::net::TcpStream;
     use tokio::time::Instant;
 
     use crate::memdx::auth_mechanism::AuthMechanism::{ScramSha1, ScramSha256, ScramSha512};
     use crate::memdx::client::{Client, Connection};
+    use crate::memdx::connection::ConnectOptions;
     use crate::memdx::hello_feature::HelloFeature;
     use crate::memdx::op_auth_saslauto::SASLAuthAutoOptions;
     use crate::memdx::op_bootstrap::{BootstrapOptions, OpBootstrap};
@@ -285,12 +281,10 @@ mod tests {
     async fn roundtrip_a_request() {
         let _ = env_logger::try_init();
 
-        let socket = TcpStream::connect("192.168.107.128:11210")
+        let conn = Connection::connect("192.168.107.128", 11210, ConnectOptions::default())
             .await
-            .expect("could not connect");
-        socket.set_nodelay(false).unwrap();
+            .expect("Could not connect");
 
-        let conn = Connection::Tcp(socket);
         let mut client = Client::new(conn);
 
         let username = "Administrator".to_string();
@@ -305,16 +299,21 @@ mod tests {
                 hello: Some(HelloRequest {
                     client_name: "test-client".into(),
                     requested_features: vec![
+                        HelloFeature::DataType,
+                        HelloFeature::SeqNo,
+                        HelloFeature::Xattr,
+                        HelloFeature::Xerror,
+                        HelloFeature::Snappy,
+                        HelloFeature::Json,
+                        HelloFeature::UnorderedExec,
+                        HelloFeature::Durations,
+                        HelloFeature::SyncReplication,
+                        HelloFeature::ReplaceBodyWithXattr,
+                        HelloFeature::SelectBucket,
+                        HelloFeature::CreateAsDeleted,
                         HelloFeature::AltRequests,
                         HelloFeature::Collections,
-                        HelloFeature::Duplex,
-                        HelloFeature::SelectBucket,
-                        HelloFeature::Durations,
-                        HelloFeature::Json,
                         HelloFeature::Opentracing,
-                        HelloFeature::UnorderedExec,
-                        HelloFeature::SyncReplication,
-                        HelloFeature::SeqNo,
                     ],
                 }),
                 get_error_map: Some(GetErrorMapRequest { version: 2 }),
@@ -334,7 +333,7 @@ mod tests {
         dbg!(&bootstrap_result.hello);
 
         let hello_result = bootstrap_result.hello.unwrap();
-        assert_eq!(10, hello_result.enabled_features.len());
+        assert_eq!(14, hello_result.enabled_features.len());
 
         let result: SetResponse = sync_unary_call(
             OpsCrud {

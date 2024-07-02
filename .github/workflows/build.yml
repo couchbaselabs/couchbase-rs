@@ -59,4 +59,6 @@ jobs:
         with:
           command: build
           args: --verbose --target ${{ matrix.target }}
+        env:
+          VCPKGRS_DYNAMIC: 1
         if: matrix.os == 'windows-latest'

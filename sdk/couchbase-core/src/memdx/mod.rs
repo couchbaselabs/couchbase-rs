@@ -1,7 +1,8 @@
 mod auth_mechanism;
 mod client;
 mod codec;
-mod dispatcher;
+mod connection;
+pub mod dispatcher;
 mod durability_level;
 mod error;
 mod ext_frame_code;

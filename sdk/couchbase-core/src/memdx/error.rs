@@ -5,6 +5,8 @@ use crate::scram::ScramError;
 
 #[derive(thiserror::Error, Debug, Eq, PartialEq)]
 pub enum Error {
+    #[error("Connect failed {0}")]
+    Connect(io::ErrorKind),
     #[error("Dispatch failed {0}")]
     Dispatch(io::ErrorKind),
     #[error("Request cancelled {0}")]
