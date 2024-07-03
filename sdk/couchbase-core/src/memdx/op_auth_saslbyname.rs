@@ -1,3 +1,5 @@
+use tokio::time::Instant;
+
 use crate::memdx::auth_mechanism::AuthMechanism;
 use crate::memdx::client::Result;
 use crate::memdx::dispatcher::Dispatcher;
@@ -10,6 +12,8 @@ pub struct SASLAuthByNameOptions {
     pub password: String,
 
     pub auth_mechanism: AuthMechanism,
+
+    pub deadline: Instant,
 }
 
 pub trait OpSASLAuthByNameEncoder: OpSASLScramEncoder + OpSASLPlainEncoder {}
@@ -30,22 +34,20 @@ impl OpsSASLAuthByName {
     {
         match opts.auth_mechanism {
             AuthMechanism::Plain => {
-                let mut op = OpsSASLAuthPlain {}
+                OpsSASLAuthPlain {}
                     .sasl_auth_plain(
                         encoder,
                         dispatcher,
-                        SASLAuthPlainOptions::new(opts.username, opts.password),
+                        SASLAuthPlainOptions::new(opts.username, opts.password, opts.deadline),
                     )
-                    .await?;
-                op.recv().await?;
-                Ok(())
+                    .await
             }
             AuthMechanism::ScramSha1 => {
                 OpsSASLAuthScram {}
                     .sasl_auth_scram_1(
                         encoder,
                         dispatcher,
-                        SASLAuthScramOptions::new(opts.username, opts.password),
+                        SASLAuthScramOptions::new(opts.username, opts.password, opts.deadline),
                     )
                     .await
             }
@@ -54,7 +56,7 @@ impl OpsSASLAuthByName {
                     .sasl_auth_scram_256(
                         encoder,
                         dispatcher,
-                        SASLAuthScramOptions::new(opts.username, opts.password),
+                        SASLAuthScramOptions::new(opts.username, opts.password, opts.deadline),
                     )
                     .await
             }
@@ -63,7 +65,7 @@ impl OpsSASLAuthByName {
                     .sasl_auth_scram_512(
                         encoder,
                         dispatcher,
-                        SASLAuthScramOptions::new(opts.username, opts.password),
+                        SASLAuthScramOptions::new(opts.username, opts.password, opts.deadline),
                     )
                     .await
             }

@@ -1,7 +1,7 @@
 use std::future::Future;
 
 use crate::memdx::client::Result;
-use crate::memdx::pendingop::StandardPendingOp;
+use crate::memdx::pendingop::{PendingOp, StandardPendingOp};
 use crate::memdx::response::TryFromClientResponse;
 
 pub async fn sync_unary_call<RespT, Fut>(fut: Fut) -> Result<RespT>

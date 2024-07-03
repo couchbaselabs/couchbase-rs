@@ -220,10 +220,7 @@ impl TryFromClientResponse for GetClusterConfigResponse {
         // TODO: Clone, maybe also inefficient?
         let value = match std::str::from_utf8(packet.value.clone().unwrap_or_default().as_slice()) {
             Ok(v) => v.to_string(),
-            Err(e) => {
-                dbg!(e.to_string());
-                "".to_string()
-            }
+            Err(e) => "".to_string(),
         };
 
         let out = value.replace("$HOST", host.as_ref());

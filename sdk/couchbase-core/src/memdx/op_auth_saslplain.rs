@@ -1,7 +1,10 @@
+use tokio::time::Instant;
+
 use crate::memdx::auth_mechanism::AuthMechanism;
 use crate::memdx::client::Result;
 use crate::memdx::dispatcher::Dispatcher;
-use crate::memdx::pendingop::StandardPendingOp;
+use crate::memdx::error::Error;
+use crate::memdx::pendingop::{run_op_with_deadline, StandardPendingOp};
 use crate::memdx::request::SASLAuthRequest;
 use crate::memdx::response::SASLAuthResponse;
 
@@ -17,19 +20,18 @@ pub trait OpSASLPlainEncoder {
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct SASLAuthPlainOptions {
-    username: String,
-    password: String,
+    pub username: String,
+    pub password: String,
+    pub deadline: Instant,
 }
 
 impl SASLAuthPlainOptions {
-    pub fn new(username: String, password: String) -> Self {
-        Self { username, password }
-    }
-    pub fn username(&self) -> String {
-        self.username.clone()
-    }
-    pub fn password(&self) -> String {
-        self.password.clone()
+    pub fn new(username: String, password: String, deadline: Instant) -> Self {
+        Self {
+            username,
+            password,
+            deadline,
+        }
     }
 }
 
@@ -42,24 +44,32 @@ impl OpsSASLAuthPlain {
         encoder: &E,
         dispatcher: &mut D,
         opts: SASLAuthPlainOptions,
-    ) -> Result<StandardPendingOp<SASLAuthResponse>>
+    ) -> Result<()>
     where
         E: OpSASLPlainEncoder,
         D: Dispatcher,
     {
         let mut payload: Vec<u8> = Vec::new();
         payload.push(0);
-        payload.extend_from_slice(opts.username().as_ref());
+        payload.extend_from_slice(opts.username.as_ref());
         payload.push(0);
-        payload.extend_from_slice(opts.password().as_ref());
+        payload.extend_from_slice(opts.password.as_ref());
 
         let req = SASLAuthRequest {
             payload,
             auth_mechanism: AuthMechanism::Plain,
         };
 
-        let op = encoder.sasl_auth(dispatcher, req).await?;
+        let mut op = encoder.sasl_auth(dispatcher, req).await?;
 
-        Ok(op)
+        let resp = run_op_with_deadline(opts.deadline, &mut op).await?;
+
+        if resp.needs_more_steps {
+            return Err(Error::Protocol(
+                "Server did not accept auth when the client expected".to_string(),
+            ));
+        }
+
+        Ok(())
     }
 }

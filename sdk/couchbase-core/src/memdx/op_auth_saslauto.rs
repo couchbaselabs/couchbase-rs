@@ -1,5 +1,7 @@
 use std::cmp::PartialEq;
 
+use tokio::time::Instant;
+
 use crate::memdx::auth_mechanism::AuthMechanism;
 use crate::memdx::client::Result;
 use crate::memdx::dispatcher::Dispatcher;
@@ -9,7 +11,7 @@ use crate::memdx::error::Error::Generic;
 use crate::memdx::op_auth_saslbyname::{
     OpSASLAuthByNameEncoder, OpsSASLAuthByName, SASLAuthByNameOptions,
 };
-use crate::memdx::pendingop::StandardPendingOp;
+use crate::memdx::pendingop::{PendingOp, StandardPendingOp};
 use crate::memdx::request::SASLListMechsRequest;
 use crate::memdx::response::SASLListMechsResponse;
 
@@ -42,6 +44,7 @@ impl OpsSASLAuthAuto {
         &self,
         encoder: &E,
         dispatcher: &mut D,
+        deadline: Instant,
         opts: SASLAuthAutoOptions,
     ) -> Result<()>
     where
@@ -71,6 +74,7 @@ impl OpsSASLAuthAuto {
                     username: opts.username.clone(),
                     password: opts.password.clone(),
                     auth_mechanism: default_mech.clone(),
+                    deadline,
                 },
             )
             .await
@@ -114,6 +118,7 @@ impl OpsSASLAuthAuto {
                             username: opts.username.clone(),
                             password: opts.password.clone(),
                             auth_mechanism: selected_mech.clone(),
+                            deadline,
                         },
                     )
                     .await

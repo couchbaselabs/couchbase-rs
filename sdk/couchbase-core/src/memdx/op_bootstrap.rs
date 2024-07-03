@@ -1,12 +1,13 @@
 use log::warn;
 use tokio::select;
-use tokio::time::{Instant, sleep, timeout_at};
+use tokio::time::{Instant, sleep};
 
 use crate::memdx::client::Result;
 use crate::memdx::dispatcher::Dispatcher;
+use crate::memdx::error::CancellationErrorKind;
 use crate::memdx::op_auth_saslauto::{OpSASLAutoEncoder, OpsSASLAuthAuto, SASLAuthAutoOptions};
 use crate::memdx::op_auth_saslplain::OpSASLPlainEncoder;
-use crate::memdx::pendingop::StandardPendingOp;
+use crate::memdx::pendingop::{PendingOp, run_op_with_deadline, StandardPendingOp};
 use crate::memdx::request::{
     GetClusterConfigRequest, GetErrorMapRequest, HelloRequest, SASLAuthRequest,
     SASLListMechsRequest, SASLStepRequest, SelectBucketRequest,
@@ -83,7 +84,7 @@ impl OpBootstrap {
         if let Some(req) = opts.hello {
             let mut op = encoder.hello(dispatcher, req).await?;
 
-            result.hello = match timeout_at(opts.deadline, op.recv()).await? {
+            result.hello = match run_op_with_deadline(opts.deadline, &mut op).await {
                 Ok(r) => Some(r),
                 Err(e) => {
                     warn!("Hello failed {}", e);
@@ -95,7 +96,7 @@ impl OpBootstrap {
         if let Some(req) = opts.get_error_map {
             let mut op = encoder.get_error_map(dispatcher, req).await?;
 
-            result.error_map = match timeout_at(opts.deadline, op.recv()).await? {
+            result.error_map = match run_op_with_deadline(opts.deadline, &mut op).await {
                 Ok(r) => Some(r),
                 Err(e) => {
                     warn!("Get error map failed {}", e);
@@ -104,16 +105,14 @@ impl OpBootstrap {
             };
         };
         if let Some(req) = opts.auth {
-            match timeout_at(
-                opts.deadline,
-                OpsSASLAuthAuto {}.sasl_auth_auto(&encoder, dispatcher, req),
-            )
-            .await?
+            let op_auto = OpsSASLAuthAuto {};
+            match op_auto
+                .sasl_auth_auto(&encoder, dispatcher, opts.deadline, req)
+                .await
             {
-                Ok(r) => Some(r),
+                Ok(_) => {}
                 Err(e) => {
                     warn!("Auth failed {}", e);
-                    None
                 }
             };
         }
@@ -121,7 +120,7 @@ impl OpBootstrap {
         if let Some(req) = opts.select_bucket {
             let mut op = encoder.select_bucket(dispatcher, req).await?;
 
-            match timeout_at(opts.deadline, op.recv()).await? {
+            match run_op_with_deadline(opts.deadline, &mut op).await {
                 Ok(r) => Some(r),
                 Err(e) => {
                     warn!("Select bucket failed {}", e);
@@ -133,7 +132,7 @@ impl OpBootstrap {
         if let Some(req) = opts.get_cluster_config {
             let mut op = encoder.get_cluster_config(dispatcher, req).await?;
 
-            result.cluster_config = match timeout_at(opts.deadline, op.recv()).await? {
+            result.cluster_config = match run_op_with_deadline(opts.deadline, &mut op).await {
                 Ok(r) => Some(r),
                 Err(e) => {
                     warn!("Get cluster config failed {}", e);

@@ -1,13 +1,14 @@
 use hmac::Hmac;
 use sha1::Sha1;
 use sha2::{Sha256, Sha512};
+use tokio::time::Instant;
 
 use crate::memdx::auth_mechanism::AuthMechanism;
 use crate::memdx::client::Result;
 use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::error::Error;
 use crate::memdx::op_auth_saslplain::OpSASLPlainEncoder;
-use crate::memdx::pendingop::StandardPendingOp;
+use crate::memdx::pendingop::{run_op_with_deadline, StandardPendingOp};
 use crate::memdx::request::{SASLAuthRequest, SASLStepRequest};
 use crate::memdx::response::SASLStepResponse;
 use crate::scram;
@@ -27,14 +28,16 @@ pub struct SASLAuthScramOptions {
     pub username: String,
     pub password: String,
     // pub hash: SASLAuthScramHash,
+    deadline: Instant,
 }
 
 impl SASLAuthScramOptions {
-    pub fn new(username: String, password: String) -> Self {
+    pub fn new(username: String, password: String, deadline: Instant) -> Self {
         Self {
             username,
             password,
             // hash,
+            deadline,
         }
     }
 }
@@ -67,7 +70,7 @@ impl OpsSASLAuthScram {
 
         let mut op = encoder.sasl_auth(dispatcher, req).await?;
 
-        let resp = op.recv().await?;
+        let resp = run_op_with_deadline(opts.deadline, &mut op).await?;
 
         if !resp.needs_more_steps {
             return Ok(());
@@ -82,7 +85,7 @@ impl OpsSASLAuthScram {
 
         let mut op = encoder.sasl_step(dispatcher, req).await?;
 
-        let resp = op.recv().await?;
+        let resp = run_op_with_deadline(opts.deadline, &mut op).await?;
 
         if resp.needs_more_steps {
             return Err(Error::Protocol(
@@ -116,7 +119,7 @@ impl OpsSASLAuthScram {
 
         let mut op = encoder.sasl_auth(dispatcher, req).await?;
 
-        let resp = op.recv().await?;
+        let resp = run_op_with_deadline(opts.deadline, &mut op).await?;
 
         if !resp.needs_more_steps {
             return Ok(());
@@ -131,7 +134,7 @@ impl OpsSASLAuthScram {
 
         let mut op = encoder.sasl_step(dispatcher, req).await?;
 
-        let resp = op.recv().await?;
+        let resp = run_op_with_deadline(opts.deadline, &mut op).await?;
 
         if resp.needs_more_steps {
             return Err(Error::Protocol(
@@ -164,7 +167,7 @@ impl OpsSASLAuthScram {
 
         let mut op = encoder.sasl_auth(dispatcher, req).await?;
 
-        let resp = op.recv().await?;
+        let resp = run_op_with_deadline(opts.deadline, &mut op).await?;
 
         if !resp.needs_more_steps {
             return Ok(());
@@ -179,7 +182,7 @@ impl OpsSASLAuthScram {
 
         let mut op = encoder.sasl_step(dispatcher, req).await?;
 
-        let resp = op.recv().await?;
+        let resp = run_op_with_deadline(opts.deadline, &mut op).await?;
 
         if resp.needs_more_steps {
             return Err(Error::Protocol(

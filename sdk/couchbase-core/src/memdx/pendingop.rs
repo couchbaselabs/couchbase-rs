@@ -1,7 +1,10 @@
 use std::marker::PhantomData;
+use std::sync::atomic::AtomicBool;
 
 use log::debug;
+use tokio::select;
 use tokio::sync::mpsc::Receiver;
+use tokio::time::{Instant, timeout_at};
 
 use crate::memdx::client::CancellationSender;
 use crate::memdx::client::Result;
@@ -10,7 +13,10 @@ use crate::memdx::error::CancellationErrorKind;
 use crate::memdx::error::Error::Closed;
 use crate::memdx::response::TryFromClientResponse;
 
-pub trait PendingOp {
+pub trait PendingOp<T> {
+    async fn recv(&mut self) -> Result<T>
+    where
+        T: TryFromClientResponse;
     fn cancel(&mut self, e: CancellationErrorKind);
 }
 
@@ -66,14 +72,30 @@ impl<T: TryFromClientResponse> StandardPendingOp<T> {
             _target: PhantomData,
         }
     }
+}
 
-    pub async fn recv(&mut self) -> Result<T> {
+impl<T: TryFromClientResponse> PendingOp<T> for StandardPendingOp<T> {
+    async fn recv(&mut self) -> Result<T> {
         let packet = self.wrapped.recv().await?;
 
         T::try_from(packet)
     }
 
-    pub fn cancel(&mut self, e: CancellationErrorKind) {
+    fn cancel(&mut self, e: CancellationErrorKind) {
         self.wrapped.cancel(e);
+    }
+}
+
+pub async fn run_op_with_deadline<O, T>(deadline: Instant, op: &mut O) -> Result<T>
+where
+    O: PendingOp<T>,
+    T: TryFromClientResponse,
+{
+    match timeout_at(deadline, op.recv()).await {
+        Ok(res) => res,
+        Err(_e) => {
+            op.cancel(CancellationErrorKind::Timeout);
+            op.recv().await
+        }
     }
 }
