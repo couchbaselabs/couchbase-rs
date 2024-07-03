@@ -3,6 +3,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use tokio::net::TcpStream;
+use tokio::time::{Instant, timeout_at};
 use tokio_rustls::client::TlsStream;
 use tokio_rustls::rustls::{ClientConfig, DigitallySignedStruct, RootCertStore, SignatureScheme};
 use tokio_rustls::rustls::client::danger::{
@@ -20,9 +21,10 @@ pub struct TlsConfig {
     pub accept_all_certs: Option<bool>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct ConnectOptions {
     pub tls_config: Option<TlsConfig>,
+    pub deadline: Instant,
 }
 
 #[derive(Debug)]
@@ -64,8 +66,8 @@ impl Connection {
                 ));
             };
 
-            let tcp_socket = TcpStream::connect(remote_addr)
-                .await
+            let tcp_socket = timeout_at(opts.deadline, TcpStream::connect(remote_addr))
+                .await?
                 .map_err(|e| Error::Connect(e.kind()))?;
 
             tcp_socket
@@ -82,13 +84,15 @@ impl Connection {
             };
 
             let connector = TlsConnector::from(Arc::new(config));
-            let socket = connector
-                .connect(
+            let socket = timeout_at(
+                opts.deadline,
+                connector.connect(
                     ServerName::try_from(hostname).map_err(|e| Error::Generic(e.to_string()))?,
                     tcp_socket,
-                )
-                .await
-                .map_err(|e| Error::Connect(e.kind()))?;
+                ),
+            )
+            .await?
+            .map_err(|e| Error::Connect(e.kind()))?;
 
             Ok(Connection {
                 inner: ConnectionType::Tls(socket),
@@ -96,8 +100,8 @@ impl Connection {
                 peer_addr,
             })
         } else {
-            let socket = TcpStream::connect(remote_addr)
-                .await
+            let socket = timeout_at(opts.deadline, TcpStream::connect(remote_addr))
+                .await?
                 .map_err(|e| Error::Connect(e.kind()))?;
             socket
                 .set_nodelay(false)

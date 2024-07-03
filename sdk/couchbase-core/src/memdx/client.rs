@@ -271,16 +271,23 @@ mod tests {
     async fn roundtrip_a_request() {
         let _ = env_logger::try_init();
 
-        let conn = Connection::connect("192.168.107.136", 11210, ConnectOptions::default())
-            .await
-            .expect("Could not connect");
+        let instant = Instant::now().add(Duration::new(7, 0));
+
+        let conn = Connection::connect(
+            "192.168.107.128",
+            11210,
+            ConnectOptions {
+                tls_config: None,
+                deadline: instant,
+            },
+        )
+        .await
+        .expect("Could not connect");
 
         let mut client = Client::new(conn);
 
         let username = "Administrator".to_string();
         let password = "password".to_string();
-
-        let instant = Instant::now().add(Duration::new(7, 0));
 
         let bootstrap_result = OpBootstrap::bootstrap(
             OpsCore {},

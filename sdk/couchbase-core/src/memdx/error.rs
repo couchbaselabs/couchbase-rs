@@ -1,6 +1,8 @@
 use std::fmt::{Display, Formatter};
 use std::io;
 
+use tokio::time::error::Elapsed;
+
 use crate::scram::ScramError;
 
 #[derive(thiserror::Error, Debug, Eq, PartialEq)]
@@ -72,5 +74,11 @@ impl From<io::Error> for Error {
 impl From<ScramError> for Error {
     fn from(value: ScramError) -> Self {
         Self::Auth(value.to_string())
+    }
+}
+
+impl From<Elapsed> for Error {
+    fn from(_value: Elapsed) -> Self {
+        Self::Cancelled(CancellationErrorKind::Timeout)
     }
 }
