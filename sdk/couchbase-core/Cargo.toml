@@ -16,6 +16,7 @@ bytes = "1.5.0"
 hmac = "0.12"
 sha1 = "0.10"
 sha2 = "0.10"
+serde = { version = "1.0.203", features = ["derive"] }
 rand = "0.9.0-alpha.1"
 base64 = "0.22.1"
 webpki = "0.22.4"

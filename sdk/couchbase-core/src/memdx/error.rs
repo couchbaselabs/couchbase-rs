@@ -29,12 +29,16 @@ pub enum Error {
     CollectionsNotEnabled,
     #[error("Unknown collection id")]
     UnknownCollectionID,
+    #[error("Unknown bucket name")]
+    UnknownBucketName,
     #[error("Access error")]
     Access,
     #[error("Auth error")]
     Auth(String),
     #[error("Connection closed")]
     Closed,
+    #[error("Config not set")]
+    ConfigNotSet,
     #[error("{0}")]
     Generic(String),
     #[error("Unknown error {0}")]

@@ -3,11 +3,12 @@ use std::marker::PhantomData;
 use log::debug;
 use tokio::sync::mpsc::Receiver;
 
-use crate::memdx::client::{CancellationSender, ClientResponse};
+use crate::memdx::client::CancellationSender;
 use crate::memdx::client::Result;
+use crate::memdx::client_response::ClientResponse;
 use crate::memdx::error::CancellationErrorKind;
 use crate::memdx::error::Error::Closed;
-use crate::memdx::response::{TryFromClientResponse};
+use crate::memdx::response::TryFromClientResponse;
 
 pub trait PendingOp {
     fn cancel(&mut self, e: CancellationErrorKind);

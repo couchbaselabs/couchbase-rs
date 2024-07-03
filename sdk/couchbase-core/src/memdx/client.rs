@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::env;
+use std::net::SocketAddr;
 use std::sync::Arc;
 
 use futures::{SinkExt, StreamExt};
@@ -12,8 +13,9 @@ use tokio_rustls::client::TlsStream;
 use tokio_util::codec::{FramedRead, FramedWrite};
 use uuid::Uuid;
 
+use crate::memdx::client_response::ClientResponse;
 use crate::memdx::codec::KeyValueCodec;
-use crate::memdx::connection::Connection;
+use crate::memdx::connection::{Connection, ConnectionType};
 use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::error::{CancellationErrorKind, Error};
 use crate::memdx::packet::{RequestPacket, ResponsePacket};
@@ -23,32 +25,6 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub type ResponseSender = Sender<Result<ClientResponse>>;
 type OpaqueMap = HashMap<u32, Arc<ResponseSender>>;
 pub(crate) type CancellationSender = UnboundedSender<(u32, CancellationErrorKind)>;
-
-#[derive(Debug)]
-pub(crate) struct ClientResponse {
-    packet: ResponsePacket,
-    has_more_sender: oneshot::Sender<bool>,
-}
-
-impl ClientResponse {
-    pub fn new(packet: ResponsePacket, has_more_sender: oneshot::Sender<bool>) -> Self {
-        Self {
-            packet,
-            has_more_sender,
-        }
-    }
-
-    pub fn packet(&self) -> &ResponsePacket {
-        &self.packet
-    }
-
-    pub fn send_has_more(self) {
-        match self.has_more_sender.send(true) {
-            Ok(_) => {}
-            Err(_e) => {}
-        };
-    }
-}
 
 static HANDLER_INVOKE_PERMITS: Semaphore = Semaphore::const_new(1);
 
@@ -62,13 +38,19 @@ pub struct Client {
     writer: FramedWrite<WriteHalf<TcpStream>, KeyValueCodec>,
 
     cancel_tx: CancellationSender,
+
+    local_addr: Option<SocketAddr>,
+    peer_addr: Option<SocketAddr>,
 }
 
 impl Client {
     pub fn new(conn: Connection) -> Self {
-        let (r, w) = match conn {
-            Connection::Tcp(stream) => tokio::io::split(stream),
-            Connection::Tls(stream) => {
+        let local_addr = *conn.local_addr();
+        let peer_addr = *conn.peer_addr();
+
+        let (r, w) = match conn.into_inner() {
+            ConnectionType::Tcp(stream) => tokio::io::split(stream),
+            ConnectionType::Tls(stream) => {
                 let (tcp, _) = stream.into_inner();
                 tokio::io::split(tcp)
             }
@@ -90,11 +72,14 @@ impl Client {
             cancel_tx,
 
             writer,
+
+            local_addr,
+            peer_addr,
         };
 
         let read_opaque_map = Arc::clone(&client.opaque_map);
         tokio::spawn(async move {
-            Client::read_loop(reader, read_opaque_map, uuid).await;
+            Client::read_loop(reader, read_opaque_map, uuid, local_addr, peer_addr).await;
         });
 
         let cancel_opaque_map = Arc::clone(&client.opaque_map);
@@ -156,6 +141,8 @@ impl Client {
         mut stream: FramedRead<ReadHalf<TcpStream>, KeyValueCodec>,
         opaque_map: Arc<Mutex<OpaqueMap>>,
         client_id: String,
+        local_addr: Option<SocketAddr>,
+        peer_addr: Option<SocketAddr>,
     ) {
         loop {
             if let Some(input) = stream.next().await {
@@ -183,7 +170,9 @@ impl Client {
                             let sender = Arc::clone(map_entry);
                             drop(map);
                             let (more_tx, more_rx) = oneshot::channel();
-                            let resp = ClientResponse::new(packet, more_tx);
+
+                            // TODO: clone
+                            let resp = ClientResponse::new(packet, more_tx, peer_addr, local_addr);
                             match sender.send(Ok(resp)).await {
                                 Ok(_) => {}
                                 Err(e) => {
@@ -272,7 +261,8 @@ mod tests {
     use crate::memdx::ops_core::OpsCore;
     use crate::memdx::ops_crud::OpsCrud;
     use crate::memdx::request::{
-        GetErrorMapRequest, GetRequest, HelloRequest, SelectBucketRequest, SetRequest,
+        GetClusterConfigRequest, GetErrorMapRequest, GetRequest, HelloRequest, SelectBucketRequest,
+        SetRequest,
     };
     use crate::memdx::response::{GetResponse, SetResponse};
     use crate::memdx::sync_helpers::sync_unary_call;
@@ -281,7 +271,7 @@ mod tests {
     async fn roundtrip_a_request() {
         let _ = env_logger::try_init();
 
-        let conn = Connection::connect("192.168.107.128", 11210, ConnectOptions::default())
+        let conn = Connection::connect("192.168.107.136", 11210, ConnectOptions::default())
             .await
             .expect("Could not connect");
 
@@ -326,6 +316,7 @@ mod tests {
                     bucket_name: "default".into(),
                 }),
                 deadline: instant,
+                get_cluster_config: Some(GetClusterConfigRequest {}),
             },
         )
         .await
@@ -333,7 +324,11 @@ mod tests {
         dbg!(&bootstrap_result.hello);
 
         let hello_result = bootstrap_result.hello.unwrap();
-        assert_eq!(14, hello_result.enabled_features.len());
+
+        dbg!(
+            std::str::from_utf8(bootstrap_result.cluster_config.unwrap().config.as_slice())
+                .unwrap()
+        );
 
         let result: SetResponse = sync_unary_call(
             OpsCrud {

@@ -4,7 +4,7 @@ use std::time::Duration;
 use byteorder::{BigEndian, ReadBytesExt};
 
 use crate::memdx::auth_mechanism::AuthMechanism;
-use crate::memdx::client::ClientResponse;
+use crate::memdx::client_response::ClientResponse;
 use crate::memdx::error::Error;
 use crate::memdx::hello_feature::HelloFeature;
 use crate::memdx::ops_core::OpsCore;
@@ -76,6 +76,9 @@ impl TryFromClientResponse for SelectBucketResponse {
         let packet = resp.packet();
         let status = packet.status;
         if status != Status::Success {
+            if status == Status::AccessError || status == Status::KeyNotFound {
+                return Err(Error::UnknownBucketName);
+            }
             return Err(OpsCore::decode_error(packet));
         }
 
@@ -146,6 +149,13 @@ impl TryFromClientResponse for SASLListMechsResponse {
         let packet = resp.packet();
         let status = packet.status;
         if status != Status::Success {
+            if status == Status::KeyNotFound {
+                // KeyNotFound appears here when the bucket was initialized by ns_server, but
+                // ns_server has not posted a configuration for the bucket to kv_engine yet. We
+                // transform this into a ErrTmpFail as we make the assumption that the
+                // SelectBucket will have failed if this was anything but a transient issue.
+                return Err(Error::ConfigNotSet);
+            }
             return Err(OpsCore::decode_error(packet));
         }
 
@@ -170,9 +180,65 @@ impl TryFromClientResponse for SASLListMechsResponse {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct GetClusterConfigResponse {
+    pub config: Vec<u8>,
+}
+
+impl GetClusterConfigResponse {
+    fn replace(search: &[u8], find: u8, replace: &[u8]) -> Vec<u8> {
+        let mut result = vec![];
+
+        for &b in search {
+            if b == find {
+                result.extend(replace);
+            } else {
+                result.push(b);
+            }
+        }
+
+        result
+    }
+}
+
+impl TryFromClientResponse for GetClusterConfigResponse {
+    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+        let packet = resp.packet();
+        let status = packet.status;
+        if status != Status::Success {
+            return Err(OpsCore::decode_error(packet));
+        }
+
+        let host = match resp.local_addr() {
+            Some(addr) => addr.ip().to_string(),
+            None => {
+                return Err(Error::Generic(
+                    "Failed to identify memd hostname for $HOST replacement".to_string(),
+                ))
+            }
+        };
+
+        // TODO: Clone, maybe also inefficient?
+        let value = match std::str::from_utf8(packet.value.clone().unwrap_or_default().as_slice()) {
+            Ok(v) => v.to_string(),
+            Err(e) => {
+                dbg!(e.to_string());
+                "".to_string()
+            }
+        };
+
+        let out = value.replace("$HOST", host.as_ref());
+
+        Ok(GetClusterConfigResponse {
+            config: out.into_bytes(),
+        })
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct BootstrapResult {
     pub hello: Option<HelloResponse>,
     pub error_map: Option<GetErrorMapResponse>,
+    pub cluster_config: Option<GetClusterConfigResponse>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]

@@ -1,4 +1,5 @@
 use std::fmt::Debug;
+use std::net::SocketAddr;
 use std::sync::Arc;
 
 use tokio::net::TcpStream;
@@ -25,9 +26,17 @@ pub struct ConnectOptions {
 }
 
 #[derive(Debug)]
-pub enum Connection {
+pub enum ConnectionType {
     Tcp(TcpStream),
     Tls(TlsStream<TcpStream>),
+}
+
+#[derive(Debug)]
+pub struct Connection {
+    inner: ConnectionType,
+
+    local_addr: Option<SocketAddr>,
+    peer_addr: Option<SocketAddr>,
 }
 
 impl Connection {
@@ -63,6 +72,15 @@ impl Connection {
                 .set_nodelay(false)
                 .map_err(|e| Error::Connect(e.kind()))?;
 
+            let local_addr = match tcp_socket.local_addr() {
+                Ok(addr) => Some(addr),
+                Err(_) => None,
+            };
+            let peer_addr = match tcp_socket.peer_addr() {
+                Ok(addr) => Some(addr),
+                Err(_) => None,
+            };
+
             let connector = TlsConnector::from(Arc::new(config));
             let socket = connector
                 .connect(
@@ -72,7 +90,11 @@ impl Connection {
                 .await
                 .map_err(|e| Error::Connect(e.kind()))?;
 
-            Ok(Connection::Tls(socket))
+            Ok(Connection {
+                inner: ConnectionType::Tls(socket),
+                local_addr,
+                peer_addr,
+            })
         } else {
             let socket = TcpStream::connect(remote_addr)
                 .await
@@ -81,8 +103,33 @@ impl Connection {
                 .set_nodelay(false)
                 .map_err(|e| Error::Connect(e.kind()))?;
 
-            Ok(Connection::Tcp(socket))
+            let local_addr = match socket.local_addr() {
+                Ok(addr) => Some(addr),
+                Err(_) => None,
+            };
+            let peer_addr = match socket.peer_addr() {
+                Ok(addr) => Some(addr),
+                Err(_) => None,
+            };
+
+            Ok(Connection {
+                inner: ConnectionType::Tcp(socket),
+                local_addr,
+                peer_addr,
+            })
         }
+    }
+
+    pub fn local_addr(&self) -> &Option<SocketAddr> {
+        &self.local_addr
+    }
+
+    pub fn peer_addr(&self) -> &Option<SocketAddr> {
+        &self.peer_addr
+    }
+
+    pub fn into_inner(self) -> ConnectionType {
+        self.inner
     }
 }
 

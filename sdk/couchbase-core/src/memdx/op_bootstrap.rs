@@ -7,12 +7,12 @@ use crate::memdx::op_auth_saslauto::{OpSASLAutoEncoder, OpsSASLAuthAuto, SASLAut
 use crate::memdx::op_auth_saslplain::OpSASLPlainEncoder;
 use crate::memdx::pendingop::StandardPendingOp;
 use crate::memdx::request::{
-    GetErrorMapRequest, HelloRequest, SASLAuthRequest, SASLListMechsRequest, SASLStepRequest,
-    SelectBucketRequest,
+    GetClusterConfigRequest, GetErrorMapRequest, HelloRequest, SASLAuthRequest,
+    SASLListMechsRequest, SASLStepRequest, SelectBucketRequest,
 };
 use crate::memdx::response::{
-    BootstrapResult, GetErrorMapResponse, HelloResponse, SASLAuthResponse, SASLListMechsResponse,
-    SASLStepResponse, SelectBucketResponse,
+    BootstrapResult, GetClusterConfigResponse, GetErrorMapResponse, HelloResponse,
+    SASLAuthResponse, SASLListMechsResponse, SASLStepResponse, SelectBucketResponse,
 };
 
 pub trait OpBootstrapEncoder {
@@ -39,6 +39,14 @@ pub trait OpBootstrapEncoder {
     ) -> Result<StandardPendingOp<SelectBucketResponse>>
     where
         D: Dispatcher;
+
+    async fn get_cluster_config<D>(
+        &self,
+        dispatcher: &mut D,
+        request: GetClusterConfigRequest,
+    ) -> Result<StandardPendingOp<GetClusterConfigResponse>>
+    where
+        D: Dispatcher;
 }
 
 pub struct OpBootstrap {}
@@ -50,6 +58,7 @@ pub struct BootstrapOptions {
     pub auth: Option<SASLAuthAutoOptions>,
     pub select_bucket: Option<SelectBucketRequest>,
     pub deadline: Instant,
+    pub get_cluster_config: Option<GetClusterConfigRequest>,
 }
 
 impl OpBootstrap {
@@ -67,6 +76,7 @@ impl OpBootstrap {
         let mut result = BootstrapResult {
             hello: None,
             error_map: None,
+            cluster_config: None,
         };
 
         let hello_op = if let Some(req) = opts.hello {
@@ -111,11 +121,27 @@ impl OpBootstrap {
             None
         };
 
+        let get_cluster_config_op = if let Some(req) = opts.get_cluster_config {
+            Some(encoder.get_cluster_config(dispatcher, req).await?)
+        } else {
+            None
+        };
+
         if let Some(mut op) = select_bucket_op {
             match op.recv().await {
                 Ok(_r) => {}
                 Err(e) => {
                     warn!("Select bucket failed {}", e);
+                    return Err(e);
+                }
+            }
+        }
+
+        if let Some(mut op) = get_cluster_config_op {
+            match op.recv().await {
+                Ok(r) => result.cluster_config = Some(r),
+                Err(e) => {
+                    warn!("Get cluster config failed {}", e);
                     return Err(e);
                 }
             }

@@ -15,12 +15,12 @@ use crate::memdx::opcode::OpCode;
 use crate::memdx::packet::{RequestPacket, ResponsePacket};
 use crate::memdx::pendingop::StandardPendingOp;
 use crate::memdx::request::{
-    GetErrorMapRequest, HelloRequest, SASLAuthRequest, SASLListMechsRequest, SASLStepRequest,
-    SelectBucketRequest,
+    GetClusterConfigRequest, GetErrorMapRequest, HelloRequest, SASLAuthRequest,
+    SASLListMechsRequest, SASLStepRequest, SelectBucketRequest,
 };
 use crate::memdx::response::{
-    GetErrorMapResponse, HelloResponse, SASLAuthResponse, SASLListMechsResponse, SASLStepResponse,
-    SelectBucketResponse,
+    GetClusterConfigResponse, GetErrorMapResponse, HelloResponse, SASLAuthResponse,
+    SASLListMechsResponse, SASLStepResponse, SelectBucketResponse,
 };
 use crate::memdx::status::Status;
 
@@ -122,6 +122,32 @@ impl OpBootstrapEncoder for OpsCore {
                 cas: None,
                 extras: None,
                 key: Some(key),
+                value: None,
+                framing_extras: None,
+                opaque: None,
+            })
+            .await?;
+
+        Ok(StandardPendingOp::new(op))
+    }
+
+    async fn get_cluster_config<D>(
+        &self,
+        dispatcher: &mut D,
+        _request: GetClusterConfigRequest,
+    ) -> Result<StandardPendingOp<GetClusterConfigResponse>>
+    where
+        D: Dispatcher,
+    {
+        let op = dispatcher
+            .dispatch(RequestPacket {
+                magic: Magic::Req,
+                op_code: OpCode::GetClusterConfig,
+                datatype: 0,
+                vbucket_id: None,
+                cas: None,
+                extras: None,
+                key: None,
                 value: None,
                 framing_extras: None,
                 opaque: None,

@@ -21,6 +21,9 @@ pub struct SelectBucketRequest {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct GetClusterConfigRequest {}
+
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct SASLAuthRequest {
     pub auth_mechanism: AuthMechanism,
     pub payload: Vec<u8>,

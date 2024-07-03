@@ -1,5 +1,6 @@
 mod auth_mechanism;
 mod client;
+mod client_response;
 mod codec;
 mod connection;
 pub mod dispatcher;
