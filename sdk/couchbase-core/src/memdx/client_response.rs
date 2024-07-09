@@ -5,7 +5,7 @@ use tokio::sync::oneshot;
 use crate::memdx::packet::ResponsePacket;
 
 #[derive(Debug)]
-pub(crate) struct ClientResponse {
+pub struct ClientResponse {
     packet: ResponsePacket,
     has_more_sender: oneshot::Sender<bool>,
 

@@ -18,35 +18,35 @@ use crate::memdx::response::{
 };
 
 pub trait OpBootstrapEncoder {
-    async fn hello<D>(
+    fn hello<D>(
         &self,
         dispatcher: &mut D,
         request: HelloRequest,
-    ) -> Result<StandardPendingOp<HelloResponse>>
+    ) -> impl std::future::Future<Output = Result<StandardPendingOp<HelloResponse>>>
     where
         D: Dispatcher;
 
-    async fn get_error_map<D>(
+    fn get_error_map<D>(
         &self,
         dispatcher: &mut D,
         request: GetErrorMapRequest,
-    ) -> Result<StandardPendingOp<GetErrorMapResponse>>
+    ) -> impl std::future::Future<Output = Result<StandardPendingOp<GetErrorMapResponse>>>
     where
         D: Dispatcher;
 
-    async fn select_bucket<D>(
+    fn select_bucket<D>(
         &self,
         dispatcher: &mut D,
         request: SelectBucketRequest,
-    ) -> Result<StandardPendingOp<SelectBucketResponse>>
+    ) -> impl std::future::Future<Output = Result<StandardPendingOp<SelectBucketResponse>>>
     where
         D: Dispatcher;
 
-    async fn get_cluster_config<D>(
+    fn get_cluster_config<D>(
         &self,
         dispatcher: &mut D,
         request: GetClusterConfigRequest,
-    ) -> Result<StandardPendingOp<GetClusterConfigResponse>>
+    ) -> impl std::future::Future<Output = Result<StandardPendingOp<GetClusterConfigResponse>>>
     where
         D: Dispatcher;
 }

@@ -9,7 +9,7 @@ use tokio_rustls::rustls::{ClientConfig, DigitallySignedStruct, RootCertStore, S
 use tokio_rustls::rustls::client::danger::{
     HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier,
 };
-use tokio_rustls::rustls::pki_types::{CertificateDer, ServerName, UnixTime};
+use tokio_rustls::rustls::pki_types::{CertificateDer, IpAddr, ServerName, UnixTime};
 use tokio_rustls::TlsConnector;
 
 use crate::memdx::client::Result;
@@ -42,13 +42,8 @@ pub struct Connection {
 }
 
 impl Connection {
-    pub async fn connect(
-        hostname: impl Into<String>,
-        port: u32,
-        opts: ConnectOptions,
-    ) -> Result<Connection> {
-        let hostname = hostname.into();
-        let remote_addr = format!("{}:{}", hostname, port);
+    pub async fn connect(addr: SocketAddr, opts: ConnectOptions) -> Result<Connection> {
+        let remote_addr = addr.to_string();
 
         if let Some(tls_config) = opts.tls_config {
             let builder = ClientConfig::builder();
@@ -86,10 +81,7 @@ impl Connection {
             let connector = TlsConnector::from(Arc::new(config));
             let socket = timeout_at(
                 opts.deadline,
-                connector.connect(
-                    ServerName::try_from(hostname).map_err(|e| Error::Generic(e.to_string()))?,
-                    tcp_socket,
-                ),
+                connector.connect(ServerName::IpAddress(IpAddr::from(addr.ip())), tcp_socket),
             )
             .await?
             .map_err(|e| Error::Connect(e.kind()))?;

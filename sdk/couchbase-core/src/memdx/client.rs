@@ -1,16 +1,23 @@
 use std::collections::HashMap;
 use std::env;
+use std::io::empty;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use futures::{SinkExt, StreamExt};
+use async_trait::async_trait;
+use futures::SinkExt;
 use log::{debug, trace, warn};
-use tokio::io::{ReadHalf, WriteHalf};
+use tokio::io::{Join, ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
+use tokio::select;
 use tokio::sync::{mpsc, Mutex, oneshot, Semaphore};
-use tokio::sync::mpsc::{Sender, UnboundedReceiver, UnboundedSender};
+use tokio::sync::mpsc::{Receiver, Sender, UnboundedReceiver, UnboundedSender};
+use tokio::sync::mpsc::unbounded_channel;
+use tokio::task::JoinHandle;
 use tokio_rustls::client::TlsStream;
+use tokio_stream::StreamExt;
 use tokio_util::codec::{FramedRead, FramedWrite};
+use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use crate::memdx::client_response::ClientResponse;
@@ -22,11 +29,25 @@ use crate::memdx::packet::{RequestPacket, ResponsePacket};
 use crate::memdx::pendingop::ClientPendingOp;
 
 pub type Result<T> = std::result::Result<T, Error>;
-pub type ResponseSender = Sender<Result<ClientResponse>>;
+type ResponseSender = Sender<Result<ClientResponse>>;
 type OpaqueMap = HashMap<u32, Arc<ResponseSender>>;
 pub(crate) type CancellationSender = UnboundedSender<(u32, CancellationErrorKind)>;
 
-static HANDLER_INVOKE_PERMITS: Semaphore = Semaphore::const_new(1);
+#[derive(Debug)]
+struct ReadLoopOptions {
+    pub client_id: String,
+    pub local_addr: Option<SocketAddr>,
+    pub peer_addr: Option<SocketAddr>,
+    pub orphan_handler: UnboundedSender<ResponsePacket>,
+    pub on_connection_close_tx: Option<oneshot::Sender<Result<()>>>,
+    pub on_client_close_rx: Receiver<()>,
+}
+
+#[derive(Debug)]
+pub struct ClientOptions {
+    pub orphan_handler: UnboundedSender<ResponsePacket>,
+    pub on_connection_close_handler: Option<oneshot::Sender<Result<()>>>,
+}
 
 #[derive(Debug)]
 pub struct Client {
@@ -36,15 +57,17 @@ pub struct Client {
     client_id: String,
 
     writer: FramedWrite<WriteHalf<TcpStream>, KeyValueCodec>,
+    read_handle: JoinHandle<()>,
 
     cancel_tx: CancellationSender,
+    close_tx: Sender<()>,
 
     local_addr: Option<SocketAddr>,
     peer_addr: Option<SocketAddr>,
 }
 
 impl Client {
-    pub fn new(conn: Connection) -> Self {
+    pub fn new(conn: Connection, opts: ClientOptions) -> Self {
         let local_addr = *conn.local_addr();
         let peer_addr = *conn.peer_addr();
 
@@ -63,31 +86,44 @@ impl Client {
         let uuid = Uuid::new_v4().to_string();
 
         let (cancel_tx, cancel_rx) = mpsc::unbounded_channel();
+        let (close_tx, close_rx) = mpsc::channel::<()>(1);
 
-        let client = Self {
+        let opaque_map = Arc::new(Mutex::new(OpaqueMap::default()));
+
+        let read_opaque_map = Arc::clone(&opaque_map);
+        let read_uuid = uuid.clone();
+
+        let read_handle = tokio::spawn(async move {
+            Client::read_loop(
+                reader,
+                cancel_rx,
+                read_opaque_map,
+                ReadLoopOptions {
+                    client_id: read_uuid,
+                    local_addr,
+                    peer_addr,
+                    orphan_handler: opts.orphan_handler,
+                    on_connection_close_tx: opts.on_connection_close_handler,
+                    on_client_close_rx: close_rx,
+                },
+            )
+            .await;
+        });
+
+        Self {
             current_opaque: 1,
-            opaque_map: Arc::new(Mutex::new(OpaqueMap::default())),
-            client_id: uuid.clone(),
+            opaque_map,
+            client_id: uuid,
 
             cancel_tx,
+            close_tx,
 
             writer,
+            read_handle,
 
             local_addr,
             peer_addr,
-        };
-
-        let read_opaque_map = Arc::clone(&client.opaque_map);
-        tokio::spawn(async move {
-            Client::read_loop(reader, read_opaque_map, uuid, local_addr, peer_addr).await;
-        });
-
-        let cancel_opaque_map = Arc::clone(&client.opaque_map);
-        tokio::spawn(async move {
-            Client::cancel_loop(cancel_rx, cancel_opaque_map).await;
-        });
-
-        client
+        }
     }
 
     async fn register_handler(&mut self, handler: Arc<ResponseSender>) -> u32 {
@@ -102,120 +138,164 @@ impl Client {
         opaque
     }
 
-    async fn cancel_loop(
-        mut cancel_rx: UnboundedReceiver<(u32, CancellationErrorKind)>,
+    async fn read_loop(
+        mut stream: FramedRead<ReadHalf<TcpStream>, KeyValueCodec>,
+        mut op_cancel_rx: UnboundedReceiver<(u32, CancellationErrorKind)>,
         opaque_map: Arc<Mutex<OpaqueMap>>,
+        mut opts: ReadLoopOptions,
     ) {
         loop {
-            match cancel_rx.recv().await {
-                Some(cancel_info) => {
-                    let permit = HANDLER_INVOKE_PERMITS.acquire().await.unwrap();
-                    let requests: Arc<Mutex<OpaqueMap>> = Arc::clone(&opaque_map);
-                    let mut map = requests.lock().await;
-
-                    let t = map.remove(&cancel_info.0);
-
-                    if let Some(map_entry) = t {
-                        let sender = Arc::clone(&map_entry);
-                        drop(map);
-
-                        sender
-                            .send(Err(Error::Cancelled(cancel_info.1)))
-                            .await
-                            .unwrap();
-                    } else {
-                        drop(map);
+            select! {
+                (_) = opts.on_client_close_rx.recv() => {
+                    drop(stream);
+                    drop(op_cancel_rx);
+                    if let Some(handler) = opts.on_connection_close_tx {
+                        handler.send(Ok(())).unwrap();
+                        return;
                     }
-
-                    drop(requests);
-                    drop(permit);
-                }
-                None => {
                     return;
+                },
+                (cancel_reason) = op_cancel_rx.recv() => {
+                    match cancel_reason {
+                        Some(cancel_info) => {
+                            let requests: Arc<Mutex<OpaqueMap>> = Arc::clone(&opaque_map);
+                            let mut map = requests.lock().await;
+
+                            let t = map.remove(&cancel_info.0);
+
+                            if let Some(map_entry) = t {
+                                let sender = Arc::clone(&map_entry);
+                                drop(map);
+
+                                sender
+                                    .send(Err(Error::Cancelled(cancel_info.1)))
+                                    .await
+                                    .unwrap();
+                            } else {
+                                drop(map);
+                            }
+
+                            drop(requests);
+                        }
+                        None => {
+                            return;
+                        }
+                    }
+                },
+                (next) = stream.next() => {
+                    match next {
+                        Some(input) => {
+                            match input {
+                                Ok(packet) => {
+                                    trace!(
+                                        "Resolving response on {}. Opcode={}. Opaque={}. Status={}",
+                                        opts.client_id,
+                                        packet.op_code,
+                                        packet.opaque,
+                                        packet.status,
+                                    );
+
+                                    let opaque = packet.opaque;
+
+                                    let requests: Arc<Mutex<OpaqueMap>> = Arc::clone(&opaque_map);
+                                    let map = requests.lock().await;
+
+                                    // We remove and then re-add if there are more packets so that we don't have
+                                    // to hold the opaque map mutex across the callback.
+                                    let t = map.get(&opaque);
+
+                                    if let Some(map_entry) = t {
+                                        let sender = Arc::clone(map_entry);
+                                        drop(map);
+                                        let (more_tx, more_rx) = oneshot::channel();
+
+                                        // TODO: clone
+                                        let resp = ClientResponse::new(packet, more_tx, opts.peer_addr, opts.local_addr);
+                                        match sender.send(Ok(resp)).await {
+                                            Ok(_) => {}
+                                            Err(e) => {
+                                                debug!("Sending response to caller failed: {}", e);
+                                            }
+                                        };
+                                        drop(sender);
+
+                                        match more_rx.await {
+                                            Ok(has_more_packets) => {
+                                                if !has_more_packets {
+                                                    let mut map = requests.lock().await;
+                                                    map.remove(&opaque);
+                                                    drop(map);
+                                                }
+                                            }
+                                            Err(_) => {
+                                                // If the response gets dropped then the receiver will be closed,
+                                                // which we treat as an implicit !has_more_packets.
+                                                let mut map = requests.lock().await;
+                                                map.remove(&opaque);
+                                                drop(map);
+                                            }
+                                        }
+                                    } else {
+                                        drop(map);
+                                        let opaque = packet.opaque;
+                                        match opts.orphan_handler.send(packet) {
+                                            Ok(_) => {}
+                                            Err(_) => {
+                                                warn!(
+                                                    "{} failed to send packet to orphan handler {}",
+                                                    opts.client_id, opaque
+                                                );
+                                            }
+                                        };
+                                    }
+                                    drop(requests);
+                                }
+                                Err(e) => {
+                                    warn!("{} failed to read frame {}", opts.client_id, e.to_string());
+                                }
+                            }
+                        }
+                        None => {
+                            if let Some(handler) = opts.on_connection_close_tx {
+                                handler.send(Ok(())).unwrap();
+                                return;
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 
-    async fn read_loop(
-        mut stream: FramedRead<ReadHalf<TcpStream>, KeyValueCodec>,
-        opaque_map: Arc<Mutex<OpaqueMap>>,
-        client_id: String,
-        local_addr: Option<SocketAddr>,
-        peer_addr: Option<SocketAddr>,
-    ) {
-        loop {
-            if let Some(input) = stream.next().await {
-                match input {
-                    Ok(packet) => {
-                        trace!(
-                            "Resolving response on {}. Opcode={}. Opaque={}. Status={}",
-                            client_id,
-                            packet.op_code,
-                            packet.opaque,
-                            packet.status,
-                        );
-
-                        let opaque = packet.opaque;
-
-                        let permit = HANDLER_INVOKE_PERMITS.acquire().await.unwrap();
-                        let requests: Arc<Mutex<OpaqueMap>> = Arc::clone(&opaque_map);
-                        let map = requests.lock().await;
-
-                        // We remove and then re-add if there are more packets so that we don't have
-                        // to hold the opaque map mutex across the callback.
-                        let t = map.get(&opaque);
-
-                        if let Some(map_entry) = t {
-                            let sender = Arc::clone(map_entry);
-                            drop(map);
-                            let (more_tx, more_rx) = oneshot::channel();
-
-                            // TODO: clone
-                            let resp = ClientResponse::new(packet, more_tx, peer_addr, local_addr);
-                            match sender.send(Ok(resp)).await {
-                                Ok(_) => {}
-                                Err(e) => {
-                                    debug!("Sending response to caller failed: {}", e);
-                                }
-                            };
-                            drop(sender);
-
-                            match more_rx.await {
-                                Ok(has_more_packets) => {
-                                    if !has_more_packets {
-                                        let mut map = requests.lock().await;
-                                        map.remove(&opaque);
-                                        drop(map);
-                                    }
-                                }
-                                Err(_) => {
-                                    // If the response gets dropped then the receiver will be closed,
-                                    // which we treat as an implicit !has_more_packets.
-                                    let mut map = requests.lock().await;
-                                    map.remove(&opaque);
-                                    drop(map);
-                                }
-                            }
-                        } else {
-                            drop(map);
-                            warn!(
-                                "{} has no entry in request map for {}",
-                                client_id, &packet.opaque
-                            );
-                        }
-                        drop(requests);
-                        drop(permit);
-                    }
-                    Err(e) => {
-                        warn!("{} failed to read frame {}", client_id, e.to_string());
-                    }
-                }
+    pub async fn close(mut self) -> Result<()> {
+        let mut close_err = None;
+        match self.writer.close().await {
+            Ok(_) => {}
+            Err(e) => {
+                close_err = Some(e);
             }
+        };
+        self.close_tx.send(()).await.unwrap_or_default();
+        self.read_handle.await.unwrap_or_default();
+
+        let map = self.opaque_map.lock().await;
+        for entry in map.iter() {
+            entry
+                .1
+                .send(Err(Error::ClosedInFlight))
+                .await
+                .unwrap_or_default();
         }
+
+        if let Some(e) = close_err {
+            return Err(Error::from(e));
+        }
+
+        Ok(())
     }
 }
 
+#[async_trait]
 impl Dispatcher for Client {
     async fn dispatch(&mut self, mut packet: RequestPacket) -> Result<ClientPendingOp> {
         let (response_tx, response_rx) = mpsc::channel(1);
@@ -250,16 +330,19 @@ mod tests {
     use std::ops::Add;
     use std::time::Duration;
 
+    use tokio::sync::mpsc::unbounded_channel;
+    use tokio::sync::oneshot;
     use tokio::time::Instant;
 
     use crate::memdx::auth_mechanism::AuthMechanism::{ScramSha1, ScramSha256, ScramSha512};
-    use crate::memdx::client::{Client, Connection};
+    use crate::memdx::client::{Client, ClientOptions, Connection};
     use crate::memdx::connection::ConnectOptions;
     use crate::memdx::hello_feature::HelloFeature;
     use crate::memdx::op_auth_saslauto::SASLAuthAutoOptions;
     use crate::memdx::op_bootstrap::{BootstrapOptions, OpBootstrap};
     use crate::memdx::ops_core::OpsCore;
     use crate::memdx::ops_crud::OpsCrud;
+    use crate::memdx::packet::ResponsePacket;
     use crate::memdx::request::{
         GetClusterConfigRequest, GetErrorMapRequest, GetRequest, HelloRequest, SelectBucketRequest,
         SetRequest,
@@ -274,8 +357,7 @@ mod tests {
         let instant = Instant::now().add(Duration::new(7, 0));
 
         let conn = Connection::connect(
-            "192.168.107.128",
-            11210,
+            "192.168.107.128:11210".parse().unwrap(),
             ConnectOptions {
                 tls_config: None,
                 deadline: instant,
@@ -284,7 +366,38 @@ mod tests {
         .await
         .expect("Could not connect");
 
-        let mut client = Client::new(conn);
+        let (orphan_tx, mut orphan_rx) = unbounded_channel::<ResponsePacket>();
+        let (close_tx, mut close_rx) = oneshot::channel::<crate::memdx::client::Result<()>>();
+
+        tokio::spawn(async move {
+            loop {
+                match orphan_rx.recv().await {
+                    Some(resp) => {
+                        dbg!("unexpected orphan", resp);
+                    }
+                    None => {
+                        return;
+                    }
+                }
+            }
+        });
+
+        tokio::spawn(async move {
+            loop {
+                if let Ok(resp) = close_rx.try_recv() {
+                    dbg!("closed");
+                    return;
+                }
+            }
+        });
+
+        let mut client = Client::new(
+            conn,
+            ClientOptions {
+                on_connection_close_handler: Some(close_tx),
+                orphan_handler: orphan_tx,
+            },
+        );
 
         let username = "Administrator".to_string();
         let password = "password".to_string();
@@ -388,5 +501,7 @@ mod tests {
         .unwrap();
 
         dbg!(get_result);
+
+        client.close().await.unwrap();
     }
 }

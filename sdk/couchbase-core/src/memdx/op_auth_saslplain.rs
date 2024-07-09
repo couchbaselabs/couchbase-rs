@@ -9,11 +9,11 @@ use crate::memdx::request::SASLAuthRequest;
 use crate::memdx::response::SASLAuthResponse;
 
 pub trait OpSASLPlainEncoder {
-    async fn sasl_auth<D>(
+    fn sasl_auth<D>(
         &self,
         dispatcher: &mut D,
         req: SASLAuthRequest,
-    ) -> Result<StandardPendingOp<SASLAuthResponse>>
+    ) -> impl std::future::Future<Output = Result<StandardPendingOp<SASLAuthResponse>>>
     where
         D: Dispatcher;
 }

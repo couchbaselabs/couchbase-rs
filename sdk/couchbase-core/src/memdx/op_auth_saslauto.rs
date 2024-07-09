@@ -27,11 +27,11 @@ pub struct SASLAuthAutoOptions {
 pub struct SASLListMechsOptions {}
 
 pub trait OpSASLAutoEncoder: OpSASLAuthByNameEncoder {
-    async fn sasl_list_mechs<D>(
+    fn sasl_list_mechs<D>(
         &self,
         dispatcher: &mut D,
         request: SASLListMechsRequest,
-    ) -> Result<StandardPendingOp<SASLListMechsResponse>>
+    ) -> impl std::future::Future<Output = Result<StandardPendingOp<SASLListMechsResponse>>>
     where
         D: Dispatcher;
 }

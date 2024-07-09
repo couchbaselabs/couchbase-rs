@@ -14,11 +14,11 @@ use crate::memdx::response::SASLStepResponse;
 use crate::scram;
 
 pub trait OpSASLScramEncoder: OpSASLPlainEncoder {
-    async fn sasl_step<D>(
+    fn sasl_step<D>(
         &self,
         dispatcher: &mut D,
         request: SASLStepRequest,
-    ) -> Result<StandardPendingOp<SASLStepResponse>>
+    ) -> impl std::future::Future<Output = Result<StandardPendingOp<SASLStepResponse>>>
     where
         D: Dispatcher;
 }

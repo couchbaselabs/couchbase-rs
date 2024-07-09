@@ -32,6 +32,7 @@ impl Decoder for KeyValueCodec {
         } as usize;
 
         if buf_len < (HEADER_SIZE + total_body_len) {
+            buf.reserve(HEADER_SIZE + total_body_len);
             return Ok(None);
         }
 

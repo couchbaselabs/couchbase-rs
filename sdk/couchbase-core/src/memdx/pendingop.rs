@@ -14,7 +14,7 @@ use crate::memdx::error::Error::Closed;
 use crate::memdx::response::TryFromClientResponse;
 
 pub trait PendingOp<T> {
-    async fn recv(&mut self) -> Result<T>
+    fn recv(&mut self) -> impl std::future::Future<Output = Result<T>>
     where
         T: TryFromClientResponse;
     fn cancel(&mut self, e: CancellationErrorKind);
@@ -24,14 +24,14 @@ pub(crate) trait OpCanceller {
     fn cancel_handler(&mut self, opaque: u32);
 }
 
-pub(crate) struct ClientPendingOp {
+pub struct ClientPendingOp {
     opaque: u32,
     cancel_chan: CancellationSender,
     response_receiver: Receiver<Result<ClientResponse>>,
 }
 
 impl ClientPendingOp {
-    pub fn new(
+    pub(crate) fn new(
         opaque: u32,
         cancel_chan: CancellationSender,
         response_receiver: Receiver<Result<ClientResponse>>,
@@ -66,7 +66,7 @@ pub struct StandardPendingOp<TryFromClientResponse> {
 }
 
 impl<T: TryFromClientResponse> StandardPendingOp<T> {
-    pub fn new(op: ClientPendingOp) -> Self {
+    pub(crate) fn new(op: ClientPendingOp) -> Self {
         Self {
             wrapped: op,
             _target: PhantomData,
@@ -86,7 +86,7 @@ impl<T: TryFromClientResponse> PendingOp<T> for StandardPendingOp<T> {
     }
 }
 
-pub async fn run_op_with_deadline<O, T>(deadline: Instant, op: &mut O) -> Result<T>
+pub(super) async fn run_op_with_deadline<O, T>(deadline: Instant, op: &mut O) -> Result<T>
 where
     O: PendingOp<T>,
     T: TryFromClientResponse,

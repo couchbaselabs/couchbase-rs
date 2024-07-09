@@ -41,6 +41,8 @@ pub enum Error {
     Closed,
     #[error("Config not set")]
     ConfigNotSet,
+    #[error("Closed in flight")]
+    ClosedInFlight,
     #[error("{0}")]
     Generic(String),
     #[error("Unknown error {0}")]
