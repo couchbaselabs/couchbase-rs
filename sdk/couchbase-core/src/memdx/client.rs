@@ -3,6 +3,7 @@ use std::env;
 use std::io::empty;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::thread::spawn;
 
 use async_trait::async_trait;
 use futures::SinkExt;
@@ -17,13 +18,12 @@ use tokio::task::JoinHandle;
 use tokio_rustls::client::TlsStream;
 use tokio_stream::StreamExt;
 use tokio_util::codec::{FramedRead, FramedWrite};
-use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use crate::memdx::client_response::ClientResponse;
 use crate::memdx::codec::KeyValueCodec;
 use crate::memdx::connection::{Connection, ConnectionType};
-use crate::memdx::dispatcher::Dispatcher;
+use crate::memdx::dispatcher::{Dispatcher, DispatcherOptions};
 use crate::memdx::error::{CancellationErrorKind, Error};
 use crate::memdx::packet::{RequestPacket, ResponsePacket};
 use crate::memdx::pendingop::ClientPendingOp;
@@ -44,12 +44,6 @@ struct ReadLoopOptions {
 }
 
 #[derive(Debug)]
-pub struct ClientOptions {
-    pub orphan_handler: UnboundedSender<ResponsePacket>,
-    pub on_connection_close_handler: Option<oneshot::Sender<Result<()>>>,
-}
-
-#[derive(Debug)]
 pub struct Client {
     current_opaque: u32,
     opaque_map: Arc<Mutex<OpaqueMap>>,
@@ -67,65 +61,6 @@ pub struct Client {
 }
 
 impl Client {
-    pub fn new(conn: Connection, opts: ClientOptions) -> Self {
-        let local_addr = *conn.local_addr();
-        let peer_addr = *conn.peer_addr();
-
-        let (r, w) = match conn.into_inner() {
-            ConnectionType::Tcp(stream) => tokio::io::split(stream),
-            ConnectionType::Tls(stream) => {
-                let (tcp, _) = stream.into_inner();
-                tokio::io::split(tcp)
-            }
-        };
-
-        let codec = KeyValueCodec::default();
-        let reader = FramedRead::new(r, codec);
-        let writer = FramedWrite::new(w, codec);
-
-        let uuid = Uuid::new_v4().to_string();
-
-        let (cancel_tx, cancel_rx) = mpsc::unbounded_channel();
-        let (close_tx, close_rx) = mpsc::channel::<()>(1);
-
-        let opaque_map = Arc::new(Mutex::new(OpaqueMap::default()));
-
-        let read_opaque_map = Arc::clone(&opaque_map);
-        let read_uuid = uuid.clone();
-
-        let read_handle = tokio::spawn(async move {
-            Client::read_loop(
-                reader,
-                cancel_rx,
-                read_opaque_map,
-                ReadLoopOptions {
-                    client_id: read_uuid,
-                    local_addr,
-                    peer_addr,
-                    orphan_handler: opts.orphan_handler,
-                    on_connection_close_tx: opts.on_connection_close_handler,
-                    on_client_close_rx: close_rx,
-                },
-            )
-            .await;
-        });
-
-        Self {
-            current_opaque: 1,
-            opaque_map,
-            client_id: uuid,
-
-            cancel_tx,
-            close_tx,
-
-            writer,
-            read_handle,
-
-            local_addr,
-            peer_addr,
-        }
-    }
-
     async fn register_handler(&mut self, handler: Arc<ResponseSender>) -> u32 {
         let requests = Arc::clone(&self.opaque_map);
         let mut map = requests.lock().await;
@@ -266,8 +201,97 @@ impl Client {
             }
         }
     }
+}
 
-    pub async fn close(mut self) -> Result<()> {
+#[async_trait]
+impl Dispatcher for Client {
+    fn new(conn: Connection, opts: DispatcherOptions) -> Self {
+        let local_addr = *conn.local_addr();
+        let peer_addr = *conn.peer_addr();
+
+        let (r, w) = match conn.into_inner() {
+            ConnectionType::Tcp(stream) => tokio::io::split(stream),
+            ConnectionType::Tls(stream) => {
+                let (tcp, _) = stream.into_inner();
+                tokio::io::split(tcp)
+            }
+        };
+
+        let codec = KeyValueCodec::default();
+        let reader = FramedRead::new(r, codec);
+        let writer = FramedWrite::new(w, codec);
+
+        let uuid = Uuid::new_v4().to_string();
+
+        let (cancel_tx, cancel_rx) = mpsc::unbounded_channel();
+        let (close_tx, close_rx) = mpsc::channel::<()>(1);
+
+        let opaque_map = Arc::new(Mutex::new(OpaqueMap::default()));
+
+        let read_opaque_map = Arc::clone(&opaque_map);
+        let read_uuid = uuid.clone();
+
+        let read_handle = tokio::spawn(async move {
+            Client::read_loop(
+                reader,
+                cancel_rx,
+                read_opaque_map,
+                ReadLoopOptions {
+                    client_id: read_uuid,
+                    local_addr,
+                    peer_addr,
+                    orphan_handler: opts.orphan_handler,
+                    on_connection_close_tx: opts.on_connection_close_handler,
+                    on_client_close_rx: close_rx,
+                },
+            )
+            .await;
+        });
+
+        Self {
+            current_opaque: 1,
+            opaque_map,
+            client_id: uuid,
+
+            cancel_tx,
+            close_tx,
+
+            writer,
+            read_handle,
+
+            local_addr,
+            peer_addr,
+        }
+    }
+
+    async fn dispatch(&mut self, mut packet: RequestPacket) -> Result<ClientPendingOp> {
+        let (response_tx, response_rx) = mpsc::channel(1);
+        let opaque = self.register_handler(Arc::new(response_tx)).await;
+        packet.opaque = Some(opaque);
+        let op_code = packet.op_code;
+
+        match self.writer.send(packet).await {
+            Ok(_) => Ok(ClientPendingOp::new(
+                opaque,
+                self.cancel_tx.clone(),
+                response_rx,
+            )),
+            Err(e) => {
+                debug!(
+                    "{} failed to write packet {} {} {}",
+                    self.client_id, opaque, op_code, e
+                );
+
+                let requests: Arc<Mutex<OpaqueMap>> = Arc::clone(&self.opaque_map);
+                let mut map = requests.lock().await;
+                map.remove(&opaque);
+
+                Err(Error::Dispatch(e.kind()))
+            }
+        }
+    }
+
+    async fn close(mut self) -> Result<()> {
         let mut close_err = None;
         match self.writer.close().await {
             Ok(_) => {}
@@ -295,36 +319,6 @@ impl Client {
     }
 }
 
-#[async_trait]
-impl Dispatcher for Client {
-    async fn dispatch(&mut self, mut packet: RequestPacket) -> Result<ClientPendingOp> {
-        let (response_tx, response_rx) = mpsc::channel(1);
-        let opaque = self.register_handler(Arc::new(response_tx)).await;
-        packet.opaque = Some(opaque);
-        let op_code = packet.op_code;
-
-        match self.writer.send(packet).await {
-            Ok(_) => Ok(ClientPendingOp::new(
-                opaque,
-                self.cancel_tx.clone(),
-                response_rx,
-            )),
-            Err(e) => {
-                debug!(
-                    "{} failed to write packet {} {} {}",
-                    self.client_id, opaque, op_code, e
-                );
-
-                let requests: Arc<Mutex<OpaqueMap>> = Arc::clone(&self.opaque_map);
-                let mut map = requests.lock().await;
-                map.remove(&opaque);
-
-                Err(Error::Dispatch(e.kind()))
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::ops::Add;
@@ -335,8 +329,9 @@ mod tests {
     use tokio::time::Instant;
 
     use crate::memdx::auth_mechanism::AuthMechanism::{ScramSha1, ScramSha256, ScramSha512};
-    use crate::memdx::client::{Client, ClientOptions, Connection};
+    use crate::memdx::client::{Client, Connection};
     use crate::memdx::connection::ConnectOptions;
+    use crate::memdx::dispatcher::{Dispatcher, DispatcherOptions};
     use crate::memdx::hello_feature::HelloFeature;
     use crate::memdx::op_auth_saslauto::SASLAuthAutoOptions;
     use crate::memdx::op_bootstrap::{BootstrapOptions, OpBootstrap};
@@ -393,7 +388,7 @@ mod tests {
 
         let mut client = Client::new(
             conn,
-            ClientOptions {
+            DispatcherOptions {
                 on_connection_close_handler: Some(close_tx),
                 orphan_handler: orphan_tx,
             },

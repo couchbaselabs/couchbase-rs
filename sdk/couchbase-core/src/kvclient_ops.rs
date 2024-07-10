@@ -1,5 +1,6 @@
 use crate::error::CoreError;
 use crate::kvclient::StdKvClient;
+use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::hello_feature::HelloFeature;
 use crate::memdx::op_bootstrap::{BootstrapOptions, OpBootstrap};
 use crate::memdx::ops_core::OpsCore;
@@ -9,7 +10,10 @@ use crate::memdx::request::{GetRequest, SetRequest};
 use crate::memdx::response::{BootstrapResult, GetResponse, SetResponse};
 use crate::result::CoreResult;
 
-impl StdKvClient {
+impl<D> StdKvClient<D>
+where
+    D: Dispatcher,
+{
     pub async fn bootstrap(&mut self, opts: BootstrapOptions) -> CoreResult<BootstrapResult> {
         OpBootstrap::bootstrap(OpsCore {}, self.client_mut(), opts)
             .await

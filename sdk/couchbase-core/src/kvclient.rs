@@ -1,5 +1,5 @@
 use std::net::SocketAddr;
-use std::ops::Add;
+use std::ops::{Add, Deref};
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
@@ -12,8 +12,8 @@ use tokio_rustls::rustls::RootCertStore;
 use crate::authenticator::Authenticator;
 use crate::error::CoreError;
 use crate::memdx::auth_mechanism::AuthMechanism;
-use crate::memdx::client::{Client, ClientOptions};
 use crate::memdx::connection::{Connection, ConnectOptions};
+use crate::memdx::dispatcher::{Dispatcher, DispatcherOptions};
 use crate::memdx::hello_feature::HelloFeature;
 use crate::memdx::op_auth_saslauto::SASLAuthAutoOptions;
 use crate::memdx::op_bootstrap::BootstrapOptions;
@@ -49,13 +49,12 @@ pub(crate) trait KvClient {
     fn local_addr(&self) -> SocketAddr;
 }
 
-pub(crate) struct StdKvClient {
+pub(crate) struct StdKvClient<D: Dispatcher> {
     remote_addr: SocketAddr,
     local_addr: Option<SocketAddr>,
 
     pending_operations: u64,
-    // TODO: figure out how to make this use Dispatcher instead.
-    cli: Client,
+    cli: D,
     current_config: Mutex<KvClientConfig>,
 
     supported_features: Vec<HelloFeature>,
@@ -69,8 +68,11 @@ pub(crate) struct StdKvClient {
     closed: Arc<AtomicBool>,
 }
 
-impl StdKvClient {
-    pub async fn new(config: KvClientConfig, opts: KvClientOptions) -> CoreResult<StdKvClient> {
+impl<D> StdKvClient<D>
+where
+    D: Dispatcher,
+{
+    pub async fn new(config: KvClientConfig, opts: KvClientOptions) -> CoreResult<StdKvClient<D>> {
         let requested_features = if config.disable_default_features {
             vec![]
         } else {
@@ -140,7 +142,7 @@ impl StdKvClient {
 
         let (connection_close_tx, mut connection_close_rx) =
             oneshot::channel::<crate::memdx::client::Result<()>>();
-        let memdx_client_opts = ClientOptions {
+        let memdx_client_opts = DispatcherOptions {
             on_connection_close_handler: Some(connection_close_tx),
             orphan_handler: opts.orphan_handler,
         };
@@ -171,7 +173,9 @@ impl StdKvClient {
 
         let local_addr = *conn.local_addr();
 
-        let mut cli = Client::new(conn, memdx_client_opts);
+        // let mut cli = Client::new(conn, memdx_client_opts);
+
+        let mut cli = D::new(conn, memdx_client_opts);
 
         let mut kv_cli = StdKvClient {
             remote_addr,
@@ -226,11 +230,11 @@ impl StdKvClient {
         Ok(self.cli.close().await?)
     }
 
-    pub fn client(&self) -> &Client {
+    pub fn client(&self) -> &D {
         &self.cli
     }
 
-    pub fn client_mut(&mut self) -> &mut Client {
+    pub fn client_mut(&mut self) -> &mut D {
         &mut self.cli
     }
 
@@ -248,6 +252,7 @@ mod tests {
 
     use crate::authenticator::PasswordAuthenticator;
     use crate::kvclient::{KvClientConfig, KvClientOptions, StdKvClient};
+    use crate::memdx::client::Client;
     use crate::memdx::packet::ResponsePacket;
     use crate::memdx::request::{GetRequest, SetRequest};
 
@@ -272,7 +277,7 @@ mod tests {
             }
         });
 
-        let mut client = StdKvClient::new(
+        let mut client = StdKvClient::<Client>::new(
             KvClientConfig {
                 address: "192.168.107.128:11210"
                     .parse()
