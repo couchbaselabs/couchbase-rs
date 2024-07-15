@@ -1,3 +1,4 @@
+use std::future::Future;
 use std::net::SocketAddr;
 use std::ops::{Add, Deref};
 use std::sync::{Arc, Mutex};
@@ -6,8 +7,10 @@ use std::time::Duration;
 
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::oneshot;
+use tokio::sync::oneshot::Sender;
 use tokio::time::Instant;
 use tokio_rustls::rustls::RootCertStore;
+use uuid::Uuid;
 
 use crate::authenticator::Authenticator;
 use crate::error::CoreError;
@@ -22,12 +25,13 @@ use crate::memdx::request::{GetErrorMapRequest, HelloRequest, SelectBucketReques
 use crate::result::CoreResult;
 use crate::service_type::ServiceType;
 
+#[derive(Debug, Clone)]
 pub(crate) struct KvClientConfig {
     pub address: SocketAddr,
     pub root_certs: Option<RootCertStore>,
     pub accept_all_certs: Option<bool>,
     pub client_name: String,
-    pub authenticator: Option<Box<dyn Authenticator>>,
+    pub authenticator: Option<Arc<dyn Authenticator>>,
     pub selected_bucket: Option<String>,
     pub disable_default_features: bool,
     pub disable_error_map: bool,
@@ -37,25 +41,44 @@ pub(crate) struct KvClientConfig {
     pub disable_bootstrap: bool,
 }
 
-pub(crate) struct KvClientOptions {
-    orphan_handler: UnboundedSender<ResponsePacket>,
+impl PartialEq for KvClientConfig {
+    fn eq(&self, other: &Self) -> bool {
+        // TODO: compare root certs or something somehow.
+        self.address == other.address
+            && self.accept_all_certs == other.accept_all_certs
+            && self.client_name == other.client_name
+            && self.selected_bucket == other.selected_bucket
+            && self.disable_default_features == other.disable_default_features
+            && self.disable_error_map == other.disable_error_map
+            && self.disable_bootstrap == other.disable_bootstrap
+    }
 }
 
-pub(crate) trait KvClient {
-    fn reconfigure(&self, config: KvClientConfig, on_complete: oneshot::Sender<CoreResult<()>>);
+pub(crate) struct KvClientOptions {
+    pub orphan_handler: Arc<UnboundedSender<ResponsePacket>>,
+}
+
+pub(crate) trait KvClient: Sized + PartialEq + Send + Sync {
+    fn new(
+        config: Arc<KvClientConfig>,
+        opts: KvClientOptions,
+    ) -> impl Future<Output = CoreResult<Self>> + Send;
+    fn reconfigure(&self, config: Arc<KvClientConfig>, on_complete: Sender<CoreResult<()>>);
     fn has_feature(&self, feature: HelloFeature) -> bool;
     fn load_factor(&self) -> f64;
     fn remote_addr(&self) -> SocketAddr;
-    fn local_addr(&self) -> SocketAddr;
+    fn local_addr(&self) -> Option<SocketAddr>;
+    fn close(&self) -> impl Future<Output = CoreResult<()>> + Send;
 }
 
+// TODO: connect timeout
 pub(crate) struct StdKvClient<D: Dispatcher> {
     remote_addr: SocketAddr,
     local_addr: Option<SocketAddr>,
 
     pending_operations: u64,
     cli: D,
-    current_config: Mutex<KvClientConfig>,
+    current_config: Arc<KvClientConfig>,
 
     supported_features: Vec<HelloFeature>,
 
@@ -66,13 +89,28 @@ pub(crate) struct StdKvClient<D: Dispatcher> {
     selected_bucket: Arc<Mutex<Option<String>>>,
 
     closed: Arc<AtomicBool>,
+
+    id: String,
 }
 
 impl<D> StdKvClient<D>
 where
     D: Dispatcher,
 {
-    pub async fn new(config: KvClientConfig, opts: KvClientOptions) -> CoreResult<StdKvClient<D>> {
+    pub fn client(&self) -> &D {
+        &self.cli
+    }
+
+    pub fn client_mut(&mut self) -> &mut D {
+        &mut self.cli
+    }
+}
+
+impl<D> KvClient for StdKvClient<D>
+where
+    D: Dispatcher,
+{
+    async fn new(config: Arc<KvClientConfig>, opts: KvClientOptions) -> CoreResult<StdKvClient<D>> {
         let requested_features = if config.disable_default_features {
             vec![]
         } else {
@@ -153,7 +191,7 @@ where
         tokio::spawn(async move {
             // There's not much to do when the connection closes so just mark us as closed.
             if connection_close_rx.await.is_ok() {
-                closed_clone.store(true, Ordering::Relaxed)
+                closed_clone.store(true, Ordering::SeqCst);
             };
         });
 
@@ -173,8 +211,6 @@ where
 
         let local_addr = *conn.local_addr();
 
-        // let mut cli = Client::new(conn, memdx_client_opts);
-
         let mut cli = D::new(conn, memdx_client_opts);
 
         let mut kv_cli = StdKvClient {
@@ -182,10 +218,11 @@ where
             local_addr,
             pending_operations: 0,
             cli,
-            current_config: Mutex::new(config),
+            current_config: config,
             supported_features: vec![],
             selected_bucket: Arc::new(Mutex::new(None)),
             closed,
+            id: Uuid::new_v4().to_string(),
         };
 
         if should_bootstrap {
@@ -220,7 +257,27 @@ where
         Ok(kv_cli)
     }
 
-    pub async fn close(self) -> CoreResult<()> {
+    fn reconfigure(&self, config: Arc<KvClientConfig>, on_complete: Sender<CoreResult<()>>) {
+        todo!()
+    }
+
+    fn has_feature(&self, feature: HelloFeature) -> bool {
+        self.supported_features.contains(&feature)
+    }
+
+    fn load_factor(&self) -> f64 {
+        0.0
+    }
+
+    fn remote_addr(&self) -> SocketAddr {
+        self.remote_addr
+    }
+
+    fn local_addr(&self) -> Option<SocketAddr> {
+        self.local_addr
+    }
+
+    async fn close(&self) -> CoreResult<()> {
         if self.closed.swap(true, Ordering::Relaxed) {
             return Err(CoreError {
                 msg: "closed".to_string(),
@@ -229,29 +286,28 @@ where
 
         Ok(self.cli.close().await?)
     }
+}
 
-    pub fn client(&self) -> &D {
-        &self.cli
-    }
-
-    pub fn client_mut(&mut self) -> &mut D {
-        &mut self.cli
-    }
-
-    pub fn has_feature(&self, feature: HelloFeature) -> bool {
-        self.supported_features.contains(&feature)
+impl<D> PartialEq for StdKvClient<D>
+where
+    D: Dispatcher,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
     }
 }
+
 #[cfg(test)]
 mod tests {
     use std::ops::Add;
+    use std::sync::Arc;
     use std::time::Duration;
 
     use tokio::sync::mpsc::unbounded_channel;
     use tokio::time::Instant;
 
     use crate::authenticator::PasswordAuthenticator;
-    use crate::kvclient::{KvClientConfig, KvClientOptions, StdKvClient};
+    use crate::kvclient::{KvClient, KvClientConfig, KvClientOptions, StdKvClient};
     use crate::memdx::client::Client;
     use crate::memdx::packet::ResponsePacket;
     use crate::memdx::request::{GetRequest, SetRequest};
@@ -277,25 +333,27 @@ mod tests {
             }
         });
 
+        let client_config = KvClientConfig {
+            address: "192.168.107.128:11210"
+                .parse()
+                .expect("Failed to parse address"),
+            root_certs: None,
+            accept_all_certs: None,
+            client_name: "myclient".to_string(),
+            authenticator: Some(Arc::new(PasswordAuthenticator {
+                username: "Administrator".to_string(),
+                password: "password".to_string(),
+            })),
+            selected_bucket: Some("default".to_string()),
+            disable_default_features: false,
+            disable_error_map: false,
+            disable_bootstrap: false,
+        };
+
         let mut client = StdKvClient::<Client>::new(
-            KvClientConfig {
-                address: "192.168.107.128:11210"
-                    .parse()
-                    .expect("Failed to parse address"),
-                root_certs: None,
-                accept_all_certs: None,
-                client_name: "myclient".to_string(),
-                authenticator: Some(Box::new(PasswordAuthenticator {
-                    username: "Administrator".to_string(),
-                    password: "password".to_string(),
-                })),
-                selected_bucket: Some("default".to_string()),
-                disable_default_features: false,
-                disable_error_map: false,
-                disable_bootstrap: false,
-            },
+            Arc::new(client_config),
             KvClientOptions {
-                orphan_handler: orphan_tx,
+                orphan_handler: Arc::new(orphan_tx),
             },
         )
         .await

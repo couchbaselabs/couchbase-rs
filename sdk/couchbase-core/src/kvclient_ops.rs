@@ -1,5 +1,5 @@
 use crate::error::CoreError;
-use crate::kvclient::StdKvClient;
+use crate::kvclient::{KvClient, StdKvClient};
 use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::hello_feature::HelloFeature;
 use crate::memdx::op_bootstrap::{BootstrapOptions, OpBootstrap};
@@ -20,15 +20,15 @@ where
             .map_err(CoreError::from)
     }
 
-    pub async fn get(&mut self, req: GetRequest) -> CoreResult<GetResponse> {
-        let mut op = self.ops_crud().get(self.client_mut(), req).await?;
+    pub async fn get(&self, req: GetRequest) -> CoreResult<GetResponse> {
+        let mut op = self.ops_crud().get(self.client(), req).await?;
 
         let res = op.recv().await?;
         Ok(res)
     }
 
-    pub async fn set(&mut self, req: SetRequest) -> CoreResult<SetResponse> {
-        let mut op = self.ops_crud().set(self.client_mut(), req).await?;
+    pub async fn set(&self, req: SetRequest) -> CoreResult<SetResponse> {
+        let mut op = self.ops_crud().set(self.client(), req).await?;
 
         let res = op.recv().await?;
         Ok(res)

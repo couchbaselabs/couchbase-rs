@@ -28,7 +28,7 @@ pub struct OpsCrud {
 impl OpsCrud {
     pub async fn set<D>(
         &self,
-        dispatcher: &mut D,
+        dispatcher: &D,
         request: SetRequest,
     ) -> Result<StandardPendingOp<SetResponse>>
     where
@@ -74,7 +74,7 @@ impl OpsCrud {
     }
     pub async fn get<D>(
         &self,
-        dispatcher: &mut D,
+        dispatcher: &D,
         request: GetRequest,
     ) -> Result<StandardPendingOp<GetResponse>>
     where

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::oneshot;
@@ -9,13 +11,13 @@ use crate::memdx::pendingop::ClientPendingOp;
 
 #[derive(Debug)]
 pub struct DispatcherOptions {
-    pub orphan_handler: UnboundedSender<ResponsePacket>,
+    pub orphan_handler: Arc<UnboundedSender<ResponsePacket>>,
     pub on_connection_close_handler: Option<oneshot::Sender<Result<()>>>,
 }
 
 #[async_trait]
-pub trait Dispatcher {
+pub trait Dispatcher: Send + Sync {
     fn new(conn: Connection, opts: DispatcherOptions) -> Self;
-    async fn dispatch(&mut self, packet: RequestPacket) -> Result<ClientPendingOp>;
-    async fn close(mut self) -> Result<()>;
+    async fn dispatch(&self, packet: RequestPacket) -> Result<ClientPendingOp>;
+    async fn close(&self) -> Result<()>;
 }

@@ -1,3 +1,4 @@
+use std::future::Future;
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicBool;
 
@@ -10,7 +11,7 @@ use crate::memdx::client::CancellationSender;
 use crate::memdx::client::Result;
 use crate::memdx::client_response::ClientResponse;
 use crate::memdx::error::CancellationErrorKind;
-use crate::memdx::error::Error::Closed;
+use crate::memdx::error::Error::{Cancelled, Closed};
 use crate::memdx::response::TryFromClientResponse;
 
 pub trait PendingOp<T> {
@@ -86,11 +87,19 @@ impl<T: TryFromClientResponse> PendingOp<T> for StandardPendingOp<T> {
     }
 }
 
-pub(super) async fn run_op_with_deadline<O, T>(deadline: Instant, op: &mut O) -> Result<T>
+pub(super) async fn run_op_future_with_deadline<F, T, O>(deadline: Instant, fut: F) -> Result<T>
 where
     O: PendingOp<T>,
+    F: Future<Output = Result<O>>,
     T: TryFromClientResponse,
 {
+    let mut op = match timeout_at(deadline, fut).await {
+        Ok(op) => op?,
+        Err(_e) => {
+            return Err(Cancelled(CancellationErrorKind::Timeout));
+        }
+    };
+
     match timeout_at(deadline, op.recv()).await {
         Ok(res) => res,
         Err(_e) => {

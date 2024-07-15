@@ -1,1 +1,1 @@
-pub type CoreResult<T> = std::result::Result<T, crate::error::CoreError>;
+pub type CoreResult<T> = Result<T, crate::error::CoreError>;
