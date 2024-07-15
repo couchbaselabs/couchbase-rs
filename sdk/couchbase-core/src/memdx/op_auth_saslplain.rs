@@ -4,7 +4,7 @@ use crate::memdx::auth_mechanism::AuthMechanism;
 use crate::memdx::client::Result;
 use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::error::Error;
-use crate::memdx::pendingop::{run_op_with_deadline, StandardPendingOp};
+use crate::memdx::pendingop::{run_op_future_with_deadline, StandardPendingOp};
 use crate::memdx::request::SASLAuthRequest;
 use crate::memdx::response::SASLAuthResponse;
 
@@ -60,9 +60,8 @@ impl OpsSASLAuthPlain {
             auth_mechanism: AuthMechanism::Plain,
         };
 
-        let mut op = encoder.sasl_auth(dispatcher, req).await?;
-
-        let resp = run_op_with_deadline(opts.deadline, &mut op).await?;
+        let resp =
+            run_op_future_with_deadline(opts.deadline, encoder.sasl_auth(dispatcher, req)).await?;
 
         if resp.needs_more_steps {
             return Err(Error::Protocol(

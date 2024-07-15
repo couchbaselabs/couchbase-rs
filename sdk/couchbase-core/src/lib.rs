@@ -3,6 +3,7 @@ pub mod cbconfig;
 mod error;
 mod kvclient;
 mod kvclient_ops;
+mod kvclientpool;
 pub mod memdx;
 pub mod result;
 mod scram;

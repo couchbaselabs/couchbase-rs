@@ -1,8 +1,10 @@
+use std::fmt::Debug;
+
 use crate::result::CoreResult;
 use crate::service_type::ServiceType;
 
-pub trait Authenticator: Send {
-    // get_client_certificate needs some thought about how to expose the certificate
+pub trait Authenticator: Debug + Send + Sync {
+    // TODO: get_client_certificate needs some thought about how to expose the certificate
     // fn get_client_certificate(service: ServiceType, host_port: String) ->
     fn get_credentials(
         &self,

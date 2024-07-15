@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::fmt::{Display, Formatter};
 
 use crate::memdx::error::Error;
 
@@ -12,5 +12,11 @@ impl From<Error> for CoreError {
         Self {
             msg: value.to_string(),
         }
+    }
+}
+
+impl Display for CoreError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.msg)
     }
 }

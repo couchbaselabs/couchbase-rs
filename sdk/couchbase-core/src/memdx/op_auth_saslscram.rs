@@ -8,7 +8,7 @@ use crate::memdx::client::Result;
 use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::error::Error;
 use crate::memdx::op_auth_saslplain::OpSASLPlainEncoder;
-use crate::memdx::pendingop::{run_op_with_deadline, StandardPendingOp};
+use crate::memdx::pendingop::{run_op_future_with_deadline, StandardPendingOp};
 use crate::memdx::request::{SASLAuthRequest, SASLStepRequest};
 use crate::memdx::response::SASLStepResponse;
 use crate::scram;
@@ -68,9 +68,8 @@ impl OpsSASLAuthScram {
             auth_mechanism: AuthMechanism::ScramSha512,
         };
 
-        let mut op = encoder.sasl_auth(dispatcher, req).await?;
-
-        let resp = run_op_with_deadline(opts.deadline, &mut op).await?;
+        let resp =
+            run_op_future_with_deadline(opts.deadline, encoder.sasl_auth(dispatcher, req)).await?;
 
         if !resp.needs_more_steps {
             return Ok(());
@@ -83,9 +82,8 @@ impl OpsSASLAuthScram {
             auth_mechanism: AuthMechanism::ScramSha512,
         };
 
-        let mut op = encoder.sasl_step(dispatcher, req).await?;
-
-        let resp = run_op_with_deadline(opts.deadline, &mut op).await?;
+        let resp =
+            run_op_future_with_deadline(opts.deadline, encoder.sasl_step(dispatcher, req)).await?;
 
         if resp.needs_more_steps {
             return Err(Error::Protocol(
@@ -117,9 +115,8 @@ impl OpsSASLAuthScram {
             auth_mechanism: AuthMechanism::ScramSha256,
         };
 
-        let mut op = encoder.sasl_auth(dispatcher, req).await?;
-
-        let resp = run_op_with_deadline(opts.deadline, &mut op).await?;
+        let resp =
+            run_op_future_with_deadline(opts.deadline, encoder.sasl_auth(dispatcher, req)).await?;
 
         if !resp.needs_more_steps {
             return Ok(());
@@ -132,9 +129,8 @@ impl OpsSASLAuthScram {
             auth_mechanism: AuthMechanism::ScramSha256,
         };
 
-        let mut op = encoder.sasl_step(dispatcher, req).await?;
-
-        let resp = run_op_with_deadline(opts.deadline, &mut op).await?;
+        let resp =
+            run_op_future_with_deadline(opts.deadline, encoder.sasl_step(dispatcher, req)).await?;
 
         if resp.needs_more_steps {
             return Err(Error::Protocol(
@@ -165,9 +161,8 @@ impl OpsSASLAuthScram {
             auth_mechanism: AuthMechanism::ScramSha1,
         };
 
-        let mut op = encoder.sasl_auth(dispatcher, req).await?;
-
-        let resp = run_op_with_deadline(opts.deadline, &mut op).await?;
+        let resp =
+            run_op_future_with_deadline(opts.deadline, encoder.sasl_auth(dispatcher, req)).await?;
 
         if !resp.needs_more_steps {
             return Ok(());
@@ -180,9 +175,8 @@ impl OpsSASLAuthScram {
             auth_mechanism: AuthMechanism::ScramSha1,
         };
 
-        let mut op = encoder.sasl_step(dispatcher, req).await?;
-
-        let resp = run_op_with_deadline(opts.deadline, &mut op).await?;
+        let resp =
+            run_op_future_with_deadline(opts.deadline, encoder.sasl_step(dispatcher, req)).await?;
 
         if resp.needs_more_steps {
             return Err(Error::Protocol(
