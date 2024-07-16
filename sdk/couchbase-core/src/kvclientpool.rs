@@ -4,8 +4,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
-use tokio::sync::{broadcast, Mutex};
-use tokio::sync::broadcast::{Receiver, Sender};
+use tokio::sync::{mpsc, Mutex};
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::time::{Instant, sleep};
 
@@ -21,6 +20,8 @@ pub(crate) trait KvClientPool<K>: Sized + Send + Sync {
         opts: KvClientPoolOptions,
     ) -> impl Future<Output = Self> + Send;
     fn get_client(&self) -> impl Future<Output = CoreResult<Arc<K>>> + Send;
+    fn shutdown_client(&self, client: Arc<K>) -> impl Future<Output = ()> + Send;
+    fn close(&self) -> impl Future<Output = CoreResult<()>> + Send;
 }
 
 #[derive(Debug)]
@@ -37,51 +38,72 @@ pub(crate) struct KvClientPoolOptions {
 
 type KvClientsList<K> = Vec<Arc<K>>;
 
-struct KvClients<K>
+struct NaiveKvClientPoolInner<K>
 where
     K: KvClient,
 {
+    connect_timeout: Duration,
+    connect_throttle_period: Duration,
+
+    config: KvClientPoolConfig,
+
     clients: KvClientsList<K>,
 
     client_idx: usize,
 
     connect_error: Option<CoreError>,
     connect_error_time: Option<Instant>,
-}
-
-pub(crate) struct NaiveKvClientPool<K: KvClient> {
-    pub connect_timeout: Duration,
-    pub connect_throttle_period: Duration,
-
-    config: KvClientPoolConfig,
 
     orphan_handler: Arc<UnboundedSender<ResponsePacket>>,
 
-    connect_error: Option<CoreError>,
-    connect_error_time: Option<Instant>,
+    on_client_close_tx: UnboundedSender<String>,
 
-    close_tx: Sender<()>,
-    close_rx: Receiver<()>,
     closed: AtomicBool,
-
-    clients: Arc<Mutex<KvClients<K>>>,
 }
 
-impl<K> NaiveKvClientPool<K>
+pub(crate) struct NaiveKvClientPool<K: KvClient> {
+    inner: Arc<Mutex<NaiveKvClientPoolInner<K>>>,
+}
+
+impl<K> NaiveKvClientPoolInner<K>
 where
     K: KvClient + PartialEq + Sync + Send + 'static,
 {
-    async fn check_connections(&self) {
-        let mut clients = self.clients.lock().await;
+    pub async fn new(
+        config: KvClientPoolConfig,
+        opts: KvClientPoolOptions,
+        on_client_close_tx: UnboundedSender<String>,
+    ) -> Self {
+        // TODO: is unbounded the right option?
+        let mut inner = NaiveKvClientPoolInner::<K> {
+            connect_timeout: opts.connect_timeout,
+            connect_throttle_period: opts.connect_throttle_period,
+            config,
+            closed: AtomicBool::new(false),
+            on_client_close_tx,
+            orphan_handler: opts.orphan_handler,
+
+            clients: vec![],
+            connect_error: None,
+            connect_error_time: None,
+            client_idx: 0,
+        };
+
+        inner.check_connections().await;
+
+        inner
+    }
+
+    async fn check_connections(&mut self) {
         let num_wanted_clients = self.config.num_connections;
-        let num_active_clients = clients.clients.len();
+        let num_active_clients = self.clients.len();
 
         if num_active_clients > num_wanted_clients {
             let mut num_excess_clients = num_active_clients - num_wanted_clients;
             let mut num_closed_clients = 0;
 
             while num_excess_clients > 0 {
-                let client_to_close = clients.clients.remove(0);
+                let client_to_close = self.clients.remove(0);
                 self.shutdown_client(client_to_close).await;
 
                 num_excess_clients -= 1;
@@ -94,21 +116,21 @@ where
             while num_needed_clients > 0 {
                 match self.start_new_client().await {
                     Ok(client) => {
-                        clients.connect_error = None;
-                        clients.connect_error_time = None;
-                        clients.clients.push(Arc::new(client));
+                        self.connect_error = None;
+                        self.connect_error_time = None;
+                        self.clients.push(Arc::new(client));
                         num_needed_clients -= 1;
                     }
                     Err(e) => {
-                        clients.connect_error_time = Some(Instant::now());
-                        clients.connect_error = Some(e);
+                        self.connect_error_time = Some(Instant::now());
+                        self.connect_error = Some(e);
                     }
                 }
             }
         }
     }
 
-    async fn start_new_client(&self) -> CoreResult<K> {
+    async fn start_new_client(&mut self) -> CoreResult<K> {
         loop {
             if let Some(error_time) = self.connect_error_time {
                 let connect_wait_period =
@@ -126,6 +148,7 @@ where
             self.config.client_config.clone(),
             KvClientOptions {
                 orphan_handler: self.orphan_handler.clone(),
+                on_close_tx: Some(self.on_client_close_tx.clone()),
             },
         )
         .await;
@@ -144,47 +167,79 @@ where
         client_result
     }
 
-    async fn get_client_slow(&self) -> CoreResult<Arc<K>> {
+    async fn get_client_slow(&mut self) -> CoreResult<Arc<K>> {
         if self.closed.load(Ordering::SeqCst) {
             return Err(CoreError {
                 msg: "closed".to_string(),
             });
         }
-        let mut clients = self.clients.lock().await;
 
-        if !clients.clients.is_empty() {
-            let idx = clients.client_idx;
-            clients.client_idx += 1;
+        if !self.clients.is_empty() {
+            let idx = self.client_idx;
+            self.client_idx += 1;
             // TODO: is this unwrap ok? It should be...
-            let client = clients.clients.get(idx % clients.clients.len()).unwrap();
+            let client = self.clients.get(idx % self.clients.len()).unwrap();
             return Ok(client.clone());
         }
 
-        if let Some(e) = &clients.connect_error {
+        if let Some(e) = &self.connect_error {
             return Err(CoreError { msg: e.to_string() });
         }
-
-        drop(clients);
 
         self.check_connections().await;
         Box::pin(self.get_client_slow()).await
     }
 
-    async fn shutdown_client(&self, client: Arc<K>) {
-        let mut clients = self.clients.lock().await;
-
-        let idx = clients.clients.iter().position(|x| *x == client);
-        if let Some(idx) = idx {
-            clients.clients.remove(idx);
+    pub async fn get_client(&mut self) -> CoreResult<Arc<K>> {
+        if !self.clients.is_empty() {
+            let idx = self.client_idx;
+            self.client_idx += 1;
+            // TODO: is this unwrap ok? It should be...
+            let client = self.clients.get(idx % self.clients.len()).unwrap();
+            return Ok(client.clone());
         }
 
-        drop(clients);
+        self.get_client_slow().await
+    }
+
+    pub async fn shutdown_client(&mut self, client: Arc<K>) {
+        let idx = self.clients.iter().position(|x| *x == client);
+        if let Some(idx) = idx {
+            self.clients.remove(idx);
+        }
 
         // TODO: Should log
         client.close().await.unwrap_or_default();
     }
 
-    // async fn handle_client_close(&self, )
+    pub async fn handle_client_close(&mut self, client_id: String) {
+        // TODO: not sure the ordering of close leading to here is great.
+        if self.closed.load(Ordering::SeqCst) {
+            return;
+        }
+
+        let idx = self.clients.iter().position(|x| x.id() == client_id);
+        if let Some(idx) = idx {
+            self.clients.remove(idx);
+        }
+
+        self.check_connections().await;
+    }
+
+    pub async fn close(&mut self) -> CoreResult<()> {
+        if self.closed.swap(true, Ordering::SeqCst) {
+            return Err(CoreError {
+                msg: "closed".to_string(),
+            });
+        }
+
+        for mut client in &self.clients {
+            // TODO: probably log
+            client.close().await.unwrap_or_default();
+        }
+
+        Ok(())
+    }
 }
 
 impl<K> KvClientPool<K> for NaiveKvClientPool<K>
@@ -192,44 +247,45 @@ where
     K: KvClient + PartialEq + Sync + Send + 'static,
 {
     async fn new(config: KvClientPoolConfig, opts: KvClientPoolOptions) -> Self {
-        let (close_tx, close_rx) = broadcast::channel(1);
-        let mut pool = NaiveKvClientPool {
-            connect_timeout: opts.connect_timeout,
-            connect_throttle_period: opts.connect_throttle_period,
-            config,
-            connect_error: None,
-            connect_error_time: None,
-            close_tx,
-            close_rx,
-            closed: AtomicBool::new(false),
-            clients: Arc::new(Mutex::new(KvClients {
-                clients: vec![],
-                connect_error: None,
-                connect_error_time: None,
-                client_idx: 0,
-            })),
-            orphan_handler: opts.orphan_handler,
-        };
+        // TODO: is unbounded the right option?
+        let (on_client_close_tx, mut on_client_close_rx) = mpsc::unbounded_channel();
 
-        pool.check_connections().await;
+        let clients = Arc::new(Mutex::new(
+            NaiveKvClientPoolInner::<K>::new(config, opts, on_client_close_tx).await,
+        ));
 
-        pool
+        let reader_clients = clients.clone();
+        tokio::spawn(async move {
+            loop {
+                if let Some(id) = on_client_close_rx.recv().await {
+                    reader_clients.lock().await.handle_client_close(id).await;
+                } else {
+                    return;
+                }
+            }
+        });
+
+        NaiveKvClientPool { inner: clients }
     }
 
     async fn get_client(&self) -> CoreResult<Arc<K>> {
-        let mut clients = self.clients.lock().await;
+        let mut clients = self.inner.lock().await;
 
-        if !clients.clients.is_empty() {
-            let idx = clients.client_idx;
-            clients.client_idx += 1;
-            // TODO: is this unwrap ok? It should be...
-            let client = clients.clients.get(idx % clients.clients.len()).unwrap();
-            return Ok(client.clone());
-        }
+        clients.get_client().await
+    }
 
-        self.get_client_slow().await
+    async fn shutdown_client(&self, client: Arc<K>) {
+        let mut clients = self.inner.lock().await;
+
+        clients.shutdown_client(client).await;
+    }
+
+    async fn close(&self) -> CoreResult<()> {
+        let mut inner = self.inner.lock().await;
+        inner.close().await
     }
 }
+
 #[cfg(test)]
 mod tests {
     use std::ops::Add;
@@ -336,5 +392,7 @@ mod tests {
         dbg!(get_result);
 
         client.close().await.unwrap();
+
+        pool.close().await.unwrap();
     }
 }
