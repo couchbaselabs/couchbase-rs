@@ -5,9 +5,8 @@ use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
-use tokio::sync::mpsc::UnboundedSender;
+use tokio::sync::mpsc::{Sender, UnboundedSender};
 use tokio::sync::oneshot;
-use tokio::sync::oneshot::Sender;
 use tokio::time::Instant;
 use tokio_rustls::rustls::RootCertStore;
 use uuid::Uuid;
@@ -56,6 +55,7 @@ impl PartialEq for KvClientConfig {
 
 pub(crate) struct KvClientOptions {
     pub orphan_handler: Arc<UnboundedSender<ResponsePacket>>,
+    pub on_close_tx: Option<UnboundedSender<String>>,
 }
 
 pub(crate) trait KvClient: Sized + PartialEq + Send + Sync {
@@ -69,6 +69,7 @@ pub(crate) trait KvClient: Sized + PartialEq + Send + Sync {
     fn remote_addr(&self) -> SocketAddr;
     fn local_addr(&self) -> Option<SocketAddr>;
     fn close(&self) -> impl Future<Output = CoreResult<()>> + Send;
+    fn id(&self) -> &str;
 }
 
 // TODO: connect timeout
@@ -188,13 +189,6 @@ where
         let closed = Arc::new(AtomicBool::new(false));
         let closed_clone = closed.clone();
 
-        tokio::spawn(async move {
-            // There's not much to do when the connection closes so just mark us as closed.
-            if connection_close_rx.await.is_ok() {
-                closed_clone.store(true, Ordering::SeqCst);
-            };
-        });
-
         let conn = Connection::connect(
             config.address,
             ConnectOptions {
@@ -212,6 +206,7 @@ where
         let local_addr = *conn.local_addr();
 
         let mut cli = D::new(conn, memdx_client_opts);
+        let id = Uuid::new_v4().to_string();
 
         let mut kv_cli = StdKvClient {
             remote_addr,
@@ -222,8 +217,20 @@ where
             supported_features: vec![],
             selected_bucket: Arc::new(Mutex::new(None)),
             closed,
-            id: Uuid::new_v4().to_string(),
+            id: id.clone(),
         };
+
+        tokio::spawn(async move {
+            // There's not much to do when the connection closes so just mark us as closed.
+            if connection_close_rx.await.is_ok() {
+                closed_clone.store(true, Ordering::SeqCst);
+            };
+
+            if let Some(mut tx) = opts.on_close_tx {
+                // TODO: Probably log on failure.
+                tx.send(id).unwrap_or_default();
+            }
+        });
 
         if should_bootstrap {
             if let Some(b) = &bootstrap_select_bucket {
@@ -285,6 +292,10 @@ where
         }
 
         Ok(self.cli.close().await?)
+    }
+
+    fn id(&self) -> &str {
+        &self.id
     }
 }
 
@@ -354,6 +365,7 @@ mod tests {
             Arc::new(client_config),
             KvClientOptions {
                 orphan_handler: Arc::new(orphan_tx),
+                on_close_tx: None,
             },
         )
         .await

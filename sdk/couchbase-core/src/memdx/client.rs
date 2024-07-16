@@ -1,13 +1,14 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::env;
 use std::io::empty;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::thread::spawn;
 
 use async_trait::async_trait;
-use futures::SinkExt;
+use futures::{SinkExt, TryFutureExt};
 use log::{debug, trace, warn};
 use tokio::io::{Join, ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
@@ -45,14 +46,25 @@ struct ReadLoopOptions {
 }
 
 #[derive(Debug)]
-pub struct ClientInner {
-    current_opaque: u32,
+struct ClientReadHandle {
+    read_handle: JoinHandle<()>,
+}
+
+impl ClientReadHandle {
+    pub async fn await_completion(&mut self) {
+        (&mut self.read_handle).await.unwrap_or_default()
+    }
+}
+
+#[derive(Debug)]
+pub struct Client {
+    current_opaque: AtomicU32,
     opaque_map: Arc<Mutex<OpaqueMap>>,
 
     client_id: String,
 
-    writer: FramedWrite<WriteHalf<TcpStream>, KeyValueCodec>,
-    read_handle: JoinHandle<()>,
+    writer: Mutex<FramedWrite<WriteHalf<TcpStream>, KeyValueCodec>>,
+    read_handle: Mutex<ClientReadHandle>,
 
     cancel_tx: CancellationSender,
     close_tx: Sender<()>,
@@ -63,18 +75,11 @@ pub struct ClientInner {
     closed: AtomicBool,
 }
 
-#[derive(Debug, Clone)]
-pub struct Client {
-    inner: Arc<Mutex<ClientInner>>,
-}
+impl Client {
+    async fn register_handler(&self, handler: Arc<ResponseSender>) -> u32 {
+        let mut map = self.opaque_map.lock().await;
 
-impl ClientInner {
-    async fn register_handler(&mut self, handler: Arc<ResponseSender>) -> u32 {
-        let requests = Arc::clone(&self.opaque_map);
-        let mut map = requests.lock().await;
-
-        let opaque = self.current_opaque;
-        self.current_opaque += 1;
+        let opaque = self.current_opaque.fetch_add(1, Ordering::SeqCst);
 
         map.insert(opaque, handler);
 
@@ -230,63 +235,6 @@ impl ClientInner {
             }
         }
     }
-
-    async fn dispatch(&mut self, mut packet: RequestPacket) -> Result<ClientPendingOp> {
-        let (response_tx, response_rx) = mpsc::channel(1);
-        let opaque = self.register_handler(Arc::new(response_tx)).await;
-        packet.opaque = Some(opaque);
-        let op_code = packet.op_code;
-
-        match self.writer.send(packet).await {
-            Ok(_) => Ok(ClientPendingOp::new(
-                opaque,
-                self.cancel_tx.clone(),
-                response_rx,
-            )),
-            Err(e) => {
-                debug!(
-                    "{} failed to write packet {} {} {}",
-                    self.client_id, opaque, op_code, e
-                );
-
-                let requests: Arc<Mutex<OpaqueMap>> = Arc::clone(&self.opaque_map);
-                let mut map = requests.lock().await;
-                map.remove(&opaque);
-
-                Err(Error::Dispatch(e.kind()))
-            }
-        }
-    }
-
-    async fn close(&mut self) -> Result<()> {
-        if self.closed.swap(true, Ordering::SeqCst) {
-            return Err(Error::Closed);
-        }
-
-        let mut close_err = None;
-        match self.writer.close().await {
-            Ok(_) => {}
-            Err(e) => {
-                close_err = Some(e);
-            }
-        };
-
-        // TODO: We probably need to be logging any errors here.
-        self.close_tx.send(()).await.unwrap_or_default();
-
-        // Note: doing this doesn't technically consume the handle but calling it twice will
-        // cause a panic.
-        (&mut self.read_handle).await.unwrap_or_default();
-
-        let map = self.opaque_map.lock().await;
-        Self::drain_opaque_map(map).await;
-
-        if let Some(e) = close_err {
-            return Err(Error::from(e));
-        }
-
-        Ok(())
-    }
 }
 
 #[async_trait]
@@ -318,7 +266,7 @@ impl Dispatcher for Client {
         let read_uuid = uuid.clone();
 
         let read_handle = tokio::spawn(async move {
-            ClientInner::read_loop(
+            Client::read_loop(
                 reader,
                 cancel_rx,
                 read_opaque_map,
@@ -334,38 +282,82 @@ impl Dispatcher for Client {
             .await;
         });
 
-        let inner = ClientInner {
-            current_opaque: 1,
+        Self {
+            current_opaque: AtomicU32::new(1),
             opaque_map,
             client_id: uuid,
 
             cancel_tx,
             close_tx,
 
-            writer,
-            read_handle,
+            writer: Mutex::new(writer),
+            read_handle: Mutex::new(ClientReadHandle { read_handle }),
 
             local_addr,
             peer_addr,
 
             closed: AtomicBool::new(false),
-        };
-
-        Self {
-            inner: Arc::new(Mutex::new(inner)),
         }
     }
 
-    async fn dispatch(&self, packet: RequestPacket) -> Result<ClientPendingOp> {
-        let mut inner = self.inner.lock().await;
+    async fn dispatch(&self, mut packet: RequestPacket) -> Result<ClientPendingOp> {
+        let (response_tx, response_rx) = mpsc::channel(1);
+        let opaque = self.register_handler(Arc::new(response_tx)).await;
+        packet.opaque = Some(opaque);
+        let op_code = packet.op_code;
 
-        inner.dispatch(packet).await
+        let mut writer = self.writer.lock().await;
+        match writer.send(packet).await {
+            Ok(_) => Ok(ClientPendingOp::new(
+                opaque,
+                self.cancel_tx.clone(),
+                response_rx,
+            )),
+            Err(e) => {
+                debug!(
+                    "{} failed to write packet {} {} {}",
+                    self.client_id, opaque, op_code, e
+                );
+
+                let requests: Arc<Mutex<OpaqueMap>> = Arc::clone(&self.opaque_map);
+                let mut map = requests.lock().await;
+                map.remove(&opaque);
+
+                Err(Error::Dispatch(e.kind()))
+            }
+        }
     }
 
     async fn close(&self) -> Result<()> {
-        let mut inner = self.inner.lock().await;
+        if self.closed.swap(true, Ordering::SeqCst) {
+            return Err(Error::Closed);
+        }
 
-        inner.close().await
+        let mut close_err = None;
+        let mut writer = self.writer.lock().await;
+        match writer.close().await {
+            Ok(_) => {}
+            Err(e) => {
+                close_err = Some(e);
+            }
+        };
+
+        // TODO: We probably need to be logging any errors here.
+        self.close_tx.send(()).await.unwrap_or_default();
+
+        // Note: doing this doesn't technically consume the handle but calling it twice will
+        // cause a panic.
+        let mut read_handle = self.read_handle.lock().await;
+        read_handle.await_completion().await;
+
+        let map = self.opaque_map.lock().await;
+        Self::drain_opaque_map(map).await;
+
+        if let Some(e) = close_err {
+            return Err(Error::from(e));
+        }
+
+        Ok(())
     }
 }
 
@@ -504,7 +496,7 @@ mod tests {
                 ext_frames_enabled: true,
             }
             .set(
-                &mut client,
+                &client,
                 SetRequest {
                     collection_id: 0,
                     key: "test".as_bytes().into(),
@@ -534,7 +526,7 @@ mod tests {
                 ext_frames_enabled: true,
             }
             .get(
-                &mut client,
+                &client,
                 GetRequest {
                     collection_id: 0,
                     key: "test".as_bytes().into(),
