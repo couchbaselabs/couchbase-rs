@@ -2,9 +2,9 @@ use std::io::Write;
 
 use byteorder::{BigEndian, WriteBytesExt};
 
-use crate::memdx::client::Result;
+use crate::memdx::client::MemdxResult;
 use crate::memdx::dispatcher::Dispatcher;
-use crate::memdx::error::Error;
+use crate::memdx::error::MemdxError;
 use crate::memdx::magic::Magic;
 use crate::memdx::op_auth_saslauto::OpSASLAutoEncoder;
 use crate::memdx::op_auth_saslbyname::OpSASLAuthByNameEncoder;
@@ -27,14 +27,14 @@ use crate::memdx::status::Status;
 pub struct OpsCore {}
 
 impl OpsCore {
-    pub(crate) fn decode_error(resp: &ResponsePacket) -> Error {
+    pub(crate) fn decode_error(resp: &ResponsePacket) -> MemdxError {
         let status = resp.status;
         if status == Status::NotMyVbucket {
-            Error::NotMyVbucket
+            MemdxError::NotMyVbucket
         } else if status == Status::TmpFail {
-            Error::TmpFail
+            MemdxError::TmpFail
         } else {
-            Error::Unknown(format!("{}", status))
+            MemdxError::Unknown(format!("{}", status))
         }
 
         // TODO: decode error context
@@ -44,9 +44,9 @@ impl OpsCore {
 impl OpBootstrapEncoder for OpsCore {
     async fn hello<D>(
         &self,
-        dispatcher: &mut D,
+        dispatcher: &D,
         request: HelloRequest,
-    ) -> Result<StandardPendingOp<HelloResponse>>
+    ) -> MemdxResult<StandardPendingOp<HelloResponse>>
     where
         D: Dispatcher,
     {
@@ -75,9 +75,9 @@ impl OpBootstrapEncoder for OpsCore {
 
     async fn get_error_map<D>(
         &self,
-        dispatcher: &mut D,
+        dispatcher: &D,
         request: GetErrorMapRequest,
-    ) -> Result<StandardPendingOp<GetErrorMapResponse>>
+    ) -> MemdxResult<StandardPendingOp<GetErrorMapResponse>>
     where
         D: Dispatcher,
     {
@@ -104,9 +104,9 @@ impl OpBootstrapEncoder for OpsCore {
 
     async fn select_bucket<D>(
         &self,
-        dispatcher: &mut D,
+        dispatcher: &D,
         request: SelectBucketRequest,
-    ) -> Result<StandardPendingOp<SelectBucketResponse>>
+    ) -> MemdxResult<StandardPendingOp<SelectBucketResponse>>
     where
         D: Dispatcher,
     {
@@ -133,9 +133,9 @@ impl OpBootstrapEncoder for OpsCore {
 
     async fn get_cluster_config<D>(
         &self,
-        dispatcher: &mut D,
+        dispatcher: &D,
         _request: GetClusterConfigRequest,
-    ) -> Result<StandardPendingOp<GetClusterConfigResponse>>
+    ) -> MemdxResult<StandardPendingOp<GetClusterConfigResponse>>
     where
         D: Dispatcher,
     {
@@ -161,9 +161,9 @@ impl OpBootstrapEncoder for OpsCore {
 impl OpSASLPlainEncoder for OpsCore {
     async fn sasl_auth<D>(
         &self,
-        dispatcher: &mut D,
+        dispatcher: &D,
         request: SASLAuthRequest,
-    ) -> Result<StandardPendingOp<SASLAuthResponse>>
+    ) -> MemdxResult<StandardPendingOp<SASLAuthResponse>>
     where
         D: Dispatcher,
     {
@@ -194,9 +194,9 @@ impl OpSASLAuthByNameEncoder for OpsCore {}
 impl OpSASLAutoEncoder for OpsCore {
     async fn sasl_list_mechs<D>(
         &self,
-        dispatcher: &mut D,
+        dispatcher: &D,
         _request: SASLListMechsRequest,
-    ) -> Result<StandardPendingOp<SASLListMechsResponse>>
+    ) -> MemdxResult<StandardPendingOp<SASLListMechsResponse>>
     where
         D: Dispatcher,
     {
@@ -222,9 +222,9 @@ impl OpSASLAutoEncoder for OpsCore {
 impl OpSASLScramEncoder for OpsCore {
     async fn sasl_step<D>(
         &self,
-        dispatcher: &mut D,
+        dispatcher: &D,
         request: SASLStepRequest,
-    ) -> Result<StandardPendingOp<SASLStepResponse>>
+    ) -> MemdxResult<StandardPendingOp<SASLStepResponse>>
     where
         D: Dispatcher,
     {

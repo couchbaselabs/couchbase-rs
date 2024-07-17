@@ -4,9 +4,9 @@ use sha2::{Sha256, Sha512};
 use tokio::time::Instant;
 
 use crate::memdx::auth_mechanism::AuthMechanism;
-use crate::memdx::client::Result;
+use crate::memdx::client::MemdxResult;
 use crate::memdx::dispatcher::Dispatcher;
-use crate::memdx::error::Error;
+use crate::memdx::error::MemdxError;
 use crate::memdx::op_auth_saslplain::OpSASLPlainEncoder;
 use crate::memdx::pendingop::{run_op_future_with_deadline, StandardPendingOp};
 use crate::memdx::request::{SASLAuthRequest, SASLStepRequest};
@@ -16,9 +16,9 @@ use crate::scram;
 pub trait OpSASLScramEncoder: OpSASLPlainEncoder {
     fn sasl_step<D>(
         &self,
-        dispatcher: &mut D,
+        dispatcher: &D,
         request: SASLStepRequest,
-    ) -> impl std::future::Future<Output = Result<StandardPendingOp<SASLStepResponse>>>
+    ) -> impl std::future::Future<Output = MemdxResult<StandardPendingOp<SASLStepResponse>>>
     where
         D: Dispatcher;
 }
@@ -50,9 +50,9 @@ impl OpsSASLAuthScram {
     pub async fn sasl_auth_scram_512<E, D>(
         &self,
         encoder: &E,
-        dispatcher: &mut D,
+        dispatcher: &D,
         opts: SASLAuthScramOptions,
-    ) -> Result<()>
+    ) -> MemdxResult<()>
     where
         E: OpSASLScramEncoder,
         D: Dispatcher,
@@ -86,7 +86,7 @@ impl OpsSASLAuthScram {
             run_op_future_with_deadline(opts.deadline, encoder.sasl_step(dispatcher, req)).await?;
 
         if resp.needs_more_steps {
-            return Err(Error::Protocol(
+            return Err(MemdxError::Protocol(
                 "Server did not accept auth when the client expected".to_string(),
             ));
         }
@@ -97,9 +97,9 @@ impl OpsSASLAuthScram {
     pub async fn sasl_auth_scram_256<E, D>(
         &self,
         encoder: &E,
-        dispatcher: &mut D,
+        dispatcher: &D,
         opts: SASLAuthScramOptions,
-    ) -> Result<()>
+    ) -> MemdxResult<()>
     where
         E: OpSASLScramEncoder,
         D: Dispatcher,
@@ -133,7 +133,7 @@ impl OpsSASLAuthScram {
             run_op_future_with_deadline(opts.deadline, encoder.sasl_step(dispatcher, req)).await?;
 
         if resp.needs_more_steps {
-            return Err(Error::Protocol(
+            return Err(MemdxError::Protocol(
                 "Server did not accept auth when the client expected".to_string(),
             ));
         }
@@ -144,9 +144,9 @@ impl OpsSASLAuthScram {
     pub async fn sasl_auth_scram_1<E, D>(
         &self,
         encoder: &E,
-        dispatcher: &mut D,
+        dispatcher: &D,
         opts: SASLAuthScramOptions,
-    ) -> Result<()>
+    ) -> MemdxResult<()>
     where
         E: OpSASLScramEncoder,
         D: Dispatcher,
@@ -179,7 +179,7 @@ impl OpsSASLAuthScram {
             run_op_future_with_deadline(opts.deadline, encoder.sasl_step(dispatcher, req)).await?;
 
         if resp.needs_more_steps {
-            return Err(Error::Protocol(
+            return Err(MemdxError::Protocol(
                 "Server did not accept auth when the client expected".to_string(),
             ));
         }

@@ -5,14 +5,14 @@ use byteorder::{BigEndian, ReadBytesExt};
 
 use crate::memdx::auth_mechanism::AuthMechanism;
 use crate::memdx::client_response::ClientResponse;
-use crate::memdx::error::Error;
+use crate::memdx::error::MemdxError;
 use crate::memdx::hello_feature::HelloFeature;
 use crate::memdx::ops_core::OpsCore;
 use crate::memdx::ops_crud::{decode_res_ext_frames, OpsCrud};
 use crate::memdx::status::Status;
 
 pub trait TryFromClientResponse: Sized {
-    fn try_from(resp: ClientResponse) -> Result<Self, Error>;
+    fn try_from(resp: ClientResponse) -> Result<Self, MemdxError>;
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -21,7 +21,7 @@ pub struct HelloResponse {
 }
 
 impl TryFromClientResponse for HelloResponse {
-    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+    fn try_from(resp: ClientResponse) -> Result<Self, MemdxError> {
         let packet = resp.packet();
         let status = packet.status;
         if status != Status::Success {
@@ -31,7 +31,7 @@ impl TryFromClientResponse for HelloResponse {
         let mut features: Vec<HelloFeature> = Vec::new();
         if let Some(value) = &packet.value {
             if value.len() % 2 != 0 {
-                return Err(Error::Protocol("invalid hello features length".into()));
+                return Err(MemdxError::Protocol("invalid hello features length".into()));
             }
 
             let mut cursor = Cursor::new(value);
@@ -53,7 +53,7 @@ pub struct GetErrorMapResponse {
 }
 
 impl TryFromClientResponse for GetErrorMapResponse {
-    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+    fn try_from(resp: ClientResponse) -> Result<Self, MemdxError> {
         let packet = resp.packet();
         let status = packet.status;
         if status != Status::Success {
@@ -72,12 +72,12 @@ impl TryFromClientResponse for GetErrorMapResponse {
 pub struct SelectBucketResponse {}
 
 impl TryFromClientResponse for SelectBucketResponse {
-    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+    fn try_from(resp: ClientResponse) -> Result<Self, MemdxError> {
         let packet = resp.packet();
         let status = packet.status;
         if status != Status::Success {
             if status == Status::AccessError || status == Status::KeyNotFound {
-                return Err(Error::UnknownBucketName);
+                return Err(MemdxError::UnknownBucketName);
             }
             return Err(OpsCore::decode_error(packet));
         }
@@ -93,7 +93,7 @@ pub struct SASLAuthResponse {
 }
 
 impl TryFromClientResponse for SASLAuthResponse {
-    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+    fn try_from(resp: ClientResponse) -> Result<Self, MemdxError> {
         let packet = resp.packet();
         let status = packet.status;
         if status == Status::SASLAuthContinue {
@@ -124,7 +124,7 @@ pub struct SASLStepResponse {
 }
 
 impl TryFromClientResponse for SASLStepResponse {
-    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+    fn try_from(resp: ClientResponse) -> Result<Self, MemdxError> {
         let packet = resp.packet();
         let status = packet.status;
         if status != Status::Success {
@@ -145,7 +145,7 @@ pub struct SASLListMechsResponse {
 }
 
 impl TryFromClientResponse for SASLListMechsResponse {
-    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+    fn try_from(resp: ClientResponse) -> Result<Self, MemdxError> {
         let packet = resp.packet();
         let status = packet.status;
         if status != Status::Success {
@@ -154,7 +154,7 @@ impl TryFromClientResponse for SASLListMechsResponse {
                 // ns_server has not posted a configuration for the bucket to kv_engine yet. We
                 // transform this into a ErrTmpFail as we make the assumption that the
                 // SelectBucket will have failed if this was anything but a transient issue.
-                return Err(Error::ConfigNotSet);
+                return Err(MemdxError::ConfigNotSet);
             }
             return Err(OpsCore::decode_error(packet));
         }
@@ -164,7 +164,7 @@ impl TryFromClientResponse for SASLListMechsResponse {
         let mechs_list_string = match String::from_utf8(value) {
             Ok(v) => v,
             Err(e) => {
-                return Err(Error::Protocol(e.to_string()));
+                return Err(MemdxError::Protocol(e.to_string()));
             }
         };
         let mechs_list_split = mechs_list_string.split(' ');
@@ -201,7 +201,7 @@ impl GetClusterConfigResponse {
 }
 
 impl TryFromClientResponse for GetClusterConfigResponse {
-    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+    fn try_from(resp: ClientResponse) -> Result<Self, MemdxError> {
         let packet = resp.packet();
         let status = packet.status;
         if status != Status::Success {
@@ -211,7 +211,7 @@ impl TryFromClientResponse for GetClusterConfigResponse {
         let host = match resp.local_addr() {
             Some(addr) => addr.ip().to_string(),
             None => {
-                return Err(Error::Generic(
+                return Err(MemdxError::Generic(
                     "Failed to identify memd hostname for $HOST replacement".to_string(),
                 ))
             }
@@ -252,35 +252,35 @@ pub struct SetResponse {
 }
 
 impl TryFromClientResponse for SetResponse {
-    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+    fn try_from(resp: ClientResponse) -> Result<Self, MemdxError> {
         let packet = resp.packet();
         let status = packet.status;
 
         if status == Status::TooBig {
-            return Err(Error::TooBig);
+            return Err(MemdxError::TooBig);
         } else if status == Status::Locked {
-            return Err(Error::Locked);
+            return Err(MemdxError::Locked);
         } else if status == Status::KeyExists {
-            return Err(Error::KeyExists);
+            return Err(MemdxError::KeyExists);
         } else if status != Status::Success {
-            return Err(Error::Unknown(
+            return Err(MemdxError::Unknown(
                 OpsCrud::decode_common_error(resp.packet()).to_string(),
             ));
         }
 
         let mutation_token = if let Some(extras) = &packet.extras {
             if extras.len() != 16 {
-                return Err(Error::Protocol("Bad extras length".to_string()));
+                return Err(MemdxError::Protocol("Bad extras length".to_string()));
             }
             let mut extras = Cursor::new(extras);
 
             Some(MutationToken {
                 vbuuid: extras
                     .read_u64::<BigEndian>()
-                    .map_err(|e| Error::Unknown(e.to_string()))?,
+                    .map_err(|e| MemdxError::Unknown(e.to_string()))?,
                 seqno: extras
                     .read_u64::<BigEndian>()
-                    .map_err(|e| Error::Unknown(e.to_string()))?,
+                    .map_err(|e| MemdxError::Unknown(e.to_string()))?,
             })
         } else {
             None
@@ -310,29 +310,29 @@ pub struct GetResponse {
 }
 
 impl TryFromClientResponse for GetResponse {
-    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+    fn try_from(resp: ClientResponse) -> Result<Self, MemdxError> {
         let packet = resp.packet();
         let status = packet.status;
 
         if status == Status::KeyNotFound {
-            return Err(Error::KeyNotFound);
+            return Err(MemdxError::KeyNotFound);
         } else if status != Status::Success {
-            return Err(Error::Unknown(
+            return Err(MemdxError::Unknown(
                 OpsCrud::decode_common_error(resp.packet()).to_string(),
             ));
         }
 
         let flags = if let Some(extras) = &packet.extras {
             if extras.len() != 4 {
-                return Err(Error::Protocol("Bad extras length".to_string()));
+                return Err(MemdxError::Protocol("Bad extras length".to_string()));
             }
 
             let mut extras = Cursor::new(extras);
             extras
                 .read_u32::<BigEndian>()
-                .map_err(|e| Error::Unknown(e.to_string()))?
+                .map_err(|e| MemdxError::Unknown(e.to_string()))?
         } else {
-            return Err(Error::Protocol("Bad extras length".to_string()));
+            return Err(MemdxError::Protocol("Bad extras length".to_string()));
         };
 
         let server_duration = if let Some(f) = &packet.framing_extras {

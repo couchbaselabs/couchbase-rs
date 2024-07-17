@@ -3,11 +3,11 @@ use std::cmp::PartialEq;
 use tokio::time::Instant;
 
 use crate::memdx::auth_mechanism::AuthMechanism;
-use crate::memdx::client::Result;
+use crate::memdx::client::MemdxResult;
 use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::error::CancellationErrorKind::{RequestCancelled, Timeout};
-use crate::memdx::error::Error;
-use crate::memdx::error::Error::Generic;
+use crate::memdx::error::MemdxError;
+use crate::memdx::error::MemdxError::Generic;
 use crate::memdx::op_auth_saslbyname::{
     OpSASLAuthByNameEncoder, OpsSASLAuthByName, SASLAuthByNameOptions,
 };
@@ -29,9 +29,9 @@ pub struct SASLListMechsOptions {}
 pub trait OpSASLAutoEncoder: OpSASLAuthByNameEncoder {
     fn sasl_list_mechs<D>(
         &self,
-        dispatcher: &mut D,
+        dispatcher: &D,
         request: SASLListMechsRequest,
-    ) -> impl std::future::Future<Output = Result<StandardPendingOp<SASLListMechsResponse>>>
+    ) -> impl std::future::Future<Output = MemdxResult<StandardPendingOp<SASLListMechsResponse>>>
     where
         D: Dispatcher;
 }
@@ -43,10 +43,10 @@ impl OpsSASLAuthAuto {
     pub async fn sasl_auth_auto<E, D>(
         &self,
         encoder: &E,
-        dispatcher: &mut D,
+        dispatcher: &D,
         deadline: Instant,
         opts: SASLAuthAutoOptions,
-    ) -> Result<()>
+    ) -> MemdxResult<()>
     where
         E: OpSASLAutoEncoder,
         D: Dispatcher,
@@ -81,7 +81,9 @@ impl OpsSASLAuthAuto {
         {
             Ok(()) => Ok(()),
             Err(e) => {
-                if e == Error::Cancelled(Timeout) || e == Error::Cancelled(RequestCancelled) {
+                if e == MemdxError::Cancelled(Timeout)
+                    || e == MemdxError::Cancelled(RequestCancelled)
+                {
                     return Err(e);
                 }
 

@@ -3,8 +3,8 @@ use std::io;
 use tokio_util::bytes::{Buf, BufMut, BytesMut};
 use tokio_util::codec::{Decoder, Encoder};
 
-use crate::memdx::error::Error;
-use crate::memdx::error::Error::Protocol;
+use crate::memdx::error::MemdxError;
+use crate::memdx::error::MemdxError::Protocol;
 use crate::memdx::magic::Magic;
 use crate::memdx::opcode::OpCode;
 use crate::memdx::packet::{RequestPacket, ResponsePacket};
@@ -17,7 +17,7 @@ pub struct KeyValueCodec(());
 
 impl Decoder for KeyValueCodec {
     type Item = ResponsePacket;
-    type Error = Error;
+    type Error = MemdxError;
 
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         let buf_len = buf.len();

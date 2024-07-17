@@ -3,10 +3,10 @@ use std::time::Duration;
 use byteorder::{BigEndian, WriteBytesExt};
 use bytes::{BufMut, BytesMut};
 
-use crate::memdx::client::Result;
+use crate::memdx::client::MemdxResult;
 use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::durability_level::{DurabilityLevel, DurabilityLevelSettings};
-use crate::memdx::error::Error;
+use crate::memdx::error::MemdxError;
 use crate::memdx::ext_frame_code::{ExtReqFrameCode, ExtResFrameCode};
 use crate::memdx::magic::Magic;
 use crate::memdx::opcode::OpCode;
@@ -30,7 +30,7 @@ impl OpsCrud {
         &self,
         dispatcher: &D,
         request: SetRequest,
-    ) -> Result<StandardPendingOp<SetResponse>>
+    ) -> MemdxResult<StandardPendingOp<SetResponse>>
     where
         D: Dispatcher,
     {
@@ -76,7 +76,7 @@ impl OpsCrud {
         &self,
         dispatcher: &D,
         request: GetRequest,
-    ) -> Result<StandardPendingOp<GetResponse>>
+    ) -> MemdxResult<StandardPendingOp<GetResponse>>
     where
         D: Dispatcher,
     {
@@ -110,10 +110,10 @@ impl OpsCrud {
         Ok(StandardPendingOp::new(pending_op))
     }
 
-    fn encode_collection_and_key(&self, collection_id: u32, key: Vec<u8>) -> Result<Vec<u8>> {
+    fn encode_collection_and_key(&self, collection_id: u32, key: Vec<u8>) -> MemdxResult<Vec<u8>> {
         if !self.collections_enabled {
             if collection_id != 0 {
-                return Err(Error::CollectionsNotEnabled);
+                return Err(MemdxError::CollectionsNotEnabled);
             }
 
             return Ok(key);
@@ -129,14 +129,14 @@ impl OpsCrud {
         preserve_expiry: Option<bool>,
         on_behalf_of: Option<String>,
         buf: &mut Vec<u8>,
-    ) -> Result<Magic> {
+    ) -> MemdxResult<Magic> {
         if let Some(obo) = on_behalf_of {
             append_ext_frame(ExtReqFrameCode::OnBehalfOf, obo.into_bytes(), buf)?;
         }
 
         if let Some(dura) = durability_level {
             if !self.durability_enabled {
-                return Err(Error::Protocol(
+                return Err(MemdxError::Protocol(
                     "Cannot use synchronous durability when its not enabled".to_string(),
                 ));
             }
@@ -145,14 +145,14 @@ impl OpsCrud {
 
             append_ext_frame(ExtReqFrameCode::Durability, dura_buf, buf)?;
         } else if durability_timeout.is_some() {
-            return Err(Error::Protocol(
+            return Err(MemdxError::Protocol(
                 "Cannot encode durability timeout without durability level".to_string(),
             ));
         }
 
         if preserve_expiry.is_some() {
             if !self.preserve_expiry_enabled {
-                return Err(Error::Protocol(
+                return Err(MemdxError::Protocol(
                     "Cannot use preserve expiry when its not enabled".to_string(),
                 ));
             }
@@ -162,7 +162,7 @@ impl OpsCrud {
 
         let magic = if !buf.is_empty() {
             if !self.ext_frames_enabled {
-                return Err(Error::Protocol(
+                return Err(MemdxError::Protocol(
                     "Cannot use framing extras when its not enabled".to_string(),
                 ));
             }
@@ -175,10 +175,10 @@ impl OpsCrud {
         Ok(magic)
     }
 
-    pub(crate) fn decode_common_status(status: Status) -> Result<()> {
+    pub(crate) fn decode_common_status(status: Status) -> MemdxResult<()> {
         let err = match status {
-            Status::CollectionUnknown => Error::UnknownCollectionID,
-            Status::AccessError => Error::Access,
+            Status::CollectionUnknown => MemdxError::UnknownCollectionID,
+            Status::AccessError => MemdxError::Access,
             _ => {
                 return Ok(());
             }
@@ -187,7 +187,7 @@ impl OpsCrud {
         Err(err)
     }
 
-    pub(crate) fn decode_common_error(resp: &ResponsePacket) -> Error {
+    pub(crate) fn decode_common_error(resp: &ResponsePacket) -> MemdxError {
         if let Err(e) = Self::decode_common_status(resp.status) {
             return e;
         };
@@ -196,7 +196,7 @@ impl OpsCrud {
     }
 }
 
-pub(crate) fn decode_res_ext_frames(buf: &[u8]) -> Result<Option<Duration>> {
+pub(crate) fn decode_res_ext_frames(buf: &[u8]) -> MemdxResult<Option<Duration>> {
     let mut server_duration_data = None;
 
     iter_ext_frames(buf, |code, data| {
@@ -212,9 +212,11 @@ pub(crate) fn decode_res_ext_frames(buf: &[u8]) -> Result<Option<Duration>> {
     Ok(None)
 }
 
-pub fn decode_ext_frame(buf: &[u8]) -> Result<(ExtResFrameCode, Vec<u8>, usize)> {
+pub fn decode_ext_frame(buf: &[u8]) -> MemdxResult<(ExtResFrameCode, Vec<u8>, usize)> {
     if buf.is_empty() {
-        return Err(Error::Protocol("Framing extras protocol error".to_string()));
+        return Err(MemdxError::Protocol(
+            "Framing extras protocol error".to_string(),
+        ));
     }
 
     let mut buf_pos = 0;
@@ -227,7 +229,7 @@ pub fn decode_ext_frame(buf: &[u8]) -> Result<(ExtResFrameCode, Vec<u8>, usize)>
 
     if u_frame_code == 15 {
         if buf.len() < buf_pos + 1 {
-            return Err(Error::Protocol("Unexpected eof".to_string()));
+            return Err(MemdxError::Protocol("Unexpected eof".to_string()));
         }
 
         let frame_code_ext = buf[buf_pos];
@@ -238,7 +240,7 @@ pub fn decode_ext_frame(buf: &[u8]) -> Result<(ExtResFrameCode, Vec<u8>, usize)>
 
     if frame_len == 15 {
         if buf.len() < buf_pos + 1 {
-            return Err(Error::Protocol("Unexpected eof".to_string()));
+            return Err(MemdxError::Protocol("Unexpected eof".to_string()));
         }
 
         let frame_len_ext = buf[buf_pos];
@@ -248,7 +250,7 @@ pub fn decode_ext_frame(buf: &[u8]) -> Result<(ExtResFrameCode, Vec<u8>, usize)>
 
     let u_frame_len = frame_len as usize;
     if buf.len() < buf_pos + u_frame_len {
-        return Err(Error::Protocol("unexpected eof".to_string()));
+        return Err(MemdxError::Protocol("unexpected eof".to_string()));
     }
 
     let frame_body = &buf[buf_pos..buf_pos + u_frame_len];
@@ -257,7 +259,10 @@ pub fn decode_ext_frame(buf: &[u8]) -> Result<(ExtResFrameCode, Vec<u8>, usize)>
     Ok((frame_code, frame_body.to_vec(), buf_pos))
 }
 
-fn iter_ext_frames(buf: &[u8], mut cb: impl FnMut(ExtResFrameCode, Vec<u8>)) -> Result<Vec<u8>> {
+fn iter_ext_frames(
+    buf: &[u8],
+    mut cb: impl FnMut(ExtResFrameCode, Vec<u8>),
+) -> MemdxResult<Vec<u8>> {
     if !buf.is_empty() {
         let (frame_code, frame_body, buf_pos) = decode_ext_frame(buf)?;
 
@@ -273,7 +278,7 @@ pub fn append_ext_frame(
     frame_code: ExtReqFrameCode,
     frame_body: Vec<u8>,
     buf: &mut Vec<u8>,
-) -> Result<()> {
+) -> MemdxResult<()> {
     let frame_len = frame_body.len();
     let buf_len = buf.len();
 
@@ -285,7 +290,7 @@ pub fn append_ext_frame(
         *hdr_byte_ptr = (*hdr_byte_ptr as u16 | ((u_frame_code & 0x0f) << 4)) as u8;
     } else {
         if u_frame_code - 15 >= 15 {
-            return Err(Error::Protocol(
+            return Err(MemdxError::Protocol(
                 "Extframe code too large to encode".to_string(),
             ));
         }
@@ -326,7 +331,7 @@ pub fn make_uleb128_32(key: Vec<u8>, collection_id: u32) -> Vec<u8> {
 fn encode_durability_ext_frame(
     level: DurabilityLevel,
     timeout: Option<Duration>,
-) -> Result<Vec<u8>> {
+) -> MemdxResult<Vec<u8>> {
     if timeout.is_none() {
         return Ok(vec![level.into()]);
     }
@@ -335,7 +340,7 @@ fn encode_durability_ext_frame(
 
     let mut timeout_millis = timeout.as_millis();
     if timeout_millis > 65535 {
-        return Err(Error::Protocol(
+        return Err(MemdxError::Protocol(
             "Cannot encode durability timeout greater than 65535 milliseconds".to_string(),
         ));
     }
@@ -351,9 +356,9 @@ fn encode_durability_ext_frame(
     Ok(buf)
 }
 
-pub(crate) fn decode_server_duration_ext_frame(mut data: Vec<u8>) -> Result<Duration> {
+pub(crate) fn decode_server_duration_ext_frame(mut data: Vec<u8>) -> MemdxResult<Duration> {
     if data.len() != 2 {
-        return Err(Error::Protocol(
+        return Err(MemdxError::Protocol(
             "Invalid server duration extframe length".to_string(),
         ));
     }
@@ -366,7 +371,7 @@ pub(crate) fn decode_server_duration_ext_frame(mut data: Vec<u8>) -> Result<Dura
 
 pub(crate) fn decode_durability_level_ext_frame(
     data: &mut Vec<u8>,
-) -> Result<DurabilityLevelSettings> {
+) -> MemdxResult<DurabilityLevelSettings> {
     if data.len() == 1 {
         let durability = DurabilityLevel::from(data.remove(0));
 
@@ -381,7 +386,7 @@ pub(crate) fn decode_durability_level_ext_frame(
         ));
     }
 
-    Err(Error::Protocol(
+    Err(MemdxError::Protocol(
         "Invalid durability extframe length".to_string(),
     ))
 }

@@ -1,13 +1,13 @@
 use std::future::Future;
 
-use crate::memdx::client::Result;
+use crate::memdx::client::MemdxResult;
 use crate::memdx::pendingop::{PendingOp, StandardPendingOp};
 use crate::memdx::response::TryFromClientResponse;
 
-pub async fn sync_unary_call<RespT, Fut>(fut: Fut) -> Result<RespT>
+pub async fn sync_unary_call<RespT, Fut>(fut: Fut) -> MemdxResult<RespT>
 where
     RespT: TryFromClientResponse,
-    Fut: Future<Output = Result<StandardPendingOp<RespT>>>,
+    Fut: Future<Output = MemdxResult<StandardPendingOp<RespT>>>,
 {
     let mut op = fut.await?;
 
