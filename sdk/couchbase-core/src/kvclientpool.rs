@@ -14,13 +14,15 @@ use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::packet::ResponsePacket;
 use crate::result::CoreResult;
 
-pub(crate) trait KvClientPool<K>: Sized + Send + Sync {
+pub(crate) trait KvClientPool: Sized + Send + Sync {
+    type Client: KvClient + Send + Sync;
+
     fn new(
         config: KvClientPoolConfig,
         opts: KvClientPoolOptions,
     ) -> impl Future<Output = Self> + Send;
-    fn get_client(&self) -> impl Future<Output = CoreResult<Arc<K>>> + Send;
-    fn shutdown_client(&self, client: Arc<K>) -> impl Future<Output = ()> + Send;
+    fn get_client(&self) -> impl Future<Output = CoreResult<Arc<Self::Client>>> + Send;
+    fn shutdown_client(&self, client: Arc<Self::Client>) -> impl Future<Output = ()> + Send;
     fn close(&self) -> impl Future<Output = CoreResult<()>> + Send;
     fn reconfigure(
         &self,
@@ -259,10 +261,12 @@ where
     }
 }
 
-impl<K> KvClientPool<K> for NaiveKvClientPool<K>
+impl<K> KvClientPool for NaiveKvClientPool<K>
 where
     K: KvClient + PartialEq + Sync + Send + 'static,
 {
+    type Client = K;
+
     async fn new(config: KvClientPoolConfig, opts: KvClientPoolOptions) -> Self {
         // TODO: is unbounded the right option?
         let (on_client_close_tx, mut on_client_close_rx) = mpsc::unbounded_channel();
@@ -285,13 +289,13 @@ where
         NaiveKvClientPool { inner: clients }
     }
 
-    async fn get_client(&self) -> CoreResult<Arc<K>> {
+    async fn get_client(&self) -> CoreResult<Arc<Self::Client>> {
         let mut clients = self.inner.lock().await;
 
         clients.get_client().await
     }
 
-    async fn shutdown_client(&self, client: Arc<K>) {
+    async fn shutdown_client(&self, client: Arc<Self::Client>) {
         let mut clients = self.inner.lock().await;
 
         clients.shutdown_client(client).await;

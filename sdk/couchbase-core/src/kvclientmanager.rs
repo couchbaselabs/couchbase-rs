@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::future::Future;
-use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -13,7 +12,9 @@ use crate::kvclientpool::{KvClientPool, KvClientPoolConfig, KvClientPoolOptions}
 use crate::memdx::packet::ResponsePacket;
 use crate::result::CoreResult;
 
-pub(crate) trait KvClientManager<P, K>: Sized + Send + Sync {
+pub(crate) trait KvClientManager: Sized + Send + Sync {
+    type Pool: KvClientPool + Send + Sync;
+
     fn new(
         config: KvClientManagerConfig,
         opts: KvClientManagerOptions,
@@ -22,18 +23,27 @@ pub(crate) trait KvClientManager<P, K>: Sized + Send + Sync {
         &self,
         config: KvClientManagerConfig,
     ) -> impl Future<Output = CoreResult<()>> + Send;
-    fn get_client(&self, endpoint: String) -> impl Future<Output = CoreResult<Arc<K>>> + Send;
-    fn get_random_client(&self) -> impl Future<Output = CoreResult<Arc<K>>> + Send;
+    fn get_client(
+        &self,
+        endpoint: String,
+    ) -> impl Future<
+        Output = CoreResult<Arc<<<Self as KvClientManager>::Pool as KvClientPool>::Client>>,
+    > + Send;
+    fn get_random_client(
+        &self,
+    ) -> impl Future<
+        Output = CoreResult<Arc<<<Self as KvClientManager>::Pool as KvClientPool>::Client>>,
+    > + Send;
     fn shutdown_client(
         &self,
         endpoint: String,
-        client: Arc<K>,
+        client: Arc<<<Self as KvClientManager>::Pool as KvClientPool>::Client>,
     ) -> impl Future<Output = CoreResult<()>> + Send;
     fn close(&self) -> impl Future<Output = CoreResult<()>> + Send;
     fn orchestrate_operation<R, Fut>(
         &self,
         endpoint: String,
-        operation: impl Fn(Arc<K>) -> Fut,
+        operation: impl Fn(Arc<<<Self as KvClientManager>::Pool as KvClientPool>::Client>) -> Fut,
     ) -> impl Future<Output = CoreResult<R>>
     where
         Fut: Future<Output = CoreResult<R>> + Send;
@@ -53,35 +63,33 @@ pub(crate) struct KvClientManagerOptions {
 }
 
 #[derive(Debug)]
-struct KvClientManagerPool<P, K>
+struct KvClientManagerPool<P>
 where
-    P: KvClientPool<K>,
+    P: KvClientPool,
 {
     config: KvClientPoolConfig,
     pool: Arc<P>,
-    _phantom_client_type: PhantomData<K>,
 }
 
 #[derive(Debug, Default)]
-struct KvClientManagerState<P, K>
+struct KvClientManagerState<P>
 where
-    P: KvClientPool<K>,
+    P: KvClientPool,
 {
-    pub client_pools: HashMap<String, KvClientManagerPool<P, K>>,
+    pub client_pools: HashMap<String, KvClientManagerPool<P>>,
 }
 
-pub(crate) struct StdKvClientManager<P, K>
+pub(crate) struct StdKvClientManager<P>
 where
-    P: KvClientPool<K>,
+    P: KvClientPool,
 {
-    state: Mutex<KvClientManagerState<P, K>>,
+    state: Mutex<KvClientManagerState<P>>,
     opts: KvClientManagerOptions,
 }
 
-impl<P, K> StdKvClientManager<P, K>
+impl<P> StdKvClientManager<P>
 where
-    K: KvClient,
-    P: KvClientPool<K>,
+    P: KvClientPool,
 {
     async fn get_pool(&self, endpoint: String) -> CoreResult<Arc<P>> {
         let state = self.state.lock().await;
@@ -107,7 +115,7 @@ where
         Err(CoreError::Placeholder("Endpoint not known".to_string()))
     }
 
-    async fn create_pool(&self, pool_config: KvClientPoolConfig) -> KvClientManagerPool<P, K> {
+    async fn create_pool(&self, pool_config: KvClientPoolConfig) -> KvClientManagerPool<P> {
         let pool = P::new(
             pool_config.clone(),
             KvClientPoolOptions {
@@ -121,16 +129,16 @@ where
         KvClientManagerPool {
             config: pool_config,
             pool: Arc::new(pool),
-            _phantom_client_type: Default::default(),
         }
     }
 }
 
-impl<P, K> KvClientManager<P, K> for StdKvClientManager<P, K>
+impl<P> KvClientManager for StdKvClientManager<P>
 where
-    K: KvClient,
-    P: KvClientPool<K>,
+    P: KvClientPool,
 {
+    type Pool = P;
+
     async fn new(config: KvClientManagerConfig, opts: KvClientManagerOptions) -> CoreResult<Self> {
         let manager = Self {
             state: Mutex::new(KvClientManagerState {
@@ -148,7 +156,7 @@ where
 
         let mut old_pools = std::mem::take(&mut guard.client_pools);
 
-        let mut new_state = KvClientManagerState::<P, K> {
+        let mut new_state = KvClientManagerState::<P> {
             client_pools: Default::default(),
         };
 
@@ -183,19 +191,28 @@ where
         Ok(())
     }
 
-    async fn get_client(&self, endpoint: String) -> CoreResult<Arc<K>> {
+    async fn get_client(
+        &self,
+        endpoint: String,
+    ) -> CoreResult<Arc<<<Self as KvClientManager>::Pool as KvClientPool>::Client>> {
         let pool = self.get_pool(endpoint).await?;
 
         pool.get_client().await
     }
 
-    async fn get_random_client(&self) -> CoreResult<Arc<K>> {
+    async fn get_random_client(
+        &self,
+    ) -> CoreResult<Arc<<<Self as KvClientManager>::Pool as KvClientPool>::Client>> {
         let pool = self.get_random_pool().await?;
 
         pool.get_client().await
     }
 
-    async fn shutdown_client(&self, endpoint: String, client: Arc<K>) -> CoreResult<()> {
+    async fn shutdown_client(
+        &self,
+        endpoint: String,
+        client: Arc<<<Self as KvClientManager>::Pool as KvClientPool>::Client>,
+    ) -> CoreResult<()> {
         let pool = self.get_pool(endpoint).await?;
 
         pool.shutdown_client(client).await;
@@ -219,7 +236,7 @@ where
     async fn orchestrate_operation<R, Fut>(
         &self,
         endpoint: String,
-        operation: impl Fn(Arc<K>) -> Fut,
+        operation: impl Fn(Arc<P::Client>) -> Fut,
     ) -> CoreResult<R>
     where
         Fut: Future<Output = CoreResult<R>> + Send,
@@ -316,19 +333,17 @@ mod tests {
             clients: client_configs,
         };
 
-        let manager: StdKvClientManager<
-            NaiveKvClientPool<StdKvClient<Client>>,
-            StdKvClient<Client>,
-        > = StdKvClientManager::new(
-            manger_config,
-            KvClientManagerOptions {
-                connect_timeout: Default::default(),
-                connect_throttle_period: Default::default(),
-                orphan_handler: Arc::new(orphan_tx),
-            },
-        )
-        .await
-        .unwrap();
+        let manager: StdKvClientManager<NaiveKvClientPool<StdKvClient<Client>>> =
+            StdKvClientManager::new(
+                manger_config,
+                KvClientManagerOptions {
+                    connect_timeout: Default::default(),
+                    connect_throttle_period: Default::default(),
+                    orphan_handler: Arc::new(orphan_tx),
+                },
+            )
+            .await
+            .unwrap();
 
         let result = manager
             .orchestrate_operation(
