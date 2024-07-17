@@ -26,12 +26,12 @@ use crate::memdx::client_response::ClientResponse;
 use crate::memdx::codec::KeyValueCodec;
 use crate::memdx::connection::{Connection, ConnectionType};
 use crate::memdx::dispatcher::{Dispatcher, DispatcherOptions};
-use crate::memdx::error::{CancellationErrorKind, Error};
+use crate::memdx::error::{CancellationErrorKind, MemdxError};
 use crate::memdx::packet::{RequestPacket, ResponsePacket};
 use crate::memdx::pendingop::ClientPendingOp;
 
-pub type Result<T> = std::result::Result<T, Error>;
-type ResponseSender = Sender<Result<ClientResponse>>;
+pub type MemdxResult<T> = std::result::Result<T, MemdxError>;
+type ResponseSender = Sender<MemdxResult<ClientResponse>>;
 type OpaqueMap = HashMap<u32, Arc<ResponseSender>>;
 pub(crate) type CancellationSender = UnboundedSender<(u32, CancellationErrorKind)>;
 
@@ -41,7 +41,7 @@ struct ReadLoopOptions {
     pub local_addr: Option<SocketAddr>,
     pub peer_addr: Option<SocketAddr>,
     pub orphan_handler: Arc<UnboundedSender<ResponsePacket>>,
-    pub on_connection_close_tx: Option<oneshot::Sender<Result<()>>>,
+    pub on_connection_close_tx: Option<oneshot::Sender<MemdxResult<()>>>,
     pub on_client_close_rx: Receiver<()>,
 }
 
@@ -90,7 +90,7 @@ impl Client {
         for entry in opaque_map.iter() {
             entry
                 .1
-                .send(Err(Error::ClosedInFlight))
+                .send(Err(MemdxError::ClosedInFlight))
                 .await
                 .unwrap_or_default();
         }
@@ -100,7 +100,7 @@ impl Client {
         stream: FramedRead<ReadHalf<TcpStream>, KeyValueCodec>,
         op_cancel_rx: UnboundedReceiver<(u32, CancellationErrorKind)>,
         opaque_map: MutexGuard<'_, OpaqueMap>,
-        on_connection_close_tx: Option<oneshot::Sender<Result<()>>>,
+        on_connection_close_tx: Option<oneshot::Sender<MemdxResult<()>>>,
     ) {
         drop(stream);
         drop(op_cancel_rx);
@@ -138,7 +138,7 @@ impl Client {
                                 drop(map);
 
                                 sender
-                                    .send(Err(Error::Cancelled(cancel_info.1)))
+                                    .send(Err(MemdxError::Cancelled(cancel_info.1)))
                                     .await
                                     .unwrap();
                             } else {
@@ -300,7 +300,7 @@ impl Dispatcher for Client {
         }
     }
 
-    async fn dispatch(&self, mut packet: RequestPacket) -> Result<ClientPendingOp> {
+    async fn dispatch(&self, mut packet: RequestPacket) -> MemdxResult<ClientPendingOp> {
         let (response_tx, response_rx) = mpsc::channel(1);
         let opaque = self.register_handler(Arc::new(response_tx)).await;
         packet.opaque = Some(opaque);
@@ -323,14 +323,14 @@ impl Dispatcher for Client {
                 let mut map = requests.lock().await;
                 map.remove(&opaque);
 
-                Err(Error::Dispatch(e.kind()))
+                Err(MemdxError::Dispatch(e.kind()))
             }
         }
     }
 
-    async fn close(&self) -> Result<()> {
+    async fn close(&self) -> MemdxResult<()> {
         if self.closed.swap(true, Ordering::SeqCst) {
-            return Err(Error::Closed);
+            return Err(MemdxError::Closed);
         }
 
         let mut close_err = None;
@@ -354,7 +354,7 @@ impl Dispatcher for Client {
         Self::drain_opaque_map(map).await;
 
         if let Some(e) = close_err {
-            return Err(Error::from(e));
+            return Err(MemdxError::from(e));
         }
 
         Ok(())
@@ -405,7 +405,7 @@ mod tests {
         .expect("Could not connect");
 
         let (orphan_tx, mut orphan_rx) = unbounded_channel::<ResponsePacket>();
-        let (close_tx, mut close_rx) = oneshot::channel::<crate::memdx::client::Result<()>>();
+        let (close_tx, mut close_rx) = oneshot::channel::<crate::memdx::client::MemdxResult<()>>();
 
         tokio::spawn(async move {
             loop {
@@ -442,7 +442,7 @@ mod tests {
 
         let bootstrap_result = OpBootstrap::bootstrap(
             OpsCore {},
-            &mut client,
+            &client,
             BootstrapOptions {
                 hello: Some(HelloRequest {
                     client_name: "test-client".into(),

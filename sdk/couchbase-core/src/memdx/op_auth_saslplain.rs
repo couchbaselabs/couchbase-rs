@@ -1,9 +1,9 @@
 use tokio::time::Instant;
 
 use crate::memdx::auth_mechanism::AuthMechanism;
-use crate::memdx::client::Result;
+use crate::memdx::client::MemdxResult;
 use crate::memdx::dispatcher::Dispatcher;
-use crate::memdx::error::Error;
+use crate::memdx::error::MemdxError;
 use crate::memdx::pendingop::{run_op_future_with_deadline, StandardPendingOp};
 use crate::memdx::request::SASLAuthRequest;
 use crate::memdx::response::SASLAuthResponse;
@@ -11,9 +11,9 @@ use crate::memdx::response::SASLAuthResponse;
 pub trait OpSASLPlainEncoder {
     fn sasl_auth<D>(
         &self,
-        dispatcher: &mut D,
+        dispatcher: &D,
         req: SASLAuthRequest,
-    ) -> impl std::future::Future<Output = Result<StandardPendingOp<SASLAuthResponse>>>
+    ) -> impl std::future::Future<Output = MemdxResult<StandardPendingOp<SASLAuthResponse>>>
     where
         D: Dispatcher;
 }
@@ -42,9 +42,9 @@ impl OpsSASLAuthPlain {
     pub async fn sasl_auth_plain<E, D>(
         &self,
         encoder: &E,
-        dispatcher: &mut D,
+        dispatcher: &D,
         opts: SASLAuthPlainOptions,
-    ) -> Result<()>
+    ) -> MemdxResult<()>
     where
         E: OpSASLPlainEncoder,
         D: Dispatcher,
@@ -64,7 +64,7 @@ impl OpsSASLAuthPlain {
             run_op_future_with_deadline(opts.deadline, encoder.sasl_auth(dispatcher, req)).await?;
 
         if resp.needs_more_steps {
-            return Err(Error::Protocol(
+            return Err(MemdxError::Protocol(
                 "Server did not accept auth when the client expected".to_string(),
             ));
         }

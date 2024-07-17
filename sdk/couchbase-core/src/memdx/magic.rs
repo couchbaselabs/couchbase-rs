@@ -1,6 +1,6 @@
 use std::fmt::{Debug, Display};
 
-use crate::memdx::error::Error;
+use crate::memdx::error::MemdxError;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Magic {
@@ -36,7 +36,7 @@ impl From<Magic> for u8 {
 }
 
 impl TryFrom<u8> for Magic {
-    type Error = Error;
+    type Error = MemdxError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         let magic = match value {
@@ -45,7 +45,7 @@ impl TryFrom<u8> for Magic {
             0x08 => Magic::ReqExt,
             0x18 => Magic::ResExt,
             _ => {
-                return Err(Error::Protocol(format!("unknown magic {}", value)));
+                return Err(MemdxError::Protocol(format!("unknown magic {}", value)));
             }
         };
 

@@ -2,7 +2,7 @@ use log::warn;
 use tokio::select;
 use tokio::time::{Instant, sleep};
 
-use crate::memdx::client::Result;
+use crate::memdx::client::MemdxResult;
 use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::error::CancellationErrorKind;
 use crate::memdx::op_auth_saslauto::{OpSASLAutoEncoder, OpsSASLAuthAuto, SASLAuthAutoOptions};
@@ -20,33 +20,33 @@ use crate::memdx::response::{
 pub trait OpBootstrapEncoder {
     fn hello<D>(
         &self,
-        dispatcher: &mut D,
+        dispatcher: &D,
         request: HelloRequest,
-    ) -> impl std::future::Future<Output = Result<StandardPendingOp<HelloResponse>>>
+    ) -> impl std::future::Future<Output = MemdxResult<StandardPendingOp<HelloResponse>>>
     where
         D: Dispatcher;
 
     fn get_error_map<D>(
         &self,
-        dispatcher: &mut D,
+        dispatcher: &D,
         request: GetErrorMapRequest,
-    ) -> impl std::future::Future<Output = Result<StandardPendingOp<GetErrorMapResponse>>>
+    ) -> impl std::future::Future<Output = MemdxResult<StandardPendingOp<GetErrorMapResponse>>>
     where
         D: Dispatcher;
 
     fn select_bucket<D>(
         &self,
-        dispatcher: &mut D,
+        dispatcher: &D,
         request: SelectBucketRequest,
-    ) -> impl std::future::Future<Output = Result<StandardPendingOp<SelectBucketResponse>>>
+    ) -> impl std::future::Future<Output = MemdxResult<StandardPendingOp<SelectBucketResponse>>>
     where
         D: Dispatcher;
 
     fn get_cluster_config<D>(
         &self,
-        dispatcher: &mut D,
+        dispatcher: &D,
         request: GetClusterConfigRequest,
-    ) -> impl std::future::Future<Output = Result<StandardPendingOp<GetClusterConfigResponse>>>
+    ) -> impl std::future::Future<Output = MemdxResult<StandardPendingOp<GetClusterConfigResponse>>>
     where
         D: Dispatcher;
 }
@@ -68,9 +68,9 @@ impl OpBootstrap {
     // make pipelining complex. It's a bit of a niche optimization so we can improve later.
     pub async fn bootstrap<E, D>(
         encoder: E,
-        dispatcher: &mut D,
+        dispatcher: &D,
         opts: BootstrapOptions,
-    ) -> Result<BootstrapResult>
+    ) -> MemdxResult<BootstrapResult>
     where
         E: OpBootstrapEncoder + OpSASLAutoEncoder,
         D: Dispatcher,

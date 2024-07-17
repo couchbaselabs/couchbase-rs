@@ -1,22 +1,23 @@
-use std::fmt::{Display, Formatter};
+use std::fmt::Display;
 
-use crate::memdx::error::Error;
+use crate::error::CoreError::{Dispatch, PlaceholderMemdxWrapper};
+use crate::memdx::error::MemdxError;
 
-#[derive(Debug)]
-pub struct CoreError {
-    pub msg: String,
+#[derive(thiserror::Error, Debug, Eq, PartialEq)]
+pub enum CoreError {
+    #[error("Dispatch error {0}")]
+    Dispatch(MemdxError),
+    #[error("Placeholder error {0}")]
+    Placeholder(String),
+    #[error("Placeholder memdx wrapper error {0}")]
+    PlaceholderMemdxWrapper(MemdxError),
 }
 
-impl From<Error> for CoreError {
-    fn from(value: Error) -> Self {
-        Self {
-            msg: value.to_string(),
+impl From<MemdxError> for CoreError {
+    fn from(value: MemdxError) -> Self {
+        match value {
+            MemdxError::Dispatch(_) => Dispatch(value),
+            _ => PlaceholderMemdxWrapper(value),
         }
-    }
-}
-
-impl Display for CoreError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.msg)
     }
 }

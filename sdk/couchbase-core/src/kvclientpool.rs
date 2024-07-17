@@ -1,5 +1,5 @@
 use std::future::Future;
-use std::ops::Sub;
+use std::ops::{Deref, Sub};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
@@ -22,12 +22,16 @@ pub(crate) trait KvClientPool<K>: Sized + Send + Sync {
     fn get_client(&self) -> impl Future<Output = CoreResult<Arc<K>>> + Send;
     fn shutdown_client(&self, client: Arc<K>) -> impl Future<Output = ()> + Send;
     fn close(&self) -> impl Future<Output = CoreResult<()>> + Send;
+    fn reconfigure(
+        &self,
+        config: KvClientPoolConfig,
+    ) -> impl Future<Output = CoreResult<()>> + Send;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct KvClientPoolConfig {
     pub num_connections: usize,
-    pub client_config: Arc<KvClientConfig>,
+    pub client_config: KvClientConfig,
 }
 
 pub(crate) struct KvClientPoolOptions {
@@ -35,8 +39,6 @@ pub(crate) struct KvClientPoolOptions {
     pub connect_throttle_period: Duration,
     pub orphan_handler: Arc<UnboundedSender<ResponsePacket>>,
 }
-
-type KvClientsList<K> = Vec<Arc<K>>;
 
 struct NaiveKvClientPoolInner<K>
 where
@@ -47,7 +49,7 @@ where
 
     config: KvClientPoolConfig,
 
-    clients: KvClientsList<K>,
+    clients: Vec<Arc<K>>,
 
     client_idx: usize,
 
@@ -159,9 +161,7 @@ where
                 client.close().await.unwrap_or_default();
             }
 
-            return Err(CoreError {
-                msg: "closed".to_string(),
-            });
+            return Err(CoreError::Placeholder("Closed".to_string()));
         }
 
         client_result
@@ -169,9 +169,7 @@ where
 
     async fn get_client_slow(&mut self) -> CoreResult<Arc<K>> {
         if self.closed.load(Ordering::SeqCst) {
-            return Err(CoreError {
-                msg: "closed".to_string(),
-            });
+            return Err(CoreError::Placeholder("Closed".to_string()));
         }
 
         if !self.clients.is_empty() {
@@ -183,7 +181,7 @@ where
         }
 
         if let Some(e) = &self.connect_error {
-            return Err(CoreError { msg: e.to_string() });
+            return Err(CoreError::Placeholder(e.to_string()));
         }
 
         self.check_connections().await;
@@ -228,15 +226,34 @@ where
 
     pub async fn close(&mut self) -> CoreResult<()> {
         if self.closed.swap(true, Ordering::SeqCst) {
-            return Err(CoreError {
-                msg: "closed".to_string(),
-            });
+            return Err(CoreError::Placeholder("Closed".to_string()));
         }
 
         for mut client in &self.clients {
             // TODO: probably log
             client.close().await.unwrap_or_default();
         }
+
+        Ok(())
+    }
+
+    pub async fn reconfigure(&mut self, config: KvClientPoolConfig) -> CoreResult<()> {
+        let mut old_clients = self.clients.clone();
+        let mut new_clients = vec![];
+        for client in old_clients {
+            if let Err(e) = client.reconfigure(config.client_config.clone()).await {
+                // TODO: log here.
+                dbg!(e);
+                client.close().await.unwrap_or_default();
+                continue;
+            };
+
+            new_clients.push(client.clone());
+        }
+        self.clients = new_clients;
+        self.config = config;
+
+        self.check_connections().await;
 
         Ok(())
     }
@@ -283,6 +300,11 @@ where
     async fn close(&self) -> CoreResult<()> {
         let mut inner = self.inner.lock().await;
         inner.close().await
+    }
+
+    async fn reconfigure(&self, config: KvClientPoolConfig) -> CoreResult<()> {
+        let mut inner = self.inner.lock().await;
+        inner.reconfigure(config).await
     }
 }
 
@@ -344,7 +366,7 @@ mod tests {
 
         let pool_config = KvClientPoolConfig {
             num_connections: 1,
-            client_config: Arc::new(client_config),
+            client_config,
         };
 
         let pool: NaiveKvClientPool<StdKvClient<Client>> = NaiveKvClientPool::new(
@@ -392,6 +414,141 @@ mod tests {
         dbg!(get_result);
 
         client.close().await.unwrap();
+
+        pool.close().await.unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn reconfigure() {
+        let _ = env_logger::try_init();
+
+        let instant = Instant::now().add(Duration::new(7, 0));
+
+        let (orphan_tx, mut orphan_rx) = unbounded_channel::<ResponsePacket>();
+
+        tokio::spawn(async move {
+            loop {
+                match orphan_rx.recv().await {
+                    Some(resp) => {
+                        dbg!("unexpected orphan", resp);
+                    }
+                    None => {
+                        return;
+                    }
+                }
+            }
+        });
+
+        let client_config = KvClientConfig {
+            address: "192.168.107.128:11210"
+                .parse()
+                .expect("Failed to parse address"),
+            root_certs: None,
+            accept_all_certs: None,
+            client_name: "myclient".to_string(),
+            authenticator: Some(Arc::new(PasswordAuthenticator {
+                username: "Administrator".to_string(),
+                password: "password".to_string(),
+            })),
+            selected_bucket: None,
+            disable_default_features: false,
+            disable_error_map: false,
+            disable_bootstrap: false,
+        };
+
+        let pool_config = KvClientPoolConfig {
+            num_connections: 1,
+            client_config,
+        };
+
+        let pool: NaiveKvClientPool<StdKvClient<Client>> = NaiveKvClientPool::new(
+            pool_config,
+            KvClientPoolOptions {
+                connect_timeout: Default::default(),
+                connect_throttle_period: Default::default(),
+                orphan_handler: Arc::new(orphan_tx),
+            },
+        )
+        .await;
+
+        let client_config = KvClientConfig {
+            address: "192.168.107.128:11210"
+                .parse()
+                .expect("Failed to parse address"),
+            root_certs: None,
+            accept_all_certs: None,
+            client_name: "myclient".to_string(),
+            authenticator: Some(Arc::new(PasswordAuthenticator {
+                username: "Administrator".to_string(),
+                password: "password".to_string(),
+            })),
+            selected_bucket: Some("default".to_string()),
+            disable_default_features: false,
+            disable_error_map: false,
+            disable_bootstrap: false,
+        };
+
+        let client = pool.get_client().await.unwrap();
+        let result = client
+            .set(SetRequest {
+                collection_id: 0,
+                key: "test".as_bytes().into(),
+                vbucket_id: 1,
+                flags: 0,
+                value: "test".as_bytes().into(),
+                datatype: 0,
+                expiry: None,
+                preserve_expiry: None,
+                cas: None,
+                on_behalf_of: None,
+                durability_level: None,
+                durability_level_timeout: None,
+            })
+            .await;
+        if result.is_ok() {
+            panic!("result did not contain an error");
+        }
+
+        pool.reconfigure(KvClientPoolConfig {
+            num_connections: 1,
+            client_config,
+        })
+        .await
+        .unwrap();
+
+        let client = pool.get_client().await.unwrap();
+
+        let result = client
+            .set(SetRequest {
+                collection_id: 0,
+                key: "test".as_bytes().into(),
+                vbucket_id: 1,
+                flags: 0,
+                value: "test".as_bytes().into(),
+                datatype: 0,
+                expiry: None,
+                preserve_expiry: None,
+                cas: None,
+                on_behalf_of: None,
+                durability_level: None,
+                durability_level_timeout: None,
+            })
+            .await
+            .unwrap();
+
+        dbg!(result);
+
+        let get_result = client
+            .get(GetRequest {
+                collection_id: 0,
+                key: "test".as_bytes().into(),
+                vbucket_id: 1,
+                on_behalf_of: None,
+            })
+            .await
+            .unwrap();
+
+        dbg!(get_result);
 
         pool.close().await.unwrap();
     }

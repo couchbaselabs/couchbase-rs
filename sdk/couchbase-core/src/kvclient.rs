@@ -1,12 +1,12 @@
 use std::future::Future;
 use std::net::SocketAddr;
 use std::ops::{Add, Deref};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
-use tokio::sync::mpsc::{Sender, UnboundedSender};
-use tokio::sync::oneshot;
+use tokio::sync::{Mutex, oneshot};
+use tokio::sync::mpsc::UnboundedSender;
 use tokio::time::Instant;
 use tokio_rustls::rustls::RootCertStore;
 use uuid::Uuid;
@@ -60,10 +60,10 @@ pub(crate) struct KvClientOptions {
 
 pub(crate) trait KvClient: Sized + PartialEq + Send + Sync {
     fn new(
-        config: Arc<KvClientConfig>,
+        config: KvClientConfig,
         opts: KvClientOptions,
     ) -> impl Future<Output = CoreResult<Self>> + Send;
-    fn reconfigure(&self, config: Arc<KvClientConfig>, on_complete: Sender<CoreResult<()>>);
+    fn reconfigure(&self, config: KvClientConfig) -> impl Future<Output = CoreResult<()>> + Send;
     fn has_feature(&self, feature: HelloFeature) -> bool;
     fn load_factor(&self) -> f64;
     fn remote_addr(&self) -> SocketAddr;
@@ -79,7 +79,7 @@ pub(crate) struct StdKvClient<D: Dispatcher> {
 
     pending_operations: u64,
     cli: D,
-    current_config: Arc<KvClientConfig>,
+    current_config: Mutex<KvClientConfig>,
 
     supported_features: Vec<HelloFeature>,
 
@@ -87,7 +87,7 @@ pub(crate) struct StdKvClient<D: Dispatcher> {
     // so that we can use it in our errors.  Note that it is set before
     // we send the operation to select the bucket, since things happen
     // asynchronously and we do not support changing selected buckets.
-    selected_bucket: Arc<Mutex<Option<String>>>,
+    selected_bucket: Mutex<Option<String>>,
 
     closed: Arc<AtomicBool>,
 
@@ -101,17 +101,13 @@ where
     pub fn client(&self) -> &D {
         &self.cli
     }
-
-    pub fn client_mut(&mut self) -> &mut D {
-        &mut self.cli
-    }
 }
 
 impl<D> KvClient for StdKvClient<D>
 where
     D: Dispatcher,
 {
-    async fn new(config: Arc<KvClientConfig>, opts: KvClientOptions) -> CoreResult<StdKvClient<D>> {
+    async fn new(config: KvClientConfig, opts: KvClientOptions) -> CoreResult<StdKvClient<D>> {
         let requested_features = if config.disable_default_features {
             vec![]
         } else {
@@ -174,13 +170,13 @@ where
 
         if should_bootstrap && config.disable_bootstrap {
             // TODO: error model needs thought.
-            return Err(CoreError {
-                msg: "oopsies".to_string(),
-            });
+            return Err(CoreError::Placeholder(
+                "Bootstrap was disabled but options requiring bootstrap were specified".to_string(),
+            ));
         }
 
         let (connection_close_tx, mut connection_close_rx) =
-            oneshot::channel::<crate::memdx::client::Result<()>>();
+            oneshot::channel::<crate::memdx::client::MemdxResult<()>>();
         let memdx_client_opts = DispatcherOptions {
             on_connection_close_handler: Some(connection_close_tx),
             orphan_handler: opts.orphan_handler,
@@ -213,9 +209,9 @@ where
             local_addr,
             pending_operations: 0,
             cli,
-            current_config: config,
+            current_config: Mutex::new(config),
             supported_features: vec![],
-            selected_bucket: Arc::new(Mutex::new(None)),
+            selected_bucket: Mutex::new(None),
             closed,
             id: id.clone(),
         };
@@ -234,7 +230,7 @@ where
 
         if should_bootstrap {
             if let Some(b) = &bootstrap_select_bucket {
-                let mut guard = kv_cli.selected_bucket.lock().unwrap();
+                let mut guard = kv_cli.selected_bucket.lock().await;
                 *guard = Some(b.bucket_name.clone());
             };
 
@@ -264,8 +260,64 @@ where
         Ok(kv_cli)
     }
 
-    fn reconfigure(&self, config: Arc<KvClientConfig>, on_complete: Sender<CoreResult<()>>) {
-        todo!()
+    async fn reconfigure(&self, config: KvClientConfig) -> CoreResult<()> {
+        let mut current_config = self.current_config.lock().await;
+
+        // TODO: compare root certs or something somehow.
+        if !(current_config.address == config.address
+            && current_config.accept_all_certs == config.accept_all_certs
+            && current_config.client_name == config.client_name
+            && current_config.disable_default_features == config.disable_default_features
+            && current_config.disable_error_map == config.disable_error_map
+            && current_config.disable_bootstrap == config.disable_bootstrap)
+        {
+            return Err(CoreError::Placeholder(
+                "Cannot reconfigure due to conflicting options".to_string(),
+            ));
+        }
+
+        let selected_bucket_name = if current_config.selected_bucket != config.selected_bucket {
+            if current_config.selected_bucket.is_some() {
+                return Err(CoreError::Placeholder(
+                    "Cannot reconfigure from one selected bucket to another".to_string(),
+                ));
+            }
+
+            current_config
+                .selected_bucket
+                .clone_from(&config.selected_bucket);
+            config.selected_bucket.clone()
+        } else {
+            None
+        };
+
+        if *current_config.deref() != config {
+            return Err(CoreError::Placeholder(
+                "Client config after reconfigure did not match new configuration".to_string(),
+            ));
+        }
+
+        if let Some(bucket_name) = selected_bucket_name {
+            let mut current_bucket = self.selected_bucket.lock().await;
+            *current_bucket = Some(bucket_name.clone());
+            drop(current_bucket);
+
+            match self
+                .select_bucket(SelectBucketRequest { bucket_name })
+                .await
+            {
+                Ok(_) => {}
+                Err(e) => {
+                    let mut current_bucket = self.selected_bucket.lock().await;
+                    *current_bucket = None;
+                    drop(current_bucket);
+
+                    current_config.selected_bucket = None;
+                }
+            }
+        }
+
+        Ok(())
     }
 
     fn has_feature(&self, feature: HelloFeature) -> bool {
@@ -286,9 +338,7 @@ where
 
     async fn close(&self) -> CoreResult<()> {
         if self.closed.swap(true, Ordering::Relaxed) {
-            return Err(CoreError {
-                msg: "closed".to_string(),
-            });
+            return Err(CoreError::Placeholder("Client closed".to_string()));
         }
 
         Ok(self.cli.close().await?)
@@ -362,7 +412,7 @@ mod tests {
         };
 
         let mut client = StdKvClient::<Client>::new(
-            Arc::new(client_config),
+            client_config,
             KvClientOptions {
                 orphan_handler: Arc::new(orphan_tx),
                 on_close_tx: None,

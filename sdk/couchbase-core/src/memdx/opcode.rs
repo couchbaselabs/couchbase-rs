@@ -1,6 +1,6 @@
 use std::fmt::{Display, Formatter};
 
-use crate::memdx::error::Error;
+use crate::memdx::error::MemdxError;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum OpCode {
@@ -34,7 +34,7 @@ impl From<OpCode> for u8 {
 }
 
 impl TryFrom<u8> for OpCode {
-    type Error = Error;
+    type Error = MemdxError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         let code = match value {
@@ -49,7 +49,7 @@ impl TryFrom<u8> for OpCode {
             0xb5 => OpCode::GetClusterConfig,
             0xfe => OpCode::GetErrorMap,
             _ => {
-                return Err(Error::Protocol(format!("unknown opcode {}", value)));
+                return Err(MemdxError::Protocol(format!("unknown opcode {}", value)));
             }
         };
 

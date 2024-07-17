@@ -12,8 +12,8 @@ use tokio_rustls::rustls::client::danger::{
 use tokio_rustls::rustls::pki_types::{CertificateDer, IpAddr, ServerName, UnixTime};
 use tokio_rustls::TlsConnector;
 
-use crate::memdx::client::Result;
-use crate::memdx::error::Error;
+use crate::memdx::client::MemdxResult;
+use crate::memdx::error::MemdxError;
 
 #[derive(Debug, Default)]
 pub struct TlsConfig {
@@ -42,7 +42,7 @@ pub struct Connection {
 }
 
 impl Connection {
-    pub async fn connect(addr: SocketAddr, opts: ConnectOptions) -> Result<Connection> {
+    pub async fn connect(addr: SocketAddr, opts: ConnectOptions) -> MemdxResult<Connection> {
         let remote_addr = addr.to_string();
 
         if let Some(tls_config) = opts.tls_config {
@@ -55,7 +55,7 @@ impl Connection {
             } else if let Some(roots) = tls_config.root_certs {
                 builder.with_root_certificates(roots).with_no_client_auth()
             } else {
-                return Err(Error::Generic(
+                return Err(MemdxError::Generic(
                     "If tls config is specified then roots or accept_all_certs must be specified"
                         .to_string(),
                 ));
@@ -63,11 +63,11 @@ impl Connection {
 
             let tcp_socket = timeout_at(opts.deadline, TcpStream::connect(remote_addr))
                 .await?
-                .map_err(|e| Error::Connect(e.kind()))?;
+                .map_err(|e| MemdxError::Connect(e.kind()))?;
 
             tcp_socket
                 .set_nodelay(false)
-                .map_err(|e| Error::Connect(e.kind()))?;
+                .map_err(|e| MemdxError::Connect(e.kind()))?;
 
             let local_addr = match tcp_socket.local_addr() {
                 Ok(addr) => Some(addr),
@@ -84,7 +84,7 @@ impl Connection {
                 connector.connect(ServerName::IpAddress(IpAddr::from(addr.ip())), tcp_socket),
             )
             .await?
-            .map_err(|e| Error::Connect(e.kind()))?;
+            .map_err(|e| MemdxError::Connect(e.kind()))?;
 
             Ok(Connection {
                 inner: ConnectionType::Tls(socket),
@@ -94,10 +94,10 @@ impl Connection {
         } else {
             let socket = timeout_at(opts.deadline, TcpStream::connect(remote_addr))
                 .await?
-                .map_err(|e| Error::Connect(e.kind()))?;
+                .map_err(|e| MemdxError::Connect(e.kind()))?;
             socket
                 .set_nodelay(false)
-                .map_err(|e| Error::Connect(e.kind()))?;
+                .map_err(|e| MemdxError::Connect(e.kind()))?;
 
             let local_addr = match socket.local_addr() {
                 Ok(addr) => Some(addr),

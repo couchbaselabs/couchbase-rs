@@ -6,7 +6,7 @@ use tokio::time::error::Elapsed;
 use crate::scram::ScramError;
 
 #[derive(thiserror::Error, Debug, Eq, PartialEq)]
-pub enum Error {
+pub enum MemdxError {
     #[error("Connect failed {0}")]
     Connect(io::ErrorKind),
     #[error("Dispatch failed {0}")]
@@ -67,19 +67,19 @@ impl Display for CancellationErrorKind {
 }
 
 // TODO: improve this.
-impl From<io::Error> for Error {
+impl From<io::Error> for MemdxError {
     fn from(value: io::Error) -> Self {
-        Error::Unknown(value.to_string())
+        MemdxError::Unknown(value.to_string())
     }
 }
 
-impl From<ScramError> for Error {
+impl From<ScramError> for MemdxError {
     fn from(value: ScramError) -> Self {
         Self::Auth(value.to_string())
     }
 }
 
-impl From<Elapsed> for Error {
+impl From<Elapsed> for MemdxError {
     fn from(_value: Elapsed) -> Self {
         Self::Cancelled(CancellationErrorKind::Timeout)
     }
