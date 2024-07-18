@@ -279,6 +279,7 @@ mod tests {
 
     use crate::authenticator::PasswordAuthenticator;
     use crate::kvclient::{KvClient, KvClientConfig, StdKvClient};
+    use crate::kvclient_ops::KvClientOps;
     use crate::kvclientmanager::{
         KvClientManager, KvClientManagerConfig, KvClientManagerOptions, StdKvClientManager,
     };

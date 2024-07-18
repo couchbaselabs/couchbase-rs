@@ -10,12 +10,13 @@ use tokio::time::{Instant, sleep};
 
 use crate::error::CoreError;
 use crate::kvclient::{KvClient, KvClientConfig, KvClientOptions};
+use crate::kvclient_ops::KvClientOps;
 use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::packet::ResponsePacket;
 use crate::result::CoreResult;
 
 pub(crate) trait KvClientPool: Sized + Send + Sync {
-    type Client: KvClient + Send + Sync;
+    type Client: KvClient + KvClientOps + Send + Sync;
 
     fn new(
         config: KvClientPoolConfig,
@@ -263,7 +264,7 @@ where
 
 impl<K> KvClientPool for NaiveKvClientPool<K>
 where
-    K: KvClient + PartialEq + Sync + Send + 'static,
+    K: KvClient + KvClientOps + PartialEq + Sync + Send + 'static,
 {
     type Client = K;
 
@@ -323,6 +324,7 @@ mod tests {
 
     use crate::authenticator::PasswordAuthenticator;
     use crate::kvclient::{KvClient, KvClientConfig, StdKvClient};
+    use crate::kvclient_ops::KvClientOps;
     use crate::kvclientpool::{
         KvClientPool, KvClientPoolConfig, KvClientPoolOptions, NaiveKvClientPool,
     };

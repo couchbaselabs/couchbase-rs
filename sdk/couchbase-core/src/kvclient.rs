@@ -369,6 +369,7 @@ mod tests {
 
     use crate::authenticator::PasswordAuthenticator;
     use crate::kvclient::{KvClient, KvClientConfig, KvClientOptions, StdKvClient};
+    use crate::kvclient_ops::KvClientOps;
     use crate::memdx::client::Client;
     use crate::memdx::packet::ResponsePacket;
     use crate::memdx::request::{GetRequest, SetRequest};
