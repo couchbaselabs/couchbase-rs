@@ -1,3 +1,5 @@
+use std::future::Future;
+
 use crate::error::CoreError;
 use crate::kvclient::{KvClient, StdKvClient};
 use crate::memdx::dispatcher::Dispatcher;
@@ -6,9 +8,49 @@ use crate::memdx::op_bootstrap::{BootstrapOptions, OpBootstrap, OpBootstrapEncod
 use crate::memdx::ops_core::OpsCore;
 use crate::memdx::ops_crud::OpsCrud;
 use crate::memdx::pendingop::PendingOp;
-use crate::memdx::request::{GetRequest, SelectBucketRequest, SetRequest};
-use crate::memdx::response::{BootstrapResult, GetResponse, SelectBucketResponse, SetResponse};
+use crate::memdx::request::{GetClusterConfigRequest, GetRequest, SelectBucketRequest, SetRequest};
+use crate::memdx::response::{
+    BootstrapResult, GetClusterConfigResponse, GetResponse, SelectBucketResponse, SetResponse,
+};
 use crate::result::CoreResult;
+
+pub(crate) trait KvClientOps: Sized + Send + Sync {
+    fn set(&self, req: SetRequest) -> impl Future<Output = CoreResult<SetResponse>> + Send;
+    fn get(&self, req: GetRequest) -> impl Future<Output = CoreResult<GetResponse>> + Send;
+    fn get_cluster_config(
+        &self,
+        req: GetClusterConfigRequest,
+    ) -> impl Future<Output = CoreResult<GetClusterConfigResponse>> + Send;
+}
+
+impl<D> KvClientOps for StdKvClient<D>
+where
+    D: Dispatcher,
+{
+    async fn set(&self, req: SetRequest) -> CoreResult<SetResponse> {
+        let mut op = self.ops_crud().set(self.client(), req).await?;
+
+        let res = op.recv().await?;
+        Ok(res)
+    }
+
+    async fn get(&self, req: GetRequest) -> CoreResult<GetResponse> {
+        let mut op = self.ops_crud().get(self.client(), req).await?;
+
+        let res = op.recv().await?;
+        Ok(res)
+    }
+
+    async fn get_cluster_config(
+        &self,
+        req: GetClusterConfigRequest,
+    ) -> CoreResult<GetClusterConfigResponse> {
+        let mut op = OpsCore {}.get_cluster_config(self.client(), req).await?;
+
+        let res = op.recv().await?;
+        Ok(res)
+    }
+}
 
 impl<D> StdKvClient<D>
 where
@@ -28,20 +70,6 @@ where
             .select_bucket(self.client(), req)
             .await
             .map_err(CoreError::from)?;
-
-        let res = op.recv().await?;
-        Ok(res)
-    }
-
-    pub async fn get(&self, req: GetRequest) -> CoreResult<GetResponse> {
-        let mut op = self.ops_crud().get(self.client(), req).await?;
-
-        let res = op.recv().await?;
-        Ok(res)
-    }
-
-    pub async fn set(&self, req: SetRequest) -> CoreResult<SetResponse> {
-        let mut op = self.ops_crud().set(self.client(), req).await?;
 
         let res = op.recv().await?;
         Ok(res)

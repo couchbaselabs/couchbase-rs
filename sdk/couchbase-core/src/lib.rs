@@ -1,11 +1,15 @@
 pub mod authenticator;
 pub mod cbconfig;
+mod configparser;
+mod configwatcher;
 mod error;
 mod kvclient;
 mod kvclient_ops;
 mod kvclientmanager;
 mod kvclientpool;
 pub mod memdx;
+mod parsedconfig;
 pub mod result;
 mod scram;
 pub mod service_type;
+mod vbucketmap;
