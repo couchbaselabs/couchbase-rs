@@ -26,12 +26,12 @@ use crate::memdx::client_response::ClientResponse;
 use crate::memdx::codec::KeyValueCodec;
 use crate::memdx::connection::{Connection, ConnectionType};
 use crate::memdx::dispatcher::{Dispatcher, DispatcherOptions};
-use crate::memdx::error::{CancellationErrorKind, MemdxError};
+use crate::memdx::error;
+use crate::memdx::error::{CancellationErrorKind, Error, ErrorKind};
 use crate::memdx::packet::{RequestPacket, ResponsePacket};
 use crate::memdx::pendingop::ClientPendingOp;
 
-pub type MemdxResult<T> = std::result::Result<T, MemdxError>;
-type ResponseSender = Sender<MemdxResult<ClientResponse>>;
+type ResponseSender = Sender<error::Result<ClientResponse>>;
 type OpaqueMap = HashMap<u32, Arc<ResponseSender>>;
 pub(crate) type CancellationSender = UnboundedSender<(u32, CancellationErrorKind)>;
 
@@ -41,7 +41,7 @@ struct ReadLoopOptions {
     pub local_addr: Option<SocketAddr>,
     pub peer_addr: Option<SocketAddr>,
     pub orphan_handler: Arc<UnboundedSender<ResponsePacket>>,
-    pub on_connection_close_tx: Option<oneshot::Sender<MemdxResult<()>>>,
+    pub on_connection_close_tx: Option<oneshot::Sender<error::Result<()>>>,
     pub on_client_close_rx: Receiver<()>,
 }
 
@@ -90,7 +90,10 @@ impl Client {
         for entry in opaque_map.iter() {
             entry
                 .1
-                .send(Err(MemdxError::ClosedInFlight))
+                .send(Err(ErrorKind::Cancelled(
+                    CancellationErrorKind::ClosedInFlight,
+                )
+                .into()))
                 .await
                 .unwrap_or_default();
         }
@@ -100,7 +103,7 @@ impl Client {
         stream: FramedRead<ReadHalf<TcpStream>, KeyValueCodec>,
         op_cancel_rx: UnboundedReceiver<(u32, CancellationErrorKind)>,
         opaque_map: MutexGuard<'_, OpaqueMap>,
-        on_connection_close_tx: Option<oneshot::Sender<MemdxResult<()>>>,
+        on_connection_close_tx: Option<oneshot::Sender<error::Result<()>>>,
     ) {
         drop(stream);
         drop(op_cancel_rx);
@@ -138,7 +141,7 @@ impl Client {
                                 drop(map);
 
                                 sender
-                                    .send(Err(MemdxError::Cancelled(cancel_info.1)))
+                                    .send(Err(ErrorKind::Cancelled(cancel_info.1).into()))
                                     .await
                                     .unwrap();
                             } else {
@@ -300,7 +303,7 @@ impl Dispatcher for Client {
         }
     }
 
-    async fn dispatch(&self, mut packet: RequestPacket) -> MemdxResult<ClientPendingOp> {
+    async fn dispatch(&self, mut packet: RequestPacket) -> error::Result<ClientPendingOp> {
         let (response_tx, response_rx) = mpsc::channel(1);
         let opaque = self.register_handler(Arc::new(response_tx)).await;
         packet.opaque = Some(opaque);
@@ -323,14 +326,14 @@ impl Dispatcher for Client {
                 let mut map = requests.lock().await;
                 map.remove(&opaque);
 
-                Err(MemdxError::Dispatch(e.kind()))
+                Err(ErrorKind::Dispatch(Arc::new(e)).into())
             }
         }
     }
 
-    async fn close(&self) -> MemdxResult<()> {
+    async fn close(&self) -> error::Result<()> {
         if self.closed.swap(true, Ordering::SeqCst) {
-            return Err(MemdxError::Closed);
+            return Err(ErrorKind::Closed.into());
         }
 
         let mut close_err = None;
@@ -354,7 +357,7 @@ impl Dispatcher for Client {
         Self::drain_opaque_map(map).await;
 
         if let Some(e) = close_err {
-            return Err(MemdxError::from(e));
+            return Err(ErrorKind::Io(Arc::new(e)).into());
         }
 
         Ok(())
@@ -405,7 +408,7 @@ mod tests {
         .expect("Could not connect");
 
         let (orphan_tx, mut orphan_rx) = unbounded_channel::<ResponsePacket>();
-        let (close_tx, mut close_rx) = oneshot::channel::<crate::memdx::client::MemdxResult<()>>();
+        let (close_tx, mut close_rx) = oneshot::channel::<crate::memdx::error::Result<()>>();
 
         tokio::spawn(async move {
             loop {

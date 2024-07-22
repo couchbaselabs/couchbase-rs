@@ -2,9 +2,9 @@ use log::warn;
 use tokio::select;
 use tokio::time::{Instant, sleep};
 
-use crate::memdx::client::MemdxResult;
 use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::error::CancellationErrorKind;
+use crate::memdx::error::Result;
 use crate::memdx::op_auth_saslauto::{OpSASLAutoEncoder, OpsSASLAuthAuto, SASLAuthAutoOptions};
 use crate::memdx::op_auth_saslplain::OpSASLPlainEncoder;
 use crate::memdx::pendingop::{PendingOp, run_op_future_with_deadline, StandardPendingOp};
@@ -22,7 +22,7 @@ pub trait OpBootstrapEncoder {
         &self,
         dispatcher: &D,
         request: HelloRequest,
-    ) -> impl std::future::Future<Output = MemdxResult<StandardPendingOp<HelloResponse>>>
+    ) -> impl std::future::Future<Output = Result<StandardPendingOp<HelloResponse>>>
     where
         D: Dispatcher;
 
@@ -30,7 +30,7 @@ pub trait OpBootstrapEncoder {
         &self,
         dispatcher: &D,
         request: GetErrorMapRequest,
-    ) -> impl std::future::Future<Output = MemdxResult<StandardPendingOp<GetErrorMapResponse>>>
+    ) -> impl std::future::Future<Output = Result<StandardPendingOp<GetErrorMapResponse>>>
     where
         D: Dispatcher;
 
@@ -38,7 +38,7 @@ pub trait OpBootstrapEncoder {
         &self,
         dispatcher: &D,
         request: SelectBucketRequest,
-    ) -> impl std::future::Future<Output = MemdxResult<StandardPendingOp<SelectBucketResponse>>>
+    ) -> impl std::future::Future<Output = Result<StandardPendingOp<SelectBucketResponse>>>
     where
         D: Dispatcher;
 
@@ -46,7 +46,7 @@ pub trait OpBootstrapEncoder {
         &self,
         dispatcher: &D,
         request: GetClusterConfigRequest,
-    ) -> impl std::future::Future<Output = MemdxResult<StandardPendingOp<GetClusterConfigResponse>>>
+    ) -> impl std::future::Future<Output = Result<StandardPendingOp<GetClusterConfigResponse>>>
     where
         D: Dispatcher;
 }
@@ -70,7 +70,7 @@ impl OpBootstrap {
         encoder: E,
         dispatcher: &D,
         opts: BootstrapOptions,
-    ) -> MemdxResult<BootstrapResult>
+    ) -> Result<BootstrapResult>
     where
         E: OpBootstrapEncoder + OpSASLAutoEncoder,
         D: Dispatcher,

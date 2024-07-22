@@ -1,6 +1,6 @@
 use std::fmt::{Display, Formatter};
 
-use crate::memdx::error::MemdxError;
+use crate::memdx::error::Error;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum OpCode {
@@ -14,6 +14,7 @@ pub enum OpCode {
     SASLAuth,
     SASLListMechs,
     SASLStep,
+    Unknown(u8),
 }
 
 impl From<OpCode> for u8 {
@@ -29,12 +30,13 @@ impl From<OpCode> for u8 {
             OpCode::SelectBucket => 0x89,
             OpCode::GetClusterConfig => 0xb5,
             OpCode::GetErrorMap => 0xfe,
+            OpCode::Unknown(code) => code,
         }
     }
 }
 
 impl TryFrom<u8> for OpCode {
-    type Error = MemdxError;
+    type Error = Error;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         let code = match value {
@@ -48,9 +50,7 @@ impl TryFrom<u8> for OpCode {
             0x89 => OpCode::SelectBucket,
             0xb5 => OpCode::GetClusterConfig,
             0xfe => OpCode::GetErrorMap,
-            _ => {
-                return Err(MemdxError::Protocol(format!("unknown opcode {}", value)));
-            }
+            _ => OpCode::Unknown(value),
         };
 
         Ok(code)
@@ -70,6 +70,9 @@ impl Display for OpCode {
             OpCode::SASLAuth => "SASL auth",
             OpCode::SASLListMechs => "SASL list mechanisms",
             OpCode::SASLStep => "SASL step",
+            OpCode::Unknown(code) => {
+                return write!(f, "x{:02x}", code);
+            }
         };
         write!(f, "{}", txt)
     }

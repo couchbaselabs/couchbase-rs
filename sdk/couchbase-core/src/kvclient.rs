@@ -176,7 +176,7 @@ where
         }
 
         let (connection_close_tx, mut connection_close_rx) =
-            oneshot::channel::<crate::memdx::client::MemdxResult<()>>();
+            oneshot::channel::<crate::memdx::error::Result<()>>();
         let memdx_client_opts = DispatcherOptions {
             on_connection_close_handler: Some(connection_close_tx),
             orphan_handler: opts.orphan_handler,

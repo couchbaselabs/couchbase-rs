@@ -1,8 +1,8 @@
 use tokio::time::Instant;
 
 use crate::memdx::auth_mechanism::AuthMechanism;
-use crate::memdx::client::MemdxResult;
 use crate::memdx::dispatcher::Dispatcher;
+use crate::memdx::error::Result;
 use crate::memdx::op_auth_saslplain::{OpSASLPlainEncoder, OpsSASLAuthPlain, SASLAuthPlainOptions};
 use crate::memdx::op_auth_saslscram::{OpSASLScramEncoder, OpsSASLAuthScram, SASLAuthScramOptions};
 
@@ -27,7 +27,7 @@ impl OpsSASLAuthByName {
         encoder: &E,
         dispatcher: &D,
         opts: SASLAuthByNameOptions,
-    ) -> MemdxResult<()>
+    ) -> Result<()>
     where
         E: OpSASLAuthByNameEncoder,
         D: Dispatcher,

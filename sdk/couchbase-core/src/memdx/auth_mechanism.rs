@@ -1,4 +1,4 @@
-use crate::memdx::error::MemdxError;
+use crate::memdx::error::{Error, ErrorKind};
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum AuthMechanism {
@@ -22,7 +22,7 @@ impl From<AuthMechanism> for Vec<u8> {
 }
 
 impl TryFrom<&str> for AuthMechanism {
-    type Error = MemdxError;
+    type Error = Error;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         let mech = match value {
@@ -31,10 +31,10 @@ impl TryFrom<&str> for AuthMechanism {
             "SCRAM-SHA256" => AuthMechanism::ScramSha256,
             "SCRAM-SHA512" => AuthMechanism::ScramSha512,
             _ => {
-                return Err(MemdxError::Protocol(format!(
-                    "Unknown auth mechanism {}",
-                    value
-                )));
+                return Err(ErrorKind::Protocol {
+                    msg: format!("Unknown auth mechanism {}", value),
+                }
+                .into());
             }
         };
 

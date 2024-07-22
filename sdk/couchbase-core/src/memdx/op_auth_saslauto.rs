@@ -3,11 +3,10 @@ use std::cmp::PartialEq;
 use tokio::time::Instant;
 
 use crate::memdx::auth_mechanism::AuthMechanism;
-use crate::memdx::client::MemdxResult;
 use crate::memdx::dispatcher::Dispatcher;
+use crate::memdx::error::{ErrorKind, ServerErrorKind};
 use crate::memdx::error::CancellationErrorKind::{RequestCancelled, Timeout};
-use crate::memdx::error::MemdxError;
-use crate::memdx::error::MemdxError::Generic;
+use crate::memdx::error::Result;
 use crate::memdx::op_auth_saslbyname::{
     OpSASLAuthByNameEncoder, OpsSASLAuthByName, SASLAuthByNameOptions,
 };
@@ -31,7 +30,7 @@ pub trait OpSASLAutoEncoder: OpSASLAuthByNameEncoder {
         &self,
         dispatcher: &D,
         request: SASLListMechsRequest,
-    ) -> impl std::future::Future<Output = MemdxResult<StandardPendingOp<SASLListMechsResponse>>>
+    ) -> impl std::future::Future<Output = Result<StandardPendingOp<SASLListMechsResponse>>>
     where
         D: Dispatcher;
 }
@@ -46,15 +45,16 @@ impl OpsSASLAuthAuto {
         dispatcher: &D,
         deadline: Instant,
         opts: SASLAuthAutoOptions,
-    ) -> MemdxResult<()>
+    ) -> Result<()>
     where
         E: OpSASLAutoEncoder,
         D: Dispatcher,
     {
         if opts.enabled_mechs.is_empty() {
-            return Err(Generic(
-                "Must specify at least one allowed authentication mechanism".to_string(),
-            ));
+            return Err(ErrorKind::InvalidArgument {
+                msg: "Must specify at least one allowed authentication mechanism".to_string(),
+            }
+            .into());
         }
 
         let mut op = encoder
@@ -81,10 +81,11 @@ impl OpsSASLAuthAuto {
         {
             Ok(()) => Ok(()),
             Err(e) => {
-                if e == MemdxError::Cancelled(Timeout)
-                    || e == MemdxError::Cancelled(RequestCancelled)
-                {
-                    return Err(e);
+                match e.kind.as_ref() {
+                    ErrorKind::Cancelled(Timeout) | ErrorKind::Cancelled(RequestCancelled) => {
+                        return Err(e);
+                    }
+                    _ => {}
                 }
 
                 // There is no obvious way to differentiate between a mechanism being unsupported
@@ -105,10 +106,13 @@ impl OpsSASLAuthAuto {
                 let selected_mech = match selected_mech {
                     Some(mech) => mech,
                     None => {
-                        return Err(Generic(format!(
+                        return Err(ServerErrorKind::Auth {
+                            msg: format!(
                             "No supported auth mechanism was found (enabled: {:?}, server: {:?})",
                             opts.enabled_mechs, server_mechs
-                        )));
+                        ),
+                        }
+                        .into());
                     }
                 };
 
