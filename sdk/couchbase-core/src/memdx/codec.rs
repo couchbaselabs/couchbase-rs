@@ -3,8 +3,7 @@ use std::io;
 use tokio_util::bytes::{Buf, BufMut, BytesMut};
 use tokio_util::codec::{Decoder, Encoder};
 
-use crate::memdx::error::MemdxError;
-use crate::memdx::error::MemdxError::Protocol;
+use crate::memdx::error::{Error, ErrorKind};
 use crate::memdx::magic::Magic;
 use crate::memdx::opcode::OpCode;
 use crate::memdx::packet::{RequestPacket, ResponsePacket};
@@ -17,7 +16,7 @@ pub struct KeyValueCodec(());
 
 impl Decoder for KeyValueCodec {
     type Item = ResponsePacket;
-    type Error = MemdxError;
+    type Error = Error;
 
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         let buf_len = buf.len();
@@ -28,7 +27,11 @@ impl Decoder for KeyValueCodec {
 
         let total_body_len = match buf[8..12].try_into() {
             Ok(v) => u32::from_be_bytes(v),
-            Err(e) => return Err(Protocol(e.to_string())),
+            Err(e) => {
+                return Err(Error {
+                    kind: ErrorKind::Protocol { msg: e.to_string() }.into(),
+                })
+            }
         } as usize;
 
         if buf_len < (HEADER_SIZE + total_body_len) {

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use serde::Deserialize;
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct VBucketServerMap {
     #[serde(alias = "hashAlgorithm")]
     pub hash_algorithm: String,
@@ -14,13 +14,13 @@ pub struct VBucketServerMap {
     pub vbucket_map: Vec<Vec<i16>>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct ConfigDDocs {
     #[serde(alias = "uri")]
     pub uri: String,
 }
 
-#[derive(Deserialize, Debug, Default)]
+#[derive(Deserialize, Debug, Default, Clone)]
 pub struct TerseExtNodePorts {
     #[serde(alias = "kv")]
     pub kv: Option<i64>,
@@ -61,7 +61,7 @@ pub struct TerseExtNodePorts {
     pub backup_ssl: Option<i64>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct TerseExtNodeAltAddresses {
     #[serde(alias = "ports")]
     pub ports: TerseExtNodePorts,
@@ -69,7 +69,7 @@ pub struct TerseExtNodeAltAddresses {
     pub hostname: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct TerseNodePorts {
     #[serde(alias = "direct")]
     pub direct: Option<u16>,
@@ -77,7 +77,7 @@ pub struct TerseNodePorts {
     pub proxy: Option<u16>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct TerseNodeConfig {
     #[serde(alias = "couchbaseApiBase")]
     pub couchbase_api_base: Option<String>,
@@ -87,7 +87,7 @@ pub struct TerseNodeConfig {
     pub ports: Option<TerseNodePorts>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct TerseNodeExtConfig {
     #[serde(alias = "services")]
     pub services: Option<TerseExtNodePorts>,
@@ -99,7 +99,7 @@ pub struct TerseNodeExtConfig {
     pub alternate_addresses: HashMap<String, TerseExtNodeAltAddresses>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct TerseConfig {
     #[serde(alias = "rev")]
     pub rev: i64,

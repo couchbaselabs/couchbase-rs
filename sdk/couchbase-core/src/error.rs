@@ -1,22 +1,22 @@
 use std::fmt::Display;
 
 use crate::error::CoreError::{Dispatch, Placeholder, PlaceholderMemdxWrapper};
-use crate::memdx::error::MemdxError;
+use crate::memdx::error::{Error, ErrorKind};
 
-#[derive(thiserror::Error, Debug, Eq, PartialEq)]
+#[derive(thiserror::Error, Debug)]
 pub enum CoreError {
     #[error("Dispatch error {0}")]
-    Dispatch(MemdxError),
+    Dispatch(Error),
     #[error("Placeholder error {0}")]
     Placeholder(String),
     #[error("Placeholder memdx wrapper error {0}")]
-    PlaceholderMemdxWrapper(MemdxError),
+    PlaceholderMemdxWrapper(Error),
 }
 
-impl From<MemdxError> for CoreError {
-    fn from(value: MemdxError) -> Self {
-        match value {
-            MemdxError::Dispatch(_) => Dispatch(value),
+impl From<Error> for CoreError {
+    fn from(value: Error) -> Self {
+        match value.kind.as_ref() {
+            ErrorKind::Dispatch(_) => Dispatch(value),
             _ => PlaceholderMemdxWrapper(value),
         }
     }

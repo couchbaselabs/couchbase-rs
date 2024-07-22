@@ -8,14 +8,14 @@ use tokio::sync::mpsc::Receiver;
 use tokio::time::{Instant, timeout_at};
 
 use crate::memdx::client::CancellationSender;
-use crate::memdx::client::MemdxResult;
 use crate::memdx::client_response::ClientResponse;
-use crate::memdx::error::CancellationErrorKind;
-use crate::memdx::error::MemdxError::{Cancelled, Closed};
+use crate::memdx::error::{CancellationErrorKind, ErrorKind};
+use crate::memdx::error::Error;
+use crate::memdx::error::Result;
 use crate::memdx::response::TryFromClientResponse;
 
 pub trait PendingOp<T> {
-    fn recv(&mut self) -> impl std::future::Future<Output = MemdxResult<T>>
+    fn recv(&mut self) -> impl std::future::Future<Output = Result<T>>
     where
         T: TryFromClientResponse;
     fn cancel(&mut self, e: CancellationErrorKind);
@@ -28,14 +28,14 @@ pub(crate) trait OpCanceller {
 pub struct ClientPendingOp {
     opaque: u32,
     cancel_chan: CancellationSender,
-    response_receiver: Receiver<MemdxResult<ClientResponse>>,
+    response_receiver: Receiver<Result<ClientResponse>>,
 }
 
 impl ClientPendingOp {
     pub(crate) fn new(
         opaque: u32,
         cancel_chan: CancellationSender,
-        response_receiver: Receiver<MemdxResult<ClientResponse>>,
+        response_receiver: Receiver<Result<ClientResponse>>,
     ) -> Self {
         ClientPendingOp {
             opaque,
@@ -44,10 +44,10 @@ impl ClientPendingOp {
         }
     }
 
-    pub async fn recv(&mut self) -> MemdxResult<ClientResponse> {
+    pub async fn recv(&mut self) -> Result<ClientResponse> {
         match self.response_receiver.recv().await {
             Some(r) => r,
-            None => Err(Closed),
+            None => Err(ErrorKind::Closed.into()),
         }
     }
 
@@ -76,7 +76,7 @@ impl<T: TryFromClientResponse> StandardPendingOp<T> {
 }
 
 impl<T: TryFromClientResponse> PendingOp<T> for StandardPendingOp<T> {
-    async fn recv(&mut self) -> MemdxResult<T> {
+    async fn recv(&mut self) -> Result<T> {
         let packet = self.wrapped.recv().await?;
 
         T::try_from(packet)
@@ -87,19 +87,16 @@ impl<T: TryFromClientResponse> PendingOp<T> for StandardPendingOp<T> {
     }
 }
 
-pub(super) async fn run_op_future_with_deadline<F, T, O>(
-    deadline: Instant,
-    fut: F,
-) -> MemdxResult<T>
+pub(super) async fn run_op_future_with_deadline<F, T, O>(deadline: Instant, fut: F) -> Result<T>
 where
     O: PendingOp<T>,
-    F: Future<Output = MemdxResult<O>>,
+    F: Future<Output = Result<O>>,
     T: TryFromClientResponse,
 {
     let mut op = match timeout_at(deadline, fut).await {
         Ok(op) => op?,
         Err(_e) => {
-            return Err(Cancelled(CancellationErrorKind::Timeout));
+            return Err(ErrorKind::Cancelled(CancellationErrorKind::Timeout).into());
         }
     };
 
