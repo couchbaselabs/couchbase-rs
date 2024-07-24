@@ -9,7 +9,7 @@ mod kvclientmanager;
 mod kvclientpool;
 pub mod memdx;
 mod parsedconfig;
-pub mod result;
 mod scram;
 pub mod service_type;
 mod vbucketmap;
+mod vbucketrouter;

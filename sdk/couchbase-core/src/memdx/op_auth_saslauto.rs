@@ -4,8 +4,8 @@ use tokio::time::Instant;
 
 use crate::memdx::auth_mechanism::AuthMechanism;
 use crate::memdx::dispatcher::Dispatcher;
-use crate::memdx::error::{ErrorKind, ServerErrorKind};
 use crate::memdx::error::CancellationErrorKind::{RequestCancelled, Timeout};
+use crate::memdx::error::ErrorKind;
 use crate::memdx::error::Result;
 use crate::memdx::op_auth_saslbyname::{
     OpSASLAuthByNameEncoder, OpsSASLAuthByName, SASLAuthByNameOptions,
@@ -106,13 +106,7 @@ impl OpsSASLAuthAuto {
                 let selected_mech = match selected_mech {
                     Some(mech) => mech,
                     None => {
-                        return Err(ServerErrorKind::Auth {
-                            msg: format!(
-                            "No supported auth mechanism was found (enabled: {:?}, server: {:?})",
-                            opts.enabled_mechs, server_mechs
-                        ),
-                        }
-                        .into());
+                        return Err(ErrorKind::NoSupportedAuthMechanisms.into());
                     }
                 };
 

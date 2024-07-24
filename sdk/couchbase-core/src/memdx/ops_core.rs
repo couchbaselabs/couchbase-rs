@@ -1,9 +1,10 @@
 use std::io::Write;
+use std::net::SocketAddr;
 
 use byteorder::{BigEndian, WriteBytesExt};
 
 use crate::memdx::dispatcher::Dispatcher;
-use crate::memdx::error::{Error, ServerErrorKind};
+use crate::memdx::error::{Error, ErrorKind, ServerError, ServerErrorKind};
 use crate::memdx::error::Result;
 use crate::memdx::magic::Magic;
 use crate::memdx::op_auth_saslauto::OpSASLAutoEncoder;
@@ -27,17 +28,41 @@ use crate::memdx::status::Status;
 pub struct OpsCore {}
 
 impl OpsCore {
-    pub(crate) fn decode_error(resp: &ResponsePacket) -> Error {
-        let status = resp.status;
-        if status == Status::NotMyVbucket {
-            ServerErrorKind::NotMyVbucket.into()
-        } else if status == Status::TmpFail {
-            ServerErrorKind::TmpFail.into()
-        } else {
-            ServerErrorKind::UnknownStatus { status }.into()
+    pub(crate) fn decode_error_context(
+        resp: &ResponsePacket,
+        kind: ServerErrorKind,
+        dispatched_to: &Option<SocketAddr>,
+        dispatched_from: &Option<SocketAddr>,
+    ) -> Error {
+        let mut base_cause = ServerError::new(kind, resp, dispatched_to, dispatched_from);
+
+        if let Some(value) = &resp.value {
+            if resp.status == Status::NotMyVbucket {
+                // TODO: unsure what this actually does.
+                base_cause.config = Some(value.to_vec());
+            } else {
+                base_cause.context = Some(value.to_vec())
+            }
         }
 
-        // TODO: decode error context
+        ErrorKind::Server(base_cause).into()
+    }
+
+    pub(crate) fn decode_error(
+        resp: &ResponsePacket,
+        dispatched_to: &Option<SocketAddr>,
+        dispatched_from: &Option<SocketAddr>,
+    ) -> Error {
+        let status = resp.status;
+        let base_error_kind = if status == Status::NotMyVbucket {
+            ServerErrorKind::NotMyVbucket
+        } else if status == Status::TmpFail {
+            ServerErrorKind::TmpFail
+        } else {
+            ServerErrorKind::UnknownStatus { status }
+        };
+
+        Self::decode_error_context(resp, base_error_kind, dispatched_to, dispatched_from)
     }
 }
 

@@ -1,3 +1,4 @@
+use std::net::SocketAddr;
 use std::time::Duration;
 
 use byteorder::{BigEndian, WriteBytesExt};
@@ -5,7 +6,7 @@ use bytes::{BufMut, BytesMut};
 
 use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::durability_level::{DurabilityLevel, DurabilityLevelSettings};
-use crate::memdx::error::{Error, ErrorKind, ServerErrorKind};
+use crate::memdx::error::{Error, ErrorKind, ServerError, ServerErrorKind};
 use crate::memdx::error::Result;
 use crate::memdx::ext_frame_code::{ExtReqFrameCode, ExtResFrameCode};
 use crate::memdx::magic::Magic;
@@ -178,24 +179,32 @@ impl OpsCrud {
         Ok(magic)
     }
 
-    pub(crate) fn decode_common_status(status: Status) -> Result<()> {
-        let err = match status {
-            Status::CollectionUnknown => ServerErrorKind::UnknownCollectionID.into(),
-            Status::AccessError => ServerErrorKind::Access.into(),
+    pub(crate) fn decode_common_status(
+        resp: &ResponsePacket,
+        dispatched_to: &Option<SocketAddr>,
+        dispatched_from: &Option<SocketAddr>,
+    ) -> Result<()> {
+        let kind = match resp.status {
+            Status::CollectionUnknown => ServerErrorKind::UnknownCollectionID,
+            Status::AccessError => ServerErrorKind::Access,
             _ => {
                 return Ok(());
             }
         };
 
-        Err(err)
+        Err(ErrorKind::Server(ServerError::new(kind, resp, dispatched_to, dispatched_from)).into())
     }
 
-    pub(crate) fn decode_common_error(resp: &ResponsePacket) -> Error {
-        if let Err(e) = Self::decode_common_status(resp.status) {
+    pub(crate) fn decode_common_error(
+        resp: &ResponsePacket,
+        dispatched_to: &Option<SocketAddr>,
+        dispatched_from: &Option<SocketAddr>,
+    ) -> Error {
+        if let Err(e) = Self::decode_common_status(resp, dispatched_to, dispatched_from) {
             return e;
         };
 
-        OpsCore::decode_error(resp)
+        OpsCore::decode_error(resp, dispatched_to, dispatched_from)
     }
 }
 
