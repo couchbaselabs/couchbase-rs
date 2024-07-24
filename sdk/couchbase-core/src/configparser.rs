@@ -1,20 +1,17 @@
 use std::collections::HashMap;
 
 use crate::cbconfig::{TerseConfig, TerseExtNodePorts, VBucketServerMap};
+use crate::error::Result;
 use crate::parsedconfig::{
     BucketType, ParsedConfig, ParsedConfigBucket, ParsedConfigFeatures, ParsedConfigNode,
     ParsedConfigNodeAddresses, ParsedConfigNodePorts,
 };
-use crate::result::CoreResult;
 use crate::vbucketmap::VbucketMap;
 
 pub(crate) struct ConfigParser {}
 
 impl ConfigParser {
-    pub fn parse_terse_config(
-        config: TerseConfig,
-        source_hostname: &str,
-    ) -> CoreResult<ParsedConfig> {
+    pub fn parse_terse_config(config: TerseConfig, source_hostname: &str) -> Result<ParsedConfig> {
         let rev_id = config.rev;
         let rev_epoch = config.rev_epoch.unwrap_or_default();
 
@@ -119,7 +116,7 @@ impl ConfigParser {
 
     fn parse_vbucket_server_map(
         vbucket_server_map: Option<VBucketServerMap>,
-    ) -> CoreResult<Option<VbucketMap>> {
+    ) -> Result<Option<VbucketMap>> {
         if let Some(vbucket_server_map) = vbucket_server_map {
             if vbucket_server_map.vbucket_map.is_empty() {
                 return Ok(None);

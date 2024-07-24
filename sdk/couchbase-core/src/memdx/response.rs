@@ -5,7 +5,7 @@ use byteorder::{BigEndian, ReadBytesExt};
 
 use crate::memdx::auth_mechanism::AuthMechanism;
 use crate::memdx::client_response::ClientResponse;
-use crate::memdx::error::{Error, ErrorKind, ServerErrorKind};
+use crate::memdx::error::{Error, ErrorKind, ServerError, ServerErrorKind};
 use crate::memdx::hello_feature::HelloFeature;
 use crate::memdx::ops_core::OpsCore;
 use crate::memdx::ops_crud::{decode_res_ext_frames, OpsCrud};
@@ -25,7 +25,11 @@ impl TryFromClientResponse for HelloResponse {
         let packet = resp.packet();
         let status = packet.status;
         if status != Status::Success {
-            return Err(OpsCore::decode_error(packet));
+            return Err(OpsCore::decode_error(
+                packet,
+                resp.local_addr(),
+                resp.peer_addr(),
+            ));
         }
 
         let mut features: Vec<HelloFeature> = Vec::new();
@@ -60,7 +64,11 @@ impl TryFromClientResponse for GetErrorMapResponse {
         let packet = resp.packet();
         let status = packet.status;
         if status != Status::Success {
-            return Err(OpsCore::decode_error(packet));
+            return Err(OpsCore::decode_error(
+                packet,
+                resp.local_addr(),
+                resp.peer_addr(),
+            ));
         }
 
         // TODO: Clone?
@@ -82,7 +90,11 @@ impl TryFromClientResponse for SelectBucketResponse {
             if status == Status::AccessError || status == Status::KeyNotFound {
                 return Err(ErrorKind::UnknownBucketName.into());
             }
-            return Err(OpsCore::decode_error(packet));
+            return Err(OpsCore::decode_error(
+                packet,
+                resp.local_addr(),
+                resp.peer_addr(),
+            ));
         }
 
         Ok(SelectBucketResponse {})
@@ -109,7 +121,11 @@ impl TryFromClientResponse for SASLAuthResponse {
         }
 
         if status != Status::Success {
-            return Err(OpsCore::decode_error(packet));
+            return Err(OpsCore::decode_error(
+                packet,
+                resp.local_addr(),
+                resp.peer_addr(),
+            ));
         }
 
         Ok(SASLAuthResponse {
@@ -131,7 +147,11 @@ impl TryFromClientResponse for SASLStepResponse {
         let packet = resp.packet();
         let status = packet.status;
         if status != Status::Success {
-            return Err(OpsCore::decode_error(packet));
+            return Err(OpsCore::decode_error(
+                packet,
+                resp.local_addr(),
+                resp.peer_addr(),
+            ));
         }
 
         Ok(SASLStepResponse {
@@ -157,9 +177,19 @@ impl TryFromClientResponse for SASLListMechsResponse {
                 // ns_server has not posted a configuration for the bucket to kv_engine yet. We
                 // transform this into a ErrTmpFail as we make the assumption that the
                 // SelectBucket will have failed if this was anything but a transient issue.
-                return Err(ServerErrorKind::ConfigNotSet.into());
+                return Err(ServerError::new(
+                    ServerErrorKind::ConfigNotSet,
+                    packet,
+                    resp.local_addr(),
+                    resp.peer_addr(),
+                )
+                .into());
             }
-            return Err(OpsCore::decode_error(packet));
+            return Err(OpsCore::decode_error(
+                packet,
+                resp.local_addr(),
+                resp.peer_addr(),
+            ));
         }
 
         // TODO: Clone?
@@ -208,7 +238,11 @@ impl TryFromClientResponse for GetClusterConfigResponse {
         let packet = resp.packet();
         let status = packet.status;
         if status != Status::Success {
-            return Err(OpsCore::decode_error(packet));
+            return Err(OpsCore::decode_error(
+                packet,
+                resp.local_addr(),
+                resp.peer_addr(),
+            ));
         }
 
         let host = match resp.local_addr() {
@@ -261,13 +295,35 @@ impl TryFromClientResponse for SetResponse {
         let status = packet.status;
 
         if status == Status::TooBig {
-            return Err(ServerErrorKind::TooBig.into());
+            return Err(ServerError::new(
+                ServerErrorKind::TooBig,
+                resp.packet(),
+                resp.local_addr(),
+                resp.peer_addr(),
+            )
+            .into());
         } else if status == Status::Locked {
-            return Err(ServerErrorKind::Locked.into());
+            return Err(ServerError::new(
+                ServerErrorKind::Locked,
+                resp.packet(),
+                resp.local_addr(),
+                resp.peer_addr(),
+            )
+            .into());
         } else if status == Status::KeyExists {
-            return Err(ServerErrorKind::KeyExists.into());
+            return Err(ServerError::new(
+                ServerErrorKind::KeyExists,
+                resp.packet(),
+                resp.local_addr(),
+                resp.peer_addr(),
+            )
+            .into());
         } else if status != Status::Success {
-            return Err(OpsCrud::decode_common_error(resp.packet()));
+            return Err(OpsCrud::decode_common_error(
+                resp.packet(),
+                resp.local_addr(),
+                resp.peer_addr(),
+            ));
         }
 
         let mutation_token = if let Some(extras) = &packet.extras {
@@ -320,9 +376,19 @@ impl TryFromClientResponse for GetResponse {
         let status = packet.status;
 
         if status == Status::KeyNotFound {
-            return Err(ServerErrorKind::KeyNotFound.into());
+            return Err(ServerError::new(
+                ServerErrorKind::KeyNotFound,
+                resp.packet(),
+                resp.local_addr(),
+                resp.peer_addr(),
+            )
+            .into());
         } else if status != Status::Success {
-            return Err(OpsCrud::decode_common_error(resp.packet()));
+            return Err(OpsCrud::decode_common_error(
+                resp.packet(),
+                resp.local_addr(),
+                resp.peer_addr(),
+            ));
         }
 
         let flags = if let Some(extras) = &packet.extras {

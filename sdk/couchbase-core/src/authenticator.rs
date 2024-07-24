@@ -1,16 +1,13 @@
 use std::fmt::Debug;
 
-use crate::result::CoreResult;
+use crate::error::Result;
 use crate::service_type::ServiceType;
 
 pub trait Authenticator: Debug + Send + Sync {
     // TODO: get_client_certificate needs some thought about how to expose the certificate
     // fn get_client_certificate(service: ServiceType, host_port: String) ->
-    fn get_credentials(
-        &self,
-        service_type: ServiceType,
-        host_port: String,
-    ) -> CoreResult<UserPassPair>;
+    fn get_credentials(&self, service_type: ServiceType, host_port: String)
+        -> Result<UserPassPair>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -30,7 +27,7 @@ impl Authenticator for PasswordAuthenticator {
         &self,
         _service_type: ServiceType,
         _host_port: String,
-    ) -> CoreResult<UserPassPair> {
+    ) -> Result<UserPassPair> {
         Ok(UserPassPair {
             username: self.username.clone(),
             password: self.password.clone(),

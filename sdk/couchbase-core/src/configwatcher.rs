@@ -10,16 +10,16 @@ use tokio::time::sleep;
 
 use crate::cbconfig::TerseConfig;
 use crate::configparser::ConfigParser;
+use crate::error::Result;
 use crate::kvclient::KvClient;
 use crate::kvclient_ops::KvClientOps;
 use crate::kvclientmanager::KvClientManager;
 use crate::memdx::request::GetClusterConfigRequest;
 use crate::parsedconfig::ParsedConfig;
-use crate::result::CoreResult;
 
 pub(crate) trait ConfigWatcher {
     fn watch(&self, on_shutdown_rx: Receiver<()>) -> Receiver<ParsedConfig>;
-    fn reconfigure(&self, config: ConfigWatcherMemdConfig) -> impl Future<Output = CoreResult<()>>;
+    fn reconfigure(&self, config: ConfigWatcherMemdConfig) -> impl Future<Output = Result<()>>;
 }
 
 pub(crate) struct ConfigWatcherMemdConfig {
@@ -41,7 +41,7 @@ impl<M> ConfigWatcherMemdInner<M>
 where
     M: KvClientManager,
 {
-    pub async fn reconfigure(&self, config: ConfigWatcherMemdConfig) -> CoreResult<()> {
+    pub async fn reconfigure(&self, config: ConfigWatcherMemdConfig) -> Result<()> {
         let mut endpoints = self.endpoints.lock().unwrap();
         *endpoints = config.endpoints;
 
@@ -139,7 +139,7 @@ where
         }
     }
 
-    async fn poll_one(&self, endpoint: String) -> CoreResult<ParsedConfig> {
+    async fn poll_one(&self, endpoint: String) -> Result<ParsedConfig> {
         let client = self.kv_client_manager.get_client(endpoint).await?;
 
         let addr = client.remote_addr();
@@ -189,7 +189,7 @@ where
         on_new_config_rx
     }
 
-    async fn reconfigure(&self, config: ConfigWatcherMemdConfig) -> CoreResult<()> {
+    async fn reconfigure(&self, config: ConfigWatcherMemdConfig) -> Result<()> {
         self.inner.reconfigure(config).await
     }
 }

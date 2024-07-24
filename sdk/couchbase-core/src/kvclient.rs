@@ -12,7 +12,8 @@ use tokio_rustls::rustls::RootCertStore;
 use uuid::Uuid;
 
 use crate::authenticator::Authenticator;
-use crate::error::CoreError;
+use crate::error::Error;
+use crate::error::Result;
 use crate::memdx::auth_mechanism::AuthMechanism;
 use crate::memdx::connection::{Connection, ConnectOptions};
 use crate::memdx::dispatcher::{Dispatcher, DispatcherOptions};
@@ -21,7 +22,6 @@ use crate::memdx::op_auth_saslauto::SASLAuthAutoOptions;
 use crate::memdx::op_bootstrap::BootstrapOptions;
 use crate::memdx::packet::ResponsePacket;
 use crate::memdx::request::{GetErrorMapRequest, HelloRequest, SelectBucketRequest};
-use crate::result::CoreResult;
 use crate::service_type::ServiceType;
 
 #[derive(Debug, Clone)]
@@ -62,13 +62,13 @@ pub(crate) trait KvClient: Sized + PartialEq + Send + Sync {
     fn new(
         config: KvClientConfig,
         opts: KvClientOptions,
-    ) -> impl Future<Output = CoreResult<Self>> + Send;
-    fn reconfigure(&self, config: KvClientConfig) -> impl Future<Output = CoreResult<()>> + Send;
+    ) -> impl Future<Output = Result<Self>> + Send;
+    fn reconfigure(&self, config: KvClientConfig) -> impl Future<Output = Result<()>> + Send;
     fn has_feature(&self, feature: HelloFeature) -> bool;
     fn load_factor(&self) -> f64;
     fn remote_addr(&self) -> SocketAddr;
     fn local_addr(&self) -> Option<SocketAddr>;
-    fn close(&self) -> impl Future<Output = CoreResult<()>> + Send;
+    fn close(&self) -> impl Future<Output = Result<()>> + Send;
     fn id(&self) -> &str;
 }
 
@@ -89,8 +89,6 @@ pub(crate) struct StdKvClient<D: Dispatcher> {
     // asynchronously and we do not support changing selected buckets.
     selected_bucket: Mutex<Option<String>>,
 
-    closed: Arc<AtomicBool>,
-
     id: String,
 }
 
@@ -107,7 +105,7 @@ impl<D> KvClient for StdKvClient<D>
 where
     D: Dispatcher,
 {
-    async fn new(config: KvClientConfig, opts: KvClientOptions) -> CoreResult<StdKvClient<D>> {
+    async fn new(config: KvClientConfig, opts: KvClientOptions) -> Result<StdKvClient<D>> {
         let requested_features = if config.disable_default_features {
             vec![]
         } else {
@@ -170,8 +168,8 @@ where
 
         if should_bootstrap && config.disable_bootstrap {
             // TODO: error model needs thought.
-            return Err(CoreError::Placeholder(
-                "Bootstrap was disabled but options requiring bootstrap were specified".to_string(),
+            return Err(Error::new_invalid_arguments_error(
+                "Bootstrap was disabled but options requiring bootstrap were specified",
             ));
         }
 
@@ -212,7 +210,6 @@ where
             current_config: Mutex::new(config),
             supported_features: vec![],
             selected_bucket: Mutex::new(None),
-            closed,
             id: id.clone(),
         };
 
@@ -260,7 +257,7 @@ where
         Ok(kv_cli)
     }
 
-    async fn reconfigure(&self, config: KvClientConfig) -> CoreResult<()> {
+    async fn reconfigure(&self, config: KvClientConfig) -> Result<()> {
         let mut current_config = self.current_config.lock().await;
 
         // TODO: compare root certs or something somehow.
@@ -271,15 +268,15 @@ where
             && current_config.disable_error_map == config.disable_error_map
             && current_config.disable_bootstrap == config.disable_bootstrap)
         {
-            return Err(CoreError::Placeholder(
-                "Cannot reconfigure due to conflicting options".to_string(),
+            return Err(Error::new_invalid_arguments_error(
+                "Cannot reconfigure due to conflicting options",
             ));
         }
 
         let selected_bucket_name = if current_config.selected_bucket != config.selected_bucket {
             if current_config.selected_bucket.is_some() {
-                return Err(CoreError::Placeholder(
-                    "Cannot reconfigure from one selected bucket to another".to_string(),
+                return Err(Error::new_invalid_arguments_error(
+                    "Cannot reconfigure from one selected bucket to another",
                 ));
             }
 
@@ -292,8 +289,8 @@ where
         };
 
         if *current_config.deref() != config {
-            return Err(CoreError::Placeholder(
-                "Client config after reconfigure did not match new configuration".to_string(),
+            return Err(Error::new_invalid_arguments_error(
+                "Client config after reconfigure did not match new configuration",
             ));
         }
 
@@ -336,11 +333,7 @@ where
         self.local_addr
     }
 
-    async fn close(&self) -> CoreResult<()> {
-        if self.closed.swap(true, Ordering::Relaxed) {
-            return Err(CoreError::Placeholder("Client closed".to_string()));
-        }
-
+    async fn close(&self) -> Result<()> {
         Ok(self.cli.close().await?)
     }
 

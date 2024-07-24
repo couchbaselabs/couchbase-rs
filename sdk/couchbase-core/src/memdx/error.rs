@@ -1,11 +1,17 @@
+use std::error::Error as StdError;
 use std::fmt::{Display, Formatter, Pointer};
 use std::io;
+use std::net::SocketAddr;
 use std::sync::Arc;
 
+use serde::Deserialize;
 use thiserror::Error;
 use tokio::time::error::Elapsed;
 
 use crate::memdx::error;
+use crate::memdx::error::ErrorKind::Server;
+use crate::memdx::opcode::OpCode;
+use crate::memdx::packet::ResponsePacket;
 use crate::memdx::status::Status;
 use crate::scram::ScramError;
 
@@ -46,33 +52,121 @@ pub enum ErrorKind {
     #[error("Invalid argument {msg}")]
     #[non_exhaustive]
     InvalidArgument { msg: String },
+    #[error("No supported auth mechanism was found")]
+    #[non_exhaustive]
+    NoSupportedAuthMechanisms,
 }
 
-#[derive(Clone, Debug, Error, PartialEq, Eq)]
-#[error("Server error: {kind}")]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ServerError {
     pub kind: ServerErrorKind,
     pub config: Option<Vec<u8>>,
-    pub context: Option<ServerErrorContext>,
+    pub context: Option<Vec<u8>>,
+    pub op_code: OpCode,
+    pub status: Status,
+    pub dispatched_to: String,
+    pub dispatched_from: String,
+    pub opaque: u32,
 }
 
+impl Display for ServerError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut base_msg = format!("Server error: {}, status: 0x{:02x}, opcode: {}, dispatched from: {}, dispatched to: {}, opaque: {}",
+                                   self.kind, u16::from(self.status), self.op_code, self.dispatched_from, self.dispatched_to, self.opaque);
+
+        if let Some(context) = &self.context {
+            if let Some(parsed) = Self::parse_context(context) {
+                base_msg = format!("{}, (context: {})", base_msg, parsed.text);
+            }
+        }
+
+        write!(f, "{}", base_msg)
+    }
+}
+
+impl StdError for ServerError {}
+
 impl ServerError {
-    pub(crate) fn new(kind: ServerErrorKind) -> Self {
+    pub(crate) fn new(
+        kind: ServerErrorKind,
+        resp: &ResponsePacket,
+        dispatched_to: &Option<SocketAddr>,
+        dispatched_from: &Option<SocketAddr>,
+    ) -> Self {
+        let dispatched_to = if let Some(to) = dispatched_to {
+            to.to_string()
+        } else {
+            String::new()
+        };
+        let dispatched_from = if let Some(from) = dispatched_from {
+            from.to_string()
+        } else {
+            String::new()
+        };
         Self {
             kind,
             config: None,
             context: None,
+            op_code: resp.op_code,
+            status: resp.status,
+            dispatched_to,
+            dispatched_from,
+            opaque: resp.opaque,
         }
     }
+
+    pub fn parse_context(context: &[u8]) -> Option<ServerErrorContext> {
+        if context.is_empty() {
+            return None;
+        }
+
+        let context_json: ServerErrorContextJson = match serde_json::from_slice(context) {
+            Ok(c) => c,
+            Err(_) => {
+                return None;
+            }
+        };
+
+        let text = context_json.error.context.unwrap_or_default();
+
+        let error_ref = context_json.error_ref;
+
+        let manifest_rev = context_json
+            .manifest_rev
+            .map(|manifest_rev| manifest_rev.parse().unwrap_or_default());
+
+        Some(ServerErrorContext {
+            text,
+            error_ref,
+            manifest_rev,
+        })
+    }
+}
+
+#[derive(Deserialize, Clone, Debug, PartialEq, Eq, Default)]
+struct ServerErrorContextJsonContext {
+    #[serde(alias = "context")]
+    context: Option<String>,
+}
+
+#[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+struct ServerErrorContextJson {
+    #[serde(alias = "text", default)]
+    pub error: ServerErrorContextJsonContext,
+    #[serde(alias = "ref")]
+    pub error_ref: Option<String>,
+    #[serde(alias = "manifest_uid")]
+    pub manifest_rev: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ServerErrorContext {
     pub text: String,
-    pub error_ref: String,
-    pub manifest_rev: u64,
+    pub error_ref: Option<String>,
+    pub manifest_rev: Option<u64>,
 }
 
 #[derive(Error, Clone, Debug, Eq, Hash, PartialEq)]
@@ -120,18 +214,29 @@ impl Error {
     }
 
     pub fn has_server_config(&self) -> Option<&Vec<u8>> {
-        if let ErrorKind::Server(ServerError { config, .. }) = self.kind.as_ref() {
+        if let Server(ServerError { config, .. }) = self.kind.as_ref() {
             config.as_ref()
         } else {
             None
         }
     }
 
-    pub fn has_server_error_context(&self) -> Option<&ServerErrorContext> {
-        if let ErrorKind::Server(ServerError { context, .. }) = self.kind.as_ref() {
+    pub fn has_server_error_context(&self) -> Option<&Vec<u8>> {
+        if let Server(ServerError { context, .. }) = self.kind.as_ref() {
             context.as_ref()
         } else {
             None
+        }
+    }
+
+    pub fn is_dispatch_error(&self) -> bool {
+        matches!(self.kind.as_ref(), ErrorKind::Dispatch(_))
+    }
+
+    pub fn is_notmyvbucket_error(&self) -> bool {
+        match self.kind.as_ref() {
+            Server(e) => e.kind == ServerErrorKind::NotMyVbucket,
+            _ => false,
         }
     }
 }
@@ -159,11 +264,17 @@ where
     }
 }
 
-impl From<ServerErrorKind> for Error {
-    fn from(kind: ServerErrorKind) -> Self {
+impl From<ServerError> for Error {
+    fn from(value: ServerError) -> Self {
         Self {
-            kind: Box::new(ErrorKind::Server(ServerError::new(kind))),
+            kind: Box::new(Server(value)),
         }
+    }
+}
+
+impl From<ScramError> for Error {
+    fn from(e: ScramError) -> Self {
+        ErrorKind::Protocol { msg: e.to_string() }.into()
     }
 }
 
@@ -171,16 +282,6 @@ impl From<io::Error> for Error {
     fn from(value: io::Error) -> Self {
         Self {
             kind: Box::new(ErrorKind::Io(Arc::new(value))),
-        }
-    }
-}
-
-impl From<ScramError> for Error {
-    fn from(value: ScramError) -> Self {
-        Self {
-            kind: Box::new(ErrorKind::Server(ServerError::new(ServerErrorKind::Auth {
-                msg: value.to_string(),
-            }))),
         }
     }
 }

@@ -8,12 +8,12 @@ use tokio::sync::{mpsc, Mutex};
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::time::{Instant, sleep};
 
-use crate::error::CoreError;
+use crate::error::{Error, ErrorKind};
+use crate::error::Result;
 use crate::kvclient::{KvClient, KvClientConfig, KvClientOptions};
 use crate::kvclient_ops::KvClientOps;
 use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::packet::ResponsePacket;
-use crate::result::CoreResult;
 
 pub(crate) trait KvClientPool: Sized + Send + Sync {
     type Client: KvClient + KvClientOps + Send + Sync;
@@ -22,13 +22,10 @@ pub(crate) trait KvClientPool: Sized + Send + Sync {
         config: KvClientPoolConfig,
         opts: KvClientPoolOptions,
     ) -> impl Future<Output = Self> + Send;
-    fn get_client(&self) -> impl Future<Output = CoreResult<Arc<Self::Client>>> + Send;
+    fn get_client(&self) -> impl Future<Output = Result<Arc<Self::Client>>> + Send;
     fn shutdown_client(&self, client: Arc<Self::Client>) -> impl Future<Output = ()> + Send;
-    fn close(&self) -> impl Future<Output = CoreResult<()>> + Send;
-    fn reconfigure(
-        &self,
-        config: KvClientPoolConfig,
-    ) -> impl Future<Output = CoreResult<()>> + Send;
+    fn close(&self) -> impl Future<Output = Result<()>> + Send;
+    fn reconfigure(&self, config: KvClientPoolConfig) -> impl Future<Output = Result<()>> + Send;
 }
 
 #[derive(Debug, Clone)]
@@ -56,7 +53,7 @@ where
 
     client_idx: usize,
 
-    connect_error: Option<CoreError>,
+    connect_error: Option<Error>,
     connect_error_time: Option<Instant>,
 
     orphan_handler: Arc<UnboundedSender<ResponsePacket>>,
@@ -135,7 +132,7 @@ where
         }
     }
 
-    async fn start_new_client(&mut self) -> CoreResult<K> {
+    async fn start_new_client(&mut self) -> Result<K> {
         loop {
             if let Some(error_time) = self.connect_error_time {
                 let connect_wait_period =
@@ -164,15 +161,15 @@ where
                 client.close().await.unwrap_or_default();
             }
 
-            return Err(CoreError::Placeholder("Closed".to_string()));
+            return Err(ErrorKind::Shutdown.into());
         }
 
         client_result
     }
 
-    async fn get_client_slow(&mut self) -> CoreResult<Arc<K>> {
+    async fn get_client_slow(&mut self) -> Result<Arc<K>> {
         if self.closed.load(Ordering::SeqCst) {
-            return Err(CoreError::Placeholder("Closed".to_string()));
+            return Err(ErrorKind::Shutdown.into());
         }
 
         if !self.clients.is_empty() {
@@ -184,14 +181,14 @@ where
         }
 
         if let Some(e) = &self.connect_error {
-            return Err(CoreError::Placeholder(e.to_string()));
+            return Err(e.clone());
         }
 
         self.check_connections().await;
         Box::pin(self.get_client_slow()).await
     }
 
-    pub async fn get_client(&mut self) -> CoreResult<Arc<K>> {
+    pub async fn get_client(&mut self) -> Result<Arc<K>> {
         if !self.clients.is_empty() {
             let idx = self.client_idx;
             self.client_idx += 1;
@@ -227,9 +224,9 @@ where
         self.check_connections().await;
     }
 
-    pub async fn close(&mut self) -> CoreResult<()> {
+    pub async fn close(&mut self) -> Result<()> {
         if self.closed.swap(true, Ordering::SeqCst) {
-            return Err(CoreError::Placeholder("Closed".to_string()));
+            return Err(ErrorKind::Shutdown.into());
         }
 
         for mut client in &self.clients {
@@ -240,7 +237,7 @@ where
         Ok(())
     }
 
-    pub async fn reconfigure(&mut self, config: KvClientPoolConfig) -> CoreResult<()> {
+    pub async fn reconfigure(&mut self, config: KvClientPoolConfig) -> Result<()> {
         let mut old_clients = self.clients.clone();
         let mut new_clients = vec![];
         for client in old_clients {
@@ -290,7 +287,7 @@ where
         NaiveKvClientPool { inner: clients }
     }
 
-    async fn get_client(&self) -> CoreResult<Arc<Self::Client>> {
+    async fn get_client(&self) -> Result<Arc<Self::Client>> {
         let mut clients = self.inner.lock().await;
 
         clients.get_client().await
@@ -302,12 +299,12 @@ where
         clients.shutdown_client(client).await;
     }
 
-    async fn close(&self) -> CoreResult<()> {
+    async fn close(&self) -> Result<()> {
         let mut inner = self.inner.lock().await;
         inner.close().await
     }
 
-    async fn reconfigure(&self, config: KvClientPoolConfig) -> CoreResult<()> {
+    async fn reconfigure(&self, config: KvClientPoolConfig) -> Result<()> {
         let mut inner = self.inner.lock().await;
         inner.reconfigure(config).await
     }

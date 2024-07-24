@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::error::Error;
 use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
@@ -6,11 +7,13 @@ use std::time::Duration;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::Mutex;
 
-use crate::error::CoreError;
+use crate::error::ErrorKind;
+use crate::error::Result;
 use crate::kvclient::{KvClient, KvClientConfig};
+use crate::kvclient_ops::KvClientOps;
 use crate::kvclientpool::{KvClientPool, KvClientPoolConfig, KvClientPoolOptions};
 use crate::memdx::packet::ResponsePacket;
-use crate::result::CoreResult;
+use crate::memdx::response::TryFromClientResponse;
 
 pub(crate) trait KvClientManager: Sized + Send + Sync {
     type Pool: KvClientPool + Send + Sync;
@@ -18,35 +21,24 @@ pub(crate) trait KvClientManager: Sized + Send + Sync {
     fn new(
         config: KvClientManagerConfig,
         opts: KvClientManagerOptions,
-    ) -> impl Future<Output = CoreResult<Self>> + Send;
-    fn reconfigure(
-        &self,
-        config: KvClientManagerConfig,
-    ) -> impl Future<Output = CoreResult<()>> + Send;
+    ) -> impl Future<Output = Result<Self>> + Send;
+    fn reconfigure(&self, config: KvClientManagerConfig)
+        -> impl Future<Output = Result<()>> + Send;
     fn get_client(
         &self,
         endpoint: String,
-    ) -> impl Future<
-        Output = CoreResult<Arc<<<Self as KvClientManager>::Pool as KvClientPool>::Client>>,
-    > + Send;
+    ) -> impl Future<Output = Result<Arc<<<Self as KvClientManager>::Pool as KvClientPool>::Client>>>
+           + Send;
     fn get_random_client(
         &self,
-    ) -> impl Future<
-        Output = CoreResult<Arc<<<Self as KvClientManager>::Pool as KvClientPool>::Client>>,
-    > + Send;
+    ) -> impl Future<Output = Result<Arc<<<Self as KvClientManager>::Pool as KvClientPool>::Client>>>
+           + Send;
     fn shutdown_client(
         &self,
         endpoint: String,
         client: Arc<<<Self as KvClientManager>::Pool as KvClientPool>::Client>,
-    ) -> impl Future<Output = CoreResult<()>> + Send;
-    fn close(&self) -> impl Future<Output = CoreResult<()>> + Send;
-    fn orchestrate_operation<R, Fut>(
-        &self,
-        endpoint: String,
-        operation: impl Fn(Arc<<<Self as KvClientManager>::Pool as KvClientPool>::Client>) -> Fut,
-    ) -> impl Future<Output = CoreResult<R>>
-    where
-        Fut: Future<Output = CoreResult<R>> + Send;
+    ) -> impl Future<Output = Result<()>> + Send;
+    fn close(&self) -> impl Future<Output = Result<()>> + Send;
 }
 
 #[derive(Debug)]
@@ -91,20 +83,20 @@ impl<P> StdKvClientManager<P>
 where
     P: KvClientPool,
 {
-    async fn get_pool(&self, endpoint: String) -> CoreResult<Arc<P>> {
+    async fn get_pool(&self, endpoint: String) -> Result<Arc<P>> {
         let state = self.state.lock().await;
 
         let pool = match state.client_pools.get(&endpoint) {
             Some(p) => p,
             None => {
-                return Err(CoreError::Placeholder("Endpoint not known".to_string()));
+                return Err(ErrorKind::EndpointNotKnown { endpoint }.into());
             }
         };
 
         Ok(pool.pool.clone())
     }
 
-    async fn get_random_pool(&self) -> CoreResult<Arc<P>> {
+    async fn get_random_pool(&self) -> Result<Arc<P>> {
         let state = self.state.lock().await;
 
         // Just pick one at random for now
@@ -112,7 +104,7 @@ where
             return Ok(pool.pool.clone());
         }
 
-        Err(CoreError::Placeholder("Endpoint not known".to_string()))
+        Err(ErrorKind::NoEndpointsAvailable.into())
     }
 
     async fn create_pool(&self, pool_config: KvClientPoolConfig) -> KvClientManagerPool<P> {
@@ -139,7 +131,7 @@ where
 {
     type Pool = P;
 
-    async fn new(config: KvClientManagerConfig, opts: KvClientManagerOptions) -> CoreResult<Self> {
+    async fn new(config: KvClientManagerConfig, opts: KvClientManagerOptions) -> Result<Self> {
         let manager = Self {
             state: Mutex::new(KvClientManagerState {
                 client_pools: Default::default(),
@@ -151,7 +143,7 @@ where
         Ok(manager)
     }
 
-    async fn reconfigure(&self, config: KvClientManagerConfig) -> CoreResult<()> {
+    async fn reconfigure(&self, config: KvClientManagerConfig) -> Result<()> {
         let mut guard = self.state.lock().await;
 
         let mut old_pools = std::mem::take(&mut guard.client_pools);
@@ -194,7 +186,7 @@ where
     async fn get_client(
         &self,
         endpoint: String,
-    ) -> CoreResult<Arc<<<Self as KvClientManager>::Pool as KvClientPool>::Client>> {
+    ) -> Result<Arc<<<Self as KvClientManager>::Pool as KvClientPool>::Client>> {
         let pool = self.get_pool(endpoint).await?;
 
         pool.get_client().await
@@ -202,7 +194,7 @@ where
 
     async fn get_random_client(
         &self,
-    ) -> CoreResult<Arc<<<Self as KvClientManager>::Pool as KvClientPool>::Client>> {
+    ) -> Result<Arc<<<Self as KvClientManager>::Pool as KvClientPool>::Client>> {
         let pool = self.get_random_pool().await?;
 
         pool.get_client().await
@@ -212,7 +204,7 @@ where
         &self,
         endpoint: String,
         client: Arc<<<Self as KvClientManager>::Pool as KvClientPool>::Client>,
-    ) -> CoreResult<()> {
+    ) -> Result<()> {
         let pool = self.get_pool(endpoint).await?;
 
         pool.shutdown_client(client).await;
@@ -220,7 +212,7 @@ where
         Ok(())
     }
 
-    async fn close(&self) -> CoreResult<()> {
+    async fn close(&self) -> Result<()> {
         let mut guard = self.state.lock().await;
 
         let mut old_pools = std::mem::take(&mut guard.client_pools);
@@ -232,38 +224,53 @@ where
 
         Ok(())
     }
+}
 
-    async fn orchestrate_operation<R, Fut>(
-        &self,
-        endpoint: String,
-        operation: impl Fn(Arc<P::Client>) -> Fut,
-    ) -> CoreResult<R>
-    where
-        Fut: Future<Output = CoreResult<R>> + Send,
-    {
-        loop {
-            let client = self.get_client(endpoint.clone()).await?;
+pub(crate) async fn orchestrate_memd_client<Resp, M, Fut>(
+    manager: &M,
+    endpoint: String,
+    mut operation: impl FnMut(Arc<<<M as KvClientManager>::Pool as KvClientPool>::Client>) -> Fut,
+) -> Result<Resp>
+where
+    M: KvClientManager,
+    Fut: Future<Output = Result<Resp>> + Send,
+{
+    loop {
+        let client = manager.get_client(endpoint.clone()).await?;
 
-            let res = operation(client.clone()).await;
-            match res {
-                Ok(r) => {
-                    return Ok(r);
-                }
-                Err(e) => match e {
-                    CoreError::Dispatch(_) => {
+        let res = operation(client.clone()).await;
+        match res {
+            Ok(r) => {
+                return Ok(r);
+            }
+            Err(e) => {
+                if let Some(memdx_err) = e.is_memdx_error() {
+                    if memdx_err.is_dispatch_error() {
                         // This was a dispatch error, so we can just try with
                         // a different client instead...
                         // TODO: Log something
-                        self.shutdown_client(endpoint.clone(), client)
+                        manager
+                            .shutdown_client(endpoint.clone(), client)
                             .await
                             .unwrap_or_default();
+                        continue;
                     }
-                    _ => {
-                        return Err(e);
-                    }
-                },
+                }
+
+                return Err(e);
             }
         }
+    }
+}
+
+pub(crate) struct OrchestrateMemdClientAsyncFnMut {}
+
+impl OrchestrateMemdClientAsyncFnMut {
+    async fn call<K, Resp: TryFromClientResponse>(&mut self, client: Arc<K>) -> Result<Resp>
+    where
+        K: KvClient + KvClientOps + PartialEq + Sync + Send + 'static,
+    {
+        todo!()
     }
 }
 
@@ -281,7 +288,8 @@ mod tests {
     use crate::kvclient::{KvClient, KvClientConfig, StdKvClient};
     use crate::kvclient_ops::KvClientOps;
     use crate::kvclientmanager::{
-        KvClientManager, KvClientManagerConfig, KvClientManagerOptions, StdKvClientManager,
+        KvClientManager, KvClientManagerConfig, KvClientManagerOptions, orchestrate_memd_client,
+        StdKvClientManager,
     };
     use crate::kvclientpool::{KvClientPool, NaiveKvClientPool};
     use crate::memdx::client::Client;
@@ -346,30 +354,30 @@ mod tests {
             .await
             .unwrap();
 
-        let result = manager
-            .orchestrate_operation(
-                "192.168.107.128:11210".to_string(),
-                |client: Arc<StdKvClient<Client>>| async move {
-                    client
-                        .set(SetRequest {
-                            collection_id: 0,
-                            key: "test".as_bytes().into(),
-                            vbucket_id: 1,
-                            flags: 0,
-                            value: "test".as_bytes().into(),
-                            datatype: 0,
-                            expiry: None,
-                            preserve_expiry: None,
-                            cas: None,
-                            on_behalf_of: None,
-                            durability_level: None,
-                            durability_level_timeout: None,
-                        })
-                        .await
-                },
-            )
-            .await
-            .unwrap();
+        let result = orchestrate_memd_client(
+            &manager,
+            "192.168.107.128:11210".to_string(),
+            |client: Arc<StdKvClient<Client>>| async move {
+                client
+                    .set(SetRequest {
+                        collection_id: 0,
+                        key: "test".as_bytes().into(),
+                        vbucket_id: 1,
+                        flags: 0,
+                        value: "test".as_bytes().into(),
+                        datatype: 0,
+                        expiry: None,
+                        preserve_expiry: None,
+                        cas: None,
+                        on_behalf_of: None,
+                        durability_level: None,
+                        durability_level_timeout: None,
+                    })
+                    .await
+            },
+        )
+        .await
+        .unwrap();
 
         dbg!(result);
 

@@ -1,4 +1,4 @@
-use std::fmt::{Display, Formatter};
+use std::fmt::{Display, Formatter, LowerHex};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Status {
@@ -16,6 +16,27 @@ pub enum Status {
     InvalidArgs,
 
     Unknown(u16),
+}
+
+impl From<Status> for u16 {
+    fn from(value: Status) -> Self {
+        match value {
+            Status::Success => 0x00,
+            Status::KeyNotFound => 0x01,
+            Status::KeyExists => 0x02,
+            Status::TooBig => 0x03,
+            Status::InvalidArgs => 0x04,
+            Status::Locked => 0x09,
+            Status::NotMyVbucket => 0x07,
+            Status::AuthError => 0x20,
+            Status::SASLAuthContinue => 0x21,
+            Status::AccessError => 0x24,
+            Status::TmpFail => 0x86,
+            Status::CollectionUnknown => 0x88,
+
+            Status::Unknown(value) => value,
+        }
+    }
 }
 
 impl From<u16> for Status {
