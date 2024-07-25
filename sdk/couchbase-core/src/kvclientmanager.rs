@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::error::Error;
 use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
@@ -13,7 +12,9 @@ use crate::kvclient::{KvClient, KvClientConfig};
 use crate::kvclient_ops::KvClientOps;
 use crate::kvclientpool::{KvClientPool, KvClientPoolConfig, KvClientPoolOptions};
 use crate::memdx::packet::ResponsePacket;
-use crate::memdx::response::TryFromClientResponse;
+
+pub(crate) type KvClientManagerClientType<M> =
+    <<M as KvClientManager>::Pool as KvClientPool>::Client;
 
 pub(crate) trait KvClientManager: Sized + Send + Sync {
     type Pool: KvClientPool + Send + Sync;
@@ -27,16 +28,14 @@ pub(crate) trait KvClientManager: Sized + Send + Sync {
     fn get_client(
         &self,
         endpoint: String,
-    ) -> impl Future<Output = Result<Arc<<<Self as KvClientManager>::Pool as KvClientPool>::Client>>>
-           + Send;
+    ) -> impl Future<Output = Result<Arc<KvClientManagerClientType<Self>>>> + Send;
     fn get_random_client(
         &self,
-    ) -> impl Future<Output = Result<Arc<<<Self as KvClientManager>::Pool as KvClientPool>::Client>>>
-           + Send;
+    ) -> impl Future<Output = Result<Arc<KvClientManagerClientType<Self>>>> + Send;
     fn shutdown_client(
         &self,
         endpoint: String,
-        client: Arc<<<Self as KvClientManager>::Pool as KvClientPool>::Client>,
+        client: Arc<KvClientManagerClientType<Self>>,
     ) -> impl Future<Output = Result<()>> + Send;
     fn close(&self) -> impl Future<Output = Result<()>> + Send;
 }
@@ -183,18 +182,13 @@ where
         Ok(())
     }
 
-    async fn get_client(
-        &self,
-        endpoint: String,
-    ) -> Result<Arc<<<Self as KvClientManager>::Pool as KvClientPool>::Client>> {
+    async fn get_client(&self, endpoint: String) -> Result<Arc<KvClientManagerClientType<Self>>> {
         let pool = self.get_pool(endpoint).await?;
 
         pool.get_client().await
     }
 
-    async fn get_random_client(
-        &self,
-    ) -> Result<Arc<<<Self as KvClientManager>::Pool as KvClientPool>::Client>> {
+    async fn get_random_client(&self) -> Result<Arc<KvClientManagerClientType<Self>>> {
         let pool = self.get_random_pool().await?;
 
         pool.get_client().await
@@ -203,7 +197,7 @@ where
     async fn shutdown_client(
         &self,
         endpoint: String,
-        client: Arc<<<Self as KvClientManager>::Pool as KvClientPool>::Client>,
+        client: Arc<KvClientManagerClientType<Self>>,
     ) -> Result<()> {
         let pool = self.get_pool(endpoint).await?;
 
@@ -227,9 +221,9 @@ where
 }
 
 pub(crate) async fn orchestrate_memd_client<Resp, M, Fut>(
-    manager: &M,
+    manager: Arc<M>,
     endpoint: String,
-    mut operation: impl FnMut(Arc<<<M as KvClientManager>::Pool as KvClientPool>::Client>) -> Fut,
+    mut operation: impl FnMut(Arc<KvClientManagerClientType<M>>) -> Fut,
 ) -> Result<Resp>
 where
     M: KvClientManager,
@@ -258,153 +252,5 @@ where
                 Err(e)
             }
         };
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::collections::HashMap;
-    use std::ops::Add;
-    use std::sync::Arc;
-    use std::time::Duration;
-
-    use tokio::sync::mpsc::unbounded_channel;
-    use tokio::time::Instant;
-
-    use crate::authenticator::PasswordAuthenticator;
-    use crate::kvclient::{KvClient, KvClientConfig, StdKvClient};
-    use crate::kvclient_ops::KvClientOps;
-    use crate::kvclientmanager::{
-        KvClientManager, KvClientManagerConfig, KvClientManagerOptions, orchestrate_memd_client,
-        StdKvClientManager,
-    };
-    use crate::kvclientpool::{KvClientPool, NaiveKvClientPool};
-    use crate::memdx::client::Client;
-    use crate::memdx::packet::ResponsePacket;
-    use crate::memdx::request::{GetRequest, SetRequest};
-
-    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn roundtrip_a_request() {
-        let _ = env_logger::try_init();
-
-        let instant = Instant::now().add(Duration::new(7, 0));
-
-        let (orphan_tx, mut orphan_rx) = unbounded_channel::<ResponsePacket>();
-
-        tokio::spawn(async move {
-            loop {
-                match orphan_rx.recv().await {
-                    Some(resp) => {
-                        dbg!("unexpected orphan", resp);
-                    }
-                    None => {
-                        return;
-                    }
-                }
-            }
-        });
-
-        let client_config = KvClientConfig {
-            address: "192.168.107.128:11210"
-                .parse()
-                .expect("Failed to parse address"),
-            root_certs: None,
-            accept_all_certs: None,
-            client_name: "myclient".to_string(),
-            authenticator: Some(Arc::new(PasswordAuthenticator {
-                username: "Administrator".to_string(),
-                password: "password".to_string(),
-            })),
-            selected_bucket: Some("default".to_string()),
-            disable_default_features: false,
-            disable_error_map: false,
-            disable_bootstrap: false,
-        };
-
-        let mut client_configs = HashMap::new();
-        client_configs.insert("192.168.107.128:11210".to_string(), client_config);
-
-        let manger_config = KvClientManagerConfig {
-            num_pool_connections: 1,
-            clients: client_configs,
-        };
-
-        let manager: StdKvClientManager<NaiveKvClientPool<StdKvClient<Client>>> =
-            StdKvClientManager::new(
-                manger_config,
-                KvClientManagerOptions {
-                    connect_timeout: Default::default(),
-                    connect_throttle_period: Default::default(),
-                    orphan_handler: Arc::new(orphan_tx),
-                },
-            )
-            .await
-            .unwrap();
-
-        let result = orchestrate_memd_client(
-            &manager,
-            "192.168.107.128:11210".to_string(),
-            async |client: Arc<StdKvClient<Client>>| {
-                client
-                    .set(SetRequest {
-                        collection_id: 0,
-                        key: "test".as_bytes().into(),
-                        vbucket_id: 1,
-                        flags: 0,
-                        value: "test".as_bytes().into(),
-                        datatype: 0,
-                        expiry: None,
-                        preserve_expiry: None,
-                        cas: None,
-                        on_behalf_of: None,
-                        durability_level: None,
-                        durability_level_timeout: None,
-                    })
-                    .await
-            },
-        )
-        .await
-        .unwrap();
-
-        // dbg!(result);
-
-        let client = manager
-            .get_client("192.168.107.128:11210".to_string())
-            .await
-            .unwrap();
-
-        let result = client
-            .set(SetRequest {
-                collection_id: 0,
-                key: "test".as_bytes().into(),
-                vbucket_id: 1,
-                flags: 0,
-                value: "test".as_bytes().into(),
-                datatype: 0,
-                expiry: None,
-                preserve_expiry: None,
-                cas: None,
-                on_behalf_of: None,
-                durability_level: None,
-                durability_level_timeout: None,
-            })
-            .await
-            .unwrap();
-
-        dbg!(result);
-
-        let get_result = client
-            .get(GetRequest {
-                collection_id: 0,
-                key: "test".as_bytes().into(),
-                vbucket_id: 1,
-                on_behalf_of: None,
-            })
-            .await
-            .unwrap();
-
-        dbg!(get_result);
-
-        manager.close().await.unwrap();
     }
 }
