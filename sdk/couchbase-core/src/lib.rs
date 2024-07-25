@@ -1,3 +1,5 @@
+#![feature(async_closure)]
+
 pub mod authenticator;
 pub mod cbconfig;
 mod configparser;

@@ -79,10 +79,10 @@ pub(crate) trait NotMyVbucketConfigHandler {
 
 pub(crate) async fn orchestrate_memd_routing<V, Resp: TryFromClientResponse, Fut>(
     vb: &V,
-    ch: Option<Arc<impl NotMyVbucketConfigHandler>>,
+    nmvb_handler: Arc<impl NotMyVbucketConfigHandler>,
     key: &[u8],
     vb_server_idx: u32,
-    mut operation: impl FnMut(String, u16) -> Fut,
+    mut operation: impl Fn(String, u16) -> Fut,
 ) -> Result<Resp>
 where
     V: VbucketRouter,
@@ -95,12 +95,6 @@ where
             Ok(r) => return Ok(r),
             Err(e) => e,
         };
-
-        let ch = ch.clone();
-
-        if ch.is_none() {
-            return Err(err);
-        }
 
         let config = if let Some(memdx_err) = err.is_memdx_error() {
             if memdx_err.is_notmyvbucket_error() {
@@ -134,7 +128,9 @@ where
             }
         };
 
-        ch.unwrap().not_my_vbucket_config(config_json, &endpoint);
+        nmvb_handler
+            .clone()
+            .not_my_vbucket_config(config_json, &endpoint);
 
         let (new_endpoint, new_vb_id) = vb.dispatch_by_key(key, vb_server_idx)?;
         if new_endpoint == endpoint && new_vb_id == vb_id {
@@ -280,16 +276,19 @@ mod tests {
 
         let dispatcher = StdVbucketRouter::new(routing_info, VbucketRouterOptions {});
 
+        // let dispatcher = Arc::new(dispatcher);
+        // let manager = Arc::new(manager);
+
         let set_result = orchestrate_memd_routing(
             &dispatcher,
-            Some(Arc::new(NVMBHandler {})),
+            Arc::new(NVMBHandler {}),
             b"test",
             0,
-            |endpoint: String, vb_id: u16| async {
+            async |endpoint: String, vb_id: u16| {
                 orchestrate_memd_client(
                     &manager,
                     endpoint,
-                    |client: Arc<StdKvClient<Client>>| async move {
+                    async |client: Arc<StdKvClient<Client>>| {
                         client
                             .set(SetRequest {
                                 collection_id: 0,
@@ -318,14 +317,14 @@ mod tests {
 
         let get_result = orchestrate_memd_routing(
             &dispatcher,
-            Some(Arc::new(NVMBHandler {})),
+            Arc::new(NVMBHandler {}),
             b"test",
             0,
-            |endpoint: String, vb_id: u16| async {
+            async |endpoint: String, vb_id: u16| {
                 orchestrate_memd_client(
                     &manager,
                     endpoint,
-                    |client: Arc<StdKvClient<Client>>| async move {
+                    async |client: Arc<StdKvClient<Client>>| {
                         client
                             .get(GetRequest {
                                 collection_id: 0,
