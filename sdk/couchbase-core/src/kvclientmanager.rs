@@ -239,10 +239,8 @@ where
         let client = manager.get_client(endpoint.clone()).await?;
 
         let res = operation(client.clone()).await;
-        match res {
-            Ok(r) => {
-                return Ok(r);
-            }
+        return match res {
+            Ok(r) => Ok(r),
             Err(e) => {
                 if let Some(memdx_err) = e.is_memdx_error() {
                     if memdx_err.is_dispatch_error() {
@@ -257,20 +255,9 @@ where
                     }
                 }
 
-                return Err(e);
+                Err(e)
             }
-        }
-    }
-}
-
-pub(crate) struct OrchestrateMemdClientAsyncFnMut {}
-
-impl OrchestrateMemdClientAsyncFnMut {
-    async fn call<K, Resp: TryFromClientResponse>(&mut self, client: Arc<K>) -> Result<Resp>
-    where
-        K: KvClient + KvClientOps + PartialEq + Sync + Send + 'static,
-    {
-        todo!()
+        };
     }
 }
 
@@ -357,7 +344,7 @@ mod tests {
         let result = orchestrate_memd_client(
             &manager,
             "192.168.107.128:11210".to_string(),
-            |client: Arc<StdKvClient<Client>>| async move {
+            async |client: Arc<StdKvClient<Client>>| {
                 client
                     .set(SetRequest {
                         collection_id: 0,
@@ -379,7 +366,7 @@ mod tests {
         .await
         .unwrap();
 
-        dbg!(result);
+        // dbg!(result);
 
         let client = manager
             .get_client("192.168.107.128:11210".to_string())
