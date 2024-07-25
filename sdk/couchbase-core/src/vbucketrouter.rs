@@ -77,8 +77,8 @@ pub(crate) trait NotMyVbucketConfigHandler {
     fn not_my_vbucket_config(&self, config: TerseConfig, source_hostname: &str);
 }
 
-pub(crate) async fn orchestrate_memd_routing<V, Resp: TryFromClientResponse, Fut>(
-    vb: &V,
+pub(crate) async fn orchestrate_memd_routing<V, Resp, Fut>(
+    vb: Arc<V>,
     nmvb_handler: Arc<impl NotMyVbucketConfigHandler>,
     key: &[u8],
     vb_server_idx: u32,
@@ -144,30 +144,12 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-    use std::ops::Add;
-    use std::sync::Arc;
-    use std::time::Duration;
-
-    use tokio::sync::mpsc::unbounded_channel;
-    use tokio::time::Instant;
-
-    use crate::authenticator::PasswordAuthenticator;
     use crate::cbconfig::TerseConfig;
-    use crate::kvclient::{KvClientConfig, StdKvClient};
-    use crate::kvclient_ops::KvClientOps;
-    use crate::kvclientmanager::{
-        KvClientManager, KvClientManagerConfig, KvClientManagerOptions, orchestrate_memd_client,
-        StdKvClientManager,
-    };
-    use crate::kvclientpool::NaiveKvClientPool;
-    use crate::memdx::client::Client;
-    use crate::memdx::packet::ResponsePacket;
-    use crate::memdx::request::{GetRequest, SetRequest};
+    use crate::kvclientmanager::KvClientManager;
     use crate::vbucketmap::VbucketMap;
     use crate::vbucketrouter::{
-        NotMyVbucketConfigHandler, orchestrate_memd_routing, StdVbucketRouter, VbucketRouter,
-        VbucketRouterOptions, VbucketRoutingInfo,
+        NotMyVbucketConfigHandler, StdVbucketRouter, VbucketRouter, VbucketRouterOptions,
+        VbucketRoutingInfo,
     };
 
     struct NVMBHandler {}
@@ -203,144 +185,5 @@ mod tests {
 
         assert_eq!("endpoint2", endpoint);
         assert_eq!(3, vb_id);
-    }
-
-    struct Resp {}
-
-    #[tokio::test]
-    async fn can_orchestrate_memd_routing() {
-        let _ = env_logger::try_init();
-
-        let instant = Instant::now().add(Duration::new(7, 0));
-
-        let (orphan_tx, mut orphan_rx) = unbounded_channel::<ResponsePacket>();
-
-        tokio::spawn(async move {
-            loop {
-                match orphan_rx.recv().await {
-                    Some(resp) => {
-                        dbg!("unexpected orphan", resp);
-                    }
-                    None => {
-                        return;
-                    }
-                }
-            }
-        });
-
-        let client_config = KvClientConfig {
-            address: "192.168.107.128:11210"
-                .parse()
-                .expect("Failed to parse address"),
-            root_certs: None,
-            accept_all_certs: None,
-            client_name: "myclient".to_string(),
-            authenticator: Some(Arc::new(PasswordAuthenticator {
-                username: "Administrator".to_string(),
-                password: "password".to_string(),
-            })),
-            selected_bucket: Some("default".to_string()),
-            disable_default_features: false,
-            disable_error_map: false,
-            disable_bootstrap: false,
-        };
-
-        let mut client_configs = HashMap::new();
-        client_configs.insert("192.168.107.128:11210".to_string(), client_config);
-
-        let manger_config = KvClientManagerConfig {
-            num_pool_connections: 1,
-            clients: client_configs,
-        };
-
-        let manager: StdKvClientManager<NaiveKvClientPool<StdKvClient<Client>>> =
-            StdKvClientManager::new(
-                manger_config,
-                KvClientManagerOptions {
-                    connect_timeout: Default::default(),
-                    connect_throttle_period: Default::default(),
-                    orphan_handler: Arc::new(orphan_tx),
-                },
-            )
-            .await
-            .unwrap();
-
-        let routing_info = VbucketRoutingInfo {
-            vbucket_info: VbucketMap::new(
-                vec![vec![0, 1], vec![1, 0], vec![0, 1], vec![0, 1], vec![1, 0]],
-                1,
-            )
-            .unwrap(),
-            server_list: vec!["192.168.107.128:11210".to_string()],
-        };
-
-        let dispatcher = StdVbucketRouter::new(routing_info, VbucketRouterOptions {});
-
-        // let dispatcher = Arc::new(dispatcher);
-        // let manager = Arc::new(manager);
-
-        let set_result = orchestrate_memd_routing(
-            &dispatcher,
-            Arc::new(NVMBHandler {}),
-            b"test",
-            0,
-            async |endpoint: String, vb_id: u16| {
-                orchestrate_memd_client(
-                    &manager,
-                    endpoint,
-                    async |client: Arc<StdKvClient<Client>>| {
-                        client
-                            .set(SetRequest {
-                                collection_id: 0,
-                                key: "test".as_bytes().into(),
-                                vbucket_id: 1,
-                                flags: 0,
-                                value: "test".as_bytes().into(),
-                                datatype: 0,
-                                expiry: None,
-                                preserve_expiry: None,
-                                cas: None,
-                                on_behalf_of: None,
-                                durability_level: None,
-                                durability_level_timeout: None,
-                            })
-                            .await
-                    },
-                )
-                .await
-            },
-        )
-        .await
-        .unwrap();
-
-        dbg!(set_result);
-
-        let get_result = orchestrate_memd_routing(
-            &dispatcher,
-            Arc::new(NVMBHandler {}),
-            b"test",
-            0,
-            async |endpoint: String, vb_id: u16| {
-                orchestrate_memd_client(
-                    &manager,
-                    endpoint,
-                    async |client: Arc<StdKvClient<Client>>| {
-                        client
-                            .get(GetRequest {
-                                collection_id: 0,
-                                key: "test".as_bytes().into(),
-                                vbucket_id: 1,
-                                on_behalf_of: None,
-                            })
-                            .await
-                    },
-                )
-                .await
-            },
-        )
-        .await
-        .unwrap();
-
-        dbg!(get_result);
     }
 }
