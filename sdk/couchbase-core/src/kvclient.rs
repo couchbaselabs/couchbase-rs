@@ -30,7 +30,7 @@ pub(crate) struct KvClientConfig {
     pub root_certs: Option<RootCertStore>,
     pub accept_all_certs: Option<bool>,
     pub client_name: String,
-    pub authenticator: Option<Arc<dyn Authenticator>>,
+    pub authenticator: Option<Arc<Authenticator>>,
     pub selected_bucket: Option<String>,
     pub disable_default_features: bool,
     pub disable_error_map: bool,
@@ -142,8 +142,13 @@ where
             None
         };
 
-        let bootstrap_auth = if let Some(ref auth) = config.authenticator {
-            let creds = auth.get_credentials(ServiceType::Memd, config.address.to_string())?;
+        let bootstrap_auth = if let Some(auth) = &config.authenticator {
+            let creds = match auth.as_ref() {
+                // PasswordAuthenticator(auth) => get_credentials(ServiceType::Memd, config.address.to_string())
+                Authenticator::PasswordAuthenticator(a) => {
+                    a.get_credentials(ServiceType::Memd, config.address.to_string())?
+                }
+            };
 
             Some(SASLAuthAutoOptions {
                 username: creds.username.clone(),
@@ -395,10 +400,13 @@ mod tests {
             root_certs: None,
             accept_all_certs: None,
             client_name: "myclient".to_string(),
-            authenticator: Some(Arc::new(PasswordAuthenticator {
-                username: "Administrator".to_string(),
-                password: "password".to_string(),
-            })),
+            authenticator: Some(Arc::new(
+                PasswordAuthenticator {
+                    username: "Administrator".to_string(),
+                    password: "password".to_string(),
+                }
+                .into(),
+            )),
             selected_bucket: Some("default".to_string()),
             disable_default_features: false,
             disable_error_map: false,

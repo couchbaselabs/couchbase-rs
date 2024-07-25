@@ -357,10 +357,13 @@ mod tests {
             root_certs: None,
             accept_all_certs: None,
             client_name: "myclient".to_string(),
-            authenticator: Some(Arc::new(PasswordAuthenticator {
-                username: "Administrator".to_string(),
-                password: "password".to_string(),
-            })),
+            authenticator: Some(Arc::new(
+                PasswordAuthenticator {
+                    username: "Administrator".to_string(),
+                    password: "password".to_string(),
+                }
+                .into(),
+            )),
             selected_bucket: Some("default".to_string()),
             disable_default_features: false,
             disable_error_map: false,
@@ -449,10 +452,13 @@ mod tests {
             root_certs: None,
             accept_all_certs: None,
             client_name: "myclient".to_string(),
-            authenticator: Some(Arc::new(PasswordAuthenticator {
-                username: "Administrator".to_string(),
-                password: "password".to_string(),
-            })),
+            authenticator: Some(Arc::new(
+                PasswordAuthenticator {
+                    username: "Administrator".to_string(),
+                    password: "password".to_string(),
+                }
+                .into(),
+            )),
             selected_bucket: None,
             disable_default_features: false,
             disable_error_map: false,
@@ -481,10 +487,13 @@ mod tests {
             root_certs: None,
             accept_all_certs: None,
             client_name: "myclient".to_string(),
-            authenticator: Some(Arc::new(PasswordAuthenticator {
-                username: "Administrator".to_string(),
-                password: "password".to_string(),
-            })),
+            authenticator: Some(Arc::new(
+                PasswordAuthenticator {
+                    username: "Administrator".to_string(),
+                    password: "password".to_string(),
+                }
+                .into(),
+            )),
             selected_bucket: Some("default".to_string()),
             disable_default_features: false,
             disable_error_map: false,

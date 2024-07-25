@@ -3,11 +3,11 @@ use std::fmt::Debug;
 use crate::error::Result;
 use crate::service_type::ServiceType;
 
-pub trait Authenticator: Debug + Send + Sync {
+#[derive(Debug, Clone, PartialEq, Hash)]
+#[non_exhaustive]
+pub enum Authenticator {
+    PasswordAuthenticator(PasswordAuthenticator),
     // TODO: get_client_certificate needs some thought about how to expose the certificate
-    // fn get_client_certificate(service: ServiceType, host_port: String) ->
-    fn get_credentials(&self, service_type: ServiceType, host_port: String)
-        -> Result<UserPassPair>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -22,8 +22,8 @@ pub struct PasswordAuthenticator {
     pub password: String,
 }
 
-impl Authenticator for PasswordAuthenticator {
-    fn get_credentials(
+impl PasswordAuthenticator {
+    pub fn get_credentials(
         &self,
         _service_type: ServiceType,
         _host_port: String,
@@ -32,5 +32,11 @@ impl Authenticator for PasswordAuthenticator {
             username: self.username.clone(),
             password: self.password.clone(),
         })
+    }
+}
+
+impl From<PasswordAuthenticator> for Authenticator {
+    fn from(value: PasswordAuthenticator) -> Self {
+        Authenticator::PasswordAuthenticator(value)
     }
 }
