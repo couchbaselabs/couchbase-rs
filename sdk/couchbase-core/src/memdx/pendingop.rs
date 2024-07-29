@@ -1,16 +1,14 @@
 use std::future::Future;
 use std::marker::PhantomData;
-use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 
-use log::debug;
-use tokio::select;
 use tokio::sync::mpsc::Receiver;
+use tokio::sync::Mutex;
 use tokio::time::{Instant, timeout_at};
 
-use crate::memdx::client::CancellationSender;
+use crate::memdx::client::OpaqueMap;
 use crate::memdx::client_response::ClientResponse;
 use crate::memdx::error::{CancellationErrorKind, ErrorKind};
-use crate::memdx::error::Error;
 use crate::memdx::error::Result;
 use crate::memdx::response::TryFromClientResponse;
 
@@ -27,19 +25,19 @@ pub(crate) trait OpCanceller {
 
 pub struct ClientPendingOp {
     opaque: u32,
-    cancel_chan: CancellationSender,
     response_receiver: Receiver<Result<ClientResponse>>,
+    opaque_map: Arc<Mutex<OpaqueMap>>,
 }
 
 impl ClientPendingOp {
     pub(crate) fn new(
         opaque: u32,
-        cancel_chan: CancellationSender,
+        opaque_map: Arc<Mutex<OpaqueMap>>,
         response_receiver: Receiver<Result<ClientResponse>>,
     ) -> Self {
         ClientPendingOp {
             opaque,
-            cancel_chan,
+            opaque_map,
             response_receiver,
         }
     }
@@ -51,13 +49,31 @@ impl ClientPendingOp {
         }
     }
 
-    pub fn cancel(&mut self, e: CancellationErrorKind) {
-        match self.cancel_chan.send((self.opaque, e)) {
-            Ok(_) => {}
-            Err(e) => {
-                debug!("Failed to send cancel to channel {}", e);
-            }
-        };
+    pub async fn cancel(&mut self, e: CancellationErrorKind) {
+        // match self.cancel_chan.send((self.opaque, e)) {
+        //     Ok(_) => {}
+        //     Err(e) => {
+        //         debug!("Failed to send cancel to channel {}", e);
+        //     }
+        // };
+        let requests: Arc<Mutex<OpaqueMap>> = Arc::clone(&self.opaque_map);
+        let mut map = requests.lock().await;
+
+        let t = map.remove(&self.opaque);
+
+        if let Some(map_entry) = t {
+            let sender = Arc::clone(&map_entry);
+            drop(map);
+
+            sender
+                .send(Err(ErrorKind::Cancelled(e).into()))
+                .await
+                .unwrap();
+        } else {
+            drop(map);
+        }
+
+        drop(requests);
     }
 }
 

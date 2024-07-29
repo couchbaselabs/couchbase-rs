@@ -31,9 +31,8 @@ use crate::memdx::error::{CancellationErrorKind, Error, ErrorKind};
 use crate::memdx::packet::{RequestPacket, ResponsePacket};
 use crate::memdx::pendingop::ClientPendingOp;
 
-type ResponseSender = Sender<error::Result<ClientResponse>>;
-type OpaqueMap = HashMap<u32, Arc<ResponseSender>>;
-pub(crate) type CancellationSender = UnboundedSender<(u32, CancellationErrorKind)>;
+pub(crate) type ResponseSender = Sender<error::Result<ClientResponse>>;
+pub(crate) type OpaqueMap = HashMap<u32, Arc<ResponseSender>>;
 
 #[derive(Debug)]
 struct ReadLoopOptions {
@@ -65,8 +64,6 @@ pub struct Client {
 
     writer: Mutex<FramedWrite<WriteHalf<TcpStream>, KeyValueCodec>>,
     read_handle: Mutex<ClientReadHandle>,
-
-    cancel_tx: CancellationSender,
     close_tx: Sender<()>,
 
     local_addr: Option<SocketAddr>,
@@ -101,12 +98,10 @@ impl Client {
 
     async fn on_read_loop_close(
         stream: FramedRead<ReadHalf<TcpStream>, KeyValueCodec>,
-        op_cancel_rx: UnboundedReceiver<(u32, CancellationErrorKind)>,
         opaque_map: MutexGuard<'_, OpaqueMap>,
         on_connection_close_tx: Option<oneshot::Sender<error::Result<()>>>,
     ) {
         drop(stream);
-        drop(op_cancel_rx);
 
         Self::drain_opaque_map(opaque_map).await;
 
@@ -117,7 +112,6 @@ impl Client {
 
     async fn read_loop(
         mut stream: FramedRead<ReadHalf<TcpStream>, KeyValueCodec>,
-        mut op_cancel_rx: UnboundedReceiver<(u32, CancellationErrorKind)>,
         opaque_map: Arc<Mutex<OpaqueMap>>,
         mut opts: ReadLoopOptions,
     ) {
@@ -125,35 +119,8 @@ impl Client {
             select! {
                 (_) = opts.on_client_close_rx.recv() => {
                     let guard = opaque_map.lock().await;
-                    Self::on_read_loop_close(stream, op_cancel_rx, guard, opts.on_connection_close_tx).await;
+                    Self::on_read_loop_close(stream, guard, opts.on_connection_close_tx).await;
                     return;
-                },
-                (cancel_reason) = op_cancel_rx.recv() => {
-                    match cancel_reason {
-                        Some(cancel_info) => {
-                            let requests: Arc<Mutex<OpaqueMap>> = Arc::clone(&opaque_map);
-                            let mut map = requests.lock().await;
-
-                            let t = map.remove(&cancel_info.0);
-
-                            if let Some(map_entry) = t {
-                                let sender = Arc::clone(&map_entry);
-                                drop(map);
-
-                                sender
-                                    .send(Err(ErrorKind::Cancelled(cancel_info.1).into()))
-                                    .await
-                                    .unwrap();
-                            } else {
-                                drop(map);
-                            }
-
-                            drop(requests);
-                        }
-                        None => {
-                            return;
-                        }
-                    }
                 },
                 (next) = stream.next() => {
                     match next {
@@ -230,7 +197,7 @@ impl Client {
                         }
                         None => {
                             let guard = opaque_map.lock().await;
-                            Self::on_read_loop_close(stream, op_cancel_rx, guard, opts.on_connection_close_tx).await;
+                            Self::on_read_loop_close(stream, guard, opts.on_connection_close_tx).await;
                             return;
                         }
                     }
@@ -260,7 +227,6 @@ impl Dispatcher for Client {
 
         let uuid = Uuid::new_v4().to_string();
 
-        let (cancel_tx, cancel_rx) = mpsc::unbounded_channel();
         let (close_tx, close_rx) = mpsc::channel::<()>(1);
 
         let opaque_map = Arc::new(Mutex::new(OpaqueMap::default()));
@@ -271,7 +237,6 @@ impl Dispatcher for Client {
         let read_handle = tokio::spawn(async move {
             Client::read_loop(
                 reader,
-                cancel_rx,
                 read_opaque_map,
                 ReadLoopOptions {
                     client_id: read_uuid,
@@ -290,7 +255,6 @@ impl Dispatcher for Client {
             opaque_map,
             client_id: uuid,
 
-            cancel_tx,
             close_tx,
 
             writer: Mutex::new(writer),
@@ -313,7 +277,7 @@ impl Dispatcher for Client {
         match writer.send(packet).await {
             Ok(_) => Ok(ClientPendingOp::new(
                 opaque,
-                self.cancel_tx.clone(),
+                self.opaque_map.clone(),
                 response_rx,
             )),
             Err(e) => {
