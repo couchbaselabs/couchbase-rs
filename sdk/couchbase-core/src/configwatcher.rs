@@ -200,7 +200,6 @@ mod tests {
     use std::time::Duration;
 
     use tokio::sync::broadcast;
-    use tokio::sync::mpsc::unbounded_channel;
     use tokio::time::sleep;
 
     use crate::authenticator::PasswordAuthenticator;
@@ -213,9 +212,8 @@ mod tests {
     };
     use crate::kvclientpool::NaiveKvClientPool;
     use crate::memdx::client::Client;
-    use crate::memdx::packet::ResponsePacket;
 
-    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[tokio::test]
     async fn fetches_configs() {
         let client_config = KvClientConfig {
             address: "192.168.107.128:11210"
@@ -245,28 +243,13 @@ mod tests {
             clients: client_configs,
         };
 
-        let (orphan_tx, mut orphan_rx) = unbounded_channel::<ResponsePacket>();
-
-        tokio::spawn(async move {
-            loop {
-                match orphan_rx.recv().await {
-                    Some(resp) => {
-                        dbg!("unexpected orphan", resp);
-                    }
-                    None => {
-                        return;
-                    }
-                }
-            }
-        });
-
         let manager: StdKvClientManager<NaiveKvClientPool<StdKvClient<Client>>> =
             StdKvClientManager::new(
                 manger_config,
                 KvClientManagerOptions {
                     connect_timeout: Default::default(),
                     connect_throttle_period: Default::default(),
-                    orphan_handler: Arc::new(orphan_tx),
+                    orphan_handler: Arc::new(|_| {}),
                 },
             )
             .await

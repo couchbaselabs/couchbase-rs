@@ -3,7 +3,6 @@ use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 
-use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::Mutex;
 
 use crate::error::ErrorKind;
@@ -11,7 +10,7 @@ use crate::error::Result;
 use crate::kvclient::{KvClient, KvClientConfig};
 use crate::kvclient_ops::KvClientOps;
 use crate::kvclientpool::{KvClientPool, KvClientPoolConfig, KvClientPoolOptions};
-use crate::memdx::packet::ResponsePacket;
+use crate::memdx::dispatcher::OrphanResponseHandler;
 
 pub(crate) type KvClientManagerClientType<M> =
     <<M as KvClientManager>::Pool as KvClientPool>::Client;
@@ -46,11 +45,11 @@ pub(crate) struct KvClientManagerConfig {
     pub clients: HashMap<String, KvClientConfig>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub(crate) struct KvClientManagerOptions {
     pub connect_timeout: Duration,
     pub connect_throttle_period: Duration,
-    pub orphan_handler: Arc<UnboundedSender<ResponsePacket>>,
+    pub orphan_handler: OrphanResponseHandler,
 }
 
 #[derive(Debug)]

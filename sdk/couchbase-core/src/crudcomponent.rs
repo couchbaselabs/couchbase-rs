@@ -138,7 +138,6 @@ mod tests {
     use std::sync::Arc;
     use std::time::Duration;
 
-    use tokio::sync::mpsc::unbounded_channel;
     use tokio::time::Instant;
 
     use crate::authenticator::PasswordAuthenticator;
@@ -151,7 +150,6 @@ mod tests {
     };
     use crate::kvclientpool::NaiveKvClientPool;
     use crate::memdx::client::Client;
-    use crate::memdx::packet::ResponsePacket;
     use crate::vbucketmap::VbucketMap;
     use crate::vbucketrouter::{
         NotMyVbucketConfigHandler, StdVbucketRouter, VbucketRouterOptions, VbucketRoutingInfo,
@@ -170,21 +168,6 @@ mod tests {
         let _ = env_logger::try_init();
 
         let instant = Instant::now().add(Duration::new(7, 0));
-
-        let (orphan_tx, mut orphan_rx) = unbounded_channel::<ResponsePacket>();
-
-        tokio::spawn(async move {
-            loop {
-                match orphan_rx.recv().await {
-                    Some(resp) => {
-                        dbg!("unexpected orphan", resp);
-                    }
-                    None => {
-                        return;
-                    }
-                }
-            }
-        });
 
         let client_config = KvClientConfig {
             address: "192.168.107.128:11210"
@@ -220,7 +203,7 @@ mod tests {
                 KvClientManagerOptions {
                     connect_timeout: Default::default(),
                     connect_throttle_period: Default::default(),
-                    orphan_handler: Arc::new(orphan_tx),
+                    orphan_handler: Arc::new(|_| {}),
                 },
             )
             .await
