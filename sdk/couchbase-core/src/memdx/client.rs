@@ -1,8 +1,9 @@
+use std::{env, mem};
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::env;
 use std::io::empty;
 use std::net::SocketAddr;
+use std::pin::pin;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::thread::spawn;
@@ -25,7 +26,9 @@ use uuid::Uuid;
 use crate::memdx::client_response::ClientResponse;
 use crate::memdx::codec::KeyValueCodec;
 use crate::memdx::connection::{Connection, ConnectionType};
-use crate::memdx::dispatcher::{Dispatcher, DispatcherOptions};
+use crate::memdx::dispatcher::{
+    Dispatcher, DispatcherOptions, OnConnectionCloseHandler, OrphanResponseHandler,
+};
 use crate::memdx::error;
 use crate::memdx::error::{CancellationErrorKind, Error, ErrorKind};
 use crate::memdx::packet::{RequestPacket, ResponsePacket};
@@ -34,13 +37,12 @@ use crate::memdx::pendingop::ClientPendingOp;
 pub(crate) type ResponseSender = Sender<error::Result<ClientResponse>>;
 pub(crate) type OpaqueMap = HashMap<u32, Arc<ResponseSender>>;
 
-#[derive(Debug)]
 struct ReadLoopOptions {
     pub client_id: String,
     pub local_addr: Option<SocketAddr>,
     pub peer_addr: Option<SocketAddr>,
-    pub orphan_handler: Arc<UnboundedSender<ResponsePacket>>,
-    pub on_connection_close_tx: Option<oneshot::Sender<error::Result<()>>>,
+    pub orphan_handler: OrphanResponseHandler,
+    pub on_connection_close_tx: OnConnectionCloseHandler,
     pub on_client_close_rx: Receiver<()>,
 }
 
@@ -99,15 +101,13 @@ impl Client {
     async fn on_read_loop_close(
         stream: FramedRead<ReadHalf<TcpStream>, KeyValueCodec>,
         opaque_map: MutexGuard<'_, OpaqueMap>,
-        on_connection_close_tx: Option<oneshot::Sender<error::Result<()>>>,
+        on_connection_close: OnConnectionCloseHandler,
     ) {
         drop(stream);
 
         Self::drain_opaque_map(opaque_map).await;
 
-        if let Some(handler) = on_connection_close_tx {
-            handler.send(Ok(())).unwrap();
-        }
+        on_connection_close().await;
     }
 
     async fn read_loop(
@@ -178,15 +178,7 @@ impl Client {
                                     } else {
                                         drop(map);
                                         let opaque = packet.opaque;
-                                        match opts.orphan_handler.send(packet) {
-                                            Ok(_) => {}
-                                            Err(_) => {
-                                                warn!(
-                                                    "{} failed to send packet to orphan handler {}",
-                                                    opts.client_id, opaque
-                                                );
-                                            }
-                                        };
+                                        (opts.orphan_handler)(packet);
                                     }
                                     drop(requests);
                                 }
@@ -334,8 +326,6 @@ mod tests {
     use std::sync::Arc;
     use std::time::Duration;
 
-    use tokio::sync::mpsc::unbounded_channel;
-    use tokio::sync::oneshot;
     use tokio::time::Instant;
 
     use crate::memdx::auth_mechanism::AuthMechanism::{ScramSha1, ScramSha256, ScramSha512};
@@ -347,7 +337,6 @@ mod tests {
     use crate::memdx::op_bootstrap::{BootstrapOptions, OpBootstrap};
     use crate::memdx::ops_core::OpsCore;
     use crate::memdx::ops_crud::OpsCrud;
-    use crate::memdx::packet::ResponsePacket;
     use crate::memdx::request::{
         GetClusterConfigRequest, GetErrorMapRequest, GetRequest, HelloRequest, SelectBucketRequest,
         SetRequest,
@@ -355,7 +344,7 @@ mod tests {
     use crate::memdx::response::{GetResponse, SetResponse};
     use crate::memdx::sync_helpers::sync_unary_call;
 
-    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[tokio::test]
     async fn roundtrip_a_request() {
         let _ = env_logger::try_init();
 
@@ -371,36 +360,17 @@ mod tests {
         .await
         .expect("Could not connect");
 
-        let (orphan_tx, mut orphan_rx) = unbounded_channel::<ResponsePacket>();
-        let (close_tx, mut close_rx) = oneshot::channel::<crate::memdx::error::Result<()>>();
-
-        tokio::spawn(async move {
-            loop {
-                match orphan_rx.recv().await {
-                    Some(resp) => {
-                        dbg!("unexpected orphan", resp);
-                    }
-                    None => {
-                        return;
-                    }
-                }
-            }
-        });
-
-        tokio::spawn(async move {
-            loop {
-                if let Ok(resp) = close_rx.try_recv() {
-                    dbg!("closed");
-                    return;
-                }
-            }
-        });
-
         let mut client = Client::new(
             conn,
             DispatcherOptions {
-                on_connection_close_handler: Some(close_tx),
-                orphan_handler: Arc::new(orphan_tx),
+                on_connection_close_handler: Arc::new(|| {
+                    Box::pin(async {
+                        dbg!("closed");
+                    })
+                }),
+                orphan_handler: Arc::new(|packet| {
+                    dbg!("unexpected orphan", packet);
+                }),
             },
         );
 

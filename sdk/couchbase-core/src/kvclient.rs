@@ -1,12 +1,12 @@
 use std::future::Future;
 use std::net::SocketAddr;
-use std::ops::{Add, Deref};
+use std::ops::{Add, AsyncFn, Deref};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
-use tokio::sync::{Mutex, oneshot};
-use tokio::sync::mpsc::UnboundedSender;
+use futures::future::BoxFuture;
+use tokio::sync::Mutex;
 use tokio::time::Instant;
 use tokio_rustls::rustls::RootCertStore;
 use uuid::Uuid;
@@ -16,11 +16,10 @@ use crate::error::Error;
 use crate::error::Result;
 use crate::memdx::auth_mechanism::AuthMechanism;
 use crate::memdx::connection::{Connection, ConnectOptions};
-use crate::memdx::dispatcher::{Dispatcher, DispatcherOptions};
+use crate::memdx::dispatcher::{Dispatcher, DispatcherOptions, OrphanResponseHandler};
 use crate::memdx::hello_feature::HelloFeature;
 use crate::memdx::op_auth_saslauto::SASLAuthAutoOptions;
 use crate::memdx::op_bootstrap::BootstrapOptions;
-use crate::memdx::packet::ResponsePacket;
 use crate::memdx::request::{GetErrorMapRequest, HelloRequest, SelectBucketRequest};
 use crate::service_type::ServiceType;
 
@@ -53,9 +52,12 @@ impl PartialEq for KvClientConfig {
     }
 }
 
+pub(crate) type OnKvClientCloseHandler =
+    Arc<dyn Fn(String) -> BoxFuture<'static, ()> + Send + Sync>;
+
 pub(crate) struct KvClientOptions {
-    pub orphan_handler: Arc<UnboundedSender<ResponsePacket>>,
-    pub on_close_tx: Option<UnboundedSender<String>>,
+    pub orphan_handler: OrphanResponseHandler,
+    pub on_close: OnKvClientCloseHandler,
 }
 
 pub(crate) trait KvClient: Sized + PartialEq + Send + Sync {
@@ -178,15 +180,25 @@ where
             ));
         }
 
-        let (connection_close_tx, mut connection_close_rx) =
-            oneshot::channel::<crate::memdx::error::Result<()>>();
-        let memdx_client_opts = DispatcherOptions {
-            on_connection_close_handler: Some(connection_close_tx),
-            orphan_handler: opts.orphan_handler,
-        };
-
         let closed = Arc::new(AtomicBool::new(false));
         let closed_clone = closed.clone();
+        let id = Uuid::new_v4().to_string();
+        let read_id = id.clone();
+
+        let on_close = opts.on_close.clone();
+        let memdx_client_opts = DispatcherOptions {
+            on_connection_close_handler: Arc::new(move || {
+                // There's not much to do when the connection closes so just mark us as closed.
+                closed_clone.store(true, Ordering::SeqCst);
+                let on_close = on_close.clone();
+                let read_id = read_id.clone();
+
+                Box::pin(async move {
+                    on_close(read_id).await;
+                })
+            }),
+            orphan_handler: opts.orphan_handler,
+        };
 
         let conn = Connection::connect(
             config.address,
@@ -205,7 +217,6 @@ where
         let local_addr = *conn.local_addr();
 
         let mut cli = D::new(conn, memdx_client_opts);
-        let id = Uuid::new_v4().to_string();
 
         let mut kv_cli = StdKvClient {
             remote_addr,
@@ -217,18 +228,6 @@ where
             selected_bucket: Mutex::new(None),
             id: id.clone(),
         };
-
-        tokio::spawn(async move {
-            // There's not much to do when the connection closes so just mark us as closed.
-            if connection_close_rx.await.is_ok() {
-                closed_clone.store(true, Ordering::SeqCst);
-            };
-
-            if let Some(mut tx) = opts.on_close_tx {
-                // TODO: Probably log on failure.
-                tx.send(id).unwrap_or_default();
-            }
-        });
 
         if should_bootstrap {
             if let Some(b) = &bootstrap_select_bucket {
@@ -309,7 +308,7 @@ where
                 .await
             {
                 Ok(_) => {}
-                Err(e) => {
+                Err(_e) => {
                     let mut current_bucket = self.selected_bucket.lock().await;
                     *current_bucket = None;
                     drop(current_bucket);
@@ -362,36 +361,19 @@ mod tests {
     use std::sync::Arc;
     use std::time::Duration;
 
-    use tokio::sync::mpsc::unbounded_channel;
     use tokio::time::Instant;
 
     use crate::authenticator::PasswordAuthenticator;
     use crate::kvclient::{KvClient, KvClientConfig, KvClientOptions, StdKvClient};
     use crate::kvclient_ops::KvClientOps;
     use crate::memdx::client::Client;
-    use crate::memdx::packet::ResponsePacket;
     use crate::memdx::request::{GetRequest, SetRequest};
 
-    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[tokio::test]
     async fn roundtrip_a_request() {
         let _ = env_logger::try_init();
 
         let instant = Instant::now().add(Duration::new(7, 0));
-
-        let (orphan_tx, mut orphan_rx) = unbounded_channel::<ResponsePacket>();
-
-        tokio::spawn(async move {
-            loop {
-                match orphan_rx.recv().await {
-                    Some(resp) => {
-                        dbg!("unexpected orphan", resp);
-                    }
-                    None => {
-                        return;
-                    }
-                }
-            }
-        });
 
         let client_config = KvClientConfig {
             address: "192.168.107.128:11210"
@@ -416,8 +398,10 @@ mod tests {
         let mut client = StdKvClient::<Client>::new(
             client_config,
             KvClientOptions {
-                orphan_handler: Arc::new(orphan_tx),
-                on_close_tx: None,
+                orphan_handler: Arc::new(|packet| {
+                    dbg!("unexpected orphan", packet);
+                }),
+                on_close: Arc::new(|id| Box::pin(async {})),
             },
         )
         .await

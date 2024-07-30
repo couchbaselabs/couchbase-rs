@@ -1,4 +1,7 @@
 #![feature(async_closure)]
+// #![feature(unboxed_closures)]
+#![feature(async_fn_traits)]
+#![feature(unboxed_closures)]
 
 pub mod authenticator;
 pub mod cbconfig;
