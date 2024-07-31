@@ -69,6 +69,10 @@ pub enum ErrorKind {
     NoEndpointsAvailable,
     #[error("Shutdown")]
     Shutdown,
+    #[error("No bucket selected")]
+    NoBucket,
+    #[error("Invalid vbucket map")]
+    InvalidVbucketMap,
     #[error("Internal error {msg}")]
     #[non_exhaustive]
     Internal { msg: String },
