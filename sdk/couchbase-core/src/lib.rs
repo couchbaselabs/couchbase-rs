@@ -1,8 +1,10 @@
 #![feature(async_closure)]
-// #![feature(unboxed_closures)]
 #![feature(async_fn_traits)]
 #![feature(unboxed_closures)]
 
+pub mod agent;
+pub mod agent_ops;
+pub mod agentoptions;
 pub mod authenticator;
 pub mod cbconfig;
 mod configparser;
@@ -17,6 +19,8 @@ mod kvclientmanager;
 mod kvclientpool;
 pub mod memdx;
 mod mutationtoken;
+mod networktypeheuristic;
+mod nmvbhandler;
 mod parsedconfig;
 mod scram;
 pub mod service_type;

@@ -20,21 +20,21 @@ pub(crate) struct ParsedConfigNodePorts {
     // TODO: Do we need views?
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Default)]
 pub(crate) struct ParsedConfigNodeAddresses {
     pub hostname: String,
     pub non_ssl_ports: ParsedConfigNodePorts,
     pub ssl_ports: ParsedConfigNodePorts,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Default)]
 pub(crate) struct ParsedConfigNode {
     pub has_data: bool,
     pub addresses: ParsedConfigNodeAddresses,
     pub alt_addresses: HashMap<String, ParsedConfigNodeAddresses>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Default)]
 pub(crate) struct ParsedConfigFeatures {
     pub fts_vector_search: bool,
 }
@@ -66,11 +66,26 @@ pub(crate) struct ParsedConfig {
     pub rev_id: i64,
     pub rev_epoch: i64,
 
+    pub source_hostname: String,
+
     pub bucket: Option<ParsedConfigBucket>,
 
     pub nodes: Vec<ParsedConfigNode>,
 
     pub features: ParsedConfigFeatures,
+}
+
+impl Default for ParsedConfig {
+    fn default() -> Self {
+        Self {
+            rev_id: -1,
+            rev_epoch: 0,
+            source_hostname: "".to_string(),
+            bucket: None,
+            nodes: vec![],
+            features: Default::default(),
+        }
+    }
 }
 
 impl ParsedConfig {

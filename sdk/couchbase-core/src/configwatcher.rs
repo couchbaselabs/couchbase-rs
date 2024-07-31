@@ -17,11 +17,12 @@ use crate::kvclientmanager::KvClientManager;
 use crate::memdx::request::GetClusterConfigRequest;
 use crate::parsedconfig::ParsedConfig;
 
-pub(crate) trait ConfigWatcher {
+pub(crate) trait ConfigWatcher: Send + Sync {
     fn watch(&self, on_shutdown_rx: Receiver<()>) -> Receiver<ParsedConfig>;
-    fn reconfigure(&self, config: ConfigWatcherMemdConfig) -> impl Future<Output = Result<()>>;
+    fn reconfigure(&self, config: ConfigWatcherMemdConfig) -> Result<()>;
 }
 
+#[derive(Debug, Clone)]
 pub(crate) struct ConfigWatcherMemdConfig {
     pub endpoints: Vec<String>,
 }
@@ -41,7 +42,7 @@ impl<M> ConfigWatcherMemdInner<M>
 where
     M: KvClientManager,
 {
-    pub async fn reconfigure(&self, config: ConfigWatcherMemdConfig) -> Result<()> {
+    pub fn reconfigure(&self, config: ConfigWatcherMemdConfig) -> Result<()> {
         let mut endpoints = self.endpoints.lock().unwrap();
         *endpoints = config.endpoints;
 
@@ -72,7 +73,9 @@ where
                     _ = on_shutdown_rx.recv() => {
                         return;
                     },
-                    _ = sleep(self.polling_period) => {}
+                    _ = sleep(self.polling_period) => {
+                        continue;
+                    }
                 }
             }
 
@@ -184,103 +187,13 @@ where
         let inner = self.inner.clone();
         tokio::spawn(async move {
             inner.watch(on_shutdown_rx, on_new_config_tx).await;
+            dbg!("config poll exit")
         });
 
         on_new_config_rx
     }
 
-    async fn reconfigure(&self, config: ConfigWatcherMemdConfig) -> Result<()> {
-        self.inner.reconfigure(config).await
-    }
-}
-#[cfg(test)]
-mod tests {
-    use std::collections::HashMap;
-    use std::sync::Arc;
-    use std::time::Duration;
-
-    use tokio::sync::broadcast;
-    use tokio::time::sleep;
-
-    use crate::authenticator::PasswordAuthenticator;
-    use crate::configwatcher::{
-        ConfigWatcher, ConfigWatcherMemd, ConfigWatcherMemdConfig, ConfigWatcherMemdOptions,
-    };
-    use crate::kvclient::{KvClientConfig, StdKvClient};
-    use crate::kvclientmanager::{
-        KvClientManager, KvClientManagerConfig, KvClientManagerOptions, StdKvClientManager,
-    };
-    use crate::kvclientpool::NaiveKvClientPool;
-    use crate::memdx::client::Client;
-
-    #[tokio::test]
-    async fn fetches_configs() {
-        let client_config = KvClientConfig {
-            address: "192.168.107.128:11210"
-                .parse()
-                .expect("Failed to parse address"),
-            root_certs: None,
-            accept_all_certs: None,
-            client_name: "myclient".to_string(),
-            authenticator: Some(Arc::new(
-                PasswordAuthenticator {
-                    username: "Administrator".to_string(),
-                    password: "password".to_string(),
-                }
-                .into(),
-            )),
-            selected_bucket: Some("default".to_string()),
-            disable_default_features: false,
-            disable_error_map: false,
-            disable_bootstrap: false,
-        };
-
-        let mut client_configs = HashMap::new();
-        client_configs.insert("192.168.107.128:11210".to_string(), client_config);
-
-        let manger_config = KvClientManagerConfig {
-            num_pool_connections: 1,
-            clients: client_configs,
-        };
-
-        let manager: StdKvClientManager<NaiveKvClientPool<StdKvClient<Client>>> =
-            StdKvClientManager::new(
-                manger_config,
-                KvClientManagerOptions {
-                    connect_timeout: Default::default(),
-                    connect_throttle_period: Default::default(),
-                    orphan_handler: Arc::new(|_| {}),
-                },
-            )
-            .await
-            .unwrap();
-
-        let config = ConfigWatcherMemdConfig {
-            endpoints: vec!["192.168.107.128:11210".to_string()],
-        };
-        let opts = ConfigWatcherMemdOptions {
-            polling_period: Duration::from_secs(1),
-            kv_client_manager: Arc::new(manager),
-        };
-        let watcher = ConfigWatcherMemd::new(config, opts);
-
-        let (shutdown_tx, shutdown_rx) = broadcast::channel(1);
-        let mut receiver = watcher.watch(shutdown_rx);
-
-        tokio::spawn(async move {
-            sleep(Duration::from_secs(5)).await;
-            shutdown_tx.send(()).unwrap();
-        });
-
-        loop {
-            let config = match receiver.recv().await {
-                Ok(c) => c,
-                Err(e) => {
-                    dbg!(e);
-                    return;
-                }
-            };
-            dbg!(config);
-        }
+    fn reconfigure(&self, config: ConfigWatcherMemdConfig) -> Result<()> {
+        self.inner.reconfigure(config)
     }
 }

@@ -76,6 +76,7 @@ impl ConfigParser {
             bucket,
             nodes,
             features,
+            source_hostname: source_hostname.to_string(),
         })
     }
 

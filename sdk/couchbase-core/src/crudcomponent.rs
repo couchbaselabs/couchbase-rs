@@ -2,18 +2,21 @@
 
 use std::future::Future;
 use std::sync::Arc;
+use std::time::Duration;
 
 use futures::{FutureExt, TryFutureExt};
+use tokio::time::sleep;
 
 use crate::crudoptions::{GetOptions, UpsertOptions};
 use crate::crudresults::{GetResult, UpsertResult};
-use crate::error::Result;
+use crate::error::{ErrorKind, Result};
 use crate::kvclient_ops::KvClientOps;
 use crate::kvclientmanager::{KvClientManager, KvClientManagerClientType, orchestrate_memd_client};
 use crate::memdx::request::{GetRequest, SetRequest};
 use crate::memdx::response::TryFromClientResponse;
 use crate::mutationtoken::MutationToken;
-use crate::vbucketrouter::{NotMyVbucketConfigHandler, orchestrate_memd_routing, VbucketRouter};
+use crate::nmvbhandler::NotMyVbucketConfigHandler;
+use crate::vbucketrouter::{orchestrate_memd_routing, VbucketRouter};
 
 pub(crate) struct CrudComponent<
     M: KvClientManager,
@@ -38,23 +41,40 @@ where
     Fut: Future<Output = Result<Resp>> + Send,
     Resp: Send,
 {
-    orchestrate_memd_routing(
-        vb.clone(),
-        nmvb_handler,
-        key,
-        0,
-        async |endpoint: String, vb_id: u16| {
-            orchestrate_memd_client(
-                mgr.clone(),
-                endpoint.clone(),
-                async |client: Arc<KvClientManagerClientType<M>>| {
-                    operation(endpoint.clone(), vb_id, client).await
-                },
-            )
-            .await
-        },
-    )
-    .await
+    loop {
+        match orchestrate_memd_routing(
+            vb.clone(),
+            nmvb_handler.clone(),
+            key,
+            0,
+            async |endpoint: String, vb_id: u16| {
+                orchestrate_memd_client(
+                    mgr.clone(),
+                    endpoint.clone(),
+                    async |client: Arc<KvClientManagerClientType<M>>| {
+                        operation(endpoint.clone(), vb_id, client).await
+                    },
+                )
+                .await
+            },
+        )
+        .await
+        {
+            Ok(res) => {
+                return Ok(res);
+            }
+            Err(e) => match e.kind.as_ref() {
+                ErrorKind::InvalidVbucketMap => {
+                    // TODO: this can only be temporary.
+                    sleep(Duration::from_millis(10)).await;
+                    continue;
+                }
+                _ => {
+                    return Err(e);
+                }
+            },
+        }
+    }
 }
 
 // TODO: So much clone.
@@ -74,7 +94,7 @@ impl<M: KvClientManager, V: VbucketRouter, Nmvb: NotMyVbucketConfigHandler>
             self.nmvb_handler.clone(),
             self.router.clone(),
             self.conn_manager.clone(),
-            opts.key.clone().as_slice(),
+            &opts.key,
             async |endpoint, vb_id, client| {
                 client
                     .set(SetRequest {
@@ -150,15 +170,14 @@ mod tests {
     };
     use crate::kvclientpool::NaiveKvClientPool;
     use crate::memdx::client::Client;
+    use crate::nmvbhandler::NotMyVbucketConfigHandler;
     use crate::vbucketmap::VbucketMap;
-    use crate::vbucketrouter::{
-        NotMyVbucketConfigHandler, StdVbucketRouter, VbucketRouterOptions, VbucketRoutingInfo,
-    };
+    use crate::vbucketrouter::{StdVbucketRouter, VbucketRouterOptions, VbucketRoutingInfo};
 
     struct NVMBHandler {}
 
     impl NotMyVbucketConfigHandler for NVMBHandler {
-        fn not_my_vbucket_config(&self, config: TerseConfig, source_hostname: &str) {}
+        async fn not_my_vbucket_config(&self, config: TerseConfig, source_hostname: &str) {}
     }
 
     struct Resp {}
@@ -210,12 +229,15 @@ mod tests {
             .unwrap();
 
         let routing_info = VbucketRoutingInfo {
-            vbucket_info: VbucketMap::new(
-                vec![vec![0, 1], vec![1, 0], vec![0, 1], vec![0, 1], vec![1, 0]],
-                1,
-            )
-            .unwrap(),
+            vbucket_info: Option::from(
+                VbucketMap::new(
+                    vec![vec![0, 1], vec![1, 0], vec![0, 1], vec![0, 1], vec![1, 0]],
+                    1,
+                )
+                .unwrap(),
+            ),
             server_list: vec!["192.168.107.128:11210".to_string()],
+            bucket_selected: true,
         };
 
         let dispatcher = StdVbucketRouter::new(routing_info, VbucketRouterOptions {});
