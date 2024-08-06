@@ -5,7 +5,7 @@ use byteorder::{BigEndian, ReadBytesExt};
 
 use crate::memdx::auth_mechanism::AuthMechanism;
 use crate::memdx::client_response::ClientResponse;
-use crate::memdx::error::{Error, ErrorKind, ServerError, ServerErrorKind};
+use crate::memdx::error::{Error, ErrorKind, ResourceError, ServerError, ServerErrorKind};
 use crate::memdx::hello_feature::HelloFeature;
 use crate::memdx::ops_core::OpsCore;
 use crate::memdx::ops_crud::{decode_res_ext_frames, OpsCrud};
@@ -25,11 +25,7 @@ impl TryFromClientResponse for HelloResponse {
         let packet = resp.packet();
         let status = packet.status;
         if status != Status::Success {
-            return Err(OpsCore::decode_error(
-                packet,
-                resp.local_addr(),
-                resp.peer_addr(),
-            ));
+            return Err(OpsCore::decode_error(packet, resp.local_addr(), resp.peer_addr()).into());
         }
 
         let mut features: Vec<HelloFeature> = Vec::new();
@@ -64,11 +60,7 @@ impl TryFromClientResponse for GetErrorMapResponse {
         let packet = resp.packet();
         let status = packet.status;
         if status != Status::Success {
-            return Err(OpsCore::decode_error(
-                packet,
-                resp.local_addr(),
-                resp.peer_addr(),
-            ));
+            return Err(OpsCore::decode_error(packet, resp.local_addr(), resp.peer_addr()).into());
         }
 
         // TODO: Clone?
@@ -90,11 +82,7 @@ impl TryFromClientResponse for SelectBucketResponse {
             if status == Status::AccessError || status == Status::KeyNotFound {
                 return Err(ErrorKind::UnknownBucketName.into());
             }
-            return Err(OpsCore::decode_error(
-                packet,
-                resp.local_addr(),
-                resp.peer_addr(),
-            ));
+            return Err(OpsCore::decode_error(packet, resp.local_addr(), resp.peer_addr()).into());
         }
 
         Ok(SelectBucketResponse {})
@@ -121,11 +109,7 @@ impl TryFromClientResponse for SASLAuthResponse {
         }
 
         if status != Status::Success {
-            return Err(OpsCore::decode_error(
-                packet,
-                resp.local_addr(),
-                resp.peer_addr(),
-            ));
+            return Err(OpsCore::decode_error(packet, resp.local_addr(), resp.peer_addr()).into());
         }
 
         Ok(SASLAuthResponse {
@@ -147,11 +131,7 @@ impl TryFromClientResponse for SASLStepResponse {
         let packet = resp.packet();
         let status = packet.status;
         if status != Status::Success {
-            return Err(OpsCore::decode_error(
-                packet,
-                resp.local_addr(),
-                resp.peer_addr(),
-            ));
+            return Err(OpsCore::decode_error(packet, resp.local_addr(), resp.peer_addr()).into());
         }
 
         Ok(SASLStepResponse {
@@ -185,11 +165,7 @@ impl TryFromClientResponse for SASLListMechsResponse {
                 )
                 .into());
             }
-            return Err(OpsCore::decode_error(
-                packet,
-                resp.local_addr(),
-                resp.peer_addr(),
-            ));
+            return Err(OpsCore::decode_error(packet, resp.local_addr(), resp.peer_addr()).into());
         }
 
         // TODO: Clone?
@@ -238,11 +214,7 @@ impl TryFromClientResponse for GetClusterConfigResponse {
         let packet = resp.packet();
         let status = packet.status;
         if status != Status::Success {
-            return Err(OpsCore::decode_error(
-                packet,
-                resp.local_addr(),
-                resp.peer_addr(),
-            ));
+            return Err(OpsCore::decode_error(packet, resp.local_addr(), resp.peer_addr()).into());
         }
 
         let host = match resp.local_addr() {
@@ -427,6 +399,82 @@ impl TryFromClientResponse for GetResponse {
             value,
             datatype: packet.datatype,
             server_duration,
+        })
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct GetCollectionIdResponse {
+    pub manifest_rev: u64,
+    pub collection_id: u32,
+}
+
+impl TryFromClientResponse for GetCollectionIdResponse {
+    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+        let packet = resp.packet();
+        let status = packet.status;
+
+        if status == Status::ScopeUnknown {
+            return Err(ErrorKind::Resource(ResourceError {
+                cause: OpsCore::decode_error_context(
+                    packet,
+                    ServerErrorKind::UnknownScopeName,
+                    resp.local_addr(),
+                    resp.peer_addr(),
+                ),
+                scope_name: "".to_string(),
+                collection_name: None,
+            })
+            .into());
+        } else if status == Status::CollectionUnknown {
+            return Err(ErrorKind::Resource(ResourceError {
+                cause: OpsCore::decode_error_context(
+                    packet,
+                    ServerErrorKind::UnknownCollectionName,
+                    resp.local_addr(),
+                    resp.peer_addr(),
+                ),
+                scope_name: "".to_string(),
+                collection_name: Some("".to_string()),
+            })
+            .into());
+        } else if status != Status::Success {
+            return Err(
+                OpsCore::decode_error(resp.packet(), resp.local_addr(), resp.peer_addr()).into(),
+            );
+        }
+
+        let extras = if let Some(extras) = &packet.extras {
+            if extras.len() != 12 {
+                return Err(ErrorKind::Protocol {
+                    msg: "Invalid extras length".to_string(),
+                }
+                .into());
+            }
+            extras
+        } else {
+            return Err(ErrorKind::Protocol {
+                msg: "Invalid extras length".to_string(),
+            }
+            .into());
+        };
+
+        let mut extras = Cursor::new(extras);
+        let manifest_rev = extras.read_u64::<BigEndian>().map_err(|e| {
+            Error::from(ErrorKind::Protocol {
+                msg: "Bad extras length".to_string(),
+            })
+        })?;
+
+        let collection_id = extras.read_u32::<BigEndian>().map_err(|e| {
+            Error::from(ErrorKind::Protocol {
+                msg: "Bad extras length".to_string(),
+            })
+        })?;
+
+        Ok(GetCollectionIdResponse {
+            manifest_rev,
+            collection_id,
         })
     }
 }

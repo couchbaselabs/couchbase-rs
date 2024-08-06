@@ -24,6 +24,12 @@ pub struct SelectBucketRequest {
 pub struct GetClusterConfigRequest {}
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct GetCollectionIdRequest {
+    pub scope_name: String,
+    pub collection_name: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct SASLAuthRequest {
     pub auth_mechanism: AuthMechanism,
     pub payload: Vec<u8>,

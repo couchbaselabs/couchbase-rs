@@ -183,7 +183,7 @@ impl OpsCrud {
         resp: &ResponsePacket,
         dispatched_to: &Option<SocketAddr>,
         dispatched_from: &Option<SocketAddr>,
-    ) -> Result<()> {
+    ) -> std::result::Result<(), Error> {
         let kind = match resp.status {
             Status::CollectionUnknown => ServerErrorKind::UnknownCollectionID,
             Status::AccessError => ServerErrorKind::Access,
@@ -192,7 +192,7 @@ impl OpsCrud {
             }
         };
 
-        Err(ErrorKind::Server(ServerError::new(kind, resp, dispatched_to, dispatched_from)).into())
+        Err(ServerError::new(kind, resp, dispatched_to, dispatched_from).into())
     }
 
     pub(crate) fn decode_common_error(
@@ -204,7 +204,7 @@ impl OpsCrud {
             return e;
         };
 
-        OpsCore::decode_error(resp, dispatched_to, dispatched_from)
+        OpsCore::decode_error(resp, dispatched_to, dispatched_from).into()
     }
 }
 

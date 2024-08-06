@@ -1,3 +1,4 @@
+use std::future::Future;
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -5,12 +6,20 @@ use tokio::sync::Mutex;
 
 use crate::cbconfig::TerseConfig;
 
-pub(crate) trait NotMyVbucketConfigHandler {
-    async fn not_my_vbucket_config(&self, config: TerseConfig, source_hostname: &str);
+pub(crate) trait NotMyVbucketConfigHandler: Send + Sync {
+    fn not_my_vbucket_config(
+        &self,
+        config: TerseConfig,
+        source_hostname: &str,
+    ) -> impl Future<Output = ()> + Send;
 }
 
 pub(crate) trait ConfigUpdater: Send + Sync + Sized {
-    async fn apply_terse_config(&self, config: TerseConfig, source_hostname: &str);
+    fn apply_terse_config(
+        &self,
+        config: TerseConfig,
+        source_hostname: &str,
+    ) -> impl Future<Output = ()> + Send;
 }
 
 pub(crate) struct StdNotMyVbucketConfigHandler<C> {

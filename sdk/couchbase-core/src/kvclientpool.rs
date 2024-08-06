@@ -82,13 +82,15 @@ where
     K: KvClient + KvClientOps + PartialEq + Sync + Send + 'static,
 {
     pub async fn get_client(&self) -> Result<Arc<K>> {
-        let fm = self.fast_map.load();
+        {
+            let fm = self.fast_map.load();
 
-        if !fm.is_empty() {
-            let idx = self.client_idx.fetch_add(1, Ordering::SeqCst);
-            // TODO: is this unwrap ok? It should be...
-            let client = fm.get(idx % fm.len()).unwrap();
-            return Ok(client.clone());
+            if !fm.is_empty() {
+                let idx = self.client_idx.fetch_add(1, Ordering::SeqCst);
+                // TODO: is this unwrap ok? It should be...
+                let client = fm.get(idx % fm.len()).unwrap();
+                return Ok(client.clone());
+            }
         }
 
         self.get_client_slow().await
@@ -176,20 +178,20 @@ where
             return Err(ErrorKind::Shutdown.into());
         }
 
-        let clients = self.clients.lock().await;
-        if !clients.is_empty() {
-            let idx = self.client_idx.fetch_add(1, Ordering::SeqCst);
-            // TODO: is this unwrap ok? It should be...
-            let client = clients.get(idx % clients.len()).unwrap();
-            return Ok(client.clone());
-        }
+        {
+            let clients = self.clients.lock().await;
+            if !clients.is_empty() {
+                let idx = self.client_idx.fetch_add(1, Ordering::SeqCst);
+                // TODO: is this unwrap ok? It should be...
+                let client = clients.get(idx % clients.len()).unwrap();
+                return Ok(client.clone());
+            }
 
-        let spawner = self.spawner.lock().await;
-        if let Some(e) = spawner.error().await {
-            return Err(e.connect_error);
+            let spawner = self.spawner.lock().await;
+            if let Some(e) = spawner.error().await {
+                return Err(e.connect_error);
+            }
         }
-
-        drop(clients);
 
         self.new_client_watcher_notif.notified();
         Box::pin(self.get_client_slow()).await
@@ -319,13 +321,14 @@ where
             closed: AtomicBool::new(false),
         });
 
-        let clients_clone = clients.clone();
-        let mut spawner = clients.spawner.lock().await;
-        spawner.on_client_close = Arc::new(move |id| {
-            let clients_clone = clients_clone.clone();
-            Box::pin(async move { clients_clone.handle_client_close(id).await })
-        });
-        drop(spawner);
+        {
+            let clients_clone = clients.clone();
+            let mut spawner = clients.spawner.lock().await;
+            spawner.on_client_close = Arc::new(move |id| {
+                let clients_clone = clients_clone.clone();
+                Box::pin(async move { clients_clone.handle_client_close(id).await })
+            });
+        }
 
         clients.check_connections().await;
 

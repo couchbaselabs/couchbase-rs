@@ -32,6 +32,8 @@ pub struct Error {
 pub enum ErrorKind {
     #[error("{0:?}")]
     Server(ServerError),
+    #[error("{0:?}")]
+    Resource(ResourceError),
     #[error("Dispatch failed {0:?}")]
     #[non_exhaustive]
     Dispatch(Arc<io::Error>),
@@ -56,6 +58,27 @@ pub enum ErrorKind {
     #[non_exhaustive]
     NoSupportedAuthMechanisms,
 }
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct ResourceError {
+    pub cause: ServerError,
+    pub scope_name: String,
+    pub collection_name: Option<String>,
+}
+
+impl Display for ResourceError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let msg = format!(
+            "resource error: {} (scope: {}, collection: {:?})",
+            self.cause, self.scope_name, self.collection_name,
+        );
+
+        write!(f, "{}", msg)
+    }
+}
+
+impl StdError for ResourceError {}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -194,6 +217,10 @@ pub enum ServerErrorKind {
     Auth { msg: String },
     #[error("Config not set")]
     ConfigNotSet,
+    #[error("scope name unknown")]
+    UnknownScopeName,
+    #[error("collection name unknown")]
+    UnknownCollectionName,
     #[error("Server status unexpected for operation: {status}")]
     UnknownStatus { status: Status },
 }
@@ -236,6 +263,13 @@ impl Error {
     pub fn is_notmyvbucket_error(&self) -> bool {
         match self.kind.as_ref() {
             Server(e) => e.kind == ServerErrorKind::NotMyVbucket,
+            _ => false,
+        }
+    }
+
+    pub fn is_unknown_collection_id_error(&self) -> bool {
+        match self.kind.as_ref() {
+            Server(e) => e.kind == ServerErrorKind::UnknownCollectionID,
             _ => false,
         }
     }

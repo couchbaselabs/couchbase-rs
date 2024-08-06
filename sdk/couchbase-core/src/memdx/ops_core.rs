@@ -4,7 +4,7 @@ use std::net::SocketAddr;
 use byteorder::{BigEndian, WriteBytesExt};
 
 use crate::memdx::dispatcher::Dispatcher;
-use crate::memdx::error::{Error, ErrorKind, ServerError, ServerErrorKind};
+use crate::memdx::error::{ServerError, ServerErrorKind};
 use crate::memdx::error::Result;
 use crate::memdx::magic::Magic;
 use crate::memdx::op_auth_saslauto::OpSASLAutoEncoder;
@@ -33,7 +33,7 @@ impl OpsCore {
         kind: ServerErrorKind,
         dispatched_to: &Option<SocketAddr>,
         dispatched_from: &Option<SocketAddr>,
-    ) -> Error {
+    ) -> ServerError {
         let mut base_cause = ServerError::new(kind, resp, dispatched_to, dispatched_from);
 
         if let Some(value) = &resp.value {
@@ -45,14 +45,14 @@ impl OpsCore {
             }
         }
 
-        ErrorKind::Server(base_cause).into()
+        base_cause
     }
 
     pub(crate) fn decode_error(
         resp: &ResponsePacket,
         dispatched_to: &Option<SocketAddr>,
         dispatched_from: &Option<SocketAddr>,
-    ) -> Error {
+    ) -> ServerError {
         let status = resp.status;
         let base_error_kind = if status == Status::NotMyVbucket {
             ServerErrorKind::NotMyVbucket

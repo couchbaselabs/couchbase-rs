@@ -33,7 +33,7 @@ pub(crate) trait KvClientManager: Sized + Send + Sync {
     ) -> impl Future<Output = Result<Arc<KvClientManagerClientType<Self>>>> + Send;
     fn shutdown_client(
         &self,
-        endpoint: String,
+        endpoint: Option<String>,
         client: Arc<KvClientManagerClientType<Self>>,
     ) -> impl Future<Output = Result<()>> + Send;
     fn close(&self) -> impl Future<Output = Result<()>> + Send;
@@ -121,6 +121,19 @@ where
             pool: Arc::new(pool),
         }
     }
+
+    async fn shutdown_random_client(
+        &self,
+        client: Arc<KvClientManagerClientType<Self>>,
+    ) -> Result<()> {
+        let state = self.state.lock().await;
+
+        for (_, pool) in state.client_pools.iter() {
+            pool.pool.shutdown_client(client.clone()).await;
+        }
+
+        Ok(())
+    }
 }
 
 impl<P> KvClientManager for StdKvClientManager<P>
@@ -195,14 +208,20 @@ where
 
     async fn shutdown_client(
         &self,
-        endpoint: String,
+        endpoint: Option<String>,
         client: Arc<KvClientManagerClientType<Self>>,
     ) -> Result<()> {
-        let pool = self.get_pool(endpoint).await?;
+        if let Some(ep) = endpoint {
+            let pool = self.get_pool(ep).await?;
 
-        pool.shutdown_client(client).await;
+            pool.shutdown_client(client).await;
 
-        Ok(())
+            return Ok(());
+        }
+
+        // we don't know which endpoint this belongs to, so we need to send the
+        // shutdown request to all the possibilities...
+        self.shutdown_random_client(client).await
     }
 
     async fn close(&self) -> Result<()> {
@@ -241,7 +260,7 @@ where
                         // a different client instead...
                         // TODO: Log something
                         manager
-                            .shutdown_client(endpoint.clone(), client)
+                            .shutdown_client(Some(endpoint.clone()), client)
                             .await
                             .unwrap_or_default();
                         continue;
@@ -251,5 +270,40 @@ where
                 Err(e)
             }
         };
+    }
+}
+
+pub(crate) async fn orchestrate_random_memd_client<Resp, M, Fut>(
+    manager: Arc<M>,
+    mut operation: impl FnMut(Arc<KvClientManagerClientType<M>>) -> Fut,
+) -> Result<Resp>
+where
+    M: KvClientManager,
+    Fut: Future<Output = Result<Resp>> + Send,
+{
+    loop {
+        let client = manager.get_random_client().await?;
+
+        let res = operation(client.clone()).await;
+        let res = match res {
+            Ok(r) => Ok(r),
+            Err(e) => {
+                if let Some(memdx_err) = e.is_memdx_error() {
+                    if memdx_err.is_dispatch_error() {
+                        // This was a dispatch error, so we can just try with
+                        // a different client instead...
+                        // TODO: Log something
+                        manager
+                            .shutdown_client(None, client)
+                            .await
+                            .unwrap_or_default();
+                        continue;
+                    }
+                }
+
+                Err(e)
+            }
+        };
+        return res;
     }
 }
