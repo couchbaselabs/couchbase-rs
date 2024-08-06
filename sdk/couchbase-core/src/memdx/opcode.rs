@@ -9,6 +9,7 @@ pub enum OpCode {
     Add,
     Hello,
     GetClusterConfig,
+    GetCollectionId,
     GetErrorMap,
     SelectBucket,
     SASLAuth,
@@ -29,6 +30,7 @@ impl From<OpCode> for u8 {
             OpCode::SASLStep => 0x22,
             OpCode::SelectBucket => 0x89,
             OpCode::GetClusterConfig => 0xb5,
+            OpCode::GetCollectionId => 0xbb,
             OpCode::GetErrorMap => 0xfe,
             OpCode::Unknown(code) => code,
         }
@@ -49,6 +51,7 @@ impl TryFrom<u8> for OpCode {
             0x22 => OpCode::SASLStep,
             0x89 => OpCode::SelectBucket,
             0xb5 => OpCode::GetClusterConfig,
+            0xbb => OpCode::GetCollectionId,
             0xfe => OpCode::GetErrorMap,
             _ => OpCode::Unknown(value),
         };
@@ -65,6 +68,7 @@ impl Display for OpCode {
             OpCode::Add => "Add",
             OpCode::Hello => "Hello",
             OpCode::GetClusterConfig => "Get cluster config",
+            OpCode::GetCollectionId => "Get collection id",
             OpCode::GetErrorMap => "Get error map",
             OpCode::SelectBucket => "Select bucket",
             OpCode::SASLAuth => "SASL auth",

@@ -11,6 +11,10 @@ use tokio::task::JoinHandle;
 use crate::agentoptions::AgentOptions;
 use crate::authenticator::Authenticator;
 use crate::cbconfig::TerseConfig;
+use crate::collection_resolver_cached::{
+    CollectionResolverCached, CollectionResolverCachedOptions,
+};
+use crate::collection_resolver_memd::{CollectionResolverMemd, CollectionResolverMemdOptions};
 use crate::configwatcher::{
     ConfigWatcher, ConfigWatcherMemd, ConfigWatcherMemdConfig, ConfigWatcherMemdOptions,
 };
@@ -44,6 +48,7 @@ struct AgentState {
 }
 
 type AgentClientManager = StdKvClientManager<NaiveKvClientPool<StdKvClient<Client>>>;
+type AgentCollectionResolver = CollectionResolverCached<CollectionResolverMemd<AgentClientManager>>;
 
 pub(crate) struct AgentInner {
     state: Arc<Mutex<AgentState>>,
@@ -51,11 +56,13 @@ pub(crate) struct AgentInner {
     cfg_watcher: Arc<dyn ConfigWatcher>,
     conn_mgr: Arc<AgentClientManager>,
     vb_router: Arc<StdVbucketRouter>,
+    collections: Arc<AgentCollectionResolver>,
 
     pub crud: CrudComponent<
         AgentClientManager,
         StdVbucketRouter,
         StdNotMyVbucketConfigHandler<AgentInner>,
+        AgentCollectionResolver,
     >,
 }
 
@@ -299,14 +306,30 @@ impl Agent {
 
         let nmvb_handler = Arc::new(StdNotMyVbucketConfigHandler::new());
 
-        let crud = CrudComponent::new(nmvb_handler.clone(), vb_router.clone(), conn_mgr.clone());
+        let memd_resolver = CollectionResolverMemd::new(CollectionResolverMemdOptions {
+            conn_mgr: conn_mgr.clone(),
+        });
 
+        // TODO: hardcoded duration.
+        let collections = Arc::new(CollectionResolverCached::new(
+            CollectionResolverCachedOptions {
+                resolver: memd_resolver,
+            },
+        ));
+
+        let crud = CrudComponent::new(
+            nmvb_handler.clone(),
+            vb_router.clone(),
+            conn_mgr.clone(),
+            collections.clone(),
+        );
         let inner = Arc::new(AgentInner {
             state: Arc::new(Mutex::new(state)),
             cfg_watcher: cfg_watcher.clone(),
             conn_mgr,
             vb_router,
             crud,
+            collections,
         });
 
         nmvb_handler.set_watcher(inner.clone()).await;
@@ -420,8 +443,8 @@ mod tests {
         let upsert_result = agent
             .upsert(UpsertOptions {
                 key: "test".into(),
-                scope_name: None,
-                collection_name: None,
+                scope_name: "".into(),
+                collection_name: "".into(),
                 value: "value".into(),
                 flags: 0,
                 expiry: None,
@@ -437,8 +460,8 @@ mod tests {
         let get_result = agent
             .get(GetOptions {
                 key: "test".into(),
-                scope_name: None,
-                collection_name: None,
+                scope_name: "".into(),
+                collection_name: "".into(),
             })
             .await
             .unwrap();

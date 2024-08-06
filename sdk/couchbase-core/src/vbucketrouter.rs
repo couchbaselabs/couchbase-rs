@@ -8,7 +8,7 @@ use crate::memdx::response::TryFromClientResponse;
 use crate::nmvbhandler::NotMyVbucketConfigHandler;
 use crate::vbucketmap::VbucketMap;
 
-pub(crate) trait VbucketRouter {
+pub(crate) trait VbucketRouter: Send + Sync {
     fn update_vbucket_info(&self, info: VbucketRoutingInfo);
     fn dispatch_by_key(&self, key: &[u8], vbucket_server_idx: u32) -> Result<(String, u16)>;
     fn dispatch_to_vbucket(&self, vb_id: u16) -> Result<String>;

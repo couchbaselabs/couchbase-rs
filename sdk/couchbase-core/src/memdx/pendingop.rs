@@ -13,10 +13,10 @@ use crate::memdx::error::Result;
 use crate::memdx::response::TryFromClientResponse;
 
 pub trait PendingOp<T> {
-    fn recv(&mut self) -> impl std::future::Future<Output = Result<T>>
+    fn recv(&mut self) -> impl Future<Output = Result<T>>
     where
         T: TryFromClientResponse;
-    fn cancel(&mut self, e: CancellationErrorKind);
+    fn cancel(&mut self, e: CancellationErrorKind) -> impl Future<Output = ()>;
 }
 
 pub(crate) trait OpCanceller {
@@ -98,8 +98,8 @@ impl<T: TryFromClientResponse> PendingOp<T> for StandardPendingOp<T> {
         T::try_from(packet)
     }
 
-    fn cancel(&mut self, e: CancellationErrorKind) {
-        self.wrapped.cancel(e);
+    async fn cancel(&mut self, e: CancellationErrorKind) {
+        self.wrapped.cancel(e).await;
     }
 }
 

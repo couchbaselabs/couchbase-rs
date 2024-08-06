@@ -10,6 +10,7 @@ pub enum Status {
     KeyExists,
     Locked,
     TooBig,
+    ScopeUnknown,
     CollectionUnknown,
     AccessError,
     KeyNotFound,
@@ -32,6 +33,7 @@ impl From<Status> for u16 {
             Status::SASLAuthContinue => 0x21,
             Status::AccessError => 0x24,
             Status::TmpFail => 0x86,
+            Status::ScopeUnknown => 0x8c,
             Status::CollectionUnknown => 0x88,
 
             Status::Unknown(value) => value,
@@ -53,6 +55,7 @@ impl From<u16> for Status {
             0x21 => Status::SASLAuthContinue,
             0x24 => Status::AccessError,
             0x86 => Status::TmpFail,
+            0x8c => Status::ScopeUnknown,
             0x88 => Status::CollectionUnknown,
 
             _ => Status::Unknown(value),
@@ -71,6 +74,7 @@ impl Display for Status {
             Status::KeyExists => "key exists",
             Status::TooBig => "too big",
             Status::Locked => "locked",
+            Status::ScopeUnknown => "scope unknown",
             Status::CollectionUnknown => "collection unknown",
             Status::AccessError => "access error",
             Status::KeyNotFound => "key not found",

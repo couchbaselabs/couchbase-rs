@@ -8,10 +8,14 @@ use crate::memdx::hello_feature::HelloFeature;
 use crate::memdx::op_bootstrap::{BootstrapOptions, OpBootstrap, OpBootstrapEncoder};
 use crate::memdx::ops_core::OpsCore;
 use crate::memdx::ops_crud::OpsCrud;
+use crate::memdx::ops_util::OpsUtil;
 use crate::memdx::pendingop::PendingOp;
-use crate::memdx::request::{GetClusterConfigRequest, GetRequest, SelectBucketRequest, SetRequest};
+use crate::memdx::request::{
+    GetClusterConfigRequest, GetCollectionIdRequest, GetRequest, SelectBucketRequest, SetRequest,
+};
 use crate::memdx::response::{
-    BootstrapResult, GetClusterConfigResponse, GetResponse, SelectBucketResponse, SetResponse,
+    BootstrapResult, GetClusterConfigResponse, GetCollectionIdResponse, GetResponse,
+    SelectBucketResponse, SetResponse,
 };
 
 pub(crate) trait KvClientOps: Sized + Send + Sync {
@@ -21,6 +25,10 @@ pub(crate) trait KvClientOps: Sized + Send + Sync {
         &self,
         req: GetClusterConfigRequest,
     ) -> impl Future<Output = Result<GetClusterConfigResponse>> + Send;
+    fn get_collection_id(
+        &self,
+        req: GetCollectionIdRequest,
+    ) -> impl Future<Output = Result<GetCollectionIdResponse>> + Send;
 }
 
 impl<D> KvClientOps for StdKvClient<D>
@@ -46,6 +54,16 @@ where
         req: GetClusterConfigRequest,
     ) -> Result<GetClusterConfigResponse> {
         let mut op = OpsCore {}.get_cluster_config(self.client(), req).await?;
+
+        let res = op.recv().await?;
+        Ok(res)
+    }
+
+    async fn get_collection_id(
+        &self,
+        req: GetCollectionIdRequest,
+    ) -> Result<GetCollectionIdResponse> {
+        let mut op = OpsUtil {}.get_collection_id(self.client(), req).await?;
 
         let res = op.recv().await?;
         Ok(res)

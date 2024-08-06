@@ -73,6 +73,11 @@ pub enum ErrorKind {
     NoBucket,
     #[error("Invalid vbucket map")]
     InvalidVbucketMap,
+    #[error("Collection manifest outdated: our manifest uid: {manifest_uid}, server manifest uid: {server_manifest_uid}")]
+    CollectionManifestOutdated {
+        manifest_uid: u64,
+        server_manifest_uid: u64,
+    },
     #[error("Internal error {msg}")]
     #[non_exhaustive]
     Internal { msg: String },
