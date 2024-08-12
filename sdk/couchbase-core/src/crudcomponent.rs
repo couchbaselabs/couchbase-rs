@@ -1,20 +1,19 @@
 use std::fmt::Debug;
 use std::future::Future;
 use std::sync::Arc;
-use std::time::Duration;
 
 use futures::{FutureExt, TryFutureExt};
-use tokio::time::sleep;
 
 use crate::collectionresolver::{CollectionResolver, orchestrate_memd_collection_id};
 use crate::crudoptions::{GetOptions, UpsertOptions};
 use crate::crudresults::{GetResult, UpsertResult};
-use crate::error::{ErrorKind, Result};
+use crate::error::Result;
 use crate::kvclient_ops::KvClientOps;
 use crate::kvclientmanager::{KvClientManager, KvClientManagerClientType, orchestrate_memd_client};
 use crate::memdx::request::{GetRequest, SetRequest};
 use crate::mutationtoken::MutationToken;
 use crate::nmvbhandler::NotMyVbucketConfigHandler;
+use crate::retry::{orchestrate_retries, RetryInfo, RetryManager};
 use crate::vbucketrouter::{orchestrate_memd_routing, VbucketRouter};
 
 pub(crate) struct CrudComponent<
@@ -27,6 +26,7 @@ pub(crate) struct CrudComponent<
     router: Arc<V>,
     nmvb_handler: Arc<Nmvb>,
     collections: Arc<C>,
+    retry_manager: Arc<RetryManager>,
 }
 
 // TODO: So much clone.
@@ -42,18 +42,21 @@ impl<
         router: Arc<V>,
         conn_manager: Arc<M>,
         collections: Arc<C>,
+        retry_manager: Arc<RetryManager>,
     ) -> Self {
         CrudComponent {
             conn_manager,
             router,
             nmvb_handler,
             collections,
+            retry_manager,
         }
     }
 
     pub(crate) async fn upsert(&self, opts: UpsertOptions) -> Result<UpsertResult> {
         self.orchestrate_simple_crud(
             &opts.key,
+            RetryInfo::new(false, opts.retry_strategy),
             &opts.scope_name,
             &opts.collection_name,
             async |collection_id, _manifest_id, endpoint, vb_id, client| {
@@ -93,6 +96,7 @@ impl<
     pub(crate) async fn get(&self, opts: GetOptions) -> Result<GetResult> {
         self.orchestrate_simple_crud(
             &opts.key,
+            RetryInfo::new(true, opts.retry_strategy),
             &opts.scope_name,
             &opts.collection_name,
             async |collection_id, _manifest_id, endpoint, vb_id, client| {
@@ -113,6 +117,7 @@ impl<
     pub(crate) async fn orchestrate_simple_crud<Fut, Resp>(
         &self,
         key: &[u8],
+        retry_info: RetryInfo,
         scope_name: &str,
         collection_name: &str,
         operation: impl Fn(u32, u64, String, u16, Arc<KvClientManagerClientType<M>>) -> Fut
@@ -123,8 +128,8 @@ impl<
         Fut: Future<Output = Result<Resp>> + Send,
         Resp: Send,
     {
-        loop {
-            match orchestrate_memd_collection_id(
+        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
+            orchestrate_memd_collection_id(
                 self.collections.clone(),
                 scope_name,
                 collection_name,
@@ -156,21 +161,7 @@ impl<
                 },
             )
             .await
-            {
-                Ok(res) => {
-                    return Ok(res);
-                }
-                Err(e) => match e.kind.as_ref() {
-                    ErrorKind::InvalidVbucketMap => {
-                        // TODO: this can only be temporary.
-                        sleep(Duration::from_millis(10)).await;
-                        continue;
-                    }
-                    _ => {
-                        return Err(e);
-                    }
-                },
-            }
-        }
+        })
+        .await
     }
 }

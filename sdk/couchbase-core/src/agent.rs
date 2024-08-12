@@ -29,6 +29,7 @@ use crate::memdx::client::Client;
 use crate::networktypeheuristic::NetworkTypeHeuristic;
 use crate::nmvbhandler::{ConfigUpdater, StdNotMyVbucketConfigHandler};
 use crate::parsedconfig::ParsedConfig;
+use crate::retry::RetryManager;
 use crate::vbucketrouter::{
     StdVbucketRouter, VbucketRouter, VbucketRouterOptions, VbucketRoutingInfo,
 };
@@ -57,6 +58,7 @@ pub(crate) struct AgentInner {
     conn_mgr: Arc<AgentClientManager>,
     vb_router: Arc<StdVbucketRouter>,
     collections: Arc<AgentCollectionResolver>,
+    retry_manager: Arc<RetryManager>,
 
     pub crud: CrudComponent<
         AgentClientManager,
@@ -317,11 +319,14 @@ impl Agent {
             },
         ));
 
+        let retry_manager = Arc::new(RetryManager::new());
+
         let crud = CrudComponent::new(
             nmvb_handler.clone(),
             vb_router.clone(),
             conn_mgr.clone(),
             collections.clone(),
+            retry_manager.clone(),
         );
         let inner = Arc::new(AgentInner {
             state: Arc::new(Mutex::new(state)),
@@ -330,6 +335,7 @@ impl Agent {
             vb_router,
             crud,
             collections,
+            retry_manager,
         });
 
         nmvb_handler.set_watcher(inner.clone()).await;
@@ -414,10 +420,13 @@ impl Drop for Agent {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use crate::agent::Agent;
     use crate::agentoptions::{AgentOptions, SeedConfig};
     use crate::authenticator::{Authenticator, PasswordAuthenticator};
     use crate::crudoptions::{GetOptions, UpsertOptions};
+    use crate::retrybesteffort::{BestEffortRetryStrategy, ExponentialBackoffCalculator};
 
     #[tokio::test]
     async fn agent_biz() {
@@ -440,6 +449,10 @@ mod tests {
 
         // sleep(Duration::from_millis(1000)).await;
 
+        let strat = Arc::new(BestEffortRetryStrategy::new(
+            ExponentialBackoffCalculator::default(),
+        ));
+
         let upsert_result = agent
             .upsert(UpsertOptions {
                 key: "test".into(),
@@ -451,6 +464,7 @@ mod tests {
                 preserve_expiry: None,
                 cas: None,
                 durability_level: None,
+                retry_strategy: strat.clone(),
             })
             .await
             .unwrap();
@@ -462,6 +476,7 @@ mod tests {
                 key: "test".into(),
                 scope_name: "".into(),
                 collection_name: "".into(),
+                retry_strategy: strat,
             })
             .await
             .unwrap();
