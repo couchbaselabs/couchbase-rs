@@ -1,13 +1,17 @@
-use crate::memdx::durability_level::DurabilityLevel;
+use std::sync::Arc;
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+use crate::memdx::durability_level::DurabilityLevel;
+use crate::retry::RetryStrategy;
+
+#[derive(Clone, Debug)]
 pub struct GetOptions {
     pub key: Vec<u8>,
     pub scope_name: String,
     pub collection_name: String,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug)]
 pub struct UpsertOptions {
     pub key: Vec<u8>,
     pub scope_name: String,
@@ -19,4 +23,5 @@ pub struct UpsertOptions {
     pub preserve_expiry: Option<bool>,
     pub cas: Option<u64>,
     pub durability_level: Option<DurabilityLevel>,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
