@@ -14,6 +14,7 @@ pub type OnConnectionCloseHandler = Arc<dyn Fn() -> BoxFuture<'static, ()> + Sen
 pub struct DispatcherOptions {
     pub orphan_handler: OrphanResponseHandler,
     pub on_connection_close_handler: OnConnectionCloseHandler,
+    pub disable_decompression: bool,
 }
 
 #[async_trait]

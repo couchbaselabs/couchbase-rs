@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::memdx::datatype::DataTypeFlag;
 use crate::memdx::durability_level::DurabilityLevel;
 use crate::retry::RetryStrategy;
 
@@ -18,7 +19,7 @@ pub struct UpsertOptions {
     pub collection_name: String,
     pub value: Vec<u8>,
     pub flags: u32,
-    // pub datatype:
+    pub datatype: DataTypeFlag,
     pub expiry: Option<u32>,
     pub preserve_expiry: Option<bool>,
     pub cas: Option<u64>,

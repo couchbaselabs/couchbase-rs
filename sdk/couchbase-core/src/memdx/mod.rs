@@ -3,6 +3,7 @@ pub mod client;
 pub mod client_response;
 pub mod codec;
 pub mod connection;
+pub mod datatype;
 pub mod dispatcher;
 pub mod durability_level;
 pub mod error;

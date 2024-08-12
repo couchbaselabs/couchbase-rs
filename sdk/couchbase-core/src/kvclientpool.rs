@@ -40,6 +40,7 @@ pub(crate) struct KvClientPoolOptions {
     pub connect_timeout: Duration,
     pub connect_throttle_period: Duration,
     pub orphan_handler: OrphanResponseHandler,
+    pub disable_decompression: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -58,6 +59,8 @@ struct KvClientPoolClientSpawner {
 
     orphan_handler: OrphanResponseHandler,
     on_client_close: OnKvClientCloseHandler,
+
+    disable_decompression: bool,
 }
 
 struct KvClientPoolClientHandler<K: KvClient> {
@@ -273,6 +276,7 @@ impl KvClientPoolClientSpawner {
             KvClientOptions {
                 orphan_handler: self.orphan_handler.clone(),
                 on_close: self.on_client_close.clone(),
+                disable_decompression: self.disable_decompression,
             },
         )
         .await
@@ -315,6 +319,8 @@ where
                 connection_error: Mutex::new(None),
                 on_client_close: Arc::new(|id| Box::pin(async {})),
                 config: Arc::new(Mutex::new(config.client_config)),
+
+                disable_decompression: opts.disable_decompression,
             }),
 
             new_client_watcher_notif: Notify::new(),
@@ -408,6 +414,7 @@ mod tests {
                 orphan_handler: Arc::new(|packet| {
                     dbg!("unexpected orphan", packet);
                 }),
+                disable_decompression: false,
             },
         )
         .await;
@@ -490,6 +497,7 @@ mod tests {
                 orphan_handler: Arc::new(|packet| {
                     dbg!("unexpected orphan", packet);
                 }),
+                disable_decompression: false,
             },
         )
         .await;
