@@ -11,7 +11,7 @@ pub struct AgentOptions {
     pub bucket_name: Option<String>,
 
     pub seed_config: SeedConfig,
-    // pub compression_config: Option<CompressionConfig>,
+    pub compression_config: CompressionConfig,
 }
 
 #[derive(Default, Clone, Debug, PartialEq, TypedBuilder)]
@@ -27,8 +27,22 @@ pub struct SeedConfig {
 #[non_exhaustive]
 pub struct CompressionConfig {
     pub disable_decompression: bool,
-    pub min_size: Option<i32>,
-    pub min_ratio: Option<f64>,
+    pub mode: CompressionMode,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum CompressionMode {
+    Enabled { min_size: usize, min_ratio: f64 },
+    Disabled,
+}
+
+impl Default for CompressionMode {
+    fn default() -> Self {
+        Self::Enabled {
+            min_size: 32,
+            min_ratio: 0.83,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

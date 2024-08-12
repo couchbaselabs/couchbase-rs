@@ -50,6 +50,7 @@ pub(crate) struct KvClientManagerOptions {
     pub connect_timeout: Duration,
     pub connect_throttle_period: Duration,
     pub orphan_handler: OrphanResponseHandler,
+    pub disable_decompression: bool,
 }
 
 #[derive(Debug)]
@@ -112,6 +113,7 @@ where
                 connect_timeout: self.opts.connect_timeout,
                 connect_throttle_period: self.opts.connect_throttle_period,
                 orphan_handler: self.opts.orphan_handler.clone(),
+                disable_decompression: self.opts.disable_decompression,
             },
         )
         .await;

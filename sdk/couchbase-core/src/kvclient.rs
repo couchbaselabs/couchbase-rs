@@ -58,6 +58,7 @@ pub(crate) type OnKvClientCloseHandler =
 pub(crate) struct KvClientOptions {
     pub orphan_handler: OrphanResponseHandler,
     pub on_close: OnKvClientCloseHandler,
+    pub disable_decompression: bool,
 }
 
 pub(crate) trait KvClient: Sized + PartialEq + Send + Sync {
@@ -117,6 +118,7 @@ where
                 HelloFeature::Xattr,
                 HelloFeature::Xerror,
                 HelloFeature::Snappy,
+                HelloFeature::SnappyEverywhere,
                 HelloFeature::Json,
                 HelloFeature::UnorderedExec,
                 HelloFeature::Durations,
@@ -198,6 +200,7 @@ where
                 })
             }),
             orphan_handler: opts.orphan_handler,
+            disable_decompression: opts.disable_decompression,
         };
 
         let conn = Connection::connect(
@@ -402,6 +405,7 @@ mod tests {
                     dbg!("unexpected orphan", packet);
                 }),
                 on_close: Arc::new(|id| Box::pin(async {})),
+                disable_decompression: false,
             },
         )
         .await

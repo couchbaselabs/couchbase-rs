@@ -57,6 +57,9 @@ pub enum ErrorKind {
     #[error("No supported auth mechanism was found")]
     #[non_exhaustive]
     NoSupportedAuthMechanisms,
+    #[error("Json error {msg}")]
+    #[non_exhaustive]
+    Json { msg: String },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

@@ -10,6 +10,7 @@ pub mod cbconfig;
 mod collection_resolver_cached;
 mod collection_resolver_memd;
 mod collectionresolver;
+mod compressionmanager;
 mod configparser;
 mod configwatcher;
 mod crudcomponent;

@@ -5,11 +5,14 @@ use std::sync::Arc;
 use futures::{FutureExt, TryFutureExt};
 
 use crate::collectionresolver::{CollectionResolver, orchestrate_memd_collection_id};
+use crate::compressionmanager::CompressionManager;
 use crate::crudoptions::{GetOptions, UpsertOptions};
 use crate::crudresults::{GetResult, UpsertResult};
 use crate::error::Result;
+use crate::kvclient::KvClient;
 use crate::kvclient_ops::KvClientOps;
 use crate::kvclientmanager::{KvClientManager, KvClientManagerClientType, orchestrate_memd_client};
+use crate::memdx::hello_feature::HelloFeature;
 use crate::memdx::request::{GetRequest, SetRequest};
 use crate::mutationtoken::MutationToken;
 use crate::nmvbhandler::NotMyVbucketConfigHandler;
@@ -21,12 +24,14 @@ pub(crate) struct CrudComponent<
     V: VbucketRouter,
     Nmvb: NotMyVbucketConfigHandler,
     C: CollectionResolver,
+    CM: CompressionManager,
 > {
     conn_manager: Arc<M>,
     router: Arc<V>,
     nmvb_handler: Arc<Nmvb>,
     collections: Arc<C>,
     retry_manager: Arc<RetryManager>,
+    compression_manager: CM,
 }
 
 // TODO: So much clone.
@@ -35,7 +40,8 @@ impl<
         V: VbucketRouter,
         Nmvb: NotMyVbucketConfigHandler,
         C: CollectionResolver,
-    > CrudComponent<M, V, Nmvb, C>
+        CM: CompressionManager,
+    > CrudComponent<M, V, Nmvb, C, CM>
 {
     pub(crate) fn new(
         nmvb_handler: Arc<Nmvb>,
@@ -43,6 +49,7 @@ impl<
         conn_manager: Arc<M>,
         collections: Arc<C>,
         retry_manager: Arc<RetryManager>,
+        compression_manager: CM,
     ) -> Self {
         CrudComponent {
             conn_manager,
@@ -50,6 +57,7 @@ impl<
             nmvb_handler,
             collections,
             retry_manager,
+            compression_manager,
         }
     }
 
@@ -60,14 +68,31 @@ impl<
             &opts.scope_name,
             &opts.collection_name,
             async |collection_id, _manifest_id, endpoint, vb_id, client| {
+                let (value, datatype) = match self.compression_manager.compress(
+                    client.has_feature(HelloFeature::Snappy),
+                    opts.datatype,
+                    &opts.value,
+                ) {
+                    Ok(result) => {
+                        if let Some((new_value, datatype)) = result {
+                            (new_value, datatype)
+                        } else {
+                            (opts.value.clone(), u8::from(opts.datatype))
+                        }
+                    }
+                    Err(e) => {
+                        return Err(e);
+                    }
+                };
+
                 client
                     .set(SetRequest {
                         collection_id,
                         key: opts.key.clone(),
                         vbucket_id: vb_id,
                         flags: opts.flags,
-                        value: opts.value.clone(),
-                        datatype: 0,
+                        value,
+                        datatype,
                         expiry: opts.expiry,
                         preserve_expiry: opts.preserve_expiry,
                         cas: opts.cas,
@@ -107,7 +132,12 @@ impl<
                         vbucket_id: vb_id,
                         on_behalf_of: None,
                     })
-                    .map_ok(|resp| resp.into())
+                    .map_ok(|resp| GetResult {
+                        value: resp.value,
+                        datatype: resp.datatype,
+                        cas: resp.cas,
+                        flags: resp.flags,
+                    })
                     .await
             },
         )

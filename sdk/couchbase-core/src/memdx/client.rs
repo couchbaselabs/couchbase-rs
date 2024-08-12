@@ -11,6 +11,7 @@ use std::thread::spawn;
 use async_trait::async_trait;
 use futures::{SinkExt, TryFutureExt};
 use log::{debug, trace, warn};
+use snap::raw::Decoder;
 use tokio::io::{Join, ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
 use tokio::select;
@@ -26,11 +27,13 @@ use uuid::Uuid;
 use crate::memdx::client_response::ClientResponse;
 use crate::memdx::codec::KeyValueCodec;
 use crate::memdx::connection::{Connection, ConnectionType};
+use crate::memdx::datatype::DataTypeFlag;
 use crate::memdx::dispatcher::{
     Dispatcher, DispatcherOptions, OnConnectionCloseHandler, OrphanResponseHandler,
 };
 use crate::memdx::error;
 use crate::memdx::error::{CancellationErrorKind, Error, ErrorKind};
+use crate::memdx::hello_feature::HelloFeature::DataType;
 use crate::memdx::packet::{RequestPacket, ResponsePacket};
 use crate::memdx::pendingop::ClientPendingOp;
 
@@ -44,6 +47,7 @@ struct ReadLoopOptions {
     pub orphan_handler: OrphanResponseHandler,
     pub on_connection_close_tx: OnConnectionCloseHandler,
     pub on_client_close_rx: Receiver<()>,
+    pub disable_decompression: bool,
 }
 
 #[derive(Debug)]
@@ -126,7 +130,7 @@ impl Client {
                     match next {
                         Some(input) => {
                             match input {
-                                Ok(packet) => {
+                                Ok(mut packet) => {
                                     trace!(
                                         "Resolving response on {}. Opcode={}. Opaque={}. Status={}",
                                         opts.client_id,
@@ -148,6 +152,29 @@ impl Client {
                                         let sender = Arc::clone(map_entry);
                                         drop(map);
                                         let (more_tx, more_rx) = oneshot::channel();
+
+                                        if let Some(value) = &packet.value {
+                                            if !opts.disable_decompression && (packet.datatype & u8::from(DataTypeFlag::Compressed) != 0) {
+                                                let mut decoder = Decoder::new();
+                                                let new_value = match decoder
+                                                    .decompress_vec(value)
+                                                     {
+                                                        Ok(v) => v,
+                                                        Err(e) => {
+                                                            match sender.send(Err(ErrorKind::Json {msg: e.to_string()}.into())).await{
+                                                                Ok(_) => {}
+                                                                Err(e) => {
+                                                                    debug!("Sending response to caller failed: {}", e);
+                                                                }
+                                                            };
+                                                         continue;
+                                                        }
+                                                    };
+
+                                                packet.datatype &= !u8::from(DataTypeFlag::Compressed);
+                                                packet.value = Some(new_value);
+                                            }
+                                        }
 
                                         // TODO: clone
                                         let resp = ClientResponse::new(packet, more_tx, opts.peer_addr, opts.local_addr);
@@ -237,6 +264,7 @@ impl Dispatcher for Client {
                     orphan_handler: opts.orphan_handler,
                     on_connection_close_tx: opts.on_connection_close_handler,
                     on_client_close_rx: close_rx,
+                    disable_decompression: opts.disable_decompression,
                 },
             )
             .await;
@@ -371,6 +399,7 @@ mod tests {
                 orphan_handler: Arc::new(|packet| {
                     dbg!("unexpected orphan", packet);
                 }),
+                disable_decompression: false,
             },
         );
 
@@ -398,7 +427,7 @@ mod tests {
                         HelloFeature::CreateAsDeleted,
                         HelloFeature::AltRequests,
                         HelloFeature::Collections,
-                        HelloFeature::Opentracing,
+                        HelloFeature::SnappyEverywhere,
                     ],
                 }),
                 get_error_map: Some(GetErrorMapRequest { version: 2 }),

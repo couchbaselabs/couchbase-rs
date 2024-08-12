@@ -15,6 +15,7 @@ use crate::collection_resolver_cached::{
     CollectionResolverCached, CollectionResolverCachedOptions,
 };
 use crate::collection_resolver_memd::{CollectionResolverMemd, CollectionResolverMemdOptions};
+use crate::compressionmanager::StdCompressionManager;
 use crate::configwatcher::{
     ConfigWatcher, ConfigWatcherMemd, ConfigWatcherMemdConfig, ConfigWatcherMemdOptions,
 };
@@ -65,6 +66,7 @@ pub(crate) struct AgentInner {
         StdVbucketRouter,
         StdNotMyVbucketConfigHandler<AgentInner>,
         AgentCollectionResolver,
+        StdCompressionManager,
     >,
 }
 
@@ -289,6 +291,7 @@ impl Agent {
                     orphan_handler: Arc::new(|packet| {
                         info!("Orphan : {:?}", packet);
                     }),
+                    disable_decompression: opts.compression_config.disable_decompression,
                 },
             )
             .await?,
@@ -320,6 +323,7 @@ impl Agent {
         ));
 
         let retry_manager = Arc::new(RetryManager::new());
+        let compression_manager = StdCompressionManager::new(opts.compression_config);
 
         let crud = CrudComponent::new(
             nmvb_handler.clone(),
@@ -327,6 +331,7 @@ impl Agent {
             conn_mgr.clone(),
             collections.clone(),
             retry_manager.clone(),
+            compression_manager,
         );
         let inner = Arc::new(AgentInner {
             state: Arc::new(Mutex::new(state)),
@@ -423,9 +428,10 @@ mod tests {
     use std::sync::Arc;
 
     use crate::agent::Agent;
-    use crate::agentoptions::{AgentOptions, SeedConfig};
+    use crate::agentoptions::{AgentOptions, CompressionConfig, SeedConfig};
     use crate::authenticator::{Authenticator, PasswordAuthenticator};
     use crate::crudoptions::{GetOptions, UpsertOptions};
+    use crate::memdx::datatype::DataTypeFlag;
     use crate::retrybesteffort::{BestEffortRetryStrategy, ExponentialBackoffCalculator};
 
     #[tokio::test]
@@ -443,6 +449,7 @@ mod tests {
                 http_addrs: vec![],
                 memd_addrs: vec!["192.168.107.128:11210".to_string()],
             },
+            compression_config: CompressionConfig::default(),
         };
 
         let agent = Agent::new(agent_opts).await.unwrap();
@@ -453,18 +460,30 @@ mod tests {
             ExponentialBackoffCalculator::default(),
         ));
 
+        let mut value = "".to_string();
+        let mut i = 0;
+
+        loop {
+            value += "a";
+            i += 1;
+            if i == 256 {
+                break;
+            }
+        }
+
         let upsert_result = agent
             .upsert(UpsertOptions {
                 key: "test".into(),
                 scope_name: "".into(),
                 collection_name: "".into(),
-                value: "value".into(),
+                value: value.into_bytes(),
                 flags: 0,
                 expiry: None,
                 preserve_expiry: None,
                 cas: None,
                 durability_level: None,
                 retry_strategy: strat.clone(),
+                datatype: DataTypeFlag::None,
             })
             .await
             .unwrap();
