@@ -15,7 +15,7 @@ use crate::collection_resolver_cached::{
     CollectionResolverCached, CollectionResolverCachedOptions,
 };
 use crate::collection_resolver_memd::{CollectionResolverMemd, CollectionResolverMemdOptions};
-use crate::compressionmanager::StdCompressionManager;
+use crate::compressionmanager::{CompressionManager, StdCompressor};
 use crate::configwatcher::{
     ConfigWatcher, ConfigWatcherMemd, ConfigWatcherMemdConfig, ConfigWatcherMemdOptions,
 };
@@ -66,7 +66,7 @@ pub(crate) struct AgentInner {
         StdVbucketRouter,
         StdNotMyVbucketConfigHandler<AgentInner>,
         AgentCollectionResolver,
-        StdCompressionManager,
+        StdCompressor,
     >,
 }
 
@@ -323,7 +323,7 @@ impl Agent {
         ));
 
         let retry_manager = Arc::new(RetryManager::new());
-        let compression_manager = StdCompressionManager::new(opts.compression_config);
+        let compression_manager = Arc::new(CompressionManager::new(opts.compression_config));
 
         let crud = CrudComponent::new(
             nmvb_handler.clone(),
@@ -473,10 +473,10 @@ mod tests {
 
         let upsert_result = agent
             .upsert(UpsertOptions {
-                key: "test".into(),
-                scope_name: "".into(),
-                collection_name: "".into(),
-                value: value.into_bytes(),
+                key: b"test",
+                scope_name: "",
+                collection_name: "",
+                value: value.as_bytes(),
                 flags: 0,
                 expiry: None,
                 preserve_expiry: None,
@@ -492,9 +492,9 @@ mod tests {
 
         let get_result = agent
             .get(GetOptions {
-                key: "test".into(),
-                scope_name: "".into(),
-                collection_name: "".into(),
+                key: b"test",
+                scope_name: "",
+                collection_name: "",
                 retry_strategy: strat,
             })
             .await
