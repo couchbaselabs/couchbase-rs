@@ -5,19 +5,19 @@ use crate::memdx::durability_level::DurabilityLevel;
 use crate::retry::RetryStrategy;
 
 #[derive(Clone, Debug)]
-pub struct GetOptions {
-    pub key: Vec<u8>,
-    pub scope_name: String,
-    pub collection_name: String,
+pub struct GetOptions<'a> {
+    pub key: &'a [u8],
+    pub scope_name: &'a str,
+    pub collection_name: &'a str,
     pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 #[derive(Clone, Debug)]
-pub struct UpsertOptions {
-    pub key: Vec<u8>,
-    pub scope_name: String,
-    pub collection_name: String,
-    pub value: Vec<u8>,
+pub struct UpsertOptions<'a> {
+    pub key: &'a [u8],
+    pub scope_name: &'a str,
+    pub collection_name: &'a str,
+    pub value: &'a [u8],
     pub flags: u32,
     pub datatype: DataTypeFlag,
     pub expiry: Option<u32>,

@@ -45,12 +45,12 @@ pub struct SASLStepRequest {
 pub struct SASLListMechsRequest {}
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct SetRequest {
+pub struct SetRequest<'a> {
     pub collection_id: u32,
-    pub key: Vec<u8>,
+    pub key: &'a [u8],
     pub vbucket_id: u16,
     pub flags: u32,
-    pub value: Vec<u8>,
+    pub value: &'a [u8],
     pub datatype: u8,
     pub expiry: Option<u32>,
     pub preserve_expiry: Option<bool>,
@@ -61,9 +61,9 @@ pub struct SetRequest {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct GetRequest {
+pub struct GetRequest<'a> {
     pub collection_id: u32,
-    pub key: Vec<u8>,
+    pub key: &'a [u8],
     pub vbucket_id: u16,
     pub on_behalf_of: Option<String>,
 }

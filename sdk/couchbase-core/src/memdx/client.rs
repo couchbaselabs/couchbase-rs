@@ -465,10 +465,10 @@ mod tests {
                 &client,
                 SetRequest {
                     collection_id: 0,
-                    key: "test".as_bytes().into(),
+                    key: b"test",
                     vbucket_id: 1,
                     flags: 0,
-                    value: "test".as_bytes().into(),
+                    value: b"test",
                     datatype: 0,
                     expiry: None,
                     preserve_expiry: None,
@@ -495,7 +495,7 @@ mod tests {
                 &client,
                 GetRequest {
                     collection_id: 0,
-                    key: "test".as_bytes().into(),
+                    key: b"test",
                     vbucket_id: 1,
                     on_behalf_of: None,
                 },

@@ -27,10 +27,10 @@ pub struct OpsCrud {
 }
 
 impl OpsCrud {
-    pub async fn set<D>(
+    pub async fn set<'a, D>(
         &self,
         dispatcher: &D,
-        request: SetRequest,
+        request: SetRequest<'a>,
     ) -> Result<StandardPendingOp<SetResponse>>
     where
         D: Dispatcher,
@@ -64,7 +64,7 @@ impl OpsCrud {
             cas: request.cas,
             extras: Some(extra_buf),
             key: Some(key),
-            value: Some(request.value),
+            value: Some(request.value.to_vec()),
             framing_extras,
             opaque: None,
         };
@@ -73,10 +73,10 @@ impl OpsCrud {
 
         Ok(StandardPendingOp::new(pending_op))
     }
-    pub async fn get<D>(
+    pub async fn get<'a, D>(
         &self,
         dispatcher: &D,
-        request: GetRequest,
+        request: GetRequest<'a>,
     ) -> Result<StandardPendingOp<GetResponse>>
     where
         D: Dispatcher,
@@ -111,7 +111,7 @@ impl OpsCrud {
         Ok(StandardPendingOp::new(pending_op))
     }
 
-    fn encode_collection_and_key(&self, collection_id: u32, key: Vec<u8>) -> Result<Vec<u8>> {
+    fn encode_collection_and_key(&self, collection_id: u32, key: &[u8]) -> Result<Vec<u8>> {
         if !self.collections_enabled {
             if collection_id != 0 {
                 return Err(ErrorKind::InvalidArgument {
@@ -120,7 +120,7 @@ impl OpsCrud {
                 .into());
             }
 
-            return Ok(key);
+            return Ok(key.to_vec());
         }
 
         Ok(make_uleb128_32(key, collection_id))
@@ -315,7 +315,7 @@ pub fn append_ext_frame(
     Ok(())
 }
 
-pub fn make_uleb128_32(key: Vec<u8>, collection_id: u32) -> Vec<u8> {
+pub fn make_uleb128_32(key: &[u8], collection_id: u32) -> Vec<u8> {
     let mut cid = collection_id;
     let mut builder = BytesMut::with_capacity(key.len() + 5);
     loop {
@@ -331,7 +331,7 @@ pub fn make_uleb128_32(key: Vec<u8>, collection_id: u32) -> Vec<u8> {
         }
     }
     for k in key {
-        builder.put_u8(k);
+        builder.put_u8(*k);
     }
 
     builder.freeze().to_vec()
