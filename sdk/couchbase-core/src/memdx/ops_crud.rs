@@ -187,6 +187,7 @@ impl OpsCrud {
         let kind = match resp.status {
             Status::CollectionUnknown => ServerErrorKind::UnknownCollectionID,
             Status::AccessError => ServerErrorKind::Access,
+            Status::NoBucket => ServerErrorKind::NoBucket,
             _ => {
                 return Ok(());
             }

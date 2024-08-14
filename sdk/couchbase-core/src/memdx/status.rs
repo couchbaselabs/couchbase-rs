@@ -15,6 +15,7 @@ pub enum Status {
     AccessError,
     KeyNotFound,
     InvalidArgs,
+    NoBucket,
 
     Unknown(u16),
 }
@@ -27,8 +28,9 @@ impl From<Status> for u16 {
             Status::KeyExists => 0x02,
             Status::TooBig => 0x03,
             Status::InvalidArgs => 0x04,
-            Status::Locked => 0x09,
             Status::NotMyVbucket => 0x07,
+            Status::NoBucket => 0x08,
+            Status::Locked => 0x09,
             Status::AuthError => 0x20,
             Status::SASLAuthContinue => 0x21,
             Status::AccessError => 0x24,
@@ -49,8 +51,9 @@ impl From<u16> for Status {
             0x02 => Status::KeyExists,
             0x03 => Status::TooBig,
             0x04 => Status::InvalidArgs,
-            0x09 => Status::Locked,
             0x07 => Status::NotMyVbucket,
+            0x08 => Status::NoBucket,
+            0x09 => Status::Locked,
             0x20 => Status::AuthError,
             0x21 => Status::SASLAuthContinue,
             0x24 => Status::AccessError,
@@ -79,6 +82,7 @@ impl Display for Status {
             Status::AccessError => "access error",
             Status::KeyNotFound => "key not found",
             Status::InvalidArgs => "invalid args",
+            Status::NoBucket => "no bucket selected",
             Status::Unknown(status) => {
                 // TODO: improve this.
                 let t = format!("unknown status {}", status);

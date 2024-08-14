@@ -1,0 +1,80 @@
+name: Run Tests
+
+on:
+  push:
+    tags:
+      - v*
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  test:
+    name: Integration Test
+
+    strategy:
+      matrix:
+        server:
+          - 7.2.2
+          - 7.1.1
+          - 7.0.3
+
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Install cbdinocluster
+        run: |
+          mkdir -p "$HOME/bin"
+          wget -nv -O $HOME/bin/cbdinocluster https://github.com/couchbaselabs/cbdinocluster/releases/download/v0.0.41/cbdinocluster-linux-amd64
+          chmod +x $HOME/bin/cbdinocluster
+          echo "$HOME/bin" >> $GITHUB_PATH
+
+      - name: Initialize cbdinocluster
+        run: |
+          cbdinocluster -v init --auto
+
+      - name: Start couchbase cluster
+        env:
+          CLUSTERCONFIG: |
+            nodes:
+              - count: 3
+                version: ${{ matrix.server }}
+                services: [kv, n1ql, index, fts, cbas]
+            docker:
+              kv-memory: 512
+        run: |
+          CBDC_ID=$(cbdinocluster -v alloc --def="${CLUSTERCONFIG}")
+          cbdinocluster -v buckets add ${CBDC_ID} default --ram-quota-mb=100 --flush-enabled=true --num-replicas=2
+          cbdinocluster -v collections add ${CBDC_ID} default _default test
+          CBDC_CONNSTR=$(cbdinocluster -v connstr $CBDC_ID)
+          echo "CBDC_ID=$CBDC_ID" >> "$GITHUB_ENV"
+          echo "CBDC_CONNSTR=$CBDC_CONNSTR" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain and cache
+        uses: actions-rust-lang/setup-rust-toolchain@v1.4.3
+
+      - name: Run tests
+        timeout-minutes: 40
+        env:
+          CBDC_ID: # from above
+          CBDC_CONNSTR: # from above
+          RCBDINOID: ${{ env.CBDC_ID }}
+          RCBCONNSTR: ${{ env.CBDC_CONNSTR }}
+        run: |
+          cargo test --color=always -- --nocapture
+
+#      - name: Collect couchbase logs
+#        timeout-minutes: 10
+#        if: failure()
+#        run: |
+#          mkdir -p ./logs
+#          cbdinocluster -v collect-logs $CBDC_ID ./logs
+#
+#      - name: Upload couchbase logs
+#        if: failure()
+#        uses: actions/upload-artifact@v3
+#        with:
+#          name: cbcollect-logs
+#          path: ./logs/*
+#          retention-days: 1

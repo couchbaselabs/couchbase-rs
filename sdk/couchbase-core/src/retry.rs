@@ -39,13 +39,10 @@ impl RetryReason {
     }
 }
 
+#[derive(Default)]
 pub struct RetryManager {}
 
 impl RetryManager {
-    pub fn new() -> Self {
-        Self {}
-    }
-
     pub async fn maybe_retry(
         &self,
         request: &mut RetryInfo,

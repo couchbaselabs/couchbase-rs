@@ -15,7 +15,11 @@ impl ConfigParser {
         let rev_id = config.rev;
         let rev_epoch = config.rev_epoch.unwrap_or_default();
 
-        let len_nodes = config.nodes.len();
+        let len_nodes = if let Some(nodes) = config.nodes {
+            nodes.len()
+        } else {
+            0
+        };
         let mut nodes = Vec::with_capacity(config.nodes_ext.len());
         for (node_idx, node) in config.nodes_ext.into_iter().enumerate() {
             let node_hostname = Self::parse_config_hostname(&node.hostname, source_hostname);
@@ -42,12 +46,16 @@ impl ConfigParser {
 
         let bucket = if let Some(bucket_name) = config.name {
             let bucket_uuid = config.uuid.unwrap_or_default();
-            let (bucket_type, vbucket_map) = match config.node_locator.as_str() {
-                "vbucket" => (
-                    BucketType::Couchbase,
-                    Self::parse_vbucket_server_map(config.vbucket_server_map)?,
-                ),
-                _ => (BucketType::Invalid, None),
+            let (bucket_type, vbucket_map) = if let Some(locator) = config.node_locator {
+                match locator.as_str() {
+                    "vbucket" => (
+                        BucketType::Couchbase,
+                        Self::parse_vbucket_server_map(config.vbucket_server_map)?,
+                    ),
+                    _ => (BucketType::Invalid, None),
+                }
+            } else {
+                (BucketType::Invalid, None)
             };
 
             Some(ParsedConfigBucket {

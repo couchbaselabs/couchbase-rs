@@ -58,6 +58,8 @@ impl OpsCore {
             ServerErrorKind::NotMyVbucket
         } else if status == Status::TmpFail {
             ServerErrorKind::TmpFail
+        } else if status == Status::NoBucket {
+            ServerErrorKind::NoBucket
         } else {
             ServerErrorKind::UnknownStatus { status }
         };
