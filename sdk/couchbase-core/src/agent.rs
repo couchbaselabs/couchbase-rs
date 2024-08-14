@@ -16,6 +16,7 @@ use crate::collection_resolver_cached::{
 };
 use crate::collection_resolver_memd::{CollectionResolverMemd, CollectionResolverMemdOptions};
 use crate::compressionmanager::{CompressionManager, StdCompressor};
+use crate::configparser::ConfigParser;
 use crate::configwatcher::{
     ConfigWatcher, ConfigWatcherMemd, ConfigWatcherMemdConfig, ConfigWatcherMemdOptions,
 };
@@ -254,8 +255,15 @@ impl AgentInner {
 
 impl ConfigUpdater for AgentInner {
     async fn apply_terse_config(&self, config: TerseConfig, source_hostname: &str) {
-        debug!("weee");
-        todo!()
+        let parsed_config = match ConfigParser::parse_terse_config(config, source_hostname) {
+            Ok(cfg) => cfg,
+            Err(_e) => {
+                // TODO: log
+                return;
+            }
+        };
+
+        self.apply_config(parsed_config).await;
     }
 }
 
