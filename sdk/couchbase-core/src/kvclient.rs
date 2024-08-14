@@ -1,6 +1,6 @@
 use std::future::Future;
 use std::net::SocketAddr;
-use std::ops::{Add, AsyncFn, Deref};
+use std::ops::{Add, Deref};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
@@ -355,94 +355,5 @@ where
 {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::ops::Add;
-    use std::sync::Arc;
-    use std::time::Duration;
-
-    use tokio::time::Instant;
-
-    use crate::authenticator::PasswordAuthenticator;
-    use crate::kvclient::{KvClient, KvClientConfig, KvClientOptions, StdKvClient};
-    use crate::kvclient_ops::KvClientOps;
-    use crate::memdx::client::Client;
-    use crate::memdx::request::{GetRequest, SetRequest};
-
-    #[tokio::test]
-    async fn roundtrip_a_request() {
-        let _ = env_logger::try_init();
-
-        let instant = Instant::now().add(Duration::new(7, 0));
-
-        let client_config = KvClientConfig {
-            address: "192.168.107.128:11210"
-                .parse()
-                .expect("Failed to parse address"),
-            root_certs: None,
-            accept_all_certs: None,
-            client_name: "myclient".to_string(),
-            authenticator: Some(Arc::new(
-                PasswordAuthenticator {
-                    username: "Administrator".to_string(),
-                    password: "password".to_string(),
-                }
-                .into(),
-            )),
-            selected_bucket: Some("default".to_string()),
-            disable_default_features: false,
-            disable_error_map: false,
-            disable_bootstrap: false,
-        };
-
-        let mut client = StdKvClient::<Client>::new(
-            client_config,
-            KvClientOptions {
-                orphan_handler: Arc::new(|packet| {
-                    dbg!("unexpected orphan", packet);
-                }),
-                on_close: Arc::new(|id| Box::pin(async {})),
-                disable_decompression: false,
-            },
-        )
-        .await
-        .unwrap();
-
-        let result = client
-            .set(SetRequest {
-                collection_id: 0,
-                key: b"test",
-                vbucket_id: 1,
-                flags: 0,
-                value: b"test",
-                datatype: 0,
-                expiry: None,
-                preserve_expiry: None,
-                cas: None,
-                on_behalf_of: None,
-                durability_level: None,
-                durability_level_timeout: None,
-            })
-            .await
-            .unwrap();
-
-        dbg!(result);
-
-        let get_result = client
-            .get(GetRequest {
-                collection_id: 0,
-                key: b"test",
-                vbucket_id: 1,
-                on_behalf_of: None,
-            })
-            .await
-            .unwrap();
-
-        dbg!(get_result);
-
-        client.close().await.unwrap();
     }
 }

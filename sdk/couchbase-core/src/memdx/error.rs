@@ -212,6 +212,8 @@ pub enum ServerErrorKind {
     TooBig,
     #[error("Unknown collection id")]
     UnknownCollectionID,
+    #[error("No bucket selected")]
+    NoBucket,
     #[error("Unknown bucket name")]
     UnknownBucketName,
     #[error("Access error")]

@@ -108,7 +108,7 @@ pub struct TerseConfig {
     #[serde(alias = "name")]
     pub name: Option<String>,
     #[serde(alias = "nodeLocator")]
-    pub node_locator: String,
+    pub node_locator: Option<String>,
     #[serde(alias = "uuid")]
     pub uuid: Option<String>,
     #[serde(alias = "uri")]
@@ -118,7 +118,7 @@ pub struct TerseConfig {
     #[serde(alias = "bucketCapabilitiesVer")]
     pub bucket_capabilities_ver: Option<String>,
     #[serde(alias = "bucketCapabilities")]
-    pub bucket_capabilities: Vec<String>,
+    pub bucket_capabilities: Option<Vec<String>>,
     #[serde(alias = "collectionsManifestUid")]
     pub collections_manifest_uuid: Option<String>,
     #[serde(alias = "ddocs")]
@@ -126,7 +126,7 @@ pub struct TerseConfig {
     #[serde(alias = "vBucketServerMap")]
     pub vbucket_server_map: Option<VBucketServerMap>,
     #[serde(alias = "nodes")]
-    pub nodes: Vec<TerseNodeConfig>,
+    pub nodes: Option<Vec<TerseNodeConfig>>,
     #[serde(alias = "nodesExt")]
     pub nodes_ext: Vec<TerseNodeExtConfig>,
     #[serde(alias = "clusterCapabilitiesVer")]

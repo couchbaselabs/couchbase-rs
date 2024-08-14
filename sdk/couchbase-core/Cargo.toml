@@ -18,7 +18,7 @@ hmac = "0.12"
 sha1 = "0.10"
 sha2 = "0.10"
 serde = { version = "1.0.203", features = ["derive"] }
-rand = "0.9.0-alpha.1"
+rand = "0.9.0-alpha.2"
 base64 = "0.22.1"
 webpki = "0.22.4"
 async-trait = "0.1.80"
@@ -31,6 +31,7 @@ snap = "1.1"
 
 [dev-dependencies]
 env_logger = "0.11"
+envconfig = "0.10"
 
 [lints.rust]
 # This is temporary whilst we build out the root modules.

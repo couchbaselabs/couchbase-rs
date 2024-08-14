@@ -330,7 +330,7 @@ impl Agent {
             },
         ));
 
-        let retry_manager = Arc::new(RetryManager::new());
+        let retry_manager = Arc::new(RetryManager::default());
         let compression_manager = Arc::new(CompressionManager::new(opts.compression_config));
 
         let crud = CrudComponent::new(
@@ -428,86 +428,5 @@ impl Agent {
 impl Drop for Agent {
     fn drop(&mut self) {
         self.config_watcher_shutdown_tx.send(()).unwrap_or_default();
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::sync::Arc;
-
-    use crate::agent::Agent;
-    use crate::agentoptions::{AgentOptions, CompressionConfig, SeedConfig};
-    use crate::authenticator::{Authenticator, PasswordAuthenticator};
-    use crate::crudoptions::{GetOptions, UpsertOptions};
-    use crate::memdx::datatype::DataTypeFlag;
-    use crate::retrybesteffort::{BestEffortRetryStrategy, ExponentialBackoffCalculator};
-
-    #[tokio::test]
-    async fn agent_biz() {
-        let agent_opts = AgentOptions {
-            tls_config: None,
-            authenticator: Some(Authenticator::PasswordAuthenticator(
-                PasswordAuthenticator {
-                    username: "Administrator".to_string(),
-                    password: "password".to_string(),
-                },
-            )),
-            bucket_name: Some("default".to_string()),
-            seed_config: SeedConfig {
-                http_addrs: vec![],
-                memd_addrs: vec!["192.168.107.128:11210".to_string()],
-            },
-            compression_config: CompressionConfig::default(),
-        };
-
-        let agent = Agent::new(agent_opts).await.unwrap();
-
-        // sleep(Duration::from_millis(1000)).await;
-
-        let strat = Arc::new(BestEffortRetryStrategy::new(
-            ExponentialBackoffCalculator::default(),
-        ));
-
-        let mut value = "".to_string();
-        let mut i = 0;
-
-        loop {
-            value += "a";
-            i += 1;
-            if i == 256 {
-                break;
-            }
-        }
-
-        let upsert_result = agent
-            .upsert(UpsertOptions {
-                key: b"test",
-                scope_name: "",
-                collection_name: "",
-                value: value.as_bytes(),
-                flags: 0,
-                expiry: None,
-                preserve_expiry: None,
-                cas: None,
-                durability_level: None,
-                retry_strategy: strat.clone(),
-                datatype: DataTypeFlag::None,
-            })
-            .await
-            .unwrap();
-
-        dbg!(upsert_result);
-
-        let get_result = agent
-            .get(GetOptions {
-                key: b"test",
-                scope_name: "",
-                collection_name: "",
-                retry_strategy: strat,
-            })
-            .await
-            .unwrap();
-
-        dbg!(get_result);
     }
 }
