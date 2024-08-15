@@ -10,9 +10,9 @@ use std::thread::spawn;
 
 use async_trait::async_trait;
 use futures::{SinkExt, TryFutureExt};
-use log::{debug, trace, warn};
+use log::{debug, error, trace, warn};
 use snap::raw::Decoder;
-use tokio::io::{Join, ReadHalf, WriteHalf};
+use tokio::io::{AsyncRead, AsyncWrite, Join, ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
 use tokio::select;
 use tokio::sync::{mpsc, Mutex, MutexGuard, oneshot, RwLock, Semaphore};
@@ -26,7 +26,7 @@ use uuid::Uuid;
 
 use crate::memdx::client_response::ClientResponse;
 use crate::memdx::codec::KeyValueCodec;
-use crate::memdx::connection::{Connection, ConnectionType};
+use crate::memdx::connection::{ConnectionType, Stream};
 use crate::memdx::datatype::DataTypeFlag;
 use crate::memdx::dispatcher::{
     Dispatcher, DispatcherOptions, OnConnectionCloseHandler, OrphanResponseHandler,
@@ -68,7 +68,7 @@ pub struct Client {
 
     client_id: String,
 
-    writer: Mutex<FramedWrite<WriteHalf<TcpStream>, KeyValueCodec>>,
+    writer: Mutex<FramedWrite<WriteHalf<Box<dyn Stream>>, KeyValueCodec>>,
     read_handle: Mutex<ClientReadHandle>,
     close_tx: Sender<()>,
 
@@ -103,7 +103,7 @@ impl Client {
     }
 
     async fn on_read_loop_close(
-        stream: FramedRead<ReadHalf<TcpStream>, KeyValueCodec>,
+        stream: FramedRead<ReadHalf<Box<dyn Stream>>, KeyValueCodec>,
         opaque_map: MutexGuard<'_, OpaqueMap>,
         on_connection_close: OnConnectionCloseHandler,
     ) {
@@ -115,7 +115,7 @@ impl Client {
     }
 
     async fn read_loop(
-        mut stream: FramedRead<ReadHalf<TcpStream>, KeyValueCodec>,
+        mut stream: FramedRead<ReadHalf<Box<dyn Stream>>, KeyValueCodec>,
         opaque_map: Arc<Mutex<OpaqueMap>>,
         mut opts: ReadLoopOptions,
     ) {
@@ -224,21 +224,21 @@ impl Client {
             }
         }
     }
+
+    fn split_stream<StreamType: AsyncRead + AsyncWrite + Send + Unpin>(
+        stream: StreamType,
+    ) -> (ReadHalf<StreamType>, WriteHalf<StreamType>) {
+        tokio::io::split(stream)
+    }
 }
 
 #[async_trait]
 impl Dispatcher for Client {
-    fn new(conn: Connection, opts: DispatcherOptions) -> Self {
+    fn new(conn: ConnectionType, opts: DispatcherOptions) -> Self {
         let local_addr = *conn.local_addr();
         let peer_addr = *conn.peer_addr();
 
-        let (r, w) = match conn.into_inner() {
-            ConnectionType::Tcp(stream) => tokio::io::split(stream),
-            ConnectionType::Tls(stream) => {
-                let (tcp, _) = stream.into_inner();
-                tokio::io::split(tcp)
-            }
-        };
+        let (r, w) = tokio::io::split(conn.into_inner());
 
         let codec = KeyValueCodec::default();
         let reader = FramedRead::new(r, codec);

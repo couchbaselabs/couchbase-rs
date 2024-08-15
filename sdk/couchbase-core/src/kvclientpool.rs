@@ -258,8 +258,12 @@ impl KvClientPoolClientSpawner {
         loop {
             let err = self.connection_error.lock().await;
             if let Some(error) = err.deref() {
-                let connect_wait_period =
-                    self.connect_throttle_period - Instant::now().sub(error.connect_error_time);
+                let connection_wait_period = Instant::now().sub(error.connect_error_time);
+                let connect_wait_period = if connection_wait_period > self.connect_throttle_period {
+                    self.connect_throttle_period
+                } else {
+                    self.connect_throttle_period - Instant::now().sub(error.connect_error_time)
+                };
 
                 if !connect_wait_period.is_zero() {
                     drop(err);
