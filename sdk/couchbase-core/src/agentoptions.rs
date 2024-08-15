@@ -1,6 +1,7 @@
 use typed_builder::TypedBuilder;
 
 use crate::authenticator::Authenticator;
+use crate::memdx::connection::TlsConfig as MemdxTlsConfig;
 
 #[derive(Clone, Debug, PartialEq, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
@@ -31,6 +32,7 @@ pub struct CompressionConfig {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub enum CompressionMode {
     Enabled { min_size: usize, min_ratio: f64 },
     Disabled,
@@ -46,4 +48,16 @@ impl Default for CompressionMode {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum TlsConfig {}
+#[non_exhaustive]
+pub enum TlsConfig {
+    NoVerify,
+}
+
+impl From<TlsConfig> for MemdxTlsConfig {
+    fn from(value: TlsConfig) -> Self {
+        MemdxTlsConfig {
+            root_certs: None,
+            accept_all_certs: Some(true),
+        }
+    }
+}

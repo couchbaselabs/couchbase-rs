@@ -1,6 +1,8 @@
+use std::io::Write;
 use std::sync::{Arc, Mutex};
 
 use envconfig::Envconfig;
+use log::LevelFilter;
 
 pub(crate) static TEST_CONFIG: Mutex<Option<Arc<TestConfig>>> = Mutex::new(None);
 
@@ -31,6 +33,20 @@ pub fn setup_tests() {
     let mut config = TEST_CONFIG.lock().unwrap();
 
     if config.is_none() {
+        env_logger::Builder::new()
+            .format(|buf, record| {
+                writeln!(
+                    buf,
+                    "{}:{} {} [{}] - {}",
+                    record.file().unwrap_or("unknown"),
+                    record.line().unwrap_or(0),
+                    chrono::Local::now().format("%Y-%m-%dT%H:%M:%S"),
+                    record.level(),
+                    record.args()
+                )
+            })
+            .filter_level(LevelFilter::Trace)
+            .init();
         let test_config = EnvTestConfig::init_from_env().unwrap();
 
         // TODO: Once we have connection string parsing in place this should go away.
@@ -40,6 +56,7 @@ pub fn setup_tests() {
         let (conn_string, port) = if let Some(pos) = conn_string.find(":") {
             let split = conn_string.split_at(pos);
             let port_str = split.1;
+            let port_str = port_str.replace(":", "");
             (split.0.to_string(), port_str.parse().unwrap())
         } else {
             (conn_string, 11210)

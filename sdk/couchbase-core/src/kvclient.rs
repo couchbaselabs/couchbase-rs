@@ -8,14 +8,15 @@ use std::time::Duration;
 use futures::future::BoxFuture;
 use tokio::sync::Mutex;
 use tokio::time::Instant;
-use tokio_rustls::rustls::RootCertStore;
 use uuid::Uuid;
 
 use crate::authenticator::Authenticator;
 use crate::error::Error;
 use crate::error::Result;
 use crate::memdx::auth_mechanism::AuthMechanism;
-use crate::memdx::connection::{Connection, ConnectOptions};
+use crate::memdx::connection::{
+    ConnectionType, ConnectOptions, TcpConnection, TlsConfig, TlsConnection,
+};
 use crate::memdx::dispatcher::{Dispatcher, DispatcherOptions, OrphanResponseHandler};
 use crate::memdx::hello_feature::HelloFeature;
 use crate::memdx::op_auth_saslauto::SASLAuthAutoOptions;
@@ -26,8 +27,7 @@ use crate::service_type::ServiceType;
 #[derive(Debug, Clone)]
 pub(crate) struct KvClientConfig {
     pub address: SocketAddr,
-    pub root_certs: Option<RootCertStore>,
-    pub accept_all_certs: Option<bool>,
+    pub tls: Option<TlsConfig>,
     pub client_name: String,
     pub authenticator: Option<Arc<Authenticator>>,
     pub selected_bucket: Option<String>,
@@ -43,7 +43,7 @@ impl PartialEq for KvClientConfig {
     fn eq(&self, other: &Self) -> bool {
         // TODO: compare root certs or something somehow.
         self.address == other.address
-            && self.accept_all_certs == other.accept_all_certs
+            && self.tls == other.tls
             && self.client_name == other.client_name
             && self.selected_bucket == other.selected_bucket
             && self.disable_default_features == other.disable_default_features
@@ -203,14 +203,28 @@ where
             disable_decompression: opts.disable_decompression,
         };
 
-        let conn = Connection::connect(
-            config.address,
-            ConnectOptions {
-                tls_config: None,
-                deadline: Instant::now().add(Duration::new(7, 0)),
-            },
-        )
-        .await?;
+        let conn = if let Some(tls) = config.tls.clone() {
+            ConnectionType::Tls(
+                TlsConnection::connect(
+                    config.address,
+                    tls,
+                    ConnectOptions {
+                        deadline: Instant::now().add(Duration::new(7, 0)),
+                    },
+                )
+                .await?,
+            )
+        } else {
+            ConnectionType::Tcp(
+                TcpConnection::connect(
+                    config.address,
+                    ConnectOptions {
+                        deadline: Instant::now().add(Duration::new(7, 0)),
+                    },
+                )
+                .await?,
+            )
+        };
 
         let remote_addr = match conn.peer_addr() {
             Some(addr) => *addr,
@@ -269,7 +283,7 @@ where
 
         // TODO: compare root certs or something somehow.
         if !(current_config.address == config.address
-            && current_config.accept_all_certs == config.accept_all_certs
+            && current_config.tls == config.tls
             && current_config.client_name == config.client_name
             && current_config.disable_default_features == config.disable_default_features
             && current_config.disable_error_map == config.disable_error_map

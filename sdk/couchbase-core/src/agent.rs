@@ -28,6 +28,7 @@ use crate::kvclientmanager::{
 };
 use crate::kvclientpool::NaiveKvClientPool;
 use crate::memdx::client::Client;
+use crate::memdx::connection::TlsConfig;
 use crate::networktypeheuristic::NetworkTypeHeuristic;
 use crate::nmvbhandler::{ConfigUpdater, StdNotMyVbucketConfigHandler};
 use crate::parsedconfig::ParsedConfig;
@@ -39,7 +40,7 @@ use crate::vbucketrouter::{
 #[derive(Debug, Clone)]
 struct AgentState {
     bucket: Option<String>,
-    // tls_config:
+    tls_config: Option<TlsConfig>,
     authenticator: Option<Arc<Authenticator>>,
     num_pool_connections: usize,
     // http_transport:
@@ -206,7 +207,11 @@ impl AgentInner {
                 kv_data_node_ids.push(kv_ep_id.clone());
             }
 
-            if let Some(p) = node.non_ssl_ports.kv {
+            if state.tls_config.is_some() {
+                if let Some(p) = node.ssl_ports.kv {
+                    kv_data_hosts.insert(kv_ep_id, format!("{}:{}", node.hostname, p));
+                }
+            } else if let Some(p) = node.non_ssl_ports.kv {
                 kv_data_hosts.insert(kv_ep_id, format!("{}:{}", node.hostname, p));
             }
         }
@@ -216,8 +221,7 @@ impl AgentInner {
             let config = KvClientConfig {
                 // TODO: unwrap, return error on fail?
                 address: addr.parse().unwrap(),
-                root_certs: None,
-                accept_all_certs: None,
+                tls: state.tls_config.clone(),
                 client_name: state.client_name.clone(),
                 authenticator: state.authenticator.clone(),
                 selected_bucket: state.bucket.clone(),
@@ -282,6 +286,7 @@ impl Agent {
             latest_config: ParsedConfig::default(),
             network_type: None,
             client_name,
+            tls_config: opts.tls_config.map(|cfg| cfg.into()),
         };
 
         let agent_component_configs =
@@ -323,7 +328,6 @@ impl Agent {
             conn_mgr: conn_mgr.clone(),
         });
 
-        // TODO: hardcoded duration.
         let collections = Arc::new(CollectionResolverCached::new(
             CollectionResolverCachedOptions {
                 resolver: memd_resolver,
@@ -399,8 +403,7 @@ impl Agent {
             let config = KvClientConfig {
                 // TODO: unwrap, return error on fail?
                 address: addr.parse().unwrap(),
-                root_certs: None,
-                accept_all_certs: None,
+                tls: state.tls_config.clone(),
                 client_name: state.client_name.clone(),
                 authenticator: state.authenticator.clone(),
                 selected_bucket: state.bucket.clone(),
