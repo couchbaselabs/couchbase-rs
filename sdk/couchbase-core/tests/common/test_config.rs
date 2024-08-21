@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use envconfig::Envconfig;
 use log::LevelFilter;
 
-pub(crate) static TEST_CONFIG: Mutex<Option<Arc<TestConfig>>> = Mutex::new(None);
+pub static TEST_CONFIG: Mutex<Option<Arc<TestConfig>>> = Mutex::new(None);
 
 #[derive(Debug, Clone, Envconfig)]
 pub struct EnvTestConfig {
@@ -75,4 +75,33 @@ pub fn setup_tests() {
             data_timeout: test_config.data_timeout,
         }));
     }
+}
+pub fn test_username() -> String {
+    let guard = TEST_CONFIG.lock().unwrap();
+    let config = guard.clone().unwrap();
+    config.username.clone()
+}
+
+pub fn test_password() -> String {
+    let guard = TEST_CONFIG.lock().unwrap();
+    let config = guard.clone().unwrap();
+    config.password.clone()
+}
+
+pub fn test_mem_addrs() -> Vec<String> {
+    let guard = TEST_CONFIG.lock().unwrap();
+    let config = guard.clone().unwrap();
+    config.memd_addrs.clone()
+}
+
+pub fn test_bucket() -> String {
+    let guard = TEST_CONFIG.lock().unwrap();
+    let config = guard.clone().unwrap();
+    config.default_bucket.clone()
+}
+
+pub fn test_data_timeout() -> String {
+    let guard = TEST_CONFIG.lock().unwrap();
+    let config = guard.clone().unwrap();
+    config.data_timeout.clone()
 }

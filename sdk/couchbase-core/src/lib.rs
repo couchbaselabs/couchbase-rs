@@ -33,3 +33,4 @@ mod scram;
 pub mod service_type;
 mod vbucketmap;
 mod vbucketrouter;
+pub mod httpx;
