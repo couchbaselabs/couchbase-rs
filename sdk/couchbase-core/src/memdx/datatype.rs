@@ -6,6 +6,12 @@ pub enum DataTypeFlag {
     Xattrs,
 }
 
+impl Default for DataTypeFlag {
+    fn default() -> Self {
+        Self::None
+    }
+}
+
 impl From<DataTypeFlag> for u8 {
     fn from(value: DataTypeFlag) -> Self {
         match value {

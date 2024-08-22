@@ -1,8 +1,9 @@
+extern crate core;
+
 use std::sync::Arc;
 
 use rscbx_couchbase_core::agent::Agent;
 use rscbx_couchbase_core::crudoptions::{GetOptions, UpsertOptions};
-use rscbx_couchbase_core::memdx::datatype::DataTypeFlag;
 use rscbx_couchbase_core::memdx::error::{ErrorKind, ServerErrorKind};
 use rscbx_couchbase_core::retrybesteffort::{
     BestEffortRetryStrategy, ExponentialBackoffCalculator,
@@ -29,33 +30,28 @@ async fn test_upsert_and_get() {
     let key = generate_key();
     let value = generate_string_value(32);
 
-    let upsert_result = agent
-        .upsert(UpsertOptions {
-            key: &key,
-            scope_name: "",
-            collection_name: "",
-            value: &value,
-            flags: 0,
-            expiry: None,
-            preserve_expiry: None,
-            cas: None,
-            durability_level: None,
-            retry_strategy: strat.clone(),
-            datatype: DataTypeFlag::None,
-        })
-        .await
-        .unwrap();
+    let upsert_opts = UpsertOptions::builder()
+        .key(key.as_slice())
+        .retry_strategy(strat.clone())
+        .scope_name("")
+        .collection_name("")
+        .value(value.as_slice())
+        .build();
+
+    let upsert_result = agent.upsert(upsert_opts).await.unwrap();
 
     assert_ne!(0, upsert_result.cas);
     assert!(upsert_result.mutation_token.is_some());
 
     let get_result = agent
-        .get(GetOptions {
-            key: &key,
-            scope_name: "",
-            collection_name: "",
-            retry_strategy: strat,
-        })
+        .get(
+            GetOptions::builder()
+                .key(&key)
+                .scope_name("")
+                .collection_name("")
+                .retry_strategy(strat)
+                .build(),
+        )
         .await
         .unwrap();
 
@@ -79,19 +75,15 @@ async fn test_kv_without_a_bucket() {
     let value = generate_string_value(32);
 
     let upsert_result = agent
-        .upsert(UpsertOptions {
-            key: &key,
-            scope_name: "",
-            collection_name: "",
-            value: &value,
-            flags: 0,
-            expiry: None,
-            preserve_expiry: None,
-            cas: None,
-            durability_level: None,
-            retry_strategy: strat.clone(),
-            datatype: DataTypeFlag::None,
-        })
+        .upsert(
+            UpsertOptions::builder()
+                .key(key.as_slice())
+                .retry_strategy(strat.clone())
+                .scope_name("")
+                .collection_name("")
+                .value(value.as_slice())
+                .build(),
+        )
         .await;
 
     assert!(upsert_result.is_err());

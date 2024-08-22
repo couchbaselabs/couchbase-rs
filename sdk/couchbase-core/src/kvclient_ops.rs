@@ -19,8 +19,8 @@ use crate::memdx::response::{
 };
 
 pub(crate) trait KvClientOps: Sized + Send + Sync {
-    fn set<'a>(&self, req: SetRequest<'a>) -> impl Future<Output = Result<SetResponse>> + Send;
-    fn get<'a>(&self, req: GetRequest<'a>) -> impl Future<Output = Result<GetResponse>> + Send;
+    fn set(&self, req: SetRequest) -> impl Future<Output = Result<SetResponse>> + Send;
+    fn get(&self, req: GetRequest) -> impl Future<Output = Result<GetResponse>> + Send;
     fn get_cluster_config(
         &self,
         req: GetClusterConfigRequest,
