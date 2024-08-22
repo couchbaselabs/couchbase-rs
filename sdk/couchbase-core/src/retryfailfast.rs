@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use crate::retry::{RetryAction, RetryInfo, RetryReason, RetryStrategy};
 
 #[derive(Debug, Default)]
-pub(crate) struct FailFastRetryStrategy {}
+pub struct FailFastRetryStrategy {}
 
 #[async_trait]
 impl RetryStrategy for FailFastRetryStrategy {

@@ -1,3 +1,6 @@
 [workspace]
 members = ["sdk/couchbase-core", "sdk/protostellar"]
 resolver = "2"
+
+[profile.test]
+debug = 1
