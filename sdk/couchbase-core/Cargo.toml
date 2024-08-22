@@ -31,10 +31,15 @@ snap = "1.1"
 reqwest = { version = "0.12.5", features = ["json", "stream", "rustls-tls"], default-features = false }
 http = "1.1.0"
 
+dhat = { version = "0.3.3", optional = true }
+
 [dev-dependencies]
 env_logger = "0.11"
 envconfig = "0.10"
 chrono = "0.4.38"
+
+[features]
+dhat-heap = ["dhat"]
 
 [lints.rust]
 # This is temporary whilst we build out the root modules.
