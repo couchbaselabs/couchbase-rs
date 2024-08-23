@@ -160,7 +160,8 @@ where
         if num_wanted_clients > num_active_clients {
             let mut num_needed_clients = num_wanted_clients - num_active_clients;
             while num_needed_clients > 0 {
-                if let Some(client) = self.spawner.lock().await.start_new_client::<K>().await {
+                let mut guard = self.spawner.lock().await;
+                if let Some(client) = guard.start_new_client::<K>().await {
                     if self.closed.load(Ordering::SeqCst) {
                         client.close().await.unwrap_or_default();
                     }

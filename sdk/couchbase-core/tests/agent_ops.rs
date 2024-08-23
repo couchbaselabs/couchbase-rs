@@ -110,9 +110,9 @@ async fn test_kv_without_a_bucket() {
 #[cfg(feature = "dhat-heap")]
 #[tokio::test]
 async fn upsert_allocations() {
-    let profiler = dhat::Profiler::builder().build();
-
     setup_tests();
+
+    let profiler = dhat::Profiler::builder().build();
 
     let agent_opts = create_default_options();
 

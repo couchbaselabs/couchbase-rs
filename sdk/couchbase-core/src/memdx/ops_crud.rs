@@ -214,18 +214,18 @@ pub(crate) fn decode_res_ext_frames(buf: &[u8]) -> Result<Option<Duration>> {
 
     iter_ext_frames(buf, |code, data| {
         if code == ExtResFrameCode::ServerDuration {
-            server_duration_data = Some(data);
+            server_duration_data = Some(decode_server_duration_ext_frame(data));
         }
     })?;
 
     if let Some(data) = server_duration_data {
-        return Ok(Some(decode_server_duration_ext_frame(data)?));
+        return Ok(Some(data?));
     }
 
     Ok(None)
 }
 
-pub fn decode_ext_frame(buf: &[u8]) -> Result<(ExtResFrameCode, Vec<u8>, usize)> {
+pub fn decode_ext_frame(buf: &[u8]) -> Result<(ExtResFrameCode, &[u8], usize)> {
     if buf.is_empty() {
         return Err(Error::new_protocol_error(
             "Framing extras new_protocol_error error",
@@ -269,19 +269,19 @@ pub fn decode_ext_frame(buf: &[u8]) -> Result<(ExtResFrameCode, Vec<u8>, usize)>
     let frame_body = &buf[buf_pos..buf_pos + u_frame_len];
     buf_pos += u_frame_len;
 
-    Ok((frame_code, frame_body.to_vec(), buf_pos))
+    Ok((frame_code, frame_body, buf_pos))
 }
 
-fn iter_ext_frames(buf: &[u8], mut cb: impl FnMut(ExtResFrameCode, Vec<u8>)) -> Result<Vec<u8>> {
+fn iter_ext_frames(buf: &[u8], mut cb: impl FnMut(ExtResFrameCode, &[u8])) -> Result<&[u8]> {
     if !buf.is_empty() {
         let (frame_code, frame_body, buf_pos) = decode_ext_frame(buf)?;
 
         cb(frame_code, frame_body);
 
-        return Ok(buf[buf_pos..].to_vec());
+        return Ok(&buf[buf_pos..]);
     }
 
-    Ok(Vec::from(buf))
+    Ok(buf)
 }
 
 pub fn append_ext_frame(
@@ -366,14 +366,14 @@ fn encode_durability_ext_frame(
     Ok(buf)
 }
 
-pub(crate) fn decode_server_duration_ext_frame(mut data: Vec<u8>) -> Result<Duration> {
+pub(crate) fn decode_server_duration_ext_frame(mut data: &[u8]) -> Result<Duration> {
     if data.len() != 2 {
         return Err(Error::new_protocol_error(
             "Invalid server duration extframe length",
         ));
     }
 
-    let dura_enc = (data.remove(0) as u32) << 8 | (data.remove(0) as u32);
+    let dura_enc = (data[0] as u32) << 8 | (data[1] as u32);
     let dura_micros = ((dura_enc as f32).powf(1.74) / 2.0).round();
 
     Ok(Duration::from_micros(dura_micros as u64))
