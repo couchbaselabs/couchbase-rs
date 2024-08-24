@@ -5,6 +5,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::Duration;
 
 use arc_swap::ArcSwap;
+use log::debug;
 use tokio::sync::{Mutex, Notify};
 use tokio::time::{Instant, sleep};
 
@@ -110,6 +111,8 @@ where
             client.close().await.unwrap_or_default();
         }
 
+        drop(clients);
+
         Ok(())
     }
 
@@ -202,6 +205,8 @@ where
     }
 
     pub async fn handle_client_close(&self, client_id: String) {
+        debug!("Client id {} closed", &client_id);
+
         // TODO: not sure the ordering of close leading to here is great.
         if self.closed.load(Ordering::SeqCst) {
             return;

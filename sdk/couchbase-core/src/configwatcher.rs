@@ -3,6 +3,7 @@ use std::future::Future;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use log::debug;
 use tokio::select;
 use tokio::sync::broadcast;
 use tokio::sync::broadcast::{Receiver, Sender};
@@ -187,7 +188,7 @@ where
         let inner = self.inner.clone();
         tokio::spawn(async move {
             inner.watch(on_shutdown_rx, on_new_config_tx).await;
-            dbg!("config poll exit")
+            debug!("config poll exit")
         });
 
         on_new_config_rx

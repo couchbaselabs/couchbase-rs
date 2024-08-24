@@ -1,12 +1,16 @@
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::ops::Add;
 use std::sync::Arc;
 use std::time::Duration;
 
+use futures::executor::block_on;
 use log::{debug, error, info};
+use tokio::runtime::{Handle, Runtime};
 use tokio::sync::{broadcast, mpsc, Mutex};
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::task::JoinHandle;
+use tokio::time::{Instant, timeout, timeout_at};
 
 use crate::agentoptions::AgentOptions;
 use crate::authenticator::Authenticator;
@@ -22,13 +26,17 @@ use crate::configwatcher::{
 };
 use crate::crudcomponent::CrudComponent;
 use crate::error::Result;
-use crate::kvclient::{KvClientConfig, StdKvClient};
+use crate::kvclient::{KvClient, KvClientConfig, KvClientOptions, StdKvClient};
+use crate::kvclient_ops::KvClientOps;
 use crate::kvclientmanager::{
     KvClientManager, KvClientManagerConfig, KvClientManagerOptions, StdKvClientManager,
 };
-use crate::kvclientpool::NaiveKvClientPool;
+use crate::kvclientpool::{
+    KvClientPool, KvClientPoolConfig, KvClientPoolOptions, NaiveKvClientPool,
+};
 use crate::memdx::client::Client;
 use crate::memdx::connection::TlsConfig;
+use crate::memdx::request::GetClusterConfigRequest;
 use crate::networktypeheuristic::NetworkTypeHeuristic;
 use crate::nmvbhandler::{ConfigUpdater, StdNotMyVbucketConfigHandler};
 use crate::parsedconfig::ParsedConfig;
@@ -46,7 +54,7 @@ struct AgentState {
     // http_transport:
     last_clients: HashMap<String, KvClientConfig>,
     latest_config: ParsedConfig,
-    network_type: Option<String>,
+    network_type: String,
 
     client_name: String,
 }
@@ -182,17 +190,9 @@ impl AgentInner {
     }
 
     fn gen_agent_component_configs(state: &mut AgentState) -> AgentComponentConfigs {
-        let network_info = if let Some(network_type) = &state.network_type {
-            state
-                .latest_config
-                .addresses_group_for_network_type(network_type)
-        } else {
-            let network_type = NetworkTypeHeuristic::identify(&state.latest_config);
-            state.network_type = Some(network_type.clone());
-            state
-                .latest_config
-                .addresses_group_for_network_type(&network_type)
-        };
+        let network_info = state
+            .latest_config
+            .addresses_group_for_network_type(&state.network_type);
 
         let mut kv_data_node_ids = Vec::with_capacity(network_info.nodes.len());
         let mut kv_data_hosts: HashMap<String, String> =
@@ -284,13 +284,24 @@ impl Agent {
             num_pool_connections: 1,
             last_clients: Default::default(),
             latest_config: ParsedConfig::default(),
-            network_type: None,
+            network_type: "".to_string(),
             client_name,
             tls_config: opts.tls_config.map(|cfg| cfg.into()),
         };
 
-        let agent_component_configs =
-            Agent::gen_first_agent_component_configs(&opts.seed_config.memd_addrs, &state);
+        let connect_timeout = opts.connect_timeout.unwrap_or(Duration::from_secs(7));
+        let connect_throttle_period = opts.connect_timeout.unwrap_or(Duration::from_secs(5));
+
+        let first_kv_client_configs =
+            Self::gen_first_kv_client_configs(&opts.seed_config.memd_addrs, &state);
+        let first_config = Self::get_first_config(first_kv_client_configs, connect_timeout).await?;
+
+        state.latest_config = first_config;
+
+        let network_type = NetworkTypeHeuristic::identify(&state.latest_config);
+        state.network_type = network_type;
+
+        let agent_component_configs = AgentInner::gen_agent_component_configs(&mut state);
 
         let conn_mgr = Arc::new(
             StdKvClientManager::new(
@@ -299,8 +310,8 @@ impl Agent {
                     clients: agent_component_configs.kv_client_manager_client_configs,
                 },
                 KvClientManagerOptions {
-                    connect_timeout: Duration::from_secs(7),
-                    connect_throttle_period: Duration::from_secs(5),
+                    connect_timeout,
+                    connect_throttle_period,
                     orphan_handler: Arc::new(|packet| {
                         info!("Orphan : {:?}", packet);
                     }),
@@ -391,15 +402,64 @@ impl Agent {
         });
     }
 
-    fn gen_first_agent_component_configs(
+    async fn get_first_config(
+        kv_client_manager_client_configs: HashMap<String, KvClientConfig>,
+        connect_timeout: Duration,
+    ) -> Result<ParsedConfig> {
+        loop {
+            for endpoint_config in kv_client_manager_client_configs.values() {
+                let host = endpoint_config.address.ip();
+                let timeout_result = timeout(
+                    connect_timeout,
+                    StdKvClient::new(
+                        endpoint_config.clone(),
+                        KvClientOptions {
+                            orphan_handler: Arc::new(|packet| {}),
+                            on_close: Arc::new(|id| {
+                                Box::pin(async move {
+                                    debug!("Bootstrap client {} closed", id);
+                                })
+                            }),
+                            disable_decompression: false,
+                        },
+                    ),
+                )
+                .await;
+
+                let client: StdKvClient<Client> = match timeout_result {
+                    Ok(client_result) => match client_result {
+                        Ok(client) => client,
+                        Err(_e) => continue,
+                    },
+                    Err(_e) => continue,
+                };
+
+                let raw_config = match client.get_cluster_config(GetClusterConfigRequest {}).await {
+                    Ok(resp) => resp.config,
+                    Err(_e) => continue,
+                };
+
+                client.close().await.unwrap();
+
+                let config: TerseConfig = serde_json::from_slice(raw_config.as_slice())?;
+
+                match ConfigParser::parse_terse_config(config, &host.to_string()) {
+                    Ok(c) => {
+                        return Ok(c);
+                    }
+                    Err(_e) => continue,
+                };
+            }
+        }
+    }
+
+    fn gen_first_kv_client_configs(
         memd_addrs: &Vec<String>,
         state: &AgentState,
-    ) -> AgentComponentConfigs {
+    ) -> HashMap<String, KvClientConfig> {
         let mut clients = HashMap::new();
-        let mut node_ids = vec![];
         for addr in memd_addrs {
             let node_id = format!("kv{}", addr);
-            node_ids.push(node_id.clone());
             let config = KvClientConfig {
                 // TODO: unwrap, return error on fail?
                 address: addr.parse().unwrap(),
@@ -414,22 +474,20 @@ impl Agent {
             clients.insert(node_id, config);
         }
 
-        AgentComponentConfigs {
-            config_watcher_memd_config: ConfigWatcherMemdConfig {
-                endpoints: node_ids,
-            },
-            kv_client_manager_client_configs: clients,
-            vbucket_routing_info: VbucketRoutingInfo {
-                vbucket_info: None,
-                server_list: vec![],
-                bucket_selected: state.bucket.is_some(),
-            },
-        }
+        clients
+    }
+
+    pub async fn close(&mut self) {
+        self.config_watcher_shutdown_tx.send(()).unwrap_or_default();
+
+        self.inner.conn_mgr.close().await.unwrap_or_default();
     }
 }
 
-impl Drop for Agent {
-    fn drop(&mut self) {
-        self.config_watcher_shutdown_tx.send(()).unwrap_or_default();
-    }
-}
+// impl Drop for Agent {
+//     fn drop(&mut self) {
+//         self.config_watcher_shutdown_tx.send(()).unwrap_or_default();
+//
+//         block_on(async { self.inner.conn_mgr.close().await }).unwrap_or_default();
+//     }
+// }

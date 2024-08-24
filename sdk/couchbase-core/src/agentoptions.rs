@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use typed_builder::TypedBuilder;
 
 use crate::authenticator::Authenticator;
@@ -10,6 +12,9 @@ pub struct AgentOptions {
     pub tls_config: Option<TlsConfig>,
     pub authenticator: Option<Authenticator>,
     pub bucket_name: Option<String>,
+
+    pub connect_timeout: Option<Duration>,
+    pub connect_throttle_timeout: Option<Duration>,
 
     pub seed_config: SeedConfig,
     pub compression_config: CompressionConfig,
