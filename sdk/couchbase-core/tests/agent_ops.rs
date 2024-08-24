@@ -26,7 +26,7 @@ async fn test_upsert_and_get() {
 
     let agent_opts = create_default_options();
 
-    let agent = Agent::new(agent_opts).await.unwrap();
+    let mut agent = Agent::new(agent_opts).await.unwrap();
 
     let strat = Arc::new(BestEffortRetryStrategy::new(
         ExponentialBackoffCalculator::default(),
@@ -62,6 +62,8 @@ async fn test_upsert_and_get() {
 
     assert_eq!(value, get_result.value);
     assert_eq!(upsert_result.cas, get_result.cas);
+
+    agent.close().await;
 }
 
 #[tokio::test]
