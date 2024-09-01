@@ -1,3 +1,5 @@
+#![allow(clippy::all)]
+
 pub mod couchbase {
     pub mod admin {
         pub mod analytics {
