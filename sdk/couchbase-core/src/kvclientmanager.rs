@@ -3,6 +3,7 @@ use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 
+use arc_swap::ArcSwap;
 use tokio::sync::Mutex;
 
 use crate::error::ErrorKind;
@@ -53,28 +54,20 @@ pub(crate) struct KvClientManagerOptions {
     pub disable_decompression: bool,
 }
 
-#[derive(Debug)]
-struct KvClientManagerPool<P>
-where
-    P: KvClientPool,
-{
-    config: KvClientPoolConfig,
-    pool: Arc<P>,
-}
-
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 struct KvClientManagerState<P>
 where
     P: KvClientPool,
 {
-    pub client_pools: HashMap<String, KvClientManagerPool<P>>,
+    pub client_pools: HashMap<String, Arc<P>>,
 }
 
 pub(crate) struct StdKvClientManager<P>
 where
     P: KvClientPool,
 {
-    state: Mutex<KvClientManagerState<P>>,
+    closed: Mutex<bool>,
+    state: ArcSwap<KvClientManagerState<P>>,
     opts: KvClientManagerOptions,
 }
 
@@ -83,7 +76,7 @@ where
     P: KvClientPool,
 {
     async fn get_pool(&self, endpoint: String) -> Result<Arc<P>> {
-        let state = self.state.lock().await;
+        let state = self.state.load();
 
         let pool = match state.client_pools.get(&endpoint) {
             Some(p) => p,
@@ -92,21 +85,21 @@ where
             }
         };
 
-        Ok(pool.pool.clone())
+        Ok(pool.clone())
     }
 
     async fn get_random_pool(&self) -> Result<Arc<P>> {
-        let state = self.state.lock().await;
+        let state = self.state.load();
 
         // Just pick one at random for now
         if let Some((_, pool)) = state.client_pools.iter().next() {
-            return Ok(pool.pool.clone());
+            return Ok(pool.clone());
         }
 
         Err(ErrorKind::NoEndpointsAvailable.into())
     }
 
-    async fn create_pool(&self, pool_config: KvClientPoolConfig) -> KvClientManagerPool<P> {
+    async fn create_pool(&self, pool_config: KvClientPoolConfig) -> Arc<P> {
         let pool = P::new(
             pool_config.clone(),
             KvClientPoolOptions {
@@ -118,20 +111,17 @@ where
         )
         .await;
 
-        KvClientManagerPool {
-            config: pool_config,
-            pool: Arc::new(pool),
-        }
+        Arc::new(pool)
     }
 
     async fn shutdown_random_client(
         &self,
         client: Arc<KvClientManagerClientType<Self>>,
     ) -> Result<()> {
-        let state = self.state.lock().await;
+        let state = self.state.load();
 
         for (_, pool) in state.client_pools.iter() {
-            pool.pool.shutdown_client(client.clone()).await;
+            pool.shutdown_client(client.clone()).await;
         }
 
         Ok(())
@@ -146,7 +136,8 @@ where
 
     async fn new(config: KvClientManagerConfig, opts: KvClientManagerOptions) -> Result<Self> {
         let manager = Self {
-            state: Mutex::new(KvClientManagerState {
+            closed: Mutex::new(false),
+            state: ArcSwap::from_pointee(KvClientManagerState {
                 client_pools: Default::default(),
             }),
             opts,
@@ -157,13 +148,22 @@ where
     }
 
     async fn reconfigure(&self, config: KvClientManagerConfig) -> Result<()> {
-        let mut guard = self.state.lock().await;
-
-        let mut old_pools = std::mem::take(&mut guard.client_pools);
+        let mut guard = self.closed.lock().await;
+        if *guard {
+            return Err(ErrorKind::IllegalState {
+                msg: "reconfigure called after close".to_string(),
+            }
+            .into());
+        }
 
         let mut new_state = KvClientManagerState::<P> {
             client_pools: Default::default(),
         };
+
+        let state = self.state.load();
+
+        let mut old_pools = HashMap::new();
+        old_pools.clone_from(&state.client_pools);
 
         for (endpoint, endpoint_config) in config.clients {
             let pool_config = KvClientPoolConfig {
@@ -174,7 +174,7 @@ where
             let old_pool = old_pools.remove(&endpoint);
             let new_pool = if let Some(pool) = old_pool {
                 // TODO: log on error.
-                if pool.pool.reconfigure(pool_config.clone()).await.is_ok() {
+                if pool.reconfigure(pool_config.clone()).await.is_ok() {
                     pool
                 } else {
                     self.create_pool(pool_config).await
@@ -188,10 +188,10 @@ where
 
         for (_, pool) in old_pools {
             // TODO: log?
-            pool.pool.close().await.unwrap_or_default();
+            pool.close().await.unwrap_or_default();
         }
 
-        *guard = new_state;
+        self.state.store(Arc::from(new_state));
 
         Ok(())
     }
@@ -227,13 +227,27 @@ where
     }
 
     async fn close(&self) -> Result<()> {
-        let mut guard = self.state.lock().await;
+        let mut guard = self.closed.lock().await;
+        if *guard {
+            return Err(ErrorKind::IllegalState {
+                msg: "close called twice".to_string(),
+            }
+            .into());
+        }
+        *guard = true;
 
-        let mut old_pools = std::mem::take(&mut guard.client_pools);
+        let state = self.state.load();
+
+        let mut old_pools = HashMap::new();
+        old_pools.clone_from(&state.client_pools);
+
+        self.state.swap(Arc::new(KvClientManagerState {
+            client_pools: HashMap::new(),
+        }));
 
         for (_, pool) in old_pools {
             // TODO: log error.
-            pool.pool.close().await.unwrap_or_default();
+            pool.close().await.unwrap_or_default();
         }
 
         Ok(())

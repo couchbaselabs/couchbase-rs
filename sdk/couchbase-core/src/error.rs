@@ -71,6 +71,8 @@ pub enum ErrorKind {
     Shutdown,
     #[error("No bucket selected")]
     NoBucket,
+    #[error("Illegal State {msg}")]
+    IllegalState { msg: String },
     #[error("Invalid vbucket map")]
     InvalidVbucketMap,
     #[error("Collection manifest outdated: our manifest uid: {manifest_uid}, server manifest uid: {server_manifest_uid}")]
