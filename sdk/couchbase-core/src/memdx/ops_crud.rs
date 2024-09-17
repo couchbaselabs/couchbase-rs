@@ -14,8 +14,8 @@ use crate::memdx::opcode::OpCode;
 use crate::memdx::ops_core::OpsCore;
 use crate::memdx::packet::{RequestPacket, ResponsePacket};
 use crate::memdx::pendingop::StandardPendingOp;
-use crate::memdx::request::{GetRequest, SetRequest};
-use crate::memdx::response::{GetResponse, SetResponse};
+use crate::memdx::request::{AddRequest, AppendRequest, DecrementRequest, DeleteRequest, GetAndLockRequest, GetAndTouchRequest, GetRequest, IncrementRequest, PrependRequest, ReplaceRequest, SetRequest, TouchRequest, UnlockRequest};
+use crate::memdx::response::{AddResponse, AppendResponse, DecrementResponse, DeleteResponse, GetAndLockResponse, GetAndTouchResponse, GetResponse, IncrementResponse, PrependResponse, ReplaceResponse, SetResponse, TouchResponse, UnlockResponse};
 use crate::memdx::status::Status;
 
 #[derive(Debug)]
@@ -100,6 +100,498 @@ impl OpsCrud {
             vbucket_id: Some(request.vbucket_id),
             cas: None,
             extras: None,
+            key: Some(key),
+            value: None,
+            framing_extras,
+            opaque: None,
+        };
+
+        let pending_op = dispatcher.dispatch(packet).await?;
+
+        Ok(StandardPendingOp::new(pending_op))
+    }
+
+    pub async fn delete<'a, D>(
+        &self,
+        dispatcher: &D,
+        request: DeleteRequest<'a>,
+    ) -> Result<StandardPendingOp<DeleteResponse>>
+    where
+        D: Dispatcher,
+    {
+        let mut ext_frame_buf: Vec<u8> = vec![];
+        let magic = self.encode_req_ext_frames(
+            request.durability_level,
+            request.durability_level_timeout,
+            None,
+            request.on_behalf_of,
+            &mut ext_frame_buf
+        )?;
+
+        let framing_extras = if !ext_frame_buf.is_empty() {
+            Some(ext_frame_buf)
+        } else {
+            None
+        };
+
+        let key = self.encode_collection_and_key(request.collection_id, request.key)?;
+
+        let packet = RequestPacket {
+            magic,
+            op_code: OpCode::Delete,
+            datatype: 0,
+            vbucket_id: Some(request.vbucket_id),
+            cas: request.cas,
+            extras: None,
+            key: Some(key),
+            value: None,
+            framing_extras,
+            opaque: None,
+        };
+
+        let pending_op = dispatcher.dispatch(packet).await?;
+
+        Ok(StandardPendingOp::new(pending_op))
+    }
+
+    pub async fn get_and_lock<'a, D>(
+        &self,
+        dispatcher: &D,
+        request: GetAndLockRequest<'a>,
+    ) -> Result<StandardPendingOp<GetAndLockResponse>>
+    where
+        D: Dispatcher,
+    {
+        let mut ext_frame_buf: Vec<u8> = vec![];
+        let magic =
+            self.encode_req_ext_frames(None, None, None, request.on_behalf_of, &mut ext_frame_buf)?;
+
+        let key = self.encode_collection_and_key(request.collection_id, request.key)?;
+
+        let framing_extras = if !ext_frame_buf.is_empty() {
+            Some(ext_frame_buf)
+        } else {
+            None
+        };
+
+        let mut extra_buf: Vec<u8> = Vec::with_capacity(4);
+        extra_buf.write_u32::<BigEndian>(request.lock_time)?;
+
+        let packet = RequestPacket {
+            magic,
+            op_code: OpCode::GetLocked,
+            datatype: 0,
+            vbucket_id: Some(request.vbucket_id),
+            cas: None,
+            extras: Some(extra_buf),
+            key: Some(key),
+            value: None,
+            framing_extras,
+            opaque: None,
+        };
+
+        let pending_op = dispatcher.dispatch(packet).await?;
+
+        Ok(StandardPendingOp::new(pending_op))
+    }
+
+    pub async fn get_and_touch<'a, D>(
+        &self,
+        dispatcher: &D,
+        request: GetAndTouchRequest<'a>,
+    ) -> Result<StandardPendingOp<GetAndTouchResponse>>
+    where
+        D: Dispatcher,
+    {
+        let mut ext_frame_buf: Vec<u8> = vec![];
+        let magic =
+            self.encode_req_ext_frames(None, None, None, request.on_behalf_of, &mut ext_frame_buf)?;
+
+        let key = self.encode_collection_and_key(request.collection_id, request.key)?;
+
+        let framing_extras = if !ext_frame_buf.is_empty() {
+            Some(ext_frame_buf)
+        } else {
+            None
+        };
+
+        let mut extra_buf: Vec<u8> = Vec::with_capacity(4);
+        extra_buf.write_u32::<BigEndian>(request.expiry)?;
+
+        let packet = RequestPacket {
+            magic,
+            op_code: OpCode::GAT,
+            datatype: 0,
+            vbucket_id: Some(request.vbucket_id),
+            cas: None,
+            extras: Some(extra_buf),
+            key: Some(key),
+            value: None,
+            framing_extras,
+            opaque: None,
+        };
+
+        let pending_op = dispatcher.dispatch(packet).await?;
+
+        Ok(StandardPendingOp::new(pending_op))
+    }
+
+    pub async fn unlock<'a, D>(
+    &self,
+    dispatcher: &D,
+    request: UnlockRequest<'a>,
+    ) -> Result<StandardPendingOp<UnlockResponse>>
+    where
+        D: Dispatcher,
+    {
+        let mut ext_frame_buf: Vec<u8> = vec![];
+        let magic =
+            self.encode_req_ext_frames(None, None, None, request.on_behalf_of, &mut ext_frame_buf)?;
+
+        let key = self.encode_collection_and_key(request.collection_id, request.key)?;
+
+        let framing_extras = if !ext_frame_buf.is_empty() {
+            Some(ext_frame_buf)
+        } else {
+            None
+        };
+
+        let packet = RequestPacket {
+            magic,
+            op_code: OpCode::UnlockKey,
+            datatype: 0,
+            vbucket_id: Some(request.vbucket_id),
+            cas: Some(request.cas),
+            extras: None,
+            key: Some(key),
+            value: None,
+            framing_extras,
+            opaque: None,
+        };
+
+        let pending_op = dispatcher.dispatch(packet).await?;
+
+        Ok(StandardPendingOp::new(pending_op))
+    }
+
+    pub async fn touch<'a, D> (
+        &self,
+        dispatcher: &D,
+        request: TouchRequest<'a>,
+    ) -> Result<StandardPendingOp<TouchResponse>>
+    where
+        D: Dispatcher,
+    {
+        let mut ext_frame_buf: Vec<u8> = vec![];
+        let magic =
+            self.encode_req_ext_frames(None, None, None, request.on_behalf_of, &mut ext_frame_buf)?;
+
+        let key = self.encode_collection_and_key(request.collection_id, request.key)?;
+
+        let framing_extras = if !ext_frame_buf.is_empty() {
+            Some(ext_frame_buf)
+        } else {
+            None
+        };
+
+        let mut extra_buf: Vec<u8> = Vec::with_capacity(4);
+        extra_buf.write_u32::<BigEndian>(request.expiry)?;
+
+        let packet = RequestPacket {
+            magic,
+            op_code: OpCode::Touch,
+            datatype: 0,
+            vbucket_id: Some(request.vbucket_id),
+            cas: None,
+            extras: Some(extra_buf),
+            key: Some(key),
+            value: None,
+            framing_extras,
+            opaque: None,
+        };
+
+        let pending_op = dispatcher.dispatch(packet).await?;
+
+        Ok(StandardPendingOp::new(pending_op))
+    }
+
+    pub async fn add<'a, D>(
+        &self,
+        dispatcher: &D,
+        request: AddRequest<'a>,
+    ) -> Result<StandardPendingOp<AddResponse>>
+    where
+        D: Dispatcher,
+    {
+        let mut ext_frame_buf: Vec<u8> = vec![];
+        let magic = self.encode_req_ext_frames(
+            request.durability_level,
+            request.durability_level_timeout,
+            None,
+            request.on_behalf_of,
+            &mut ext_frame_buf,
+        )?;
+
+        let framing_extras = if !ext_frame_buf.is_empty() {
+            Some(ext_frame_buf)
+        } else {
+            None
+        };
+
+        let key = self.encode_collection_and_key(request.collection_id, request.key)?;
+
+        let mut extra_buf: Vec<u8> = Vec::with_capacity(8);
+        extra_buf.write_u32::<BigEndian>(request.flags)?;
+        extra_buf.write_u32::<BigEndian>(request.expiry.unwrap_or_default())?;
+
+        let packet = RequestPacket {
+            magic,
+            op_code: OpCode::Add,
+            datatype: request.datatype,
+            vbucket_id: Some(request.vbucket_id),
+            cas: None,
+            extras: Some(extra_buf),
+            key: Some(key),
+            value: Some(request.value.to_vec()),
+            framing_extras,
+            opaque: None,
+        };
+
+        let pending_op = dispatcher.dispatch(packet).await?;
+
+        Ok(StandardPendingOp::new(pending_op))
+    }
+
+    pub async fn replace<'a, D>(
+        &self,
+        dispatcher: &D,
+        request: ReplaceRequest<'a>,
+    ) -> Result<StandardPendingOp<ReplaceResponse>>
+    where
+        D: Dispatcher,
+    {
+        let mut ext_frame_buf: Vec<u8> = vec![];
+        let magic = self.encode_req_ext_frames(
+            request.durability_level,
+            request.durability_level_timeout,
+            request.preserve_expiry,
+            request.on_behalf_of,
+            &mut ext_frame_buf,
+        )?;
+
+        let framing_extras = if !ext_frame_buf.is_empty() {
+            Some(ext_frame_buf)
+        } else {
+            None
+        };
+
+        let key = self.encode_collection_and_key(request.collection_id, request.key)?;
+
+        let mut extra_buf: Vec<u8> = Vec::with_capacity(8);
+        extra_buf.write_u32::<BigEndian>(request.flags)?;
+        extra_buf.write_u32::<BigEndian>(request.expiry.unwrap_or_default())?;
+
+        let packet = RequestPacket {
+            magic,
+            op_code: OpCode::Replace,
+            datatype: request.datatype,
+            vbucket_id: Some(request.vbucket_id),
+            cas: request.cas,
+            extras: Some(extra_buf),
+            key: Some(key),
+            value: Some(request.value.to_vec()),
+            framing_extras,
+            opaque: None,
+        };
+
+        let pending_op = dispatcher.dispatch(packet).await?;
+
+        Ok(StandardPendingOp::new(pending_op))
+    }
+
+    pub async fn append<'a, D>(
+        &self,
+        dispatcher: &D,
+        request: AppendRequest<'a>,
+    ) -> Result<StandardPendingOp<AppendResponse>>
+    where
+        D: Dispatcher,
+    {
+        let mut ext_frame_buf: Vec<u8> = vec![];
+        let magic = self.encode_req_ext_frames(
+            request.durability_level,
+            request.durability_level_timeout,
+            None,
+            request.on_behalf_of,
+            &mut ext_frame_buf,
+        )?;
+
+        let framing_extras = if !ext_frame_buf.is_empty() {
+            Some(ext_frame_buf)
+        } else {
+            None
+        };
+
+        let key = self.encode_collection_and_key(request.collection_id, request.key)?;
+
+        let packet = RequestPacket {
+            magic,
+            op_code: OpCode::Append,
+            datatype: request.datatype,
+            vbucket_id: Some(request.vbucket_id),
+            cas: request.cas,
+            extras: None,
+            key: Some(key),
+            value: Some(request.value.to_vec()),
+            framing_extras,
+            opaque: None,
+        };
+
+        let pending_op = dispatcher.dispatch(packet).await?;
+
+        Ok(StandardPendingOp::new(pending_op))
+    }
+
+    pub async fn prepend<'a, D>(
+        &self,
+        dispatcher: &D,
+        request: PrependRequest<'a>,
+    ) -> Result<StandardPendingOp<PrependResponse>>
+    where
+        D: Dispatcher,
+    {
+        let mut ext_frame_buf: Vec<u8> = vec![];
+        let magic = self.encode_req_ext_frames(
+            request.durability_level,
+            request.durability_level_timeout,
+            None,
+            request.on_behalf_of,
+            &mut ext_frame_buf,
+        )?;
+
+        let framing_extras = if !ext_frame_buf.is_empty() {
+            Some(ext_frame_buf)
+        } else {
+            None
+        };
+
+        let key = self.encode_collection_and_key(request.collection_id, request.key)?;
+
+        let packet = RequestPacket {
+            magic,
+            op_code: OpCode::Prepend,
+            datatype: request.datatype,
+            vbucket_id: Some(request.vbucket_id),
+            cas: request.cas,
+            extras: None,
+            key: Some(key),
+            value: Some(request.value.to_vec()),
+            framing_extras,
+            opaque: None,
+        };
+
+        let pending_op = dispatcher.dispatch(packet).await?;
+
+        Ok(StandardPendingOp::new(pending_op))
+    }
+
+    pub async fn increment<'a, D>(
+        &self,
+        dispatcher: &D,
+        request: IncrementRequest<'a>,
+    ) -> Result<StandardPendingOp<IncrementResponse>>
+    where
+        D: Dispatcher,
+    {
+        let mut ext_frame_buf: Vec<u8> = vec![];
+        let magic = self.encode_req_ext_frames(
+            request.durability_level,
+            request.durability_level_timeout,
+            None,
+            request.on_behalf_of,
+            &mut ext_frame_buf,
+        )?;
+
+        let framing_extras = if !ext_frame_buf.is_empty() {
+            Some(ext_frame_buf)
+        } else {
+            None
+        };
+
+        let key = self.encode_collection_and_key(request.collection_id, request.key)?;
+
+        let mut extra_buf: Vec<u8> = Vec::with_capacity(20);
+        extra_buf.write_u64::<BigEndian>(request.delta.unwrap_or_default())?;
+
+        if request.initial.unwrap_or_default() != 0xFFFFFFFFFFFFFFFF {
+            extra_buf.write_u64::<BigEndian>(request.initial.unwrap_or_default())?;
+            extra_buf.write_u32::<BigEndian>(request.expiry.unwrap_or_default())?;
+        } else {
+            extra_buf.write_u64::<BigEndian>(0x0000000000000000)?;
+            extra_buf.write_u32::<BigEndian>(0xFFFFFFFF)?;
+        }
+
+        let packet = RequestPacket {
+            magic,
+            op_code: OpCode::Increment,
+            datatype: 0,
+            vbucket_id: Some(request.vbucket_id),
+            cas: None,
+            extras: Some(extra_buf),
+            key: Some(key),
+            value: None,
+            framing_extras,
+            opaque: None,
+        };
+
+        let pending_op = dispatcher.dispatch(packet).await?;
+
+        Ok(StandardPendingOp::new(pending_op))
+    }
+
+    pub async fn decrement<'a, D>(
+        &self,
+        dispatcher: &D,
+        request: DecrementRequest<'a>,
+    ) -> Result<StandardPendingOp<DecrementResponse>>
+    where
+        D: Dispatcher,
+    {
+        let mut ext_frame_buf: Vec<u8> = vec![];
+        let magic = self.encode_req_ext_frames(
+            request.durability_level,
+            request.durability_level_timeout,
+            None,
+            request.on_behalf_of,
+            &mut ext_frame_buf,
+        )?;
+
+        let framing_extras = if !ext_frame_buf.is_empty() {
+            Some(ext_frame_buf)
+        } else {
+            None
+        };
+
+        let key = self.encode_collection_and_key(request.collection_id, request.key)?;
+
+        let mut extra_buf: Vec<u8> = Vec::with_capacity(20);
+        extra_buf.write_u64::<BigEndian>(request.delta.unwrap_or_default())?;
+
+        if request.initial.unwrap_or_default() != 0xFFFFFFFFFFFFFFFF {
+            extra_buf.write_u64::<BigEndian>(request.initial.unwrap_or_default())?;
+            extra_buf.write_u32::<BigEndian>(request.expiry.unwrap_or_default())?;
+        } else {
+            extra_buf.write_u64::<BigEndian>(0x0000000000000000)?;
+            extra_buf.write_u32::<BigEndian>(0xFFFFFFFF)?;
+        }
+
+        let packet = RequestPacket {
+            magic,
+            op_code: OpCode::Decrement,
+            datatype: 0,
+            vbucket_id: Some(request.vbucket_id),
+            cas: None,
+            extras: Some(extra_buf),
             key: Some(key),
             value: None,
             framing_extras,

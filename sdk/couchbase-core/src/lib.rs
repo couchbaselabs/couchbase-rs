@@ -16,7 +16,7 @@ mod configwatcher;
 mod crudcomponent;
 pub mod crudoptions;
 pub mod crudresults;
-mod error;
+pub mod error;
 mod kvclient;
 mod kvclient_ops;
 mod kvclientmanager;

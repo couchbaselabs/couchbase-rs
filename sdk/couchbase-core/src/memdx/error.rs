@@ -206,8 +206,12 @@ pub enum ServerErrorKind {
     KeyNotFound,
     #[error("Temporary failure")]
     TmpFail,
+    #[error("CAS mismatch")]
+    CasMismatch,
     #[error("Locked")]
     Locked,
+    #[error("Not Locked")]
+    NotLocked,
     #[error("Too big")]
     TooBig,
     #[error("Unknown collection id")]
