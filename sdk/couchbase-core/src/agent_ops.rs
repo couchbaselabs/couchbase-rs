@@ -1,7 +1,17 @@
 use crate::agent::Agent;
-use crate::crudoptions::{AddOptions, AppendOptions, DecrementOptions, DeleteOptions, GetAndLockOptions, GetAndTouchOptions, GetOptions, IncrementOptions, PrependOptions, ReplaceOptions, TouchOptions, UnlockOptions, UpsertOptions};
-use crate::crudresults::{AddResult, AppendResult, DecrementResult, DeleteResult, GetAndLockResult, GetAndTouchResult, GetResult, IncrementResult, PrependResult, ReplaceResult, TouchResult, UnlockResult, UpsertResult};
+use crate::crudoptions::{
+    AddOptions, AppendOptions, DecrementOptions, DeleteOptions, GetAndLockOptions,
+    GetAndTouchOptions, GetOptions, IncrementOptions, PrependOptions, ReplaceOptions, TouchOptions,
+    UnlockOptions, UpsertOptions,
+};
+use crate::crudresults::{
+    AddResult, AppendResult, DecrementResult, DeleteResult, GetAndLockResult, GetAndTouchResult,
+    GetResult, IncrementResult, PrependResult, ReplaceResult, TouchResult, UnlockResult,
+    UpsertResult,
+};
 use crate::error::Result;
+use crate::querycomponent::QueryResultStream;
+use crate::queryoptions::QueryOptions;
 
 impl Agent {
     pub async fn upsert<'a>(&self, opts: UpsertOptions<'a>) -> Result<UpsertResult> {
@@ -20,7 +30,10 @@ impl Agent {
         self.inner.crud.get_and_lock(opts).await
     }
 
-    pub async fn get_and_touch<'a>(&self, opts: GetAndTouchOptions<'a>) -> Result<GetAndTouchResult> {
+    pub async fn get_and_touch<'a>(
+        &self,
+        opts: GetAndTouchOptions<'a>,
+    ) -> Result<GetAndTouchResult> {
         self.inner.crud.get_and_touch(opts).await
     }
 
@@ -54,5 +67,13 @@ impl Agent {
 
     pub async fn decrement<'a>(&self, opts: DecrementOptions<'a>) -> Result<DecrementResult> {
         self.inner.crud.decrement(opts).await
+    }
+
+    pub async fn query(&self, opts: QueryOptions) -> Result<QueryResultStream> {
+        self.inner.query.query(opts).await
+    }
+
+    pub async fn prepared_query(&self, opts: QueryOptions) -> Result<QueryResultStream> {
+        self.inner.query.prepared_query(opts).await
     }
 }

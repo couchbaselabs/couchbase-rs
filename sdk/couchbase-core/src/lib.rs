@@ -1,6 +1,9 @@
 #![feature(async_closure)]
 #![feature(async_fn_traits)]
 #![feature(unboxed_closures)]
+extern crate core;
+#[macro_use]
+extern crate lazy_static;
 
 pub mod agent;
 pub mod agent_ops;
@@ -17,20 +20,26 @@ mod crudcomponent;
 pub mod crudoptions;
 pub mod crudresults;
 pub mod error;
+mod helpers;
+mod httpcomponent;
+pub mod httpx;
 mod kvclient;
 mod kvclient_ops;
 mod kvclientmanager;
 mod kvclientpool;
 pub mod memdx;
-mod mutationtoken;
+pub mod mutationtoken;
 mod networktypeheuristic;
 mod nmvbhandler;
 mod parsedconfig;
+mod querycomponent;
+pub mod queryoptions;
+pub mod queryx;
 pub mod retry;
 pub mod retrybesteffort;
 pub mod retryfailfast;
 mod scram;
 pub mod service_type;
+mod util;
 mod vbucketmap;
 mod vbucketrouter;
-pub mod httpx;

@@ -1,5 +1,6 @@
 use std::fmt::{Display, Formatter};
 
+#[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum ServiceType {
     Memd,

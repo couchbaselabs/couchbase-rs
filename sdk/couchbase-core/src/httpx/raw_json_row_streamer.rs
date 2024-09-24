@@ -1,11 +1,12 @@
+use std::cmp::{PartialEq, PartialOrd};
+use std::collections::HashMap;
+
+use futures::{StreamExt, TryStreamExt};
+use serde_json::Value;
+
 use crate::httpx::error::ErrorKind::Generic;
 use crate::httpx::error::Result as HttpxResult;
 use crate::httpx::json_row_stream::JsonRowStream;
-use bytes::Bytes;
-use futures::{Stream, StreamExt, TryStreamExt};
-use serde_json::Value;
-use std::cmp::{PartialEq, PartialOrd};
-use std::collections::HashMap;
 
 #[derive(PartialEq, Eq, PartialOrd, Debug)]
 enum RowStreamState {
@@ -15,26 +16,20 @@ enum RowStreamState {
     End = 3,
 }
 
-pub struct RawJsonRowStreamer<S>
-where
-    S: Stream,
-{
-    stream: JsonRowStream<S>,
+pub struct RawJsonRowStreamer {
+    stream: JsonRowStream,
     rows_attrib: String,
-    buffered_row: String,
+    buffered_row: Vec<u8>,
     attribs: HashMap<String, Value>,
     state: RowStreamState,
 }
 
-impl<S> RawJsonRowStreamer<S>
-where
-    S: Stream<Item = HttpxResult<Bytes>> + Unpin,
-{
-    pub fn new(stream: JsonRowStream<S>, rows_attrib: String) -> Self {
+impl RawJsonRowStreamer {
+    pub fn new(stream: JsonRowStream, rows_attrib: impl Into<String>) -> Self {
         Self {
             stream,
-            rows_attrib: rows_attrib.to_string(),
-            buffered_row: String::new(),
+            rows_attrib: rows_attrib.into(),
+            buffered_row: Vec::new(),
             attribs: HashMap::new(),
             state: RowStreamState::Start,
         }
@@ -75,10 +70,11 @@ where
                     }
                     if item.contains(&self.rows_attrib) {
                         if let Some(mut maybe_row) = self.stream.next().await {
-                            let maybe_row = String::from_utf8(maybe_row?)
+                            let maybe_row = maybe_row?;
+                            let str_row = std::str::from_utf8(&maybe_row)
                                 .map_err(|e| Generic { msg: e.to_string() })?;
                             // if there are no more rows, immediately move to post-rows
-                            if maybe_row == "]" {
+                            if str_row == "]" {
                                 self.state = RowStreamState::PostRows;
                                 break;
                             } else {
@@ -110,7 +106,7 @@ where
         Ok(())
     }
 
-    pub fn has_more_rows(&mut self) -> bool {
+    pub fn has_more_rows(&self) -> bool {
         if self.state < RowStreamState::Rows {
             return false;
         }
@@ -122,7 +118,7 @@ where
         !self.buffered_row.is_empty()
     }
 
-    pub async fn read_row(&mut self) -> HttpxResult<Option<String>> {
+    pub async fn read_row(&mut self) -> HttpxResult<Option<Vec<u8>>> {
         if self.state < RowStreamState::Rows {
             return Err(Generic {
                 msg: "Unexpected parsing state during read rows".to_string(),
@@ -138,9 +134,10 @@ where
         let row = self.buffered_row.clone();
 
         if let Some(mut maybe_row) = self.stream.next().await {
-            let maybe_row =
-                String::from_utf8(maybe_row?).map_err(|e| Generic { msg: e.to_string() })?;
-            if maybe_row == "]" {
+            let maybe_row = maybe_row?;
+            let str_row =
+                std::str::from_utf8(&maybe_row).map_err(|e| Generic { msg: e.to_string() })?;
+            if str_row == "]" {
                 self.state = RowStreamState::PostRows;
             } else {
                 self.buffered_row = maybe_row;
@@ -189,15 +186,13 @@ where
         Ok(())
     }
 
-    pub async fn read_prelude(&mut self) -> HttpxResult<String> {
+    pub async fn read_prelude(&mut self) -> HttpxResult<Vec<u8>> {
         self.begin().await?;
-        let as_string = serde_json::to_string(&self.attribs)?;
-        Ok(as_string)
+        Ok(serde_json::to_vec(&self.attribs)?)
     }
 
-    pub async fn read_epilog(&mut self) -> HttpxResult<String> {
+    pub async fn read_epilog(&mut self) -> HttpxResult<Vec<u8>> {
         self.end().await?;
-        let as_string = serde_json::to_string(&self.attribs)?;
-        Ok(as_string)
+        Ok(serde_json::to_vec(&self.attribs)?)
     }
 }

@@ -29,7 +29,7 @@ pub(crate) struct KvClientConfig {
     pub address: SocketAddr,
     pub tls: Option<TlsConfig>,
     pub client_name: String,
-    pub authenticator: Option<Arc<Authenticator>>,
+    pub authenticator: Arc<Authenticator>,
     pub selected_bucket: Option<String>,
     pub disable_default_features: bool,
     pub disable_error_map: bool,
@@ -146,22 +146,18 @@ where
             None
         };
 
-        let bootstrap_auth = if let Some(auth) = &config.authenticator {
-            let creds = match auth.as_ref() {
-                // PasswordAuthenticator(auth) => get_credentials(ServiceType::Memd, config.address.to_string())
-                Authenticator::PasswordAuthenticator(a) => {
-                    a.get_credentials(ServiceType::Memd, config.address.to_string())?
-                }
-            };
-
-            Some(SASLAuthAutoOptions {
-                username: creds.username.clone(),
-                password: creds.password.clone(),
-                enabled_mechs: vec![AuthMechanism::ScramSha512, AuthMechanism::ScramSha256],
-            })
-        } else {
-            None
+        let creds = match config.authenticator.as_ref() {
+            // PasswordAuthenticator(auth) => get_credentials(ServiceType::Memd, config.address.to_string())
+            Authenticator::PasswordAuthenticator(a) => {
+                a.get_credentials(ServiceType::Memd, config.address.to_string())?
+            }
         };
+
+        let bootstrap_auth = Some(SASLAuthAutoOptions {
+            username: creds.username.clone(),
+            password: creds.password.clone(),
+            enabled_mechs: vec![AuthMechanism::ScramSha512, AuthMechanism::ScramSha256],
+        });
 
         let bootstrap_select_bucket =
             config
