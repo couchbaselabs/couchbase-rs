@@ -10,12 +10,12 @@ pub fn create_default_options() -> AgentOptions {
 
     AgentOptions::builder()
         .tls_config(None)
-        .authenticator(Some(Authenticator::PasswordAuthenticator(
+        .authenticator(Authenticator::PasswordAuthenticator(
             PasswordAuthenticator {
                 username: config.username.clone(),
                 password: config.password.clone(),
             },
-        )))
+        ))
         .bucket_name(config.default_bucket.clone())
         .seed_config(
             SeedConfig::builder()
@@ -33,12 +33,12 @@ pub fn create_options_without_bucket() -> AgentOptions {
 
     AgentOptions::builder()
         .tls_config(None)
-        .authenticator(Some(Authenticator::PasswordAuthenticator(
+        .authenticator(Authenticator::PasswordAuthenticator(
             PasswordAuthenticator {
                 username: config.username.clone(),
                 password: config.password.clone(),
             },
-        )))
+        ))
         .seed_config(
             SeedConfig::builder()
                 .memd_addrs(config.memd_addrs.clone())

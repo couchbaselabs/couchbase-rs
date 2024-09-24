@@ -153,7 +153,7 @@ where
 
 pub(crate) fn error_to_retry_reason(err: &Error) -> RetryReason {
     match err.kind.as_ref() {
-        ErrorKind::MemdxError(e) => {
+        ErrorKind::Memdx(e) => {
             if e.is_notmyvbucket_error() {
                 return RetryReason::NotMyVbucket;
             }

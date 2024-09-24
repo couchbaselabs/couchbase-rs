@@ -1,13 +1,17 @@
-use http::Method;
+use bytes::Bytes;
+use http::{Method, Response};
 use serde::Deserialize;
 use serde_json::{json, Value};
-use rscbx_couchbase_core::httpx::base::{BasicAuth, OnBehalfOfInfo, RequestCreator, ResponseProvider};
-use rscbx_couchbase_core::httpx::client::Client;
-use rscbx_couchbase_core::httpx::json_block_read::read_as_json;
+
+use rscbx_couchbase_core::httpx::client::{Client, ReqwestClient};
 use rscbx_couchbase_core::httpx::json_row_stream::JsonRowStream;
 use rscbx_couchbase_core::httpx::raw_json_row_streamer::RawJsonRowStreamer;
+use rscbx_couchbase_core::httpx::request::{Auth, BasicAuth, Request};
+
 use crate::common::helpers::{generate_key, generate_string_value};
-use crate::common::test_config::{setup_tests, EnvTestConfig, TEST_CONFIG, test_username, test_password, test_mem_addrs};
+use crate::common::test_config::{
+    EnvTestConfig, setup_tests, TEST_CONFIG, test_mem_addrs, test_password, test_username,
+};
 
 mod common;
 
@@ -32,38 +36,36 @@ async fn test_row_streamer() {
 
     let ip = addrs.first().unwrap().split(":").next().unwrap();
 
-    let basic_auth = BasicAuth::builder().username(test_username()).password(test_password()).build();
-
-    let builder = RequestCreator::builder()
-        .user_agent(String::from("rscbcorex"))
-        .basic_auth(basic_auth)
-        .endpoint(format!("http://{}:8095", ip)
-        ).build();
+    let basic_auth = BasicAuth {
+        username: test_username(),
+        password: test_password(),
+    };
 
     let request_body = json!({"statement": "FROM RANGE(0, 999) AS i SELECT *"});
+    let uri = format!("http://{}:8095/analytics/service", ip);
 
-    let client: Client<reqwest::Client> = Client::new().unwrap();
+    let request = Request::builder()
+        .user_agent("rscbcorex".to_string())
+        .auth(Auth::BasicAuth(basic_auth))
+        .method(Method::POST)
+        .content_type("application/json".to_string())
+        .uri(uri.as_str())
+        .body(Bytes::from(serde_json::to_vec(&request_body).unwrap()))
+        .build();
 
-    let request = builder
-        .new_request(
-            Method::POST,
-            "/analytics/service".to_string(),
-            Some("application/json".to_string()),
-            None,
-            Some(request_body.to_string()),
-        );
+    let client = ReqwestClient::new().unwrap();
 
     let resp = client.execute(request).await.unwrap();
 
-    let mut streamer = RawJsonRowStreamer::new(
-        JsonRowStream::new(resp.inner.get_stream()),
-        "results".to_string(),
-    );
+    let mut streamer = RawJsonRowStreamer::new(JsonRowStream::new(resp.bytes_stream()), "results");
 
-    let prelude = streamer
-        .read_prelude()
-        .await
-        .expect("Failed reading prelude");
+    let prelude = String::from_utf8(
+        streamer
+            .read_prelude()
+            .await
+            .expect("Failed reading prelude"),
+    )
+    .unwrap();
 
     assert!(prelude.contains("signature"));
     assert!(prelude.contains("requestID"));
@@ -81,7 +83,7 @@ async fn test_row_streamer() {
     assert_eq!(rows.len(), 1000);
 
     let epilog = streamer.read_epilog().await.expect("Failed reading epilog");
-    let epilog: Value = serde_json::from_str(&epilog).expect("failed parsing epilog as json");
+    let epilog: Value = serde_json::from_slice(&epilog).expect("failed parsing epilog as json");
 
     let request_id = epilog
         .get("requestID")
@@ -109,30 +111,25 @@ async fn test_json_block_read() {
     let addrs = test_mem_addrs();
     let ip = addrs.first().unwrap().split(":").next().unwrap();
 
-    let basic_auth = BasicAuth::builder().username(test_username()).password(test_password()).build();
+    let basic_auth = BasicAuth {
+        username: test_username(),
+        password: test_password(),
+    };
+    let uri = format!("http://{}:8091/pools/default/terseClusterInfo", ip);
 
-    let builder = RequestCreator::builder()
-        .user_agent(String::from("rscbcorex"))
-        .basic_auth(basic_auth)
-        .endpoint(format!("http://{}:8091", ip)
-        ).build();
+    let request = Request::builder()
+        .user_agent("rscbcorex".to_string())
+        .auth(Auth::BasicAuth(basic_auth))
+        .method(Method::GET)
+        .content_type("application/json".to_string())
+        .uri(uri.as_str())
+        .build();
 
-    let client: Client<reqwest::Client> = Client::new().expect("could not create client");
-
-    let request = builder
-        .new_request(
-            Method::GET,
-            "/pools/default/terseClusterInfo".to_string(),
-            None,
-            None,
-            None,
-        );
+    let client = ReqwestClient::new().expect("could not create client");
 
     let res = client.execute(request).await.expect("Failed http request");
 
-    let cluster_info = read_as_json::<TerseClusterInfo>(res.inner)
-        .await
-        .expect("Failed parsing response as json");
+    let cluster_info: TerseClusterInfo = res.json().await.unwrap();
 
     assert!(!cluster_info.compat_version.is_empty());
     assert!(!cluster_info.cluster_uuid.is_empty());

@@ -1,6 +1,9 @@
 use std::fmt::Display;
 
+use crate::httpx::error::Error as HttpError;
 use crate::memdx::error::Error as MemdxError;
+use crate::queryx::error::Error as QueryError;
+use crate::service_type::ServiceType;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -30,7 +33,7 @@ impl Error {
 
     pub fn is_memdx_error(&self) -> Option<&MemdxError> {
         match self.kind.as_ref() {
-            ErrorKind::MemdxError(e) => Some(e),
+            ErrorKind::Memdx(e) => Some(e),
             _ => None,
         }
     }
@@ -60,7 +63,11 @@ pub enum ErrorKind {
     #[non_exhaustive]
     InvalidArgument { msg: String },
     #[error("{0}")]
-    MemdxError(MemdxError),
+    Memdx(MemdxError),
+    #[error("{0}")]
+    Query(QueryError),
+    #[error("{0}")]
+    Http(HttpError),
     #[error("Endpoint not known {endpoint}")]
     #[non_exhaustive]
     EndpointNotKnown { endpoint: String },
@@ -80,6 +87,12 @@ pub enum ErrorKind {
         manifest_uid: u64,
         server_manifest_uid: u64,
     },
+    #[error("{msg}")]
+    #[non_exhaustive]
+    Generic { msg: String },
+    #[error("Service not available {service}")]
+    #[non_exhaustive]
+    ServiceNotAvailable { service: ServiceType },
     #[error("Internal error {msg}")]
     #[non_exhaustive]
     Internal { msg: String },
@@ -98,7 +111,19 @@ where
 
 impl From<MemdxError> for Error {
     fn from(value: MemdxError) -> Self {
-        Self::new(ErrorKind::MemdxError(value))
+        Self::new(ErrorKind::Memdx(value))
+    }
+}
+
+impl From<QueryError> for Error {
+    fn from(value: QueryError) -> Self {
+        Self::new(ErrorKind::Query(value))
+    }
+}
+
+impl From<HttpError> for Error {
+    fn from(value: HttpError) -> Self {
+        Self::new(ErrorKind::Http(value))
     }
 }
 

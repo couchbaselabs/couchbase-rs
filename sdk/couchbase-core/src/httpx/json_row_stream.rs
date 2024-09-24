@@ -1,52 +1,48 @@
-use crate::httpx::error::Result as HttpxResult;
-use crate::httpx::json_row_parser::JsonRowParser;
-use bytes::Bytes;
-use futures::stream::{FusedStream, Stream};
-use futures::StreamExt;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-#[derive(Debug)]
-pub struct JsonRowStream<S>
-where
-    S: Stream,
-{
+use bytes::Bytes;
+use futures::stream::{FusedStream, Stream};
+use futures::StreamExt;
+
+use crate::httpx::error::Result as HttpxResult;
+use crate::httpx::json_row_parser::JsonRowParser;
+
+type QueryStream = dyn Stream<Item = HttpxResult<Bytes>> + Send;
+
+pub struct JsonRowStream {
     state: State,
     parser: JsonRowParser,
-    stream: S,
+    stream: Pin<Box<QueryStream>>,
 }
+
 #[derive(Debug, Eq, PartialEq)]
 enum State {
     Collecting,
     Done,
 }
 
-impl<S> JsonRowStream<S>
-where
-    S: Stream<Item = HttpxResult<Bytes>> + Unpin,
-{
-    pub fn new(stream: S) -> Self {
+impl JsonRowStream {
+    pub fn new<S>(stream: S) -> Self
+    where
+        // TODO: static lifetime?
+        S: Stream<Item = HttpxResult<Bytes>> + Send + 'static,
+    {
         Self {
             state: State::Collecting,
             parser: JsonRowParser::new(2),
-            stream,
+            stream: Box::pin(stream),
         }
     }
 }
 
-impl<S> FusedStream for JsonRowStream<S>
-where
-    S: Stream<Item = HttpxResult<Bytes>> + Unpin,
-{
+impl FusedStream for JsonRowStream {
     fn is_terminated(&self) -> bool {
         matches!(self.state, State::Done)
     }
 }
 
-impl<S> Stream for JsonRowStream<S>
-where
-    S: Stream<Item = HttpxResult<Bytes>> + Unpin,
-{
+impl Stream for JsonRowStream {
     type Item = HttpxResult<Vec<u8>>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<HttpxResult<Vec<u8>>>> {

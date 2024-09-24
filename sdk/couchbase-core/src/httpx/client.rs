@@ -1,44 +1,50 @@
+use std::sync::Arc;
+
+use arc_swap::ArcSwap;
 use async_trait::async_trait;
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
-use crate::httpx::base::{Auth, OboPasswordOrDomain, Request, Response, ResponseProvider};
+use http::header::{CONTENT_TYPE, USER_AGENT};
+use reqwest::redirect::Policy;
+
 use crate::httpx::error::ErrorKind::{Connect, Generic};
 use crate::httpx::error::Result as HttpxResult;
-use reqwest::{redirect::Policy, Client as ReqwestClient};
-use reqwest::header::{CONTENT_TYPE, USER_AGENT};
-
-#[derive(Debug, Clone)]
-pub struct Client<C> {
-    pub inner: C,
-}
+use crate::httpx::request::{Auth, OboPasswordOrDomain, Request};
+use crate::httpx::response::Response;
 
 #[async_trait]
-pub trait ClientProvider {
-    type R: ResponseProvider;
-    fn new() -> HttpxResult<Self> where Self: Sized; // TODO RSCBC-44: Add TLS
-    async fn execute(self, req: Request) -> HttpxResult<Response<Self::R>>;
+pub trait Client: Send + Sync {
+    async fn execute(&self, req: Request) -> HttpxResult<Response>;
 }
 
-impl<C> Client<C> where C: ClientProvider,
-{
+#[derive(Debug)]
+pub struct ReqwestClient {
+    inner: ArcSwap<reqwest::Client>,
+}
+
+impl ReqwestClient {
     pub fn new() -> HttpxResult<Self> {
-        let inner = C::new()?;
+        let inner = Self::new_client()?;
         Ok(Self {
-            inner
+            inner: ArcSwap::from_pointee(inner),
         })
     }
 
-    pub async fn execute(self, req: Request) -> HttpxResult<Response<C::R>> {
-        self.inner.execute(req).await
-    }
-}
+    // TODO: once options are supported we need to check if they've changed before creating
+    // a new client provider.
+    pub fn reconfigure(&self) -> HttpxResult<()> {
+        let new_inner = Self::new_client()?;
+        let old_inner = self.inner.swap(Arc::new(new_inner));
 
-#[async_trait]
-impl ClientProvider for reqwest::Client
-{
-    type R = reqwest::Response;
-    fn new() -> HttpxResult<Self> {
-        let client = ReqwestClient::builder()
+        // TODO: This will close any in flight requests, do we actually need to do this or will
+        // it get dropped once requests complete anyway?
+        drop(old_inner);
+
+        Ok(())
+    }
+
+    fn new_client() -> HttpxResult<reqwest::Client> {
+        let client = reqwest::Client::builder()
             .redirect(Policy::limited(10))
             .build()
             .map_err(|err| Generic {
@@ -46,9 +52,14 @@ impl ClientProvider for reqwest::Client
             })?;
         Ok(client)
     }
+}
 
-    async fn execute(self, req: Request) -> HttpxResult<Response<Self::R>>{
-        let mut builder = self.request(req.method, req.uri);
+#[async_trait]
+impl Client for ReqwestClient {
+    async fn execute(&self, req: Request) -> HttpxResult<Response> {
+        let inner = self.inner.load();
+
+        let mut builder = inner.request(req.method, req.uri);
 
         if let Some(body) = req.body {
             builder = builder.body(body);
@@ -62,18 +73,18 @@ impl ClientProvider for reqwest::Client
             builder = builder.header(USER_AGENT, user_agent);
         }
 
-        if let Some(auth) = req.auth {
+        if let Some(auth) = &req.auth {
             match auth {
                 Auth::BasicAuth(basic) => {
-                    builder = builder.basic_auth(basic.username, Some(basic.password))
+                    builder = builder.basic_auth(&basic.username, Some(&basic.password))
                 }
                 Auth::OnBehalfOf(obo) => {
-                    match obo.password_or_domain {
+                    match &obo.password_or_domain {
                         OboPasswordOrDomain::Password(password) => {
                             // If we have the OBO users password, we just directly set the basic auth
                             // on the request with those credentials rather than using an on-behalf-of
                             // header.  This enables support for older server versions.
-                            builder = builder.basic_auth(obo.username, Some(password));
+                            builder = builder.basic_auth(&obo.username, Some(password));
                         }
                         OboPasswordOrDomain::Domain(domain) => {
                             // Otherwise we send the user/domain using an OBO header.
@@ -87,19 +98,19 @@ impl ClientProvider for reqwest::Client
         }
 
         match builder.send().await {
-            Ok(response) => Ok(Response { inner: response }),
+            Ok(response) => Ok(Response::from(response)),
             // TODO improve error handling
             Err(err) => {
                 if err.is_connect() {
                     Err(Connect {
                         msg: err.to_string(),
                     }
-                        .into())
+                    .into())
                 } else {
                     Err(Generic {
                         msg: err.to_string(),
                     }
-                        .into())
+                    .into())
                 }
             }
         }

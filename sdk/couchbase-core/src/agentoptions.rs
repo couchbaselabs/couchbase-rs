@@ -6,17 +6,23 @@ use crate::authenticator::Authenticator;
 use crate::memdx::connection::TlsConfig as MemdxTlsConfig;
 
 #[derive(Clone, Debug, PartialEq, TypedBuilder)]
-#[builder(field_defaults(default, setter(into)))]
+#[builder(field_defaults(setter(into)))]
 #[non_exhaustive]
 pub struct AgentOptions {
+    #[builder(default)]
     pub tls_config: Option<TlsConfig>,
-    pub authenticator: Option<Authenticator>,
+    pub authenticator: Authenticator,
+    #[builder(default)]
     pub bucket_name: Option<String>,
 
+    #[builder(default)]
     pub connect_timeout: Option<Duration>,
+    #[builder(default)]
     pub connect_throttle_timeout: Option<Duration>,
 
+    #[builder(default)]
     pub seed_config: SeedConfig,
+    #[builder(default)]
     pub compression_config: CompressionConfig,
 }
 

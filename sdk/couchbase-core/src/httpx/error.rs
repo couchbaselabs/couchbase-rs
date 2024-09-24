@@ -1,9 +1,10 @@
 use std::io;
+
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Clone, Debug, Error)]
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
 #[error("{kind}")]
 #[non_exhaustive]
 pub struct Error {
@@ -13,7 +14,7 @@ pub struct Error {
     pub kind: Box<ErrorKind>,
 }
 
-#[derive(Clone, Debug, Error)]
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ErrorKind {
     #[error("Connect failed {msg}")]

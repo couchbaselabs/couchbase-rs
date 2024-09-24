@@ -26,6 +26,8 @@ use crate::configwatcher::{
 };
 use crate::crudcomponent::CrudComponent;
 use crate::error::Result;
+use crate::httpcomponent::HttpComponent;
+use crate::httpx::client::ReqwestClient;
 use crate::kvclient::{KvClient, KvClientConfig, KvClientOptions, StdKvClient};
 use crate::kvclient_ops::KvClientOps;
 use crate::kvclientmanager::{
@@ -40,6 +42,7 @@ use crate::memdx::request::GetClusterConfigRequest;
 use crate::networktypeheuristic::NetworkTypeHeuristic;
 use crate::nmvbhandler::{ConfigUpdater, StdNotMyVbucketConfigHandler};
 use crate::parsedconfig::ParsedConfig;
+use crate::querycomponent::{QueryComponent, QueryComponentConfig, QueryComponentOptions};
 use crate::retry::RetryManager;
 use crate::vbucketrouter::{
     StdVbucketRouter, VbucketRouter, VbucketRouterOptions, VbucketRoutingInfo,
@@ -49,7 +52,7 @@ use crate::vbucketrouter::{
 struct AgentState {
     bucket: Option<String>,
     tls_config: Option<TlsConfig>,
-    authenticator: Option<Arc<Authenticator>>,
+    authenticator: Arc<Authenticator>,
     num_pool_connections: usize,
     // http_transport:
     last_clients: HashMap<String, KvClientConfig>,
@@ -70,14 +73,17 @@ pub(crate) struct AgentInner {
     vb_router: Arc<StdVbucketRouter>,
     collections: Arc<AgentCollectionResolver>,
     retry_manager: Arc<RetryManager>,
+    http_client: Arc<ReqwestClient>,
 
-    pub crud: CrudComponent<
+    pub(crate) crud: CrudComponent<
         AgentClientManager,
         StdVbucketRouter,
         StdNotMyVbucketConfigHandler<AgentInner>,
         AgentCollectionResolver,
         StdCompressor,
     >,
+
+    pub(crate) query: QueryComponent<ReqwestClient>,
 }
 
 #[derive(Clone)]
@@ -88,11 +94,12 @@ pub struct Agent {
     config_watcher_shutdown_tx: Sender<()>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct AgentComponentConfigs {
     pub config_watcher_memd_config: ConfigWatcherMemdConfig,
     pub kv_client_manager_client_configs: HashMap<String, KvClientConfig>,
     pub vbucket_routing_info: VbucketRoutingInfo,
+    pub query_config: QueryComponentConfig,
 }
 
 impl AgentInner {
@@ -170,6 +177,12 @@ impl AgentInner {
                 e.to_string()
             );
         }
+
+        if let Err(e) = self.http_client.reconfigure() {
+            error!("Failed to reconfigure http client: {}", e.to_string());
+        }
+
+        self.query.reconfigure(agent_component_configs.query_config)
     }
 
     fn can_update_config(new_config: &ParsedConfig, old_config: &ParsedConfig) -> bool {
@@ -197,11 +210,12 @@ impl AgentInner {
         let mut kv_data_node_ids = Vec::with_capacity(network_info.nodes.len());
         let mut kv_data_hosts: HashMap<String, String> =
             HashMap::with_capacity(network_info.nodes.len());
-
-        // let tls_config = state.tls_config;
+        let mut query_endpoints: HashMap<String, String> =
+            HashMap::with_capacity(network_info.nodes.len());
 
         for node in network_info.nodes {
             let kv_ep_id = format!("kv{}", node.node_id);
+            let query_ep_id = format!("query{}", node.node_id);
 
             if node.has_data {
                 kv_data_node_ids.push(kv_ep_id.clone());
@@ -211,8 +225,16 @@ impl AgentInner {
                 if let Some(p) = node.ssl_ports.kv {
                     kv_data_hosts.insert(kv_ep_id, format!("{}:{}", node.hostname, p));
                 }
-            } else if let Some(p) = node.non_ssl_ports.kv {
-                kv_data_hosts.insert(kv_ep_id, format!("{}:{}", node.hostname, p));
+                if let Some(p) = node.ssl_ports.query {
+                    query_endpoints.insert(query_ep_id, format!("https://{}:{}", node.hostname, p));
+                }
+            } else {
+                if let Some(p) = node.non_ssl_ports.kv {
+                    kv_data_hosts.insert(kv_ep_id, format!("{}:{}", node.hostname, p));
+                }
+                if let Some(p) = node.non_ssl_ports.query {
+                    query_endpoints.insert(query_ep_id, format!("http://{}:{}", node.hostname, p));
+                }
             }
         }
 
@@ -253,6 +275,10 @@ impl AgentInner {
             },
             kv_client_manager_client_configs: clients,
             vbucket_routing_info,
+            query_config: QueryComponentConfig {
+                endpoints: query_endpoints,
+                authenticator: state.authenticator.clone(),
+            },
         }
     }
 }
@@ -276,16 +302,14 @@ impl Agent {
         let build_version = env!("CARGO_PKG_VERSION");
         let client_name = format!("couchbase-rs-core {}", build_version);
 
-        let authenticator = opts.authenticator.map(Arc::new);
-
         let mut state = AgentState {
             bucket: opts.bucket_name,
-            authenticator,
+            authenticator: Arc::new(opts.authenticator),
             num_pool_connections: 1,
             last_clients: Default::default(),
             latest_config: ParsedConfig::default(),
             network_type: "".to_string(),
-            client_name,
+            client_name: client_name.clone(),
             tls_config: opts.tls_config.map(|cfg| cfg.into()),
         };
 
@@ -347,6 +371,7 @@ impl Agent {
 
         let retry_manager = Arc::new(RetryManager::default());
         let compression_manager = Arc::new(CompressionManager::new(opts.compression_config));
+        let http_client = Arc::new(ReqwestClient::new()?);
 
         let crud = CrudComponent::new(
             nmvb_handler.clone(),
@@ -356,6 +381,15 @@ impl Agent {
             retry_manager.clone(),
             compression_manager,
         );
+        let query = QueryComponent::new(
+            retry_manager.clone(),
+            http_client.clone(),
+            agent_component_configs.query_config,
+            QueryComponentOptions {
+                user_agent: client_name,
+            },
+        );
+
         let inner = Arc::new(AgentInner {
             state: Arc::new(Mutex::new(state)),
             cfg_watcher: cfg_watcher.clone(),
@@ -364,6 +398,8 @@ impl Agent {
             crud,
             collections,
             retry_manager,
+            http_client,
+            query,
         });
 
         nmvb_handler.set_watcher(inner.clone()).await;
