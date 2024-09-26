@@ -1,9 +1,13 @@
 # Couchbase Rust SDK
 
+## Deprecation notice
+
+This branch/version of the SDK is deprecated in favor of a fully native version that is currently in development on
+the [nativex branch](https://github.com/couchbaselabs/couchbase-rs/tree/nativex).
+Once the native SDK is considered to be complete enough it will be moved into this (master) branch.
+
 [![LICENSE](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Crates.io Version](https://img.shields.io/crates/v/couchbase.svg)](https://crates.io/crates/couchbase)
-
-This is the repository for the official, community supported Couchbase Rust SDK. It is currently a work in progress and built on top of [libcouchbase](https://github.com/couchbase/libcouchbase/).
 
 ## Requirements
 
@@ -47,7 +51,14 @@ pub fn main() {
 ```
 
 ## Examples
-More examples can be found in the `examples` folder. Please open a ticket if something is not present or does not showcase what you need.
+
+More examples can be found in the `examples` folder. Please open a ticket if something is not present or does not
+showcase what you need.
 
 ## Unsafe Code
-This code contains **unsafe {}** code blocks. Breathe slowly and calm down, it's going to be okay. The reason why we use unsafe code is so that we can call into `libcouchbase` which is a C library. The only unsafe code is found in the lcb part of the IO module. So if you experience a segfault, it will likely come from there. We are trying to even keep unsafe in there minimal, but by the nature of it, it is all over the place. We are also working on a pure Rust SDK with no unsafe code (hopefully), but until this ships and is mature we have to live with it.
+
+This code contains **unsafe {}** code blocks. Breathe slowly and calm down, it's going to be okay. The reason why we use
+unsafe code is so that we can call into `libcouchbase` which is a C library. The only unsafe code is found in the lcb
+part of the IO module. So if you experience a segfault, it will likely come from there. We are trying to even keep
+unsafe in there minimal, but by the nature of it, it is all over the place. We are also working on a pure Rust SDK with
+no unsafe code (hopefully), but until this ships and is mature we have to live with it.
