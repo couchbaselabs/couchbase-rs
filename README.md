@@ -1,9 +1,14 @@
 # Couchbase Rust SDK
 
+## Deprecation notice
+This branch/version of the SDK is deprecated and not in maintenance.
+We are now working on a fully native version of the SDK in the [nativex branch](https://github.com/couchbaselabs/couchbase-rs/tree/nativex).
+Once the native SDK is considered to be complete enough it will be moved into this (master) branch.
+
 [![LICENSE](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Crates.io Version](https://img.shields.io/crates/v/couchbase.svg)](https://crates.io/crates/couchbase)
 
-This is the repository for the official, community supported Couchbase Rust SDK. It is currently a work in progress and built on top of [libcouchbase](https://github.com/couchbase/libcouchbase/).
+This is the repository for the official, community supported Couchbase Rust SDK, built on top of [libcouchbase](https://github.com/couchbase/libcouchbase/).
 
 ## Requirements
 
