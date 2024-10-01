@@ -342,7 +342,7 @@ impl QueryRespReader {
 
         let chosen_desc = error_descs
             .iter()
-            .find(|desc| desc.retry)
+            .find(|desc| !desc.retry)
             .unwrap_or(&error_descs[0]);
 
         Error {
