@@ -31,6 +31,7 @@ pub mod memdx;
 pub mod mutationtoken;
 mod networktypeheuristic;
 mod nmvbhandler;
+pub mod ondemand_agentmanager;
 mod parsedconfig;
 mod querycomponent;
 pub mod queryoptions;

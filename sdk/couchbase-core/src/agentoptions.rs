@@ -24,6 +24,8 @@ pub struct AgentOptions {
     pub seed_config: SeedConfig,
     #[builder(default)]
     pub compression_config: CompressionConfig,
+    #[builder(default)]
+    pub config_poller_config: ConfigPollerConfig,
 }
 
 #[derive(Default, Clone, Debug, PartialEq, TypedBuilder)]
@@ -54,6 +56,22 @@ impl Default for CompressionMode {
         Self::Enabled {
             min_size: 32,
             min_ratio: 0.83,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
+pub struct ConfigPollerConfig {
+    pub poll_interval: Duration,
+    pub floor_interval: Duration,
+}
+
+impl Default for ConfigPollerConfig {
+    fn default() -> Self {
+        Self {
+            poll_interval: Duration::from_millis(2500),
+            floor_interval: Duration::from_millis(50),
         }
     }
 }
