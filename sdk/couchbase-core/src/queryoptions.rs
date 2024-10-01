@@ -6,7 +6,7 @@ use typed_builder::TypedBuilder;
 
 use crate::httpx::request::OnBehalfOfInfo;
 use crate::queryx;
-use crate::retry::RetryStrategy;
+use crate::retry::{DEFAULT_RETRY_STRATEGY, RetryStrategy};
 use crate::retryfailfast::FailFastRetryStrategy;
 
 #[derive(Debug, Clone, TypedBuilder)]
@@ -60,7 +60,7 @@ pub struct QueryOptions {
 
     pub on_behalf_of: Option<OnBehalfOfInfo>,
     pub endpoint: Option<String>,
-    #[builder(default=Arc::new(FailFastRetryStrategy::default()))]
+    #[builder(default=DEFAULT_RETRY_STRATEGY.clone())]
     pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 

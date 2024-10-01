@@ -10,6 +10,12 @@ use tokio::time::sleep;
 use crate::error;
 use crate::error::{Error, ErrorKind};
 use crate::retrybesteffort::controlled_backoff;
+use crate::retryfailfast::FailFastRetryStrategy;
+
+lazy_static! {
+    pub(crate) static ref DEFAULT_RETRY_STRATEGY: Arc<dyn RetryStrategy> =
+        Arc::new(FailFastRetryStrategy::default());
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]

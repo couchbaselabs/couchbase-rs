@@ -348,7 +348,7 @@ impl Agent {
         let cfg_watcher = Arc::new(ConfigWatcherMemd::new(
             agent_component_configs.config_watcher_memd_config,
             ConfigWatcherMemdOptions {
-                polling_period: Duration::from_millis(2500),
+                polling_period: opts.config_poller_config.poll_interval,
                 kv_client_manager: conn_mgr.clone(),
             },
         ));
