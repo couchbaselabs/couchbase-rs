@@ -1,0 +1,20 @@
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+name: Cargo sort
+
+jobs:
+  cargo_sort:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install cargo-sort from git
+        uses: baptiste0928/cargo-install@v3
+        with:
+          crate: cargo-sort
+          git: https://github.com/devinr528/cargo-sort
+          tag: v1.0.9
+      - name: Run cargo sort
+        run: cargo sort -c -g sdk/couchbase-core/Cargo.toml sdk/protostellar/Cargo.toml
