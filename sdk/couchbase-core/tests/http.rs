@@ -3,10 +3,10 @@ use http::{Method, Response};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use rscbx_couchbase_core::httpx::client::{Client, ReqwestClient};
-use rscbx_couchbase_core::httpx::json_row_stream::JsonRowStream;
-use rscbx_couchbase_core::httpx::raw_json_row_streamer::RawJsonRowStreamer;
-use rscbx_couchbase_core::httpx::request::{Auth, BasicAuth, Request};
+use couchbase_core::httpx::client::{Client, ReqwestClient};
+use couchbase_core::httpx::json_row_stream::JsonRowStream;
+use couchbase_core::httpx::raw_json_row_streamer::RawJsonRowStreamer;
+use couchbase_core::httpx::request::{Auth, BasicAuth, Request};
 
 use crate::common::helpers::{generate_key, generate_string_value};
 use crate::common::test_config::{

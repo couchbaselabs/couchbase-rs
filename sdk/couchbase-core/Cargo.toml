@@ -1,5 +1,5 @@
 [package]
-name = "rscbx_couchbase_core"
+name = "couchbase_core"
 version = "0.1.0"
 edition = "2021"
 
@@ -29,7 +29,7 @@ tokio-io = { version = "0.2.0-alpha.6", features = ["util"] }
 tokio-rustls = { version = "0.26.0" }
 tokio-stream = "0.1.15"
 tokio-util = { version = "0.7", features = ["codec"] }
-typed-builder = "0.19.1"
+typed-builder = "0.20.0"
 url = "2.5.2"
 uuid = { version = "1.7.0", features = ["v4"] }
 webpki = "0.22.4"
