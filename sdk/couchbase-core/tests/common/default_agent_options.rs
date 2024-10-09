@@ -1,5 +1,5 @@
-use rscbx_couchbase_core::agentoptions::{AgentOptions, CompressionConfig, SeedConfig};
-use rscbx_couchbase_core::authenticator::{Authenticator, PasswordAuthenticator};
+use couchbase_core::agentoptions::{AgentOptions, CompressionConfig, SeedConfig};
+use couchbase_core::authenticator::{Authenticator, PasswordAuthenticator};
 
 use crate::common::test_config::TEST_CONFIG;
 

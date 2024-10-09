@@ -2,9 +2,9 @@ extern crate core;
 
 use serde_json::Value;
 
-use rscbx_couchbase_core::agent::Agent;
-use rscbx_couchbase_core::queryoptions::QueryOptions;
-use rscbx_couchbase_core::queryx::query_result::Status;
+use couchbase_core::agent::Agent;
+use couchbase_core::queryoptions::QueryOptions;
+use couchbase_core::queryx::query_result::Status;
 
 use crate::common::default_agent_options::create_default_options;
 use crate::common::test_config::setup_tests;

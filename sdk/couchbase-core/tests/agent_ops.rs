@@ -2,15 +2,17 @@ extern crate core;
 
 use std::sync::Arc;
 
-use rscbx_couchbase_core::agent::Agent;
-use rscbx_couchbase_core::crudoptions::{AddOptions, AppendOptions, DecrementOptions, DeleteOptions, GetAndLockOptions, GetAndTouchOptions, GetOptions, IncrementOptions, PrependOptions, ReplaceOptions, TouchOptions, UnlockOptions, UpsertOptions};
-use rscbx_couchbase_core::memdx::error::{ErrorKind, ServerError, ServerErrorKind};
-use rscbx_couchbase_core::memdx::error::ErrorKind::Server;
-use rscbx_couchbase_core::memdx::error::ServerErrorKind::KeyExists;
-use rscbx_couchbase_core::retrybesteffort::{
-    BestEffortRetryStrategy, ExponentialBackoffCalculator,
+use couchbase_core::agent::Agent;
+use couchbase_core::crudoptions::{
+    AddOptions, AppendOptions, DecrementOptions, DeleteOptions, GetAndLockOptions,
+    GetAndTouchOptions, GetOptions, IncrementOptions, PrependOptions, ReplaceOptions, TouchOptions,
+    UnlockOptions, UpsertOptions,
 };
-use rscbx_couchbase_core::retryfailfast::FailFastRetryStrategy;
+use couchbase_core::memdx::error::{ErrorKind, ServerError, ServerErrorKind};
+use couchbase_core::memdx::error::ErrorKind::Server;
+use couchbase_core::memdx::error::ServerErrorKind::KeyExists;
+use couchbase_core::retrybesteffort::{BestEffortRetryStrategy, ExponentialBackoffCalculator};
+use couchbase_core::retryfailfast::FailFastRetryStrategy;
 
 use crate::common::default_agent_options::{create_default_options, create_options_without_bucket};
 use crate::common::helpers::{generate_key, generate_string_value};
@@ -91,19 +93,25 @@ async fn test_add_and_delete() {
         .value(value.as_slice())
         .build();
 
-    let add_result = agent.add(add_opts.clone())
-        .await
-        .unwrap();
+    let add_result = agent.add(add_opts.clone()).await.unwrap();
 
     assert_ne!(0, add_result.cas);
     assert!(add_result.mutation_token.is_some());
 
-    let add_result = agent.add(add_opts.clone())
-        .await;
+    let add_result = agent.add(add_opts.clone()).await;
 
     assert!(matches!(
-        add_result.err().unwrap().is_memdx_error().unwrap().kind.as_ref(),
-        Server(ServerError {kind: KeyExists, ..})
+        add_result
+            .err()
+            .unwrap()
+            .is_memdx_error()
+            .unwrap()
+            .kind
+            .as_ref(),
+        Server(ServerError {
+            kind: KeyExists,
+            ..
+        })
     ));
 
     let delete_result = agent
@@ -121,9 +129,7 @@ async fn test_add_and_delete() {
     assert_ne!(0, delete_result.cas);
     assert!(delete_result.mutation_token.is_some());
 
-    let add_result = agent.add(add_opts)
-        .await
-        .unwrap();
+    let add_result = agent.add(add_opts).await.unwrap();
 
     assert_ne!(0, add_result.cas);
     assert!(add_result.mutation_token.is_some());
@@ -169,7 +175,7 @@ async fn test_replace() {
                 .collection_name("")
                 .retry_strategy(strat.clone())
                 .value(new_value.as_slice())
-                .build()
+                .build(),
         )
         .await
         .unwrap();
@@ -194,8 +200,6 @@ async fn test_replace() {
 
     agent.close().await;
 }
-
-
 
 #[tokio::test]
 async fn test_lock_unlock() {
@@ -247,14 +251,25 @@ async fn test_lock_unlock() {
                 .scope_name("")
                 .collection_name("")
                 .cas(cas)
-                .build()
+                .build(),
         )
         .await;
 
     assert!(matches!(
-    unlock_result.err().unwrap().is_memdx_error().unwrap().kind.as_ref(),
-    Server(ServerError { kind: ServerErrorKind::NotLocked, .. })
-    | Server(ServerError { kind: ServerErrorKind::TmpFail, .. })
+        unlock_result
+            .err()
+            .unwrap()
+            .is_memdx_error()
+            .unwrap()
+            .kind
+            .as_ref(),
+        Server(ServerError {
+            kind: ServerErrorKind::NotLocked,
+            ..
+        }) | Server(ServerError {
+            kind: ServerErrorKind::TmpFail,
+            ..
+        })
     ));
 
     let get_and_lock_result = agent
@@ -265,7 +280,7 @@ async fn test_lock_unlock() {
                 .scope_name("")
                 .collection_name("")
                 .lock_time(10)
-                .build()
+                .build(),
         )
         .await
         .unwrap();
@@ -281,7 +296,7 @@ async fn test_lock_unlock() {
                 .scope_name("")
                 .collection_name("")
                 .cas(cas)
-                .build()
+                .build(),
         )
         .await;
 
@@ -321,29 +336,31 @@ async fn test_touch_operations() {
     assert_ne!(0, upsert_result.cas);
     assert!(upsert_result.mutation_token.is_some());
 
-    let touch_result = agent.touch(
-        TouchOptions::builder()
-            .key(key.as_slice())
-            .retry_strategy(strat.clone())
-            .scope_name("")
-            .collection_name("")
-            .expiry(12)
-            .build()
-    )
+    let touch_result = agent
+        .touch(
+            TouchOptions::builder()
+                .key(key.as_slice())
+                .retry_strategy(strat.clone())
+                .scope_name("")
+                .collection_name("")
+                .expiry(12)
+                .build(),
+        )
         .await
         .unwrap();
 
     assert_ne!(0, touch_result.cas);
 
-    let get_and_touch_result = agent.get_and_touch(
-        GetAndTouchOptions::builder()
-            .key(key.as_slice())
-            .retry_strategy(strat.clone())
-            .scope_name("")
-            .collection_name("")
-            .expiry(15)
-            .build()
-    )
+    let get_and_touch_result = agent
+        .get_and_touch(
+            GetAndTouchOptions::builder()
+                .key(key.as_slice())
+                .retry_strategy(strat.clone())
+                .scope_name("")
+                .collection_name("")
+                .expiry(15)
+                .build(),
+        )
         .await
         .unwrap();
 
@@ -394,7 +411,7 @@ async fn test_append_and_prepend() {
                 .collection_name("")
                 .retry_strategy(strat.clone())
                 .value(value)
-                .build()
+                .build(),
         )
         .await
         .unwrap();
@@ -412,7 +429,7 @@ async fn test_append_and_prepend() {
                 .collection_name("")
                 .retry_strategy(strat.clone())
                 .value(value)
-                .build()
+                .build(),
         )
         .await
         .unwrap();
@@ -461,7 +478,7 @@ async fn test_increment_and_decrement() {
                 .collection_name("")
                 .delta(1)
                 .initial(42)
-                .build()
+                .build(),
         )
         .await
         .unwrap();
@@ -478,7 +495,7 @@ async fn test_increment_and_decrement() {
                 .scope_name("")
                 .collection_name("")
                 .delta(2)
-                .build()
+                .build(),
         )
         .await
         .unwrap();
