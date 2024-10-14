@@ -33,7 +33,7 @@ mod networktypeheuristic;
 mod nmvbhandler;
 pub mod ondemand_agentmanager;
 mod parsedconfig;
-mod querycomponent;
+pub mod querycomponent;
 pub mod queryoptions;
 pub mod queryx;
 pub mod retry;

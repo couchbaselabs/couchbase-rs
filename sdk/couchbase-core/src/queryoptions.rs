@@ -6,24 +6,24 @@ use typed_builder::TypedBuilder;
 
 use crate::httpx::request::OnBehalfOfInfo;
 use crate::queryx;
-use crate::retry::{DEFAULT_RETRY_STRATEGY, RetryStrategy};
-use crate::retryfailfast::FailFastRetryStrategy;
+use crate::queryx::query_options::{FullScanVectors, SparseScanVectors};
+use crate::retry::RetryStrategy;
 
 #[derive(Debug, Clone, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct QueryOptions {
-    pub args: Vec<Vec<u8>>,
+    pub args: Option<Vec<Vec<u8>>>,
     pub atr_collection: Option<String>,
     pub auto_execute: Option<bool>,
     pub client_context_id: Option<String>,
-    pub compression: Option<crate::queryx::query_options::Compression>,
+    pub compression: Option<queryx::query_options::Compression>,
     pub controls: Option<bool>,
-    pub creds: Option<Vec<crate::queryx::query_options::CredsJson>>,
-    pub durability_level: Option<crate::queryx::query_options::DurabilityLevel>,
+    pub creds: Option<Vec<queryx::query_options::CredsJson>>,
+    pub durability_level: Option<queryx::query_options::DurabilityLevel>,
     pub encoded_plan: Option<String>,
-    pub encoding: Option<crate::queryx::query_options::Encoding>,
-    pub format: Option<crate::queryx::query_options::Format>,
+    pub encoding: Option<queryx::query_options::Encoding>,
+    pub format: Option<queryx::query_options::Format>,
     pub kv_timeout: Option<Duration>,
     pub max_parallelism: Option<u32>,
     pub memory_quota: Option<u32>,
@@ -35,33 +35,34 @@ pub struct QueryOptions {
     pub prepared: Option<String>,
     pub preserve_expiry: Option<bool>,
     pub pretty: Option<bool>,
-    pub profile: Option<crate::queryx::query_options::ProfileMode>,
+    pub profile: Option<queryx::query_options::ProfileMode>,
     pub query_context: Option<String>,
     pub read_only: Option<bool>,
     pub scan_cap: Option<u32>,
-    pub scan_consistency: Option<crate::queryx::query_options::ScanConsistency>,
-    pub scan_vector: Vec<u8>,
-    pub scan_vectors: HashMap<String, Vec<u8>>,
+    pub scan_consistency: Option<queryx::query_options::ScanConsistency>,
+    pub sparse_scan_vector: Option<SparseScanVectors>,
+    pub full_scan_vector: Option<FullScanVectors>,
+    pub sparse_scan_vectors: Option<HashMap<String, SparseScanVectors>>,
+    pub full_scan_vectors: Option<HashMap<String, FullScanVectors>>,
     pub scan_wait: Option<Duration>,
     pub signature: Option<bool>,
     pub statement: Option<String>,
     pub timeout: Option<Duration>,
-    pub tx_data: Vec<u8>,
+    pub tx_data: Option<Vec<u8>>,
     pub tx_id: Option<String>,
     pub tx_implicit: Option<bool>,
     pub tx_stmt_num: Option<u32>,
     pub tx_timeout: Option<Duration>,
     pub use_cbo: Option<bool>,
     pub use_fts: Option<bool>,
-    pub use_replica: Option<crate::queryx::query_options::ReplicaLevel>,
+    pub use_replica: Option<queryx::query_options::ReplicaLevel>,
 
-    pub named_args: HashMap<String, Vec<u8>>,
-    pub raw: HashMap<String, Vec<u8>>,
+    pub named_args: Option<HashMap<String, Vec<u8>>>,
+    pub raw: Option<HashMap<String, Vec<u8>>>,
 
     pub on_behalf_of: Option<OnBehalfOfInfo>,
     pub endpoint: Option<String>,
-    #[builder(default=DEFAULT_RETRY_STRATEGY.clone())]
-    pub retry_strategy: Arc<dyn RetryStrategy>,
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl From<QueryOptions> for queryx::query_options::QueryOptions {
@@ -94,8 +95,10 @@ impl From<QueryOptions> for queryx::query_options::QueryOptions {
             read_only: opts.read_only,
             scan_cap: opts.scan_cap,
             scan_consistency: opts.scan_consistency,
-            scan_vector: opts.scan_vector,
-            scan_vectors: opts.scan_vectors,
+            sparse_scan_vector: opts.sparse_scan_vector,
+            full_scan_vector: opts.full_scan_vector,
+            sparse_scan_vectors: opts.sparse_scan_vectors,
+            full_scan_vectors: opts.full_scan_vectors,
             scan_wait: opts.scan_wait,
             signature: opts.signature,
             statement: opts.statement,
@@ -108,8 +111,10 @@ impl From<QueryOptions> for queryx::query_options::QueryOptions {
             use_cbo: opts.use_cbo,
             use_fts: opts.use_fts,
             use_replica: opts.use_replica,
+
             named_args: opts.named_args,
             raw: opts.raw,
+
             on_behalf_of: opts.on_behalf_of,
         }
     }

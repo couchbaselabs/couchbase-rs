@@ -7,7 +7,6 @@ use crate::queryx::error::Error;
 use crate::queryx::query::Query;
 use crate::queryx::query_options::QueryOptions;
 use crate::queryx::query_respreader::QueryRespReader;
-use crate::queryx::query_result::ResultStream;
 
 #[derive(Clone, Debug, Default)]
 pub struct PreparedStatementCache {

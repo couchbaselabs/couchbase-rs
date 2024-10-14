@@ -2,10 +2,8 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::sync::{Arc, Mutex};
 
-use bytes::Bytes;
-
-use crate::{error, queryx};
 use crate::authenticator::Authenticator;
+use crate::error;
 use crate::error::ErrorKind;
 use crate::httpcomponent::{HttpComponent, HttpComponentState};
 use crate::httpx::client::Client;
@@ -13,9 +11,11 @@ use crate::queryoptions::QueryOptions;
 use crate::queryx::preparedquery::{PreparedQuery, PreparedStatementCache};
 use crate::queryx::query::Query;
 use crate::queryx::query_respreader::QueryRespReader;
-use crate::queryx::query_result::{EarlyMetaData, MetaData, ResultStream};
-use crate::retry::{orchestrate_retries, RetryInfo, RetryManager};
+use crate::queryx::query_result::{EarlyMetaData, MetaData};
+use crate::retry::{orchestrate_retries, RetryInfo, RetryManager, DEFAULT_RETRY_STRATEGY};
 use crate::service_type::ServiceType;
+use bytes::Bytes;
+use futures::{Stream, StreamExt};
 
 pub(crate) struct QueryComponent<C: Client> {
     http_component: HttpComponent<C>,
@@ -48,13 +48,19 @@ impl QueryResultStream {
         self.inner.early_metadata()
     }
 
-    // TODO: map these errors maybe?
-    pub fn metadata(self) -> queryx::error::Result<MetaData> {
-        self.inner.metadata()
+    pub async fn metadata(self) -> error::Result<MetaData> {
+        self.inner.metadata().await.map_err(|e| e.into())
     }
+}
 
-    pub async fn read_row(&mut self) -> queryx::error::Result<Option<Bytes>> {
-        self.inner.read_row().await
+impl Stream for QueryResultStream {
+    type Item = error::Result<Bytes>;
+
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
+        self.inner.poll_next_unpin(cx).map_err(|e| e.into())
     }
 }
 
@@ -85,10 +91,13 @@ impl<C: Client> QueryComponent<C> {
     }
 
     pub async fn query(&self, opts: QueryOptions) -> error::Result<QueryResultStream> {
-        let retry_info = RetryInfo::new(
-            opts.read_only.unwrap_or_default(),
-            opts.retry_strategy.clone(),
-        );
+        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
+            retry_strategy
+        } else {
+            DEFAULT_RETRY_STRATEGY.clone()
+        };
+
+        let retry_info = RetryInfo::new(opts.read_only.unwrap_or_default(), retry);
 
         let endpoint = opts.endpoint.clone();
         let copts = opts.into();
@@ -127,10 +136,12 @@ impl<C: Client> QueryComponent<C> {
     }
 
     pub async fn prepared_query(&self, opts: QueryOptions) -> error::Result<QueryResultStream> {
-        let retry_info = RetryInfo::new(
-            opts.read_only.unwrap_or_default(),
-            opts.retry_strategy.clone(),
-        );
+        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
+            retry_strategy
+        } else {
+            DEFAULT_RETRY_STRATEGY.clone()
+        };
+        let retry_info = RetryInfo::new(opts.read_only.unwrap_or_default(), retry);
 
         let endpoint = opts.endpoint.clone();
         let copts = opts.into();

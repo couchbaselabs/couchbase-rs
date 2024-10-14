@@ -1,5 +1,8 @@
 use crate::error;
+use crate::options::query_options::QueryOptions;
+use crate::results::query_results::QueryResult;
 use couchbase_core::agent::Agent;
+use uuid::Uuid;
 
 pub(crate) struct QueryClient {
     backend: QueryClientBackend,
@@ -10,17 +13,19 @@ impl QueryClient {
         Self { backend }
     }
 
-    pub async fn query(&self, query: String) -> error::Result<()> {
+    pub async fn query(
+        &self,
+        statement: String,
+        opts: Option<QueryOptions>,
+    ) -> error::Result<QueryResult> {
         match &self.backend {
             QueryClientBackend::CouchbaseQueryClientBackend(backend) => {
-                backend.query(query).await?;
+                backend.query(statement, opts).await
             }
             QueryClientBackend::Couchbase2QueryClientBackend(backend) => {
-                backend.query(query).await?;
+                backend.query(statement, opts).await
             }
         }
-
-        Ok(())
     }
 }
 
@@ -38,8 +43,28 @@ impl CouchbaseQueryClient {
         Self { agent }
     }
 
-    async fn query(&self, _query: String) -> error::Result<()> {
-        unimplemented!()
+    async fn query(
+        &self,
+        statement: String,
+        opts: Option<QueryOptions>,
+    ) -> error::Result<QueryResult> {
+        let mut opts = opts.unwrap_or_default();
+        if opts.client_context_id.is_none() {
+            opts.client_context_id = Some(Uuid::new_v4().to_string());
+        }
+
+        let ad_hoc = opts.ad_hoc.unwrap_or(true);
+
+        let mut query_opts = couchbase_core::queryoptions::QueryOptions::try_from(opts)?;
+        query_opts.statement = Some(statement);
+
+        if ad_hoc {
+            Ok(QueryResult::from(self.agent.query(query_opts).await?))
+        } else {
+            Ok(QueryResult::from(
+                self.agent.prepared_query(query_opts).await?,
+            ))
+        }
     }
 }
 
@@ -50,7 +75,11 @@ impl Couchbase2QueryClient {
         unimplemented!()
     }
 
-    async fn query(&self, _query: String) -> error::Result<()> {
+    async fn query(
+        &self,
+        statement: String,
+        opts: Option<QueryOptions>,
+    ) -> error::Result<QueryResult> {
         unimplemented!()
     }
 }

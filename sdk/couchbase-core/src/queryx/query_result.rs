@@ -1,18 +1,7 @@
-use std::future::Future;
 use std::time::Duration;
 
-use async_trait::async_trait;
-use bytes::Bytes;
 use serde::Deserialize;
 use serde_json::Value;
-
-use crate::queryx::error;
-
-pub trait ResultStream: Send {
-    fn early_metadata(&self) -> Option<&EarlyMetaData>;
-    fn metadata(self) -> error::Result<MetaData>;
-    fn read_row(&mut self) -> impl Future<Output = error::Result<Option<Bytes>>> + Send;
-}
 
 #[derive(Debug, Clone, Deserialize, Ord, PartialOrd, Eq, PartialEq, Hash)]
 #[serde(rename_all = "lowercase")]

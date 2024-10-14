@@ -1,18 +1,21 @@
+use std::pin::{pin, Pin};
 use std::ptr::read;
 use std::sync::Arc;
+use std::task::{Context, Poll};
 use std::time::Duration;
 
 use arc_swap::ArcSwap;
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::future::err;
-use futures::TryStreamExt;
+use futures::{FutureExt, Stream, StreamExt, TryStreamExt};
 use http::StatusCode;
 use log::debug;
 use regex::Regex;
 use tokio::sync::Mutex;
 
 use crate::helpers::durations::parse_duration_from_golang_string;
+use crate::httpx::error::ErrorKind::Generic;
 use crate::httpx::json_row_stream::JsonRowStream;
 use crate::httpx::raw_json_row_streamer::RawJsonRowStreamer;
 use crate::httpx::response::Response;
@@ -24,7 +27,7 @@ use crate::queryx::error::{
 use crate::queryx::query_json::{
     QueryEarlyMetaData, QueryError, QueryErrorResponse, QueryMetaData, QueryMetrics, QueryWarning,
 };
-use crate::queryx::query_result::{EarlyMetaData, MetaData, Metrics, ResultStream, Warning};
+use crate::queryx::query_result::{EarlyMetaData, MetaData, Metrics, Warning};
 
 pub struct QueryRespReader {
     endpoint: String,
@@ -38,50 +41,29 @@ pub struct QueryRespReader {
     meta_data_error: Option<Error>,
 }
 
-impl ResultStream for QueryRespReader {
-    fn early_metadata(&self) -> Option<&EarlyMetaData> {
-        self.early_meta_data.as_ref()
-    }
+impl Stream for QueryRespReader {
+    type Item = error::Result<Bytes>;
 
-    fn metadata(self) -> error::Result<MetaData> {
-        if let Some(err) = self.meta_data_error {
-            return Err(err);
-        }
-
-        if let Some(meta) = self.meta_data {
-            return Ok(meta);
-        }
-
-        Err(Error::new_generic_error(
-            "cannot read meta-data until after all rows are read",
-            self.endpoint,
-            self.statement,
-            self.client_context_id,
-        ))
-    }
-
-    async fn read_row(&mut self) -> error::Result<Option<Bytes>> {
-        if let Some(ref mut streamer) = self.streamer {
-            let row_data = streamer.read_row().await.map_err(|e| {
-                Error::new_server_error(
-                    ServerError::new(ServerErrorKind::Unknown { msg: e.to_string() }, None, None),
-                    &self.endpoint,
-                    &self.statement,
-                    &self.client_context_id,
-                    vec![],
-                    self.status_code,
-                )
-            })?;
-
-            if row_data.is_none() && self.meta_data.is_none() && self.meta_data_error.is_none() {
-                if let Err(e) = self.read_final_metadata().await {
-                    self.meta_data_error = Some(e);
-                }
-            }
-
-            Ok(row_data.map(Bytes::from))
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.get_mut();
+        let mut streamer: &mut RawJsonRowStreamer = if let Some(streamer) = this.streamer.as_mut() {
+            streamer
         } else {
-            Ok(None)
+            return Poll::Ready(None);
+        };
+
+        match streamer.poll_next_unpin(cx) {
+            Poll::Ready(Some(Ok(row_data))) => Poll::Ready(Some(Ok(Bytes::from(row_data)))),
+            Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(Error::new_server_error(
+                ServerError::new(ServerErrorKind::Unknown { msg: e.to_string() }, None, None),
+                &this.endpoint,
+                &this.statement,
+                &this.client_context_id,
+                vec![],
+                this.status_code,
+            )))),
+            Poll::Ready(None) => Poll::Ready(None),
+            Poll::Pending => Poll::Pending,
         }
     }
 }
@@ -177,6 +159,29 @@ impl QueryRespReader {
         Ok(reader)
     }
 
+    pub fn early_metadata(&self) -> Option<&EarlyMetaData> {
+        self.early_meta_data.as_ref()
+    }
+
+    pub async fn metadata(mut self) -> error::Result<MetaData> {
+        self.read_final_metadata().await?;
+
+        if let Some(err) = self.meta_data_error {
+            return Err(err);
+        }
+
+        if let Some(meta) = self.meta_data {
+            return Ok(meta);
+        }
+
+        Err(Error::new_generic_error(
+            "cannot read meta-data until after all rows are read",
+            self.endpoint,
+            self.statement,
+            self.client_context_id,
+        ))
+    }
+
     async fn read_early_metadata(&mut self) -> error::Result<()> {
         if let Some(ref mut streamer) = self.streamer {
             let prelude = streamer.read_prelude().await.map_err(|e| {
@@ -243,16 +248,9 @@ impl QueryRespReader {
             let metadata = self.parse_metadata(metadata)?;
 
             self.meta_data = Some(metadata);
-
-            return Ok(());
         }
 
-        Err(Error::new_generic_error(
-            "streamer already consumed",
-            &self.endpoint,
-            &self.statement,
-            &self.client_context_id,
-        ))
+        Ok(())
     }
 
     fn parse_metadata(&self, metadata: QueryMetaData) -> error::Result<MetaData> {

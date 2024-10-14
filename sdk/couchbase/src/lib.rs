@@ -5,7 +5,9 @@ pub mod collection;
 pub mod collection_crud;
 pub mod connstr;
 pub mod error;
+mod mutation_state;
 pub mod options;
+pub mod results;
 pub mod scope;
 
 pub mod authenticator {

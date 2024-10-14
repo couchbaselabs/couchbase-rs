@@ -1,9 +1,8 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
-use bytes::Bytes;
-use serde::{Serialize, Serializer};
 use serde::ser::SerializeMap;
+use serde::{Serialize, Serializer};
 use typed_builder::TypedBuilder;
 
 use crate::helpers;
@@ -72,12 +71,6 @@ pub struct CredsJson {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct ScanVectorEntry {
-    pub seq_no: u64,
-    pub vb_uuid: String,
-}
-
-#[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "lowercase")]
 #[non_exhaustive]
 pub enum ReplicaLevel {
@@ -85,14 +78,20 @@ pub enum ReplicaLevel {
     On,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct ScanVectorEntry {
+    pub seq_no: u64,
+    pub vb_uuid: String,
+}
+
 pub type FullScanVectors = Vec<ScanVectorEntry>;
-pub type SparseScanVectors = HashMap<u32, ScanVectorEntry>;
+pub type SparseScanVectors = HashMap<String, ScanVectorEntry>;
 
 #[derive(Debug, Clone, TypedBuilder)]
 #[builder(field_defaults(setter(into)))]
 #[non_exhaustive]
 pub struct QueryOptions {
-    pub args: Vec<Vec<u8>>,
+    pub args: Option<Vec<Vec<u8>>>,
     pub atr_collection: Option<String>,
     pub auto_execute: Option<bool>,
     pub client_context_id: Option<String>,
@@ -119,13 +118,15 @@ pub struct QueryOptions {
     pub read_only: Option<bool>,
     pub scan_cap: Option<u32>,
     pub scan_consistency: Option<ScanConsistency>,
-    pub scan_vector: Vec<u8>,
-    pub scan_vectors: HashMap<String, Vec<u8>>,
+    pub sparse_scan_vector: Option<SparseScanVectors>,
+    pub full_scan_vector: Option<FullScanVectors>,
+    pub sparse_scan_vectors: Option<HashMap<String, SparseScanVectors>>,
+    pub full_scan_vectors: Option<HashMap<String, FullScanVectors>>,
     pub scan_wait: Option<Duration>,
     pub signature: Option<bool>,
     pub statement: Option<String>,
     pub timeout: Option<Duration>,
-    pub tx_data: Vec<u8>,
+    pub tx_data: Option<Vec<u8>>,
     pub tx_id: Option<String>,
     pub tx_implicit: Option<bool>,
     pub tx_stmt_num: Option<u32>,
@@ -134,8 +135,8 @@ pub struct QueryOptions {
     pub use_fts: Option<bool>,
     pub use_replica: Option<ReplicaLevel>,
 
-    pub named_args: HashMap<String, Vec<u8>>,
-    pub raw: HashMap<String, Vec<u8>>,
+    pub named_args: Option<HashMap<String, Vec<u8>>>,
+    pub raw: Option<HashMap<String, Vec<u8>>>,
 
     pub on_behalf_of: Option<OnBehalfOfInfo>,
 }
@@ -148,14 +149,6 @@ impl Serialize for QueryOptions {
         use helpers::durations;
         use serde::ser::SerializeMap;
         let mut map = serializer.serialize_map(None)?;
-
-        macro_rules! serialize_if_not_empty {
-            ($field:expr, $name:expr) => {
-                if !$field.is_empty() {
-                    map.serialize_entry($name, &$field)?;
-                }
-            };
-        }
 
         macro_rules! serialize_if_not_none {
             ($field:expr, $name:expr) => {
@@ -176,7 +169,7 @@ impl Serialize for QueryOptions {
             };
         }
 
-        serialize_if_not_empty!(self.args, "args");
+        serialize_if_not_none!(self.args, "args");
         serialize_if_not_none!(self.atr_collection, "atr_collection");
         serialize_if_not_none!(self.auto_execute, "auto_execute");
         serialize_if_not_none!(self.client_context_id, "client_context_id");
@@ -203,13 +196,15 @@ impl Serialize for QueryOptions {
         serialize_if_not_none!(self.read_only, "read_only");
         serialize_if_not_none!(self.scan_cap, "scan_cap");
         serialize_if_not_none!(self.scan_consistency, "scan_consistency");
-        serialize_if_not_empty!(self.scan_vector, "scan_vector");
-        serialize_if_not_empty!(self.scan_vectors, "scan_vectors");
+        serialize_if_not_none!(self.sparse_scan_vector, "scan_vector");
+        serialize_if_not_none!(self.full_scan_vector, "scan_vector");
+        serialize_if_not_none!(self.sparse_scan_vectors, "scan_vectors");
+        serialize_if_not_none!(self.full_scan_vectors, "scan_vectors");
         serialize_duration_if_not_none!(self.scan_wait, "scan_wait");
         serialize_if_not_none!(self.signature, "signature");
         serialize_if_not_none!(self.statement, "statement");
         serialize_duration_if_not_none!(self.timeout, "timeout");
-        serialize_if_not_empty!(self.tx_data, "txdata");
+        serialize_if_not_none!(self.tx_data, "txdata");
         serialize_if_not_none!(self.tx_id, "txid");
         serialize_if_not_none!(self.tx_implicit, "tximplicit");
         serialize_if_not_none!(self.tx_stmt_num, "txstmtnum");
@@ -218,19 +213,23 @@ impl Serialize for QueryOptions {
         serialize_if_not_none!(self.use_fts, "use_fts");
         serialize_if_not_none!(self.use_replica, "use_replica");
 
-        // Prefix each named_arg with "$" if not already prefixed.
-        for (key, value) in &self.named_args {
-            let key = if key.starts_with('$') {
-                key
-            } else {
-                &format!("${}", key)
-            };
-            map.serialize_entry(key, value)?;
+        if let Some(args) = &self.named_args {
+            // Prefix each named_arg with "$" if not already prefixed.
+            for (key, value) in args {
+                let key = if key.starts_with('$') {
+                    key
+                } else {
+                    &format!("${}", key)
+                };
+                map.serialize_entry(key, value)?;
+            }
         }
 
-        // Move raw fields to the top level.
-        for (key, value) in &self.raw {
-            map.serialize_entry(key, value)?;
+        if let Some(raw) = &self.raw {
+            // Move raw fields to the top level.
+            for (key, value) in raw {
+                map.serialize_entry(key, value)?;
+            }
         }
 
         map.end()
