@@ -1,12 +1,13 @@
-use std::cmp::{PartialEq, PartialOrd};
-use std::collections::HashMap;
-
-use futures::{StreamExt, TryStreamExt};
-use serde_json::Value;
-
 use crate::httpx::error::ErrorKind::Generic;
 use crate::httpx::error::Result as HttpxResult;
 use crate::httpx::json_row_stream::JsonRowStream;
+use futures::{Stream, StreamExt, TryStreamExt};
+use futures_core::FusedStream;
+use serde_json::Value;
+use std::cmp::{PartialEq, PartialOrd};
+use std::collections::HashMap;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 #[derive(PartialEq, Eq, PartialOrd, Debug)]
 enum RowStreamState {
@@ -194,5 +195,52 @@ impl RawJsonRowStreamer {
     pub async fn read_epilog(&mut self) -> HttpxResult<Vec<u8>> {
         self.end().await?;
         Ok(serde_json::to_vec(&self.attribs)?)
+    }
+}
+
+impl FusedStream for RawJsonRowStreamer {
+    fn is_terminated(&self) -> bool {
+        matches!(self.state, RowStreamState::End) || matches!(self.state, RowStreamState::PostRows)
+    }
+}
+
+impl Stream for RawJsonRowStreamer {
+    type Item = HttpxResult<Vec<u8>>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        if self.state < RowStreamState::Rows {
+            return Poll::Ready(Some(Err(Generic {
+                msg: "Unexpected parsing state during read rows".to_string(),
+            }
+            .into())));
+        }
+
+        // Check if we've already read everything
+        if self.state >= RowStreamState::PostRows {
+            return Poll::Ready(None);
+        }
+
+        let row = self.buffered_row.clone();
+
+        let this = self.get_mut();
+
+        match this.stream.poll_next_unpin(cx) {
+            Poll::Ready(Some(Ok(stream_row))) => {
+                let str_row =
+                    std::str::from_utf8(&stream_row).map_err(|e| Generic { msg: e.to_string() })?;
+                if str_row == "]" {
+                    this.state = RowStreamState::PostRows;
+                } else {
+                    this.buffered_row = stream_row;
+                }
+                Poll::Ready(Some(Ok(row)))
+            }
+            Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(e))),
+            Poll::Ready(None) => {
+                this.state = RowStreamState::End;
+                Poll::Ready(None)
+            }
+            Poll::Pending => Poll::Pending,
+        }
     }
 }

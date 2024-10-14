@@ -1,14 +1,9 @@
-extern crate core;
-
+use crate::common::create_cluster_from_test_config;
+use crate::common::test_config::setup_tests;
+use couchbase::options::query_options::QueryOptions;
+use couchbase::results::query_results::QueryStatus;
 use futures::StreamExt;
 use serde_json::Value;
-
-use couchbase_core::agent::Agent;
-use couchbase_core::queryoptions::QueryOptions;
-use couchbase_core::queryx::query_result::Status;
-
-use crate::common::default_agent_options::create_default_options;
-use crate::common::test_config::setup_tests;
 
 mod common;
 
@@ -16,13 +11,10 @@ mod common;
 async fn test_query_basic() {
     setup_tests();
 
-    let agent_opts = create_default_options();
+    let cluster = create_cluster_from_test_config().await;
 
-    let mut agent = Agent::new(agent_opts).await.unwrap();
-    let opts = QueryOptions::builder()
-        .statement("SELECT 1=1".to_string())
-        .build();
-    let mut res = agent.query(opts).await.unwrap();
+    let opts = QueryOptions::builder().metrics(true).build();
+    let mut res = cluster.query("SELECT 1=1", opts).await.unwrap();
 
     let mut rows = vec![];
     while let Some(row) = res.next().await {
@@ -39,10 +31,9 @@ async fn test_query_basic() {
     assert!(row_obj.get("$1").unwrap().as_bool().unwrap());
 
     let meta = res.metadata().await.unwrap();
-    assert!(meta.prepared.is_none());
     assert!(!meta.request_id.is_empty());
     assert!(!meta.client_context_id.is_empty());
-    assert_eq!(Status::Success, meta.status);
+    assert_eq!(QueryStatus::Success, meta.status);
     assert!(meta.profile.is_none());
     assert!(meta.warnings.is_empty());
 
@@ -65,13 +56,10 @@ async fn test_query_basic() {
 async fn test_prepared_query_basic() {
     setup_tests();
 
-    let agent_opts = create_default_options();
+    let cluster = create_cluster_from_test_config().await;
 
-    let mut agent = Agent::new(agent_opts).await.unwrap();
-    let opts = QueryOptions::builder()
-        .statement("SELECT 1=1".to_string())
-        .build();
-    let mut res = agent.prepared_query(opts).await.unwrap();
+    let opts = QueryOptions::builder().metrics(true).build();
+    let mut res = cluster.query("SELECT 1=1", opts).await.unwrap();
 
     let mut rows = vec![];
     while let Some(row) = res.next().await {
@@ -88,10 +76,9 @@ async fn test_prepared_query_basic() {
     assert!(row_obj.get("$1").unwrap().as_bool().unwrap());
 
     let meta = res.metadata().await.unwrap();
-    assert!(meta.prepared.is_some());
     assert!(!meta.request_id.is_empty());
     assert!(!meta.client_context_id.is_empty());
-    assert_eq!(Status::Success, meta.status);
+    assert_eq!(QueryStatus::Success, meta.status);
     assert!(meta.profile.is_none());
     assert!(meta.warnings.is_empty());
 

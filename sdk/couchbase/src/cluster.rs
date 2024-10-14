@@ -3,6 +3,8 @@ use crate::clients::cluster_client::ClusterClient;
 use crate::clients::query_client::QueryClient;
 use crate::error;
 use crate::options::cluster_options::ClusterOptions;
+use crate::options::query_options::QueryOptions;
+use crate::results::query_results::QueryResult;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -33,7 +35,11 @@ impl Cluster {
         Bucket::new(bucket_client)
     }
 
-    pub async fn query(&self, query: impl Into<String>) -> error::Result<()> {
-        self.query_client.query(query.into()).await
+    pub async fn query(
+        &self,
+        statement: impl Into<String>,
+        opts: impl Into<Option<QueryOptions>>,
+    ) -> error::Result<QueryResult> {
+        self.query_client.query(statement.into(), opts.into()).await
     }
 }

@@ -1,12 +1,10 @@
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use bytes::Bytes;
-use futures::stream::{FusedStream, Stream};
-use futures::StreamExt;
-
 use crate::httpx::error::Result as HttpxResult;
 use crate::httpx::json_row_parser::JsonRowParser;
+use bytes::Bytes;
+use futures::stream::{FusedStream, Stream};
 
 type QueryStream = dyn Stream<Item = HttpxResult<Bytes>> + Send;
 
@@ -45,7 +43,7 @@ impl FusedStream for JsonRowStream {
 impl Stream for JsonRowStream {
     type Item = HttpxResult<Vec<u8>>;
 
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<HttpxResult<Vec<u8>>>> {
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.get_mut();
         loop {
             match this.state {
