@@ -2,6 +2,7 @@ use crate::clients::collection_client::{
     CollectionClient, CollectionClientBackend, Couchbase2CollectionClient,
     CouchbaseCollectionClient,
 };
+use crate::clients::query_client::{CouchbaseQueryClient, QueryClient, QueryClientBackend};
 use couchbase_core::agent::Agent;
 
 #[derive(Clone)]
@@ -20,6 +21,21 @@ impl ScopeClient {
         match &self.backend {
             ScopeClientBackend::CouchbaseScopeBackend(client) => client.name(),
             ScopeClientBackend::Couchbase2ScopeBackend(client) => client.name(),
+        }
+    }
+
+    pub fn query_client(&self) -> QueryClient {
+        match &self.backend {
+            ScopeClientBackend::CouchbaseScopeBackend(backend) => {
+                let query_client = backend.query_client();
+
+                QueryClient::new(QueryClientBackend::CouchbaseQueryClientBackend(
+                    query_client,
+                ))
+            }
+            ScopeClientBackend::Couchbase2ScopeBackend(_) => {
+                unimplemented!()
+            }
         }
     }
 
@@ -70,6 +86,10 @@ impl CouchbaseScopeClient {
                 name,
             ),
         ))
+    }
+
+    pub fn query_client(&self) -> CouchbaseQueryClient {
+        CouchbaseQueryClient::new(self.agent.clone())
     }
 }
 
