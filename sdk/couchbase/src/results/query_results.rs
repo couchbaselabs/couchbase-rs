@@ -1,8 +1,12 @@
 use crate::error;
 use couchbase_core::querycomponent::QueryResultStream;
 use couchbase_core::queryx;
-use futures::{Stream, StreamExt};
+use futures::{Stream, StreamExt, TryStreamExt};
+use serde::de::DeserializeOwned;
 use serde_json::Value;
+use std::marker::PhantomData;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 use std::time::Duration;
 
 pub struct QueryResult {
@@ -113,19 +117,38 @@ impl From<QueryResultStream> for QueryResult {
     }
 }
 
-impl Stream for QueryResult {
-    type Item = error::Result<bytes::Bytes>;
+struct QueryRows<'a, V: DeserializeOwned> {
+    wrapped: &'a mut QueryResultStream,
+    phantom_data: PhantomData<&'a V>,
+}
 
-    fn poll_next(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Option<Self::Item>> {
-        self.wrapped.poll_next_unpin(cx).map_err(|e| e.into())
+impl<'a, V: DeserializeOwned> Stream for QueryRows<'a, V> {
+    type Item = error::Result<V>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let row = match self.wrapped.poll_next_unpin(cx) {
+            Poll::Ready(Some(Ok(row))) => row,
+            Poll::Ready(Some(Err(e))) => return Poll::Ready(Some(Err(e.into()))),
+            Poll::Ready(None) => return Poll::Ready(None),
+            Poll::Pending => return Poll::Pending,
+        };
+
+        let row = serde_json::from_slice(&row).map_err(error::Error::from);
+        Poll::Ready(Some(row))
     }
 }
 
 impl QueryResult {
     pub async fn metadata(self) -> error::Result<QueryMetaData> {
         Ok(self.wrapped.metadata().await?.into())
+    }
+
+    pub fn rows<'a, V: DeserializeOwned + 'a>(
+        &'a mut self,
+    ) -> impl Stream<Item = error::Result<V>> + 'a {
+        QueryRows {
+            wrapped: &mut self.wrapped,
+            phantom_data: PhantomData,
+        }
     }
 }

@@ -101,8 +101,8 @@ impl Couchbase2QueryClient {
 
     async fn query(
         &self,
-        statement: String,
-        opts: Option<QueryOptions>,
+        _statement: String,
+        _opts: Option<QueryOptions>,
     ) -> error::Result<QueryResult> {
         unimplemented!()
     }
