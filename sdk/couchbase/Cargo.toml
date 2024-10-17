@@ -13,6 +13,7 @@ lazy_static = "1.5.0"
 log = "0.4.22"
 regex = "1.11.0"
 serde = "1.0"
+serde-binary = { version = "0.5", optional = true }
 serde_json = "1.0"
 typed-builder = "0.20.0"
 uuid = { version = "1.10.0", features = ["v4"] }
@@ -25,7 +26,12 @@ couchbase_core = { path = "../couchbase-core" }
 chrono = "0.4"
 env_logger = "0.11"
 envconfig = "0.11.0"
+serde_json = { version = "1.0", features = ["raw_value"] }
+serde_yaml = "0.9"
 tokio = "1.40"
+
+[features]
+binary-transcoder = ["serde-binary"]
 
 [lints.rust]
 # This is temporary whilst we build out the root modules.

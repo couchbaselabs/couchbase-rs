@@ -1,3 +1,5 @@
+extern crate core;
+
 pub mod bucket;
 mod clients;
 pub mod cluster;
@@ -9,6 +11,9 @@ mod mutation_state;
 pub mod options;
 pub mod results;
 pub mod scope;
+pub mod transcoder;
+#[cfg(feature = "binary-transcoder")]
+pub mod transcoder_binary;
 
 pub mod authenticator {
     pub use couchbase_core::authenticator::Authenticator;
