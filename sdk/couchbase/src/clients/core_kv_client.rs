@@ -1,6 +1,7 @@
 use crate::error;
+use crate::results::get_result::GetResult;
+use bytes::Bytes;
 use couchbase_core::agent::Agent;
-use serde::Serialize;
 
 #[derive(Clone)]
 pub(crate) struct CoreKvClient {
@@ -12,14 +13,21 @@ impl CoreKvClient {
         Self { backend }
     }
 
-    pub async fn upsert<T: Serialize>(&self, id: String, value: T) -> error::Result<()> {
+    pub async fn upsert(&self, id: String, value: Bytes, flags: u32) -> error::Result<()> {
         match &self.backend {
             CoreKvClientBackend::CouchbaseCoreKvClientBackend(client) => {
-                client.upsert(id, value).await
+                client.upsert(id, value, flags).await
             }
             CoreKvClientBackend::Couchbase2CoreKvClientBackend(client) => {
-                client.upsert(id, value).await
+                client.upsert(id, value, flags).await
             }
+        }
+    }
+
+    pub async fn get(&self, id: String) -> error::Result<GetResult> {
+        match &self.backend {
+            CoreKvClientBackend::CouchbaseCoreKvClientBackend(client) => client.get(id).await,
+            CoreKvClientBackend::Couchbase2CoreKvClientBackend(client) => client.get(id).await,
         }
     }
 }
@@ -53,12 +61,13 @@ impl CouchbaseCoreKvClient {
         }
     }
 
-    pub async fn upsert<T: Serialize>(&self, id: String, _value: T) -> error::Result<()> {
+    pub async fn upsert(&self, id: String, value: Bytes, flags: u32) -> error::Result<()> {
         self.agent
             .upsert(
                 couchbase_core::crudoptions::UpsertOptions::builder()
                     .key(id.as_bytes())
-                    .value(&[])
+                    .value(&value)
+                    .flags(flags)
                     .scope_name(&self.scope_name)
                     .collection_name(&self.collection_name)
                     .build(),
@@ -66,6 +75,21 @@ impl CouchbaseCoreKvClient {
             .await?;
 
         Ok(())
+    }
+
+    pub async fn get(&self, id: String) -> error::Result<GetResult> {
+        let res = self
+            .agent
+            .get(
+                couchbase_core::crudoptions::GetOptions::builder()
+                    .key(id.as_bytes())
+                    .scope_name(&self.scope_name)
+                    .collection_name(&self.collection_name)
+                    .build(),
+            )
+            .await?;
+
+        Ok(res.into())
     }
 }
 
@@ -77,7 +101,11 @@ impl Couchbase2CoreKvClient {
         unimplemented!()
     }
 
-    pub async fn upsert<T: Serialize>(&self, _id: String, _value: T) -> error::Result<()> {
+    pub async fn upsert(&self, _id: String, _value: Bytes, _flags: u32) -> error::Result<()> {
+        unimplemented!()
+    }
+
+    pub async fn get(&self, _id: String) -> error::Result<GetResult> {
         unimplemented!()
     }
 }

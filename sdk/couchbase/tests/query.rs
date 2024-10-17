@@ -3,6 +3,7 @@ use crate::common::test_config::{setup_tests, test_bucket, test_scope};
 use couchbase::options::query_options::QueryOptions;
 use couchbase::results::query_results::{QueryMetaData, QueryStatus};
 use futures::StreamExt;
+use serde_json::value::RawValue;
 use serde_json::Value;
 
 mod common;
@@ -16,8 +17,8 @@ async fn test_query_basic() {
     let opts = QueryOptions::builder().metrics(true).build();
     let mut res = cluster.query("SELECT 1=1", opts).await.unwrap();
 
-    let mut rows = vec![];
-    while let Some(row) = res.next().await {
+    let mut rows: Vec<Value> = vec![];
+    while let Some(row) = res.rows().next().await {
         rows.push(row.unwrap());
     }
 
@@ -25,7 +26,33 @@ async fn test_query_basic() {
 
     let row = rows.first().unwrap();
 
-    let row_value: Value = serde_json::from_slice(row).unwrap();
+    let row_obj = row.as_object().unwrap();
+
+    assert!(row_obj.get("$1").unwrap().as_bool().unwrap());
+
+    let meta = res.metadata().await.unwrap();
+    assert_metadata(meta);
+}
+
+#[tokio::test]
+async fn test_query_raw_result() {
+    setup_tests();
+
+    let cluster = create_cluster_from_test_config().await;
+
+    let opts = QueryOptions::builder().metrics(true).build();
+    let mut res = cluster.query("SELECT 1=1", opts).await.unwrap();
+
+    let mut rows: Vec<Box<RawValue>> = vec![];
+    while let Some(row) = res.rows().next().await {
+        rows.push(row.unwrap());
+    }
+
+    assert_eq!(1, rows.len());
+
+    let row = rows.first().unwrap();
+
+    let row_value: Value = serde_json::from_str(row.get()).unwrap();
     let row_obj = row_value.as_object().unwrap();
 
     assert!(row_obj.get("$1").unwrap().as_bool().unwrap());
@@ -43,8 +70,8 @@ async fn test_prepared_query_basic() {
     let opts = QueryOptions::builder().metrics(true).build();
     let mut res = cluster.query("SELECT 1=1", opts).await.unwrap();
 
-    let mut rows = vec![];
-    while let Some(row) = res.next().await {
+    let mut rows: Vec<Value> = vec![];
+    while let Some(row) = res.rows().next().await {
         rows.push(row.unwrap());
     }
 
@@ -52,8 +79,7 @@ async fn test_prepared_query_basic() {
 
     let row = rows.first().unwrap();
 
-    let row_value: Value = serde_json::from_slice(row).unwrap();
-    let row_obj = row_value.as_object().unwrap();
+    let row_obj = row.as_object().unwrap();
 
     assert!(row_obj.get("$1").unwrap().as_bool().unwrap());
 
@@ -71,8 +97,8 @@ async fn test_scope_query_basic() {
     let opts = QueryOptions::builder().metrics(true).build();
     let mut res = scope.query("SELECT 1=1", opts).await.unwrap();
 
-    let mut rows = vec![];
-    while let Some(row) = res.next().await {
+    let mut rows: Vec<Value> = vec![];
+    while let Some(row) = res.rows().next().await {
         rows.push(row.unwrap());
     }
 
@@ -80,8 +106,7 @@ async fn test_scope_query_basic() {
 
     let row = rows.first().unwrap();
 
-    let row_value: Value = serde_json::from_slice(row).unwrap();
-    let row_obj = row_value.as_object().unwrap();
+    let row_obj = row.as_object().unwrap();
 
     assert!(row_obj.get("$1").unwrap().as_bool().unwrap());
 
