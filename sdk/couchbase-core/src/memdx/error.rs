@@ -40,8 +40,8 @@ pub enum ErrorKind {
     #[error("Protocol error {msg}")]
     #[non_exhaustive]
     Protocol { msg: String },
-    #[error("Connect error {0}")]
-    Connect(Arc<io::Error>),
+    #[error("Connect error {msg}")]
+    Connect { msg: String },
     #[error("Request cancelled {0}")]
     Cancelled(CancellationErrorKind),
     #[error("Connection closed")]

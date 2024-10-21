@@ -7,14 +7,13 @@ use tokio::sync::Mutex;
 use typed_builder::TypedBuilder;
 
 use crate::agent::Agent;
-use crate::agentoptions::{
-    AgentOptions, CompressionConfig, ConfigPollerConfig, SeedConfig, TlsConfig,
-};
+use crate::agentoptions::{AgentOptions, CompressionConfig, ConfigPollerConfig, SeedConfig};
 use crate::authenticator::Authenticator;
 use crate::error;
 use crate::error::ErrorKind;
+use crate::tls_config::TlsConfig;
 
-#[derive(Clone, Debug, PartialEq, TypedBuilder)]
+#[derive(Clone, TypedBuilder)]
 #[builder(field_defaults(setter(into)))]
 #[non_exhaustive]
 pub struct OnDemandAgentManagerOptions {
@@ -54,12 +53,12 @@ impl From<AgentOptions> for OnDemandAgentManagerOptions {
     fn from(opts: AgentOptions) -> Self {
         OnDemandAgentManagerOptions {
             authenticator: opts.authenticator,
+            tls_config: opts.tls_config,
             connect_timeout: opts.connect_timeout,
             connect_throttle_timeout: opts.connect_throttle_timeout,
             seed_config: opts.seed_config,
             compression_config: opts.compression_config,
             config_poller_config: opts.config_poller_config,
-            tls_config: opts.tls_config,
         }
     }
 }

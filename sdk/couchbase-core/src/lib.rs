@@ -41,6 +41,10 @@ pub mod retrybesteffort;
 pub mod retryfailfast;
 mod scram;
 pub mod service_type;
+mod tls_config;
 mod util;
 mod vbucketmap;
 mod vbucketrouter;
+
+#[cfg(feature = "rustls-tls")]
+pub mod insecure_certverfier;

@@ -1,17 +1,14 @@
 use bytes::Bytes;
-use http::{Method, Response};
+use http::Method;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use couchbase_core::httpx::client::{Client, ReqwestClient};
+use couchbase_core::httpx::client::{Client, ClientConfig, ReqwestClient};
 use couchbase_core::httpx::json_row_stream::JsonRowStream;
 use couchbase_core::httpx::raw_json_row_streamer::RawJsonRowStreamer;
 use couchbase_core::httpx::request::{Auth, BasicAuth, Request};
 
-use crate::common::helpers::{generate_key, generate_string_value};
-use crate::common::test_config::{
-    EnvTestConfig, setup_tests, TEST_CONFIG, test_mem_addrs, test_password, test_username,
-};
+use crate::common::test_config::{setup_tests, test_mem_addrs, test_password, test_username};
 
 mod common;
 
@@ -53,7 +50,7 @@ async fn test_row_streamer() {
         .body(Bytes::from(serde_json::to_vec(&request_body).unwrap()))
         .build();
 
-    let client = ReqwestClient::new().unwrap();
+    let client = ReqwestClient::new(ClientConfig::default()).unwrap();
 
     let resp = client.execute(request).await.unwrap();
 
@@ -125,7 +122,7 @@ async fn test_json_block_read() {
         .uri(uri.as_str())
         .build();
 
-    let client = ReqwestClient::new().expect("could not create client");
+    let client = ReqwestClient::new(ClientConfig::default()).expect("could not create client");
 
     let res = client.execute(request).await.expect("Failed http request");
 
