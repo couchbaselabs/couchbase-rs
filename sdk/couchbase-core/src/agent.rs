@@ -7,10 +7,10 @@ use std::time::Duration;
 use futures::executor::block_on;
 use log::{debug, error, info};
 use tokio::runtime::{Handle, Runtime};
-use tokio::sync::{broadcast, mpsc, Mutex};
 use tokio::sync::broadcast::{Receiver, Sender};
+use tokio::sync::{broadcast, mpsc, Mutex};
 use tokio::task::JoinHandle;
-use tokio::time::{Instant, timeout, timeout_at};
+use tokio::time::{timeout, timeout_at, Instant};
 
 use crate::agentoptions::AgentOptions;
 use crate::authenticator::Authenticator;
@@ -27,7 +27,8 @@ use crate::configwatcher::{
 use crate::crudcomponent::CrudComponent;
 use crate::error::Result;
 use crate::httpcomponent::HttpComponent;
-use crate::httpx::client::ReqwestClient;
+use crate::httpx;
+use crate::httpx::client::{ClientConfig, ReqwestClient};
 use crate::kvclient::{KvClient, KvClientConfig, KvClientOptions, StdKvClient};
 use crate::kvclient_ops::KvClientOps;
 use crate::kvclientmanager::{
@@ -37,18 +38,18 @@ use crate::kvclientpool::{
     KvClientPool, KvClientPoolConfig, KvClientPoolOptions, NaiveKvClientPool,
 };
 use crate::memdx::client::Client;
-use crate::memdx::connection::TlsConfig;
 use crate::memdx::request::GetClusterConfigRequest;
 use crate::networktypeheuristic::NetworkTypeHeuristic;
 use crate::nmvbhandler::{ConfigUpdater, StdNotMyVbucketConfigHandler};
 use crate::parsedconfig::ParsedConfig;
 use crate::querycomponent::{QueryComponent, QueryComponentConfig, QueryComponentOptions};
 use crate::retry::RetryManager;
+use crate::tls_config::TlsConfig;
 use crate::vbucketrouter::{
     StdVbucketRouter, VbucketRouter, VbucketRouterOptions, VbucketRoutingInfo,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 struct AgentState {
     bucket: Option<String>,
     tls_config: Option<TlsConfig>,
@@ -94,12 +95,12 @@ pub struct Agent {
     config_watcher_shutdown_tx: Sender<()>,
 }
 
-#[derive(Debug)]
 struct AgentComponentConfigs {
     pub config_watcher_memd_config: ConfigWatcherMemdConfig,
     pub kv_client_manager_client_configs: HashMap<String, KvClientConfig>,
     pub vbucket_routing_info: VbucketRoutingInfo,
     pub query_config: QueryComponentConfig,
+    pub http_client_config: ClientConfig,
 }
 
 impl AgentInner {
@@ -178,7 +179,10 @@ impl AgentInner {
             );
         }
 
-        if let Err(e) = self.http_client.reconfigure() {
+        if let Err(e) = self
+            .http_client
+            .reconfigure(agent_component_configs.http_client_config)
+        {
             error!("Failed to reconfigure http client: {}", e.to_string());
         }
 
@@ -279,6 +283,9 @@ impl AgentInner {
                 endpoints: query_endpoints,
                 authenticator: state.authenticator.clone(),
             },
+            http_client_config: ClientConfig {
+                tls_config: state.tls_config.clone(),
+            },
         }
     }
 }
@@ -310,7 +317,7 @@ impl Agent {
             latest_config: ParsedConfig::default(),
             network_type: "".to_string(),
             client_name: client_name.clone(),
-            tls_config: opts.tls_config.map(|cfg| cfg.into()),
+            tls_config: opts.tls_config,
         };
 
         let connect_timeout = opts.connect_timeout.unwrap_or(Duration::from_secs(7));
@@ -371,7 +378,9 @@ impl Agent {
 
         let retry_manager = Arc::new(RetryManager::default());
         let compression_manager = Arc::new(CompressionManager::new(opts.compression_config));
-        let http_client = Arc::new(ReqwestClient::new()?);
+        let http_client = Arc::new(ReqwestClient::new(
+            agent_component_configs.http_client_config,
+        )?);
 
         let crud = CrudComponent::new(
             nmvb_handler.clone(),
@@ -475,7 +484,7 @@ impl Agent {
                     Err(_e) => continue,
                 };
 
-                client.close().await.unwrap();
+                client.close().await?;
 
                 let config: TerseConfig = serde_json::from_slice(raw_config.as_slice())?;
 

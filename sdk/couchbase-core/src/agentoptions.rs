@@ -3,9 +3,9 @@ use std::time::Duration;
 use typed_builder::TypedBuilder;
 
 use crate::authenticator::Authenticator;
-use crate::memdx::connection::TlsConfig as MemdxTlsConfig;
+use crate::tls_config::TlsConfig;
 
-#[derive(Clone, Debug, PartialEq, TypedBuilder)]
+#[derive(Clone, TypedBuilder)]
 #[builder(field_defaults(setter(into)))]
 #[non_exhaustive]
 pub struct AgentOptions {
@@ -72,21 +72,6 @@ impl Default for ConfigPollerConfig {
         Self {
             poll_interval: Duration::from_millis(2500),
             floor_interval: Duration::from_millis(50),
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-#[non_exhaustive]
-pub enum TlsConfig {
-    NoVerify,
-}
-
-impl From<TlsConfig> for MemdxTlsConfig {
-    fn from(value: TlsConfig) -> Self {
-        MemdxTlsConfig {
-            root_certs: None,
-            accept_all_certs: Some(true),
         }
     }
 }

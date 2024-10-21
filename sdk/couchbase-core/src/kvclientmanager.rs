@@ -40,7 +40,6 @@ pub(crate) trait KvClientManager: Sized + Send + Sync {
     fn close(&self) -> impl Future<Output = Result<()>> + Send;
 }
 
-#[derive(Debug)]
 pub(crate) struct KvClientManagerConfig {
     pub num_pool_connections: usize,
     pub clients: HashMap<String, KvClientConfig>,

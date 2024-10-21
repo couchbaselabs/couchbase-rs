@@ -31,7 +31,7 @@ pub(crate) trait KvClientPool: Sized + Send + Sync {
     fn reconfigure(&self, config: KvClientPoolConfig) -> impl Future<Output = Result<()>> + Send;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub(crate) struct KvClientPoolConfig {
     pub num_connections: usize,
     pub client_config: KvClientConfig,

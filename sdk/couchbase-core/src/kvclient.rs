@@ -1,8 +1,8 @@
 use std::future::Future;
 use std::net::SocketAddr;
 use std::ops::{Add, Deref};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 
 use futures::future::BoxFuture;
@@ -14,17 +14,16 @@ use crate::authenticator::Authenticator;
 use crate::error::Error;
 use crate::error::Result;
 use crate::memdx::auth_mechanism::AuthMechanism;
-use crate::memdx::connection::{
-    ConnectionType, ConnectOptions, TcpConnection, TlsConfig, TlsConnection,
-};
+use crate::memdx::connection::{ConnectOptions, ConnectionType, TcpConnection, TlsConnection};
 use crate::memdx::dispatcher::{Dispatcher, DispatcherOptions, OrphanResponseHandler};
 use crate::memdx::hello_feature::HelloFeature;
 use crate::memdx::op_auth_saslauto::SASLAuthAutoOptions;
 use crate::memdx::op_bootstrap::BootstrapOptions;
 use crate::memdx::request::{GetErrorMapRequest, HelloRequest, SelectBucketRequest};
 use crate::service_type::ServiceType;
+use crate::tls_config::TlsConfig;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub(crate) struct KvClientConfig {
     pub address: SocketAddr,
     pub tls: Option<TlsConfig>,
@@ -43,7 +42,6 @@ impl PartialEq for KvClientConfig {
     fn eq(&self, other: &Self) -> bool {
         // TODO: compare root certs or something somehow.
         self.address == other.address
-            && self.tls == other.tls
             && self.client_name == other.client_name
             && self.selected_bucket == other.selected_bucket
             && self.disable_default_features == other.disable_default_features
@@ -279,7 +277,6 @@ where
 
         // TODO: compare root certs or something somehow.
         if !(current_config.address == config.address
-            && current_config.tls == config.tls
             && current_config.client_name == config.client_name
             && current_config.disable_default_features == config.disable_default_features
             && current_config.disable_error_map == config.disable_error_map
