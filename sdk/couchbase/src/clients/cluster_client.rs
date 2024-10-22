@@ -2,9 +2,9 @@ use crate::clients::bucket_client::{
     BucketClient, BucketClientBackend, Couchbase2BucketClient, CouchbaseBucketClient,
 };
 use crate::clients::query_client::{CouchbaseQueryClient, QueryClient, QueryClientBackend};
-use crate::connstr::{parse, resolve, Address, SrvRecord};
 use crate::error;
 use crate::options::cluster_options::ClusterOptions;
+use couchbase_connstr::{parse, resolve, Address, SrvRecord};
 use couchbase_core::ondemand_agentmanager::{OnDemandAgentManager, OnDemandAgentManagerOptions};
 use std::collections::HashMap;
 use std::sync::Arc;

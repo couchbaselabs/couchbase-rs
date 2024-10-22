@@ -17,4 +17,4 @@ jobs:
           git: https://github.com/devinr528/cargo-sort
           tag: v1.0.9
       - name: Run cargo sort
-        run: cargo sort -c -g sdk/couchbase-core/Cargo.toml sdk/protostellar/Cargo.toml
+        run: cargo sort -c -g -w
