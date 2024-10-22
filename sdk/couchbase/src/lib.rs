@@ -1,6 +1,7 @@
 extern crate core;
 
 pub mod bucket;
+mod capella_ca;
 mod clients;
 pub mod cluster;
 pub mod collection;

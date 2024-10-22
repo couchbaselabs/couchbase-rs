@@ -18,9 +18,14 @@ typed-builder = "0.20.0"
 url = "2.5.2"
 urlencoding = "2.1.3"
 uuid = { version = "1.10.0", features = ["v4"] }
+webpki-roots = "0.26"
 
 couchbase_connstr = { path = "../couchbase-connstr" }
-couchbase_core = { path = "../couchbase-core" }
+couchbase_core = { path = "../couchbase-core", default-features = false }
+rustls-pemfile = { version = "2.2", optional = true }
+
+tokio-native-tls = { version = "0.3", optional = true }
+tokio-rustls = { version = "0.26.0", optional = true }
 
 [dev-dependencies]
 chrono = "0.4"
@@ -31,6 +36,10 @@ serde_yaml = "0.9"
 tokio = "1.40"
 
 [features]
+default = ["default-tls", "binary-transcoder"]
+default-tls = ["rustls-tls"]
+rustls-tls = ["dep:tokio-rustls", "couchbase_core/rustls-tls", "dep:rustls-pemfile"]
+native-tls = ["dep:tokio-native-tls", "couchbase_core/native-tls"]
 binary-transcoder = ["serde-binary"]
 
 [lints.rust]

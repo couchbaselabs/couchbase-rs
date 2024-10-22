@@ -94,7 +94,7 @@ impl CouchbaseClusterBackend {
         opts: ClusterOptions,
         extra_opts: HashMap<String, Vec<String>>,
     ) -> error::Result<CouchbaseClusterBackend> {
-        let mut opts: OnDemandAgentManagerOptions = opts.into();
+        let mut opts: OnDemandAgentManagerOptions = opts.try_into()?;
 
         if opts.tls_config.is_some() && !use_ssl {
             return Err(error::Error {
