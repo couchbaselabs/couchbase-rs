@@ -45,6 +45,8 @@ chrono = "0.4.38"
 env_logger = "0.11"
 envconfig = "0.10"
 
+couchbase_connstr = { path = "../couchbase-connstr" }
+
 [features]
 dhat-heap = ["dhat"]
 

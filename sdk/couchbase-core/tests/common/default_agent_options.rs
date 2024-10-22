@@ -13,17 +13,21 @@ pub fn create_default_options() -> AgentOptions {
     let config = guard.clone().unwrap();
     drop(guard);
 
-    // #[cfg(feature = "native-tls")]
-    // let tls_config = {
-    //     let mut builder = tokio_native_tls::native_tls::TlsConnector::builder();
-    //     builder.danger_accept_invalid_certs(true);
-    //     builder.build().unwrap()
-    // };
-    // #[cfg(feature = "rustls-tls")]
-    // let tls_config = get_rustls_config();
+    let tls_config = if config.use_ssl {
+        #[cfg(feature = "native-tls")]
+        {
+            let mut builder = tokio_native_tls::native_tls::TlsConnector::builder();
+            builder.danger_accept_invalid_certs(true);
+            Some(builder.build().unwrap())
+        }
+        #[cfg(all(feature = "rustls-tls", not(feature = "native-tls")))]
+        Some(get_rustls_config())
+    } else {
+        None
+    };
 
     AgentOptions::builder()
-        .tls_config(None)
+        .tls_config(tls_config)
         .authenticator(Authenticator::PasswordAuthenticator(
             PasswordAuthenticator {
                 username: config.username.clone(),
@@ -45,8 +49,21 @@ pub fn create_options_without_bucket() -> AgentOptions {
     let config = guard.clone().unwrap();
     drop(guard);
 
+    let tls_config = if config.use_ssl {
+        #[cfg(feature = "native-tls")]
+        {
+            let mut builder = tokio_native_tls::native_tls::TlsConnector::builder();
+            builder.danger_accept_invalid_certs(true);
+            Some(builder.build().unwrap())
+        }
+        #[cfg(all(feature = "rustls-tls", not(feature = "native-tls")))]
+        Some(get_rustls_config())
+    } else {
+        None
+    };
+
     AgentOptions::builder()
-        .tls_config(None)
+        .tls_config(tls_config)
         .authenticator(Authenticator::PasswordAuthenticator(
             PasswordAuthenticator {
                 username: config.username.clone(),
