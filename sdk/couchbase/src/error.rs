@@ -20,3 +20,11 @@ impl From<serde_json::Error> for Error {
         }
     }
 }
+
+impl From<couchbase_connstr::error::Error> for Error {
+    fn from(value: couchbase_connstr::error::Error) -> Self {
+        Self {
+            msg: value.to_string(),
+        }
+    }
+}

@@ -1,6 +1,9 @@
-use crate::error;
+pub mod error;
+
+use error::ErrorKind;
 use regex::Regex;
 use std::collections::HashMap;
+use std::fmt;
 use std::fmt::{Display, Formatter};
 use url::form_urlencoded;
 
@@ -8,12 +11,6 @@ pub const DEFAULT_LEGACY_HTTP_PORT: u16 = 8091;
 pub const DEFAULT_MEMD_PORT: u16 = 11210;
 pub const DEFAULT_SSL_MEMD_PORT: u16 = 11207;
 pub const DEFAULT_COUCHBASE2_PORT: u16 = 18098;
-
-#[derive(Debug, Clone, PartialEq)]
-enum Scheme {
-    Couchbase,
-    Couchbase2,
-}
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ConnSpec {
@@ -29,7 +26,7 @@ pub struct Address {
 }
 
 impl Display for Address {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}:{}", self.host, self.port)
     }
 }
@@ -75,7 +72,7 @@ impl ConnSpec {
 }
 
 impl Display for ConnSpec {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let scheme = self
             .scheme
             .clone()
@@ -136,9 +133,10 @@ pub fn parse(conn_str: impl AsRef<str>) -> error::Result<ConnSpec> {
                 };
 
                 if let Some(port) = host_info.get(5) {
-                    address.port = Some(port.as_str().parse().map_err(|e| error::Error {
-                        msg: format!("Failed to parse port: {}", e),
-                    })?);
+                    address.port =
+                        Some(port.as_str().parse().map_err(|e| {
+                            ErrorKind::Parse(format!("failed to parse port: {}", e))
+                        })?);
                 }
 
                 addresses.push(address);
@@ -191,9 +189,7 @@ pub fn resolve(conn_spec: ConnSpec) -> error::Result<ResolvedConnSpec> {
             }
             "" => (DEFAULT_MEMD_PORT, false, false),
             _ => {
-                return Err(error::Error {
-                    msg: "bad scheme".to_string(),
-                });
+                return Err(ErrorKind::InvalidArgument("bad port").into());
             }
         }
     } else {
@@ -242,15 +238,11 @@ pub fn resolve(conn_spec: ConnSpec) -> error::Result<ResolvedConnSpec> {
     for address in conn_spec.hosts {
         if let Some(port) = &address.port {
             if *port == DEFAULT_LEGACY_HTTP_PORT {
-                return Err(error::Error {
-                    msg: "couchbase://host:8091 not supported for couchbase:// scheme. Use couchbase://host".to_string(),
-                });
+                return Err(ErrorKind::InvalidArgument("couchbase://host:8091 not supported for couchbase:// scheme. Use couchbase://host").into());
             }
 
             if !has_explicit_scheme && address.port != Some(default_port) {
-                return Err(error::Error {
-                    msg: "ambiguous port without scheme".to_string(),
-                });
+                return Err(ErrorKind::InvalidArgument("ambiguous port without scheme").into());
             }
 
             hosts.push(Address {
@@ -282,9 +274,10 @@ pub fn resolve(conn_spec: ConnSpec) -> error::Result<ResolvedConnSpec> {
 
 fn handle_couchbase2_scheme(conn_spec: ConnSpec) -> error::Result<ResolvedConnSpec> {
     if conn_spec.hosts.len() > 1 {
-        return Err(error::Error {
-            msg: "couchbase2 scheme can only be used with a single host".to_string(),
-        });
+        return Err(ErrorKind::InvalidArgument(
+            "couchbase2 scheme can only be used with a single host",
+        )
+        .into());
     }
 
     let host = if conn_spec.hosts.is_empty() {
@@ -320,13 +313,10 @@ fn lookup_srv(scheme: &str, proto: &str, host: &str) -> error::Result<Vec<Addres
     use hickory_resolver::config::*;
     use hickory_resolver::Resolver;
 
-    let resolver = Resolver::new(ResolverConfig::default(), ResolverOpts::default())
-        .map_err(|e| error::Error { msg: e.to_string() })?;
+    let resolver = Resolver::new(ResolverConfig::default(), ResolverOpts::default())?;
 
     let name = format!("_{}._{}.{}", scheme, proto, host);
-    let response = resolver
-        .srv_lookup(name)
-        .map_err(|e| error::Error { msg: e.to_string() })?;
+    let response = resolver.srv_lookup(name)?;
 
     Ok(response
         .iter()
@@ -343,7 +333,7 @@ fn host_is_ip_address(host: &str) -> bool {
 
 #[cfg(test)]
 mod test {
-    use crate::connstr::{
+    use crate::{
         parse, resolve, Address, ConnSpec, ConnSpecAddress, ResolvedConnSpec,
         DEFAULT_COUCHBASE2_PORT, DEFAULT_MEMD_PORT, DEFAULT_SSL_MEMD_PORT,
     };

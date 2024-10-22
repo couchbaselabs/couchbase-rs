@@ -5,7 +5,6 @@ mod clients;
 pub mod cluster;
 pub mod collection;
 pub mod collection_crud;
-pub mod connstr;
 pub mod error;
 mod mutation_state;
 pub mod options;
