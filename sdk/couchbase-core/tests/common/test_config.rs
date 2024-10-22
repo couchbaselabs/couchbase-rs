@@ -2,7 +2,7 @@ use std::io::Write;
 use std::sync::{Arc, Mutex};
 
 use envconfig::Envconfig;
-use log::LevelFilter;
+use log::{trace, LevelFilter};
 
 pub static TEST_CONFIG: Mutex<Option<Arc<TestConfig>>> = Mutex::new(None);
 
@@ -12,7 +12,7 @@ pub struct EnvTestConfig {
     pub username: String,
     #[envconfig(from = "RCBPASSWORD", default = "password")]
     pub password: String,
-    #[envconfig(from = "RCBCONNSTR", default = "192.168.107.128:11210")]
+    #[envconfig(from = "RCBCONNSTR", default = "couchbases://192.168.107.128")]
     pub conn_string: String,
     #[envconfig(from = "RCBBUCKET", default = "default")]
     pub default_bucket: String,
@@ -27,6 +27,7 @@ pub struct TestConfig {
     pub memd_addrs: Vec<String>,
     pub default_bucket: String,
     pub data_timeout: String,
+    pub use_ssl: bool,
 }
 
 pub fn setup_tests() {
@@ -50,30 +51,19 @@ pub fn setup_tests() {
         let test_config = EnvTestConfig::init_from_env().unwrap();
 
         // TODO: Once we have connection string parsing in place this should go away.
-        let mut conn_string = test_config.conn_string.replace("couchbases://", "");
-        conn_string = conn_string.replace("couchbase://", "");
-
-        let (conn_string, port) = if let Some(pos) = conn_string.find(":") {
-            let split = conn_string.split_at(pos);
-            let port_str = split.1;
-            let port_str = port_str.replace(":", "");
-            (split.0.to_string(), port_str.parse().unwrap())
-        } else {
-            (conn_string, 11210)
-        };
-
-        let memd_addrs = conn_string
-            .split(',')
-            .map(|addr| format!("{}:{}", addr, port))
-            .collect();
+        let conn_spec = couchbase_connstr::parse(test_config.conn_string).unwrap();
+        let resolved = couchbase_connstr::resolve(conn_spec).unwrap();
 
         *config = Some(Arc::new(TestConfig {
             username: test_config.username,
             password: test_config.password,
-            memd_addrs,
+            memd_addrs: resolved.memd_hosts.iter().map(|h| h.to_string()).collect(),
             default_bucket: test_config.default_bucket,
             data_timeout: test_config.data_timeout,
+            use_ssl: resolved.use_ssl,
         }));
+
+        trace!("{:?}", &config);
     }
 }
 pub fn test_username() -> String {

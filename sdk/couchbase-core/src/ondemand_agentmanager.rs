@@ -37,7 +37,7 @@ pub struct OnDemandAgentManagerOptions {
 impl From<OnDemandAgentManagerOptions> for AgentOptions {
     fn from(opts: OnDemandAgentManagerOptions) -> Self {
         AgentOptions {
-            tls_config: None,
+            tls_config: opts.tls_config,
             authenticator: opts.authenticator,
             bucket_name: None,
             connect_timeout: opts.connect_timeout,

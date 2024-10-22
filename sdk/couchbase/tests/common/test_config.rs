@@ -1,6 +1,7 @@
 use std::io::Write;
 use std::sync::{Arc, RwLock};
 
+use couchbase_connstr::ResolvedConnSpec;
 use envconfig::Envconfig;
 use log::LevelFilter;
 
@@ -12,7 +13,7 @@ pub struct EnvTestConfig {
     pub username: String,
     #[envconfig(from = "RCBPASSWORD", default = "password")]
     pub password: String,
-    #[envconfig(from = "RCBCONNSTR", default = "192.168.107.128:11210")]
+    #[envconfig(from = "RCBCONNSTR", default = "couchbases://192.168.107.128")]
     pub conn_string: String,
     #[envconfig(from = "RCBBUCKET", default = "default")]
     pub default_bucket: String,
@@ -33,6 +34,7 @@ pub struct TestConfig {
     pub default_scope: String,
     pub default_collection: String,
     pub data_timeout: String,
+    pub resolved_conn_spec: ResolvedConnSpec,
 }
 
 pub fn setup_tests() {
@@ -55,6 +57,8 @@ pub fn setup_tests() {
             .init();
         let test_config = EnvTestConfig::init_from_env().unwrap();
 
+        let conn_spec = couchbase_connstr::parse(&test_config.conn_string).unwrap();
+
         *config = Some(Arc::new(TestConfig {
             username: test_config.username,
             password: test_config.password,
@@ -63,6 +67,7 @@ pub fn setup_tests() {
             default_scope: test_config.default_scope,
             default_collection: test_config.default_collection,
             data_timeout: test_config.data_timeout,
+            resolved_conn_spec: couchbase_connstr::resolve(conn_spec).unwrap(),
         }));
     }
 }
