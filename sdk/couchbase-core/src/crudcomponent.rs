@@ -4,17 +4,29 @@ use std::sync::Arc;
 
 use futures::{FutureExt, TryFutureExt};
 
-use crate::collectionresolver::{CollectionResolver, orchestrate_memd_collection_id};
+use crate::collectionresolver::{orchestrate_memd_collection_id, CollectionResolver};
 use crate::compressionmanager::{CompressionManager, Compressor};
-use crate::crudoptions::{AddOptions, AppendOptions, DecrementOptions, DeleteOptions, GetAndLockOptions, GetAndTouchOptions, GetOptions, IncrementOptions, PrependOptions, ReplaceOptions, TouchOptions, UnlockOptions, UpsertOptions};
-use crate::crudresults::{AddResult, AppendResult, DecrementResult, DeleteResult, GetAndLockResult, GetAndTouchResult, GetResult, IncrementResult, PrependResult, ReplaceResult, TouchResult, UnlockResult, UpsertResult};
+use crate::crudoptions::{
+    AddOptions, AppendOptions, DecrementOptions, DeleteOptions, GetAndLockOptions,
+    GetAndTouchOptions, GetMetaOptions, GetOptions, IncrementOptions, PrependOptions,
+    ReplaceOptions, TouchOptions, UnlockOptions, UpsertOptions,
+};
+use crate::crudresults::{
+    AddResult, AppendResult, DecrementResult, DeleteResult, GetAndLockResult, GetAndTouchResult,
+    GetMetaResult, GetResult, IncrementResult, PrependResult, ReplaceResult, TouchResult,
+    UnlockResult, UpsertResult,
+};
 use crate::error::Result;
 use crate::kvclient::KvClient;
 use crate::kvclient_ops::KvClientOps;
-use crate::kvclientmanager::{KvClientManager, KvClientManagerClientType, orchestrate_memd_client};
+use crate::kvclientmanager::{orchestrate_memd_client, KvClientManager, KvClientManagerClientType};
 use crate::memdx::datatype::DataTypeFlag;
 use crate::memdx::hello_feature::HelloFeature;
-use crate::memdx::request::{AddRequest, AppendRequest, DecrementRequest, DeleteRequest, GetAndLockRequest, GetAndTouchRequest, GetRequest, IncrementRequest, PrependRequest, ReplaceRequest, SetRequest, TouchRequest, UnlockRequest};
+use crate::memdx::request::{
+    AddRequest, AppendRequest, DecrementRequest, DeleteRequest, GetAndLockRequest,
+    GetAndTouchRequest, GetMetaRequest, GetRequest, IncrementRequest, PrependRequest,
+    ReplaceRequest, SetRequest, TouchRequest, UnlockRequest,
+};
 use crate::mutationtoken::MutationToken;
 use crate::nmvbhandler::NotMyVbucketConfigHandler;
 use crate::retry::{orchestrate_retries, RetryInfo, RetryManager};
@@ -140,13 +152,43 @@ impl<
         .await
     }
 
+    pub(crate) async fn get_meta<'a>(&self, opts: GetMetaOptions<'a>) -> Result<GetMetaResult> {
+        self.orchestrate_simple_crud(
+            opts.key,
+            RetryInfo::new(true, opts.retry_strategy),
+            opts.scope_name,
+            opts.collection_name,
+            async |collection_id, _manifest_id, endpoint, vbucket_id, client| {
+                client
+                    .get_meta(GetMetaRequest {
+                        collection_id,
+                        key: opts.key,
+                        vbucket_id,
+                        on_behalf_of: None,
+                    })
+                    .map_ok(|resp| GetMetaResult {
+                        value: resp.value,
+                        datatype: resp.datatype,
+                        server_duration: resp.server_duration,
+                        expiry: resp.expiry,
+                        seq_no: resp.seq_no,
+                        cas: resp.cas,
+                        flags: resp.flags,
+                        deleted: resp.deleted,
+                    })
+                    .await
+            },
+        )
+        .await
+    }
+
     pub async fn delete<'a>(&self, opts: DeleteOptions<'a>) -> Result<DeleteResult> {
         self.orchestrate_simple_crud(
             opts.key,
             RetryInfo::new(false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
-            async |collection_id, manifest_id, endpoint, vbucket_id, client | {
+            async |collection_id, manifest_id, endpoint, vbucket_id, client| {
                 client
                     .delete(DeleteRequest {
                         collection_id,
@@ -202,8 +244,10 @@ impl<
         .await
     }
 
-
-    pub async fn get_and_touch<'a>(&self, opts: GetAndTouchOptions<'a>) -> Result<GetAndTouchResult> {
+    pub async fn get_and_touch<'a>(
+        &self,
+        opts: GetAndTouchOptions<'a>,
+    ) -> Result<GetAndTouchResult> {
         self.orchestrate_simple_crud(
             opts.key,
             RetryInfo::new(false, opts.retry_strategy),
@@ -227,7 +271,7 @@ impl<
                     .await
             },
         )
-            .await
+        .await
     }
 
     pub async fn unlock<'a>(&self, opts: UnlockOptions<'a>) -> Result<UnlockResult> {
@@ -269,9 +313,7 @@ impl<
                         expiry: opts.expiry,
                         on_behalf_of: None,
                     })
-                    .map_ok(|resp| TouchResult {
-                        cas: resp.cas
-                    })
+                    .map_ok(|resp| TouchResult { cas: resp.cas })
                     .await
             },
         )
@@ -319,7 +361,7 @@ impl<
 
                         AddResult {
                             cas: resp.cas,
-                            mutation_token
+                            mutation_token,
                         }
                     })
                     .await
@@ -420,7 +462,7 @@ impl<
 
                         AppendResult {
                             cas: resp.cas,
-                            mutation_token
+                            mutation_token,
                         }
                     })
                     .await
@@ -469,13 +511,13 @@ impl<
 
                         PrependResult {
                             cas: resp.cas,
-                            mutation_token
+                            mutation_token,
                         }
                     })
                     .await
             },
         )
-            .await
+        .await
     }
 
     pub async fn increment<'a>(&self, opts: IncrementOptions<'a>) -> Result<IncrementResult> {
@@ -507,15 +549,14 @@ impl<
                         IncrementResult {
                             cas: resp.cas,
                             value: resp.value,
-                            mutation_token
+                            mutation_token,
                         }
                     })
                     .await
             },
         )
-            .await
+        .await
     }
-
 
     pub async fn decrement<'a>(&self, opts: DecrementOptions<'a>) -> Result<DecrementResult> {
         self.orchestrate_simple_crud(
@@ -546,13 +587,13 @@ impl<
                         DecrementResult {
                             cas: resp.cas,
                             value: resp.value,
-                            mutation_token
+                            mutation_token,
                         }
                     })
                     .await
             },
         )
-            .await
+        .await
     }
 
     pub(crate) async fn orchestrate_simple_crud<Fut, Resp>(

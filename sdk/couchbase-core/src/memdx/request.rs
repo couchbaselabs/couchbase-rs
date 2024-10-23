@@ -69,6 +69,14 @@ pub struct GetRequest<'a> {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct GetMetaRequest<'a> {
+    pub collection_id: u32,
+    pub key: &'a [u8],
+    pub vbucket_id: u16,
+    pub on_behalf_of: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct DeleteRequest<'a> {
     pub collection_id: u32,
     pub key: &'a [u8],

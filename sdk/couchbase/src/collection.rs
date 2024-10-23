@@ -19,4 +19,19 @@ impl Collection {
     pub fn name(&self) -> &str {
         self.client.name()
     }
+
+    pub fn binary(&self) -> BinaryCollection {
+        BinaryCollection::new(self.core_kv_client.clone())
+    }
+}
+
+#[derive(Clone)]
+pub struct BinaryCollection {
+    pub(crate) core_kv_client: CoreKvClient,
+}
+
+impl BinaryCollection {
+    pub(crate) fn new(core_kv_client: CoreKvClient) -> Self {
+        Self { core_kv_client }
+    }
 }

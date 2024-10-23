@@ -4,12 +4,21 @@ use typed_builder::TypedBuilder;
 
 use crate::memdx::datatype::DataTypeFlag;
 use crate::memdx::durability_level::DurabilityLevel;
-use crate::retry::{DEFAULT_RETRY_STRATEGY, RetryStrategy};
-use crate::retryfailfast::FailFastRetryStrategy;
+use crate::retry::{RetryStrategy, DEFAULT_RETRY_STRATEGY};
 
 #[derive(Clone, Debug, TypedBuilder)]
 #[non_exhaustive]
 pub struct GetOptions<'a> {
+    pub key: &'a [u8],
+    pub scope_name: &'a str,
+    pub collection_name: &'a str,
+    #[builder(default=DEFAULT_RETRY_STRATEGY.clone())]
+    pub retry_strategy: Arc<dyn RetryStrategy>,
+}
+
+#[derive(Clone, Debug, TypedBuilder)]
+#[non_exhaustive]
+pub struct GetMetaOptions<'a> {
     pub key: &'a [u8],
     pub scope_name: &'a str,
     pub collection_name: &'a str,

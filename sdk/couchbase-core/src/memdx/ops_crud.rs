@@ -6,16 +6,24 @@ use bytes::{BufMut, BytesMut};
 
 use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::durability_level::{DurabilityLevel, DurabilityLevelSettings};
-use crate::memdx::error::{Error, ErrorKind, ServerError, ServerErrorKind};
 use crate::memdx::error::Result;
+use crate::memdx::error::{Error, ErrorKind, ServerError, ServerErrorKind};
 use crate::memdx::ext_frame_code::{ExtReqFrameCode, ExtResFrameCode};
 use crate::memdx::magic::Magic;
 use crate::memdx::opcode::OpCode;
 use crate::memdx::ops_core::OpsCore;
 use crate::memdx::packet::{RequestPacket, ResponsePacket};
 use crate::memdx::pendingop::StandardPendingOp;
-use crate::memdx::request::{AddRequest, AppendRequest, DecrementRequest, DeleteRequest, GetAndLockRequest, GetAndTouchRequest, GetRequest, IncrementRequest, PrependRequest, ReplaceRequest, SetRequest, TouchRequest, UnlockRequest};
-use crate::memdx::response::{AddResponse, AppendResponse, DecrementResponse, DeleteResponse, GetAndLockResponse, GetAndTouchResponse, GetResponse, IncrementResponse, PrependResponse, ReplaceResponse, SetResponse, TouchResponse, UnlockResponse};
+use crate::memdx::request::{
+    AddRequest, AppendRequest, DecrementRequest, DeleteRequest, GetAndLockRequest,
+    GetAndTouchRequest, GetMetaRequest, GetRequest, IncrementRequest, PrependRequest,
+    ReplaceRequest, SetRequest, TouchRequest, UnlockRequest,
+};
+use crate::memdx::response::{
+    AddResponse, AppendResponse, DecrementResponse, DeleteResponse, GetAndLockResponse,
+    GetAndTouchResponse, GetMetaResponse, GetResponse, IncrementResponse, PrependResponse,
+    ReplaceResponse, SetResponse, TouchResponse, UnlockResponse,
+};
 use crate::memdx::status::Status;
 
 #[derive(Debug)]
@@ -73,6 +81,7 @@ impl OpsCrud {
 
         Ok(StandardPendingOp::new(pending_op))
     }
+
     pub async fn get<'a, D>(
         &self,
         dispatcher: &D,
@@ -111,6 +120,48 @@ impl OpsCrud {
         Ok(StandardPendingOp::new(pending_op))
     }
 
+    pub async fn get_meta<'a, D>(
+        &self,
+        dispatcher: &D,
+        request: GetMetaRequest<'a>,
+    ) -> Result<StandardPendingOp<GetMetaResponse>>
+    where
+        D: Dispatcher,
+    {
+        let mut ext_frame_buf: Vec<u8> = vec![];
+        let magic =
+            self.encode_req_ext_frames(None, None, None, request.on_behalf_of, &mut ext_frame_buf)?;
+
+        let key = self.encode_collection_and_key(request.collection_id, request.key)?;
+
+        let framing_extras = if !ext_frame_buf.is_empty() {
+            Some(ext_frame_buf)
+        } else {
+            None
+        };
+
+        // This appears to be necessary to get the server to include the datatype in the response
+        // extras.
+        let extras = [2];
+
+        let packet = RequestPacket {
+            magic,
+            op_code: OpCode::GetMeta,
+            datatype: 0,
+            vbucket_id: Some(request.vbucket_id),
+            cas: None,
+            extras: Some(extras.to_vec()),
+            key: Some(key),
+            value: None,
+            framing_extras,
+            opaque: None,
+        };
+
+        let pending_op = dispatcher.dispatch(packet).await?;
+
+        Ok(StandardPendingOp::new(pending_op))
+    }
+
     pub async fn delete<'a, D>(
         &self,
         dispatcher: &D,
@@ -125,7 +176,7 @@ impl OpsCrud {
             request.durability_level_timeout,
             None,
             request.on_behalf_of,
-            &mut ext_frame_buf
+            &mut ext_frame_buf,
         )?;
 
         let framing_extras = if !ext_frame_buf.is_empty() {
@@ -237,9 +288,9 @@ impl OpsCrud {
     }
 
     pub async fn unlock<'a, D>(
-    &self,
-    dispatcher: &D,
-    request: UnlockRequest<'a>,
+        &self,
+        dispatcher: &D,
+        request: UnlockRequest<'a>,
     ) -> Result<StandardPendingOp<UnlockResponse>>
     where
         D: Dispatcher,
@@ -274,7 +325,7 @@ impl OpsCrud {
         Ok(StandardPendingOp::new(pending_op))
     }
 
-    pub async fn touch<'a, D> (
+    pub async fn touch<'a, D>(
         &self,
         dispatcher: &D,
         request: TouchRequest<'a>,

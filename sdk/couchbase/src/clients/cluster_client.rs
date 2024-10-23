@@ -4,8 +4,10 @@ use crate::clients::bucket_client::{
 use crate::clients::query_client::{CouchbaseQueryClient, QueryClient, QueryClientBackend};
 use crate::error;
 use crate::options::cluster_options::ClusterOptions;
+use crate::retry::DEFAULT_RETRY_STRATEGY;
 use couchbase_connstr::{parse, resolve, Address, SrvRecord};
 use couchbase_core::ondemand_agentmanager::{OnDemandAgentManager, OnDemandAgentManagerOptions};
+use couchbase_core::retry::RetryStrategy;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
@@ -84,6 +86,7 @@ impl ClusterClient {
 
 struct CouchbaseClusterBackend {
     agent_manager: Arc<OnDemandAgentManager>,
+    default_retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl CouchbaseClusterBackend {
@@ -94,6 +97,11 @@ impl CouchbaseClusterBackend {
         opts: ClusterOptions,
         extra_opts: HashMap<String, Vec<String>>,
     ) -> error::Result<CouchbaseClusterBackend> {
+        let default_retry_strategy = match &opts.retry_strategy {
+            Some(r) => r.clone(),
+            None => DEFAULT_RETRY_STRATEGY.clone(),
+        };
+
         let mut opts: OnDemandAgentManagerOptions = opts.try_into()?;
 
         if opts.tls_config.is_some() && !use_ssl {
@@ -114,13 +122,18 @@ impl CouchbaseClusterBackend {
 
         Ok(Self {
             agent_manager: Arc::new(mgr),
+            default_retry_strategy,
         })
     }
 
     async fn bucket(&self, name: String) -> error::Result<CouchbaseBucketClient> {
         let agent = self.agent_manager.get_bucket_agent(&name).await?;
 
-        Ok(CouchbaseBucketClient::new(agent, name))
+        Ok(CouchbaseBucketClient::new(
+            agent,
+            name,
+            self.default_retry_strategy.clone(),
+        ))
     }
 
     fn query_client(&self) -> error::Result<CouchbaseQueryClient> {

@@ -4,6 +4,8 @@ use crate::clients::collection_client::{
 };
 use crate::clients::query_client::{CouchbaseQueryClient, QueryClient, QueryClientBackend};
 use couchbase_core::agent::Agent;
+use couchbase_core::retry::RetryStrategy;
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub(crate) struct ScopeClient {
@@ -58,14 +60,21 @@ pub(crate) struct CouchbaseScopeClient {
     agent: Agent,
     bucket_name: String,
     name: String,
+    default_retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl CouchbaseScopeClient {
-    pub fn new(agent: Agent, bucket_name: String, name: String) -> Self {
+    pub fn new(
+        agent: Agent,
+        bucket_name: String,
+        name: String,
+        default_retry_strategy: Arc<dyn RetryStrategy>,
+    ) -> Self {
         Self {
             agent,
             bucket_name,
             name,
+            default_retry_strategy,
         }
     }
 
@@ -84,6 +93,7 @@ impl CouchbaseScopeClient {
                 self.bucket_name().to_string(),
                 self.name().to_string(),
                 name,
+                self.default_retry_strategy.clone(),
             ),
         ))
     }

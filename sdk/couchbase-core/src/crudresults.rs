@@ -1,4 +1,5 @@
 use crate::mutationtoken::MutationToken;
+use std::time::Duration;
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct GetResult {
@@ -6,6 +7,18 @@ pub struct GetResult {
     pub flags: u32,
     pub datatype: u8,
     pub cas: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub struct GetMetaResult {
+    pub cas: u64,
+    pub flags: u32,
+    pub value: Vec<u8>,
+    pub datatype: u8,
+    pub server_duration: Option<Duration>,
+    pub expiry: u32,
+    pub seq_no: u64,
+    pub deleted: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -37,8 +50,7 @@ pub struct GetAndTouchResult {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct UnlockResult {
-}
+pub struct UnlockResult {}
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct TouchResult {
