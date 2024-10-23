@@ -147,28 +147,29 @@ where
             Err(e) => e,
         };
 
-        let reason = error_to_retry_reason(&err);
-
-        if let Some(duration) = rs.maybe_retry(&mut retry_info, reason).await {
-            sleep(duration).await;
-        } else {
-            return Err(err);
+        if let Some(reason) = error_to_retry_reason(&err) {
+            if let Some(duration) = rs.maybe_retry(&mut retry_info, reason).await {
+                sleep(duration).await;
+                continue;
+            }
         }
+
+        return Err(err);
     }
 }
 
-pub(crate) fn error_to_retry_reason(err: &Error) -> RetryReason {
+pub(crate) fn error_to_retry_reason(err: &Error) -> Option<RetryReason> {
     match err.kind.as_ref() {
         ErrorKind::Memdx(e) => {
             if e.is_notmyvbucket_error() {
-                return RetryReason::NotMyVbucket;
+                return Some(RetryReason::NotMyVbucket);
             }
         }
         ErrorKind::InvalidVbucketMap => {
-            return RetryReason::InvalidVbucketMap;
+            return Some(RetryReason::InvalidVbucketMap);
         }
         _ => {}
     }
 
-    RetryReason::Unknown
+    None
 }

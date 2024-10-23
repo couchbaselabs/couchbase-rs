@@ -1,8 +1,6 @@
 use std::io::Cursor;
 use std::time::Duration;
 
-use byteorder::{BigEndian, ReadBytesExt};
-
 use crate::memdx::auth_mechanism::AuthMechanism;
 use crate::memdx::client_response::ClientResponse;
 use crate::memdx::error::{Error, ErrorKind, ResourceError, ServerError, ServerErrorKind};
@@ -10,6 +8,7 @@ use crate::memdx::hello_feature::HelloFeature;
 use crate::memdx::ops_core::OpsCore;
 use crate::memdx::ops_crud::{decode_res_ext_frames, OpsCrud};
 use crate::memdx::status::Status;
+use byteorder::{BigEndian, ReadBytesExt};
 
 pub trait TryFromClientResponse: Sized {
     fn try_from(resp: ClientResponse) -> Result<Self, Error>;
@@ -404,6 +403,102 @@ impl TryFromClientResponse for GetResponse {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct GetMetaResponse {
+    pub cas: u64,
+    pub flags: u32,
+    pub value: Vec<u8>,
+    pub datatype: u8,
+    pub server_duration: Option<Duration>,
+    pub expiry: u32,
+    pub seq_no: u64,
+    pub deleted: bool,
+}
+
+impl TryFromClientResponse for GetMetaResponse {
+    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+        let packet = resp.packet();
+        let status = packet.status;
+
+        if status == Status::KeyNotFound {
+            return Err(ServerError::new(
+                ServerErrorKind::KeyNotFound,
+                resp.packet(),
+                resp.local_addr(),
+                resp.peer_addr(),
+            )
+            .into());
+        } else if status != Status::Success {
+            return Err(OpsCrud::decode_common_error(
+                resp.packet(),
+                resp.local_addr(),
+                resp.peer_addr(),
+            ));
+        }
+
+        let server_duration = if let Some(f) = &packet.framing_extras {
+            decode_res_ext_frames(f)?
+        } else {
+            None
+        };
+
+        // TODO: clone
+        let value = packet.value.clone().unwrap_or_default();
+
+        if let Some(extras) = &packet.extras {
+            if extras.len() != 21 {
+                return Err(ErrorKind::Protocol {
+                    msg: "Bad extras length".to_string(),
+                }
+                .into());
+            }
+
+            let mut extras = Cursor::new(extras);
+            let deleted = extras.read_u32::<BigEndian>().map_err(|e| {
+                Error::from(ErrorKind::Protocol {
+                    msg: "Bad extras length".to_string(),
+                })
+            })?;
+            let flags = extras.read_u32::<BigEndian>().map_err(|e| {
+                Error::from(ErrorKind::Protocol {
+                    msg: "Bad extras length".to_string(),
+                })
+            })?;
+            let expiry = extras.read_u32::<BigEndian>().map_err(|e| {
+                Error::from(ErrorKind::Protocol {
+                    msg: "Bad extras length".to_string(),
+                })
+            })?;
+            let seq_no = extras.read_u64::<BigEndian>().map_err(|e| {
+                Error::from(ErrorKind::Protocol {
+                    msg: "Bad extras length".to_string(),
+                })
+            })?;
+            let datatype = extras.read_u8().map_err(|e| {
+                Error::from(ErrorKind::Protocol {
+                    msg: "Bad extras length".to_string(),
+                })
+            })?;
+
+            Ok(GetMetaResponse {
+                cas: packet.cas.unwrap_or_default(),
+                flags,
+                value,
+                datatype,
+                server_duration,
+                expiry,
+                seq_no,
+                deleted: deleted != 0,
+            })
+        } else {
+            Err(ErrorKind::Protocol {
+                msg: "Bad extras length".to_string(),
+            }
+            .into())
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct DeleteResponse {
     pub cas: u64,
     pub mutation_token: Option<MutationToken>,
@@ -422,7 +517,7 @@ impl TryFromClientResponse for DeleteResponse {
                 resp.local_addr(),
                 resp.peer_addr(),
             )
-                .into());
+            .into());
         } else if status == Status::KeyExists {
             return Err(ServerError::new(
                 ServerErrorKind::KeyExists,
@@ -430,7 +525,7 @@ impl TryFromClientResponse for DeleteResponse {
                 resp.local_addr(),
                 resp.peer_addr(),
             )
-                .into());
+            .into());
         } else if status == Status::Locked {
             return Err(ServerError::new(
                 ServerErrorKind::Locked,
@@ -438,7 +533,7 @@ impl TryFromClientResponse for DeleteResponse {
                 resp.local_addr(),
                 resp.peer_addr(),
             )
-                .into());
+            .into());
         } else if status != Status::Success {
             return Err(OpsCrud::decode_common_error(
                 resp.packet(),
@@ -452,7 +547,7 @@ impl TryFromClientResponse for DeleteResponse {
                 return Err(ErrorKind::Protocol {
                     msg: "Bad extras length".to_string(),
                 }
-                    .into());
+                .into());
             }
             let mut extras = Cursor::new(extras);
 
@@ -503,7 +598,7 @@ impl TryFromClientResponse for GetAndLockResponse {
                 resp.local_addr(),
                 resp.peer_addr(),
             )
-                .into());
+            .into());
         } else if status == Status::Locked {
             return Err(ServerError::new(
                 ServerErrorKind::Locked,
@@ -511,7 +606,7 @@ impl TryFromClientResponse for GetAndLockResponse {
                 resp.local_addr(),
                 resp.peer_addr(),
             )
-                .into());
+            .into());
         } else if status != Status::Success {
             return Err(OpsCrud::decode_common_error(
                 resp.packet(),
@@ -525,7 +620,7 @@ impl TryFromClientResponse for GetAndLockResponse {
                 return Err(ErrorKind::Protocol {
                     msg: "Bad extras length".to_string(),
                 }
-                    .into());
+                .into());
             }
 
             let mut extras = Cursor::new(extras);
@@ -538,7 +633,7 @@ impl TryFromClientResponse for GetAndLockResponse {
             return Err(ErrorKind::Protocol {
                 msg: "Bad extras length".to_string(),
             }
-                .into());
+            .into());
         };
 
         let server_duration = if let Some(f) = &packet.framing_extras {
@@ -581,7 +676,7 @@ impl TryFromClientResponse for GetAndTouchResponse {
                 resp.local_addr(),
                 resp.peer_addr(),
             )
-                .into());
+            .into());
         } else if status == Status::Locked {
             return Err(ServerError::new(
                 ServerErrorKind::Locked,
@@ -589,7 +684,7 @@ impl TryFromClientResponse for GetAndTouchResponse {
                 resp.local_addr(),
                 resp.peer_addr(),
             )
-                .into());
+            .into());
         } else if status != Status::Success {
             return Err(OpsCrud::decode_common_error(
                 resp.packet(),
@@ -603,7 +698,7 @@ impl TryFromClientResponse for GetAndTouchResponse {
                 return Err(ErrorKind::Protocol {
                     msg: "Bad extras length".to_string(),
                 }
-                    .into());
+                .into());
             }
 
             let mut extras = Cursor::new(extras);
@@ -616,7 +711,7 @@ impl TryFromClientResponse for GetAndTouchResponse {
             return Err(ErrorKind::Protocol {
                 msg: "Bad extras length".to_string(),
             }
-                .into());
+            .into());
         };
 
         let server_duration = if let Some(f) = &packet.framing_extras {
@@ -655,7 +750,7 @@ impl TryFromClientResponse for UnlockResponse {
                 resp.local_addr(),
                 resp.peer_addr(),
             )
-                .into());
+            .into());
         } else if status == Status::Locked {
             return Err(ServerError::new(
                 ServerErrorKind::CasMismatch,
@@ -663,7 +758,7 @@ impl TryFromClientResponse for UnlockResponse {
                 resp.local_addr(),
                 resp.peer_addr(),
             )
-                .into());
+            .into());
         } else if status == Status::NotLocked {
             return Err(ServerError::new(
                 ServerErrorKind::NotLocked,
@@ -671,9 +766,8 @@ impl TryFromClientResponse for UnlockResponse {
                 resp.local_addr(),
                 resp.peer_addr(),
             )
-                .into());
-        }
-        else if status != Status::Success {
+            .into());
+        } else if status != Status::Success {
             return Err(OpsCrud::decode_common_error(
                 resp.packet(),
                 resp.local_addr(),
@@ -687,9 +781,7 @@ impl TryFromClientResponse for UnlockResponse {
             None
         };
 
-        Ok(UnlockResponse {
-            server_duration
-        })
+        Ok(UnlockResponse { server_duration })
     }
 }
 
@@ -711,7 +803,7 @@ impl TryFromClientResponse for TouchResponse {
                 resp.local_addr(),
                 resp.peer_addr(),
             )
-                .into());
+            .into());
         } else if status == Status::Locked {
             return Err(ServerError::new(
                 ServerErrorKind::Locked,
@@ -719,7 +811,7 @@ impl TryFromClientResponse for TouchResponse {
                 resp.local_addr(),
                 resp.peer_addr(),
             )
-                .into());
+            .into());
         } else if status != Status::Success {
             return Err(OpsCrud::decode_common_error(
                 resp.packet(),
@@ -733,7 +825,7 @@ impl TryFromClientResponse for TouchResponse {
                 return Err(ErrorKind::Protocol {
                     msg: "Bad extras length".to_string(),
                 }
-                    .into());
+                .into());
             }
         }
 
@@ -745,7 +837,7 @@ impl TryFromClientResponse for TouchResponse {
 
         Ok(TouchResponse {
             cas: packet.cas.unwrap_or_default(),
-            server_duration
+            server_duration,
         })
     }
 }
@@ -769,7 +861,7 @@ impl TryFromClientResponse for AddResponse {
                 resp.local_addr(),
                 resp.peer_addr(),
             )
-                .into());
+            .into());
         } else if status == Status::KeyExists {
             return Err(ServerError::new(
                 ServerErrorKind::KeyExists,
@@ -777,7 +869,7 @@ impl TryFromClientResponse for AddResponse {
                 resp.local_addr(),
                 resp.peer_addr(),
             )
-                .into());
+            .into());
         } else if status != Status::Success {
             return Err(OpsCrud::decode_common_error(
                 resp.packet(),
@@ -791,7 +883,7 @@ impl TryFromClientResponse for AddResponse {
                 return Err(ErrorKind::Protocol {
                     msg: "Bad extras length".to_string(),
                 }
-                    .into());
+                .into());
             }
             let mut extras = Cursor::new(extras);
 
@@ -840,7 +932,7 @@ impl TryFromClientResponse for ReplaceResponse {
                 resp.local_addr(),
                 resp.peer_addr(),
             )
-                .into());
+            .into());
         } else if status == Status::KeyExists {
             return Err(ServerError::new(
                 ServerErrorKind::CasMismatch,
@@ -848,16 +940,15 @@ impl TryFromClientResponse for ReplaceResponse {
                 resp.local_addr(),
                 resp.peer_addr(),
             )
-                .into());
-        }
-        else if status == Status::KeyNotFound {
+            .into());
+        } else if status == Status::KeyNotFound {
             return Err(ServerError::new(
                 ServerErrorKind::KeyNotFound,
                 resp.packet(),
                 resp.local_addr(),
                 resp.peer_addr(),
             )
-                .into());
+            .into());
         } else if status == Status::Locked {
             return Err(ServerError::new(
                 ServerErrorKind::Locked,
@@ -865,7 +956,7 @@ impl TryFromClientResponse for ReplaceResponse {
                 resp.local_addr(),
                 resp.peer_addr(),
             )
-                .into());
+            .into());
         } else if status != Status::Success {
             return Err(OpsCrud::decode_common_error(
                 resp.packet(),
@@ -879,7 +970,7 @@ impl TryFromClientResponse for ReplaceResponse {
                 return Err(ErrorKind::Protocol {
                     msg: "Bad extras length".to_string(),
                 }
-                    .into());
+                .into());
             }
             let mut extras = Cursor::new(extras);
 
@@ -928,7 +1019,7 @@ impl TryFromClientResponse for AppendResponse {
                 resp.local_addr(),
                 resp.peer_addr(),
             )
-                .into());
+            .into());
         } else if status == Status::TooBig {
             return Err(ServerError::new(
                 ServerErrorKind::TooBig,
@@ -936,15 +1027,15 @@ impl TryFromClientResponse for AppendResponse {
                 resp.local_addr(),
                 resp.peer_addr(),
             )
-                .into());
+            .into());
         } else if status == Status::NotStored {
             return Err(ServerError::new(
-                    ServerErrorKind::KeyNotFound,
-                    resp.packet(),
-                    resp.local_addr(),
-                    resp.peer_addr(),
-                )
-                    .into());
+                ServerErrorKind::KeyNotFound,
+                resp.packet(),
+                resp.local_addr(),
+                resp.peer_addr(),
+            )
+            .into());
         } else if status == Status::Locked {
             return Err(ServerError::new(
                 ServerErrorKind::Locked,
@@ -952,7 +1043,7 @@ impl TryFromClientResponse for AppendResponse {
                 resp.local_addr(),
                 resp.peer_addr(),
             )
-                .into());
+            .into());
         } else if status != Status::Success {
             return Err(OpsCrud::decode_common_error(
                 resp.packet(),
@@ -966,7 +1057,7 @@ impl TryFromClientResponse for AppendResponse {
                 return Err(ErrorKind::Protocol {
                     msg: "Bad extras length".to_string(),
                 }
-                    .into());
+                .into());
             }
             let mut extras = Cursor::new(extras);
 
@@ -1015,7 +1106,7 @@ impl TryFromClientResponse for PrependResponse {
                 resp.local_addr(),
                 resp.peer_addr(),
             )
-                .into());
+            .into());
         } else if status == Status::TooBig {
             return Err(ServerError::new(
                 ServerErrorKind::TooBig,
@@ -1023,7 +1114,7 @@ impl TryFromClientResponse for PrependResponse {
                 resp.local_addr(),
                 resp.peer_addr(),
             )
-                .into());
+            .into());
         } else if status == Status::NotStored {
             return Err(ServerError::new(
                 ServerErrorKind::KeyNotFound,
@@ -1031,7 +1122,7 @@ impl TryFromClientResponse for PrependResponse {
                 resp.local_addr(),
                 resp.peer_addr(),
             )
-                .into());
+            .into());
         } else if status == Status::Locked {
             return Err(ServerError::new(
                 ServerErrorKind::Locked,
@@ -1039,7 +1130,7 @@ impl TryFromClientResponse for PrependResponse {
                 resp.local_addr(),
                 resp.peer_addr(),
             )
-                .into());
+            .into());
         } else if status != Status::Success {
             return Err(OpsCrud::decode_common_error(
                 resp.packet(),
@@ -1053,7 +1144,7 @@ impl TryFromClientResponse for PrependResponse {
                 return Err(ErrorKind::Protocol {
                     msg: "Bad extras length".to_string(),
                 }
-                    .into());
+                .into());
             }
             let mut extras = Cursor::new(extras);
 
@@ -1103,7 +1194,7 @@ impl TryFromClientResponse for IncrementResponse {
                 resp.local_addr(),
                 resp.peer_addr(),
             )
-                .into());
+            .into());
         } else if status == Status::Locked {
             return Err(ServerError::new(
                 ServerErrorKind::Locked,
@@ -1111,7 +1202,7 @@ impl TryFromClientResponse for IncrementResponse {
                 resp.local_addr(),
                 resp.peer_addr(),
             )
-                .into());
+            .into());
         } else if status != Status::Success {
             return Err(OpsCrud::decode_common_error(
                 resp.packet(),
@@ -1125,12 +1216,12 @@ impl TryFromClientResponse for IncrementResponse {
                 return Err(ErrorKind::Protocol {
                     msg: "Bad value length".to_string(),
                 }
-                    .into());
+                .into());
             }
             let mut val = Cursor::new(val);
 
-            val.read_u64::<BigEndian>().map_err(|e| Error::from(ErrorKind::Protocol { msg: e.to_string() }))?
-
+            val.read_u64::<BigEndian>()
+                .map_err(|e| Error::from(ErrorKind::Protocol { msg: e.to_string() }))?
         } else {
             0
         };
@@ -1140,7 +1231,7 @@ impl TryFromClientResponse for IncrementResponse {
                 return Err(ErrorKind::Protocol {
                     msg: "Bad extras length".to_string(),
                 }
-                    .into());
+                .into());
             }
             let mut extras = Cursor::new(extras);
 
@@ -1161,7 +1252,7 @@ impl TryFromClientResponse for IncrementResponse {
         } else {
             None
         };
-        
+
         Ok(IncrementResponse {
             cas: packet.cas.unwrap_or_default(),
             value,
@@ -1191,7 +1282,7 @@ impl TryFromClientResponse for DecrementResponse {
                 resp.local_addr(),
                 resp.peer_addr(),
             )
-                .into());
+            .into());
         } else if status == Status::Locked {
             return Err(ServerError::new(
                 ServerErrorKind::Locked,
@@ -1199,7 +1290,7 @@ impl TryFromClientResponse for DecrementResponse {
                 resp.local_addr(),
                 resp.peer_addr(),
             )
-                .into());
+            .into());
         } else if status != Status::Success {
             return Err(OpsCrud::decode_common_error(
                 resp.packet(),
@@ -1213,11 +1304,12 @@ impl TryFromClientResponse for DecrementResponse {
                 return Err(ErrorKind::Protocol {
                     msg: "Bad value length".to_string(),
                 }
-                    .into());
+                .into());
             }
             let mut val = Cursor::new(val);
 
-            val.read_u64::<BigEndian>().map_err(|e| Error::from(ErrorKind::Protocol { msg: e.to_string() }))?
+            val.read_u64::<BigEndian>()
+                .map_err(|e| Error::from(ErrorKind::Protocol { msg: e.to_string() }))?
         } else {
             0
         };
@@ -1227,7 +1319,7 @@ impl TryFromClientResponse for DecrementResponse {
                 return Err(ErrorKind::Protocol {
                     msg: "Bad extras length".to_string(),
                 }
-                    .into());
+                .into());
             }
             let mut extras = Cursor::new(extras);
 

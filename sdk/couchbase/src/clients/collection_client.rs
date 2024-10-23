@@ -1,7 +1,8 @@
-use crate::clients::core_kv_client::{
-    CoreKvClient, CoreKvClientBackend, Couchbase2CoreKvClient, CouchbaseCoreKvClient,
-};
+use crate::clients::core_kv_client::{CoreKvClient, CoreKvClientBackend, Couchbase2CoreKvClient};
+use crate::clients::couchbase_core_kv_client::CouchbaseCoreKvClient;
 use couchbase_core::agent::Agent;
+use couchbase_core::retry::RetryStrategy;
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub(crate) struct CollectionClient {
@@ -40,15 +41,23 @@ pub(crate) struct CouchbaseCollectionClient {
     bucket_name: String,
     scope_name: String,
     name: String,
+    default_retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl CouchbaseCollectionClient {
-    pub fn new(agent: Agent, bucket_name: String, scope_name: String, name: String) -> Self {
+    pub fn new(
+        agent: Agent,
+        bucket_name: String,
+        scope_name: String,
+        name: String,
+        default_retry_strategy: Arc<dyn RetryStrategy>,
+    ) -> Self {
         Self {
             agent,
             bucket_name,
             scope_name,
             name,
+            default_retry_strategy,
         }
     }
 
@@ -71,6 +80,7 @@ impl CouchbaseCollectionClient {
                 self.bucket_name().to_string(),
                 self.scope_name().to_string(),
                 self.name().to_string(),
+                self.default_retry_strategy.clone(),
             ),
         ))
     }

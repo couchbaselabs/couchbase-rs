@@ -10,23 +10,47 @@ use crate::memdx::ops_core::OpsCore;
 use crate::memdx::ops_crud::OpsCrud;
 use crate::memdx::ops_util::OpsUtil;
 use crate::memdx::pendingop::PendingOp;
-use crate::memdx::request::{AddRequest, AppendRequest, DecrementRequest, DeleteRequest, GetAndLockRequest, GetAndTouchRequest, GetClusterConfigRequest, GetCollectionIdRequest, GetRequest, IncrementRequest, PrependRequest, ReplaceRequest, SelectBucketRequest, SetRequest, TouchRequest, UnlockRequest};
-use crate::memdx::response::{AddResponse, AppendResponse, BootstrapResult, DecrementResponse, DeleteResponse, GetAndLockResponse, GetAndTouchResponse, GetClusterConfigResponse, GetCollectionIdResponse, GetResponse, IncrementResponse, PrependResponse, ReplaceResponse, SelectBucketResponse, SetResponse, TouchResponse, UnlockResponse};
+use crate::memdx::request::{
+    AddRequest, AppendRequest, DecrementRequest, DeleteRequest, GetAndLockRequest,
+    GetAndTouchRequest, GetClusterConfigRequest, GetCollectionIdRequest, GetMetaRequest,
+    GetRequest, IncrementRequest, PrependRequest, ReplaceRequest, SelectBucketRequest, SetRequest,
+    TouchRequest, UnlockRequest,
+};
+use crate::memdx::response::{
+    AddResponse, AppendResponse, BootstrapResult, DecrementResponse, DeleteResponse,
+    GetAndLockResponse, GetAndTouchResponse, GetClusterConfigResponse, GetCollectionIdResponse,
+    GetMetaResponse, GetResponse, IncrementResponse, PrependResponse, ReplaceResponse,
+    SelectBucketResponse, SetResponse, TouchResponse, UnlockResponse,
+};
 
 pub(crate) trait KvClientOps: Sized + Send + Sync {
     fn set(&self, req: SetRequest) -> impl Future<Output = Result<SetResponse>> + Send;
     fn get(&self, req: GetRequest) -> impl Future<Output = Result<GetResponse>> + Send;
+    fn get_meta(&self, req: GetMetaRequest)
+        -> impl Future<Output = Result<GetMetaResponse>> + Send;
     fn delete(&self, req: DeleteRequest) -> impl Future<Output = Result<DeleteResponse>> + Send;
-    fn get_and_lock(&self, req: GetAndLockRequest) -> impl Future<Output = Result<GetAndLockResponse>> + Send;
-    fn get_and_touch(&self, req: GetAndTouchRequest) -> impl Future<Output = Result<GetAndTouchResponse>> + Send;
+    fn get_and_lock(
+        &self,
+        req: GetAndLockRequest,
+    ) -> impl Future<Output = Result<GetAndLockResponse>> + Send;
+    fn get_and_touch(
+        &self,
+        req: GetAndTouchRequest,
+    ) -> impl Future<Output = Result<GetAndTouchResponse>> + Send;
     fn unlock(&self, req: UnlockRequest) -> impl Future<Output = Result<UnlockResponse>> + Send;
     fn touch(&self, req: TouchRequest) -> impl Future<Output = Result<TouchResponse>> + Send;
     fn add(&self, req: AddRequest) -> impl Future<Output = Result<AddResponse>> + Send;
     fn replace(&self, req: ReplaceRequest) -> impl Future<Output = Result<ReplaceResponse>> + Send;
     fn append(&self, req: AppendRequest) -> impl Future<Output = Result<AppendResponse>> + Send;
     fn prepend(&self, req: PrependRequest) -> impl Future<Output = Result<PrependResponse>> + Send;
-    fn increment(&self, req: IncrementRequest) -> impl Future<Output = Result<IncrementResponse>> + Send;
-    fn decrement(&self, req: DecrementRequest) -> impl Future<Output = Result<DecrementResponse>> + Send;
+    fn increment(
+        &self,
+        req: IncrementRequest,
+    ) -> impl Future<Output = Result<IncrementResponse>> + Send;
+    fn decrement(
+        &self,
+        req: DecrementRequest,
+    ) -> impl Future<Output = Result<DecrementResponse>> + Send;
     fn get_cluster_config(
         &self,
         req: GetClusterConfigRequest,
@@ -50,6 +74,13 @@ where
 
     async fn get<'a>(&self, req: GetRequest<'a>) -> Result<GetResponse> {
         let mut op = self.ops_crud().get(self.client(), req).await?;
+
+        let res = op.recv().await?;
+        Ok(res)
+    }
+
+    async fn get_meta<'a>(&self, req: GetMetaRequest<'a>) -> Result<GetMetaResponse> {
+        let mut op = self.ops_crud().get_meta(self.client(), req).await?;
 
         let res = op.recv().await?;
         Ok(res)

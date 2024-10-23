@@ -1,13 +1,13 @@
 use crate::agent::Agent;
 use crate::crudoptions::{
     AddOptions, AppendOptions, DecrementOptions, DeleteOptions, GetAndLockOptions,
-    GetAndTouchOptions, GetOptions, IncrementOptions, PrependOptions, ReplaceOptions, TouchOptions,
-    UnlockOptions, UpsertOptions,
+    GetAndTouchOptions, GetMetaOptions, GetOptions, IncrementOptions, PrependOptions,
+    ReplaceOptions, TouchOptions, UnlockOptions, UpsertOptions,
 };
 use crate::crudresults::{
     AddResult, AppendResult, DecrementResult, DeleteResult, GetAndLockResult, GetAndTouchResult,
-    GetResult, IncrementResult, PrependResult, ReplaceResult, TouchResult, UnlockResult,
-    UpsertResult,
+    GetMetaResult, GetResult, IncrementResult, PrependResult, ReplaceResult, TouchResult,
+    UnlockResult, UpsertResult,
 };
 use crate::error::Result;
 use crate::querycomponent::QueryResultStream;
@@ -20,6 +20,10 @@ impl Agent {
 
     pub async fn get<'a>(&self, opts: GetOptions<'a>) -> Result<GetResult> {
         self.inner.crud.get(opts).await
+    }
+
+    pub async fn get_meta<'a>(&self, opts: GetMetaOptions<'a>) -> Result<GetMetaResult> {
+        self.inner.crud.get_meta(opts).await
     }
 
     pub async fn delete<'a>(&self, opts: DeleteOptions<'a>) -> Result<DeleteResult> {
