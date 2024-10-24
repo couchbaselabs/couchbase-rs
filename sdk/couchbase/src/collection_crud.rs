@@ -1,6 +1,7 @@
 use crate::collection::Collection;
 use crate::results::get_result::GetResult;
-use crate::transcoder::{DefaultTranscoder, Transcoder};
+use crate::transcoding;
+use crate::transcoding::RawValue;
 use serde::Serialize;
 
 impl Collection {
@@ -9,18 +10,18 @@ impl Collection {
         id: impl Into<String>,
         value: V,
     ) -> crate::error::Result<()> {
-        self.upsert_with_transcoder(id.into(), value, &DefaultTranscoder {})
+        self.upsert_raw(id.into(), transcoding::json::encode(value)?)
             .await
     }
 
-    pub async fn upsert_with_transcoder<T: Transcoder, V: Serialize>(
+    pub async fn upsert_raw(
         &self,
         id: impl Into<String>,
-        value: V,
-        transcoder: &T,
+        value: RawValue,
     ) -> crate::error::Result<()> {
-        let (value, flags) = transcoder.encode(value)?;
-        self.core_kv_client.upsert(id.into(), value, flags).await
+        self.core_kv_client
+            .upsert(id.into(), value.content, value.flags)
+            .await
     }
 
     pub async fn get(&self, id: impl Into<String>) -> crate::error::Result<GetResult> {

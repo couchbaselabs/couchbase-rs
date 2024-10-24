@@ -1,5 +1,5 @@
-use crate::error;
-use crate::transcoder::{DefaultTranscoder, Transcoder};
+use crate::transcoding::RawValue;
+use crate::{error, transcoding};
 use bytes::Bytes;
 use serde::de::DeserializeOwned;
 
@@ -10,14 +10,15 @@ pub struct GetResult {
 
 impl GetResult {
     pub fn content_as<V: DeserializeOwned>(self) -> error::Result<V> {
-        self.content_as_with_transcoder(&DefaultTranscoder {})
+        let content = self.content_as_raw();
+        transcoding::json::decode(&content)
     }
 
-    pub fn content_as_with_transcoder<T: Transcoder, V: DeserializeOwned>(
-        &self,
-        transcoder: &T,
-    ) -> error::Result<V> {
-        transcoder.decode(&self.content, self.flags)
+    pub fn content_as_raw(self) -> RawValue {
+        RawValue {
+            content: self.content,
+            flags: self.flags,
+        }
     }
 }
 

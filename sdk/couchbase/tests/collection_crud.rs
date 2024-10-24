@@ -1,7 +1,8 @@
 use crate::common::test_config::{setup_tests, test_bucket, test_collection, test_scope};
 use crate::common::{create_cluster_from_test_config, new_key};
 use bytes::Bytes;
-use couchbase::transcoder::{DefaultTranscoder, Transcoder};
+use couchbase::transcoding;
+use couchbase::transcoding::{encode_common_flags, DataType};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
@@ -49,7 +50,7 @@ async fn test_upsert_with_transcoder() {
     let key = new_key();
 
     collection
-        .upsert_with_transcoder(&key, value, &DefaultTranscoder {})
+        .upsert_raw(&key, transcoding::json::encode(value).unwrap())
         .await
         .unwrap();
 
@@ -77,34 +78,22 @@ async fn test_upsert_with_custom_transcoder() {
     value.insert("y".to_string(), 2.0);
 
     let key = new_key();
-    let tcoder = YamlTranscoder {};
 
     collection
-        .upsert_with_transcoder(&key, value.clone(), &tcoder)
+        .upsert_raw(
+            &key,
+            transcoding::RawValue {
+                content: Bytes::from(serde_yaml::to_string(&value).unwrap()),
+                flags: encode_common_flags(DataType::Binary),
+            },
+        )
         .await
         .unwrap();
 
     let res = collection.get(key).await.unwrap();
 
-    let content: BTreeMap<String, f64> = res.content_as_with_transcoder(&tcoder).unwrap();
+    let content = res.content_as_raw();
+    let content: BTreeMap<String, f64> = serde_yaml::from_slice(&content.content).unwrap();
 
     assert_eq!(value, content);
-}
-
-struct YamlTranscoder {}
-
-impl Transcoder for YamlTranscoder {
-    fn encode<T: Serialize>(&self, value: T) -> couchbase::error::Result<(Bytes, u32)> {
-        serde_yaml::to_string(&value)
-            .map(|s| (Bytes::from(s), 0x02))
-            .map_err(|e| couchbase::error::Error { msg: e.to_string() })
-    }
-
-    fn decode<T: DeserializeOwned>(
-        &self,
-        value: &Bytes,
-        _flags: u32,
-    ) -> couchbase::error::Result<T> {
-        serde_yaml::from_slice(value).map_err(|e| couchbase::error::Error { msg: e.to_string() })
-    }
 }
