@@ -37,7 +37,7 @@ pub struct TestConfig {
     pub resolved_conn_spec: ResolvedConnSpec,
 }
 
-pub fn setup_tests() {
+pub fn setup_tests(log_level: LevelFilter) {
     let mut config = TEST_CONFIG.write().unwrap();
 
     if config.is_none() {
@@ -53,7 +53,7 @@ pub fn setup_tests() {
                     record.args()
                 )
             })
-            .filter_level(LevelFilter::Trace)
+            .filter_level(log_level)
             .init();
         let test_config = EnvTestConfig::init_from_env().unwrap();
 
