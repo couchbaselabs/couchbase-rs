@@ -4,6 +4,7 @@ use bytes::Bytes;
 use couchbase::options::kv_binary_options::{DecrementOptions, IncrementOptions};
 use couchbase::transcoding;
 use couchbase::transcoding::{encode_common_flags, DataType};
+use log::LevelFilter;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
@@ -14,7 +15,7 @@ mod common;
 
 #[tokio::test]
 async fn test_upsert() {
-    setup_tests();
+    setup_tests(LevelFilter::Trace);
 
     let cluster = create_cluster_from_test_config().await;
 
@@ -37,7 +38,7 @@ async fn test_upsert() {
 
 #[tokio::test]
 async fn test_upsert_with_transcoder() {
-    setup_tests();
+    setup_tests(LevelFilter::Trace);
 
     let cluster = create_cluster_from_test_config().await;
 
@@ -65,7 +66,7 @@ async fn test_upsert_with_transcoder() {
 
 #[tokio::test]
 async fn test_upsert_with_custom_transcoder() {
-    setup_tests();
+    setup_tests(LevelFilter::Trace);
 
     let cluster = create_cluster_from_test_config().await;
 
@@ -103,7 +104,7 @@ async fn test_upsert_with_custom_transcoder() {
 
 #[tokio::test]
 async fn test_insert() {
-    setup_tests();
+    setup_tests(LevelFilter::Trace);
 
     let cluster = create_cluster_from_test_config().await;
 
@@ -126,7 +127,7 @@ async fn test_insert() {
 
 #[tokio::test]
 async fn test_replace() {
-    setup_tests();
+    setup_tests(LevelFilter::Trace);
 
     let cluster = create_cluster_from_test_config().await;
 
@@ -153,7 +154,7 @@ async fn test_replace() {
 
 #[tokio::test]
 async fn test_remove() {
-    setup_tests();
+    setup_tests(LevelFilter::Trace);
 
     let cluster = create_cluster_from_test_config().await;
 
@@ -175,7 +176,7 @@ async fn test_remove() {
 
 #[tokio::test]
 async fn test_exists() {
-    setup_tests();
+    setup_tests(LevelFilter::Trace);
 
     let cluster = create_cluster_from_test_config().await;
 
@@ -201,7 +202,7 @@ async fn test_exists() {
 
 #[tokio::test]
 async fn test_get_and_touch() {
-    setup_tests();
+    setup_tests(LevelFilter::Trace);
 
     let cluster = create_cluster_from_test_config().await;
 
@@ -227,7 +228,7 @@ async fn test_get_and_touch() {
 
 #[tokio::test]
 async fn test_get_and_lock() {
-    setup_tests();
+    setup_tests(LevelFilter::Trace);
 
     let cluster = create_cluster_from_test_config().await;
 
@@ -253,7 +254,7 @@ async fn test_get_and_lock() {
 
 #[tokio::test]
 async fn test_unlock() {
-    setup_tests();
+    setup_tests(LevelFilter::Trace);
 
     let cluster = create_cluster_from_test_config().await;
 
@@ -277,7 +278,7 @@ async fn test_unlock() {
 
 #[tokio::test]
 async fn test_touch() {
-    setup_tests();
+    setup_tests(LevelFilter::Trace);
 
     let cluster = create_cluster_from_test_config().await;
 
@@ -299,7 +300,7 @@ async fn test_touch() {
 
 #[tokio::test]
 async fn test_append() {
-    setup_tests();
+    setup_tests(LevelFilter::Trace);
 
     let cluster = create_cluster_from_test_config().await;
 
@@ -336,7 +337,7 @@ async fn test_append() {
 
 #[tokio::test]
 async fn test_prepend() {
-    setup_tests();
+    setup_tests(LevelFilter::Trace);
 
     let cluster = create_cluster_from_test_config().await;
 
@@ -373,7 +374,7 @@ async fn test_prepend() {
 
 #[tokio::test]
 async fn test_increment() {
-    setup_tests();
+    setup_tests(LevelFilter::Trace);
 
     let cluster = create_cluster_from_test_config().await;
 
@@ -398,7 +399,7 @@ async fn test_increment() {
 
 #[tokio::test]
 async fn test_decrement() {
-    setup_tests();
+    setup_tests(LevelFilter::Trace);
 
     let cluster = create_cluster_from_test_config().await;
 

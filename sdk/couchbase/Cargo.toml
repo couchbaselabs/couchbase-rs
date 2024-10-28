@@ -28,6 +28,7 @@ tokio-rustls = { version = "0.26.0", optional = true }
 
 [dev-dependencies]
 chrono = "0.4"
+criterion = { version = "0.5.1", features = ["html_reports", "async_tokio", "async"] }
 env_logger = "0.11"
 envconfig = "0.11.0"
 serde_json = { version = "1.0", features = ["raw_value"] }
@@ -43,3 +44,14 @@ native-tls = ["dep:tokio-native-tls", "couchbase_core/native-tls"]
 [lints.rust]
 # This is temporary whilst we build out the root modules.
 unused = "allow"
+
+[lib]
+bench = false
+
+[[bench]]
+name = "collection_crud"
+harness = false
+
+[[bench]]
+name = "query"
+harness = false

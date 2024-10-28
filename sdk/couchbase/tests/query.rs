@@ -3,6 +3,7 @@ use crate::common::test_config::{setup_tests, test_bucket, test_scope};
 use couchbase::options::query_options::QueryOptions;
 use couchbase::results::query_results::{QueryMetaData, QueryStatus};
 use futures::StreamExt;
+use log::LevelFilter;
 use serde_json::value::RawValue;
 use serde_json::Value;
 
@@ -10,7 +11,7 @@ mod common;
 
 #[tokio::test]
 async fn test_query_basic() {
-    setup_tests();
+    setup_tests(LevelFilter::Trace);
 
     let cluster = create_cluster_from_test_config().await;
 
@@ -36,7 +37,7 @@ async fn test_query_basic() {
 
 #[tokio::test]
 async fn test_query_raw_result() {
-    setup_tests();
+    setup_tests(LevelFilter::Trace);
 
     let cluster = create_cluster_from_test_config().await;
 
@@ -63,7 +64,7 @@ async fn test_query_raw_result() {
 
 #[tokio::test]
 async fn test_prepared_query_basic() {
-    setup_tests();
+    setup_tests(LevelFilter::Trace);
 
     let cluster = create_cluster_from_test_config().await;
 
@@ -89,7 +90,7 @@ async fn test_prepared_query_basic() {
 
 #[tokio::test]
 async fn test_scope_query_basic() {
-    setup_tests();
+    setup_tests(LevelFilter::Trace);
 
     let cluster = create_cluster_from_test_config().await;
     let scope = cluster.bucket(test_bucket()).await.scope(test_scope());
