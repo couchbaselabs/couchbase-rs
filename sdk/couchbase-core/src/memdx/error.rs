@@ -282,6 +282,13 @@ impl Error {
             _ => false,
         }
     }
+
+    pub fn is_tmp_fail_error(&self) -> bool {
+        match self.kind.as_ref() {
+            Server(e) => e.kind == ServerErrorKind::TmpFail,
+            _ => false,
+        }
+    }
 }
 
 impl Display for CancellationErrorKind {

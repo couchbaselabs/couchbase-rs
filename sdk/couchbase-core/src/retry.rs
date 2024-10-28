@@ -22,6 +22,7 @@ lazy_static! {
 pub enum RetryReason {
     NotMyVbucket,
     InvalidVbucketMap,
+    TempFail,
     Unknown,
 }
 
@@ -30,6 +31,7 @@ impl RetryReason {
         match self {
             RetryReason::InvalidVbucketMap => true,
             RetryReason::NotMyVbucket => true,
+            RetryReason::TempFail => true,
             RetryReason::Unknown => false,
             _ => false,
         }
@@ -39,6 +41,7 @@ impl RetryReason {
         match self {
             RetryReason::InvalidVbucketMap => true,
             RetryReason::NotMyVbucket => true,
+            RetryReason::TempFail => false,
             RetryReason::Unknown => false,
             _ => false,
         }
@@ -163,6 +166,9 @@ pub(crate) fn error_to_retry_reason(err: &Error) -> Option<RetryReason> {
         ErrorKind::Memdx(e) => {
             if e.is_notmyvbucket_error() {
                 return Some(RetryReason::NotMyVbucket);
+            }
+            if e.is_tmp_fail_error() {
+                return Some(RetryReason::TempFail);
             }
         }
         ErrorKind::InvalidVbucketMap => {
