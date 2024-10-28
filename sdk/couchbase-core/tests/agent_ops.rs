@@ -8,9 +8,9 @@ use couchbase_core::crudoptions::{
     GetAndTouchOptions, GetOptions, IncrementOptions, PrependOptions, ReplaceOptions, TouchOptions,
     UnlockOptions, UpsertOptions,
 };
-use couchbase_core::memdx::error::{ErrorKind, ServerError, ServerErrorKind};
 use couchbase_core::memdx::error::ErrorKind::Server;
 use couchbase_core::memdx::error::ServerErrorKind::KeyExists;
+use couchbase_core::memdx::error::{ErrorKind, ServerError, ServerErrorKind};
 use couchbase_core::retrybesteffort::{BestEffortRetryStrategy, ExponentialBackoffCalculator};
 use couchbase_core::retryfailfast::FailFastRetryStrategy;
 
@@ -247,7 +247,7 @@ async fn test_lock_unlock() {
         .unlock(
             UnlockOptions::builder()
                 .key(key.as_slice())
-                .retry_strategy(strat.clone())
+                .retry_strategy(Arc::new(FailFastRetryStrategy::default()))
                 .scope_name("")
                 .collection_name("")
                 .cas(cas)
