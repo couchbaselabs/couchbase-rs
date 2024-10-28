@@ -88,16 +88,16 @@ impl ConfigParser {
         })
     }
 
-    fn parse_config_hostname(hostname: &str, source_hostname: &str) -> String {
-        if hostname.is_empty() {
-            return source_hostname.to_string();
-        }
+    fn parse_config_hostname(hostname: &Option<String>, source_hostname: &str) -> String {
+        if let Some(hostname) = hostname {
+            if hostname.contains(':') {
+                return format!("[{}]", hostname);
+            }
 
-        if hostname.contains(':') {
-            return format!("[{}]", hostname);
+            hostname.to_string()
+        } else {
+            source_hostname.to_string()
         }
-
-        hostname.to_string()
     }
 
     fn parse_config_hosts_into(

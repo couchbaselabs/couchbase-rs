@@ -66,7 +66,7 @@ pub struct TerseExtNodeAltAddresses {
     #[serde(alias = "ports")]
     pub ports: TerseExtNodePorts,
     #[serde(alias = "hostname")]
-    pub hostname: String,
+    pub hostname: Option<String>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -94,7 +94,7 @@ pub struct TerseNodeExtConfig {
     #[serde(alias = "thisNode")]
     pub this_node: Option<bool>,
     #[serde(alias = "hostname")]
-    pub hostname: String,
+    pub hostname: Option<String>,
     #[serde(alias = "alternateAddresses", default)]
     pub alternate_addresses: HashMap<String, TerseExtNodeAltAddresses>,
 }
