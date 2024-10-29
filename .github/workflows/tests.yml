@@ -5,7 +5,7 @@ on:
     tags:
       - v*
     branches:
-      - master
+      - nativex
   pull_request:
 
 jobs:
