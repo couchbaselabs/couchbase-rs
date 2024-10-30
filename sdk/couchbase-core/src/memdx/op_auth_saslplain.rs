@@ -2,7 +2,7 @@ use tokio::time::Instant;
 
 use crate::memdx::auth_mechanism::AuthMechanism;
 use crate::memdx::dispatcher::Dispatcher;
-use crate::memdx::error::ErrorKind;
+use crate::memdx::error;
 use crate::memdx::error::Result;
 use crate::memdx::pendingop::{run_op_future_with_deadline, StandardPendingOp};
 use crate::memdx::request::SASLAuthRequest;
@@ -64,10 +64,9 @@ impl OpsSASLAuthPlain {
             run_op_future_with_deadline(opts.deadline, encoder.sasl_auth(dispatcher, req)).await?;
 
         if resp.needs_more_steps {
-            return Err(ErrorKind::Protocol {
-                msg: "Server did not accept auth when the client expected".to_string(),
-            }
-            .into());
+            return Err(error::Error::protocol_error(
+                "Server did not accept auth when the client expected",
+            ));
         }
 
         Ok(())

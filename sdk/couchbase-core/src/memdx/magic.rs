@@ -1,6 +1,6 @@
 use std::fmt::{Debug, Display};
 
-use crate::memdx::error::{Error, ErrorKind};
+use crate::memdx::error::Error;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Magic {
@@ -45,10 +45,7 @@ impl TryFrom<u8> for Magic {
             0x08 => Magic::ReqExt,
             0x18 => Magic::ResExt,
             _ => {
-                return Err(ErrorKind::Protocol {
-                    msg: format!("unknown magic {}", value),
-                }
-                .into());
+                return Err(Error::protocol_error(format!("unknown magic {}", value)));
             }
         };
 

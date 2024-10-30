@@ -1,4 +1,4 @@
-use crate::memdx::error::{Error, ErrorKind};
+use crate::memdx::error::Error;
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum AuthMechanism {
@@ -31,10 +31,10 @@ impl TryFrom<&str> for AuthMechanism {
             "SCRAM-SHA256" => AuthMechanism::ScramSha256,
             "SCRAM-SHA512" => AuthMechanism::ScramSha512,
             _ => {
-                return Err(ErrorKind::Protocol {
-                    msg: format!("Unknown auth mechanism {}", value),
-                }
-                .into());
+                return Err(Error::protocol_error(format!(
+                    "unknown auth mechanism {}",
+                    value
+                )));
             }
         };
 

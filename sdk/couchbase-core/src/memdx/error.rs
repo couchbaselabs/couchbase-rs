@@ -1,66 +1,287 @@
+use std::backtrace::Backtrace;
 use std::error::Error as StdError;
 use std::fmt::{Display, Formatter, Pointer};
 use std::io;
 use std::net::SocketAddr;
-use std::sync::Arc;
 
 use serde::Deserialize;
 use thiserror::Error;
-use tokio::time::error::Elapsed;
 
 use crate::memdx::error;
-use crate::memdx::error::ErrorKind::Server;
 use crate::memdx::opcode::OpCode;
 use crate::memdx::packet::ResponsePacket;
 use crate::memdx::status::Status;
-use crate::scram::ScramError;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Clone, Debug, Error)]
-#[error("{kind}")]
+#[derive(Debug)]
 #[non_exhaustive]
 pub struct Error {
     /// Taken from serde_json: This `Box` allows us to keep the size of `Error` as small as possible.
     /// A larger `Error` type was substantially slower due to all the functions
     /// that pass around `Result<T, Error>`.
     pub kind: Box<ErrorKind>,
+    pub backtrace: Backtrace,
+    source: Option<Box<dyn StdError + 'static + Send + Sync>>,
 }
 
-#[derive(Clone, Debug, Error)]
+impl Error {
+    pub(crate) fn protocol_error(msg: impl Into<String>) -> Self {
+        Self {
+            kind: Box::new(ErrorKind::Protocol { msg: msg.into() }),
+            backtrace: Backtrace::capture(),
+            source: None,
+        }
+    }
+
+    pub(crate) fn protocol_error_with_source(
+        msg: impl Into<String>,
+        source: Box<dyn StdError + Send + Sync>,
+    ) -> Self {
+        Self {
+            kind: Box::new(ErrorKind::Protocol { msg: msg.into() }),
+            backtrace: Backtrace::capture(),
+            source: Some(source),
+        }
+    }
+
+    pub(crate) fn invalid_argument_error(msg: impl Into<String>, arg: impl Into<String>) -> Self {
+        Self {
+            kind: Box::new(ErrorKind::InvalidArgument {
+                msg: msg.into(),
+                arg: arg.into(),
+            }),
+            backtrace: Backtrace::capture(),
+            source: None,
+        }
+    }
+
+    pub(crate) fn invalid_argument_error_with_source(
+        msg: impl Into<String>,
+        arg: impl Into<String>,
+        source: Box<dyn StdError + Send + Sync>,
+    ) -> Self {
+        Self {
+            kind: Box::new(ErrorKind::InvalidArgument {
+                msg: msg.into(),
+                arg: arg.into(),
+            }),
+            backtrace: Backtrace::capture(),
+            source: Some(source),
+        }
+    }
+
+    pub(crate) fn connection_error(
+        reason: &str,
+        source_addr: Option<SocketAddr>,
+        remote_addr: SocketAddr,
+        source: Box<dyn StdError + Send + Sync>,
+    ) -> Self {
+        Error {
+            kind: Box::new(ErrorKind::Io {
+                msg: reason.into(),
+                source_addr,
+                remote_addr,
+            }),
+            backtrace: Backtrace::capture(),
+            source: Some(source),
+        }
+    }
+
+    pub(crate) fn dispatch_error(
+        opaque: u32,
+        op_code: OpCode,
+        source: Box<dyn StdError + Send + Sync>,
+    ) -> Self {
+        Error {
+            kind: Box::new(ErrorKind::Dispatch { opaque, op_code }),
+            backtrace: Backtrace::capture(),
+            source: Some(source),
+        }
+    }
+
+    pub(crate) fn close_error(
+        source_addr: Option<SocketAddr>,
+        remote_addr: Option<SocketAddr>,
+        source: Box<dyn StdError + Send + Sync>,
+    ) -> Self {
+        Error {
+            kind: Box::new(ErrorKind::Close {
+                source_addr,
+                remote_addr,
+            }),
+            backtrace: Backtrace::capture(),
+            source: Some(source),
+        }
+    }
+
+    pub fn has_server_config(&self) -> Option<&Vec<u8>> {
+        if let ErrorKind::Server(ServerError { config, .. }) = self.kind.as_ref() {
+            config.as_ref()
+        } else {
+            None
+        }
+    }
+
+    pub fn has_server_error_context(&self) -> Option<&Vec<u8>> {
+        if let ErrorKind::Server(ServerError { context, .. }) = self.kind.as_ref() {
+            context.as_ref()
+        } else {
+            None
+        }
+    }
+
+    pub fn is_dispatch_error(&self) -> bool {
+        matches!(self.kind.as_ref(), ErrorKind::Dispatch { .. })
+    }
+
+    pub fn is_notmyvbucket_error(&self) -> bool {
+        match self.kind.as_ref() {
+            ErrorKind::Server(e) => e.kind == ServerErrorKind::NotMyVbucket,
+            _ => false,
+        }
+    }
+
+    pub fn is_unknown_collection_id_error(&self) -> bool {
+        match self.kind.as_ref() {
+            ErrorKind::Server(e) => e.kind == ServerErrorKind::UnknownCollectionID,
+            _ => false,
+        }
+    }
+
+    pub fn is_tmp_fail_error(&self) -> bool {
+        match self.kind.as_ref() {
+            ErrorKind::Server(e) => e.kind == ServerErrorKind::TmpFail,
+            _ => false,
+        }
+    }
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        if let Some(source) = &self.source {
+            write!(f, "{}, caused by: {}", self.kind, source)
+        } else {
+            write!(f, "{}", self.kind)
+        }
+    }
+}
+
+impl StdError for Error {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        if let Some(source) = &self.source {
+            Some(source.as_ref())
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Debug)]
 #[non_exhaustive]
 pub enum ErrorKind {
-    #[error("{0:?}")]
     Server(ServerError),
-    #[error("{0:?}")]
     Resource(ResourceError),
-    #[error("Dispatch failed {0:?}")]
     #[non_exhaustive]
-    Dispatch(Arc<io::Error>),
-    #[error("Protocol error {msg}")]
+    Dispatch {
+        opaque: u32,
+        op_code: OpCode,
+    },
     #[non_exhaustive]
-    Protocol { msg: String },
-    #[error("Connect error {msg}")]
-    Connect { msg: String },
-    #[error("Request cancelled {0}")]
+    Close {
+        source_addr: Option<SocketAddr>,
+        remote_addr: Option<SocketAddr>,
+    },
+    #[non_exhaustive]
+    Protocol {
+        msg: String,
+    },
     Cancelled(CancellationErrorKind),
-    #[error("Connection closed")]
-    Closed,
-    #[error("Unknown bucket name")]
     UnknownBucketName,
-    #[error("Unknown IO error {0:?}")]
     #[non_exhaustive]
-    Io(Arc<io::Error>),
-    #[error("Invalid argument {msg}")]
+    Io {
+        msg: String,
+        source_addr: Option<SocketAddr>,
+        remote_addr: SocketAddr,
+    },
     #[non_exhaustive]
-    InvalidArgument { msg: String },
-    #[error("No supported auth mechanism was found")]
+    UnknownIo {
+        msg: String,
+    },
     #[non_exhaustive]
+    InvalidArgument {
+        msg: String,
+        arg: String,
+    },
     NoSupportedAuthMechanisms,
-    #[error("Json error {msg}")]
     #[non_exhaustive]
-    Json { msg: String },
+    Json {
+        msg: String,
+    },
 }
+
+impl Display for ErrorKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ErrorKind::Server(e) => write!(f, "{}", e),
+            ErrorKind::Resource(e) => write!(f, "{}", e),
+            ErrorKind::Dispatch { opaque, op_code } => {
+                write!(f, "Dispatch failed: opaque: {opaque}, op_code: {op_code}")
+            }
+            ErrorKind::Close {
+                source_addr,
+                remote_addr,
+            } => write!(
+                f,
+                "Close error: source address: {}, remote: {}",
+                source_addr
+                    .map(|a| a.to_string())
+                    .unwrap_or("unknown".to_string()),
+                remote_addr
+                    .map(|a| a.to_string())
+                    .unwrap_or("unknown".to_string()),
+            ),
+            ErrorKind::Protocol { msg } => {
+                write!(f, "{msg}")
+            }
+            ErrorKind::Cancelled(kind) => {
+                write!(f, "Request cancelled: {}", kind)
+            }
+            ErrorKind::UnknownBucketName => write!(f, "Unknown bucket name"),
+            ErrorKind::Io {
+                msg: reason,
+                source_addr,
+                remote_addr,
+            } => {
+                if let Some(source_addr) = source_addr {
+                    write!(
+                        f,
+                        "{} source address: {}, remote: {}",
+                        reason, source_addr, remote_addr
+                    )
+                } else {
+                    write!(
+                        f,
+                        "{} unknown source address, remote: {}",
+                        reason, remote_addr
+                    )
+                }
+            }
+            ErrorKind::UnknownIo { msg } => {
+                write!(f, "Unknown IO error: {msg}")
+            }
+            ErrorKind::InvalidArgument { msg, arg } => {
+                write!(f, "invalid argument: {arg}, arg: {msg}")
+            }
+            ErrorKind::NoSupportedAuthMechanisms => {
+                write!(f, "No supported auth mechanism was found")
+            }
+            ErrorKind::Json { msg } => write!(f, "Json error: {}", msg),
+        }
+    }
+}
+
+impl ErrorKind {}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -242,55 +463,6 @@ pub enum CancellationErrorKind {
     ClosedInFlight,
 }
 
-impl Error {
-    pub(crate) fn new_protocol_error(msg: &str) -> Self {
-        Self {
-            kind: Box::new(ErrorKind::Protocol { msg: msg.into() }),
-        }
-    }
-
-    pub fn has_server_config(&self) -> Option<&Vec<u8>> {
-        if let Server(ServerError { config, .. }) = self.kind.as_ref() {
-            config.as_ref()
-        } else {
-            None
-        }
-    }
-
-    pub fn has_server_error_context(&self) -> Option<&Vec<u8>> {
-        if let Server(ServerError { context, .. }) = self.kind.as_ref() {
-            context.as_ref()
-        } else {
-            None
-        }
-    }
-
-    pub fn is_dispatch_error(&self) -> bool {
-        matches!(self.kind.as_ref(), ErrorKind::Dispatch(_))
-    }
-
-    pub fn is_notmyvbucket_error(&self) -> bool {
-        match self.kind.as_ref() {
-            Server(e) => e.kind == ServerErrorKind::NotMyVbucket,
-            _ => false,
-        }
-    }
-
-    pub fn is_unknown_collection_id_error(&self) -> bool {
-        match self.kind.as_ref() {
-            Server(e) => e.kind == ServerErrorKind::UnknownCollectionID,
-            _ => false,
-        }
-    }
-
-    pub fn is_tmp_fail_error(&self) -> bool {
-        match self.kind.as_ref() {
-            Server(e) => e.kind == ServerErrorKind::TmpFail,
-            _ => false,
-        }
-    }
-}
-
 impl Display for CancellationErrorKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let txt = match self {
@@ -310,6 +482,8 @@ where
     fn from(err: E) -> Self {
         Self {
             kind: Box::new(err.into()),
+            backtrace: Backtrace::capture(),
+            source: None,
         }
     }
 }
@@ -317,29 +491,21 @@ where
 impl From<ServerError> for Error {
     fn from(value: ServerError) -> Self {
         Self {
-            kind: Box::new(Server(value)),
+            kind: Box::new(ErrorKind::Server(value)),
+            backtrace: Backtrace::capture(),
+            source: None,
         }
-    }
-}
-
-impl From<ScramError> for Error {
-    fn from(e: ScramError) -> Self {
-        ErrorKind::Protocol { msg: e.to_string() }.into()
     }
 }
 
 impl From<io::Error> for Error {
     fn from(value: io::Error) -> Self {
         Self {
-            kind: Box::new(ErrorKind::Io(Arc::new(value))),
-        }
-    }
-}
-
-impl From<Elapsed> for Error {
-    fn from(_value: Elapsed) -> Self {
-        Self {
-            kind: Box::new(ErrorKind::Cancelled(CancellationErrorKind::Timeout)),
+            kind: Box::new(ErrorKind::UnknownIo {
+                msg: value.to_string(),
+            }),
+            backtrace: Backtrace::capture(),
+            source: Some(Box::new(value)),
         }
     }
 }

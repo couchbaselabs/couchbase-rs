@@ -1,16 +1,16 @@
 use std::future::Future;
 use std::ops::{Deref, Sub};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 
 use arc_swap::ArcSwap;
 use log::debug;
 use tokio::sync::{Mutex, Notify};
-use tokio::time::{Instant, sleep};
+use tokio::time::{sleep, Instant};
 
-use crate::error::{Error, ErrorKind};
 use crate::error::Result;
+use crate::error::{Error, ErrorKind};
 use crate::kvclient::{KvClient, KvClientConfig, KvClientOptions, OnKvClientCloseHandler};
 use crate::kvclient_ops::KvClientOps;
 use crate::memdx::dispatcher::{Dispatcher, OrphanResponseHandler};
@@ -167,6 +167,7 @@ where
                 if let Some(client) = guard.start_new_client::<K>().await {
                     if self.closed.load(Ordering::SeqCst) {
                         client.close().await.unwrap_or_default();
+                        return;
                     }
 
                     clients.push(Arc::new(client));

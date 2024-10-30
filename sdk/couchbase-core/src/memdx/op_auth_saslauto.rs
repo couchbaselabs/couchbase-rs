@@ -4,6 +4,7 @@ use tokio::time::Instant;
 
 use crate::memdx::auth_mechanism::AuthMechanism;
 use crate::memdx::dispatcher::Dispatcher;
+use crate::memdx::error;
 use crate::memdx::error::CancellationErrorKind::{RequestCancelled, Timeout};
 use crate::memdx::error::ErrorKind;
 use crate::memdx::error::Result;
@@ -51,10 +52,10 @@ impl OpsSASLAuthAuto {
         D: Dispatcher,
     {
         if opts.enabled_mechs.is_empty() {
-            return Err(ErrorKind::InvalidArgument {
-                msg: "Must specify at least one allowed authentication mechanism".to_string(),
-            }
-            .into());
+            return Err(error::Error::invalid_argument_error(
+                "no enabled mechanisms",
+                "enabled_mechanisms",
+            ));
         }
 
         let mut op = encoder
@@ -66,7 +67,7 @@ impl OpsSASLAuthAuto {
         let default_mech = opts.enabled_mechs.first().unwrap();
 
         let by_name = OpsSASLAuthByName {};
-        return match by_name
+        match by_name
             .sasl_auth_by_name(
                 encoder,
                 dispatcher,
@@ -123,6 +124,6 @@ impl OpsSASLAuthAuto {
                     )
                     .await
             }
-        };
+        }
     }
 }

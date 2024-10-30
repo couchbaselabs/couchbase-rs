@@ -1,17 +1,16 @@
-use hmac::Hmac;
-use sha1::Sha1;
-use sha2::{Sha256, Sha512};
+use hmac::digest::{Digest, KeyInit};
+use hmac::Mac;
 use tokio::time::Instant;
 
 use crate::memdx::auth_mechanism::AuthMechanism;
 use crate::memdx::dispatcher::Dispatcher;
-use crate::memdx::error::ErrorKind;
+use crate::memdx::error::Error;
 use crate::memdx::error::Result;
 use crate::memdx::op_auth_saslplain::OpSASLPlainEncoder;
 use crate::memdx::pendingop::{run_op_future_with_deadline, StandardPendingOp};
 use crate::memdx::request::{SASLAuthRequest, SASLStepRequest};
 use crate::memdx::response::SASLStepResponse;
-use crate::scram;
+use crate::scram::Client;
 
 pub trait OpSASLScramEncoder: OpSASLPlainEncoder {
     fn sasl_step<D>(
@@ -25,43 +24,36 @@ pub trait OpSASLScramEncoder: OpSASLPlainEncoder {
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct SASLAuthScramOptions {
-    pub username: String,
-    pub password: String,
-    // pub hash: SASLAuthScramHash,
     deadline: Instant,
 }
 
 impl SASLAuthScramOptions {
-    pub fn new(username: String, password: String, deadline: Instant) -> Self {
-        Self {
-            username,
-            password,
-            // hash,
-            deadline,
-        }
+    pub fn new(deadline: Instant) -> Self {
+        Self { deadline }
     }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct OpsSASLAuthScram {}
 
-// TODO: this is ugly, but I can't work out how to be generic over the digest algorithm.
 impl OpsSASLAuthScram {
-    pub async fn sasl_auth_scram_512<E, D>(
+    pub async fn sasl_auth_scram<E, D, Di, H>(
         &self,
         encoder: &E,
         dispatcher: &D,
+        mut client: Client<Di, H>,
         opts: SASLAuthScramOptions,
     ) -> Result<()>
     where
         E: OpSASLScramEncoder,
         D: Dispatcher,
+        Di: Mac + KeyInit,
+        H: Digest,
     {
-        let mut client =
-            scram::Client::<Hmac<Sha512>, Sha512>::new(opts.username, opts.password, None);
-
         // Perform the initial SASL step
-        let payload = client.step1()?;
+        let payload = client.step1().map_err(|e| {
+            Error::protocol_error_with_source("failed to perform step1", Box::new(e))
+        })?;
 
         let req = SASLAuthRequest {
             payload,
@@ -75,7 +67,9 @@ impl OpsSASLAuthScram {
             return Ok(());
         }
 
-        let payload = client.step2(resp.payload.as_slice())?;
+        let payload = client.step2(resp.payload.as_slice()).map_err(|e| {
+            Error::protocol_error_with_source("failed to perform step2", Box::new(e))
+        })?;
 
         let req = SASLStepRequest {
             payload,
@@ -86,105 +80,9 @@ impl OpsSASLAuthScram {
             run_op_future_with_deadline(opts.deadline, encoder.sasl_step(dispatcher, req)).await?;
 
         if resp.needs_more_steps {
-            return Err(ErrorKind::Protocol {
-                msg: "Server did not accept auth when the client expected".to_string(),
-            }
-            .into());
-        }
-
-        Ok(())
-    }
-
-    pub async fn sasl_auth_scram_256<E, D>(
-        &self,
-        encoder: &E,
-        dispatcher: &D,
-        opts: SASLAuthScramOptions,
-    ) -> Result<()>
-    where
-        E: OpSASLScramEncoder,
-        D: Dispatcher,
-    {
-        let mut client =
-            scram::Client::<Hmac<Sha256>, Sha256>::new(opts.username, opts.password, None);
-
-        // Perform the initial SASL step
-        let payload = client.step1()?;
-
-        let req = SASLAuthRequest {
-            payload,
-            auth_mechanism: AuthMechanism::ScramSha256,
-        };
-
-        let resp =
-            run_op_future_with_deadline(opts.deadline, encoder.sasl_auth(dispatcher, req)).await?;
-
-        if !resp.needs_more_steps {
-            return Ok(());
-        }
-
-        let payload = client.step2(resp.payload.as_slice())?;
-
-        let req = SASLStepRequest {
-            payload,
-            auth_mechanism: AuthMechanism::ScramSha256,
-        };
-
-        let resp =
-            run_op_future_with_deadline(opts.deadline, encoder.sasl_step(dispatcher, req)).await?;
-
-        if resp.needs_more_steps {
-            return Err(ErrorKind::Protocol {
-                msg: "Server did not accept auth when the client expected".to_string(),
-            }
-            .into());
-        }
-
-        Ok(())
-    }
-
-    pub async fn sasl_auth_scram_1<E, D>(
-        &self,
-        encoder: &E,
-        dispatcher: &D,
-        opts: SASLAuthScramOptions,
-    ) -> Result<()>
-    where
-        E: OpSASLScramEncoder,
-        D: Dispatcher,
-    {
-        let mut client = scram::Client::<Hmac<Sha1>, Sha1>::new(opts.username, opts.password, None);
-
-        // Perform the initial SASL step
-        let payload = client.step1()?;
-
-        let req = SASLAuthRequest {
-            payload,
-            auth_mechanism: AuthMechanism::ScramSha1,
-        };
-
-        let resp =
-            run_op_future_with_deadline(opts.deadline, encoder.sasl_auth(dispatcher, req)).await?;
-
-        if !resp.needs_more_steps {
-            return Ok(());
-        }
-
-        let payload = client.step2(resp.payload.as_slice())?;
-
-        let req = SASLStepRequest {
-            payload,
-            auth_mechanism: AuthMechanism::ScramSha1,
-        };
-
-        let resp =
-            run_op_future_with_deadline(opts.deadline, encoder.sasl_step(dispatcher, req)).await?;
-
-        if resp.needs_more_steps {
-            return Err(ErrorKind::Protocol {
-                msg: "Server did not accept auth when the client expected".to_string(),
-            }
-            .into());
+            return Err(Error::protocol_error(
+                "Server did not accept auth when the client expected",
+            ));
         }
 
         Ok(())

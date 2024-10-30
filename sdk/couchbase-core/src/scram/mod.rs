@@ -1,14 +1,14 @@
-use std::{fmt, vec};
-use std::error::Error;
-use std::marker::PhantomData;
-use std::str;
-
-use base64::Engine;
 use base64::engine::general_purpose;
+use base64::Engine;
 use hmac::digest::KeyInit;
 use hmac::Mac;
 use rand::RngCore;
 use sha2::Digest;
+use std::backtrace::Backtrace;
+use std::error::Error;
+use std::marker::PhantomData;
+use std::str;
+use std::{fmt, vec};
 
 pub struct Client<D: Mac + KeyInit, H: Digest> {
     user: String,
@@ -98,22 +98,19 @@ where
         let salt = general_purpose::STANDARD
             .decode(&fields[1][2..])
             .map_err(|e| {
-                ScramError::new(format!("Cannot decode SCRAM salt sent by server: {:?}", e))
+                ScramError::with_source("cannot decode SCRAM salt sent by server", Box::new(e))
             })?;
 
         let iter_count = str::from_utf8(&fields[2][2..])
             .map_err(|e| {
-                ScramError::new(format!(
-                    "Server sent an invalid SCRAM iteration count: {:?}",
-                    e
-                ))
+                ScramError::with_source("Server sent an invalid SCRAM iteration count", Box::new(e))
             })?
             .parse::<u32>()
             .map_err(|e| {
-                ScramError::new(format!(
-                    "Server sent an invalid SCRAM iteration count: {:?}",
-                    e
-                ))
+                ScramError::with_source(
+                    "Server sent an invalid SCRAM iteration count}",
+                    Box::new(e),
+                )
             })?;
         self.salt_password(&salt, iter_count)?;
 
@@ -157,16 +154,18 @@ where
     }
 
     fn salt_password(&mut self, salt: &[u8], iter_count: u32) -> Result<(), ScramError> {
-        let mut mac = <D as Mac>::new_from_slice(self.pass.as_bytes())
-            .map_err(|e| ScramError::new(e.to_string()))?;
+        let mut mac = <D as Mac>::new_from_slice(self.pass.as_bytes()).map_err(|e| {
+            ScramError::with_source("failed to create mac from salted password", Box::new(e))
+        })?;
         mac.update(salt);
         mac.update(&[0, 0, 0, 1]);
         let mut ui = mac.finalize().into_bytes().to_vec();
         let mut hi = ui.clone();
 
         for _ in 1..iter_count {
-            let mut mac = <D as Mac>::new_from_slice(self.pass.as_bytes())
-                .map_err(|e| ScramError::new(e.to_string()))?;
+            let mut mac = <D as Mac>::new_from_slice(self.pass.as_bytes()).map_err(|e| {
+                ScramError::with_source("failed to create mac from password", Box::new(e))
+            })?;
             mac.update(&ui);
             ui.copy_from_slice(&mac.finalize().into_bytes());
             for (i, b) in ui.iter().enumerate() {
@@ -178,12 +177,14 @@ where
     }
 
     fn server_signature(&self) -> Result<Vec<u8>, ScramError> {
-        let mut mac = <D as Mac>::new_from_slice(self.salted_pass.as_slice())
-            .map_err(|e| ScramError::new(e.to_string()))?;
+        let mut mac = <D as Mac>::new_from_slice(self.salted_pass.as_slice()).map_err(|e| {
+            ScramError::with_source("failed to create mac from salted password", Box::new(e))
+        })?;
         mac.update(b"Server Key");
         let server_key = mac.finalize().into_bytes().to_vec();
-        mac =
-            <D as Mac>::new_from_slice(&server_key).map_err(|e| ScramError::new(e.to_string()))?;
+        mac = <D as Mac>::new_from_slice(&server_key).map_err(|e| {
+            ScramError::with_source("failed to create mac from server key", Box::new(e))
+        })?;
         mac.update(&self.auth_msg);
         let server_signature = mac.finalize().into_bytes().to_vec();
         let encoded = general_purpose::STANDARD.encode(server_signature);
@@ -191,8 +192,9 @@ where
     }
 
     fn client_proof(&self) -> Result<Vec<u8>, ScramError> {
-        let mut mac = <D as Mac>::new_from_slice(self.salted_pass.as_ref())
-            .map_err(|e| ScramError::new(e.to_string()))?;
+        let mut mac = <D as Mac>::new_from_slice(self.salted_pass.as_ref()).map_err(|e| {
+            ScramError::with_source("failed to create mac from salted password", Box::new(e))
+        })?;
         mac.update(b"Client Key");
         let client_key = mac.finalize().into_bytes().to_vec();
 
@@ -200,8 +202,9 @@ where
         hash.update(&client_key);
         let stored_key = hash.finalize();
 
-        mac =
-            <D as Mac>::new_from_slice(&stored_key).map_err(|e| ScramError::new(e.to_string()))?;
+        mac = <D as Mac>::new_from_slice(&stored_key).map_err(|e| {
+            ScramError::with_source("failed to create mac from stored key", Box::new(e))
+        })?;
         mac.update(&self.auth_msg);
 
         let client_signature = mac.finalize().into_bytes().to_vec();
@@ -219,17 +222,35 @@ where
 #[derive(Debug)]
 pub struct ScramError {
     message: String,
+    source: Option<Box<dyn Error + Sync + Send>>,
+    backtrace: Backtrace,
 }
 
 impl ScramError {
-    fn new(message: String) -> Self {
-        ScramError { message }
+    fn new(message: impl Into<String>) -> Self {
+        ScramError {
+            message: message.into(),
+            source: None,
+            backtrace: Backtrace::capture(),
+        }
+    }
+
+    fn with_source(message: impl Into<String>, source: Box<dyn Error + Sync + Send>) -> Self {
+        ScramError {
+            message: message.into(),
+            source: Some(source),
+            backtrace: Backtrace::capture(),
+        }
     }
 }
 
 impl fmt::Display for ScramError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.message)
+        if let Some(source) = &self.source {
+            write!(f, "{} - {}", self.message, source)
+        } else {
+            write!(f, "{}", self.message)
+        }
     }
 }
 
