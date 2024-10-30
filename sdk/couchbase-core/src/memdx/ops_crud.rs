@@ -7,7 +7,7 @@ use bytes::{BufMut, BytesMut};
 use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::durability_level::{DurabilityLevel, DurabilityLevelSettings};
 use crate::memdx::error::Result;
-use crate::memdx::error::{Error, ErrorKind, ServerError, ServerErrorKind};
+use crate::memdx::error::{Error, ServerError, ServerErrorKind};
 use crate::memdx::ext_frame_code::{ExtReqFrameCode, ExtResFrameCode};
 use crate::memdx::magic::Magic;
 use crate::memdx::opcode::OpCode;
@@ -61,8 +61,24 @@ impl OpsCrud {
         let key = self.encode_collection_and_key(request.collection_id, request.key)?;
 
         let mut extra_buf: Vec<u8> = Vec::with_capacity(8);
-        extra_buf.write_u32::<BigEndian>(request.flags)?;
-        extra_buf.write_u32::<BigEndian>(request.expiry.unwrap_or_default())?;
+        extra_buf
+            .write_u32::<BigEndian>(request.flags)
+            .map_err(|e| {
+                Error::invalid_argument_error_with_source(
+                    "failed to write request flags",
+                    "flags",
+                    Box::new(e),
+                )
+            })?;
+        extra_buf
+            .write_u32::<BigEndian>(request.expiry.unwrap_or_default())
+            .map_err(|e| {
+                Error::invalid_argument_error_with_source(
+                    "failed to write request expiry",
+                    "expiry",
+                    Box::new(e),
+                )
+            })?;
 
         let packet = RequestPacket {
             magic,
@@ -226,7 +242,15 @@ impl OpsCrud {
         };
 
         let mut extra_buf: Vec<u8> = Vec::with_capacity(4);
-        extra_buf.write_u32::<BigEndian>(request.lock_time)?;
+        extra_buf
+            .write_u32::<BigEndian>(request.lock_time)
+            .map_err(|e| {
+                Error::invalid_argument_error_with_source(
+                    "failed to write request lock time",
+                    "lock_time",
+                    Box::new(e),
+                )
+            })?;
 
         let packet = RequestPacket {
             magic,
@@ -267,7 +291,15 @@ impl OpsCrud {
         };
 
         let mut extra_buf: Vec<u8> = Vec::with_capacity(4);
-        extra_buf.write_u32::<BigEndian>(request.expiry)?;
+        extra_buf
+            .write_u32::<BigEndian>(request.expiry)
+            .map_err(|e| {
+                Error::invalid_argument_error_with_source(
+                    "failed to write request expiry",
+                    "expiry",
+                    Box::new(e),
+                )
+            })?;
 
         let packet = RequestPacket {
             magic,
@@ -346,7 +378,15 @@ impl OpsCrud {
         };
 
         let mut extra_buf: Vec<u8> = Vec::with_capacity(4);
-        extra_buf.write_u32::<BigEndian>(request.expiry)?;
+        extra_buf
+            .write_u32::<BigEndian>(request.expiry)
+            .map_err(|e| {
+                Error::invalid_argument_error_with_source(
+                    "failed to write request expiry",
+                    "expiry",
+                    Box::new(e),
+                )
+            })?;
 
         let packet = RequestPacket {
             magic,
@@ -392,8 +432,24 @@ impl OpsCrud {
         let key = self.encode_collection_and_key(request.collection_id, request.key)?;
 
         let mut extra_buf: Vec<u8> = Vec::with_capacity(8);
-        extra_buf.write_u32::<BigEndian>(request.flags)?;
-        extra_buf.write_u32::<BigEndian>(request.expiry.unwrap_or_default())?;
+        extra_buf
+            .write_u32::<BigEndian>(request.flags)
+            .map_err(|e| {
+                Error::invalid_argument_error_with_source(
+                    "failed to write request flags",
+                    "flags",
+                    Box::new(e),
+                )
+            })?;
+        extra_buf
+            .write_u32::<BigEndian>(request.expiry.unwrap_or_default())
+            .map_err(|e| {
+                Error::invalid_argument_error_with_source(
+                    "failed to write request expiry",
+                    "expiry",
+                    Box::new(e),
+                )
+            })?;
 
         let packet = RequestPacket {
             magic,
@@ -439,8 +495,24 @@ impl OpsCrud {
         let key = self.encode_collection_and_key(request.collection_id, request.key)?;
 
         let mut extra_buf: Vec<u8> = Vec::with_capacity(8);
-        extra_buf.write_u32::<BigEndian>(request.flags)?;
-        extra_buf.write_u32::<BigEndian>(request.expiry.unwrap_or_default())?;
+        extra_buf
+            .write_u32::<BigEndian>(request.flags)
+            .map_err(|e| {
+                Error::invalid_argument_error_with_source(
+                    "failed to write request flags",
+                    "flags",
+                    Box::new(e),
+                )
+            })?;
+        extra_buf
+            .write_u32::<BigEndian>(request.expiry.unwrap_or_default())
+            .map_err(|e| {
+                Error::invalid_argument_error_with_source(
+                    "failed to write request expiry",
+                    "expiry",
+                    Box::new(e),
+                )
+            })?;
 
         let packet = RequestPacket {
             magic,
@@ -546,6 +618,48 @@ impl OpsCrud {
         Ok(StandardPendingOp::new(pending_op))
     }
 
+    fn encode_counter_values(
+        delta: Option<u64>,
+        initial: Option<u64>,
+        expiry: Option<u32>,
+    ) -> Result<Vec<u8>> {
+        let mut buf: Vec<u8> = Vec::with_capacity(20);
+        if initial.unwrap_or_default() != 0xFFFFFFFFFFFFFFFF {
+            buf.write_u64::<BigEndian>(delta.unwrap_or_default())
+                .map_err(|e| {
+                    Error::invalid_argument_error_with_source(
+                        "failed to write request delta",
+                        "delta",
+                        Box::new(e),
+                    )
+                })?;
+
+            buf.write_u64::<BigEndian>(initial.unwrap_or_default())
+                .map_err(|e| {
+                    Error::invalid_argument_error_with_source(
+                        "failed to write request intial value",
+                        "initial",
+                        Box::new(e),
+                    )
+                })?;
+
+            buf.write_u32::<BigEndian>(expiry.unwrap_or_default())
+                .map_err(|e| {
+                    Error::invalid_argument_error_with_source(
+                        "failed to write request expiry",
+                        "expiry",
+                        Box::new(e),
+                    )
+                })?;
+        } else {
+            // These are dev time issues and should never occur.
+            buf.write_u64::<BigEndian>(0x0000000000000000).unwrap();
+            buf.write_u32::<BigEndian>(0xFFFFFFFF).unwrap();
+        }
+
+        Ok(buf)
+    }
+
     pub async fn increment<'a, D>(
         &self,
         dispatcher: &D,
@@ -571,16 +685,8 @@ impl OpsCrud {
 
         let key = self.encode_collection_and_key(request.collection_id, request.key)?;
 
-        let mut extra_buf: Vec<u8> = Vec::with_capacity(20);
-        extra_buf.write_u64::<BigEndian>(request.delta.unwrap_or_default())?;
-
-        if request.initial.unwrap_or_default() != 0xFFFFFFFFFFFFFFFF {
-            extra_buf.write_u64::<BigEndian>(request.initial.unwrap_or_default())?;
-            extra_buf.write_u32::<BigEndian>(request.expiry.unwrap_or_default())?;
-        } else {
-            extra_buf.write_u64::<BigEndian>(0x0000000000000000)?;
-            extra_buf.write_u32::<BigEndian>(0xFFFFFFFF)?;
-        }
+        let extra_buf =
+            Self::encode_counter_values(request.delta, request.initial, request.expiry)?;
 
         let packet = RequestPacket {
             magic,
@@ -625,16 +731,8 @@ impl OpsCrud {
 
         let key = self.encode_collection_and_key(request.collection_id, request.key)?;
 
-        let mut extra_buf: Vec<u8> = Vec::with_capacity(20);
-        extra_buf.write_u64::<BigEndian>(request.delta.unwrap_or_default())?;
-
-        if request.initial.unwrap_or_default() != 0xFFFFFFFFFFFFFFFF {
-            extra_buf.write_u64::<BigEndian>(request.initial.unwrap_or_default())?;
-            extra_buf.write_u32::<BigEndian>(request.expiry.unwrap_or_default())?;
-        } else {
-            extra_buf.write_u64::<BigEndian>(0x0000000000000000)?;
-            extra_buf.write_u32::<BigEndian>(0xFFFFFFFF)?;
-        }
+        let extra_buf =
+            Self::encode_counter_values(request.delta, request.initial, request.expiry)?;
 
         let packet = RequestPacket {
             magic,
@@ -657,10 +755,10 @@ impl OpsCrud {
     fn encode_collection_and_key(&self, collection_id: u32, key: &[u8]) -> Result<Vec<u8>> {
         if !self.collections_enabled {
             if collection_id != 0 {
-                return Err(ErrorKind::InvalidArgument {
-                    msg: "collections are not enabled".to_string(),
-                }
-                .into());
+                return Err(Error::invalid_argument_error(
+                    "collections not enabled",
+                    "collection_id",
+                ));
             }
 
             return Ok(key.to_vec());
@@ -683,8 +781,9 @@ impl OpsCrud {
 
         if let Some(dura) = durability_level {
             if !self.durability_enabled {
-                return Err(Error::new_protocol_error(
+                return Err(Error::invalid_argument_error(
                     "Cannot use synchronous durability when its not enabled",
+                    "durability_level",
                 ));
             }
 
@@ -692,15 +791,17 @@ impl OpsCrud {
 
             append_ext_frame(ExtReqFrameCode::Durability, dura_buf, buf)?;
         } else if durability_timeout.is_some() {
-            return Err(Error::new_protocol_error(
+            return Err(Error::invalid_argument_error(
                 "Cannot encode durability timeout without durability level",
+                "durability_timeout",
             ));
         }
 
         if preserve_expiry.is_some() {
             if !self.preserve_expiry_enabled {
-                return Err(Error::new_protocol_error(
+                return Err(Error::invalid_argument_error(
                     "Cannot use preserve expiry when its not enabled",
+                    "preserve_expiry",
                 ));
             }
 
@@ -709,8 +810,9 @@ impl OpsCrud {
 
         let magic = if !buf.is_empty() {
             if !self.ext_frames_enabled {
-                return Err(Error::new_protocol_error(
+                return Err(Error::invalid_argument_error(
                     "Cannot use framing extras when its not enabled",
+                    "ext_frames_enabled",
                 ));
             }
 
@@ -770,8 +872,8 @@ pub(crate) fn decode_res_ext_frames(buf: &[u8]) -> Result<Option<Duration>> {
 
 pub fn decode_ext_frame(buf: &[u8]) -> Result<(ExtResFrameCode, &[u8], usize)> {
     if buf.is_empty() {
-        return Err(Error::new_protocol_error(
-            "Framing extras new_protocol_error error",
+        return Err(Error::protocol_error(
+            "empty value buffer when decoding ext frame",
         ));
     }
 
@@ -785,7 +887,7 @@ pub fn decode_ext_frame(buf: &[u8]) -> Result<(ExtResFrameCode, &[u8], usize)> {
 
     if u_frame_code == 15 {
         if buf.len() < buf_pos + 1 {
-            return Err(Error::new_protocol_error("Unexpected eof"));
+            return Err(Error::protocol_error("unexpected eof decoding ext frame"));
         }
 
         let frame_code_ext = buf[buf_pos];
@@ -796,7 +898,7 @@ pub fn decode_ext_frame(buf: &[u8]) -> Result<(ExtResFrameCode, &[u8], usize)> {
 
     if frame_len == 15 {
         if buf.len() < buf_pos + 1 {
-            return Err(Error::new_protocol_error("Unexpected eof"));
+            return Err(Error::protocol_error("unexpected eof decoding ext frame"));
         }
 
         let frame_len_ext = buf[buf_pos];
@@ -806,7 +908,7 @@ pub fn decode_ext_frame(buf: &[u8]) -> Result<(ExtResFrameCode, &[u8], usize)> {
 
     let u_frame_len = frame_len as usize;
     if buf.len() < buf_pos + u_frame_len {
-        return Err(Error::new_protocol_error("unexpected eof"));
+        return Err(Error::protocol_error("unexpected eof decoding ext frame"));
     }
 
     let frame_body = &buf[buf_pos..buf_pos + u_frame_len];
@@ -843,8 +945,9 @@ pub fn append_ext_frame(
         *hdr_byte_ptr = (*hdr_byte_ptr as u16 | ((u_frame_code & 0x0f) << 4)) as u8;
     } else {
         if u_frame_code - 15 >= 15 {
-            return Err(Error::new_protocol_error(
-                "Extframe code too large to encode",
+            return Err(Error::invalid_argument_error(
+                "ext frame code too large to encode",
+                "ext frame",
             ));
         }
 
@@ -893,8 +996,9 @@ fn encode_durability_ext_frame(
 
     let mut timeout_millis = timeout.as_millis();
     if timeout_millis > 65535 {
-        return Err(Error::new_protocol_error(
+        return Err(Error::invalid_argument_error(
             "Cannot encode durability timeout greater than 65535 milliseconds",
+            "durability_level_timeout",
         ));
     }
 
@@ -911,8 +1015,8 @@ fn encode_durability_ext_frame(
 
 pub(crate) fn decode_server_duration_ext_frame(mut data: &[u8]) -> Result<Duration> {
     if data.len() != 2 {
-        return Err(Error::new_protocol_error(
-            "Invalid server duration extframe length",
+        return Err(Error::protocol_error(
+            "invalid server duration ext frame length",
         ));
     }
 
@@ -939,7 +1043,5 @@ pub(crate) fn decode_durability_level_ext_frame(
         ));
     }
 
-    Err(Error::new_protocol_error(
-        "Invalid durability extframe length",
-    ))
+    Err(Error::protocol_error("invalid durability ext frame length"))
 }

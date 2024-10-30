@@ -1,12 +1,12 @@
-use std::{env, mem};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::io::empty;
 use std::net::SocketAddr;
 use std::pin::pin;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::Arc;
 use std::thread::spawn;
+use std::{env, mem};
 
 use async_trait::async_trait;
 use futures::{SinkExt, TryFutureExt};
@@ -14,9 +14,9 @@ use log::{debug, error, trace, warn};
 use snap::raw::Decoder;
 use tokio::io::{AsyncRead, AsyncWrite, Join, ReadHalf, WriteHalf};
 use tokio::select;
-use tokio::sync::{mpsc, Mutex, MutexGuard, oneshot, RwLock, Semaphore};
-use tokio::sync::mpsc::{Receiver, Sender, UnboundedReceiver, UnboundedSender};
 use tokio::sync::mpsc::unbounded_channel;
+use tokio::sync::mpsc::{Receiver, Sender, UnboundedReceiver, UnboundedSender};
+use tokio::sync::{mpsc, oneshot, Mutex, MutexGuard, RwLock, Semaphore};
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use tokio_util::codec::{FramedRead, FramedWrite};
@@ -308,14 +308,14 @@ impl Dispatcher for Client {
                 let mut map = requests.lock().await;
                 map.remove(&opaque);
 
-                Err(ErrorKind::Dispatch(Arc::new(e)).into())
+                Err(Error::dispatch_error(opaque, op_code, Box::new(e)))
             }
         }
     }
 
     async fn close(&self) -> error::Result<()> {
         if self.closed.swap(true, Ordering::SeqCst) {
-            return Err(ErrorKind::Closed.into());
+            return Ok(());
         }
 
         let mut close_err = None;
@@ -339,7 +339,11 @@ impl Dispatcher for Client {
         Self::drain_opaque_map(map).await;
 
         if let Some(e) = close_err {
-            return Err(ErrorKind::Io(Arc::new(e)).into());
+            return Err(Error::close_error(
+                self.local_addr,
+                self.peer_addr,
+                Box::new(e),
+            ));
         }
 
         Ok(())

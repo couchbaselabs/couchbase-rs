@@ -30,10 +30,7 @@ impl TryFromClientResponse for HelloResponse {
         let mut features: Vec<HelloFeature> = Vec::new();
         if let Some(value) = &packet.value {
             if value.len() % 2 != 0 {
-                return Err(ErrorKind::Protocol {
-                    msg: "invalid hello features length".into(),
-                }
-                .into());
+                return Err(Error::protocol_error("invalid hello features length"));
             }
 
             let mut cursor = Cursor::new(value);
@@ -172,7 +169,10 @@ impl TryFromClientResponse for SASLListMechsResponse {
         let mechs_list_string = match String::from_utf8(value) {
             Ok(v) => v,
             Err(e) => {
-                return Err(ErrorKind::Protocol { msg: e.to_string() }.into());
+                return Err(Error::protocol_error_with_source(
+                    "failed to parse authentication mechanism list",
+                    Box::new(e),
+                ));
             }
         };
         let mechs_list_split = mechs_list_string.split(' ');
@@ -219,10 +219,9 @@ impl TryFromClientResponse for GetClusterConfigResponse {
         let host = match resp.local_addr() {
             Some(addr) => addr.ip().to_string(),
             None => {
-                return Err(ErrorKind::Protocol {
-                    msg: "Failed to identify memd hostname for $HOST replacement".to_string(),
-                }
-                .into());
+                return Err(Error::protocol_error(
+                    "Failed to identify memd hostname for $HOST replacement",
+                ));
             }
         };
 
@@ -251,6 +250,33 @@ pub struct BootstrapResult {
 pub struct MutationToken {
     pub vbuuid: u64,
     pub seqno: u64,
+}
+
+impl TryFrom<&Vec<u8>> for MutationToken {
+    type Error = Error;
+
+    fn try_from(value: &Vec<u8>) -> Result<Self, Self::Error> {
+        if value.len() != 16 {
+            return Err(Error::protocol_error("bad extras length"));
+        }
+
+        let mut extras = Cursor::new(value);
+
+        Ok(MutationToken {
+            vbuuid: extras.read_u64::<BigEndian>().map_err(|e| {
+                Error::protocol_error_with_source(
+                    "failed to parse vbuuid for mutation token",
+                    Box::new(e),
+                )
+            })?,
+            seqno: extras.read_u64::<BigEndian>().map_err(|e| {
+                Error::protocol_error_with_source(
+                    "failed to parse seqno for mutation token",
+                    Box::new(e),
+                )
+            })?,
+        })
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -298,22 +324,7 @@ impl TryFromClientResponse for SetResponse {
         }
 
         let mutation_token = if let Some(extras) = &packet.extras {
-            if extras.len() != 16 {
-                return Err(ErrorKind::Protocol {
-                    msg: "Bad extras length".to_string(),
-                }
-                .into());
-            }
-            let mut extras = Cursor::new(extras);
-
-            Some(MutationToken {
-                vbuuid: extras
-                    .read_u64::<BigEndian>()
-                    .map_err(|e| Error::from(ErrorKind::Protocol { msg: e.to_string() }))?,
-                seqno: extras
-                    .read_u64::<BigEndian>()
-                    .map_err(|e| Error::from(ErrorKind::Protocol { msg: e.to_string() }))?,
-            })
+            Some(MutationToken::try_from(extras)?)
         } else {
             None
         };
@@ -329,6 +340,21 @@ impl TryFromClientResponse for SetResponse {
             mutation_token,
             server_duration,
         })
+    }
+}
+
+fn parse_flags(extras: &Option<Vec<u8>>) -> Result<u32, Error> {
+    if let Some(extras) = &extras {
+        if extras.len() != 4 {
+            return Err(Error::protocol_error("bad extras length reading flags"));
+        }
+
+        let mut extras = Cursor::new(extras);
+        extras.read_u32::<BigEndian>().map_err(|e| {
+            Error::protocol_error_with_source("failed to read flags from extras", Box::new(e))
+        })
+    } else {
+        Err(Error::protocol_error("no extras in response"))
     }
 }
 
@@ -362,26 +388,7 @@ impl TryFromClientResponse for GetResponse {
             ));
         }
 
-        let flags = if let Some(extras) = &packet.extras {
-            if extras.len() != 4 {
-                return Err(ErrorKind::Protocol {
-                    msg: "Bad extras length".to_string(),
-                }
-                .into());
-            }
-
-            let mut extras = Cursor::new(extras);
-            extras.read_u32::<BigEndian>().map_err(|e| {
-                Error::from(ErrorKind::Protocol {
-                    msg: "Bad extras length".to_string(),
-                })
-            })?
-        } else {
-            return Err(ErrorKind::Protocol {
-                msg: "Bad extras length".to_string(),
-            }
-            .into());
-        };
+        let flags = parse_flags(&packet.extras)?;
 
         let server_duration = if let Some(f) = &packet.framing_extras {
             decode_res_ext_frames(f)?
@@ -446,37 +453,30 @@ impl TryFromClientResponse for GetMetaResponse {
 
         if let Some(extras) = &packet.extras {
             if extras.len() != 21 {
-                return Err(ErrorKind::Protocol {
-                    msg: "Bad extras length".to_string(),
-                }
-                .into());
+                return Err(Error::protocol_error("bad extras length"));
             }
 
             let mut extras = Cursor::new(extras);
             let deleted = extras.read_u32::<BigEndian>().map_err(|e| {
-                Error::from(ErrorKind::Protocol {
-                    msg: "Bad extras length".to_string(),
-                })
+                Error::protocol_error_with_source(
+                    "failed to parse deleted from extras",
+                    Box::new(e),
+                )
             })?;
             let flags = extras.read_u32::<BigEndian>().map_err(|e| {
-                Error::from(ErrorKind::Protocol {
-                    msg: "Bad extras length".to_string(),
-                })
+                Error::protocol_error_with_source("failed to parse flags from extras", Box::new(e))
             })?;
             let expiry = extras.read_u32::<BigEndian>().map_err(|e| {
-                Error::from(ErrorKind::Protocol {
-                    msg: "Bad extras length".to_string(),
-                })
+                Error::protocol_error_with_source("failed to parse expiry from extras", Box::new(e))
             })?;
             let seq_no = extras.read_u64::<BigEndian>().map_err(|e| {
-                Error::from(ErrorKind::Protocol {
-                    msg: "Bad extras length".to_string(),
-                })
+                Error::protocol_error_with_source("failed to parse seq_no from extras", Box::new(e))
             })?;
             let datatype = extras.read_u8().map_err(|e| {
-                Error::from(ErrorKind::Protocol {
-                    msg: "Bad extras length".to_string(),
-                })
+                Error::protocol_error_with_source(
+                    "failed to parse datatype from extras",
+                    Box::new(e),
+                )
             })?;
 
             Ok(GetMetaResponse {
@@ -490,10 +490,7 @@ impl TryFromClientResponse for GetMetaResponse {
                 deleted: deleted != 0,
             })
         } else {
-            Err(ErrorKind::Protocol {
-                msg: "Bad extras length".to_string(),
-            }
-            .into())
+            Err(Error::protocol_error("no extras in response"))
         }
     }
 }
@@ -543,22 +540,7 @@ impl TryFromClientResponse for DeleteResponse {
         }
 
         let mutation_token = if let Some(extras) = &packet.extras {
-            if extras.len() != 16 {
-                return Err(ErrorKind::Protocol {
-                    msg: "Bad extras length".to_string(),
-                }
-                .into());
-            }
-            let mut extras = Cursor::new(extras);
-
-            Some(MutationToken {
-                vbuuid: extras
-                    .read_u64::<BigEndian>()
-                    .map_err(|e| Error::from(ErrorKind::Protocol { msg: e.to_string() }))?,
-                seqno: extras
-                    .read_u64::<BigEndian>()
-                    .map_err(|e| Error::from(ErrorKind::Protocol { msg: e.to_string() }))?,
-            })
+            Some(MutationToken::try_from(extras)?)
         } else {
             None
         };
@@ -615,26 +597,7 @@ impl TryFromClientResponse for GetAndLockResponse {
             ));
         }
 
-        let flags = if let Some(extras) = &packet.extras {
-            if extras.len() != 4 {
-                return Err(ErrorKind::Protocol {
-                    msg: "Bad extras length".to_string(),
-                }
-                .into());
-            }
-
-            let mut extras = Cursor::new(extras);
-            extras.read_u32::<BigEndian>().map_err(|e| {
-                Error::from(ErrorKind::Protocol {
-                    msg: "Bad extras length".to_string(),
-                })
-            })?
-        } else {
-            return Err(ErrorKind::Protocol {
-                msg: "Bad extras length".to_string(),
-            }
-            .into());
-        };
+        let flags = parse_flags(&packet.extras)?;
 
         let server_duration = if let Some(f) = &packet.framing_extras {
             decode_res_ext_frames(f)?
@@ -693,26 +656,7 @@ impl TryFromClientResponse for GetAndTouchResponse {
             ));
         }
 
-        let flags = if let Some(extras) = &packet.extras {
-            if extras.len() != 4 {
-                return Err(ErrorKind::Protocol {
-                    msg: "Bad extras length".to_string(),
-                }
-                .into());
-            }
-
-            let mut extras = Cursor::new(extras);
-            extras.read_u32::<BigEndian>().map_err(|e| {
-                Error::from(ErrorKind::Protocol {
-                    msg: "Bad extras length".to_string(),
-                })
-            })?
-        } else {
-            return Err(ErrorKind::Protocol {
-                msg: "Bad extras length".to_string(),
-            }
-            .into());
-        };
+        let flags = parse_flags(&packet.extras)?;
 
         let server_duration = if let Some(f) = &packet.framing_extras {
             decode_res_ext_frames(f)?
@@ -822,10 +766,7 @@ impl TryFromClientResponse for TouchResponse {
 
         if let Some(extras) = &packet.extras {
             if !extras.is_empty() {
-                return Err(ErrorKind::Protocol {
-                    msg: "Bad extras length".to_string(),
-                }
-                .into());
+                return Err(Error::protocol_error("bad extras length"));
             }
         }
 
@@ -879,22 +820,7 @@ impl TryFromClientResponse for AddResponse {
         }
 
         let mutation_token = if let Some(extras) = &packet.extras {
-            if extras.len() != 16 {
-                return Err(ErrorKind::Protocol {
-                    msg: "Bad extras length".to_string(),
-                }
-                .into());
-            }
-            let mut extras = Cursor::new(extras);
-
-            Some(MutationToken {
-                vbuuid: extras
-                    .read_u64::<BigEndian>()
-                    .map_err(|e| Error::from(ErrorKind::Protocol { msg: e.to_string() }))?,
-                seqno: extras
-                    .read_u64::<BigEndian>()
-                    .map_err(|e| Error::from(ErrorKind::Protocol { msg: e.to_string() }))?,
-            })
+            Some(MutationToken::try_from(extras)?)
         } else {
             None
         };
@@ -966,22 +892,7 @@ impl TryFromClientResponse for ReplaceResponse {
         }
 
         let mutation_token = if let Some(extras) = &packet.extras {
-            if extras.len() != 16 {
-                return Err(ErrorKind::Protocol {
-                    msg: "Bad extras length".to_string(),
-                }
-                .into());
-            }
-            let mut extras = Cursor::new(extras);
-
-            Some(MutationToken {
-                vbuuid: extras
-                    .read_u64::<BigEndian>()
-                    .map_err(|e| Error::from(ErrorKind::Protocol { msg: e.to_string() }))?,
-                seqno: extras
-                    .read_u64::<BigEndian>()
-                    .map_err(|e| Error::from(ErrorKind::Protocol { msg: e.to_string() }))?,
-            })
+            Some(MutationToken::try_from(extras)?)
         } else {
             None
         };
@@ -1053,22 +964,7 @@ impl TryFromClientResponse for AppendResponse {
         }
 
         let mutation_token = if let Some(extras) = &packet.extras {
-            if extras.len() != 16 {
-                return Err(ErrorKind::Protocol {
-                    msg: "Bad extras length".to_string(),
-                }
-                .into());
-            }
-            let mut extras = Cursor::new(extras);
-
-            Some(MutationToken {
-                vbuuid: extras
-                    .read_u64::<BigEndian>()
-                    .map_err(|e| Error::from(ErrorKind::Protocol { msg: e.to_string() }))?,
-                seqno: extras
-                    .read_u64::<BigEndian>()
-                    .map_err(|e| Error::from(ErrorKind::Protocol { msg: e.to_string() }))?,
-            })
+            Some(MutationToken::try_from(extras)?)
         } else {
             None
         };
@@ -1140,22 +1036,7 @@ impl TryFromClientResponse for PrependResponse {
         }
 
         let mutation_token = if let Some(extras) = &packet.extras {
-            if extras.len() != 16 {
-                return Err(ErrorKind::Protocol {
-                    msg: "Bad extras length".to_string(),
-                }
-                .into());
-            }
-            let mut extras = Cursor::new(extras);
-
-            Some(MutationToken {
-                vbuuid: extras
-                    .read_u64::<BigEndian>()
-                    .map_err(|e| Error::from(ErrorKind::Protocol { msg: e.to_string() }))?,
-                seqno: extras
-                    .read_u64::<BigEndian>()
-                    .map_err(|e| Error::from(ErrorKind::Protocol { msg: e.to_string() }))?,
-            })
+            Some(MutationToken::try_from(extras)?)
         } else {
             None
         };
@@ -1213,36 +1094,24 @@ impl TryFromClientResponse for IncrementResponse {
 
         let value = if let Some(val) = &resp.packet().value {
             if val.len() != 8 {
-                return Err(ErrorKind::Protocol {
-                    msg: "Bad value length".to_string(),
-                }
-                .into());
+                return Err(Error::protocol_error(
+                    "bad counter value length in response",
+                ));
             }
             let mut val = Cursor::new(val);
 
-            val.read_u64::<BigEndian>()
-                .map_err(|e| Error::from(ErrorKind::Protocol { msg: e.to_string() }))?
+            val.read_u64::<BigEndian>().map_err(|e| {
+                Error::protocol_error_with_source(
+                    "failed to read counter value from response",
+                    Box::new(e),
+                )
+            })?
         } else {
             0
         };
 
         let mutation_token = if let Some(extras) = &packet.extras {
-            if extras.len() != 16 {
-                return Err(ErrorKind::Protocol {
-                    msg: "Bad extras length".to_string(),
-                }
-                .into());
-            }
-            let mut extras = Cursor::new(extras);
-
-            Some(MutationToken {
-                vbuuid: extras
-                    .read_u64::<BigEndian>()
-                    .map_err(|e| Error::from(ErrorKind::Protocol { msg: e.to_string() }))?,
-                seqno: extras
-                    .read_u64::<BigEndian>()
-                    .map_err(|e| Error::from(ErrorKind::Protocol { msg: e.to_string() }))?,
-            })
+            Some(MutationToken::try_from(extras)?)
         } else {
             None
         };
@@ -1301,36 +1170,24 @@ impl TryFromClientResponse for DecrementResponse {
 
         let value = if let Some(val) = &resp.packet().value {
             if val.len() != 8 {
-                return Err(ErrorKind::Protocol {
-                    msg: "Bad value length".to_string(),
-                }
-                .into());
+                return Err(Error::protocol_error(
+                    "bad counter value length in response",
+                ));
             }
             let mut val = Cursor::new(val);
 
-            val.read_u64::<BigEndian>()
-                .map_err(|e| Error::from(ErrorKind::Protocol { msg: e.to_string() }))?
+            val.read_u64::<BigEndian>().map_err(|e| {
+                Error::protocol_error_with_source(
+                    "failed to read counter value from response",
+                    Box::new(e),
+                )
+            })?
         } else {
             0
         };
 
         let mutation_token = if let Some(extras) = &packet.extras {
-            if extras.len() != 16 {
-                return Err(ErrorKind::Protocol {
-                    msg: "Bad extras length".to_string(),
-                }
-                .into());
-            }
-            let mut extras = Cursor::new(extras);
-
-            Some(MutationToken {
-                vbuuid: extras
-                    .read_u64::<BigEndian>()
-                    .map_err(|e| Error::from(ErrorKind::Protocol { msg: e.to_string() }))?,
-                seqno: extras
-                    .read_u64::<BigEndian>()
-                    .map_err(|e| Error::from(ErrorKind::Protocol { msg: e.to_string() }))?,
-            })
+            Some(MutationToken::try_from(extras)?)
         } else {
             None
         };
@@ -1393,30 +1250,26 @@ impl TryFromClientResponse for GetCollectionIdResponse {
 
         let extras = if let Some(extras) = &packet.extras {
             if extras.len() != 12 {
-                return Err(ErrorKind::Protocol {
-                    msg: "Invalid extras length".to_string(),
-                }
-                .into());
+                return Err(Error::protocol_error("invalid extras length"));
             }
             extras
         } else {
-            return Err(ErrorKind::Protocol {
-                msg: "Invalid extras length".to_string(),
-            }
-            .into());
+            return Err(Error::protocol_error("no extras in response"));
         };
 
         let mut extras = Cursor::new(extras);
         let manifest_rev = extras.read_u64::<BigEndian>().map_err(|e| {
-            Error::from(ErrorKind::Protocol {
-                msg: "Bad extras length".to_string(),
-            })
+            Error::protocol_error_with_source(
+                "failed to read manifest rev from extras",
+                Box::new(e),
+            )
         })?;
 
         let collection_id = extras.read_u32::<BigEndian>().map_err(|e| {
-            Error::from(ErrorKind::Protocol {
-                msg: "Bad extras length".to_string(),
-            })
+            Error::protocol_error_with_source(
+                "failed to read collection id from extras",
+                Box::new(e),
+            )
         })?;
 
         Ok(GetCollectionIdResponse {

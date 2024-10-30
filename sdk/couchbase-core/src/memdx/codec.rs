@@ -3,7 +3,7 @@ use std::io;
 use tokio_util::bytes::{Buf, BufMut, BytesMut};
 use tokio_util::codec::{Decoder, Encoder};
 
-use crate::memdx::error::{Error, ErrorKind};
+use crate::memdx::error::Error;
 use crate::memdx::magic::Magic;
 use crate::memdx::opcode::OpCode;
 use crate::memdx::packet::{RequestPacket, ResponsePacket};
@@ -28,9 +28,10 @@ impl Decoder for KeyValueCodec {
         let total_body_len = match buf[8..12].try_into() {
             Ok(v) => u32::from_be_bytes(v),
             Err(e) => {
-                return Err(Error {
-                    kind: ErrorKind::Protocol { msg: e.to_string() }.into(),
-                })
+                return Err(Error::protocol_error_with_source(
+                    "failed to read total body length",
+                    Box::new(e),
+                ));
             }
         } as usize;
 

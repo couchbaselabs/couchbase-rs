@@ -1,7 +1,8 @@
-use crate::memdx::error::ErrorKind;
+use crate::memdx::error::Error;
 use crate::memdx::error::Result;
 use crate::tls_config::TlsConfig;
 use std::fmt::Debug;
+use std::io;
 use std::net::SocketAddr;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpStream;
@@ -59,15 +60,36 @@ pub struct TcpConnection {
 }
 
 impl TcpConnection {
-    pub async fn connect(addr: SocketAddr, opts: ConnectOptions) -> Result<TcpConnection> {
+    async fn tcp_stream(addr: SocketAddr, opts: &ConnectOptions) -> Result<TcpStream> {
         let remote_addr = addr.to_string();
 
-        let stream = timeout_at(opts.deadline, TcpStream::connect(remote_addr))
-            .await?
-            .map_err(|e| ErrorKind::Connect { msg: e.to_string() })?;
-        stream
-            .set_nodelay(false)
-            .map_err(|e| ErrorKind::Connect { msg: e.to_string() })?;
+        let tcp_socket = timeout_at(opts.deadline, TcpStream::connect(remote_addr))
+            .await
+            .map_err(|e| {
+                Error::connection_error(
+                    "failed to connect to server within timeout",
+                    None,
+                    addr,
+                    Box::new(io::Error::new(io::ErrorKind::TimedOut, e)),
+                )
+            })?
+            .map_err(|e| {
+                Error::connection_error("failed to connect to server", None, addr, Box::new(e))
+            })?;
+
+        tcp_socket.set_nodelay(false).map_err(|e| {
+            let local_addr = match tcp_socket.local_addr() {
+                Ok(addr) => Some(addr),
+                Err(_) => None,
+            };
+
+            Error::connection_error("failed to set tcp nodelay", local_addr, addr, Box::new(e))
+        })?;
+
+        Ok(tcp_socket)
+    }
+    pub async fn connect(addr: SocketAddr, opts: ConnectOptions) -> Result<TcpConnection> {
+        let stream = TcpConnection::tcp_stream(addr, &opts).await?;
 
         let local_addr = match stream.local_addr() {
             Ok(addr) => Some(addr),
@@ -118,20 +140,13 @@ impl TlsConnection {
         tls_config: TlsConfig,
         opts: ConnectOptions,
     ) -> Result<TlsConnection> {
-        let remote_addr = addr.to_string();
-
-        let tcp_socket = timeout_at(opts.deadline, TcpStream::connect(remote_addr))
-            .await?
-            .map_err(|e| ErrorKind::Connect { msg: e.to_string() })?;
-
-        tcp_socket
-            .set_nodelay(false)
-            .map_err(|e| ErrorKind::Connect { msg: e.to_string() })?;
+        let tcp_socket = TcpConnection::tcp_stream(addr, &opts).await?;
 
         let local_addr = match tcp_socket.local_addr() {
             Ok(addr) => Some(addr),
             Err(_) => None,
         };
+
         let peer_addr = match tcp_socket.peer_addr() {
             Ok(addr) => Some(addr),
             Err(_) => None,
@@ -143,8 +158,23 @@ impl TlsConnection {
             opts.deadline,
             connector.connect(ServerName::IpAddress(IpAddr::from(addr.ip())), tcp_socket),
         )
-        .await?
-        .map_err(|e| ErrorKind::Connect { msg: e.to_string() })?;
+        .await
+        .map_err(|e| {
+            Error::connection_error(
+                "failed to upgrade tcp stream to tls within timeout",
+                local_addr,
+                addr,
+                Box::new(io::Error::new(io::ErrorKind::TimedOut, e)),
+            )
+        })?
+        .map_err(|e| {
+            Error::connection_error(
+                "failed to upgrade tcp stream to tls",
+                local_addr,
+                addr,
+                Box::new(e),
+            )
+        })?;
 
         Ok(TlsConnection {
             stream,
@@ -159,15 +189,7 @@ impl TlsConnection {
         tls_config: TlsConfig,
         opts: ConnectOptions,
     ) -> Result<TlsConnection> {
-        let remote_addr = addr.to_string();
-
-        let tcp_socket = timeout_at(opts.deadline, TcpStream::connect(&remote_addr))
-            .await?
-            .map_err(|e| ErrorKind::Connect { msg: e.to_string() })?;
-
-        tcp_socket
-            .set_nodelay(false)
-            .map_err(|e| ErrorKind::Connect { msg: e.to_string() })?;
+        let tcp_socket = TcpConnection::tcp_stream(addr, &opts).await?;
 
         let local_addr = match tcp_socket.local_addr() {
             Ok(addr) => Some(addr),
@@ -180,12 +202,28 @@ impl TlsConnection {
 
         let tls_connector = tokio_native_tls::TlsConnector::from(tls_config);
 
+        let remote_addr = addr.to_string();
         let stream = timeout_at(
             opts.deadline,
             tls_connector.connect(&remote_addr, tcp_socket),
         )
-        .await?
-        .map_err(|e| ErrorKind::Connect { msg: e.to_string() })?;
+        .await
+        .map_err(|e| {
+            Error::connection_error(
+                "failed to upgrade tcp stream to tls within timeout",
+                local_addr,
+                addr,
+                Box::new(io::Error::new(io::ErrorKind::TimedOut, e)),
+            )
+        })?
+        .map_err(|e| {
+            Error::connection_error(
+                "failed to upgrade tcp stream to tls",
+                local_addr,
+                addr,
+                Box::new(e),
+            )
+        })?;
 
         Ok(TlsConnection {
             stream,

@@ -4,12 +4,12 @@ use std::sync::Arc;
 
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::Mutex;
-use tokio::time::{Instant, timeout_at};
+use tokio::time::{timeout_at, Instant};
 
 use crate::memdx::client::OpaqueMap;
 use crate::memdx::client_response::ClientResponse;
-use crate::memdx::error::{CancellationErrorKind, ErrorKind};
 use crate::memdx::error::Result;
+use crate::memdx::error::{CancellationErrorKind, ErrorKind};
 use crate::memdx::response::TryFromClientResponse;
 
 pub trait PendingOp<T> {
@@ -45,7 +45,7 @@ impl ClientPendingOp {
     pub async fn recv(&mut self) -> Result<ClientResponse> {
         match self.response_receiver.recv().await {
             Some(r) => r,
-            None => Err(ErrorKind::Closed.into()),
+            None => Err(ErrorKind::Cancelled(CancellationErrorKind::RequestCancelled).into()),
         }
     }
 

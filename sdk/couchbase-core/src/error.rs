@@ -1,9 +1,9 @@
-use std::fmt::Display;
-
 use crate::httpx::error::Error as HttpError;
 use crate::memdx::error::Error as MemdxError;
 use crate::queryx::error::Error as QueryError;
 use crate::service_type::ServiceType;
+use std::fmt::Display;
+use std::sync::Arc;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -11,7 +11,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[error("{kind}")]
 #[non_exhaustive]
 pub struct Error {
-    pub kind: Box<ErrorKind>,
+    pub kind: Arc<ErrorKind>,
     // #[source]
     // pub(crate) source: Option<Box<dyn StdError + 'static>>,
 }
@@ -19,7 +19,7 @@ pub struct Error {
 impl Error {
     pub(crate) fn new(kind: ErrorKind) -> Self {
         Self {
-            kind: Box::new(kind),
+            kind: Arc::new(kind),
             // source: None,
         }
     }
@@ -51,7 +51,7 @@ impl Error {
     }
 }
 
-#[derive(thiserror::Error, Debug, Clone)]
+#[derive(thiserror::Error, Debug)]
 #[non_exhaustive]
 pub enum ErrorKind {
     #[error("Vbucket map outdated")]
@@ -104,7 +104,7 @@ where
 {
     fn from(err: E) -> Self {
         Self {
-            kind: Box::new(err.into()),
+            kind: Arc::new(err.into()),
         }
     }
 }
