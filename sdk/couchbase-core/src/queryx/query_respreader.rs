@@ -38,7 +38,6 @@ pub struct QueryRespReader {
     streamer: Option<RawJsonRowStreamer>,
     early_meta_data: Option<EarlyMetaData>,
     meta_data: Option<MetaData>,
-    meta_data_error: Option<Error>,
 }
 
 impl Stream for QueryRespReader {
@@ -62,7 +61,14 @@ impl Stream for QueryRespReader {
                 vec![],
                 this.status_code,
             )))),
-            Poll::Ready(None) => Poll::Ready(None),
+            Poll::Ready(None) => {
+                let fut = this.read_final_metadata();
+                match Box::pin(fut).poll_unpin(cx) {
+                    Poll::Ready(Ok(_)) => Poll::Ready(None),
+                    Poll::Ready(Err(e)) => Poll::Ready(Some(Err(e))),
+                    Poll::Pending => Poll::Pending,
+                }
+            }
             Poll::Pending => Poll::Pending,
         }
     }
@@ -101,7 +107,7 @@ impl QueryRespReader {
                 Err(e) => {
                     return Err(Error::new_generic_error(
                             format!(
-                                "Non-200 status code received {} but parsing error response body failed {}",
+                                "non-200 status code received {} but parsing error response body failed {}",
                                 status_code,
                                 e
                             ),
@@ -144,7 +150,6 @@ impl QueryRespReader {
             streamer: Some(streamer),
             early_meta_data: None,
             meta_data: None,
-            meta_data_error: None,
         };
 
         reader.read_early_metadata().await?;
@@ -163,22 +168,16 @@ impl QueryRespReader {
         self.early_meta_data.as_ref()
     }
 
-    pub async fn metadata(mut self) -> error::Result<MetaData> {
-        self.read_final_metadata().await?;
-
-        if let Some(err) = self.meta_data_error {
-            return Err(err);
-        }
-
-        if let Some(meta) = self.meta_data {
+    pub fn metadata(&self) -> error::Result<&MetaData> {
+        if let Some(meta) = &self.meta_data {
             return Ok(meta);
         }
 
         Err(Error::new_generic_error(
             "cannot read meta-data until after all rows are read",
-            self.endpoint,
-            self.statement,
-            self.client_context_id,
+            &self.endpoint,
+            &self.statement,
+            &self.client_context_id,
         ))
     }
 

@@ -8,8 +8,8 @@ use std::fmt::Write;
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct MutationToken {
-    token: couchbase_core::mutationtoken::MutationToken,
-    bucket_name: String,
+    pub(crate) token: couchbase_core::mutationtoken::MutationToken,
+    pub(crate) bucket_name: String,
 }
 
 impl MutationToken {
@@ -93,10 +93,10 @@ impl From<MutationState> for HashMap<String, SparseScanVectors> {
             let bucket = buckets.entry(key.bucket_name.clone()).or_default();
             bucket.insert(
                 key.vbid.to_string(),
-                ScanVectorEntry {
-                    seq_no: token.seqno,
-                    vb_uuid: token.vbuuid.to_string(),
-                },
+                ScanVectorEntry::builder()
+                    .seq_no(token.seqno)
+                    .vb_uuid(token.vbuuid.to_string())
+                    .build(),
             );
         }
 

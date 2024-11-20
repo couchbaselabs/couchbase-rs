@@ -291,6 +291,13 @@ impl Dispatcher for Client {
         packet.opaque = Some(opaque);
         let op_code = packet.op_code;
 
+        trace!(
+            "Writing request on {}. Opcode={}. Opaque={}",
+            &self.client_id,
+            packet.op_code,
+            opaque,
+        );
+
         let mut writer = self.writer.lock().await;
         match writer.send(packet).await {
             Ok(_) => Ok(ClientPendingOp::new(

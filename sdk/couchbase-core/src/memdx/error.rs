@@ -22,7 +22,7 @@ pub struct Error {
     /// that pass around `Result<T, Error>`.
     pub kind: Box<ErrorKind>,
     pub backtrace: Backtrace,
-    source: Option<Box<dyn StdError + 'static + Send + Sync>>,
+    pub source: Option<Box<dyn StdError + 'static + Send + Sync>>,
 }
 
 impl Error {

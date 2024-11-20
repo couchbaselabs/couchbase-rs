@@ -1,24 +1,27 @@
-use base64::Engine;
-use base64::prelude::BASE64_STANDARD;
 use bytes::Bytes;
-use http::{HeaderMap, HeaderValue};
-use http::header::{CONTENT_TYPE, USER_AGENT};
-use http::request::Builder;
 use serde::Serialize;
+use std::collections::HashMap;
 use typed_builder::TypedBuilder;
+use uuid::Uuid;
 
 #[derive(Debug, TypedBuilder)]
-#[builder(field_defaults(default, setter(into)))]
+#[builder(field_defaults(default, setter(into)), mutators(
+        pub fn add_header(&mut self, key: impl Into<String>, value: impl Into<String>) {
+            self.headers.insert(key.into(), value.into());
+        }
+))]
 #[non_exhaustive]
 pub struct Request {
-    #[builder(setter(!strip_option))]
     pub method: http::Method,
-    #[builder(setter(!strip_option))]
     pub uri: String,
     pub auth: Option<Auth>,
     pub user_agent: Option<String>,
     pub content_type: Option<String>,
     pub body: Option<Bytes>,
+    #[builder(via_mutators, default = HashMap::new())]
+    pub headers: HashMap<String, String>,
+    #[builder(default = Uuid::new_v4().to_string())]
+    pub unique_id: String,
 }
 
 #[derive(PartialEq, Eq, Debug, Clone)]

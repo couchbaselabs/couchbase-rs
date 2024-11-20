@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::future::Future;
 use std::sync::{Arc, Mutex};
 
 use crate::authenticator::Authenticator;
@@ -48,8 +47,8 @@ impl QueryResultStream {
         self.inner.early_metadata()
     }
 
-    pub async fn metadata(self) -> error::Result<MetaData> {
-        self.inner.metadata().await.map_err(|e| e.into())
+    pub fn metadata(&self) -> error::Result<&MetaData> {
+        self.inner.metadata().map_err(|e| e.into())
     }
 }
 
@@ -103,34 +102,35 @@ impl<C: Client> QueryComponent<C> {
         let copts = opts.into();
 
         orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
-            self.orchestrate_query_endpoint(
-                endpoint.clone(),
-                async |client: Arc<C>,
-                       endpoint_id: String,
-                       endpoint: String,
-                       username: String,
-                       password: String| {
-                    let res = match (Query::<C> {
-                        http_client: client,
-                        user_agent: self.http_component.user_agent().to_string(),
-                        endpoint: endpoint.clone(),
-                        username,
-                        password,
-                    }
-                    .query(&copts)
-                    .await)
-                    {
-                        Ok(r) => r,
-                        Err(e) => return Err(ErrorKind::Query(e).into()),
-                    };
+            self.http_component
+                .orchestrate_endpoint(
+                    endpoint.clone(),
+                    async |client: Arc<C>,
+                           endpoint_id: String,
+                           endpoint: String,
+                           username: String,
+                           password: String| {
+                        let res = match (Query::<C> {
+                            http_client: client,
+                            user_agent: self.http_component.user_agent().to_string(),
+                            endpoint: endpoint.clone(),
+                            username,
+                            password,
+                        }
+                        .query(&copts)
+                        .await)
+                        {
+                            Ok(r) => r,
+                            Err(e) => return Err(ErrorKind::Query(e).into()),
+                        };
 
-                    Ok(QueryResultStream {
-                        inner: res,
-                        endpoint,
-                    })
-                },
-            )
-            .await
+                        Ok(QueryResultStream {
+                            inner: res,
+                            endpoint,
+                        })
+                    },
+                )
+                .await
         })
         .await
     }
@@ -147,82 +147,39 @@ impl<C: Client> QueryComponent<C> {
         let copts = opts.into();
 
         orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
-            self.orchestrate_query_endpoint(
-                endpoint.clone(),
-                async |client: Arc<C>,
-                       endpoint_id: String,
-                       endpoint: String,
-                       username: String,
-                       password: String| {
-                    let res = match (PreparedQuery {
-                        executor: Query::<C> {
-                            http_client: client,
-                            user_agent: self.http_component.user_agent().to_string(),
-                            endpoint: endpoint.clone(),
-                            username,
-                            password,
-                        },
-                        cache: self.prepared_cache.clone(),
-                    }
-                    .prepared_query(&copts)
-                    .await)
-                    {
-                        Ok(r) => r,
-                        Err(e) => return Err(ErrorKind::Query(e).into()),
-                    };
+            self.http_component
+                .orchestrate_endpoint(
+                    endpoint.clone(),
+                    async |client: Arc<C>,
+                           endpoint_id: String,
+                           endpoint: String,
+                           username: String,
+                           password: String| {
+                        let res = match (PreparedQuery {
+                            executor: Query::<C> {
+                                http_client: client,
+                                user_agent: self.http_component.user_agent().to_string(),
+                                endpoint: endpoint.clone(),
+                                username,
+                                password,
+                            },
+                            cache: self.prepared_cache.clone(),
+                        }
+                        .prepared_query(&copts)
+                        .await)
+                        {
+                            Ok(r) => r,
+                            Err(e) => return Err(ErrorKind::Query(e).into()),
+                        };
 
-                    Ok(QueryResultStream {
-                        inner: res,
-                        endpoint,
-                    })
-                },
-            )
-            .await
+                        Ok(QueryResultStream {
+                            inner: res,
+                            endpoint,
+                        })
+                    },
+                )
+                .await
         })
-        .await
-    }
-
-    pub(crate) async fn orchestrate_query_endpoint<Resp, Fut>(
-        &self,
-        endpoint_id: Option<String>,
-        operation: impl Fn(Arc<C>, String, String, String, String) -> Fut + Send + Sync,
-    ) -> error::Result<Resp>
-    where
-        C: Client,
-        Fut: Future<Output = error::Result<Resp>> + Send,
-        Resp: Send,
-    {
-        if let Some(endpoint_id) = endpoint_id {
-            let (client, endpoint_properties) =
-                self.http_component.select_specific_endpoint(&endpoint_id)?;
-
-            return operation(
-                client,
-                endpoint_id,
-                endpoint_properties.endpoint,
-                endpoint_properties.username,
-                endpoint_properties.password,
-            )
-            .await;
-        }
-
-        let (client, endpoint_properties) =
-            if let Some(selected) = self.http_component.select_endpoint(vec![])? {
-                selected
-            } else {
-                return Err(ErrorKind::ServiceNotAvailable {
-                    service: ServiceType::Query,
-                }
-                .into());
-            };
-
-        operation(
-            client,
-            endpoint_properties.endpoint_id.unwrap_or_default(),
-            endpoint_properties.endpoint,
-            endpoint_properties.username,
-            endpoint_properties.password,
-        )
         .await
     }
 }

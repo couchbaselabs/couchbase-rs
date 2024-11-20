@@ -44,6 +44,7 @@ use crate::nmvbhandler::{ConfigUpdater, StdNotMyVbucketConfigHandler};
 use crate::parsedconfig::ParsedConfig;
 use crate::querycomponent::{QueryComponent, QueryComponentConfig, QueryComponentOptions};
 use crate::retry::RetryManager;
+use crate::searchcomponent::{SearchComponent, SearchComponentConfig, SearchComponentOptions};
 use crate::tls_config::TlsConfig;
 use crate::vbucketrouter::{
     StdVbucketRouter, VbucketRouter, VbucketRouterOptions, VbucketRoutingInfo,
@@ -85,6 +86,7 @@ pub(crate) struct AgentInner {
     >,
 
     pub(crate) query: QueryComponent<ReqwestClient>,
+    pub(crate) search: SearchComponent<ReqwestClient>,
 }
 
 #[derive(Clone)]
@@ -100,6 +102,7 @@ struct AgentComponentConfigs {
     pub kv_client_manager_client_configs: HashMap<String, KvClientConfig>,
     pub vbucket_routing_info: VbucketRoutingInfo,
     pub query_config: QueryComponentConfig,
+    pub search_config: SearchComponentConfig,
     pub http_client_config: ClientConfig,
 }
 
@@ -211,15 +214,15 @@ impl AgentInner {
             .latest_config
             .addresses_group_for_network_type(&state.network_type);
 
-        let mut kv_data_node_ids = Vec::with_capacity(network_info.nodes.len());
-        let mut kv_data_hosts: HashMap<String, String> =
-            HashMap::with_capacity(network_info.nodes.len());
-        let mut query_endpoints: HashMap<String, String> =
-            HashMap::with_capacity(network_info.nodes.len());
+        let mut kv_data_node_ids = Vec::new();
+        let mut kv_data_hosts: HashMap<String, String> = HashMap::new();
+        let mut query_endpoints: HashMap<String, String> = HashMap::new();
+        let mut search_endpoints: HashMap<String, String> = HashMap::new();
 
         for node in network_info.nodes {
             let kv_ep_id = format!("kv{}", node.node_id);
             let query_ep_id = format!("query{}", node.node_id);
+            let search_ep_id = format!("search{}", node.node_id);
 
             if node.has_data {
                 kv_data_node_ids.push(kv_ep_id.clone());
@@ -232,12 +235,20 @@ impl AgentInner {
                 if let Some(p) = node.ssl_ports.query {
                     query_endpoints.insert(query_ep_id, format!("https://{}:{}", node.hostname, p));
                 }
+                if let Some(p) = node.ssl_ports.search {
+                    search_endpoints
+                        .insert(search_ep_id, format!("https://{}:{}", node.hostname, p));
+                }
             } else {
                 if let Some(p) = node.non_ssl_ports.kv {
                     kv_data_hosts.insert(kv_ep_id, format!("{}:{}", node.hostname, p));
                 }
                 if let Some(p) = node.non_ssl_ports.query {
                     query_endpoints.insert(query_ep_id, format!("http://{}:{}", node.hostname, p));
+                }
+                if let Some(p) = node.non_ssl_ports.search {
+                    search_endpoints
+                        .insert(search_ep_id, format!("http://{}:{}", node.hostname, p));
                 }
             }
         }
@@ -282,6 +293,11 @@ impl AgentInner {
             query_config: QueryComponentConfig {
                 endpoints: query_endpoints,
                 authenticator: state.authenticator.clone(),
+            },
+            search_config: SearchComponentConfig {
+                endpoints: search_endpoints,
+                authenticator: state.authenticator.clone(),
+                vector_search_enabled: state.latest_config.features.fts_vector_search,
             },
             http_client_config: ClientConfig {
                 tls_config: state.tls_config.clone(),
@@ -390,11 +406,21 @@ impl Agent {
             retry_manager.clone(),
             compression_manager,
         );
+
         let query = QueryComponent::new(
             retry_manager.clone(),
             http_client.clone(),
             agent_component_configs.query_config,
             QueryComponentOptions {
+                user_agent: client_name.clone(),
+            },
+        );
+
+        let search = SearchComponent::new(
+            retry_manager.clone(),
+            http_client.clone(),
+            agent_component_configs.search_config,
+            SearchComponentOptions {
                 user_agent: client_name,
             },
         );
@@ -409,6 +435,7 @@ impl Agent {
             retry_manager,
             http_client,
             query,
+            search,
         });
 
         nmvb_handler.set_watcher(inner.clone()).await;

@@ -1,18 +1,19 @@
 use std::sync::Arc;
 
-use arc_swap::ArcSwap;
-use async_trait::async_trait;
-use base64::prelude::BASE64_STANDARD;
-use base64::Engine;
-use http::header::{CONTENT_TYPE, USER_AGENT};
-use reqwest::redirect::Policy;
-use typed_builder::TypedBuilder;
-
 use crate::httpx::error::ErrorKind::{Connect, Generic};
 use crate::httpx::error::Result as HttpxResult;
 use crate::httpx::request::{Auth, OboPasswordOrDomain, Request};
 use crate::httpx::response::Response;
 use crate::tls_config::TlsConfig;
+use arc_swap::ArcSwap;
+use async_trait::async_trait;
+use base64::prelude::BASE64_STANDARD;
+use base64::Engine;
+use http::header::{CONTENT_TYPE, USER_AGENT};
+use log::trace;
+use reqwest::redirect::Policy;
+use typed_builder::TypedBuilder;
+use uuid::Uuid;
 
 #[async_trait]
 pub trait Client: Send + Sync {
@@ -23,12 +24,14 @@ pub trait Client: Send + Sync {
 #[builder(field_defaults(setter(into)))]
 #[non_exhaustive]
 pub struct ClientConfig {
+    #[builder(default)]
     pub tls_config: Option<TlsConfig>,
 }
 
 #[derive(Debug)]
 pub struct ReqwestClient {
     inner: ArcSwap<reqwest::Client>,
+    client_id: String,
 }
 
 impl ReqwestClient {
@@ -36,6 +39,7 @@ impl ReqwestClient {
         let inner = Self::new_client(cfg)?;
         Ok(Self {
             inner: ArcSwap::from_pointee(inner),
+            client_id: Uuid::new_v4().to_string(),
         })
     }
 
@@ -83,6 +87,15 @@ impl Client for ReqwestClient {
     async fn execute(&self, req: Request) -> HttpxResult<Response> {
         let inner = self.inner.load();
 
+        let id = req.unique_id;
+        trace!(
+            "Writing request on {} to {}. Method={}. Request id={}",
+            &self.client_id,
+            &req.uri,
+            &req.method,
+            &id
+        );
+
         let mut builder = inner.request(req.method, req.uri);
 
         if let Some(body) = req.body {
@@ -122,9 +135,23 @@ impl Client for ReqwestClient {
         }
 
         match builder.send().await {
-            Ok(response) => Ok(Response::from(response)),
+            Ok(response) => Ok({
+                trace!(
+                    "Received response on {}. Request id={}. Status: {}",
+                    &self.client_id,
+                    &id,
+                    response.status()
+                );
+                Response::from(response)
+            }),
             // TODO improve error handling
             Err(err) => {
+                trace!(
+                    "Received error on {}. Request id={}. Err: {}",
+                    &self.client_id,
+                    &id,
+                    &err,
+                );
                 if err.is_connect() {
                     Err(Connect {
                         msg: err.to_string(),

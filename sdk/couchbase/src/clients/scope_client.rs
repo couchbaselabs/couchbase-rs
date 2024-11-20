@@ -2,7 +2,12 @@ use crate::clients::collection_client::{
     CollectionClient, CollectionClientBackend, Couchbase2CollectionClient,
     CouchbaseCollectionClient,
 };
-use crate::clients::query_client::{CouchbaseQueryClient, QueryClient, QueryClientBackend};
+use crate::clients::query_client::{
+    CouchbaseQueryClient, QueryClient, QueryClientBackend, QueryKeyspace,
+};
+use crate::clients::search_client::{
+    CouchbaseSearchClient, SearchClient, SearchClientBackend, SearchKeyspace,
+};
 use couchbase_core::agent::Agent;
 use couchbase_core::retry::RetryStrategy;
 use std::sync::Arc;
@@ -33,6 +38,21 @@ impl ScopeClient {
 
                 QueryClient::new(QueryClientBackend::CouchbaseQueryClientBackend(
                     query_client,
+                ))
+            }
+            ScopeClientBackend::Couchbase2ScopeBackend(_) => {
+                unimplemented!()
+            }
+        }
+    }
+
+    pub fn search_client(&self) -> SearchClient {
+        match &self.backend {
+            ScopeClientBackend::CouchbaseScopeBackend(backend) => {
+                let search_client = backend.search_client();
+
+                SearchClient::new(SearchClientBackend::CouchbaseSearchClientBackend(
+                    search_client,
                 ))
             }
             ScopeClientBackend::Couchbase2ScopeBackend(_) => {
@@ -99,7 +119,23 @@ impl CouchbaseScopeClient {
     }
 
     pub fn query_client(&self) -> CouchbaseQueryClient {
-        CouchbaseQueryClient::new(self.agent.clone())
+        CouchbaseQueryClient::with_keyspace(
+            self.agent.clone(),
+            QueryKeyspace {
+                bucket_name: self.bucket_name().to_string(),
+                scope_name: self.name().to_string(),
+            },
+        )
+    }
+
+    pub fn search_client(&self) -> CouchbaseSearchClient {
+        CouchbaseSearchClient::with_keyspace(
+            self.agent.clone(),
+            SearchKeyspace {
+                bucket_name: self.bucket_name().to_string(),
+                scope_name: self.name().to_string(),
+            },
+        )
     }
 }
 

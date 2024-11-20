@@ -38,7 +38,7 @@ async fn test_query_basic() {
 
     assert!(row_obj.get("$1").unwrap().as_bool().unwrap());
 
-    let meta = res.metadata().await.unwrap();
+    let meta = res.metadata().unwrap();
     assert!(meta.prepared.is_none());
     assert!(!meta.request_id.is_empty());
     assert!(!meta.client_context_id.is_empty());
@@ -57,7 +57,13 @@ async fn test_query_basic() {
 
     assert_eq!(
         "boolean",
-        meta.signature.unwrap().get("$1").unwrap().as_str().unwrap()
+        meta.signature
+            .as_ref()
+            .unwrap()
+            .get("$1")
+            .unwrap()
+            .as_str()
+            .unwrap()
     );
 }
 
@@ -87,7 +93,7 @@ async fn test_prepared_query_basic() {
 
     assert!(row_obj.get("$1").unwrap().as_bool().unwrap());
 
-    let meta = res.metadata().await.unwrap();
+    let meta = res.metadata().unwrap();
     assert!(meta.prepared.is_some());
     assert!(!meta.request_id.is_empty());
     assert!(!meta.client_context_id.is_empty());
@@ -106,6 +112,12 @@ async fn test_prepared_query_basic() {
 
     assert_eq!(
         "boolean",
-        meta.signature.unwrap().get("$1").unwrap().as_str().unwrap()
+        meta.signature
+            .as_ref()
+            .unwrap()
+            .get("$1")
+            .unwrap()
+            .as_str()
+            .unwrap()
     );
 }

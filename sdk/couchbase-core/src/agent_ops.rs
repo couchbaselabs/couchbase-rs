@@ -12,6 +12,8 @@ use crate::crudresults::{
 use crate::error::Result;
 use crate::querycomponent::QueryResultStream;
 use crate::queryoptions::QueryOptions;
+use crate::searchcomponent::SearchResultStream;
+use crate::searchoptions::SearchOptions;
 
 impl Agent {
     pub async fn upsert<'a>(&self, opts: UpsertOptions<'a>) -> Result<UpsertResult> {
@@ -79,5 +81,9 @@ impl Agent {
 
     pub async fn prepared_query(&self, opts: QueryOptions) -> Result<QueryResultStream> {
         self.inner.query.prepared_query(opts).await
+    }
+
+    pub async fn search(&self, opts: SearchOptions) -> Result<SearchResultStream> {
+        self.inner.search.query(opts).await
     }
 }
