@@ -7,12 +7,13 @@ pub mod cluster;
 pub mod collection;
 pub mod collection_binary_crud;
 pub mod collection_crud;
-mod durability_level;
+pub mod durability_level;
 pub mod error;
-mod mutation_state;
+pub mod mutation_state;
 pub mod options;
 pub mod results;
 pub mod scope;
+pub mod search;
 pub mod transcoding;
 
 pub mod authenticator {

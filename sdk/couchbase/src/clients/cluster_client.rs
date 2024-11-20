@@ -2,6 +2,7 @@ use crate::clients::bucket_client::{
     BucketClient, BucketClientBackend, Couchbase2BucketClient, CouchbaseBucketClient,
 };
 use crate::clients::query_client::{CouchbaseQueryClient, QueryClient, QueryClientBackend};
+use crate::clients::search_client::{CouchbaseSearchClient, SearchClient, SearchClientBackend};
 use crate::error;
 use crate::options::cluster_options::ClusterOptions;
 use crate::retry::DEFAULT_RETRY_STRATEGY;
@@ -82,6 +83,21 @@ impl ClusterClient {
             }
         }
     }
+
+    pub fn search_client(&self) -> error::Result<SearchClient> {
+        match &self.backend {
+            ClusterClientBackend::CouchbaseClusterBackend(backend) => {
+                let search_client = backend.search_client()?;
+
+                Ok(SearchClient::new(
+                    SearchClientBackend::CouchbaseSearchClientBackend(search_client),
+                ))
+            }
+            ClusterClientBackend::Couchbase2ClusterBackend(_) => {
+                unimplemented!()
+            }
+        }
+    }
 }
 
 struct CouchbaseClusterBackend {
@@ -140,6 +156,12 @@ impl CouchbaseClusterBackend {
         let agent = self.agent_manager.get_cluster_agent()?;
 
         Ok(CouchbaseQueryClient::new(agent.clone()))
+    }
+
+    fn search_client(&self) -> error::Result<CouchbaseSearchClient> {
+        let agent = self.agent_manager.get_cluster_agent()?;
+
+        Ok(CouchbaseSearchClient::new(agent.clone()))
     }
 
     fn merge_options(

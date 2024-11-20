@@ -5,3 +5,4 @@ pub mod core_kv_client;
 mod couchbase_core_kv_client;
 pub mod query_client;
 pub mod scope_client;
+pub mod search_client;

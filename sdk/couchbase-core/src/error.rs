@@ -1,6 +1,7 @@
 use crate::httpx::error::Error as HttpError;
 use crate::memdx::error::Error as MemdxError;
 use crate::queryx::error::Error as QueryError;
+use crate::searchx::error::Error as SearchError;
 use crate::service_type::ServiceType;
 use std::fmt::Display;
 use std::sync::Arc;
@@ -67,6 +68,8 @@ pub enum ErrorKind {
     #[error("{0}")]
     Query(QueryError),
     #[error("{0}")]
+    Search(SearchError),
+    #[error("{0}")]
     Http(HttpError),
     #[error("Endpoint not known {endpoint}")]
     #[non_exhaustive]
@@ -93,6 +96,9 @@ pub enum ErrorKind {
     #[error("Service not available {service}")]
     #[non_exhaustive]
     ServiceNotAvailable { service: ServiceType },
+    #[error("feature not available {feature}, {msg}")]
+    #[non_exhaustive]
+    FeatureNotAvailable { feature: String, msg: String },
     #[error("Internal error {msg}")]
     #[non_exhaustive]
     Internal { msg: String },
@@ -124,6 +130,12 @@ impl From<QueryError> for Error {
 impl From<HttpError> for Error {
     fn from(value: HttpError) -> Self {
         Self::new(ErrorKind::Http(value))
+    }
+}
+
+impl From<SearchError> for Error {
+    fn from(value: SearchError) -> Self {
+        Self::new(ErrorKind::Search(value))
     }
 }
 

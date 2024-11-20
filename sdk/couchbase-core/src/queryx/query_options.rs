@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
-use serde::ser::SerializeMap;
+use serde::ser::{SerializeMap, SerializeSeq};
 use serde::{Serialize, Serializer};
 use typed_builder::TypedBuilder;
 
@@ -18,7 +18,7 @@ pub enum ScanConsistency {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "lowercase")]
 #[non_exhaustive]
 pub enum ProfileMode {
     Off,
@@ -27,6 +27,7 @@ pub enum ProfileMode {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "UPPERCASE")]
 #[non_exhaustive]
 pub enum Compression {
     Zip,
@@ -54,6 +55,7 @@ pub enum Encoding {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "UPPERCASE")]
 #[non_exhaustive]
 pub enum Format {
     Json,
@@ -62,7 +64,9 @@ pub enum Format {
     Tsv,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TypedBuilder)]
+#[builder(field_defaults(setter(into)))]
+#[non_exhaustive]
 pub struct CredsJson {
     #[serde(skip_serializing_if = "String::is_empty")]
     pub user: String,
@@ -78,10 +82,25 @@ pub enum ReplicaLevel {
     On,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, TypedBuilder)]
+#[builder(field_defaults(setter(into)))]
+#[non_exhaustive]
 pub struct ScanVectorEntry {
     pub seq_no: u64,
     pub vb_uuid: String,
+}
+
+impl Serialize for ScanVectorEntry {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut seq = serializer.serialize_seq(Some(2))?;
+        seq.serialize_element(&self.seq_no)?;
+        seq.serialize_element(&self.vb_uuid)?;
+
+        seq.end()
+    }
 }
 
 pub type FullScanVectors = Vec<ScanVectorEntry>;

@@ -2,6 +2,7 @@ use couchbase::cluster::Cluster;
 use uuid::Uuid;
 
 pub mod default_cluster_options;
+pub mod doc_generation;
 pub mod test_config;
 
 pub async fn create_cluster_from_test_config() -> Cluster {

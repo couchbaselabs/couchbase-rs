@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::future::Future;
 use std::hash::Hash;
 use std::sync::{Arc, Mutex};
 
@@ -154,6 +155,48 @@ impl<C: Client> HttpComponent<C> {
 
     pub fn user_agent(&self) -> &str {
         &self.user_agent
+    }
+
+    pub async fn orchestrate_endpoint<Resp, Fut>(
+        &self,
+        endpoint_id: Option<String>,
+        operation: impl Fn(Arc<C>, String, String, String, String) -> Fut + Send + Sync,
+    ) -> error::Result<Resp>
+    where
+        C: Client,
+        Fut: Future<Output = error::Result<Resp>> + Send,
+        Resp: Send,
+    {
+        if let Some(endpoint_id) = endpoint_id {
+            let (client, endpoint_properties) = self.select_specific_endpoint(&endpoint_id)?;
+
+            return operation(
+                client,
+                endpoint_id,
+                endpoint_properties.endpoint,
+                endpoint_properties.username,
+                endpoint_properties.password,
+            )
+            .await;
+        }
+
+        let (client, endpoint_properties) = if let Some(selected) = self.select_endpoint(vec![])? {
+            selected
+        } else {
+            return Err(ErrorKind::ServiceNotAvailable {
+                service: self.service_type,
+            }
+            .into());
+        };
+
+        operation(
+            client,
+            endpoint_properties.endpoint_id.unwrap_or_default(),
+            endpoint_properties.endpoint,
+            endpoint_properties.username,
+            endpoint_properties.password,
+        )
+        .await
     }
 }
 

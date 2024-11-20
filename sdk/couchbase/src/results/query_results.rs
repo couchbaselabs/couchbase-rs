@@ -97,16 +97,22 @@ pub struct QueryMetaData {
     pub profile: Option<Value>,
 }
 
-impl From<queryx::query_result::MetaData> for QueryMetaData {
-    fn from(meta: queryx::query_result::MetaData) -> Self {
+// TODO: fix ownership.
+impl From<&queryx::query_result::MetaData> for QueryMetaData {
+    fn from(meta: &queryx::query_result::MetaData) -> Self {
         Self {
-            request_id: meta.request_id,
-            client_context_id: meta.client_context_id,
-            status: meta.status.into(),
-            metrics: meta.metrics.into(),
-            signature: meta.signature,
-            warnings: meta.warnings.into_iter().map(|w| w.into()).collect(),
-            profile: meta.profile,
+            request_id: meta.request_id.to_string(),
+            client_context_id: meta.client_context_id.to_string(),
+            status: meta.status.clone().into(),
+            metrics: meta.metrics.clone().into(),
+            signature: meta.signature.clone(),
+            warnings: meta
+                .warnings
+                .clone()
+                .into_iter()
+                .map(|w| w.into())
+                .collect(),
+            profile: meta.profile.clone(),
         }
     }
 }
@@ -139,8 +145,8 @@ impl<'a, V: DeserializeOwned> Stream for QueryRows<'a, V> {
 }
 
 impl QueryResult {
-    pub async fn metadata(self) -> error::Result<QueryMetaData> {
-        Ok(self.wrapped.metadata().await?.into())
+    pub async fn metadata(&self) -> error::Result<QueryMetaData> {
+        Ok(self.wrapped.metadata()?.into())
     }
 
     pub fn rows<'a, V: DeserializeOwned + 'a>(
