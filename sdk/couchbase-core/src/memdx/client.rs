@@ -36,7 +36,18 @@ use crate::memdx::packet::{RequestPacket, ResponsePacket};
 use crate::memdx::pendingop::ClientPendingOp;
 
 pub(crate) type ResponseSender = Sender<error::Result<ClientResponse>>;
-pub(crate) type OpaqueMap = HashMap<u32, Arc<ResponseSender>>;
+pub(crate) type OpaqueMap = HashMap<u32, Arc<SenderContext>>;
+
+#[derive(Debug, Clone, Copy)]
+pub struct ResponseContext {
+    pub cas: Option<u64>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct SenderContext {
+    pub sender: ResponseSender,
+    pub context: ResponseContext,
+}
 
 struct ReadLoopOptions {
     pub client_id: String,
@@ -77,12 +88,12 @@ pub struct Client {
 }
 
 impl Client {
-    async fn register_handler(&self, handler: Arc<ResponseSender>) -> u32 {
+    async fn register_handler(&self, response_context: SenderContext) -> u32 {
         let mut map = self.opaque_map.lock().await;
 
         let opaque = self.current_opaque.fetch_add(1, Ordering::SeqCst);
 
-        map.insert(opaque, handler);
+        map.insert(opaque, Arc::new(response_context));
 
         opaque
     }
@@ -91,6 +102,7 @@ impl Client {
         for entry in opaque_map.iter() {
             entry
                 .1
+                .sender
                 .send(Err(ErrorKind::Cancelled(
                     CancellationErrorKind::ClosedInFlight,
                 )
@@ -147,7 +159,8 @@ impl Client {
                                     let t = map.get(&opaque);
 
                                     if let Some(map_entry) = t {
-                                        let sender = Arc::clone(map_entry);
+                                        let context = Arc::clone(map_entry);
+                                        let sender = &context.sender;
                                         drop(map);
                                         let (more_tx, more_rx) = oneshot::channel();
 
@@ -175,14 +188,14 @@ impl Client {
                                         }
 
                                         // TODO: clone
-                                        let resp = ClientResponse::new(packet, more_tx, opts.peer_addr, opts.local_addr);
+                                        let resp = ClientResponse::new(packet, more_tx, opts.peer_addr, opts.local_addr, context.context);
                                         match sender.send(Ok(resp)).await {
                                             Ok(_) => {}
                                             Err(e) => {
                                                 debug!("Sending response to caller failed: {}", e);
                                             }
                                         };
-                                        drop(sender);
+                                        drop(context);
 
                                         match more_rx.await {
                                             Ok(has_more_packets) => {
@@ -287,7 +300,12 @@ impl Dispatcher for Client {
 
     async fn dispatch(&self, mut packet: RequestPacket) -> error::Result<ClientPendingOp> {
         let (response_tx, response_rx) = mpsc::channel(1);
-        let opaque = self.register_handler(Arc::new(response_tx)).await;
+        let opaque = self
+            .register_handler(SenderContext {
+                sender: response_tx,
+                context: ResponseContext { cas: packet.cas },
+            })
+            .await;
         packet.opaque = Some(opaque);
         let op_code = packet.op_code;
 

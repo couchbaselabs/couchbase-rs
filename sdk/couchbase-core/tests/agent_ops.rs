@@ -456,6 +456,88 @@ async fn test_append_and_prepend() {
 }
 
 #[tokio::test]
+async fn test_append_and_prepend_cas_mismatch() {
+    setup_tests();
+
+    let agent_opts = create_default_options();
+
+    let mut agent = Agent::new(agent_opts).await.unwrap();
+
+    let strat = Arc::new(BestEffortRetryStrategy::new(
+        ExponentialBackoffCalculator::default(),
+    ));
+
+    let key = generate_key();
+    let value = "answer is".as_bytes().to_vec();
+
+    let upsert_result = agent
+        .upsert(
+            UpsertOptions::builder()
+                .key(key.as_slice())
+                .retry_strategy(strat.clone())
+                .scope_name("")
+                .collection_name("")
+                .value(value.as_slice())
+                .build(),
+        )
+        .await
+        .unwrap();
+
+    assert_ne!(0, upsert_result.cas);
+    assert!(upsert_result.mutation_token.is_some());
+
+    let value = "the ".as_bytes();
+
+    let prepend_result = agent
+        .prepend(
+            PrependOptions::builder()
+                .key(&key)
+                .scope_name("")
+                .collection_name("")
+                .retry_strategy(strat.clone())
+                .value(value)
+                .cas(1234)
+                .build(),
+        )
+        .await;
+
+    assert!(prepend_result.is_err());
+    let e = prepend_result.err().unwrap();
+    let e = e.is_memdx_error().unwrap();
+    let kind = e.kind.clone();
+    match *kind {
+        Server(err) => assert_eq!(ServerErrorKind::CasMismatch, err.kind),
+        _ => panic!("Error was not expected type, got {}", kind),
+    }
+
+    let value = " 42".as_bytes();
+
+    let append_result = agent
+        .append(
+            AppendOptions::builder()
+                .key(&key)
+                .scope_name("")
+                .collection_name("")
+                .retry_strategy(strat.clone())
+                .value(value)
+                .cas(1234)
+                .build(),
+        )
+        .await;
+
+    assert!(append_result.is_err());
+    let e = append_result.err().unwrap();
+    let e = e.is_memdx_error().unwrap();
+    let kind = e.kind.clone();
+    match *kind {
+        Server(err) => assert_eq!(ServerErrorKind::CasMismatch, err.kind),
+        _ => panic!("Error was not expected type, got {}", kind),
+    }
+
+    agent.close().await;
+}
+
+#[tokio::test]
 async fn test_increment_and_decrement() {
     setup_tests();
 
