@@ -1,16 +1,18 @@
 use crate::httpx;
 use http::StatusCode;
-use std::backtrace::Backtrace;
 use std::error::Error as StdError;
 use std::fmt::{Display, Formatter};
+use std::sync::Arc;
+
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct Error {
     pub kind: Box<ErrorKind>,
-    pub backtrace: Backtrace,
-    pub source: Option<Box<dyn StdError + 'static + Send + Sync>>,
+
+    // TODO: This shouldn't be arc but I'm losing the will to live.
+    pub source: Option<Arc<dyn StdError + 'static + Send + Sync>>,
 
     pub endpoint: String,
     pub status_code: Option<StatusCode>,
@@ -42,7 +44,6 @@ impl Error {
             }),
             endpoint: endpoint.into(),
             status_code: Some(status_code),
-            backtrace: Backtrace::capture(),
             source: None,
         }
     }
@@ -52,7 +53,7 @@ impl Error {
         msg: impl Into<String>,
         endpoint: impl Into<String>,
         status_code: StatusCode,
-        source: Box<dyn StdError + 'static + Send + Sync>,
+        source: Arc<dyn StdError + 'static + Send + Sync>,
     ) -> Error {
         Self {
             kind: Box::new(ErrorKind::Server {
@@ -61,7 +62,6 @@ impl Error {
             }),
             endpoint: endpoint.into(),
             status_code: Some(status_code),
-            backtrace: Backtrace::capture(),
             source: Some(source),
         }
     }
@@ -71,7 +71,6 @@ impl Error {
             kind: Box::new(ErrorKind::Http(e)),
             endpoint: endpoint.into(),
             status_code: None,
-            backtrace: Backtrace::capture(),
             source: None,
         }
     }
@@ -81,7 +80,6 @@ impl Error {
             kind: Box::new(ErrorKind::Generic { msg: msg.into() }),
             endpoint: endpoint.into(),
             status_code: None,
-            backtrace: Backtrace::capture(),
             source: None,
         }
     }

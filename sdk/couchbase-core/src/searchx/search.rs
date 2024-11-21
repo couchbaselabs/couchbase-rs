@@ -7,7 +7,6 @@ use crate::searchx::query_options::QueryOptions;
 use crate::searchx::search_respreader::SearchRespReader;
 use bytes::Bytes;
 use http::{Method, StatusCode};
-use std::backtrace::Backtrace;
 use std::collections::HashMap;
 use std::sync::Arc;
 use typed_builder::TypedBuilder;
@@ -84,7 +83,6 @@ impl<C: Client> Search<C> {
                 }),
                 endpoint: self.endpoint.clone(),
                 status_code: None,
-                backtrace: Backtrace::capture(),
                 source: None,
             });
         }
@@ -113,8 +111,7 @@ impl<C: Client> Search<C> {
             }),
             endpoint: self.endpoint.clone(),
             status_code: None,
-            backtrace: Backtrace::capture(),
-            source: Some(Box::new(e)),
+            source: Some(Arc::new(e)),
         })?;
 
         let res = self
@@ -155,8 +152,7 @@ impl<C: Client> Search<C> {
             }),
             endpoint: self.endpoint.clone(),
             status_code: None,
-            backtrace: Backtrace::capture(),
-            source: Some(Box::new(e)),
+            source: Some(Arc::new(e)),
         })?;
 
         let mut headers = HashMap::new();
@@ -234,8 +230,7 @@ pub(crate) async fn decode_response_error(response: Response, endpoint: String) 
                 }),
                 endpoint,
                 status_code: Some(status),
-                backtrace: Backtrace::capture(),
-                source: Some(Box::new(e)),
+                source: Some(Arc::new(e)),
             }
         }
     };
@@ -249,8 +244,7 @@ pub(crate) async fn decode_response_error(response: Response, endpoint: String) 
                 }),
                 endpoint,
                 status_code: Some(status),
-                backtrace: Backtrace::capture(),
-                source: Some(Box::new(e)),
+                source: Some(Arc::new(e)),
             }
         }
     };
