@@ -38,6 +38,7 @@ pub struct QueryRespReader {
     streamer: Option<RawJsonRowStreamer>,
     early_meta_data: Option<EarlyMetaData>,
     meta_data: Option<MetaData>,
+    meta_data_error: Option<Error>,
 }
 
 impl Stream for QueryRespReader {
@@ -62,12 +63,8 @@ impl Stream for QueryRespReader {
                 this.status_code,
             )))),
             Poll::Ready(None) => {
-                let fut = this.read_final_metadata();
-                match Box::pin(fut).poll_unpin(cx) {
-                    Poll::Ready(Ok(_)) => Poll::Ready(None),
-                    Poll::Ready(Err(e)) => Poll::Ready(Some(Err(e))),
-                    Poll::Pending => Poll::Pending,
-                }
+                this.read_final_metadata();
+                Poll::Ready(None)
             }
             Poll::Pending => Poll::Pending,
         }
@@ -150,6 +147,7 @@ impl QueryRespReader {
             streamer: Some(streamer),
             early_meta_data: None,
             meta_data: None,
+            meta_data_error: None,
         };
 
         reader.read_early_metadata().await?;
@@ -157,7 +155,10 @@ impl QueryRespReader {
         // TODO: this is a bit absurd.
         if let Some(streamer) = &reader.streamer {
             if !streamer.has_more_rows() {
-                reader.read_final_metadata().await?;
+                reader.read_final_metadata();
+                if let Some(e) = &reader.meta_data_error {
+                    return Err(e.clone());
+                }
             }
         }
 
@@ -169,6 +170,10 @@ impl QueryRespReader {
     }
 
     pub fn metadata(&self) -> error::Result<&MetaData> {
+        if let Some(e) = &self.meta_data_error {
+            return Err(e.clone());
+        }
+
         if let Some(meta) = &self.meta_data {
             return Ok(meta);
         }
@@ -219,37 +224,53 @@ impl QueryRespReader {
         ))
     }
 
-    async fn read_final_metadata(&mut self) -> error::Result<()> {
+    fn read_final_metadata(&mut self) {
         // We take the streamer here so that it gets dropped and closes the stream.
         let streamer = std::mem::take(&mut self.streamer);
 
         if let Some(mut streamer) = streamer {
-            let epilog = streamer.read_epilog().await.map_err(|e| {
-                Error::new_server_error(
-                    ServerError::new(ServerErrorKind::Unknown { msg: e.to_string() }, None, None),
-                    &self.endpoint,
-                    &self.statement,
-                    &self.client_context_id,
-                    vec![],
-                    self.status_code,
-                )
-            })?;
+            let epilog = match streamer.epilog() {
+                Ok(e) => e,
+                Err(e) => {
+                    self.meta_data_error = Some(Error::new_server_error(
+                        ServerError::new(
+                            ServerErrorKind::Unknown { msg: e.to_string() },
+                            None,
+                            None,
+                        ),
+                        &self.endpoint,
+                        &self.statement,
+                        &self.client_context_id,
+                        vec![],
+                        self.status_code,
+                    ));
+                    return;
+                }
+            };
 
-            let metadata: QueryMetaData = serde_json::from_slice(&epilog).map_err(|e| {
-                Error::new_generic_error(
-                    e.to_string(),
-                    &self.endpoint,
-                    &self.statement,
-                    &self.client_context_id,
-                )
-            })?;
+            let metadata: QueryMetaData = match serde_json::from_slice(&epilog) {
+                Ok(m) => m,
+                Err(e) => {
+                    self.meta_data_error = Some(Error::new_generic_error(
+                        e.to_string(),
+                        &self.endpoint,
+                        &self.statement,
+                        &self.client_context_id,
+                    ));
+                    return;
+                }
+            };
 
-            let metadata = self.parse_metadata(metadata)?;
+            let metadata = match self.parse_metadata(metadata) {
+                Ok(m) => m,
+                Err(e) => {
+                    self.meta_data_error = Some(e);
+                    return;
+                }
+            };
 
             self.meta_data = Some(metadata);
         }
-
-        Ok(())
     }
 
     fn parse_metadata(&self, metadata: QueryMetaData) -> error::Result<MetaData> {

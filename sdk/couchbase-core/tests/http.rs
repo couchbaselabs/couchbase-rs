@@ -1,12 +1,12 @@
 use bytes::Bytes;
-use http::Method;
-use serde::Deserialize;
-use serde_json::{json, Value};
-
 use couchbase_core::httpx::client::{Client, ClientConfig, ReqwestClient};
 use couchbase_core::httpx::json_row_stream::JsonRowStream;
 use couchbase_core::httpx::raw_json_row_streamer::RawJsonRowStreamer;
 use couchbase_core::httpx::request::{Auth, BasicAuth, Request};
+use http::Method;
+use serde::Deserialize;
+use serde_json::{json, Value};
+use tokio_stream::StreamExt;
 
 use crate::common::test_config::{setup_tests, test_mem_addrs, test_password, test_username};
 
@@ -69,17 +69,13 @@ async fn test_row_streamer() {
 
     let mut rows = vec![];
 
-    while streamer.has_more_rows() {
-        if let Some(row) = streamer.read_row().await.expect("Failed reading row") {
-            rows.push(row);
-        } else {
-            break;
-        }
+    while let Some(row) = streamer.next().await {
+        rows.push(row.expect("Failed reading row"));
     }
 
     assert_eq!(rows.len(), 1000);
 
-    let epilog = streamer.read_epilog().await.expect("Failed reading epilog");
+    let epilog = streamer.epilog().expect("Failed reading epilog");
     let epilog: Value = serde_json::from_slice(&epilog).expect("failed parsing epilog as json");
 
     let request_id = epilog

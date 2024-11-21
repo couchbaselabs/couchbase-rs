@@ -6,8 +6,8 @@ use crate::searchx::search_result::{
 use chrono::DateTime;
 use serde::Deserialize;
 use serde_json::value::RawValue;
-use std::backtrace::Backtrace;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct SearchMetadataStatus {
@@ -80,8 +80,7 @@ impl TryFrom<DateFacet> for DateRangeFacetResult {
                 kind: Box::new(error::ErrorKind::Json {
                     msg: format!("failed to parse date: {}", &e),
                 }),
-                backtrace: Backtrace::capture(),
-                source: Some(Box::new(e)),
+                source: Some(Arc::new(e)),
                 endpoint: "".to_string(),
                 status_code: None,
             })?,
@@ -89,8 +88,7 @@ impl TryFrom<DateFacet> for DateRangeFacetResult {
                 kind: Box::new(error::ErrorKind::Json {
                     msg: format!("failed to parse date: {}", &e),
                 }),
-                backtrace: Backtrace::capture(),
-                source: Some(Box::new(e)),
+                source: Some(Arc::new(e)),
                 endpoint: "".to_string(),
                 status_code: None,
             })?,

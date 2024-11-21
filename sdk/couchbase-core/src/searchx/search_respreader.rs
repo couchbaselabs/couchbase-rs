@@ -12,6 +12,7 @@ use log::debug;
 use std::backtrace::Backtrace;
 use std::collections::HashMap;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
@@ -21,6 +22,7 @@ pub struct SearchRespReader {
 
     streamer: Option<RawJsonRowStreamer>,
     meta_data: Option<MetaData>,
+    epilogue_error: Option<error::Error>,
     facets: Option<HashMap<String, FacetResult>>,
 }
 
@@ -39,9 +41,10 @@ impl Stream for SearchRespReader {
             Poll::Ready(Some(Ok(row_data))) => {
                 let row: search_json::Row =
                     match serde_json::from_slice(&row_data).map_err(|e| error::Error {
-                        kind: Box::new(ErrorKind::Generic { msg: e.to_string() }),
-                        backtrace: Backtrace::capture(),
-                        source: Some(Box::new(e)),
+                        kind: Box::new(ErrorKind::Generic {
+                            msg: format!("failed to parse row: {}", &e),
+                        }),
+                        source: Some(Arc::new(e)),
                         endpoint: this.endpoint.clone(),
                         status_code: Some(this.status_code),
                     }) {
@@ -53,18 +56,13 @@ impl Stream for SearchRespReader {
             }
             Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(error::Error {
                 kind: Box::new(ErrorKind::Generic { msg: e.to_string() }),
-                backtrace: Backtrace::capture(),
-                source: Some(Box::new(e)),
+                source: Some(Arc::new(e)),
                 endpoint: this.endpoint.clone(),
                 status_code: Some(this.status_code),
             }))),
             Poll::Ready(None) => {
-                let fut = this.read_final_metadata();
-                match Box::pin(fut).poll_unpin(cx) {
-                    Poll::Ready(Ok(_)) => Poll::Ready(None),
-                    Poll::Ready(Err(e)) => Poll::Ready(Some(Err(e))),
-                    Poll::Pending => Poll::Pending,
-                }
+                this.read_final_metadata();
+                Poll::Ready(None)
             }
             Poll::Pending => Poll::Pending,
         }
@@ -86,7 +84,7 @@ impl SearchRespReader {
                         e.to_string(),
                         endpoint,
                         status_code,
-                        Box::new(e),
+                        Arc::new(e),
                     ));
                 }
             };
@@ -101,8 +99,7 @@ impl SearchRespReader {
                             status_code,
                             e
                         )}),
-                        backtrace: Backtrace::capture(),
-                        source: Some(Box::new(e)),
+                        source: Some(Arc::new(e)),
                         endpoint,
                         status_code: Some(status_code),
                     });
@@ -121,16 +118,20 @@ impl SearchRespReader {
             .map_err(|e| error::Error::new_http_error(e, endpoint.clone()))?;
 
         let mut reader = Self {
-            endpoint,
+            endpoint: endpoint.clone(),
             status_code,
             streamer: Some(streamer),
             meta_data: None,
             facets: None,
+            epilogue_error: None,
         };
 
         if let Some(streamer) = &reader.streamer {
             if !streamer.has_more_rows() {
-                reader.read_final_metadata().await?;
+                reader.read_final_metadata();
+                if let Some(e) = reader.epilogue_error {
+                    return Err(e);
+                }
             }
         }
 
@@ -138,6 +139,10 @@ impl SearchRespReader {
     }
 
     pub fn metadata(&self) -> error::Result<&MetaData> {
+        if let Some(e) = &self.epilogue_error {
+            return Err(e.clone());
+        }
+
         if let Some(meta) = &self.meta_data {
             return Ok(meta);
         }
@@ -149,6 +154,10 @@ impl SearchRespReader {
     }
 
     pub fn facets(&self) -> error::Result<&HashMap<String, FacetResult>> {
+        if let Some(e) = &self.epilogue_error {
+            return Err(e.clone());
+        }
+
         if let Some(facets) = &self.facets {
             return Ok(facets);
         }
@@ -159,29 +168,39 @@ impl SearchRespReader {
         ))
     }
 
-    async fn read_final_metadata(&mut self) -> error::Result<()> {
+    fn read_final_metadata(&mut self) {
         // We take the streamer here so that it gets dropped and closes the stream.
         let streamer = std::mem::take(&mut self.streamer);
 
         if let Some(mut streamer) = streamer {
-            let epilog = streamer.read_epilog().await.map_err(|e| {
-                error::Error::new_server_error_with_source(
-                    ServerErrorKind::Unknown,
-                    e.to_string(),
-                    &self.endpoint,
-                    self.status_code,
-                    Box::new(e),
-                )
-            })?;
+            let epilog = match streamer.epilog() {
+                Ok(e) => e,
+                Err(e) => {
+                    self.epilogue_error = Some(error::Error::new_server_error_with_source(
+                        ServerErrorKind::Unknown,
+                        e.to_string(),
+                        &self.endpoint,
+                        self.status_code,
+                        Arc::new(e),
+                    ));
+                    return;
+                }
+            };
 
-            let metadata_json: search_json::SearchMetaData = serde_json::from_slice(&epilog)
-                .map_err(|e| error::Error {
-                    kind: Box::new(ErrorKind::Generic { msg: e.to_string() }),
-                    backtrace: Backtrace::capture(),
-                    source: Some(Box::new(e)),
-                    endpoint: self.endpoint.clone(),
-                    status_code: Some(self.status_code),
-                })?;
+            let metadata_json: search_json::SearchMetaData = match serde_json::from_slice(&epilog) {
+                Ok(m) => m,
+                Err(e) => {
+                    self.epilogue_error = Some(error::Error {
+                        kind: Box::new(ErrorKind::Generic {
+                            msg: format!("failed to parse metadata: {}", &e),
+                        }),
+                        source: Some(Arc::new(e)),
+                        endpoint: self.endpoint.clone(),
+                        status_code: Some(self.status_code),
+                    });
+                    return;
+                }
+            };
 
             let metadata = MetaData {
                 errors: metadata_json.status.errors,
@@ -197,13 +216,20 @@ impl SearchRespReader {
 
             let mut facets: HashMap<String, FacetResult> = HashMap::new();
             for (facet_name, facet_data) in metadata_json.facets {
-                facets.insert(facet_name, facet_data.try_into()?);
+                facets.insert(
+                    facet_name,
+                    match facet_data.try_into() {
+                        Ok(f) => f,
+                        Err(e) => {
+                            self.epilogue_error = Some(e);
+                            return;
+                        }
+                    },
+                );
             }
 
             self.meta_data = Some(metadata);
             self.facets = Some(facets);
         }
-
-        Ok(())
     }
 }
