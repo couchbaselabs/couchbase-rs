@@ -46,6 +46,7 @@ pub fn setup_tests() {
                     record.args()
                 )
             })
+            .filter(Some("rustls"), LevelFilter::Warn)
             .filter_level(LevelFilter::Trace)
             .init();
         let test_config = EnvTestConfig::init_from_env().unwrap();

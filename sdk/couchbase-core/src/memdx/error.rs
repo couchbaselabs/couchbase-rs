@@ -177,7 +177,7 @@ impl StdError for Error {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum ErrorKind {
     Server(ServerError),

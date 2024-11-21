@@ -923,7 +923,9 @@ impl TryFromClientResponse for AppendResponse {
         let packet = resp.packet();
         let status = packet.status;
 
-        if status == Status::KeyExists {
+        // KeyExists without a request cas would be an odd error to receive so we don't
+        // handle that case.
+        if status == Status::KeyExists && resp.response_context().cas.is_some() {
             return Err(ServerError::new(
                 ServerErrorKind::CasMismatch,
                 resp.packet(),
@@ -995,7 +997,9 @@ impl TryFromClientResponse for PrependResponse {
         let packet = resp.packet();
         let status = packet.status;
 
-        if status == Status::KeyExists {
+        // KeyExists without a request cas would be an odd error to receive so we don't
+        // handle that case.
+        if status == Status::KeyExists && resp.response_context().cas.is_some() {
             return Err(ServerError::new(
                 ServerErrorKind::CasMismatch,
                 resp.packet(),

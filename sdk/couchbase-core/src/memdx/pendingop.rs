@@ -62,7 +62,8 @@ impl ClientPendingOp {
         let t = map.remove(&self.opaque);
 
         if let Some(map_entry) = t {
-            let sender = Arc::clone(&map_entry);
+            let context = Arc::clone(&map_entry);
+            let sender = &context.sender;
             drop(map);
 
             sender
