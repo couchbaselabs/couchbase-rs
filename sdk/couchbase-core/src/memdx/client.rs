@@ -34,6 +34,7 @@ use crate::memdx::error::{CancellationErrorKind, Error, ErrorKind};
 use crate::memdx::hello_feature::HelloFeature::DataType;
 use crate::memdx::packet::{RequestPacket, ResponsePacket};
 use crate::memdx::pendingop::ClientPendingOp;
+use crate::memdx::subdoc::SubdocRequestInfo;
 
 pub(crate) type ResponseSender = Sender<error::Result<ClientResponse>>;
 pub(crate) type OpaqueMap = HashMap<u32, Arc<SenderContext>>;
@@ -41,8 +42,8 @@ pub(crate) type OpaqueMap = HashMap<u32, Arc<SenderContext>>;
 #[derive(Debug, Clone, Copy)]
 pub struct ResponseContext {
     pub cas: Option<u64>,
+    pub subdoc_info: Option<SubdocRequestInfo>,
 }
-
 #[derive(Debug, Clone)]
 pub(crate) struct SenderContext {
     pub sender: ResponseSender,
@@ -298,12 +299,12 @@ impl Dispatcher for Client {
         }
     }
 
-    async fn dispatch(&self, mut packet: RequestPacket) -> error::Result<ClientPendingOp> {
+    async fn dispatch(&self, mut packet: RequestPacket, response_context: Option<ResponseContext>) -> error::Result<ClientPendingOp> {
         let (response_tx, response_rx) = mpsc::channel(1);
         let opaque = self
             .register_handler(SenderContext {
                 sender: response_tx,
-                context: ResponseContext { cas: packet.cas },
+                context: response_context.unwrap_or(ResponseContext{cas: packet.cas, subdoc_info: None}),
             })
             .await;
         packet.opaque = Some(opaque);

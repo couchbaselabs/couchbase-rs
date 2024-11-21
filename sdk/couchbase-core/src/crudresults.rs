@@ -1,5 +1,6 @@
 use crate::mutationtoken::MutationToken;
 use std::time::Duration;
+use crate::memdx::subdoc::SubDocResult;
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct GetResult {
@@ -92,5 +93,19 @@ pub struct IncrementResult {
 pub struct DecrementResult {
     pub cas: u64,
     pub value: u64,
+    pub mutation_token: Option<MutationToken>,
+}
+
+#[derive(Clone, Debug)]
+pub struct LookupInResult {
+    pub value: Vec<SubDocResult>,
+    pub cas: u64,
+    pub doc_is_deleted: bool
+}
+
+#[derive(Clone, Debug)]
+pub struct MutateInResult {
+    pub value: Vec<SubDocResult>,
+    pub cas: u64,
     pub mutation_token: Option<MutationToken>,
 }

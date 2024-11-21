@@ -94,7 +94,7 @@ impl OpBootstrapEncoder for OpsCore {
                 value: Some(features),
                 framing_extras: None,
                 opaque: None,
-            })
+            }, None)
             .await?;
 
         Ok(StandardPendingOp::new(op))
@@ -123,7 +123,7 @@ impl OpBootstrapEncoder for OpsCore {
                 value: Some(value),
                 framing_extras: None,
                 opaque: None,
-            })
+            }, None)
             .await?;
 
         Ok(StandardPendingOp::new(op))
@@ -152,7 +152,7 @@ impl OpBootstrapEncoder for OpsCore {
                 value: None,
                 framing_extras: None,
                 opaque: None,
-            })
+            }, None)
             .await?;
 
         Ok(StandardPendingOp::new(op))
@@ -178,7 +178,7 @@ impl OpBootstrapEncoder for OpsCore {
                 value: None,
                 framing_extras: None,
                 opaque: None,
-            })
+            }, None)
             .await?;
 
         Ok(StandardPendingOp::new(op))
@@ -209,7 +209,7 @@ impl OpSASLPlainEncoder for OpsCore {
                 value: Some(value),
                 framing_extras: None,
                 opaque: None,
-            })
+            }, None)
             .await?;
 
         Ok(StandardPendingOp::new(op))
@@ -239,7 +239,7 @@ impl OpSASLAutoEncoder for OpsCore {
                 value: None,
                 framing_extras: None,
                 opaque: None,
-            })
+            }, None)
             .await?;
 
         Ok(StandardPendingOp::new(op))
@@ -270,7 +270,7 @@ impl OpSASLScramEncoder for OpsCore {
                 value: Some(value),
                 framing_extras: None,
                 opaque: None,
-            })
+            }, None)
             .await?;
 
         Ok(StandardPendingOp::new(op))

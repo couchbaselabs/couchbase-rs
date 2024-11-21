@@ -1,14 +1,16 @@
-use std::io::Cursor;
+use std::io::{Cursor, Read};
 use std::time::Duration;
 
 use crate::memdx::auth_mechanism::AuthMechanism;
 use crate::memdx::client_response::ClientResponse;
-use crate::memdx::error::{Error, ErrorKind, ResourceError, ServerError, ServerErrorKind};
+use crate::memdx::error::{Error, ErrorKind, ResourceError, ServerError, ServerErrorKind, SubdocError, SubdocErrorKind};
 use crate::memdx::hello_feature::HelloFeature;
 use crate::memdx::ops_core::OpsCore;
 use crate::memdx::ops_crud::{decode_res_ext_frames, OpsCrud};
 use crate::memdx::status::Status;
 use byteorder::{BigEndian, ReadBytesExt};
+use tokio_io::Buf;
+use crate::memdx::subdoc::{SubDocResult, SubdocDocFlag};
 
 pub trait TryFromClientResponse: Sized {
     fn try_from(resp: ClientResponse) -> Result<Self, Error>;
@@ -1206,6 +1208,407 @@ impl TryFromClientResponse for DecrementResponse {
             cas: packet.cas.unwrap_or_default(),
             value,
             mutation_token,
+            server_duration,
+        })
+    }
+}
+
+pub struct LookupInResponse {
+    pub cas: u64,
+    pub ops: Vec<SubDocResult>,
+    pub doc_is_deleted: bool,
+    pub server_duration: Option<Duration>,
+}
+
+impl TryFromClientResponse for LookupInResponse {
+    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+        let packet = resp.packet();
+        let status = packet.status;
+
+        let subdoc_info = resp.response_context().subdoc_info.ok_or_else(|| Error::protocol_error("Missing subdoc info in response context"))?;
+
+        if status == Status::KeyNotFound {
+            return Err(ServerError::new(
+                ServerErrorKind::KeyNotFound,
+                resp.packet(),
+                resp.local_addr(),
+                resp.peer_addr(),
+            ).into());
+        } else if status == Status::Locked {
+            return Err(ServerError::new(
+                ServerErrorKind::Locked,
+                resp.packet(),
+                resp.local_addr(),
+                resp.peer_addr(),
+            ).into());
+        } else if status == Status::SubDocInvalidCombo {
+            return Err(ServerError::new(
+                ServerErrorKind::Subdoc{ error: SubdocError::new(SubdocErrorKind::InvalidCombo, None) },
+                resp.packet(),
+                resp.local_addr(),
+                resp.peer_addr(),
+            ).into());
+        } else if status == Status::SubDocInvalidXattrOrder {
+            return Err(ServerError::new(
+                ServerErrorKind::Subdoc{ error: SubdocError::new(SubdocErrorKind::InvalidXattrOrder, None) },
+                resp.packet(),
+                resp.local_addr(),
+                resp.peer_addr(),
+            ).into());
+        }  else if status == Status::SubDocXattrInvalidKeyCombo {
+            return Err(ServerError::new(
+                ServerErrorKind::Subdoc{ error: SubdocError::new(SubdocErrorKind::XattrInvalidKeyCombo, None) },
+                resp.packet(),
+                resp.local_addr(),
+                resp.peer_addr(),
+            ).into());
+        } else if status == Status::SubDocXattrInvalidFlagCombo {
+            return Err(ServerError::new(
+                ServerErrorKind::Subdoc{ error: SubdocError::new(SubdocErrorKind::XattrInvalidFlagCombo, None) },
+                resp.packet(),
+                resp.local_addr(),
+                resp.peer_addr(),
+            ).into());
+        }
+
+        let mut doc_is_deleted = false;
+
+        if status == Status::SubDocSuccessDeleted || status == Status::SubDocMultiPathFailureDeleted {
+            doc_is_deleted = true;
+            // still considered a success
+        } else if status != Status::Success && status != Status::SubDocMultiPathFailure {
+            return Err(OpsCrud::decode_common_error(
+                resp.packet(),
+                resp.local_addr(),
+                resp.peer_addr(),
+            ));
+        }
+
+        let mut results: Vec<SubDocResult> = Vec::with_capacity(subdoc_info.op_count as usize);
+        let mut op_index = 0;
+
+        let value = resp.packet().value.as_ref().ok_or_else(|| Error::protocol_error("Missing value"))?;
+        let mut cursor = Cursor::new(value);
+
+        while cursor.position() < cursor.get_ref().len() as u64 {
+            if cursor.remaining() < 6 {
+                return Err(Error::protocol_error("bad value length"));
+            }
+
+            let res_status = cursor
+                .read_u16::<BigEndian>()
+                .map_err(|e| Error::from(ErrorKind::Protocol { msg: e.to_string() }))?;
+            let res_status = Status::from(res_status);
+            let res_value_len = cursor
+                .read_u32::<BigEndian>()
+                .map_err(|e| Error::from(ErrorKind::Protocol { msg: e.to_string() }))?;
+
+            if cursor.remaining() < res_value_len as usize {
+                return Err(Error::protocol_error("bad value length"));
+            }
+
+            let value = if res_value_len > 0 {
+                let mut tmp_val = vec![0; res_value_len as usize];
+                cursor.read_exact(&mut tmp_val)
+                    .map_err(|e| Error::from(ErrorKind::Protocol { msg: e.to_string() }))?;
+                Some(tmp_val)
+            } else {
+                None
+            };
+
+            let err_kind: Option<SubdocErrorKind> = match res_status {
+                Status::Success => None,
+                Status::SubDocDocTooDeep => Some(SubdocErrorKind::DocTooDeep),
+                Status::SubDocNotJSON => Some(SubdocErrorKind::NotJSON),
+                Status::SubDocPathNotFound => Some(SubdocErrorKind::PathNotFound),
+                Status::SubDocPathMismatch => Some(SubdocErrorKind::PathMismatch),
+                Status::SubDocPathInvalid => Some(SubdocErrorKind::PathInvalid),
+                Status::SubDocPathTooBig => Some(SubdocErrorKind::PathTooBig),
+                Status::SubDocXattrUnknownVAttr => Some(SubdocErrorKind::XattrUnknownVAttr),
+                _ => Some(SubdocErrorKind::UnknownStatus {status: res_status}),
+            };
+
+            let err = err_kind.map(|kind| SubdocError { kind, op_index: Some(op_index) });
+
+            results.push(SubDocResult { value, err });
+            op_index += 1;
+        }
+
+        let server_duration = if let Some(f) = &packet.framing_extras {
+            decode_res_ext_frames(f)?
+        } else {
+            None
+        };
+
+        Ok(LookupInResponse {
+            cas: resp.packet().cas.unwrap_or_default(),
+            ops: results,
+            doc_is_deleted,
+            server_duration,
+        })
+    }
+}
+
+
+pub struct MutateInResponse {
+    pub cas: u64,
+    pub ops: Vec<SubDocResult>,
+    pub doc_is_deleted: bool,
+    pub mutation_token: Option<MutationToken>,
+    pub server_duration: Option<Duration>,
+}
+
+impl TryFromClientResponse for MutateInResponse {
+    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+        let packet = resp.packet();
+        let status = packet.status;
+
+        let subdoc_info = resp.response_context().subdoc_info.ok_or_else(|| Error::protocol_error("Missing subdoc info in response context"))?;
+
+        if status == Status::KeyNotFound {
+            return Err(ServerError::new(
+                ServerErrorKind::KeyNotFound,
+                resp.packet(),
+                resp.local_addr(),
+                resp.peer_addr(),
+            ).into());
+        } else if status == Status::KeyExists && resp.response_context().cas.is_some() {
+            return Err(ServerError::new(
+                ServerErrorKind::CasMismatch,
+                resp.packet(),
+                resp.local_addr(),
+                resp.peer_addr(),
+            ).into());
+        } else if status == Status::Locked {
+            return Err(ServerError::new(
+                ServerErrorKind::Locked,
+                resp.packet(),
+                resp.local_addr(),
+                resp.peer_addr(),
+            ).into());
+        } else if status == Status::TooBig {
+            return Err(ServerError::new(
+                ServerErrorKind::TooBig,
+                resp.packet(),
+                resp.local_addr(),
+                resp.peer_addr(),
+            ).into());
+        } else if status == Status::SubDocInvalidCombo {
+            return Err(ServerError::new(
+                ServerErrorKind::Subdoc{ error: SubdocError::new(SubdocErrorKind::InvalidCombo, None) },
+                resp.packet(),
+                resp.local_addr(),
+                resp.peer_addr(),
+            ).into());
+        } else if status == Status::SubDocInvalidXattrOrder {
+            return Err(ServerError::new(
+                ServerErrorKind::Subdoc{ error: SubdocError::new(SubdocErrorKind::InvalidXattrOrder, None) },
+                resp.packet(),
+                resp.local_addr(),
+                resp.peer_addr(),
+            ).into());
+        }  else if status == Status::SubDocXattrInvalidKeyCombo {
+            return Err(ServerError::new(
+                ServerErrorKind::Subdoc{ error: SubdocError::new(SubdocErrorKind::XattrInvalidKeyCombo, None) },
+                resp.packet(),
+                resp.local_addr(),
+                resp.peer_addr(),
+            ).into());
+        } else if status == Status::SubDocXattrInvalidFlagCombo {
+            return Err(ServerError::new(
+                ServerErrorKind::Subdoc{ error: SubdocError::new(SubdocErrorKind::XattrInvalidFlagCombo, None) },
+                resp.packet(),
+                resp.local_addr(),
+                resp.peer_addr(),
+            ).into());
+        } else if status == Status::SubDocXattrUnknownMacro {
+            return Err(ServerError::new(
+                ServerErrorKind::Subdoc{ error: SubdocError::new(SubdocErrorKind::XattrUnknownMacro, None) },
+                resp.packet(),
+                resp.local_addr(),
+                resp.peer_addr(),
+            ).into());
+        } else if status == Status::SubDocXattrUnknownVattrMacro {
+            return Err(ServerError::new(
+                ServerErrorKind::Subdoc{ error: SubdocError::new(SubdocErrorKind::XattrUnknownVattrMacro, None) },
+                resp.packet(),
+                resp.local_addr(),
+                resp.peer_addr(),
+            ).into());
+        } else if status == Status::SubDocXattrCannotModifyVAttr {
+            return Err(ServerError::new(
+                ServerErrorKind::Subdoc{ error: SubdocError::new(SubdocErrorKind::XattrCannotModifyVAttr, None) },
+                resp.packet(),
+                resp.local_addr(),
+                resp.peer_addr(),
+            ).into());
+        } else if status == Status::SubDocCanOnlyReviveDeletedDocuments {
+            return Err(ServerError::new(
+                ServerErrorKind::Subdoc{ error: SubdocError::new(SubdocErrorKind::CanOnlyReviveDeletedDocuments, None) },
+                resp.packet(),
+                resp.local_addr(),
+                resp.peer_addr(),
+            ).into());
+        } else if status == Status::SubDocDeletedDocumentCantHaveValue {
+            return Err(ServerError::new(
+                ServerErrorKind::Subdoc{ error: SubdocError::new(SubdocErrorKind::DeletedDocumentCantHaveValue, None) },
+                resp.packet(),
+                resp.local_addr(),
+                resp.peer_addr(),
+            ).into());
+        } else if status == Status::NotStored {
+            if subdoc_info.flags.is_some_and(|flags| flags == SubdocDocFlag::AddDoc){
+                return Err(ServerError::new(
+                    ServerErrorKind::KeyExists,
+                    resp.packet(),
+                    resp.local_addr(),
+                    resp.peer_addr()
+                ).into());
+            }
+            return Err(ServerError::new(
+                ServerErrorKind::NotStored,
+                resp.packet(),
+                resp.local_addr(),
+                resp.peer_addr(),
+            ).into());
+        } else if status == Status::SubDocMultiPathFailure {
+            if let Some(value) = &resp.packet().value {
+                if value.len() != 3 {
+                    return Err(Error::protocol_error("bad value length"));
+                }
+                let mut cursor = Cursor::new(value);
+
+                let op_index = cursor
+                    .read_u8()
+                    .map_err(|e| Error::from(ErrorKind::Protocol { msg: e.to_string() }))?;
+                let res_status = cursor
+                    .read_u16::<BigEndian>()
+                    .map_err(|e| Error::from(ErrorKind::Protocol { msg: e.to_string() }))?;
+                let res_status = Status::from(res_status);
+
+                let err_kind: SubdocErrorKind = match res_status {
+                    Status::SubDocDocTooDeep => SubdocErrorKind::DocTooDeep,
+                    Status::SubDocNotJSON => SubdocErrorKind::NotJSON,
+                    Status::SubDocPathNotFound => SubdocErrorKind::PathNotFound,
+                    Status::SubDocPathMismatch => SubdocErrorKind::PathMismatch,
+                    Status::SubDocPathInvalid => SubdocErrorKind::PathInvalid,
+                    Status::SubDocPathTooBig => SubdocErrorKind::PathTooBig,
+                    Status::SubDocPathExists => SubdocErrorKind::PathExists,
+                    Status::SubDocCantInsert => SubdocErrorKind::CantInsert,
+                    Status::SubDocBadRange => SubdocErrorKind::BadRange,
+                    Status::SubDocBadDelta => SubdocErrorKind::BadDelta,
+                    Status::SubDocValueTooDeep => SubdocErrorKind::ValueTooDeep,
+                    _ => SubdocErrorKind::UnknownStatus {status: res_status},
+                };
+
+                return Err(ServerError::new(
+                    ServerErrorKind::Subdoc{ error: SubdocError::new(err_kind, Some(op_index)) },
+                    resp.packet(),
+                    resp.local_addr(),
+                    resp.peer_addr()
+                ).into());
+            }
+        }
+
+        let mut doc_is_deleted = false;
+        if status == Status::SubDocSuccessDeleted {
+            doc_is_deleted = true;
+            // still considered a success
+        } else if status != Status::Success && status != Status::SubDocMultiPathFailure {
+            return Err(OpsCrud::decode_common_error(
+                resp.packet(),
+                resp.local_addr(),
+                resp.peer_addr(),
+            ));
+        }
+
+        let mut results: Vec<SubDocResult> = Vec::with_capacity(subdoc_info.op_count as usize);
+
+        if let Some(value) = &resp.packet().value {
+            let mut cursor = Cursor::new(value);
+
+            while cursor.position() < cursor.get_ref().len() as u64 {
+                if cursor.remaining() < 3 {
+                    return Err(Error::protocol_error("bad value length"));
+                }
+
+                let op_index = cursor
+                    .read_u8()
+                    .map_err(|e| Error::from(ErrorKind::Protocol { msg: e.to_string() }))?;
+
+                if op_index > results.len() as u8 {
+                    for _ in results.len() as u8..op_index {
+                        results.push(SubDocResult {
+                            err: None,
+                            value: None,
+                        });
+                    }
+                }
+
+                let op_status = cursor
+                    .read_u16::<BigEndian>()
+                    .map_err(|e| Error::from(ErrorKind::Protocol { msg: e.to_string() }))?;
+                let op_status = Status::from(op_status);
+
+                if op_status == Status::Success {
+                    let val_length = cursor
+                        .read_u32::<BigEndian>()
+                        .map_err(|e| Error::from(ErrorKind::Protocol { msg: e.to_string() }))?;
+
+                    let mut value = vec![0; val_length as usize];
+                    cursor.read_exact(&mut value)?;
+
+                    results.push(SubDocResult {
+                        err: None,
+                        value: Some(value),
+                    });
+                } else {
+                    return Err(Error::protocol_error("subdoc mutatein op illegally provided an error"));
+                }
+            }
+        }
+
+        if results.len() < subdoc_info.op_count as usize {
+            for _ in results.len()..subdoc_info.op_count as usize {
+                results.push(SubDocResult {
+                    err: None,
+                    value: None,
+                });
+            }
+        }
+
+        let mutation_token = if let Some(extras) = &packet.extras {
+            if extras.len() != 16 {
+                return Err(ErrorKind::Protocol {
+                    msg: "Bad extras length".to_string(),
+                }
+                    .into());
+            }
+            let mut extras = Cursor::new(extras);
+
+            Some(MutationToken {
+                vbuuid: extras
+                    .read_u64::<BigEndian>()
+                    .map_err(|e| Error::from(ErrorKind::Protocol { msg: e.to_string() }))?,
+                seqno: extras
+                    .read_u64::<BigEndian>()
+                    .map_err(|e| Error::from(ErrorKind::Protocol { msg: e.to_string() }))?,
+            })
+        } else {
+            None
+        };
+
+        let server_duration = if let Some(f) = &packet.framing_extras {
+            decode_res_ext_frames(f)?
+        } else {
+            None
+        };
+
+        Ok(MutateInResponse {
+            cas: resp.packet().cas.unwrap_or_default(),
+            ops: results,
+            mutation_token,
+            doc_is_deleted,
             server_duration,
         })
     }

@@ -3,6 +3,7 @@ use std::sync::Arc;
 use typed_builder::TypedBuilder;
 
 use crate::memdx::datatype::DataTypeFlag;
+use crate::memdx::subdoc::{MutateInOp, LookupInOp, SubdocDocFlag};
 use crate::memdx::durability_level::DurabilityLevel;
 use crate::retry::{RetryStrategy, DEFAULT_RETRY_STRATEGY};
 
@@ -211,6 +212,40 @@ pub struct DecrementOptions<'a> {
     pub delta: Option<u64>,
     #[builder(default, setter(into))]
     pub expiry: Option<u32>,
+    #[builder(default, setter(into))]
+    pub durability_level: Option<DurabilityLevel>,
+    #[builder(default=DEFAULT_RETRY_STRATEGY.clone())]
+    pub retry_strategy: Arc<dyn RetryStrategy>,
+}
+
+#[derive(Clone, Debug, TypedBuilder)]
+#[non_exhaustive]
+pub struct LookupInOptions<'a> {
+    pub key: &'a [u8],
+    pub scope_name: &'a str,
+    pub collection_name: &'a str,
+    pub ops: &'a [LookupInOp<'a>],
+    #[builder(default, setter(into))]
+    pub flags: Option<SubdocDocFlag>,
+    #[builder(default=DEFAULT_RETRY_STRATEGY.clone())]
+    pub retry_strategy: Arc<dyn RetryStrategy>,
+}
+
+#[derive(Clone, Debug, TypedBuilder)]
+#[non_exhaustive]
+pub struct MutateInOptions<'a> {
+    pub key: &'a [u8],
+    pub scope_name: &'a str,
+    pub collection_name: &'a str,
+    pub ops: &'a [MutateInOp<'a>],
+    #[builder(default, setter(into))]
+    pub flags: Option<SubdocDocFlag>,
+    #[builder(default, setter(into))]
+    pub expiry: Option<u32>,
+    #[builder(default, setter(into))]
+    pub preserve_expiry: Option<bool>,
+    #[builder(default, setter(into))]
+    pub cas: Option<u64>,
     #[builder(default, setter(into))]
     pub durability_level: Option<DurabilityLevel>,
     #[builder(default=DEFAULT_RETRY_STRATEGY.clone())]

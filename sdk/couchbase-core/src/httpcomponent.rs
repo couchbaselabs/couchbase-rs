@@ -125,7 +125,7 @@ impl<C: Client> HttpComponent<C> {
             return Ok(None);
         }
 
-        let endpoint_idx = rand::thread_rng().gen_range(0..remaining_endpoints.len());
+        let endpoint_idx = rand::rng().random_range(0..remaining_endpoints.len());
         let endpoint_id = endpoint_ids[endpoint_idx];
         let endpoint = remaining_endpoints[endpoint_id];
 

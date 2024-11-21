@@ -304,6 +304,19 @@ impl Display for ResourceError {
 
 impl StdError for ResourceError {}
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub struct SubdocError {
+    pub kind: SubdocErrorKind,
+    pub op_index: Option<u8>
+}
+
+impl SubdocError {
+    pub(crate) fn new(kind: SubdocErrorKind, op_index: Option<u8>) -> Self {
+        Self { kind, op_index }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ServerError {
@@ -329,6 +342,18 @@ impl Display for ServerError {
         }
 
         write!(f, "{}", base_msg)
+    }
+}
+
+impl Display for SubdocError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        if let Some(op_index) = self.op_index {
+            let base_msg = format!("Subdoc error: {}, op_index: {}", self.kind, op_index);
+            write!(f, "{}", base_msg)
+        } else {
+            let base_msg = format!("Subdoc error: {}", self.kind);
+            write!(f, "{}", base_msg)
+        }
     }
 }
 
@@ -423,6 +448,8 @@ pub enum ServerErrorKind {
     NotMyVbucket,
     #[error("Key exists")]
     KeyExists,
+    #[error("key not stored")]
+    NotStored,
     #[error("Key not found")]
     KeyNotFound,
     #[error("Temporary failure")]
@@ -451,7 +478,58 @@ pub enum ServerErrorKind {
     UnknownScopeName,
     #[error("collection name unknown")]
     UnknownCollectionName,
+    #[error("{error}")]
+    Subdoc{ error: SubdocError },
     #[error("Server status unexpected for operation: {status}")]
+    UnknownStatus { status: Status },
+}
+
+#[derive(Error, Clone, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum SubdocErrorKind {
+    #[error("subdoc path not found")]
+    PathNotFound,
+    #[error("subdoc path mismatch")]
+    PathMismatch,
+    #[error("subdoc path invalid")]
+    PathInvalid,
+    #[error("subdoc path too big")]
+    PathTooBig,
+    #[error("subdoc doc too deep")]
+    DocTooDeep,
+    #[error("subdoc can't insert")]
+    CantInsert,
+    #[error("subdoc not JSON")]
+    NotJSON,
+    #[error("subdoc bad range")]
+    BadRange,
+    #[error("subdoc bad delta")]
+    BadDelta,
+    #[error("subdoc path exists")]
+    PathExists,
+    #[error("subdoc value too deep")]
+    ValueTooDeep,
+    #[error("subdoc invalid combo")]
+    InvalidCombo,
+    #[error("subdoc xattr invalid flag combo")]
+    XattrInvalidFlagCombo,
+    #[error("subdoc xattr invalid key combo")]
+    XattrInvalidKeyCombo,
+    #[error("subdoc xattr unknown macro")]
+    XattrUnknownMacro,
+    #[error("subdoc xattr unknown vattr")]
+    XattrUnknownVAttr,
+    #[error("subdoc xattr cannot modify vattr")]
+    XattrCannotModifyVAttr,
+    #[error("subdoc invalid xattr order")]
+    InvalidXattrOrder,
+    #[error("subdoc Xattr unknown vattr macro")]
+    XattrUnknownVattrMacro,
+    #[error("subdoc can only revive deleted documents")]
+    CanOnlyReviveDeletedDocuments,
+    #[error("subdoc deleted document can't have value")]
+    DeletedDocumentCantHaveValue,
+    #[error("subdoc unknown status unexpected for operation: {status}")]
     UnknownStatus { status: Status },
 }
 
@@ -509,3 +587,4 @@ impl From<io::Error> for Error {
         }
     }
 }
+

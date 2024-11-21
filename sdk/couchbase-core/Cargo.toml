@@ -16,7 +16,7 @@ hmac = "0.12"
 http = "1.1.0"
 lazy_static = "1.5.0"
 log = "0.4.20"
-rand = "0.9.0-alpha.2"
+rand = "0.9.0-beta.0"
 regex = "1.10.5"
 reqwest = { version = "0.12.5", features = ["json", "stream"], default-features = false }
 serde = { version = "1.0.203", features = ["derive"] }

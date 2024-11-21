@@ -10,18 +10,8 @@ use crate::memdx::ops_core::OpsCore;
 use crate::memdx::ops_crud::OpsCrud;
 use crate::memdx::ops_util::OpsUtil;
 use crate::memdx::pendingop::PendingOp;
-use crate::memdx::request::{
-    AddRequest, AppendRequest, DecrementRequest, DeleteRequest, GetAndLockRequest,
-    GetAndTouchRequest, GetClusterConfigRequest, GetCollectionIdRequest, GetMetaRequest,
-    GetRequest, IncrementRequest, PrependRequest, ReplaceRequest, SelectBucketRequest, SetRequest,
-    TouchRequest, UnlockRequest,
-};
-use crate::memdx::response::{
-    AddResponse, AppendResponse, BootstrapResult, DecrementResponse, DeleteResponse,
-    GetAndLockResponse, GetAndTouchResponse, GetClusterConfigResponse, GetCollectionIdResponse,
-    GetMetaResponse, GetResponse, IncrementResponse, PrependResponse, ReplaceResponse,
-    SelectBucketResponse, SetResponse, TouchResponse, UnlockResponse,
-};
+use crate::memdx::request::{AddRequest, AppendRequest, DecrementRequest, DeleteRequest, GetAndLockRequest, GetAndTouchRequest, GetClusterConfigRequest, GetCollectionIdRequest, GetMetaRequest, GetRequest, IncrementRequest, LookupInRequest, MutateInRequest, PrependRequest, ReplaceRequest, SelectBucketRequest, SetRequest, TouchRequest, UnlockRequest};
+use crate::memdx::response::{AddResponse, AppendResponse, BootstrapResult, DecrementResponse, DeleteResponse, GetAndLockResponse, GetAndTouchResponse, GetClusterConfigResponse, GetCollectionIdResponse, GetMetaResponse, GetResponse, IncrementResponse, LookupInResponse, MutateInResponse, PrependResponse, ReplaceResponse, SelectBucketResponse, SetResponse, TouchResponse, UnlockResponse};
 
 pub(crate) trait KvClientOps: Sized + Send + Sync {
     fn set(&self, req: SetRequest) -> impl Future<Output = Result<SetResponse>> + Send;
@@ -51,6 +41,16 @@ pub(crate) trait KvClientOps: Sized + Send + Sync {
         &self,
         req: DecrementRequest,
     ) -> impl Future<Output = Result<DecrementResponse>> + Send;
+
+    fn lookup_in(
+        &self,
+        req: LookupInRequest,
+    ) -> impl Future<Output = Result<LookupInResponse>> + Send;
+
+    fn mutate_in(
+        &self,
+        req: MutateInRequest,
+    ) -> impl Future<Output = Result<MutateInResponse>> + Send;
     fn get_cluster_config(
         &self,
         req: GetClusterConfigRequest,
@@ -158,6 +158,20 @@ where
 
     async fn decrement<'a>(&self, req: DecrementRequest<'a>) -> Result<DecrementResponse> {
         let mut op = self.ops_crud().decrement(self.client(), req).await?;
+
+        let res = op.recv().await?;
+        Ok(res)
+    }
+
+    async fn lookup_in<'a>(&self, req: LookupInRequest<'a>) -> Result<LookupInResponse> {
+        let mut op = self.ops_crud().lookup_in(self.client(), req).await?;
+
+        let res = op.recv().await?;
+        Ok(res)
+    }
+
+    async fn mutate_in<'a>(&self, req: MutateInRequest<'a>) -> Result<MutateInResponse> {
+        let mut op = self.ops_crud().mutate_in(self.client(), req).await?;
 
         let res = op.recv().await?;
         Ok(res)

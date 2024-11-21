@@ -6,27 +6,15 @@ use futures::{FutureExt, TryFutureExt};
 
 use crate::collectionresolver::{orchestrate_memd_collection_id, CollectionResolver};
 use crate::compressionmanager::{CompressionManager, Compressor};
-use crate::crudoptions::{
-    AddOptions, AppendOptions, DecrementOptions, DeleteOptions, GetAndLockOptions,
-    GetAndTouchOptions, GetMetaOptions, GetOptions, IncrementOptions, PrependOptions,
-    ReplaceOptions, TouchOptions, UnlockOptions, UpsertOptions,
-};
-use crate::crudresults::{
-    AddResult, AppendResult, DecrementResult, DeleteResult, GetAndLockResult, GetAndTouchResult,
-    GetMetaResult, GetResult, IncrementResult, PrependResult, ReplaceResult, TouchResult,
-    UnlockResult, UpsertResult,
-};
+use crate::crudoptions::{AddOptions, AppendOptions, DecrementOptions, DeleteOptions, GetAndLockOptions, GetAndTouchOptions, GetMetaOptions, GetOptions, IncrementOptions, LookupInOptions, MutateInOptions, PrependOptions, ReplaceOptions, TouchOptions, UnlockOptions, UpsertOptions};
+use crate::crudresults::{AddResult, AppendResult, DecrementResult, DeleteResult, GetAndLockResult, GetAndTouchResult, GetMetaResult, GetResult, IncrementResult, LookupInResult, MutateInResult, PrependResult, ReplaceResult, TouchResult, UnlockResult, UpsertResult};
 use crate::error::Result;
 use crate::kvclient::KvClient;
 use crate::kvclient_ops::KvClientOps;
 use crate::kvclientmanager::{orchestrate_memd_client, KvClientManager, KvClientManagerClientType};
 use crate::memdx::datatype::DataTypeFlag;
 use crate::memdx::hello_feature::HelloFeature;
-use crate::memdx::request::{
-    AddRequest, AppendRequest, DecrementRequest, DeleteRequest, GetAndLockRequest,
-    GetAndTouchRequest, GetMetaRequest, GetRequest, IncrementRequest, PrependRequest,
-    ReplaceRequest, SetRequest, TouchRequest, UnlockRequest,
-};
+use crate::memdx::request::{AddRequest, AppendRequest, DecrementRequest, DeleteRequest, GetAndLockRequest, GetAndTouchRequest, GetMetaRequest, GetRequest, IncrementRequest, LookupInRequest, MutateInRequest, PrependRequest, ReplaceRequest, SetRequest, TouchRequest, UnlockRequest};
 use crate::mutationtoken::MutationToken;
 use crate::nmvbhandler::NotMyVbucketConfigHandler;
 use crate::retry::{orchestrate_retries, RetryInfo, RetryManager};
@@ -594,6 +582,75 @@ impl<
             },
         )
         .await
+    }
+
+    pub async fn lookup_in<'a>(&self, opts: LookupInOptions<'a>) -> Result<LookupInResult> {
+        self.orchestrate_simple_crud(
+            opts.key,
+            RetryInfo::new(true, opts.retry_strategy),
+            opts.scope_name,
+            opts.collection_name,
+            async |collection_id, manifest_id, endpoint, vbucket_id, client| {
+                client
+                    .lookup_in(LookupInRequest {
+                        collection_id,
+                        key: opts.key,
+                        vbucket_id,
+                        flags: opts.flags,
+                        ops: opts.ops,
+                        on_behalf_of: None,
+                    })
+                    .map_ok(|resp| {
+                        LookupInResult {
+                            value: resp.ops,
+                            cas: resp.cas,
+                            doc_is_deleted: resp.doc_is_deleted,
+                        }
+                    })
+                    .await
+            },
+        )
+            .await
+    }
+
+    pub async fn mutate_in<'a>(&self, opts: MutateInOptions<'a>) -> Result<MutateInResult> {
+        self.orchestrate_simple_crud(
+            opts.key,
+            RetryInfo::new(false, opts.retry_strategy),
+            opts.scope_name,
+            opts.collection_name,
+            async |collection_id, manifest_id, endpoint, vbucket_id, client| {
+                client
+                    .mutate_in(MutateInRequest {
+                        collection_id,
+                        key: opts.key,
+                        vbucket_id,
+                        flags: opts.flags,
+                        ops: opts.ops,
+                        expiry: opts.expiry,
+                        preserve_expiry: opts.preserve_expiry,
+                        cas: opts.cas,
+                        on_behalf_of: None,
+                        durability_level: opts.durability_level,
+                        durability_level_timeout: None,
+                    })
+                    .map_ok(|resp| {
+                        let mutation_token = resp.mutation_token.map(|t| MutationToken {
+                            vbid: vbucket_id,
+                            vbuuid: t.vbuuid,
+                            seqno: t.seqno,
+                        });
+
+                        MutateInResult {
+                            value: resp.ops,
+                            cas: resp.cas,
+                            mutation_token
+                        }
+                    })
+                    .await
+            },
+        )
+            .await
     }
 
     pub(crate) async fn orchestrate_simple_crud<Fut, Resp>(
