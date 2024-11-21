@@ -1,14 +1,6 @@
 use crate::agent::Agent;
-use crate::crudoptions::{
-    AddOptions, AppendOptions, DecrementOptions, DeleteOptions, GetAndLockOptions,
-    GetAndTouchOptions, GetMetaOptions, GetOptions, IncrementOptions, PrependOptions,
-    ReplaceOptions, TouchOptions, UnlockOptions, UpsertOptions,
-};
-use crate::crudresults::{
-    AddResult, AppendResult, DecrementResult, DeleteResult, GetAndLockResult, GetAndTouchResult,
-    GetMetaResult, GetResult, IncrementResult, PrependResult, ReplaceResult, TouchResult,
-    UnlockResult, UpsertResult,
-};
+use crate::crudoptions::{AddOptions, AppendOptions, DecrementOptions, DeleteOptions, GetAndLockOptions, GetAndTouchOptions, GetMetaOptions, GetOptions, IncrementOptions, LookupInOptions, MutateInOptions, PrependOptions, ReplaceOptions, TouchOptions, UnlockOptions, UpsertOptions};
+use crate::crudresults::{AddResult, AppendResult, DecrementResult, DeleteResult, GetAndLockResult, GetAndTouchResult, GetMetaResult, GetResult, IncrementResult, LookupInResult, MutateInResult, PrependResult, ReplaceResult, TouchResult, UnlockResult, UpsertResult};
 use crate::error::Result;
 use crate::querycomponent::QueryResultStream;
 use crate::queryoptions::QueryOptions;
@@ -73,6 +65,14 @@ impl Agent {
 
     pub async fn decrement<'a>(&self, opts: DecrementOptions<'a>) -> Result<DecrementResult> {
         self.inner.crud.decrement(opts).await
+    }
+
+    pub async fn lookup_in<'a>(&self, opts: LookupInOptions<'a>) -> Result<LookupInResult> {
+        self.inner.crud.lookup_in(opts).await
+    }
+
+    pub async fn mutate_in<'a>(&self, opts: MutateInOptions<'a>) -> Result<MutateInResult> {
+        self.inner.crud.mutate_in(opts).await
     }
 
     pub async fn query(&self, opts: QueryOptions) -> Result<QueryResultStream> {

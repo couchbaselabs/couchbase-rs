@@ -259,7 +259,7 @@ impl Error for ScramError {}
 fn generate_nonce() -> Result<Vec<u8>, ScramError> {
     const NONCE_LEN: usize = 6;
     let mut buf = vec![0u8; NONCE_LEN];
-    rand::thread_rng().fill_bytes(&mut buf);
+    rand::rng().fill_bytes(&mut buf);
 
     let mut target = vec![0; buf.len() * 4 / 3 + 4];
 

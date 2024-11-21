@@ -36,7 +36,7 @@ impl OpsUtil {
                 value,
                 framing_extras: None,
                 opaque: None,
-            })
+            }, None)
             .await?;
 
         Ok(StandardPendingOp::new(op))

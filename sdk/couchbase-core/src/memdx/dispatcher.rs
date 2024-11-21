@@ -3,6 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use futures::future::BoxFuture;
 
+use crate::memdx::client::ResponseContext;
 use crate::memdx::connection::ConnectionType;
 use crate::memdx::error::Result;
 use crate::memdx::packet::{RequestPacket, ResponsePacket};
@@ -20,6 +21,6 @@ pub struct DispatcherOptions {
 #[async_trait]
 pub trait Dispatcher: Send + Sync {
     fn new(conn: ConnectionType, opts: DispatcherOptions) -> Self;
-    async fn dispatch(&self, packet: RequestPacket) -> Result<ClientPendingOp>;
+    async fn dispatch(&self, packet: RequestPacket, response_context: Option<ResponseContext>) -> Result<ClientPendingOp>;
     async fn close(&self) -> Result<()>;
 }

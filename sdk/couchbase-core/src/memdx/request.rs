@@ -3,6 +3,7 @@ use std::time::Duration;
 use crate::memdx::auth_mechanism::AuthMechanism;
 use crate::memdx::durability_level::DurabilityLevel;
 use crate::memdx::hello_feature::HelloFeature;
+use crate::memdx::subdoc::{LookupInOp, MutateInOp, SubdocDocFlag};
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct HelloRequest {
@@ -200,6 +201,29 @@ pub struct DecrementRequest<'a> {
     pub initial: Option<u64>,
     pub delta: Option<u64>,
     pub expiry: Option<u32>,
+    pub on_behalf_of: Option<String>,
+    pub durability_level: Option<DurabilityLevel>,
+    pub durability_level_timeout: Option<Duration>,
+}
+
+pub struct LookupInRequest<'a> {
+    pub collection_id: u32,
+    pub key: &'a [u8],
+    pub vbucket_id: u16,
+    pub flags: Option<SubdocDocFlag>,
+    pub ops: &'a [LookupInOp<'a>],
+    pub on_behalf_of: Option<String>,
+}
+
+pub struct MutateInRequest<'a> {
+    pub collection_id: u32,
+    pub key: &'a [u8],
+    pub vbucket_id: u16,
+    pub flags: Option<SubdocDocFlag>,
+    pub ops: &'a [MutateInOp<'a>],
+    pub expiry: Option<u32>,
+    pub preserve_expiry: Option<bool>,
+    pub cas: Option<u64>,
     pub on_behalf_of: Option<String>,
     pub durability_level: Option<DurabilityLevel>,
     pub durability_level_timeout: Option<Duration>,

@@ -1,9 +1,8 @@
 use std::net::SocketAddr;
 use std::time::Duration;
-
-use byteorder::{BigEndian, WriteBytesExt};
+use byteorder::{BigEndian, WriteBytesExt, ByteOrder};
 use bytes::{BufMut, BytesMut};
-
+use crate::memdx::client::ResponseContext;
 use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::durability_level::{DurabilityLevel, DurabilityLevelSettings};
 use crate::memdx::error::Result;
@@ -14,17 +13,10 @@ use crate::memdx::opcode::OpCode;
 use crate::memdx::ops_core::OpsCore;
 use crate::memdx::packet::{RequestPacket, ResponsePacket};
 use crate::memdx::pendingop::StandardPendingOp;
-use crate::memdx::request::{
-    AddRequest, AppendRequest, DecrementRequest, DeleteRequest, GetAndLockRequest,
-    GetAndTouchRequest, GetMetaRequest, GetRequest, IncrementRequest, PrependRequest,
-    ReplaceRequest, SetRequest, TouchRequest, UnlockRequest,
-};
-use crate::memdx::response::{
-    AddResponse, AppendResponse, DecrementResponse, DeleteResponse, GetAndLockResponse,
-    GetAndTouchResponse, GetMetaResponse, GetResponse, IncrementResponse, PrependResponse,
-    ReplaceResponse, SetResponse, TouchResponse, UnlockResponse,
-};
+use crate::memdx::request::{AddRequest, AppendRequest, DecrementRequest, DeleteRequest, GetAndLockRequest, GetAndTouchRequest, GetMetaRequest, GetRequest, IncrementRequest, LookupInRequest, MutateInRequest, PrependRequest, ReplaceRequest, SetRequest, TouchRequest, UnlockRequest};
+use crate::memdx::response::{AddResponse, AppendResponse, DecrementResponse, DeleteResponse, GetAndLockResponse, GetAndTouchResponse, GetMetaResponse, GetResponse, IncrementResponse, LookupInResponse, MutateInResponse, PrependResponse, ReplaceResponse, SetResponse, TouchResponse, UnlockResponse};
 use crate::memdx::status::Status;
+use crate::memdx::subdoc::SubdocRequestInfo;
 
 #[derive(Debug)]
 pub struct OpsCrud {
@@ -93,7 +85,7 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet).await?;
+        let pending_op = dispatcher.dispatch(packet, None).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -131,7 +123,7 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet).await?;
+        let pending_op = dispatcher.dispatch(packet, None).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -173,7 +165,7 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet).await?;
+        let pending_op = dispatcher.dispatch(packet, None).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -216,7 +208,7 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet).await?;
+        let pending_op = dispatcher.dispatch(packet, None).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -265,7 +257,7 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet).await?;
+        let pending_op = dispatcher.dispatch(packet, None).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -314,7 +306,7 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet).await?;
+        let pending_op = dispatcher.dispatch(packet, None).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -352,7 +344,7 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet).await?;
+        let pending_op = dispatcher.dispatch(packet, None).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -401,7 +393,7 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet).await?;
+        let pending_op = dispatcher.dispatch(packet, None).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -464,7 +456,7 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet).await?;
+        let pending_op = dispatcher.dispatch(packet, None).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -477,6 +469,10 @@ impl OpsCrud {
     where
         D: Dispatcher,
     {
+        if request.expiry.is_some() && request.preserve_expiry.is_some() {
+            return Err(Error::protocol_error("Cannot specify expiry and preserve expiry"));
+        }
+
         let mut ext_frame_buf: Vec<u8> = vec![];
         let magic = self.encode_req_ext_frames(
             request.durability_level,
@@ -527,7 +523,7 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet).await?;
+        let pending_op = dispatcher.dispatch(packet, None).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -570,7 +566,7 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet).await?;
+        let pending_op = dispatcher.dispatch(packet, None).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -613,7 +609,7 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet).await?;
+        let pending_op = dispatcher.dispatch(packet, None).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -701,7 +697,7 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet).await?;
+        let pending_op = dispatcher.dispatch(packet, None).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -747,7 +743,192 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet).await?;
+        let pending_op = dispatcher.dispatch(packet, None).await?;
+
+        Ok(StandardPendingOp::new(pending_op))
+    }
+
+    pub async fn lookup_in<'a, D>(
+        &self,
+        dispatcher: &D,
+        request: LookupInRequest<'a>,
+    ) -> Result<StandardPendingOp<LookupInResponse>>
+    where
+        D: Dispatcher,
+    {
+        let mut ext_frame_buf: Vec<u8> = vec![];
+        let magic = self.encode_req_ext_frames(
+            None,
+            None,
+            None,
+            request.on_behalf_of,
+            &mut ext_frame_buf,
+        )?;
+
+        let framing_extras = if !ext_frame_buf.is_empty() {
+            Some(ext_frame_buf)
+        } else {
+            None
+        };
+
+        let key = self.encode_collection_and_key(request.collection_id, request.key)?;
+
+        let len_ops = request.ops.len();
+        let mut path_bytes_list: Vec<Vec<u8>> = vec![vec![]; len_ops];
+        let mut path_bytes_total = 0;
+
+        for (i, op) in request.ops.iter().enumerate() {
+            let path_bytes = op.path.to_vec();
+            path_bytes_total += path_bytes.len();
+            path_bytes_list[i] = path_bytes;
+        }
+
+        let mut value_buf: Vec<u8> = vec![0; len_ops * 4 + path_bytes_total];
+        let mut value_iter = 0;
+        for (i, op) in request.ops.iter().enumerate() {
+            let path_bytes = &path_bytes_list[i];
+            let path_bytes_len = path_bytes.len();
+
+            value_buf[value_iter] = Into::<OpCode>::into(op.op).into();
+            value_buf[value_iter + 1] = op.flags as u8;
+            BigEndian::write_u16(&mut value_buf[value_iter + 2..value_iter + 4], path_bytes_len as u16);
+            value_buf[value_iter + 4..value_iter + 4 + path_bytes_len].copy_from_slice(path_bytes);
+            value_iter += 4 + path_bytes_len;
+        }
+
+        let mut extra_buf = Vec::with_capacity(8);
+
+        if let Some(flags) = request.flags {
+            extra_buf.push(flags as u8);
+        }
+
+        let packet = RequestPacket {
+            magic,
+            op_code: OpCode::SubDocMultiLookup,
+            datatype: 0,
+            vbucket_id: Some(request.vbucket_id),
+            cas: None,
+            extras: Some(extra_buf),
+            key: Some(key),
+            value: Some(value_buf),
+            framing_extras,
+            opaque: None,
+        };
+
+        let response_context = ResponseContext {
+            cas: packet.cas,
+            subdoc_info: Some(SubdocRequestInfo {
+                flags: request.flags,
+                op_count: request.ops.len() as u8,
+            })
+        };
+
+        let pending_op = dispatcher.dispatch(packet, Some(response_context)).await?;
+
+        Ok(StandardPendingOp::new(pending_op))
+    }
+
+    pub async fn mutate_in<'a, D>(
+        &self,
+        dispatcher: &D,
+        request: MutateInRequest<'a>,
+    ) -> Result<StandardPendingOp<MutateInResponse>>
+    where
+        D: Dispatcher,
+    {
+        if request.expiry.is_some() && request.preserve_expiry.is_some() {
+            return Err(Error::protocol_error("Cannot specify expiry and preserve expiry"));
+        }
+
+        let mut ext_frame_buf: Vec<u8> = vec![];
+        let magic = self.encode_req_ext_frames(
+            request.durability_level,
+            request.durability_level_timeout,
+            request.preserve_expiry,
+            request.on_behalf_of,
+            &mut ext_frame_buf,
+        )?;
+
+        let framing_extras = if !ext_frame_buf.is_empty() {
+            Some(ext_frame_buf)
+        } else {
+            None
+        };
+
+        let key = self.encode_collection_and_key(request.collection_id, request.key)?;
+
+        let len_ops = request.ops.len();
+        let mut path_bytes_list: Vec<Vec<u8>> = vec![vec![]; len_ops];
+        let mut path_bytes_total = 0;
+        let mut value_bytes_total = 0;
+
+        for (i, op) in request.ops.iter().enumerate() {
+            let path_bytes = op.path.to_vec();
+            path_bytes_total += path_bytes.len();
+            path_bytes_list[i] = path_bytes;
+            value_bytes_total += op.value.len();
+        }
+
+        let mut value_buf: Vec<u8> = vec![0; len_ops * 8 + path_bytes_total + value_bytes_total];
+        let mut value_iter = 0;
+
+        for (i, op) in request.ops.iter().enumerate() {
+            let path_bytes = &path_bytes_list[i];
+            let path_bytes_len = path_bytes.len();
+            let value_bytes_len = op.value.len();
+
+            value_buf[value_iter] = Into::<OpCode>::into(op.op).into();
+            value_buf[value_iter + 1] = op.flags as u8;
+            BigEndian::write_u16(&mut value_buf[value_iter + 2..value_iter + 4], path_bytes_len as u16);
+            BigEndian::write_u32(&mut value_buf[value_iter + 4.. value_iter + 8], value_bytes_len as u32);
+            value_buf[value_iter + 8..value_iter + 8 + path_bytes_len].copy_from_slice(path_bytes);
+            value_buf[value_iter + 8 + path_bytes_len..value_iter + 8 + path_bytes_len + value_bytes_len].copy_from_slice(op.value);
+            value_iter += 8 + path_bytes_len + value_bytes_len;
+        }
+
+        let mut extra_buf: Vec<u8> = Vec::with_capacity(5);
+
+        extra_buf.write_u32::<BigEndian>(request.expiry.unwrap_or_default())
+            .map_err(|e| {
+                Error::invalid_argument_error_with_source(
+                    "failed to write request expiry",
+                    "expiry",
+                    Box::new(e),
+                )
+            })?;
+
+        if let Some(flags) = request.flags {
+            extra_buf.write_u8(flags as u8).map_err(|e| {
+                Error::invalid_argument_error_with_source(
+                    "failed to write request flags",
+                    "flags",
+                    Box::new(e),
+                )
+            })?;
+        }
+
+        let packet = RequestPacket {
+            magic,
+            op_code: OpCode::SubDocMultiMutation,
+            datatype: 0,
+            vbucket_id: Some(request.vbucket_id),
+            cas: request.cas,
+            extras: Some(extra_buf),
+            key: Some(key),
+            value: Some(value_buf),
+            framing_extras,
+            opaque: None,
+        };
+
+        let response_context = ResponseContext {
+            cas: request.cas,
+            subdoc_info: Some(SubdocRequestInfo {
+                flags: request.flags,
+                op_count: request.ops.len() as u8,
+            })
+        };
+
+        let pending_op = dispatcher.dispatch(packet, Some(response_context)).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
