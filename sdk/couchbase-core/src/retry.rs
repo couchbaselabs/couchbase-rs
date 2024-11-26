@@ -163,11 +163,11 @@ where
 
 pub(crate) fn error_to_retry_reason(err: &Error) -> Option<RetryReason> {
     match err.kind.as_ref() {
-        ErrorKind::Memdx(e) => {
-            if e.is_notmyvbucket_error() {
+        ErrorKind::Memdx { source, .. } => {
+            if source.is_notmyvbucket_error() {
                 return Some(RetryReason::NotMyVbucket);
             }
-            if e.is_tmp_fail_error() {
+            if source.is_tmp_fail_error() {
                 return Some(RetryReason::TempFail);
             }
         }

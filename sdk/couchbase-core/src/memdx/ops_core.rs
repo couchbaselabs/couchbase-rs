@@ -1,11 +1,10 @@
 use std::io::Write;
-use std::net::SocketAddr;
 
 use byteorder::{BigEndian, WriteBytesExt};
 
 use crate::memdx::dispatcher::Dispatcher;
-use crate::memdx::error::{ServerError, ServerErrorKind};
 use crate::memdx::error::Result;
+use crate::memdx::error::{ServerError, ServerErrorKind};
 use crate::memdx::magic::Magic;
 use crate::memdx::op_auth_saslauto::OpSASLAutoEncoder;
 use crate::memdx::op_auth_saslbyname::OpSASLAuthByNameEncoder;
@@ -31,10 +30,8 @@ impl OpsCore {
     pub(crate) fn decode_error_context(
         resp: &ResponsePacket,
         kind: ServerErrorKind,
-        dispatched_to: &Option<SocketAddr>,
-        dispatched_from: &Option<SocketAddr>,
     ) -> ServerError {
-        let mut base_cause = ServerError::new(kind, resp, dispatched_to, dispatched_from);
+        let mut base_cause = ServerError::new(kind, resp);
 
         if let Some(value) = &resp.value {
             if resp.status == Status::NotMyVbucket {
@@ -48,11 +45,7 @@ impl OpsCore {
         base_cause
     }
 
-    pub(crate) fn decode_error(
-        resp: &ResponsePacket,
-        dispatched_to: &Option<SocketAddr>,
-        dispatched_from: &Option<SocketAddr>,
-    ) -> ServerError {
+    pub(crate) fn decode_error(resp: &ResponsePacket) -> ServerError {
         let status = resp.status;
         let base_error_kind = if status == Status::NotMyVbucket {
             ServerErrorKind::NotMyVbucket
@@ -64,7 +57,7 @@ impl OpsCore {
             ServerErrorKind::UnknownStatus { status }
         };
 
-        Self::decode_error_context(resp, base_error_kind, dispatched_to, dispatched_from)
+        Self::decode_error_context(resp, base_error_kind)
     }
 }
 

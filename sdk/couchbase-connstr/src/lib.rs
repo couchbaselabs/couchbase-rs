@@ -1,6 +1,8 @@
 pub mod error;
 
 use error::ErrorKind;
+use hickory_resolver::TokioAsyncResolver;
+use log::debug;
 use regex::Regex;
 use std::collections::HashMap;
 use std::fmt;
@@ -50,7 +52,7 @@ impl ConnSpec {
             let scheme = scheme_type.as_str();
             if (scheme != "couchbase" && scheme != "couchbases")
                 || self.hosts.len() != 1
-                || self.hosts[0].port.is_none()
+                || self.hosts[0].port.is_some()
             {
                 return None;
             }
@@ -179,7 +181,7 @@ pub struct ResolvedConnSpec {
     pub options: HashMap<String, Vec<String>>,
 }
 
-pub fn resolve(conn_spec: ConnSpec) -> error::Result<ResolvedConnSpec> {
+pub async fn resolve(conn_spec: ConnSpec) -> error::Result<ResolvedConnSpec> {
     let (default_port, has_explicit_scheme, use_ssl) = if let Some(scheme) = &conn_spec.scheme {
         match scheme.as_str() {
             "couchbase" => (DEFAULT_MEMD_PORT, true, false),
@@ -197,7 +199,7 @@ pub fn resolve(conn_spec: ConnSpec) -> error::Result<ResolvedConnSpec> {
     };
 
     if let Some(srv_record) = conn_spec.srv_record() {
-        match lookup_srv(&srv_record.scheme, &srv_record.proto, &srv_record.host) {
+        match lookup_srv(&srv_record.scheme, &srv_record.proto, &srv_record.host).await {
             Ok(srv_records) => {
                 return Ok(ResolvedConnSpec {
                     use_ssl,
@@ -211,7 +213,9 @@ pub fn resolve(conn_spec: ConnSpec) -> error::Result<ResolvedConnSpec> {
                     options: conn_spec.options,
                 });
             }
-            Err(_e) => {}
+            Err(e) => {
+                debug!("Srv lookup failed {}", e);
+            }
         };
     };
 
@@ -309,22 +313,23 @@ fn handle_couchbase2_scheme(conn_spec: ConnSpec) -> error::Result<ResolvedConnSp
     })
 }
 
-fn lookup_srv(scheme: &str, proto: &str, host: &str) -> error::Result<Vec<Address>> {
+async fn lookup_srv(scheme: &str, proto: &str, host: &str) -> error::Result<Vec<Address>> {
     use hickory_resolver::config::*;
-    use hickory_resolver::Resolver;
 
-    let resolver = Resolver::new(ResolverConfig::default(), ResolverOpts::default())?;
+    let resolver = TokioAsyncResolver::tokio(ResolverConfig::default(), ResolverOpts::default());
 
     let name = format!("_{}._{}.{}", scheme, proto, host);
-    let response = resolver.srv_lookup(name)?;
+    let response = resolver.srv_lookup(name).await?;
 
-    Ok(response
-        .iter()
-        .map(|record| Address {
-            host: record.target().to_string(),
-            port: record.port(),
-        })
-        .collect())
+    let mut addresses = vec![];
+    for addr in response.iter() {
+        addresses.push(Address {
+            host: addr.target().to_string(),
+            port: addr.port(),
+        });
+    }
+
+    Ok(addresses)
 }
 
 fn host_is_ip_address(host: &str) -> bool {
@@ -343,8 +348,9 @@ mod test {
         parse(conn_str).unwrap_or_else(|e| panic!("Failed to parse {}: {:?}", conn_str, e))
     }
 
-    fn resolve_or_die(conn_spec: ConnSpec) -> ResolvedConnSpec {
+    async fn resolve_or_die(conn_spec: ConnSpec) -> ResolvedConnSpec {
         resolve(conn_spec.clone())
+            .await
             .unwrap_or_else(|e| panic!("Failed to resolve {:?}: {:?}", conn_spec, e))
     }
 
@@ -395,7 +401,7 @@ mod test {
         }
     }
 
-    fn check_default_spec(
+    async fn check_default_spec(
         conn_str: &str,
         expected_spec: ConnSpec,
         expect_memd_hosts: Vec<Address>,
@@ -408,7 +414,7 @@ mod test {
         check_address_parsing(conn_str, &cs, &expected_spec, check_str);
         check_option_parsing(&cs, &expected_spec);
 
-        let rcs = resolve_or_die(cs);
+        let rcs = resolve_or_die(cs).await;
 
         assert_eq!(rcs.use_ssl, use_ssl, "Did not correctly mark SSL");
 
@@ -425,7 +431,7 @@ mod test {
         }
     }
 
-    fn check_couchbase2_server_spec(
+    async fn check_couchbase2_server_spec(
         conn_str: &str,
         expected_spec: ConnSpec,
         expect_address: Address,
@@ -435,7 +441,7 @@ mod test {
         check_address_parsing(conn_str, &cs, &expected_spec, true);
         check_option_parsing(&cs, &expected_spec);
 
-        let rcs = resolve_or_die(cs);
+        let rcs = resolve_or_die(cs).await;
 
         assert!(rcs.couchbase2_host.is_some(), "Couchbase2 host was missing");
         let couchbase2_host = rcs.couchbase2_host.unwrap();
@@ -449,8 +455,8 @@ mod test {
         );
     }
 
-    #[test]
-    fn test_parse_basic() {
+    #[tokio::test]
+    async fn test_parse_basic() {
         check_default_spec(
             "couchbase://1.2.3.4",
             ConnSpec {
@@ -468,7 +474,8 @@ mod test {
             false,
             true,
             true,
-        );
+        )
+        .await;
 
         check_default_spec(
             "couchbase://[2001:4860:4860::8888]",
@@ -487,7 +494,8 @@ mod test {
             false,
             true,
             true,
-        );
+        )
+        .await;
 
         check_default_spec(
             "couchbase://",
@@ -502,7 +510,8 @@ mod test {
             false,
             true,
             true,
-        );
+        )
+        .await;
 
         check_default_spec(
             "couchbase://?",
@@ -517,7 +526,8 @@ mod test {
             false,
             true,
             false,
-        );
+        )
+        .await;
 
         check_default_spec(
             "1.2.3.4",
@@ -535,7 +545,8 @@ mod test {
             false,
             true,
             true,
-        );
+        )
+        .await;
 
         check_default_spec(
             "[2001:4860:4860::8888]",
@@ -553,20 +564,21 @@ mod test {
             false,
             true,
             true,
-        );
+        )
+        .await;
 
         let cs = parse_or_die("1.2.3.4:8091");
-        assert!(resolve(cs).is_err(), "Expected error with http port");
+        assert!(resolve(cs).await.is_err(), "Expected error with http port");
 
         let cs = parse_or_die("1.2.3.4:999");
         assert!(
-            resolve(cs).is_err(),
+            resolve(cs).await.is_err(),
             "Expected error with non-default port without scheme"
         );
     }
 
-    #[test]
-    fn test_parse_hosts() {
+    #[tokio::test]
+    async fn test_parse_hosts() {
         check_default_spec(
             "couchbase://foo.com,bar.com,baz.com",
             ConnSpec {
@@ -604,7 +616,8 @@ mod test {
             false,
             true,
             true,
-        );
+        )
+        .await;
 
         check_default_spec(
             "couchbase://[2001:4860:4860::8822],[2001:4860:4860::8833]:888",
@@ -635,11 +648,12 @@ mod test {
             false,
             true,
             true,
-        );
+        )
+        .await;
 
         let cs = parse_or_die("couchbase://foo.com:8091");
         assert!(
-            resolve(cs).is_err(),
+            resolve(cs).await.is_err(),
             "Expected error for couchbase://XXX:8091"
         );
 
@@ -660,7 +674,8 @@ mod test {
             false,
             true,
             true,
-        );
+        )
+        .await;
 
         check_default_spec(
             "couchbases://foo.com:4444",
@@ -679,7 +694,8 @@ mod test {
             true,
             true,
             true,
-        );
+        )
+        .await;
 
         check_default_spec(
             "couchbases://",
@@ -694,7 +710,8 @@ mod test {
             true,
             true,
             true,
-        );
+        )
+        .await;
 
         check_default_spec(
             "couchbase://foo.com,bar.com:4444",
@@ -725,7 +742,8 @@ mod test {
             false,
             true,
             true,
-        );
+        )
+        .await;
 
         check_default_spec(
             "couchbase://foo.com;bar.com;baz.com",
@@ -764,11 +782,12 @@ mod test {
             false,
             true,
             false,
-        );
+        )
+        .await;
     }
 
-    #[test]
-    fn test_options_passthrough() {
+    #[tokio::test]
+    async fn test_options_passthrough() {
         check_default_spec(
             "couchbase:///?foo=bar",
             ConnSpec {
@@ -784,7 +803,8 @@ mod test {
             false,
             false,
             false,
-        );
+        )
+        .await;
 
         check_default_spec(
             "couchbase://?foo=bar",
@@ -801,7 +821,8 @@ mod test {
             false,
             false,
             true,
-        );
+        )
+        .await;
 
         check_default_spec(
             "couchbase://?foo=fooval&bar=barval",
@@ -819,7 +840,8 @@ mod test {
             false,
             false,
             false,
-        );
+        )
+        .await;
 
         check_default_spec(
             "couchbase://?foo=fooval&bar=barval&",
@@ -837,7 +859,8 @@ mod test {
             false,
             false,
             false,
-        );
+        )
+        .await;
 
         check_default_spec(
             "couchbase://?foo=val1&foo=val2&",
@@ -857,11 +880,12 @@ mod test {
             false,
             false,
             false,
-        );
+        )
+        .await;
     }
 
-    #[test]
-    fn test_parse_couchbase2() {
+    #[tokio::test]
+    async fn test_parse_couchbase2() {
         check_couchbase2_server_spec(
             "couchbase2://1.2.3.4",
             ConnSpec {
@@ -876,7 +900,8 @@ mod test {
                 host: "1.2.3.4".to_string(),
                 port: DEFAULT_COUCHBASE2_PORT,
             },
-        );
+        )
+        .await;
 
         check_couchbase2_server_spec(
             "couchbase2://",
@@ -888,7 +913,8 @@ mod test {
                 host: "127.0.0.1".to_string(),
                 port: DEFAULT_COUCHBASE2_PORT,
             },
-        );
+        )
+        .await;
 
         check_couchbase2_server_spec(
             "couchbase2://1.2.3.4:1234",
@@ -904,7 +930,8 @@ mod test {
                 host: "1.2.3.4".to_string(),
                 port: 1234,
             },
-        );
+        )
+        .await;
 
         check_couchbase2_server_spec(
             "couchbase2://1.2.3.4:18098",
@@ -920,6 +947,7 @@ mod test {
                 host: "1.2.3.4".to_string(),
                 port: DEFAULT_COUCHBASE2_PORT,
             },
-        );
+        )
+        .await;
     }
 }

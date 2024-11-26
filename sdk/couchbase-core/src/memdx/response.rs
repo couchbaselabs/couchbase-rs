@@ -3,14 +3,16 @@ use std::time::Duration;
 
 use crate::memdx::auth_mechanism::AuthMechanism;
 use crate::memdx::client_response::ClientResponse;
-use crate::memdx::error::{Error, ErrorKind, ResourceError, ServerError, ServerErrorKind, SubdocError, SubdocErrorKind};
+use crate::memdx::error::{
+    Error, ErrorKind, ResourceError, ServerError, ServerErrorKind, SubdocError, SubdocErrorKind,
+};
 use crate::memdx::hello_feature::HelloFeature;
 use crate::memdx::ops_core::OpsCore;
 use crate::memdx::ops_crud::{decode_res_ext_frames, OpsCrud};
 use crate::memdx::status::Status;
+use crate::memdx::subdoc::{SubDocResult, SubdocDocFlag};
 use byteorder::{BigEndian, ReadBytesExt};
 use tokio_io::Buf;
-use crate::memdx::subdoc::{SubDocResult, SubdocDocFlag};
 
 pub trait TryFromClientResponse: Sized {
     fn try_from(resp: ClientResponse) -> Result<Self, Error>;
@@ -26,7 +28,7 @@ impl TryFromClientResponse for HelloResponse {
         let packet = resp.packet();
         let status = packet.status;
         if status != Status::Success {
-            return Err(OpsCore::decode_error(packet, resp.local_addr(), resp.peer_addr()).into());
+            return Err(OpsCore::decode_error(packet).into());
         }
 
         let mut features: Vec<HelloFeature> = Vec::new();
@@ -58,7 +60,7 @@ impl TryFromClientResponse for GetErrorMapResponse {
         let packet = resp.packet();
         let status = packet.status;
         if status != Status::Success {
-            return Err(OpsCore::decode_error(packet, resp.local_addr(), resp.peer_addr()).into());
+            return Err(OpsCore::decode_error(packet).into());
         }
 
         // TODO: Clone?
@@ -80,7 +82,7 @@ impl TryFromClientResponse for SelectBucketResponse {
             if status == Status::AccessError || status == Status::KeyNotFound {
                 return Err(ErrorKind::UnknownBucketName.into());
             }
-            return Err(OpsCore::decode_error(packet, resp.local_addr(), resp.peer_addr()).into());
+            return Err(OpsCore::decode_error(packet).into());
         }
 
         Ok(SelectBucketResponse {})
@@ -107,7 +109,7 @@ impl TryFromClientResponse for SASLAuthResponse {
         }
 
         if status != Status::Success {
-            return Err(OpsCore::decode_error(packet, resp.local_addr(), resp.peer_addr()).into());
+            return Err(OpsCore::decode_error(packet).into());
         }
 
         Ok(SASLAuthResponse {
@@ -129,7 +131,7 @@ impl TryFromClientResponse for SASLStepResponse {
         let packet = resp.packet();
         let status = packet.status;
         if status != Status::Success {
-            return Err(OpsCore::decode_error(packet, resp.local_addr(), resp.peer_addr()).into());
+            return Err(OpsCore::decode_error(packet).into());
         }
 
         Ok(SASLStepResponse {
@@ -155,15 +157,9 @@ impl TryFromClientResponse for SASLListMechsResponse {
                 // ns_server has not posted a configuration for the bucket to kv_engine yet. We
                 // transform this into a ErrTmpFail as we make the assumption that the
                 // SelectBucket will have failed if this was anything but a transient issue.
-                return Err(ServerError::new(
-                    ServerErrorKind::ConfigNotSet,
-                    packet,
-                    resp.local_addr(),
-                    resp.peer_addr(),
-                )
-                .into());
+                return Err(ServerError::new(ServerErrorKind::ConfigNotSet, packet).into());
             }
-            return Err(OpsCore::decode_error(packet, resp.local_addr(), resp.peer_addr()).into());
+            return Err(OpsCore::decode_error(packet).into());
         }
 
         // TODO: Clone?
@@ -194,49 +190,16 @@ pub struct GetClusterConfigResponse {
     pub config: Vec<u8>,
 }
 
-impl GetClusterConfigResponse {
-    fn replace(search: &[u8], find: u8, replace: &[u8]) -> Vec<u8> {
-        let mut result = vec![];
-
-        for &b in search {
-            if b == find {
-                result.extend(replace);
-            } else {
-                result.push(b);
-            }
-        }
-
-        result
-    }
-}
-
 impl TryFromClientResponse for GetClusterConfigResponse {
     fn try_from(resp: ClientResponse) -> Result<Self, Error> {
         let packet = resp.packet();
         let status = packet.status;
         if status != Status::Success {
-            return Err(OpsCore::decode_error(packet, resp.local_addr(), resp.peer_addr()).into());
+            return Err(OpsCore::decode_error(packet).into());
         }
 
-        let host = match resp.local_addr() {
-            Some(addr) => addr.ip().to_string(),
-            None => {
-                return Err(Error::protocol_error(
-                    "Failed to identify memd hostname for $HOST replacement",
-                ));
-            }
-        };
-
-        // TODO: Clone, maybe also inefficient?
-        let value = match std::str::from_utf8(packet.value.clone().unwrap_or_default().as_slice()) {
-            Ok(v) => v.to_string(),
-            Err(_e) => "".to_string(),
-        };
-
-        let out = value.replace("$HOST", host.as_ref());
-
         Ok(GetClusterConfigResponse {
-            config: out.into_bytes(),
+            config: packet.value.clone().unwrap_or_default(),
         })
     }
 }
@@ -294,35 +257,13 @@ impl TryFromClientResponse for SetResponse {
         let status = packet.status;
 
         if status == Status::TooBig {
-            return Err(ServerError::new(
-                ServerErrorKind::TooBig,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            )
-            .into());
+            return Err(ServerError::new(ServerErrorKind::TooBig, resp.packet()).into());
         } else if status == Status::Locked {
-            return Err(ServerError::new(
-                ServerErrorKind::Locked,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            )
-            .into());
+            return Err(ServerError::new(ServerErrorKind::Locked, resp.packet()).into());
         } else if status == Status::KeyExists {
-            return Err(ServerError::new(
-                ServerErrorKind::KeyExists,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            )
-            .into());
+            return Err(ServerError::new(ServerErrorKind::KeyExists, resp.packet()).into());
         } else if status != Status::Success {
-            return Err(OpsCrud::decode_common_error(
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            ));
+            return Err(OpsCrud::decode_common_error(resp.packet()));
         }
 
         let mutation_token = if let Some(extras) = &packet.extras {
@@ -375,19 +316,9 @@ impl TryFromClientResponse for GetResponse {
         let status = packet.status;
 
         if status == Status::KeyNotFound {
-            return Err(ServerError::new(
-                ServerErrorKind::KeyNotFound,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            )
-            .into());
+            return Err(ServerError::new(ServerErrorKind::KeyNotFound, resp.packet()).into());
         } else if status != Status::Success {
-            return Err(OpsCrud::decode_common_error(
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            ));
+            return Err(OpsCrud::decode_common_error(resp.packet()));
         }
 
         let flags = parse_flags(&packet.extras)?;
@@ -429,19 +360,9 @@ impl TryFromClientResponse for GetMetaResponse {
         let status = packet.status;
 
         if status == Status::KeyNotFound {
-            return Err(ServerError::new(
-                ServerErrorKind::KeyNotFound,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            )
-            .into());
+            return Err(ServerError::new(ServerErrorKind::KeyNotFound, resp.packet()).into());
         } else if status != Status::Success {
-            return Err(OpsCrud::decode_common_error(
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            ));
+            return Err(OpsCrud::decode_common_error(resp.packet()));
         }
 
         let server_duration = if let Some(f) = &packet.framing_extras {
@@ -510,35 +431,13 @@ impl TryFromClientResponse for DeleteResponse {
         let status = packet.status;
 
         if status == Status::KeyNotFound {
-            return Err(ServerError::new(
-                ServerErrorKind::KeyNotFound,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            )
-            .into());
+            return Err(ServerError::new(ServerErrorKind::KeyNotFound, resp.packet()).into());
         } else if status == Status::KeyExists {
-            return Err(ServerError::new(
-                ServerErrorKind::KeyExists,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            )
-            .into());
+            return Err(ServerError::new(ServerErrorKind::KeyExists, resp.packet()).into());
         } else if status == Status::Locked {
-            return Err(ServerError::new(
-                ServerErrorKind::Locked,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            )
-            .into());
+            return Err(ServerError::new(ServerErrorKind::Locked, resp.packet()).into());
         } else if status != Status::Success {
-            return Err(OpsCrud::decode_common_error(
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            ));
+            return Err(OpsCrud::decode_common_error(resp.packet()));
         }
 
         let mutation_token = if let Some(extras) = &packet.extras {
@@ -576,27 +475,11 @@ impl TryFromClientResponse for GetAndLockResponse {
         let status = packet.status;
 
         if status == Status::KeyNotFound {
-            return Err(ServerError::new(
-                ServerErrorKind::KeyNotFound,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            )
-            .into());
+            return Err(ServerError::new(ServerErrorKind::KeyNotFound, resp.packet()).into());
         } else if status == Status::Locked {
-            return Err(ServerError::new(
-                ServerErrorKind::Locked,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            )
-            .into());
+            return Err(ServerError::new(ServerErrorKind::Locked, resp.packet()).into());
         } else if status != Status::Success {
-            return Err(OpsCrud::decode_common_error(
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            ));
+            return Err(OpsCrud::decode_common_error(resp.packet()));
         }
 
         let flags = parse_flags(&packet.extras)?;
@@ -635,27 +518,11 @@ impl TryFromClientResponse for GetAndTouchResponse {
         let status = packet.status;
 
         if status == Status::KeyNotFound {
-            return Err(ServerError::new(
-                ServerErrorKind::KeyNotFound,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            )
-            .into());
+            return Err(ServerError::new(ServerErrorKind::KeyNotFound, resp.packet()).into());
         } else if status == Status::Locked {
-            return Err(ServerError::new(
-                ServerErrorKind::Locked,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            )
-            .into());
+            return Err(ServerError::new(ServerErrorKind::Locked, resp.packet()).into());
         } else if status != Status::Success {
-            return Err(OpsCrud::decode_common_error(
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            ));
+            return Err(OpsCrud::decode_common_error(resp.packet()));
         }
 
         let flags = parse_flags(&packet.extras)?;
@@ -690,35 +557,13 @@ impl TryFromClientResponse for UnlockResponse {
         let status = packet.status;
 
         if status == Status::KeyNotFound {
-            return Err(ServerError::new(
-                ServerErrorKind::KeyNotFound,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            )
-            .into());
+            return Err(ServerError::new(ServerErrorKind::KeyNotFound, resp.packet()).into());
         } else if status == Status::Locked {
-            return Err(ServerError::new(
-                ServerErrorKind::CasMismatch,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            )
-            .into());
+            return Err(ServerError::new(ServerErrorKind::CasMismatch, resp.packet()).into());
         } else if status == Status::NotLocked {
-            return Err(ServerError::new(
-                ServerErrorKind::NotLocked,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            )
-            .into());
+            return Err(ServerError::new(ServerErrorKind::NotLocked, resp.packet()).into());
         } else if status != Status::Success {
-            return Err(OpsCrud::decode_common_error(
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            ));
+            return Err(OpsCrud::decode_common_error(resp.packet()));
         }
 
         let server_duration = if let Some(f) = &packet.framing_extras {
@@ -743,27 +588,11 @@ impl TryFromClientResponse for TouchResponse {
         let status = packet.status;
 
         if status == Status::KeyNotFound {
-            return Err(ServerError::new(
-                ServerErrorKind::KeyNotFound,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            )
-            .into());
+            return Err(ServerError::new(ServerErrorKind::KeyNotFound, resp.packet()).into());
         } else if status == Status::Locked {
-            return Err(ServerError::new(
-                ServerErrorKind::Locked,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            )
-            .into());
+            return Err(ServerError::new(ServerErrorKind::Locked, resp.packet()).into());
         } else if status != Status::Success {
-            return Err(OpsCrud::decode_common_error(
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            ));
+            return Err(OpsCrud::decode_common_error(resp.packet()));
         }
 
         if let Some(extras) = &packet.extras {
@@ -798,27 +627,11 @@ impl TryFromClientResponse for AddResponse {
         let status = packet.status;
 
         if status == Status::TooBig {
-            return Err(ServerError::new(
-                ServerErrorKind::TooBig,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            )
-            .into());
+            return Err(ServerError::new(ServerErrorKind::TooBig, resp.packet()).into());
         } else if status == Status::KeyExists {
-            return Err(ServerError::new(
-                ServerErrorKind::KeyExists,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            )
-            .into());
+            return Err(ServerError::new(ServerErrorKind::KeyExists, resp.packet()).into());
         } else if status != Status::Success {
-            return Err(OpsCrud::decode_common_error(
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            ));
+            return Err(OpsCrud::decode_common_error(resp.packet()));
         }
 
         let mutation_token = if let Some(extras) = &packet.extras {
@@ -854,43 +667,15 @@ impl TryFromClientResponse for ReplaceResponse {
         let status = packet.status;
 
         if status == Status::TooBig {
-            return Err(ServerError::new(
-                ServerErrorKind::TooBig,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            )
-            .into());
+            return Err(ServerError::new(ServerErrorKind::TooBig, resp.packet()).into());
         } else if status == Status::KeyExists {
-            return Err(ServerError::new(
-                ServerErrorKind::CasMismatch,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            )
-            .into());
+            return Err(ServerError::new(ServerErrorKind::CasMismatch, resp.packet()).into());
         } else if status == Status::KeyNotFound {
-            return Err(ServerError::new(
-                ServerErrorKind::KeyNotFound,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            )
-            .into());
+            return Err(ServerError::new(ServerErrorKind::KeyNotFound, resp.packet()).into());
         } else if status == Status::Locked {
-            return Err(ServerError::new(
-                ServerErrorKind::Locked,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            )
-            .into());
+            return Err(ServerError::new(ServerErrorKind::Locked, resp.packet()).into());
         } else if status != Status::Success {
-            return Err(OpsCrud::decode_common_error(
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            ));
+            return Err(OpsCrud::decode_common_error(resp.packet()));
         }
 
         let mutation_token = if let Some(extras) = &packet.extras {
@@ -928,43 +713,15 @@ impl TryFromClientResponse for AppendResponse {
         // KeyExists without a request cas would be an odd error to receive so we don't
         // handle that case.
         if status == Status::KeyExists && resp.response_context().cas.is_some() {
-            return Err(ServerError::new(
-                ServerErrorKind::CasMismatch,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            )
-            .into());
+            return Err(ServerError::new(ServerErrorKind::CasMismatch, resp.packet()).into());
         } else if status == Status::TooBig {
-            return Err(ServerError::new(
-                ServerErrorKind::TooBig,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            )
-            .into());
+            return Err(ServerError::new(ServerErrorKind::TooBig, resp.packet()).into());
         } else if status == Status::NotStored {
-            return Err(ServerError::new(
-                ServerErrorKind::KeyNotFound,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            )
-            .into());
+            return Err(ServerError::new(ServerErrorKind::KeyNotFound, resp.packet()).into());
         } else if status == Status::Locked {
-            return Err(ServerError::new(
-                ServerErrorKind::Locked,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            )
-            .into());
+            return Err(ServerError::new(ServerErrorKind::Locked, resp.packet()).into());
         } else if status != Status::Success {
-            return Err(OpsCrud::decode_common_error(
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            ));
+            return Err(OpsCrud::decode_common_error(resp.packet()));
         }
 
         let mutation_token = if let Some(extras) = &packet.extras {
@@ -1002,43 +759,15 @@ impl TryFromClientResponse for PrependResponse {
         // KeyExists without a request cas would be an odd error to receive so we don't
         // handle that case.
         if status == Status::KeyExists && resp.response_context().cas.is_some() {
-            return Err(ServerError::new(
-                ServerErrorKind::CasMismatch,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            )
-            .into());
+            return Err(ServerError::new(ServerErrorKind::CasMismatch, resp.packet()).into());
         } else if status == Status::TooBig {
-            return Err(ServerError::new(
-                ServerErrorKind::TooBig,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            )
-            .into());
+            return Err(ServerError::new(ServerErrorKind::TooBig, resp.packet()).into());
         } else if status == Status::NotStored {
-            return Err(ServerError::new(
-                ServerErrorKind::KeyNotFound,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            )
-            .into());
+            return Err(ServerError::new(ServerErrorKind::KeyNotFound, resp.packet()).into());
         } else if status == Status::Locked {
-            return Err(ServerError::new(
-                ServerErrorKind::Locked,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            )
-            .into());
+            return Err(ServerError::new(ServerErrorKind::Locked, resp.packet()).into());
         } else if status != Status::Success {
-            return Err(OpsCrud::decode_common_error(
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            ));
+            return Err(OpsCrud::decode_common_error(resp.packet()));
         }
 
         let mutation_token = if let Some(extras) = &packet.extras {
@@ -1075,27 +804,11 @@ impl TryFromClientResponse for IncrementResponse {
         let status = packet.status;
 
         if status == Status::KeyNotFound {
-            return Err(ServerError::new(
-                ServerErrorKind::KeyNotFound,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            )
-            .into());
+            return Err(ServerError::new(ServerErrorKind::KeyNotFound, resp.packet()).into());
         } else if status == Status::Locked {
-            return Err(ServerError::new(
-                ServerErrorKind::Locked,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            )
-            .into());
+            return Err(ServerError::new(ServerErrorKind::Locked, resp.packet()).into());
         } else if status != Status::Success {
-            return Err(OpsCrud::decode_common_error(
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            ));
+            return Err(OpsCrud::decode_common_error(resp.packet()));
         }
 
         let value = if let Some(val) = &resp.packet().value {
@@ -1151,27 +864,11 @@ impl TryFromClientResponse for DecrementResponse {
         let status = packet.status;
 
         if status == Status::KeyNotFound {
-            return Err(ServerError::new(
-                ServerErrorKind::KeyNotFound,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            )
-            .into());
+            return Err(ServerError::new(ServerErrorKind::KeyNotFound, resp.packet()).into());
         } else if status == Status::Locked {
-            return Err(ServerError::new(
-                ServerErrorKind::Locked,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            )
-            .into());
+            return Err(ServerError::new(ServerErrorKind::Locked, resp.packet()).into());
         } else if status != Status::Success {
-            return Err(OpsCrud::decode_common_error(
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            ));
+            return Err(OpsCrud::decode_common_error(resp.packet()));
         }
 
         let value = if let Some(val) = &resp.packet().value {
@@ -1225,69 +922,67 @@ impl TryFromClientResponse for LookupInResponse {
         let packet = resp.packet();
         let status = packet.status;
 
-        let subdoc_info = resp.response_context().subdoc_info.ok_or_else(|| Error::protocol_error("Missing subdoc info in response context"))?;
+        let subdoc_info = resp
+            .response_context()
+            .subdoc_info
+            .ok_or_else(|| Error::protocol_error("Missing subdoc info in response context"))?;
 
         if status == Status::KeyNotFound {
-            return Err(ServerError::new(
-                ServerErrorKind::KeyNotFound,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            ).into());
+            return Err(ServerError::new(ServerErrorKind::KeyNotFound, resp.packet()).into());
         } else if status == Status::Locked {
-            return Err(ServerError::new(
-                ServerErrorKind::Locked,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            ).into());
+            return Err(ServerError::new(ServerErrorKind::Locked, resp.packet()).into());
         } else if status == Status::SubDocInvalidCombo {
             return Err(ServerError::new(
-                ServerErrorKind::Subdoc{ error: SubdocError::new(SubdocErrorKind::InvalidCombo, None) },
+                ServerErrorKind::Subdoc {
+                    error: SubdocError::new(SubdocErrorKind::InvalidCombo, None),
+                },
                 resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            ).into());
+            )
+            .into());
         } else if status == Status::SubDocInvalidXattrOrder {
             return Err(ServerError::new(
-                ServerErrorKind::Subdoc{ error: SubdocError::new(SubdocErrorKind::InvalidXattrOrder, None) },
+                ServerErrorKind::Subdoc {
+                    error: SubdocError::new(SubdocErrorKind::InvalidXattrOrder, None),
+                },
                 resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            ).into());
-        }  else if status == Status::SubDocXattrInvalidKeyCombo {
+            )
+            .into());
+        } else if status == Status::SubDocXattrInvalidKeyCombo {
             return Err(ServerError::new(
-                ServerErrorKind::Subdoc{ error: SubdocError::new(SubdocErrorKind::XattrInvalidKeyCombo, None) },
+                ServerErrorKind::Subdoc {
+                    error: SubdocError::new(SubdocErrorKind::XattrInvalidKeyCombo, None),
+                },
                 resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            ).into());
+            )
+            .into());
         } else if status == Status::SubDocXattrInvalidFlagCombo {
             return Err(ServerError::new(
-                ServerErrorKind::Subdoc{ error: SubdocError::new(SubdocErrorKind::XattrInvalidFlagCombo, None) },
+                ServerErrorKind::Subdoc {
+                    error: SubdocError::new(SubdocErrorKind::XattrInvalidFlagCombo, None),
+                },
                 resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            ).into());
+            )
+            .into());
         }
 
         let mut doc_is_deleted = false;
 
-        if status == Status::SubDocSuccessDeleted || status == Status::SubDocMultiPathFailureDeleted {
+        if status == Status::SubDocSuccessDeleted || status == Status::SubDocMultiPathFailureDeleted
+        {
             doc_is_deleted = true;
             // still considered a success
         } else if status != Status::Success && status != Status::SubDocMultiPathFailure {
-            return Err(OpsCrud::decode_common_error(
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            ));
+            return Err(OpsCrud::decode_common_error(resp.packet()));
         }
 
         let mut results: Vec<SubDocResult> = Vec::with_capacity(subdoc_info.op_count as usize);
         let mut op_index = 0;
 
-        let value = resp.packet().value.as_ref().ok_or_else(|| Error::protocol_error("Missing value"))?;
+        let value = resp
+            .packet()
+            .value
+            .as_ref()
+            .ok_or_else(|| Error::protocol_error("Missing value"))?;
         let mut cursor = Cursor::new(value);
 
         while cursor.position() < cursor.get_ref().len() as u64 {
@@ -1309,7 +1004,8 @@ impl TryFromClientResponse for LookupInResponse {
 
             let value = if res_value_len > 0 {
                 let mut tmp_val = vec![0; res_value_len as usize];
-                cursor.read_exact(&mut tmp_val)
+                cursor
+                    .read_exact(&mut tmp_val)
                     .map_err(|e| Error::from(ErrorKind::Protocol { msg: e.to_string() }))?;
                 Some(tmp_val)
             } else {
@@ -1325,10 +1021,13 @@ impl TryFromClientResponse for LookupInResponse {
                 Status::SubDocPathInvalid => Some(SubdocErrorKind::PathInvalid),
                 Status::SubDocPathTooBig => Some(SubdocErrorKind::PathTooBig),
                 Status::SubDocXattrUnknownVAttr => Some(SubdocErrorKind::XattrUnknownVAttr),
-                _ => Some(SubdocErrorKind::UnknownStatus {status: res_status}),
+                _ => Some(SubdocErrorKind::UnknownStatus { status: res_status }),
             };
 
-            let err = err_kind.map(|kind| SubdocError { kind, op_index: Some(op_index) });
+            let err = err_kind.map(|kind| SubdocError {
+                kind,
+                op_index: Some(op_index),
+            });
 
             results.push(SubDocResult { value, err });
             op_index += 1;
@@ -1349,7 +1048,6 @@ impl TryFromClientResponse for LookupInResponse {
     }
 }
 
-
 pub struct MutateInResponse {
     pub cas: u64,
     pub ops: Vec<SubDocResult>,
@@ -1363,114 +1061,99 @@ impl TryFromClientResponse for MutateInResponse {
         let packet = resp.packet();
         let status = packet.status;
 
-        let subdoc_info = resp.response_context().subdoc_info.ok_or_else(|| Error::protocol_error("Missing subdoc info in response context"))?;
+        let subdoc_info = resp
+            .response_context()
+            .subdoc_info
+            .ok_or_else(|| Error::protocol_error("Missing subdoc info in response context"))?;
 
         if status == Status::KeyNotFound {
-            return Err(ServerError::new(
-                ServerErrorKind::KeyNotFound,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            ).into());
+            return Err(ServerError::new(ServerErrorKind::KeyNotFound, resp.packet()).into());
         } else if status == Status::KeyExists && resp.response_context().cas.is_some() {
-            return Err(ServerError::new(
-                ServerErrorKind::CasMismatch,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            ).into());
+            return Err(ServerError::new(ServerErrorKind::CasMismatch, resp.packet()).into());
         } else if status == Status::Locked {
-            return Err(ServerError::new(
-                ServerErrorKind::Locked,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            ).into());
+            return Err(ServerError::new(ServerErrorKind::Locked, resp.packet()).into());
         } else if status == Status::TooBig {
-            return Err(ServerError::new(
-                ServerErrorKind::TooBig,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            ).into());
+            return Err(ServerError::new(ServerErrorKind::TooBig, resp.packet()).into());
         } else if status == Status::SubDocInvalidCombo {
             return Err(ServerError::new(
-                ServerErrorKind::Subdoc{ error: SubdocError::new(SubdocErrorKind::InvalidCombo, None) },
+                ServerErrorKind::Subdoc {
+                    error: SubdocError::new(SubdocErrorKind::InvalidCombo, None),
+                },
                 resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            ).into());
+            )
+            .into());
         } else if status == Status::SubDocInvalidXattrOrder {
             return Err(ServerError::new(
-                ServerErrorKind::Subdoc{ error: SubdocError::new(SubdocErrorKind::InvalidXattrOrder, None) },
+                ServerErrorKind::Subdoc {
+                    error: SubdocError::new(SubdocErrorKind::InvalidXattrOrder, None),
+                },
                 resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            ).into());
-        }  else if status == Status::SubDocXattrInvalidKeyCombo {
+            )
+            .into());
+        } else if status == Status::SubDocXattrInvalidKeyCombo {
             return Err(ServerError::new(
-                ServerErrorKind::Subdoc{ error: SubdocError::new(SubdocErrorKind::XattrInvalidKeyCombo, None) },
+                ServerErrorKind::Subdoc {
+                    error: SubdocError::new(SubdocErrorKind::XattrInvalidKeyCombo, None),
+                },
                 resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            ).into());
+            )
+            .into());
         } else if status == Status::SubDocXattrInvalidFlagCombo {
             return Err(ServerError::new(
-                ServerErrorKind::Subdoc{ error: SubdocError::new(SubdocErrorKind::XattrInvalidFlagCombo, None) },
+                ServerErrorKind::Subdoc {
+                    error: SubdocError::new(SubdocErrorKind::XattrInvalidFlagCombo, None),
+                },
                 resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            ).into());
+            )
+            .into());
         } else if status == Status::SubDocXattrUnknownMacro {
             return Err(ServerError::new(
-                ServerErrorKind::Subdoc{ error: SubdocError::new(SubdocErrorKind::XattrUnknownMacro, None) },
+                ServerErrorKind::Subdoc {
+                    error: SubdocError::new(SubdocErrorKind::XattrUnknownMacro, None),
+                },
                 resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            ).into());
+            )
+            .into());
         } else if status == Status::SubDocXattrUnknownVattrMacro {
             return Err(ServerError::new(
-                ServerErrorKind::Subdoc{ error: SubdocError::new(SubdocErrorKind::XattrUnknownVattrMacro, None) },
+                ServerErrorKind::Subdoc {
+                    error: SubdocError::new(SubdocErrorKind::XattrUnknownVattrMacro, None),
+                },
                 resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            ).into());
+            )
+            .into());
         } else if status == Status::SubDocXattrCannotModifyVAttr {
             return Err(ServerError::new(
-                ServerErrorKind::Subdoc{ error: SubdocError::new(SubdocErrorKind::XattrCannotModifyVAttr, None) },
+                ServerErrorKind::Subdoc {
+                    error: SubdocError::new(SubdocErrorKind::XattrCannotModifyVAttr, None),
+                },
                 resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            ).into());
+            )
+            .into());
         } else if status == Status::SubDocCanOnlyReviveDeletedDocuments {
             return Err(ServerError::new(
-                ServerErrorKind::Subdoc{ error: SubdocError::new(SubdocErrorKind::CanOnlyReviveDeletedDocuments, None) },
+                ServerErrorKind::Subdoc {
+                    error: SubdocError::new(SubdocErrorKind::CanOnlyReviveDeletedDocuments, None),
+                },
                 resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            ).into());
+            )
+            .into());
         } else if status == Status::SubDocDeletedDocumentCantHaveValue {
             return Err(ServerError::new(
-                ServerErrorKind::Subdoc{ error: SubdocError::new(SubdocErrorKind::DeletedDocumentCantHaveValue, None) },
+                ServerErrorKind::Subdoc {
+                    error: SubdocError::new(SubdocErrorKind::DeletedDocumentCantHaveValue, None),
+                },
                 resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            ).into());
+            )
+            .into());
         } else if status == Status::NotStored {
-            if subdoc_info.flags.is_some_and(|flags| flags == SubdocDocFlag::AddDoc){
-                return Err(ServerError::new(
-                    ServerErrorKind::KeyExists,
-                    resp.packet(),
-                    resp.local_addr(),
-                    resp.peer_addr()
-                ).into());
+            if subdoc_info
+                .flags
+                .is_some_and(|flags| flags == SubdocDocFlag::AddDoc)
+            {
+                return Err(ServerError::new(ServerErrorKind::KeyExists, resp.packet()).into());
             }
-            return Err(ServerError::new(
-                ServerErrorKind::NotStored,
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            ).into());
+            return Err(ServerError::new(ServerErrorKind::NotStored, resp.packet()).into());
         } else if status == Status::SubDocMultiPathFailure {
             if let Some(value) = &resp.packet().value {
                 if value.len() != 3 {
@@ -1498,15 +1181,16 @@ impl TryFromClientResponse for MutateInResponse {
                     Status::SubDocBadRange => SubdocErrorKind::BadRange,
                     Status::SubDocBadDelta => SubdocErrorKind::BadDelta,
                     Status::SubDocValueTooDeep => SubdocErrorKind::ValueTooDeep,
-                    _ => SubdocErrorKind::UnknownStatus {status: res_status},
+                    _ => SubdocErrorKind::UnknownStatus { status: res_status },
                 };
 
                 return Err(ServerError::new(
-                    ServerErrorKind::Subdoc{ error: SubdocError::new(err_kind, Some(op_index)) },
+                    ServerErrorKind::Subdoc {
+                        error: SubdocError::new(err_kind, Some(op_index)),
+                    },
                     resp.packet(),
-                    resp.local_addr(),
-                    resp.peer_addr()
-                ).into());
+                )
+                .into());
             }
         }
 
@@ -1515,11 +1199,7 @@ impl TryFromClientResponse for MutateInResponse {
             doc_is_deleted = true;
             // still considered a success
         } else if status != Status::Success && status != Status::SubDocMultiPathFailure {
-            return Err(OpsCrud::decode_common_error(
-                resp.packet(),
-                resp.local_addr(),
-                resp.peer_addr(),
-            ));
+            return Err(OpsCrud::decode_common_error(resp.packet()));
         }
 
         let mut results: Vec<SubDocResult> = Vec::with_capacity(subdoc_info.op_count as usize);
@@ -1563,7 +1243,9 @@ impl TryFromClientResponse for MutateInResponse {
                         value: Some(value),
                     });
                 } else {
-                    return Err(Error::protocol_error("subdoc mutatein op illegally provided an error"));
+                    return Err(Error::protocol_error(
+                        "subdoc mutatein op illegally provided an error",
+                    ));
                 }
             }
         }
@@ -1582,7 +1264,7 @@ impl TryFromClientResponse for MutateInResponse {
                 return Err(ErrorKind::Protocol {
                     msg: "Bad extras length".to_string(),
                 }
-                    .into());
+                .into());
             }
             let mut extras = Cursor::new(extras);
 
@@ -1627,12 +1309,7 @@ impl TryFromClientResponse for GetCollectionIdResponse {
 
         if status == Status::ScopeUnknown {
             return Err(ErrorKind::Resource(ResourceError {
-                cause: OpsCore::decode_error_context(
-                    packet,
-                    ServerErrorKind::UnknownScopeName,
-                    resp.local_addr(),
-                    resp.peer_addr(),
-                ),
+                cause: OpsCore::decode_error_context(packet, ServerErrorKind::UnknownScopeName),
                 scope_name: "".to_string(),
                 collection_name: None,
             })
@@ -1642,17 +1319,13 @@ impl TryFromClientResponse for GetCollectionIdResponse {
                 cause: OpsCore::decode_error_context(
                     packet,
                     ServerErrorKind::UnknownCollectionName,
-                    resp.local_addr(),
-                    resp.peer_addr(),
                 ),
                 scope_name: "".to_string(),
                 collection_name: Some("".to_string()),
             })
             .into());
         } else if status != Status::Success {
-            return Err(
-                OpsCore::decode_error(resp.packet(), resp.local_addr(), resp.peer_addr()).into(),
-            );
+            return Err(OpsCore::decode_error(resp.packet()).into());
         }
 
         let extras = if let Some(extras) = &packet.extras {

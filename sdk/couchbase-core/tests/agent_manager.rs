@@ -10,9 +10,9 @@ mod common;
 
 #[tokio::test]
 async fn test_get_cluster_agent() {
-    setup_tests();
+    setup_tests().await;
 
-    let agent_opts = OnDemandAgentManagerOptions::from(create_default_options());
+    let agent_opts = OnDemandAgentManagerOptions::from(create_default_options().await);
 
     let mgr = OnDemandAgentManager::new(agent_opts).await.unwrap();
 
@@ -30,9 +30,9 @@ async fn test_get_cluster_agent() {
 
 #[tokio::test]
 async fn test_get_bucket_agent() {
-    setup_tests();
+    setup_tests().await;
 
-    let agent_opts = create_default_options();
+    let agent_opts = create_default_options().await;
     let bucket_name = agent_opts.bucket_name.clone().unwrap();
 
     let mgr_opts = OnDemandAgentManagerOptions::from(agent_opts);

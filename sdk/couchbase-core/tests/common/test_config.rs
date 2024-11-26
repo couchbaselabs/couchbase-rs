@@ -1,10 +1,16 @@
 use std::io::Write;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use envconfig::Envconfig;
+use futures::executor::block_on;
+use lazy_static::lazy_static;
 use log::{trace, LevelFilter};
+use tokio::runtime::{Handle, Runtime};
+use tokio::sync::Mutex;
 
-pub static TEST_CONFIG: Mutex<Option<Arc<TestConfig>>> = Mutex::new(None);
+lazy_static! {
+    pub static ref TEST_CONFIG: Mutex<Option<Arc<TestConfig>>> = Mutex::new(None);
+}
 
 #[derive(Debug, Clone, Envconfig)]
 pub struct EnvTestConfig {
@@ -30,8 +36,8 @@ pub struct TestConfig {
     pub use_ssl: bool,
 }
 
-pub fn setup_tests() {
-    let mut config = TEST_CONFIG.lock().unwrap();
+pub async fn setup_tests() {
+    let mut config = TEST_CONFIG.lock().await;
 
     if config.is_none() {
         env_logger::Builder::new()
@@ -53,7 +59,7 @@ pub fn setup_tests() {
 
         // TODO: Once we have connection string parsing in place this should go away.
         let conn_spec = couchbase_connstr::parse(test_config.conn_string).unwrap();
-        let resolved = couchbase_connstr::resolve(conn_spec).unwrap();
+        let resolved = couchbase_connstr::resolve(conn_spec).await.unwrap();
 
         *config = Some(Arc::new(TestConfig {
             username: test_config.username,
@@ -67,32 +73,33 @@ pub fn setup_tests() {
         trace!("{:?}", &config);
     }
 }
-pub fn test_username() -> String {
-    let guard = TEST_CONFIG.lock().unwrap();
+
+pub async fn test_username() -> String {
+    let guard = TEST_CONFIG.lock().await;
     let config = guard.clone().unwrap();
     config.username.clone()
 }
 
-pub fn test_password() -> String {
-    let guard = TEST_CONFIG.lock().unwrap();
+pub async fn test_password() -> String {
+    let guard = TEST_CONFIG.lock().await;
     let config = guard.clone().unwrap();
     config.password.clone()
 }
 
-pub fn test_mem_addrs() -> Vec<String> {
-    let guard = TEST_CONFIG.lock().unwrap();
+pub async fn test_mem_addrs() -> Vec<String> {
+    let guard = TEST_CONFIG.lock().await;
     let config = guard.clone().unwrap();
     config.memd_addrs.clone()
 }
 
-pub fn test_bucket() -> String {
-    let guard = TEST_CONFIG.lock().unwrap();
+pub async fn test_bucket() -> String {
+    let guard = TEST_CONFIG.lock().await;
     let config = guard.clone().unwrap();
     config.default_bucket.clone()
 }
 
-pub fn test_data_timeout() -> String {
-    let guard = TEST_CONFIG.lock().unwrap();
+pub async fn test_data_timeout() -> String {
+    let guard = TEST_CONFIG.lock().await;
     let config = guard.clone().unwrap();
     config.data_timeout.clone()
 }

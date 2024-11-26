@@ -4,6 +4,7 @@ use crate::queryx::error::Error as QueryError;
 use crate::searchx::error::Error as SearchError;
 use crate::service_type::ServiceType;
 use std::fmt::Display;
+use std::net::SocketAddr;
 use std::sync::Arc;
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -34,7 +35,7 @@ impl Error {
 
     pub fn is_memdx_error(&self) -> Option<&MemdxError> {
         match self.kind.as_ref() {
-            ErrorKind::Memdx(e) => Some(e),
+            ErrorKind::Memdx { source, .. } => Some(source),
             _ => None,
         }
     }
@@ -50,6 +51,18 @@ impl Error {
             msg: msg.to_string(),
         })
     }
+
+    pub(crate) fn new_memdx_error(
+        source: MemdxError,
+        dispatched_to: Option<SocketAddr>,
+        dispatched_from: Option<SocketAddr>,
+    ) -> Self {
+        Self::new(ErrorKind::Memdx {
+            source,
+            dispatched_to: dispatched_to.map(|x| x.to_string()),
+            dispatched_from: dispatched_from.map(|x| x.to_string()),
+        })
+    }
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -63,8 +76,12 @@ pub enum ErrorKind {
     #[error("Invalid argument {msg}")]
     #[non_exhaustive]
     InvalidArgument { msg: String },
-    #[error("{0}")]
-    Memdx(MemdxError),
+    #[error("{source} dispatched to: {dispatched_to:?}, dispatched from: {dispatched_from:?}")]
+    Memdx {
+        source: MemdxError,
+        dispatched_to: Option<String>,
+        dispatched_from: Option<String>,
+    },
     #[error("{0}")]
     Query(QueryError),
     #[error("{0}")]
@@ -112,12 +129,6 @@ where
         Self {
             kind: Arc::new(err.into()),
         }
-    }
-}
-
-impl From<MemdxError> for Error {
-    fn from(value: MemdxError) -> Self {
-        Self::new(ErrorKind::Memdx(value))
     }
 }
 

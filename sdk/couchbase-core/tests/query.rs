@@ -14,9 +14,9 @@ mod common;
 
 #[tokio::test]
 async fn test_query_basic() {
-    setup_tests();
+    setup_tests().await;
 
-    let agent_opts = create_default_options();
+    let agent_opts = create_default_options().await;
 
     let mut agent = Agent::new(agent_opts).await.unwrap();
     let opts = QueryOptions::builder()
@@ -69,9 +69,9 @@ async fn test_query_basic() {
 
 #[tokio::test]
 async fn test_prepared_query_basic() {
-    setup_tests();
+    setup_tests().await;
 
-    let agent_opts = create_default_options();
+    let agent_opts = create_default_options().await;
 
     let mut agent = Agent::new(agent_opts).await.unwrap();
     let opts = QueryOptions::builder()

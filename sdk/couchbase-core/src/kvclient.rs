@@ -11,8 +11,8 @@ use tokio::time::Instant;
 use uuid::Uuid;
 
 use crate::authenticator::Authenticator;
-use crate::error::Error;
 use crate::error::Result;
+use crate::error::{Error, ErrorKind};
 use crate::memdx::auth_mechanism::AuthMechanism;
 use crate::memdx::connection::{ConnectOptions, ConnectionType, TcpConnection, TlsConnection};
 use crate::memdx::dispatcher::{Dispatcher, DispatcherOptions, OrphanResponseHandler};
@@ -22,10 +22,11 @@ use crate::memdx::op_bootstrap::BootstrapOptions;
 use crate::memdx::request::{GetErrorMapRequest, HelloRequest, SelectBucketRequest};
 use crate::service_type::ServiceType;
 use crate::tls_config::TlsConfig;
+use crate::util::hostname_from_addr_str;
 
 #[derive(Clone)]
 pub(crate) struct KvClientConfig {
-    pub address: SocketAddr,
+    pub address: String,
     pub tls: Option<TlsConfig>,
     pub client_name: String,
     pub authenticator: Arc<Authenticator>,
@@ -67,8 +68,9 @@ pub(crate) trait KvClient: Sized + PartialEq + Send + Sync {
     fn reconfigure(&self, config: KvClientConfig) -> impl Future<Output = Result<()>> + Send;
     fn has_feature(&self, feature: HelloFeature) -> bool;
     fn load_factor(&self) -> f64;
+    fn remote_hostname(&self) -> &str;
     fn remote_addr(&self) -> SocketAddr;
-    fn local_addr(&self) -> Option<SocketAddr>;
+    fn local_addr(&self) -> SocketAddr;
     fn close(&self) -> impl Future<Output = Result<()>> + Send;
     fn id(&self) -> &str;
 }
@@ -76,7 +78,8 @@ pub(crate) trait KvClient: Sized + PartialEq + Send + Sync {
 // TODO: connect timeout
 pub(crate) struct StdKvClient<D: Dispatcher> {
     remote_addr: SocketAddr,
-    local_addr: Option<SocketAddr>,
+    local_addr: SocketAddr,
+    remote_hostname: String,
 
     pending_operations: u64,
     cli: D,
@@ -200,38 +203,46 @@ where
         let conn = if let Some(tls) = config.tls.clone() {
             ConnectionType::Tls(
                 TlsConnection::connect(
-                    config.address,
+                    &config.address,
                     tls,
                     ConnectOptions {
                         deadline: Instant::now().add(Duration::new(7, 0)),
                     },
                 )
-                .await?,
+                .await
+                .map_err(|e| ErrorKind::Memdx {
+                    source: e,
+                    dispatched_to: Some(config.address.clone()),
+                    dispatched_from: None,
+                })?,
             )
         } else {
             ConnectionType::Tcp(
                 TcpConnection::connect(
-                    config.address,
+                    &config.address,
                     ConnectOptions {
                         deadline: Instant::now().add(Duration::new(7, 0)),
                     },
                 )
-                .await?,
+                .await
+                .map_err(|e| ErrorKind::Memdx {
+                    source: e,
+                    dispatched_to: Some(config.address.clone()),
+                    dispatched_from: None,
+                })?,
             )
         };
 
-        let remote_addr = match conn.peer_addr() {
-            Some(addr) => *addr,
-            None => config.address,
-        };
-
+        let remote_addr = *conn.peer_addr();
         let local_addr = *conn.local_addr();
+        let remote_hostname = hostname_from_addr_str(&config.address);
 
         let mut cli = D::new(conn, memdx_client_opts);
 
         let mut kv_cli = StdKvClient {
             remote_addr,
             local_addr,
+            remote_hostname,
             pending_operations: 0,
             cli,
             current_config: Mutex::new(config),
@@ -343,12 +354,20 @@ where
         self.remote_addr
     }
 
-    fn local_addr(&self) -> Option<SocketAddr> {
+    fn local_addr(&self) -> SocketAddr {
         self.local_addr
     }
 
+    fn remote_hostname(&self) -> &str {
+        &self.remote_hostname
+    }
+
     async fn close(&self) -> Result<()> {
-        Ok(self.cli.close().await?)
+        Ok(self.cli.close().await.map_err(|e| ErrorKind::Memdx {
+            source: e,
+            dispatched_to: None,
+            dispatched_from: None,
+        })?)
     }
 
     fn id(&self) -> &str {

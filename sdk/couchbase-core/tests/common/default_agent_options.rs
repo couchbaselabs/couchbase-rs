@@ -8,8 +8,8 @@ use {
     tokio_rustls::rustls::crypto::CryptoProvider,
 };
 
-pub fn create_default_options() -> AgentOptions {
-    let guard = TEST_CONFIG.lock().unwrap();
+pub async fn create_default_options() -> AgentOptions {
+    let guard = TEST_CONFIG.lock().await;
     let config = guard.clone().unwrap();
     drop(guard);
 
@@ -44,8 +44,8 @@ pub fn create_default_options() -> AgentOptions {
         .build()
 }
 
-pub fn create_options_without_bucket() -> AgentOptions {
-    let guard = TEST_CONFIG.lock().unwrap();
+pub async fn create_options_without_bucket() -> AgentOptions {
+    let guard = TEST_CONFIG.lock().await;
     let config = guard.clone().unwrap();
     drop(guard);
 

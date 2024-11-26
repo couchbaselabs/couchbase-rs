@@ -1,11 +1,15 @@
 use std::io::Write;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use couchbase_connstr::ResolvedConnSpec;
 use envconfig::Envconfig;
+use lazy_static::lazy_static;
 use log::LevelFilter;
+use tokio::sync::RwLock;
 
-pub static TEST_CONFIG: RwLock<Option<Arc<TestConfig>>> = RwLock::new(None);
+lazy_static! {
+    pub static ref TEST_CONFIG: RwLock<Option<Arc<TestConfig>>> = RwLock::new(None);
+}
 
 #[derive(Debug, Clone, Envconfig)]
 pub struct EnvTestConfig {
@@ -37,8 +41,8 @@ pub struct TestConfig {
     pub resolved_conn_spec: ResolvedConnSpec,
 }
 
-pub fn setup_tests(log_level: LevelFilter) {
-    let mut config = TEST_CONFIG.write().unwrap();
+pub async fn setup_tests(log_level: LevelFilter) {
+    let mut config = TEST_CONFIG.write().await;
 
     if config.is_none() {
         env_logger::Builder::new()
@@ -68,48 +72,49 @@ pub fn setup_tests(log_level: LevelFilter) {
             default_scope: test_config.default_scope,
             default_collection: test_config.default_collection,
             data_timeout: test_config.data_timeout,
-            resolved_conn_spec: couchbase_connstr::resolve(conn_spec).unwrap(),
+            resolved_conn_spec: couchbase_connstr::resolve(conn_spec).await.unwrap(),
         }));
     }
 }
-pub fn test_username() -> String {
-    let guard = TEST_CONFIG.read().unwrap();
+
+pub async fn test_username() -> String {
+    let guard = TEST_CONFIG.read().await;
     let config = guard.clone().unwrap();
     config.username.clone()
 }
 
-pub fn test_password() -> String {
-    let guard = TEST_CONFIG.read().unwrap();
+pub async fn test_password() -> String {
+    let guard = TEST_CONFIG.read().await;
     let config = guard.clone().unwrap();
     config.password.clone()
 }
 
-pub fn test_conn_str() -> String {
-    let guard = TEST_CONFIG.read().unwrap();
+pub async fn test_conn_str() -> String {
+    let guard = TEST_CONFIG.read().await;
     let config = guard.clone().unwrap();
     config.conn_str.clone()
 }
 
-pub fn test_bucket() -> String {
-    let guard = TEST_CONFIG.read().unwrap();
+pub async fn test_bucket() -> String {
+    let guard = TEST_CONFIG.read().await;
     let config = guard.clone().unwrap();
     config.default_bucket.clone()
 }
 
-pub fn test_scope() -> String {
-    let guard = TEST_CONFIG.read().unwrap();
+pub async fn test_scope() -> String {
+    let guard = TEST_CONFIG.read().await;
     let config = guard.clone().unwrap();
     config.default_scope.clone()
 }
 
-pub fn test_collection() -> String {
-    let guard = TEST_CONFIG.read().unwrap();
+pub async fn test_collection() -> String {
+    let guard = TEST_CONFIG.read().await;
     let config = guard.clone().unwrap();
     config.default_collection.clone()
 }
 
-pub fn test_data_timeout() -> String {
-    let guard = TEST_CONFIG.read().unwrap();
+pub async fn test_data_timeout() -> String {
+    let guard = TEST_CONFIG.read().await;
     let config = guard.clone().unwrap();
     config.data_timeout.clone()
 }

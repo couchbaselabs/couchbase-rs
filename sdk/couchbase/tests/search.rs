@@ -23,13 +23,16 @@ const BASIC_INDEX_NAME: &str = "basic_search_index";
 
 #[tokio::test]
 async fn test_search_basic() {
-    setup_tests(LevelFilter::Trace);
+    setup_tests(LevelFilter::Trace).await;
 
     let cluster = create_cluster_from_test_config().await;
 
-    let scope = cluster.bucket(test_bucket()).await.scope(test_scope());
+    let scope = cluster
+        .bucket(test_bucket().await)
+        .await
+        .scope(test_scope().await);
 
-    let collection = scope.collection(test_collection());
+    let collection = scope.collection(test_collection().await);
 
     let import_results = import_sample_beer_dataset("search", &collection).await;
 
