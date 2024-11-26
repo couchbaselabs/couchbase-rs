@@ -52,8 +52,6 @@ pub(crate) struct SenderContext {
 
 struct ReadLoopOptions {
     pub client_id: String,
-    pub local_addr: Option<SocketAddr>,
-    pub peer_addr: Option<SocketAddr>,
     pub orphan_handler: OrphanResponseHandler,
     pub on_connection_close_tx: OnConnectionCloseHandler,
     pub on_client_close_rx: Receiver<()>,
@@ -82,8 +80,8 @@ pub struct Client {
     read_handle: Mutex<ClientReadHandle>,
     close_tx: Sender<()>,
 
-    local_addr: Option<SocketAddr>,
-    peer_addr: Option<SocketAddr>,
+    local_addr: SocketAddr,
+    peer_addr: SocketAddr,
 
     closed: AtomicBool,
 }
@@ -189,7 +187,7 @@ impl Client {
                                         }
 
                                         // TODO: clone
-                                        let resp = ClientResponse::new(packet, more_tx, opts.peer_addr, opts.local_addr, context.context);
+                                        let resp = ClientResponse::new(packet, more_tx, context.context);
                                         match sender.send(Ok(resp)).await {
                                             Ok(_) => {}
                                             Err(e) => {
@@ -271,8 +269,6 @@ impl Dispatcher for Client {
                 read_opaque_map,
                 ReadLoopOptions {
                     client_id: read_uuid,
-                    local_addr,
-                    peer_addr,
                     orphan_handler: opts.orphan_handler,
                     on_connection_close_tx: opts.on_connection_close_handler,
                     on_client_close_rx: close_rx,
@@ -365,11 +361,7 @@ impl Dispatcher for Client {
         Self::drain_opaque_map(map).await;
 
         if let Some(e) = close_err {
-            return Err(Error::close_error(
-                self.local_addr,
-                self.peer_addr,
-                Box::new(e),
-            ));
+            return Err(Error::close_error(e.to_string(), Box::new(e)));
         }
 
         Ok(())

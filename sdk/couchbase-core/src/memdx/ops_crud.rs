@@ -1,4 +1,3 @@
-use std::net::SocketAddr;
 use std::time::Duration;
 use byteorder::{BigEndian, WriteBytesExt, ByteOrder};
 use bytes::{BufMut, BytesMut};
@@ -1005,11 +1004,7 @@ impl OpsCrud {
         Ok(magic)
     }
 
-    pub(crate) fn decode_common_status(
-        resp: &ResponsePacket,
-        dispatched_to: &Option<SocketAddr>,
-        dispatched_from: &Option<SocketAddr>,
-    ) -> std::result::Result<(), Error> {
+    pub(crate) fn decode_common_status(resp: &ResponsePacket) -> std::result::Result<(), Error> {
         let kind = match resp.status {
             Status::CollectionUnknown => ServerErrorKind::UnknownCollectionID,
             Status::AccessError => ServerErrorKind::Access,
@@ -1019,19 +1014,15 @@ impl OpsCrud {
             }
         };
 
-        Err(ServerError::new(kind, resp, dispatched_to, dispatched_from).into())
+        Err(ServerError::new(kind, resp).into())
     }
 
-    pub(crate) fn decode_common_error(
-        resp: &ResponsePacket,
-        dispatched_to: &Option<SocketAddr>,
-        dispatched_from: &Option<SocketAddr>,
-    ) -> Error {
-        if let Err(e) = Self::decode_common_status(resp, dispatched_to, dispatched_from) {
+    pub(crate) fn decode_common_error(resp: &ResponsePacket) -> Error {
+        if let Err(e) = Self::decode_common_status(resp) {
             return e;
         };
 
-        OpsCore::decode_error(resp, dispatched_to, dispatched_from).into()
+        OpsCore::decode_error(resp).into()
     }
 }
 

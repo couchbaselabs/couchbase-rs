@@ -27,15 +27,15 @@ struct TerseClusterInfo {
 
 #[tokio::test]
 async fn test_row_streamer() {
-    setup_tests();
+    setup_tests().await;
 
-    let addrs = test_mem_addrs();
+    let addrs = test_mem_addrs().await;
 
     let ip = addrs.first().unwrap().split(":").next().unwrap();
 
     let basic_auth = BasicAuth {
-        username: test_username(),
-        password: test_password(),
+        username: test_username().await,
+        password: test_password().await,
     };
 
     let request_body = json!({"statement": "FROM RANGE(0, 999) AS i SELECT *"});
@@ -99,14 +99,14 @@ async fn test_row_streamer() {
 
 #[tokio::test]
 async fn test_json_block_read() {
-    setup_tests();
+    setup_tests().await;
 
-    let addrs = test_mem_addrs();
+    let addrs = test_mem_addrs().await;
     let ip = addrs.first().unwrap().split(":").next().unwrap();
 
     let basic_auth = BasicAuth {
-        username: test_username(),
-        password: test_password(),
+        username: test_username().await,
+        password: test_password().await,
     };
     let uri = format!("http://{}:8091/pools/default/terseClusterInfo", ip);
 

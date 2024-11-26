@@ -1,6 +1,14 @@
 use crate::agent::Agent;
-use crate::crudoptions::{AddOptions, AppendOptions, DecrementOptions, DeleteOptions, GetAndLockOptions, GetAndTouchOptions, GetMetaOptions, GetOptions, IncrementOptions, LookupInOptions, MutateInOptions, PrependOptions, ReplaceOptions, TouchOptions, UnlockOptions, UpsertOptions};
-use crate::crudresults::{AddResult, AppendResult, DecrementResult, DeleteResult, GetAndLockResult, GetAndTouchResult, GetMetaResult, GetResult, IncrementResult, LookupInResult, MutateInResult, PrependResult, ReplaceResult, TouchResult, UnlockResult, UpsertResult};
+use crate::crudoptions::{
+    AddOptions, AppendOptions, DecrementOptions, DeleteOptions, GetAndLockOptions,
+    GetAndTouchOptions, GetMetaOptions, GetOptions, IncrementOptions, LookupInOptions,
+    MutateInOptions, PrependOptions, ReplaceOptions, TouchOptions, UnlockOptions, UpsertOptions,
+};
+use crate::crudresults::{
+    AddResult, AppendResult, DecrementResult, DeleteResult, GetAndLockResult, GetAndTouchResult,
+    GetMetaResult, GetResult, IncrementResult, LookupInResult, MutateInResult, PrependResult,
+    ReplaceResult, TouchResult, UnlockResult, UpsertResult,
+};
 use crate::error::Result;
 use crate::querycomponent::QueryResultStream;
 use crate::queryoptions::QueryOptions;

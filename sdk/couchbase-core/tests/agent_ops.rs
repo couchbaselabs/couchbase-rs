@@ -1,15 +1,22 @@
 extern crate core;
 
-use std::sync::Arc;
-use serde::Serialize;
 use couchbase_core::agent::Agent;
-use couchbase_core::crudoptions::{AddOptions, AppendOptions, DecrementOptions, DeleteOptions, GetAndLockOptions, GetAndTouchOptions, GetOptions, IncrementOptions, LookupInOptions, MutateInOptions, PrependOptions, ReplaceOptions, TouchOptions, UnlockOptions, UpsertOptions};
+use couchbase_core::crudoptions::{
+    AddOptions, AppendOptions, DecrementOptions, DeleteOptions, GetAndLockOptions,
+    GetAndTouchOptions, GetOptions, IncrementOptions, LookupInOptions, MutateInOptions,
+    PrependOptions, ReplaceOptions, TouchOptions, UnlockOptions, UpsertOptions,
+};
 use couchbase_core::memdx::error::ErrorKind::Server;
 use couchbase_core::memdx::error::ServerErrorKind::KeyExists;
 use couchbase_core::memdx::error::{ErrorKind, ServerError, ServerErrorKind, SubdocErrorKind};
-use couchbase_core::memdx::subdoc::{LookupInOp, LookupInOpType, MutateInOp, MutateInOpType, SubdocOpFlag};
+use couchbase_core::memdx::subdoc::{
+    LookupInOp, LookupInOpType, MutateInOp, MutateInOpType, SubdocOpFlag,
+};
 use couchbase_core::retrybesteffort::{BestEffortRetryStrategy, ExponentialBackoffCalculator};
 use couchbase_core::retryfailfast::FailFastRetryStrategy;
+use serde::Serialize;
+use std::sync::Arc;
+
 use crate::common::default_agent_options::{create_default_options, create_options_without_bucket};
 use crate::common::helpers::{generate_key, generate_string_value};
 use crate::common::test_config::setup_tests;
@@ -22,9 +29,9 @@ static ALLOC: dhat::Alloc = dhat::Alloc;
 
 #[tokio::test]
 async fn test_upsert_and_get() {
-    setup_tests();
+    setup_tests().await;
 
-    let agent_opts = create_default_options();
+    let agent_opts = create_default_options().await;
 
     let mut agent = Agent::new(agent_opts).await.unwrap();
 
@@ -68,9 +75,9 @@ async fn test_upsert_and_get() {
 
 #[tokio::test]
 async fn test_add_and_delete() {
-    setup_tests();
+    setup_tests().await;
 
-    let agent_opts = create_default_options();
+    let agent_opts = create_default_options().await;
 
     let mut agent = Agent::new(agent_opts).await.unwrap();
 
@@ -135,9 +142,9 @@ async fn test_add_and_delete() {
 
 #[tokio::test]
 async fn test_replace() {
-    setup_tests();
+    setup_tests().await;
 
-    let agent_opts = create_default_options();
+    let agent_opts = create_default_options().await;
 
     let mut agent = Agent::new(agent_opts).await.unwrap();
 
@@ -199,9 +206,9 @@ async fn test_replace() {
 
 #[tokio::test]
 async fn test_lock_unlock() {
-    setup_tests();
+    setup_tests().await;
 
-    let agent_opts = create_default_options();
+    let agent_opts = create_default_options().await;
 
     let mut agent = Agent::new(agent_opts).await.unwrap();
 
@@ -305,9 +312,9 @@ async fn test_lock_unlock() {
 async fn test_touch_operations() {
     // TODO RSCBC-27 we can't fetch & check the expiry without subdoc
 
-    setup_tests();
+    setup_tests().await;
 
-    let agent_opts = create_default_options();
+    let agent_opts = create_default_options().await;
 
     let mut agent = Agent::new(agent_opts).await.unwrap();
 
@@ -368,9 +375,9 @@ async fn test_touch_operations() {
 
 #[tokio::test]
 async fn test_append_and_prepend() {
-    setup_tests();
+    setup_tests().await;
 
-    let agent_opts = create_default_options();
+    let agent_opts = create_default_options().await;
 
     let mut agent = Agent::new(agent_opts).await.unwrap();
 
@@ -453,9 +460,9 @@ async fn test_append_and_prepend() {
 
 #[tokio::test]
 async fn test_append_and_prepend_cas_mismatch() {
-    setup_tests();
+    setup_tests().await;
 
-    let agent_opts = create_default_options();
+    let agent_opts = create_default_options().await;
 
     let mut agent = Agent::new(agent_opts).await.unwrap();
 
@@ -535,9 +542,9 @@ async fn test_append_and_prepend_cas_mismatch() {
 
 #[tokio::test]
 async fn test_increment_and_decrement() {
-    setup_tests();
+    setup_tests().await;
 
-    let agent_opts = create_default_options();
+    let agent_opts = create_default_options().await;
 
     let agent = Agent::new(agent_opts).await.unwrap();
 
@@ -592,9 +599,9 @@ struct SubdocObject {
 
 #[tokio::test]
 async fn test_lookup_in() {
-    setup_tests();
+    setup_tests().await;
 
-    let agent_opts = create_default_options();
+    let agent_opts = create_default_options().await;
 
     let agent = Agent::new(agent_opts).await.unwrap();
 
@@ -646,7 +653,7 @@ async fn test_lookup_in() {
             op: LookupInOpType::GetDoc,
             flags: SubdocOpFlag::None,
             path: "".as_bytes(),
-        }
+        },
     ];
 
     let lookup_in_opts = LookupInOptions::builder()
@@ -664,26 +671,39 @@ async fn test_lookup_in() {
     assert!(!lookup_in_result.doc_is_deleted);
     assert!(lookup_in_result.value[0].err.is_none());
     assert_eq!(
-        std::str::from_utf8(lookup_in_result.value[0].value.as_ref().unwrap()).unwrap().trim_matches('"'),
+        std::str::from_utf8(lookup_in_result.value[0].value.as_ref().unwrap())
+            .unwrap()
+            .trim_matches('"'),
         "hello"
     );
     assert!(lookup_in_result.value[0].err.is_none());
-    assert!(lookup_in_result.value[1].err.as_ref().is_some_and(|err| err.kind == SubdocErrorKind::PathNotFound));
-    assert_eq!(lookup_in_result.value[1].err.as_ref().unwrap().op_index, Some(1));
+    assert!(lookup_in_result.value[1]
+        .err
+        .as_ref()
+        .is_some_and(|err| err.kind == SubdocErrorKind::PathNotFound));
+    assert_eq!(
+        lookup_in_result.value[1].err.as_ref().unwrap().op_index,
+        Some(1)
+    );
     assert!(lookup_in_result.value[2].err.is_none());
     assert_eq!(
-        std::str::from_utf8(lookup_in_result.value[2].value.as_ref().unwrap()).unwrap().trim_matches('"'),
+        std::str::from_utf8(lookup_in_result.value[2].value.as_ref().unwrap())
+            .unwrap()
+            .trim_matches('"'),
         "3"
     );
     assert!(lookup_in_result.value[3].err.is_none());
-    assert_eq!(lookup_in_result.value[3].value.as_ref().unwrap(), &serde_json::to_vec(&obj).unwrap());
+    assert_eq!(
+        lookup_in_result.value[3].value.as_ref().unwrap(),
+        &serde_json::to_vec(&obj).unwrap()
+    );
 }
 
 #[tokio::test]
 async fn test_mutate_in() {
-    setup_tests();
+    setup_tests().await;
 
-    let agent_opts = create_default_options();
+    let agent_opts = create_default_options().await;
 
     let agent = Agent::new(agent_opts).await.unwrap();
 
@@ -714,7 +734,7 @@ async fn test_mutate_in() {
 
     assert_ne!(0, upsert_result.cas);
     assert!(upsert_result.mutation_token.is_some());
-    
+
     let ops = [
         MutateInOp {
             op: MutateInOpType::Counter,
@@ -733,7 +753,7 @@ async fn test_mutate_in() {
             flags: SubdocOpFlag::None,
             path: "arr".as_bytes(),
             value: "4".as_bytes(),
-        }
+        },
     ];
 
     let mutate_in_options = MutateInOptions::builder()
@@ -749,7 +769,10 @@ async fn test_mutate_in() {
 
     assert_eq!(mutate_in_result.value.len(), 3);
     assert!(mutate_in_result.value[0].err.is_none());
-    assert!(mutate_in_result.value[0].clone().value.is_some_and(|val| String::from_utf8(val).unwrap() == "5"));
+    assert!(mutate_in_result.value[0]
+        .clone()
+        .value
+        .is_some_and(|val| String::from_utf8(val).unwrap() == "5"));
     assert!(mutate_in_result.value[1].err.is_none());
     assert!(mutate_in_result.value[1].value.is_none());
     assert!(mutate_in_result.value[2].err.is_none());
@@ -758,9 +781,9 @@ async fn test_mutate_in() {
 
 #[tokio::test]
 async fn test_kv_without_a_bucket() {
-    setup_tests();
+    setup_tests().await;
 
-    let agent_opts = create_options_without_bucket();
+    let agent_opts = create_options_without_bucket().await;
 
     let agent = Agent::new(agent_opts).await.unwrap();
 
@@ -802,11 +825,11 @@ async fn test_kv_without_a_bucket() {
 #[cfg(feature = "dhat-heap")]
 #[tokio::test]
 async fn upsert_allocations() {
-    setup_tests();
+    setup_tests().await;
 
     let profiler = dhat::Profiler::builder().build();
 
-    let agent_opts = create_default_options();
+    let agent_opts = create_default_options().await;
 
     let agent = Agent::new(agent_opts).await.unwrap();
 

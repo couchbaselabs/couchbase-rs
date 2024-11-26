@@ -11,7 +11,7 @@ mod common;
 
 #[tokio::test]
 async fn test_query_basic() {
-    setup_tests(LevelFilter::Trace);
+    setup_tests(LevelFilter::Trace).await;
 
     let cluster = create_cluster_from_test_config().await;
 
@@ -37,7 +37,7 @@ async fn test_query_basic() {
 
 #[tokio::test]
 async fn test_query_raw_result() {
-    setup_tests(LevelFilter::Trace);
+    setup_tests(LevelFilter::Trace).await;
 
     let cluster = create_cluster_from_test_config().await;
 
@@ -64,7 +64,7 @@ async fn test_query_raw_result() {
 
 #[tokio::test]
 async fn test_prepared_query_basic() {
-    setup_tests(LevelFilter::Trace);
+    setup_tests(LevelFilter::Trace).await;
 
     let cluster = create_cluster_from_test_config().await;
 
@@ -90,10 +90,13 @@ async fn test_prepared_query_basic() {
 
 #[tokio::test]
 async fn test_scope_query_basic() {
-    setup_tests(LevelFilter::Trace);
+    setup_tests(LevelFilter::Trace).await;
 
     let cluster = create_cluster_from_test_config().await;
-    let scope = cluster.bucket(test_bucket()).await.scope(test_scope());
+    let scope = cluster
+        .bucket(test_bucket().await)
+        .await
+        .scope(test_scope().await);
 
     let opts = QueryOptions::builder().metrics(true).build();
     let mut res = scope.query("SELECT 1=1", opts).await.unwrap();

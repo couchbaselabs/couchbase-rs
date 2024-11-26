@@ -1,11 +1,13 @@
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::net::ToSocketAddrs;
 use std::ops::Add;
 use std::sync::Arc;
 use std::time::Duration;
 
 use futures::executor::block_on;
 use log::{debug, error, info};
+use tokio::net;
 use tokio::runtime::{Handle, Runtime};
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::sync::{broadcast, mpsc, Mutex};
@@ -25,7 +27,7 @@ use crate::configwatcher::{
     ConfigWatcher, ConfigWatcherMemd, ConfigWatcherMemdConfig, ConfigWatcherMemdOptions,
 };
 use crate::crudcomponent::CrudComponent;
-use crate::error::Result;
+use crate::error::{ErrorKind, Result};
 use crate::httpcomponent::HttpComponent;
 use crate::httpx;
 use crate::httpx::client::{ClientConfig, ReqwestClient};
@@ -480,7 +482,7 @@ impl Agent {
     ) -> Result<ParsedConfig> {
         loop {
             for endpoint_config in kv_client_manager_client_configs.values() {
-                let host = endpoint_config.address.ip();
+                let host = &endpoint_config.address;
                 let timeout_result = timeout(
                     connect_timeout,
                     StdKvClient::new(
@@ -515,7 +517,7 @@ impl Agent {
 
                 let config: TerseConfig = serde_json::from_slice(raw_config.as_slice())?;
 
-                match ConfigParser::parse_terse_config(config, &host.to_string()) {
+                match ConfigParser::parse_terse_config(config, host) {
                     Ok(c) => {
                         return Ok(c);
                     }
@@ -533,8 +535,7 @@ impl Agent {
         for addr in memd_addrs {
             let node_id = format!("kv{}", addr);
             let config = KvClientConfig {
-                // TODO: unwrap, return error on fail?
-                address: addr.parse().unwrap(),
+                address: addr.clone(),
                 tls: state.tls_config.clone(),
                 client_name: state.client_name.clone(),
                 authenticator: state.authenticator.clone(),

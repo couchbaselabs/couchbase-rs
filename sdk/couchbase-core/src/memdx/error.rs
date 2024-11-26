@@ -1,10 +1,8 @@
+use serde::Deserialize;
 use std::backtrace::Backtrace;
 use std::error::Error as StdError;
 use std::fmt::{Display, Formatter, Pointer};
 use std::io;
-use std::net::SocketAddr;
-
-use serde::Deserialize;
 use thiserror::Error;
 
 use crate::memdx::error;
@@ -71,18 +69,12 @@ impl Error {
         }
     }
 
-    pub(crate) fn connection_error(
+    pub(crate) fn connection_failed_error(
         reason: &str,
-        source_addr: Option<SocketAddr>,
-        remote_addr: SocketAddr,
         source: Box<dyn StdError + Send + Sync>,
     ) -> Self {
         Error {
-            kind: Box::new(ErrorKind::Io {
-                msg: reason.into(),
-                source_addr,
-                remote_addr,
-            }),
+            kind: Box::new(ErrorKind::ConnectionFailed { msg: reason.into() }),
             backtrace: Backtrace::capture(),
             source: Some(source),
         }
@@ -100,16 +92,9 @@ impl Error {
         }
     }
 
-    pub(crate) fn close_error(
-        source_addr: Option<SocketAddr>,
-        remote_addr: Option<SocketAddr>,
-        source: Box<dyn StdError + Send + Sync>,
-    ) -> Self {
+    pub(crate) fn close_error(msg: String, source: Box<dyn StdError + Send + Sync>) -> Self {
         Error {
-            kind: Box::new(ErrorKind::Close {
-                source_addr,
-                remote_addr,
-            }),
+            kind: Box::new(ErrorKind::Close { msg }),
             backtrace: Backtrace::capture(),
             source: Some(source),
         }
@@ -189,8 +174,7 @@ pub enum ErrorKind {
     },
     #[non_exhaustive]
     Close {
-        source_addr: Option<SocketAddr>,
-        remote_addr: Option<SocketAddr>,
+        msg: String,
     },
     #[non_exhaustive]
     Protocol {
@@ -199,10 +183,8 @@ pub enum ErrorKind {
     Cancelled(CancellationErrorKind),
     UnknownBucketName,
     #[non_exhaustive]
-    Io {
+    ConnectionFailed {
         msg: String,
-        source_addr: Option<SocketAddr>,
-        remote_addr: SocketAddr,
     },
     #[non_exhaustive]
     UnknownIo {
@@ -228,19 +210,9 @@ impl Display for ErrorKind {
             ErrorKind::Dispatch { opaque, op_code } => {
                 write!(f, "Dispatch failed: opaque: {opaque}, op_code: {op_code}")
             }
-            ErrorKind::Close {
-                source_addr,
-                remote_addr,
-            } => write!(
-                f,
-                "Close error: source address: {}, remote: {}",
-                source_addr
-                    .map(|a| a.to_string())
-                    .unwrap_or("unknown".to_string()),
-                remote_addr
-                    .map(|a| a.to_string())
-                    .unwrap_or("unknown".to_string()),
-            ),
+            ErrorKind::Close { msg } => {
+                write!(f, "Close error {}", msg)
+            }
             ErrorKind::Protocol { msg } => {
                 write!(f, "{msg}")
             }
@@ -248,24 +220,8 @@ impl Display for ErrorKind {
                 write!(f, "Request cancelled: {}", kind)
             }
             ErrorKind::UnknownBucketName => write!(f, "Unknown bucket name"),
-            ErrorKind::Io {
-                msg: reason,
-                source_addr,
-                remote_addr,
-            } => {
-                if let Some(source_addr) = source_addr {
-                    write!(
-                        f,
-                        "{} source address: {}, remote: {}",
-                        reason, source_addr, remote_addr
-                    )
-                } else {
-                    write!(
-                        f,
-                        "{} unknown source address, remote: {}",
-                        reason, remote_addr
-                    )
-                }
+            ErrorKind::ConnectionFailed { msg } => {
+                write!(f, "Connection failed {}", msg)
             }
             ErrorKind::UnknownIo { msg } => {
                 write!(f, "Unknown IO error: {msg}")
@@ -325,15 +281,18 @@ pub struct ServerError {
     pub context: Option<Vec<u8>>,
     pub op_code: OpCode,
     pub status: Status,
-    pub dispatched_to: String,
-    pub dispatched_from: String,
     pub opaque: u32,
 }
 
 impl Display for ServerError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut base_msg = format!("Server error: {}, status: 0x{:02x}, opcode: {}, dispatched from: {}, dispatched to: {}, opaque: {}",
-                                   self.kind, u16::from(self.status), self.op_code, self.dispatched_from, self.dispatched_to, self.opaque);
+        let mut base_msg = format!(
+            "Server error: {}, status: 0x{:02x}, opcode: {}, opaque: {}",
+            self.kind,
+            u16::from(self.status),
+            self.op_code,
+            self.opaque
+        );
 
         if let Some(context) = &self.context {
             if let Some(parsed) = Self::parse_context(context) {
@@ -360,30 +319,13 @@ impl Display for SubdocError {
 impl StdError for ServerError {}
 
 impl ServerError {
-    pub(crate) fn new(
-        kind: ServerErrorKind,
-        resp: &ResponsePacket,
-        dispatched_to: &Option<SocketAddr>,
-        dispatched_from: &Option<SocketAddr>,
-    ) -> Self {
-        let dispatched_to = if let Some(to) = dispatched_to {
-            to.to_string()
-        } else {
-            String::new()
-        };
-        let dispatched_from = if let Some(from) = dispatched_from {
-            from.to_string()
-        } else {
-            String::new()
-        };
+    pub(crate) fn new(kind: ServerErrorKind, resp: &ResponsePacket) -> Self {
         Self {
             kind,
             config: None,
             context: None,
             op_code: resp.op_code,
             status: resp.status,
-            dispatched_to,
-            dispatched_from,
             opaque: resp.opaque,
         }
     }

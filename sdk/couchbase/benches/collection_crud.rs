@@ -18,10 +18,10 @@ fn upsert(c: &mut Criterion) {
         let cluster = create_cluster_from_test_config().await;
 
         cluster
-            .bucket(test_bucket())
+            .bucket(test_bucket().await)
             .await
-            .scope(test_scope())
-            .collection(test_collection())
+            .scope(test_scope().await)
+            .collection(test_collection().await)
     });
 
     let key = new_key();
@@ -42,10 +42,10 @@ fn insert(c: &mut Criterion) {
         let cluster = create_cluster_from_test_config().await;
 
         cluster
-            .bucket(test_bucket())
+            .bucket(test_bucket().await)
             .await
-            .scope(test_scope())
-            .collection(test_collection())
+            .scope(test_scope().await)
+            .collection(test_collection().await)
     });
 
     let key = new_key();
@@ -66,10 +66,10 @@ fn replace(c: &mut Criterion) {
         let cluster = create_cluster_from_test_config().await;
 
         cluster
-            .bucket(test_bucket())
+            .bucket(test_bucket().await)
             .await
-            .scope(test_scope())
-            .collection(test_collection())
+            .scope(test_scope().await)
+            .collection(test_collection().await)
     });
 
     let key = new_key();
@@ -94,10 +94,10 @@ fn remove(c: &mut Criterion) {
         let cluster = create_cluster_from_test_config().await;
 
         cluster
-            .bucket(test_bucket())
+            .bucket(test_bucket().await)
             .await
-            .scope(test_scope())
-            .collection(test_collection())
+            .scope(test_scope().await)
+            .collection(test_collection().await)
     });
 
     let key = new_key();
@@ -119,10 +119,10 @@ fn exists(c: &mut Criterion) {
         let cluster = create_cluster_from_test_config().await;
 
         cluster
-            .bucket(test_bucket())
+            .bucket(test_bucket().await)
             .await
-            .scope(test_scope())
-            .collection(test_collection())
+            .scope(test_scope().await)
+            .collection(test_collection().await)
     });
 
     let key = new_key();
@@ -144,10 +144,10 @@ fn get(c: &mut Criterion) {
         let cluster = create_cluster_from_test_config().await;
 
         cluster
-            .bucket(test_bucket())
+            .bucket(test_bucket().await)
             .await
-            .scope(test_scope())
-            .collection(test_collection())
+            .scope(test_scope().await)
+            .collection(test_collection().await)
     });
 
     let key = new_key();
@@ -169,10 +169,10 @@ fn get_and_touch(c: &mut Criterion) {
         let cluster = create_cluster_from_test_config().await;
 
         cluster
-            .bucket(test_bucket())
+            .bucket(test_bucket().await)
             .await
-            .scope(test_scope())
-            .collection(test_collection())
+            .scope(test_scope().await)
+            .collection(test_collection().await)
     });
 
     let key = new_key();
@@ -197,10 +197,10 @@ fn get_and_lock(c: &mut Criterion) {
         let cluster = create_cluster_from_test_config().await;
 
         cluster
-            .bucket(test_bucket())
+            .bucket(test_bucket().await)
             .await
-            .scope(test_scope())
-            .collection(test_collection())
+            .scope(test_scope().await)
+            .collection(test_collection().await)
     });
 
     let key = new_key();
@@ -225,10 +225,10 @@ fn unlock(c: &mut Criterion) {
         let cluster = create_cluster_from_test_config().await;
 
         cluster
-            .bucket(test_bucket())
+            .bucket(test_bucket().await)
             .await
-            .scope(test_scope())
-            .collection(test_collection())
+            .scope(test_scope().await)
+            .collection(test_collection().await)
     });
 
     let key = new_key();
@@ -256,10 +256,10 @@ fn touch(c: &mut Criterion) {
         let cluster = create_cluster_from_test_config().await;
 
         cluster
-            .bucket(test_bucket())
+            .bucket(test_bucket().await)
             .await
-            .scope(test_scope())
-            .collection(test_collection())
+            .scope(test_scope().await)
+            .collection(test_collection().await)
     });
 
     let key = new_key();
@@ -284,10 +284,10 @@ fn append(c: &mut Criterion) {
         let cluster = create_cluster_from_test_config().await;
 
         cluster
-            .bucket(test_bucket())
+            .bucket(test_bucket().await)
             .await
-            .scope(test_scope())
-            .collection(test_collection())
+            .scope(test_scope().await)
+            .collection(test_collection().await)
     });
 
     let key = new_key();
@@ -322,10 +322,10 @@ fn prepend(c: &mut Criterion) {
         let cluster = create_cluster_from_test_config().await;
 
         cluster
-            .bucket(test_bucket())
+            .bucket(test_bucket().await)
             .await
-            .scope(test_scope())
-            .collection(test_collection())
+            .scope(test_scope().await)
+            .collection(test_collection().await)
     });
 
     let key = new_key();
@@ -360,10 +360,10 @@ fn increment(c: &mut Criterion) {
         let cluster = create_cluster_from_test_config().await;
 
         cluster
-            .bucket(test_bucket())
+            .bucket(test_bucket().await)
             .await
-            .scope(test_scope())
-            .collection(test_collection())
+            .scope(test_scope().await)
+            .collection(test_collection().await)
     });
 
     let key = new_key();
@@ -385,10 +385,10 @@ fn decrement(c: &mut Criterion) {
         let cluster = create_cluster_from_test_config().await;
 
         cluster
-            .bucket(test_bucket())
+            .bucket(test_bucket().await)
             .await
-            .scope(test_scope())
-            .collection(test_collection())
+            .scope(test_scope().await)
+            .collection(test_collection().await)
     });
 
     let key = new_key();

@@ -1,14 +1,4 @@
-use std::cmp::Ordering;
-use std::future::Future;
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
-
-use log::debug;
-use tokio::select;
-use tokio::sync::broadcast;
-use tokio::sync::broadcast::{Receiver, Sender};
-use tokio::time::sleep;
-
+use crate::cbconfig;
 use crate::cbconfig::TerseConfig;
 use crate::configparser::ConfigParser;
 use crate::error::Result;
@@ -17,6 +7,16 @@ use crate::kvclient_ops::KvClientOps;
 use crate::kvclientmanager::KvClientManager;
 use crate::memdx::request::GetClusterConfigRequest;
 use crate::parsedconfig::ParsedConfig;
+use futures::future::err;
+use log::{debug, error, trace};
+use std::cmp::Ordering;
+use std::future::Future;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+use tokio::select;
+use tokio::sync::broadcast;
+use tokio::sync::broadcast::{Receiver, Sender};
+use tokio::time::sleep;
 
 pub(crate) trait ConfigWatcher: Send + Sync {
     fn watch(&self, on_shutdown_rx: Receiver<()>) -> Receiver<ParsedConfig>;
@@ -144,18 +144,21 @@ where
     }
 
     async fn poll_one(&self, endpoint: String) -> Result<ParsedConfig> {
+        debug!("Polling config from {}", &endpoint);
+
         let client = self.kv_client_manager.get_client(endpoint).await?;
 
-        let addr = client.remote_addr();
-        let host = addr.ip();
+        let hostname = client.remote_hostname();
 
         let resp = client
             .get_cluster_config(GetClusterConfigRequest {})
             .await?;
 
-        let config: TerseConfig = serde_json::from_slice(resp.config.as_slice())?;
+        let config = cbconfig::parse::parse_terse_config(&resp.config, hostname)?;
 
-        ConfigParser::parse_terse_config(config, &host.to_string())
+        trace!("Poller fetched new config {:?}", &config);
+
+        ConfigParser::parse_terse_config(config, hostname)
     }
 }
 

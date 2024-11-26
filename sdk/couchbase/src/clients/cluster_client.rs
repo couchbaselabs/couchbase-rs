@@ -28,7 +28,7 @@ impl ClusterClient {
         opts: ClusterOptions,
     ) -> error::Result<ClusterClient> {
         let conn_spec = parse(conn_str)?;
-        let resolved_conn_spec = resolve(conn_spec)?;
+        let resolved_conn_spec = resolve(conn_spec).await?;
 
         let backend = if let Some(host) = resolved_conn_spec.couchbase2_host {
             ClusterClientBackend::Couchbase2ClusterBackend(
