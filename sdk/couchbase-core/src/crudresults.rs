@@ -1,6 +1,6 @@
+use crate::memdx::subdoc::SubDocResult;
 use crate::mutationtoken::MutationToken;
 use std::time::Duration;
-use crate::memdx::subdoc::SubDocResult;
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct GetResult {
@@ -100,7 +100,7 @@ pub struct DecrementResult {
 pub struct LookupInResult {
     pub value: Vec<SubDocResult>,
     pub cas: u64,
-    pub doc_is_deleted: bool
+    pub doc_is_deleted: bool,
 }
 
 #[derive(Clone, Debug)]

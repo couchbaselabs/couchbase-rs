@@ -264,7 +264,7 @@ impl StdError for ResourceError {}
 #[non_exhaustive]
 pub struct SubdocError {
     pub kind: SubdocErrorKind,
-    pub op_index: Option<u8>
+    pub op_index: Option<u8>,
 }
 
 impl SubdocError {
@@ -421,7 +421,7 @@ pub enum ServerErrorKind {
     #[error("collection name unknown")]
     UnknownCollectionName,
     #[error("{error}")]
-    Subdoc{ error: SubdocError },
+    Subdoc { error: SubdocError },
     #[error("Server status unexpected for operation: {status}")]
     UnknownStatus { status: Status },
 }
@@ -529,4 +529,3 @@ impl From<io::Error> for Error {
         }
     }
 }
-

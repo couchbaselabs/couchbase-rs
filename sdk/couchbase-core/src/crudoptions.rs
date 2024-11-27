@@ -3,8 +3,8 @@ use std::sync::Arc;
 use typed_builder::TypedBuilder;
 
 use crate::memdx::datatype::DataTypeFlag;
-use crate::memdx::subdoc::{MutateInOp, LookupInOp, SubdocDocFlag};
 use crate::memdx::durability_level::DurabilityLevel;
+use crate::memdx::subdoc::{LookupInOp, MutateInOp, SubdocDocFlag};
 use crate::retry::{RetryStrategy, DEFAULT_RETRY_STRATEGY};
 
 #[derive(Clone, Debug, TypedBuilder)]

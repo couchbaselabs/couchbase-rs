@@ -185,8 +185,12 @@ impl Display for Status {
             Status::SubDocMultiPathFailureDeleted => "subdoc multipath failure deleted",
             Status::SubDocInvalidXattrOrder => "subdoc invalid xattr order",
             Status::SubDocXattrUnknownVattrMacro => "subdoc xattr unknown vattr macro",
-            Status::SubDocCanOnlyReviveDeletedDocuments => "subdoc can only revive deleted documents",
-            Status::SubDocDeletedDocumentCantHaveValue => "subdoc deleted document can't have value",
+            Status::SubDocCanOnlyReviveDeletedDocuments => {
+                "subdoc can only revive deleted documents"
+            }
+            Status::SubDocDeletedDocumentCantHaveValue => {
+                "subdoc deleted document can't have value"
+            }
             Status::Unknown(status) => {
                 // TODO: improve this.
                 let t = format!("unknown status {}", status);

@@ -1,8 +1,8 @@
-use tokio_rustls::rustls::{DigitallySignedStruct, SignatureScheme};
 use tokio_rustls::rustls::client::danger::{
     HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier,
 };
 use tokio_rustls::rustls::pki_types::{CertificateDer, ServerName, UnixTime};
+use tokio_rustls::rustls::{DigitallySignedStruct, SignatureScheme};
 
 #[derive(Debug)]
 pub struct InsecureCertVerifier {}

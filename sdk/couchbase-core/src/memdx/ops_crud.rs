@@ -1,6 +1,3 @@
-use std::time::Duration;
-use byteorder::{BigEndian, WriteBytesExt, ByteOrder};
-use bytes::{BufMut, BytesMut};
 use crate::memdx::client::ResponseContext;
 use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::durability_level::{DurabilityLevel, DurabilityLevelSettings};
@@ -12,10 +9,21 @@ use crate::memdx::opcode::OpCode;
 use crate::memdx::ops_core::OpsCore;
 use crate::memdx::packet::{RequestPacket, ResponsePacket};
 use crate::memdx::pendingop::StandardPendingOp;
-use crate::memdx::request::{AddRequest, AppendRequest, DecrementRequest, DeleteRequest, GetAndLockRequest, GetAndTouchRequest, GetMetaRequest, GetRequest, IncrementRequest, LookupInRequest, MutateInRequest, PrependRequest, ReplaceRequest, SetRequest, TouchRequest, UnlockRequest};
-use crate::memdx::response::{AddResponse, AppendResponse, DecrementResponse, DeleteResponse, GetAndLockResponse, GetAndTouchResponse, GetMetaResponse, GetResponse, IncrementResponse, LookupInResponse, MutateInResponse, PrependResponse, ReplaceResponse, SetResponse, TouchResponse, UnlockResponse};
+use crate::memdx::request::{
+    AddRequest, AppendRequest, DecrementRequest, DeleteRequest, GetAndLockRequest,
+    GetAndTouchRequest, GetMetaRequest, GetRequest, IncrementRequest, LookupInRequest,
+    MutateInRequest, PrependRequest, ReplaceRequest, SetRequest, TouchRequest, UnlockRequest,
+};
+use crate::memdx::response::{
+    AddResponse, AppendResponse, DecrementResponse, DeleteResponse, GetAndLockResponse,
+    GetAndTouchResponse, GetMetaResponse, GetResponse, IncrementResponse, LookupInResponse,
+    MutateInResponse, PrependResponse, ReplaceResponse, SetResponse, TouchResponse, UnlockResponse,
+};
 use crate::memdx::status::Status;
 use crate::memdx::subdoc::SubdocRequestInfo;
+use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
+use bytes::{BufMut, BytesMut};
+use std::time::Duration;
 
 #[derive(Debug)]
 pub struct OpsCrud {
@@ -469,7 +477,9 @@ impl OpsCrud {
         D: Dispatcher,
     {
         if request.expiry.is_some() && request.preserve_expiry.is_some() {
-            return Err(Error::protocol_error("Cannot specify expiry and preserve expiry"));
+            return Err(Error::protocol_error(
+                "Cannot specify expiry and preserve expiry",
+            ));
         }
 
         let mut ext_frame_buf: Vec<u8> = vec![];
@@ -756,13 +766,8 @@ impl OpsCrud {
         D: Dispatcher,
     {
         let mut ext_frame_buf: Vec<u8> = vec![];
-        let magic = self.encode_req_ext_frames(
-            None,
-            None,
-            None,
-            request.on_behalf_of,
-            &mut ext_frame_buf,
-        )?;
+        let magic =
+            self.encode_req_ext_frames(None, None, None, request.on_behalf_of, &mut ext_frame_buf)?;
 
         let framing_extras = if !ext_frame_buf.is_empty() {
             Some(ext_frame_buf)
@@ -790,7 +795,10 @@ impl OpsCrud {
 
             value_buf[value_iter] = Into::<OpCode>::into(op.op).into();
             value_buf[value_iter + 1] = op.flags as u8;
-            BigEndian::write_u16(&mut value_buf[value_iter + 2..value_iter + 4], path_bytes_len as u16);
+            BigEndian::write_u16(
+                &mut value_buf[value_iter + 2..value_iter + 4],
+                path_bytes_len as u16,
+            );
             value_buf[value_iter + 4..value_iter + 4 + path_bytes_len].copy_from_slice(path_bytes);
             value_iter += 4 + path_bytes_len;
         }
@@ -819,7 +827,7 @@ impl OpsCrud {
             subdoc_info: Some(SubdocRequestInfo {
                 flags: request.flags,
                 op_count: request.ops.len() as u8,
-            })
+            }),
         };
 
         let pending_op = dispatcher.dispatch(packet, Some(response_context)).await?;
@@ -836,7 +844,9 @@ impl OpsCrud {
         D: Dispatcher,
     {
         if request.expiry.is_some() && request.preserve_expiry.is_some() {
-            return Err(Error::protocol_error("Cannot specify expiry and preserve expiry"));
+            return Err(Error::protocol_error(
+                "Cannot specify expiry and preserve expiry",
+            ));
         }
 
         let mut ext_frame_buf: Vec<u8> = vec![];
@@ -878,16 +888,25 @@ impl OpsCrud {
 
             value_buf[value_iter] = Into::<OpCode>::into(op.op).into();
             value_buf[value_iter + 1] = op.flags as u8;
-            BigEndian::write_u16(&mut value_buf[value_iter + 2..value_iter + 4], path_bytes_len as u16);
-            BigEndian::write_u32(&mut value_buf[value_iter + 4.. value_iter + 8], value_bytes_len as u32);
+            BigEndian::write_u16(
+                &mut value_buf[value_iter + 2..value_iter + 4],
+                path_bytes_len as u16,
+            );
+            BigEndian::write_u32(
+                &mut value_buf[value_iter + 4..value_iter + 8],
+                value_bytes_len as u32,
+            );
             value_buf[value_iter + 8..value_iter + 8 + path_bytes_len].copy_from_slice(path_bytes);
-            value_buf[value_iter + 8 + path_bytes_len..value_iter + 8 + path_bytes_len + value_bytes_len].copy_from_slice(op.value);
+            value_buf[value_iter + 8 + path_bytes_len
+                ..value_iter + 8 + path_bytes_len + value_bytes_len]
+                .copy_from_slice(op.value);
             value_iter += 8 + path_bytes_len + value_bytes_len;
         }
 
         let mut extra_buf: Vec<u8> = Vec::with_capacity(5);
 
-        extra_buf.write_u32::<BigEndian>(request.expiry.unwrap_or_default())
+        extra_buf
+            .write_u32::<BigEndian>(request.expiry.unwrap_or_default())
             .map_err(|e| {
                 Error::invalid_argument_error_with_source(
                     "failed to write request expiry",
@@ -924,7 +943,7 @@ impl OpsCrud {
             subdoc_info: Some(SubdocRequestInfo {
                 flags: request.flags,
                 op_count: request.ops.len() as u8,
-            })
+            }),
         };
 
         let pending_op = dispatcher.dispatch(packet, Some(response_context)).await?;

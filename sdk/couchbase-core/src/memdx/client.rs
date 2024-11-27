@@ -295,12 +295,19 @@ impl Dispatcher for Client {
         }
     }
 
-    async fn dispatch(&self, mut packet: RequestPacket, response_context: Option<ResponseContext>) -> error::Result<ClientPendingOp> {
+    async fn dispatch(
+        &self,
+        mut packet: RequestPacket,
+        response_context: Option<ResponseContext>,
+    ) -> error::Result<ClientPendingOp> {
         let (response_tx, response_rx) = mpsc::channel(1);
         let opaque = self
             .register_handler(SenderContext {
                 sender: response_tx,
-                context: response_context.unwrap_or(ResponseContext{cas: packet.cas, subdoc_info: None}),
+                context: response_context.unwrap_or(ResponseContext {
+                    cas: packet.cas,
+                    subdoc_info: None,
+                }),
             })
             .await;
         packet.opaque = Some(opaque);

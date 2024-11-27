@@ -1,5 +1,5 @@
-use crate::memdx::opcode::OpCode;
 use crate::memdx::error;
+use crate::memdx::opcode::OpCode;
 
 pub trait SubdocOp {
     fn is_xattr_op(&self) -> bool;
@@ -43,7 +43,7 @@ pub struct SubDocResult {
 pub struct LookupInOp<'a> {
     pub op: LookupInOpType,
     pub flags: SubdocOpFlag,
-    pub path: &'a [u8]
+    pub path: &'a [u8],
 }
 
 impl<'a> SubdocOp for LookupInOp<'a> {
