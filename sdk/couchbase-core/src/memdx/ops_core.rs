@@ -76,18 +76,21 @@ impl OpBootstrapEncoder for OpsCore {
         }
 
         let op = dispatcher
-            .dispatch(RequestPacket {
-                magic: Magic::Req,
-                op_code: OpCode::Hello,
-                datatype: 0,
-                vbucket_id: None,
-                cas: None,
-                extras: None,
-                key: None,
-                value: Some(features),
-                framing_extras: None,
-                opaque: None,
-            }, None)
+            .dispatch(
+                RequestPacket {
+                    magic: Magic::Req,
+                    op_code: OpCode::Hello,
+                    datatype: 0,
+                    vbucket_id: None,
+                    cas: None,
+                    extras: None,
+                    key: None,
+                    value: Some(features),
+                    framing_extras: None,
+                    opaque: None,
+                },
+                None,
+            )
             .await?;
 
         Ok(StandardPendingOp::new(op))
@@ -105,18 +108,21 @@ impl OpBootstrapEncoder for OpsCore {
         value.write_u16::<BigEndian>(request.version).unwrap();
 
         let op = dispatcher
-            .dispatch(RequestPacket {
-                magic: Magic::Req,
-                op_code: OpCode::GetErrorMap,
-                datatype: 0,
-                vbucket_id: None,
-                cas: None,
-                extras: None,
-                key: None,
-                value: Some(value),
-                framing_extras: None,
-                opaque: None,
-            }, None)
+            .dispatch(
+                RequestPacket {
+                    magic: Magic::Req,
+                    op_code: OpCode::GetErrorMap,
+                    datatype: 0,
+                    vbucket_id: None,
+                    cas: None,
+                    extras: None,
+                    key: None,
+                    value: Some(value),
+                    framing_extras: None,
+                    opaque: None,
+                },
+                None,
+            )
             .await?;
 
         Ok(StandardPendingOp::new(op))
@@ -134,18 +140,21 @@ impl OpBootstrapEncoder for OpsCore {
         key.write_all(request.bucket_name.as_bytes()).unwrap();
 
         let op = dispatcher
-            .dispatch(RequestPacket {
-                magic: Magic::Req,
-                op_code: OpCode::SelectBucket,
-                datatype: 0,
-                vbucket_id: None,
-                cas: None,
-                extras: None,
-                key: Some(key),
-                value: None,
-                framing_extras: None,
-                opaque: None,
-            }, None)
+            .dispatch(
+                RequestPacket {
+                    magic: Magic::Req,
+                    op_code: OpCode::SelectBucket,
+                    datatype: 0,
+                    vbucket_id: None,
+                    cas: None,
+                    extras: None,
+                    key: Some(key),
+                    value: None,
+                    framing_extras: None,
+                    opaque: None,
+                },
+                None,
+            )
             .await?;
 
         Ok(StandardPendingOp::new(op))
@@ -160,18 +169,21 @@ impl OpBootstrapEncoder for OpsCore {
         D: Dispatcher,
     {
         let op = dispatcher
-            .dispatch(RequestPacket {
-                magic: Magic::Req,
-                op_code: OpCode::GetClusterConfig,
-                datatype: 0,
-                vbucket_id: None,
-                cas: None,
-                extras: None,
-                key: None,
-                value: None,
-                framing_extras: None,
-                opaque: None,
-            }, None)
+            .dispatch(
+                RequestPacket {
+                    magic: Magic::Req,
+                    op_code: OpCode::GetClusterConfig,
+                    datatype: 0,
+                    vbucket_id: None,
+                    cas: None,
+                    extras: None,
+                    key: None,
+                    value: None,
+                    framing_extras: None,
+                    opaque: None,
+                },
+                None,
+            )
             .await?;
 
         Ok(StandardPendingOp::new(op))
@@ -191,18 +203,21 @@ impl OpSASLPlainEncoder for OpsCore {
         value.write_all(request.payload.as_slice()).unwrap();
 
         let op = dispatcher
-            .dispatch(RequestPacket {
-                magic: Magic::Req,
-                op_code: OpCode::SASLAuth,
-                datatype: 0,
-                vbucket_id: None,
-                cas: None,
-                extras: None,
-                key: Some(request.auth_mechanism.into()),
-                value: Some(value),
-                framing_extras: None,
-                opaque: None,
-            }, None)
+            .dispatch(
+                RequestPacket {
+                    magic: Magic::Req,
+                    op_code: OpCode::SASLAuth,
+                    datatype: 0,
+                    vbucket_id: None,
+                    cas: None,
+                    extras: None,
+                    key: Some(request.auth_mechanism.into()),
+                    value: Some(value),
+                    framing_extras: None,
+                    opaque: None,
+                },
+                None,
+            )
             .await?;
 
         Ok(StandardPendingOp::new(op))
@@ -221,18 +236,21 @@ impl OpSASLAutoEncoder for OpsCore {
         D: Dispatcher,
     {
         let op = dispatcher
-            .dispatch(RequestPacket {
-                magic: Magic::Req,
-                op_code: OpCode::SASLListMechs,
-                datatype: 0,
-                vbucket_id: None,
-                cas: None,
-                extras: None,
-                key: None,
-                value: None,
-                framing_extras: None,
-                opaque: None,
-            }, None)
+            .dispatch(
+                RequestPacket {
+                    magic: Magic::Req,
+                    op_code: OpCode::SASLListMechs,
+                    datatype: 0,
+                    vbucket_id: None,
+                    cas: None,
+                    extras: None,
+                    key: None,
+                    value: None,
+                    framing_extras: None,
+                    opaque: None,
+                },
+                None,
+            )
             .await?;
 
         Ok(StandardPendingOp::new(op))
@@ -252,18 +270,21 @@ impl OpSASLScramEncoder for OpsCore {
         value.write_all(request.payload.as_slice()).unwrap();
 
         let op = dispatcher
-            .dispatch(RequestPacket {
-                magic: Magic::Req,
-                op_code: OpCode::SASLStep,
-                datatype: 0,
-                vbucket_id: None,
-                cas: None,
-                extras: None,
-                key: Some(request.auth_mechanism.into()),
-                value: Some(value),
-                framing_extras: None,
-                opaque: None,
-            }, None)
+            .dispatch(
+                RequestPacket {
+                    magic: Magic::Req,
+                    op_code: OpCode::SASLStep,
+                    datatype: 0,
+                    vbucket_id: None,
+                    cas: None,
+                    extras: None,
+                    key: Some(request.auth_mechanism.into()),
+                    value: Some(value),
+                    framing_extras: None,
+                    opaque: None,
+                },
+                None,
+            )
             .await?;
 
         Ok(StandardPendingOp::new(op))

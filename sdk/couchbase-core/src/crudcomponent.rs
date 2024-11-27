@@ -6,15 +6,27 @@ use futures::{FutureExt, TryFutureExt};
 
 use crate::collectionresolver::{orchestrate_memd_collection_id, CollectionResolver};
 use crate::compressionmanager::{CompressionManager, Compressor};
-use crate::crudoptions::{AddOptions, AppendOptions, DecrementOptions, DeleteOptions, GetAndLockOptions, GetAndTouchOptions, GetMetaOptions, GetOptions, IncrementOptions, LookupInOptions, MutateInOptions, PrependOptions, ReplaceOptions, TouchOptions, UnlockOptions, UpsertOptions};
-use crate::crudresults::{AddResult, AppendResult, DecrementResult, DeleteResult, GetAndLockResult, GetAndTouchResult, GetMetaResult, GetResult, IncrementResult, LookupInResult, MutateInResult, PrependResult, ReplaceResult, TouchResult, UnlockResult, UpsertResult};
+use crate::crudoptions::{
+    AddOptions, AppendOptions, DecrementOptions, DeleteOptions, GetAndLockOptions,
+    GetAndTouchOptions, GetMetaOptions, GetOptions, IncrementOptions, LookupInOptions,
+    MutateInOptions, PrependOptions, ReplaceOptions, TouchOptions, UnlockOptions, UpsertOptions,
+};
+use crate::crudresults::{
+    AddResult, AppendResult, DecrementResult, DeleteResult, GetAndLockResult, GetAndTouchResult,
+    GetMetaResult, GetResult, IncrementResult, LookupInResult, MutateInResult, PrependResult,
+    ReplaceResult, TouchResult, UnlockResult, UpsertResult,
+};
 use crate::error::Result;
 use crate::kvclient::KvClient;
 use crate::kvclient_ops::KvClientOps;
 use crate::kvclientmanager::{orchestrate_memd_client, KvClientManager, KvClientManagerClientType};
 use crate::memdx::datatype::DataTypeFlag;
 use crate::memdx::hello_feature::HelloFeature;
-use crate::memdx::request::{AddRequest, AppendRequest, DecrementRequest, DeleteRequest, GetAndLockRequest, GetAndTouchRequest, GetMetaRequest, GetRequest, IncrementRequest, LookupInRequest, MutateInRequest, PrependRequest, ReplaceRequest, SetRequest, TouchRequest, UnlockRequest};
+use crate::memdx::request::{
+    AddRequest, AppendRequest, DecrementRequest, DeleteRequest, GetAndLockRequest,
+    GetAndTouchRequest, GetMetaRequest, GetRequest, IncrementRequest, LookupInRequest,
+    MutateInRequest, PrependRequest, ReplaceRequest, SetRequest, TouchRequest, UnlockRequest,
+};
 use crate::mutationtoken::MutationToken;
 use crate::nmvbhandler::NotMyVbucketConfigHandler;
 use crate::retry::{orchestrate_retries, RetryInfo, RetryManager};
@@ -600,17 +612,15 @@ impl<
                         ops: opts.ops,
                         on_behalf_of: None,
                     })
-                    .map_ok(|resp| {
-                        LookupInResult {
-                            value: resp.ops,
-                            cas: resp.cas,
-                            doc_is_deleted: resp.doc_is_deleted,
-                        }
+                    .map_ok(|resp| LookupInResult {
+                        value: resp.ops,
+                        cas: resp.cas,
+                        doc_is_deleted: resp.doc_is_deleted,
                     })
                     .await
             },
         )
-            .await
+        .await
     }
 
     pub async fn mutate_in<'a>(&self, opts: MutateInOptions<'a>) -> Result<MutateInResult> {
@@ -644,13 +654,13 @@ impl<
                         MutateInResult {
                             value: resp.ops,
                             cas: resp.cas,
-                            mutation_token
+                            mutation_token,
                         }
                     })
                     .await
             },
         )
-            .await
+        .await
     }
 
     pub(crate) async fn orchestrate_simple_crud<Fut, Resp>(

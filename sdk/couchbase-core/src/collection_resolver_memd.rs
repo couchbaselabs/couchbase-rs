@@ -4,7 +4,7 @@ use crate::collectionresolver::CollectionResolver;
 use crate::error::Result;
 use crate::kvclient_ops::KvClientOps;
 use crate::kvclientmanager::{
-    KvClientManager, KvClientManagerClientType, orchestrate_random_memd_client,
+    orchestrate_random_memd_client, KvClientManager, KvClientManagerClientType,
 };
 use crate::memdx::request::GetCollectionIdRequest;
 use crate::memdx::response::GetCollectionIdResponse;

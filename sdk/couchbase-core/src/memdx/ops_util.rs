@@ -25,18 +25,21 @@ impl OpsUtil {
         );
 
         let op = dispatcher
-            .dispatch(RequestPacket {
-                magic: Magic::Req,
-                op_code: OpCode::GetCollectionId,
-                datatype: 0,
-                vbucket_id: None,
-                cas: None,
-                extras: None,
-                key: None,
-                value,
-                framing_extras: None,
-                opaque: None,
-            }, None)
+            .dispatch(
+                RequestPacket {
+                    magic: Magic::Req,
+                    op_code: OpCode::GetCollectionId,
+                    datatype: 0,
+                    vbucket_id: None,
+                    cas: None,
+                    extras: None,
+                    key: None,
+                    value,
+                    framing_extras: None,
+                    opaque: None,
+                },
+                None,
+            )
             .await?;
 
         Ok(StandardPendingOp::new(op))

@@ -1,5 +1,5 @@
-use rand::{Rng, rng};
 use rand::distr::Alphanumeric;
+use rand::{rng, Rng};
 
 pub fn generate_key() -> Vec<u8> {
     rng()

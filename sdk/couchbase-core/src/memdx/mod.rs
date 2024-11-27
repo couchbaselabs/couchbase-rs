@@ -24,5 +24,5 @@ pub mod pendingop;
 pub mod request;
 pub mod response;
 pub mod status;
-pub mod sync_helpers;
 pub mod subdoc;
+pub mod sync_helpers;
