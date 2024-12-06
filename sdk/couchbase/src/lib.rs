@@ -14,6 +14,7 @@ pub mod options;
 pub mod results;
 pub mod scope;
 pub mod search;
+pub mod subdoc;
 pub mod transcoding;
 
 pub mod authenticator {

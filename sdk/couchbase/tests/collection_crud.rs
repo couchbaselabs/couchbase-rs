@@ -2,6 +2,9 @@ use crate::common::test_config::{setup_tests, test_bucket, test_collection, test
 use crate::common::{create_cluster_from_test_config, new_key};
 use bytes::Bytes;
 use couchbase::options::kv_binary_options::{DecrementOptions, IncrementOptions};
+use couchbase::subdoc::lookup_in_specs::{GetSpecOptions, LookupInSpec};
+use couchbase::subdoc::macros::{LookupInMacros, MutateInMacros};
+use couchbase::subdoc::mutate_in_specs::MutateInSpec;
 use couchbase::transcoding;
 use couchbase::transcoding::{encode_common_flags, DataType};
 use log::LevelFilter;
@@ -420,4 +423,122 @@ async fn test_decrement() {
         .unwrap();
 
     assert_eq!(0, res.content());
+}
+
+#[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
+struct SubdocObject {
+    foo: u32,
+    bar: u32,
+    baz: String,
+    arr: Vec<u32>,
+}
+
+#[tokio::test]
+async fn test_lookup_in() {
+    setup_tests(LevelFilter::Trace).await;
+
+    let cluster = create_cluster_from_test_config().await;
+
+    let collection = cluster
+        .bucket(test_bucket().await)
+        .await
+        .scope(test_scope().await)
+        .collection(test_collection().await);
+
+    let key = new_key();
+
+    let obj = SubdocObject {
+        foo: 14,
+        bar: 2,
+        baz: "hello".to_string(),
+        arr: vec![1, 2, 3],
+    };
+
+    collection.upsert(&key, &obj, None).await.unwrap();
+
+    let ops = [
+        LookupInSpec::get("baz", None),
+        LookupInSpec::exists("not-exists", None),
+        LookupInSpec::count("arr", None),
+        LookupInSpec::get(
+            LookupInMacros::IsDeleted,
+            GetSpecOptions::builder().is_xattr(true).build(),
+        ),
+        LookupInSpec::get("", None),
+    ];
+
+    let result = collection.lookup_in(&key, &ops, None).await.unwrap();
+
+    assert_eq!(result.content_as::<String>(0).unwrap(), "hello".to_string());
+    assert!(result.exists(0).unwrap());
+    assert!(!result.content_as::<bool>(1).unwrap());
+    assert!(!result.exists(1).unwrap());
+    assert_eq!(result.content_as::<u32>(2).unwrap(), 3);
+    assert!(result.exists(2).unwrap());
+    assert!(!result.content_as::<bool>(3).unwrap());
+    assert!(result.exists(3).unwrap());
+    assert_eq!(
+        result.content_as_raw(4).unwrap(),
+        serde_json::to_vec(&obj).unwrap()
+    );
+    assert!(result.exists(4).unwrap());
+}
+
+#[tokio::test]
+async fn test_mutate_in() {
+    setup_tests(LevelFilter::Trace).await;
+
+    let cluster = create_cluster_from_test_config().await;
+
+    let collection = cluster
+        .bucket(test_bucket().await)
+        .await
+        .scope(test_scope().await)
+        .collection(test_collection().await);
+
+    let key = new_key();
+
+    let obj = SubdocObject {
+        foo: 14,
+        bar: 2,
+        baz: "hello".to_string(),
+        arr: vec![3],
+    };
+
+    collection.upsert(&key, &obj, None).await.unwrap();
+
+    let xattr_spec = MutateInSpec::insert("my-cas", MutateInMacros::CAS, None).unwrap();
+
+    assert!(xattr_spec.is_xattr);
+    assert!(xattr_spec.expand_macros);
+
+    let ops = [
+        MutateInSpec::decrement("bar", 1, None).unwrap(),
+        MutateInSpec::increment("bar", 2, None).unwrap(),
+        MutateInSpec::upsert("baz", "world", None).unwrap(),
+        xattr_spec,
+        MutateInSpec::array_prepend("arr", &[1, 2], None).unwrap(),
+        MutateInSpec::array_append("arr", &[5, 6], None).unwrap(),
+    ];
+
+    let result = collection.mutate_in(&key, &ops, None).await.unwrap();
+
+    assert_eq!(result.entries.len(), 6);
+    assert!(result.mutation_token.is_some());
+    assert_ne!(result.cas, 0);
+    assert_eq!(result.content_as::<u32>(0).unwrap(), 1);
+    assert_eq!(result.content_as::<u32>(1).unwrap(), 3);
+
+    let res = collection.get(key, None).await.unwrap();
+    let content = res.content_as::<SubdocObject>().unwrap();
+
+    assert_eq!(
+        content,
+        SubdocObject {
+            foo: 14,
+            bar: 3,
+            baz: "world".to_string(),
+            arr: vec![1, 2, 3, 5, 6],
+        }
+    );
 }

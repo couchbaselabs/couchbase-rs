@@ -636,22 +636,22 @@ async fn test_lookup_in() {
     let ops = [
         LookupInOp {
             op: LookupInOpType::Get,
-            flags: SubdocOpFlag::None,
+            flags: SubdocOpFlag::empty(),
             path: "baz".as_bytes(),
         },
         LookupInOp {
             op: LookupInOpType::Exists,
-            flags: SubdocOpFlag::None,
+            flags: SubdocOpFlag::empty(),
             path: "not-exists".as_bytes(),
         },
         LookupInOp {
             op: LookupInOpType::GetCount,
-            flags: SubdocOpFlag::None,
+            flags: SubdocOpFlag::empty(),
             path: "arr".as_bytes(),
         },
         LookupInOp {
             op: LookupInOpType::GetDoc,
-            flags: SubdocOpFlag::None,
+            flags: SubdocOpFlag::empty(),
             path: "".as_bytes(),
         },
     ];
@@ -738,19 +738,19 @@ async fn test_mutate_in() {
     let ops = [
         MutateInOp {
             op: MutateInOpType::Counter,
-            flags: SubdocOpFlag::None,
+            flags: SubdocOpFlag::empty(),
             path: "bar".as_bytes(),
             value: "3".as_bytes(),
         },
         MutateInOp {
             op: MutateInOpType::DictSet,
-            flags: SubdocOpFlag::None,
+            flags: SubdocOpFlag::empty(),
             path: "baz".as_bytes(),
             value: "\"world\"".as_bytes(),
         },
         MutateInOp {
             op: MutateInOpType::ArrayPushLast,
-            flags: SubdocOpFlag::None,
+            flags: SubdocOpFlag::empty(),
             path: "arr".as_bytes(),
             value: "4".as_bytes(),
         },

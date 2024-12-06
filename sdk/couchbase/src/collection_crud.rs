@@ -1,6 +1,8 @@
 use crate::collection::Collection;
 use crate::options::kv_options::*;
 use crate::results::kv_results::*;
+use crate::subdoc::lookup_in_specs::LookupInSpec;
+use crate::subdoc::mutate_in_specs::MutateInSpec;
 use crate::transcoding;
 use crate::transcoding::RawValue;
 use serde::Serialize;
@@ -142,5 +144,29 @@ impl Collection {
     ) -> crate::error::Result<TouchResult> {
         let options = options.into().unwrap_or_default();
         self.core_kv_client.touch(id.into(), expiry, options).await
+    }
+
+    pub async fn lookup_in(
+        &self,
+        id: impl Into<String>,
+        specs: &[LookupInSpec],
+        options: impl Into<Option<LookupInOptions>>,
+    ) -> crate::error::Result<LookupInResult> {
+        let options = options.into().unwrap_or_default();
+        self.core_kv_client
+            .lookup_in(id.into(), specs, options)
+            .await
+    }
+
+    pub async fn mutate_in(
+        &self,
+        id: impl Into<String>,
+        specs: &[MutateInSpec],
+        options: impl Into<Option<MutateInOptions>>,
+    ) -> crate::error::Result<MutateInResult> {
+        let options = options.into().unwrap_or_default();
+        self.core_kv_client
+            .mutate_in(id.into(), specs, options)
+            .await
     }
 }

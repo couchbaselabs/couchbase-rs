@@ -1147,10 +1147,7 @@ impl TryFromClientResponse for MutateInResponse {
             )
             .into());
         } else if status == Status::NotStored {
-            if subdoc_info
-                .flags
-                .is_some_and(|flags| flags == SubdocDocFlag::AddDoc)
-            {
+            if subdoc_info.flags.contains(SubdocDocFlag::AddDoc) {
                 return Err(ServerError::new(ServerErrorKind::KeyExists, resp.packet()).into());
             }
             return Err(ServerError::new(ServerErrorKind::NotStored, resp.packet()).into());

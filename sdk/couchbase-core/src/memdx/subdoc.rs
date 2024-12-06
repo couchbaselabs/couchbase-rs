@@ -1,5 +1,7 @@
 use crate::memdx::error;
 use crate::memdx::opcode::OpCode;
+use bitflags::bitflags;
+use typed_builder::TypedBuilder;
 
 pub trait SubdocOp {
     fn is_xattr_op(&self) -> bool;
@@ -12,14 +14,14 @@ pub fn reorder_subdoc_ops<T: SubdocOp>(ops: &[T]) -> (Vec<&T>, Vec<usize>) {
     for (i, op) in ops.iter().enumerate() {
         if op.is_xattr_op() {
             ordered_ops.push(op);
-            op_indexes[i] = ordered_ops.len() - 1;
+            op_indexes.push(i);
         }
     }
 
     for (i, op) in ops.iter().enumerate() {
         if !op.is_xattr_op() {
             ordered_ops.push(op);
-            op_indexes[i] = ordered_ops.len() - 1;
+            op_indexes.push(i);
         }
     }
 
@@ -29,7 +31,7 @@ pub fn reorder_subdoc_ops<T: SubdocOp>(ops: &[T]) -> (Vec<&T>, Vec<usize>) {
 // Request-info needed for response parsing
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SubdocRequestInfo {
-    pub flags: Option<SubdocDocFlag>,
+    pub flags: SubdocDocFlag,
     pub op_count: u8,
 }
 
@@ -39,7 +41,7 @@ pub struct SubDocResult {
     pub value: Option<Vec<u8>>,
 }
 
-#[derive(Clone, Debug, Copy)]
+#[derive(Clone, Debug, Copy, TypedBuilder)]
 pub struct LookupInOp<'a> {
     pub op: LookupInOpType,
     pub flags: SubdocOpFlag,
@@ -48,10 +50,10 @@ pub struct LookupInOp<'a> {
 
 impl<'a> SubdocOp for LookupInOp<'a> {
     fn is_xattr_op(&self) -> bool {
-        self.flags == SubdocOpFlag::XattrPath
+        self.flags.contains(SubdocOpFlag::XATTR_PATH)
     }
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, TypedBuilder)]
 pub struct MutateInOp<'a> {
     pub op: MutateInOpType,
     pub flags: SubdocOpFlag,
@@ -61,49 +63,48 @@ pub struct MutateInOp<'a> {
 
 impl<'a> SubdocOp for MutateInOp<'a> {
     fn is_xattr_op(&self) -> bool {
-        self.flags == SubdocOpFlag::XattrPath
+        self.flags.contains(SubdocOpFlag::XATTR_PATH)
     }
 }
 
-#[derive(Clone, Debug, Copy, Eq, PartialEq)]
-pub enum SubdocOpFlag {
-    // SubdocOpFlagNone indicates no special treatment for this operation.
-    None = 0x00,
-    // SubdocOpFlagMkDirP indicates that the path should be created if it does not already exist.
-    MkDirP = 0x01,
+bitflags! {
+    #[derive(Copy, Clone, Debug, Eq, PartialEq)]
+    pub struct SubdocOpFlag: u8 {
+        // SubdocOpFlagMkDirP indicates that the path should be created if it does not already exist.
+        const MKDIR_P = 0x01;
 
-    // 0x02 is unused, formally SubdocFlagMkDoc
+        // 0x02 is unused, formally SubdocFlagMkDoc
 
-    // SubdocOpFlagXattrPath indicates that the path refers to an Xattr rather than the document body.
-    XattrPath = 0x04,
+        // SubdocOpFlagXattrPath indicates that the path refers to an Xattr rather than the document body.
+        const XATTR_PATH = 0x04;
 
-    // 0x08 is unused, formally SubdocFlagAccessDeleted
+        // 0x08 is unused, formally SubdocFlagAccessDeleted
 
-    // SubdocOpFlagExpandMacros indicates that the value portion of any sub-document mutations
-    // should be expanded if they contain macros such as ${Mutation.CAS}.
-    ExpandMacros = 0x10,
-}
+        // SubdocOpFlagExpandMacros indicates that the value portion of any sub-document mutations
+        // should be expanded if they contain macros such as \${Mutation.CAS}.
+        const EXPAND_MACROS = 0x10;
+    }
 
-#[derive(Clone, Debug, Copy, Eq, PartialEq)]
-pub enum SubdocDocFlag {
-    // SubdocDocFlagMkDoc indicates that the document should be created if it does not already exist.
-    MkDoc = 0x01,
+    #[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
+    pub struct SubdocDocFlag: u8 {
+        // SubdocDocFlagMkDoc indicates that the document should be created if it does not already exist.
+        const MkDoc = 0x01;
+        // SubdocDocFlagAddDoc indices that this operation should be an add rather than set.
+        const AddDoc = 0x02;
 
-    // SubdocDocFlagAddDoc indices that this operation should be an add rather than set.
-    AddDoc = 0x02,
+        // SubdocDocFlagAccessDeleted indicates that you wish to receive soft-deleted documents.
+        // Internal: This should never be used and is not supported.
+        const AccessDeleted = 0x04;
 
-    // SubdocDocFlagAccessDeleted indicates that you wish to receive soft-deleted documents.
-    // Internal: This should never be used and is not supported.
-    AccessDeleted = 0x04,
+        // SubdocDocFlagCreateAsDeleted indicates that the document should be created as deleted.
+        // That is, to create a tombstone only.
+        // Internal: This should never be used and is not supported.
+        const CreateAsDeleted = 0x08;
 
-    // SubdocDocFlagCreateAsDeleted indicates that the document should be created as deleted.
-    // That is, to create a tombstone only.
-    // Internal: This should never be used and is not supported.
-    CreateAsDeleted = 0x08,
-
-    // SubdocDocFlagReviveDocument indicates that the document should be revived from a tombstone.
-    // Internal: This should never be used and is not supported.
-    ReviveDocument = 0x10,
+        // SubdocDocFlagReviveDocument indicates that the document should be revived from a tombstone.
+        // Internal: This should never be used and is not supported.
+        const ReviveDocument = 0x10;
+    }
 }
 
 // LookupInOpType specifies the type of lookup in operation.
