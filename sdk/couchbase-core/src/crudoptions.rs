@@ -226,7 +226,7 @@ pub struct LookupInOptions<'a> {
     pub collection_name: &'a str,
     pub ops: &'a [LookupInOp<'a>],
     #[builder(default, setter(into))]
-    pub flags: Option<SubdocDocFlag>,
+    pub flags: SubdocDocFlag,
     #[builder(default=DEFAULT_RETRY_STRATEGY.clone())]
     pub retry_strategy: Arc<dyn RetryStrategy>,
 }
@@ -239,7 +239,7 @@ pub struct MutateInOptions<'a> {
     pub collection_name: &'a str,
     pub ops: &'a [MutateInOp<'a>],
     #[builder(default, setter(into))]
-    pub flags: Option<SubdocDocFlag>,
+    pub flags: SubdocDocFlag,
     #[builder(default, setter(into))]
     pub expiry: Option<u32>,
     #[builder(default, setter(into))]

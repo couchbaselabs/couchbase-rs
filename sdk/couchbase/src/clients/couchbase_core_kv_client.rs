@@ -5,9 +5,15 @@ use crate::options::kv_binary_options::{
 };
 use crate::options::kv_options::*;
 use crate::results::kv_binary_results::CounterResult;
-use crate::results::kv_results::{ExistsResult, GetResult, MutationResult, TouchResult};
+use crate::results::kv_results::{
+    ExistsResult, GetResult, LookupInResult, LookupInResultEntry, MutateInResult,
+    MutateInResultEntry, MutationResult, TouchResult,
+};
+use crate::subdoc::lookup_in_specs::LookupInSpec;
+use crate::subdoc::mutate_in_specs::MutateInSpec;
 use bytes::Bytes;
 use couchbase_core::agent::Agent;
+use couchbase_core::memdx::subdoc::{reorder_subdoc_ops, SubdocDocFlag};
 use couchbase_core::retry::RetryStrategy;
 use std::sync::Arc;
 use std::time::Duration;
@@ -445,6 +451,129 @@ impl CouchbaseCoreKvClient {
                 .mutation_token
                 .map(|t| MutationToken::new(t, self.bucket_name.clone())),
             content: result.value,
+        })
+    }
+
+    pub async fn lookup_in(
+        &self,
+        id: String,
+        specs: &[LookupInSpec],
+        options: LookupInOptions,
+    ) -> error::Result<LookupInResult> {
+        let (ordered_specs, op_indexes) = reorder_subdoc_ops(specs);
+
+        let result = self
+            .agent
+            .lookup_in(
+                couchbase_core::crudoptions::LookupInOptions::builder()
+                    .key(id.as_bytes())
+                    .scope_name(&self.scope_name)
+                    .collection_name(&self.collection_name)
+                    .ops(
+                        ordered_specs
+                            .iter()
+                            .map(|spec| (*spec).into())
+                            .collect::<Vec<_>>()
+                            .as_slice(),
+                    )
+                    .flags({
+                        let mut flags = SubdocDocFlag::empty();
+
+                        if options.access_deleted.unwrap_or(false) {
+                            flags |= SubdocDocFlag::AccessDeleted;
+                        }
+                        flags
+                    })
+                    .retry_strategy(
+                        options
+                            .retry_strategy
+                            .unwrap_or(self.default_retry_strategy.clone()),
+                    )
+                    .build(),
+            )
+            .await?;
+
+        let mut entries = vec![None; specs.len()];
+
+        for (i, x) in result.value.into_iter().enumerate() {
+            let original_idx = op_indexes[i];
+            entries[original_idx] = Some(LookupInResultEntry {
+                value: x.value.as_ref().map(|v| bytes::Bytes::from(v.clone())),
+                error: x.err.as_ref().map(|e| e.clone().into()),
+                op: ordered_specs[i].op.clone(),
+            });
+        }
+
+        Ok(LookupInResult {
+            cas: result.cas,
+            entries: entries.into_iter().map(|x| x.unwrap()).collect(),
+            is_deleted: result.doc_is_deleted,
+        })
+    }
+
+    pub async fn mutate_in(
+        &self,
+        id: String,
+        specs: &[MutateInSpec],
+        options: MutateInOptions,
+    ) -> error::Result<MutateInResult> {
+        let (ordered_specs, op_indexes) = reorder_subdoc_ops(specs);
+
+        let result = self
+            .agent
+            .mutate_in(
+                couchbase_core::crudoptions::MutateInOptions::builder()
+                    .key(id.as_bytes())
+                    .scope_name(&self.scope_name)
+                    .collection_name(&self.collection_name)
+                    .ops(
+                        ordered_specs
+                            .iter()
+                            .map(|spec| (*spec).into())
+                            .collect::<Vec<_>>()
+                            .as_slice(),
+                    )
+                    .flags({
+                        let mut flags = SubdocDocFlag::empty();
+
+                        if options.access_deleted.unwrap_or(false) {
+                            flags |= SubdocDocFlag::AccessDeleted;
+                        }
+                        match options.store_semantics {
+                            Some(StoreSemantics::Insert) => flags |= SubdocDocFlag::MkDoc,
+                            Some(StoreSemantics::Upsert) => flags |= SubdocDocFlag::AddDoc,
+                            _ => {}
+                        }
+
+                        flags
+                    })
+                    .preserve_expiry(options.preserve_expiry)
+                    .expiry(options.expiry.map(|e| e.as_secs() as u32))
+                    .cas(options.cas)
+                    .retry_strategy(
+                        options
+                            .retry_strategy
+                            .unwrap_or(self.default_retry_strategy.clone()),
+                    )
+                    .build(),
+            )
+            .await?;
+
+        let mut entries = vec![None; specs.len()];
+
+        for (i, x) in result.value.into_iter().enumerate() {
+            let original_idx = op_indexes[i];
+            entries[original_idx] = Some(MutateInResultEntry {
+                value: x.value.as_ref().map(|v| bytes::Bytes::from(v.clone())),
+            });
+        }
+
+        Ok(MutateInResult {
+            cas: result.cas,
+            mutation_token: result
+                .mutation_token
+                .map(|t| MutationToken::new(t, self.bucket_name.clone())),
+            entries: entries.into_iter().map(|x| x.unwrap()).collect(),
         })
     }
 }

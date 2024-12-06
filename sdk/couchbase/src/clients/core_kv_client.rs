@@ -4,6 +4,8 @@ use crate::options::kv_binary_options::*;
 use crate::options::kv_options::*;
 use crate::results::kv_binary_results::CounterResult;
 use crate::results::kv_results::*;
+use crate::subdoc::lookup_in_specs::LookupInSpec;
+use crate::subdoc::mutate_in_specs::MutateInSpec;
 use bytes::Bytes;
 use std::time::Duration;
 
@@ -225,6 +227,38 @@ impl CoreKvClient {
             }
         }
     }
+
+    pub async fn lookup_in(
+        &self,
+        id: String,
+        specs: &[LookupInSpec],
+        options: LookupInOptions,
+    ) -> error::Result<LookupInResult> {
+        match &self.backend {
+            CoreKvClientBackend::CouchbaseCoreKvClientBackend(client) => {
+                client.lookup_in(id, specs, options).await
+            }
+            CoreKvClientBackend::Couchbase2CoreKvClientBackend(client) => {
+                client.lookup_in(id, specs, options).await
+            }
+        }
+    }
+
+    pub async fn mutate_in(
+        &self,
+        id: String,
+        specs: &[MutateInSpec],
+        options: MutateInOptions,
+    ) -> error::Result<MutateInResult> {
+        match &self.backend {
+            CoreKvClientBackend::CouchbaseCoreKvClientBackend(client) => {
+                client.mutate_in(id, specs, options).await
+            }
+            CoreKvClientBackend::Couchbase2CoreKvClientBackend(client) => {
+                client.mutate_in(id, specs, options).await
+            }
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -358,6 +392,24 @@ impl Couchbase2CoreKvClient {
         _id: String,
         _options: DecrementOptions,
     ) -> error::Result<CounterResult> {
+        unimplemented!()
+    }
+
+    pub async fn lookup_in(
+        &self,
+        _id: String,
+        _specs: &[LookupInSpec],
+        _options: LookupInOptions,
+    ) -> error::Result<LookupInResult> {
+        unimplemented!()
+    }
+
+    pub async fn mutate_in(
+        &self,
+        _id: String,
+        _specs: &[MutateInSpec],
+        _options: MutateInOptions,
+    ) -> error::Result<MutateInResult> {
         unimplemented!()
     }
 }

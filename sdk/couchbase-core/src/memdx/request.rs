@@ -210,7 +210,7 @@ pub struct LookupInRequest<'a> {
     pub collection_id: u32,
     pub key: &'a [u8],
     pub vbucket_id: u16,
-    pub flags: Option<SubdocDocFlag>,
+    pub flags: SubdocDocFlag,
     pub ops: &'a [LookupInOp<'a>],
     pub on_behalf_of: Option<String>,
 }
@@ -219,7 +219,7 @@ pub struct MutateInRequest<'a> {
     pub collection_id: u32,
     pub key: &'a [u8],
     pub vbucket_id: u16,
-    pub flags: Option<SubdocDocFlag>,
+    pub flags: SubdocDocFlag,
     pub ops: &'a [MutateInOp<'a>],
     pub expiry: Option<u32>,
     pub preserve_expiry: Option<bool>,

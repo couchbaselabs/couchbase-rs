@@ -794,7 +794,7 @@ impl OpsCrud {
             let path_bytes_len = path_bytes.len();
 
             value_buf[value_iter] = Into::<OpCode>::into(op.op).into();
-            value_buf[value_iter + 1] = op.flags as u8;
+            value_buf[value_iter + 1] = op.flags.bits();
             BigEndian::write_u16(
                 &mut value_buf[value_iter + 2..value_iter + 4],
                 path_bytes_len as u16,
@@ -805,8 +805,8 @@ impl OpsCrud {
 
         let mut extra_buf = Vec::with_capacity(8);
 
-        if let Some(flags) = request.flags {
-            extra_buf.push(flags as u8);
+        if !request.flags.is_empty() {
+            extra_buf.push(request.flags.bits());
         }
 
         let packet = RequestPacket {
@@ -887,7 +887,7 @@ impl OpsCrud {
             let value_bytes_len = op.value.len();
 
             value_buf[value_iter] = Into::<OpCode>::into(op.op).into();
-            value_buf[value_iter + 1] = op.flags as u8;
+            value_buf[value_iter + 1] = op.flags.bits();
             BigEndian::write_u16(
                 &mut value_buf[value_iter + 2..value_iter + 4],
                 path_bytes_len as u16,
@@ -915,8 +915,8 @@ impl OpsCrud {
                 )
             })?;
 
-        if let Some(flags) = request.flags {
-            extra_buf.write_u8(flags as u8).map_err(|e| {
+        if !request.flags.is_empty() {
+            extra_buf.write_u8(request.flags.bits()).map_err(|e| {
                 Error::invalid_argument_error_with_source(
                     "failed to write request flags",
                     "flags",

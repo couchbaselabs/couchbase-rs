@@ -1,8 +1,16 @@
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Error {
     pub msg: String,
+}
+
+impl From<couchbase_core::memdx::error::SubdocError> for Error {
+    fn from(value: couchbase_core::memdx::error::SubdocError) -> Self {
+        Self {
+            msg: value.to_string(),
+        }
+    }
 }
 
 impl From<couchbase_core::error::Error> for Error {

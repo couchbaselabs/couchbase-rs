@@ -84,3 +84,34 @@ pub struct UnlockOptions {
 pub struct TouchOptions {
     pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
+
+#[derive(Default, Debug, Clone, TypedBuilder)]
+#[builder(field_defaults(default, setter(into, strip_option)))]
+#[non_exhaustive]
+pub struct LookupInOptions {
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+    // Internal
+    pub access_deleted: Option<bool>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum StoreSemantics {
+    Replace,
+    Upsert,
+    Insert,
+}
+
+#[derive(Default, Debug, Clone, TypedBuilder)]
+#[builder(field_defaults(default, setter(into, strip_option)))]
+#[non_exhaustive]
+pub struct MutateInOptions {
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+    pub expiry: Option<Duration>,
+    pub preserve_expiry: Option<bool>,
+    pub cas: Option<u64>,
+    pub durability_level: Option<DurabilityLevel>,
+    pub store_semantics: Option<StoreSemantics>,
+    // Internal
+    pub access_deleted: Option<bool>,
+}
