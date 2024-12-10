@@ -69,7 +69,7 @@ pub struct QueryOptions {
     pub flex_index: Option<bool>,
     pub max_parallelism: Option<u32>,
     pub metrics: Option<bool>,
-    pub named_arguments: Option<HashMap<String, Value>>,
+    pub named_parameters: Option<HashMap<String, Value>>,
     pub pipeline_batch: Option<u32>,
     pub pipeline_cap: Option<u32>,
     pub positional_parameters: Option<Vec<Value>>,
@@ -99,7 +99,7 @@ impl TryFrom<QueryOptions> for queryoptions::QueryOptions {
             (None, opts.scan_consistency.map(|sc| sc.into()))
         };
 
-        let named_args = if let Some(named_args) = opts.named_arguments {
+        let named_args = if let Some(named_args) = opts.named_parameters {
             let mut collected = HashMap::default();
             for (k, v) in named_args {
                 collected.insert(k, serde_json::to_vec(&v)?);

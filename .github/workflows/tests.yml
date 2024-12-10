@@ -69,7 +69,7 @@ jobs:
           RCBDINOID: ${{ env.CBDC_ID }}
           RCBCONNSTR: ${{ env.CBDC_CONNSTR }}
         run: |
-          cargo test --color=always -- --nocapture
+          cargo test --color=always --no-fail-fast -- --nocapture
 
 #      - name: Collect couchbase logs
 #        timeout-minutes: 10

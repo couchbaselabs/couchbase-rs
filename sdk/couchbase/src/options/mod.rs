@@ -1,3 +1,4 @@
+pub mod analytics_options;
 pub mod cluster_options;
 pub mod kv_binary_options;
 pub mod kv_options;

@@ -75,13 +75,12 @@ impl<C: Client> PreparedQuery<C> {
 
         let res = self.executor.query(&opts).await?;
 
-        if let Some(early_metadata) = res.early_metadata() {
-            if let Some(prepared) = &early_metadata.prepared {
-                let mut cache = self.cache.lock().unwrap();
-                cache.put(&statement, prepared);
-                drop(cache);
-            }
-        };
+        let early_metadata = res.early_metadata();
+        if let Some(prepared) = &early_metadata.prepared {
+            let mut cache = self.cache.lock().unwrap();
+            cache.put(&statement, prepared);
+            drop(cache);
+        }
 
         Ok(res)
     }

@@ -1,3 +1,4 @@
+use crate::analyticsx::error::Error as AnalyticsError;
 use crate::httpx::error::Error as HttpError;
 use crate::memdx::error::Error as MemdxError;
 use crate::queryx::error::Error as QueryError;
@@ -87,6 +88,8 @@ pub enum ErrorKind {
     #[error("{0}")]
     Search(SearchError),
     #[error("{0}")]
+    Analytics(AnalyticsError),
+    #[error("{0}")]
     Http(HttpError),
     #[error("Endpoint not known {endpoint}")]
     #[non_exhaustive]
@@ -147,6 +150,12 @@ impl From<HttpError> for Error {
 impl From<SearchError> for Error {
     fn from(value: SearchError) -> Self {
         Self::new(ErrorKind::Search(value))
+    }
+}
+
+impl From<AnalyticsError> for Error {
+    fn from(value: AnalyticsError) -> Self {
+        Self::new(ErrorKind::Analytics(value))
     }
 }
 

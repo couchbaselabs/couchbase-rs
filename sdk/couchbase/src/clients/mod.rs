@@ -1,3 +1,4 @@
+pub mod analytics_client;
 pub mod bucket_client;
 pub mod cluster_client;
 pub mod collection_client;

@@ -1,3 +1,6 @@
+use crate::clients::analytics_client::{
+    AnalyticsClient, AnalyticsClientBackend, AnalyticsKeyspace, CouchbaseAnalyticsClient,
+};
 use crate::clients::collection_client::{
     CollectionClient, CollectionClientBackend, Couchbase2CollectionClient,
     CouchbaseCollectionClient,
@@ -53,6 +56,21 @@ impl ScopeClient {
 
                 SearchClient::new(SearchClientBackend::CouchbaseSearchClientBackend(
                     search_client,
+                ))
+            }
+            ScopeClientBackend::Couchbase2ScopeBackend(_) => {
+                unimplemented!()
+            }
+        }
+    }
+
+    pub fn analytics_client(&self) -> AnalyticsClient {
+        match &self.backend {
+            ScopeClientBackend::CouchbaseScopeBackend(backend) => {
+                let analytics_client = backend.analytics_client();
+
+                AnalyticsClient::new(AnalyticsClientBackend::CouchbaseAnalyticsClientBackend(
+                    analytics_client,
                 ))
             }
             ScopeClientBackend::Couchbase2ScopeBackend(_) => {
@@ -132,6 +150,16 @@ impl CouchbaseScopeClient {
         CouchbaseSearchClient::with_keyspace(
             self.agent.clone(),
             SearchKeyspace {
+                bucket_name: self.bucket_name().to_string(),
+                scope_name: self.name().to_string(),
+            },
+        )
+    }
+
+    pub fn analytics_client(&self) -> CouchbaseAnalyticsClient {
+        CouchbaseAnalyticsClient::with_keyspace(
+            self.agent.clone(),
+            AnalyticsKeyspace {
                 bucket_name: self.bucket_name().to_string(),
                 scope_name: self.name().to_string(),
             },
