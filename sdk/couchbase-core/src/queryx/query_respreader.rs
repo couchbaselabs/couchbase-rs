@@ -36,7 +36,7 @@ pub struct QueryRespReader {
     status_code: StatusCode,
 
     streamer: Option<RawJsonRowStreamer>,
-    early_meta_data: Option<EarlyMetaData>,
+    early_meta_data: EarlyMetaData,
     meta_data: Option<MetaData>,
     meta_data_error: Option<Error>,
 }
@@ -79,6 +79,9 @@ impl QueryRespReader {
         client_context_id: impl Into<String>,
     ) -> error::Result<Self> {
         let status_code = resp.status();
+        let endpoint = endpoint.into();
+        let statement = statement.into();
+        let client_context_id = client_context_id.into();
         if status_code != 200 {
             let body = match resp.bytes().await {
                 Ok(b) => b,
@@ -137,20 +140,27 @@ impl QueryRespReader {
         }
 
         let stream = resp.bytes_stream();
-        let streamer = RawJsonRowStreamer::new(JsonRowStream::new(stream), "results");
+        let mut streamer = RawJsonRowStreamer::new(JsonRowStream::new(stream), "results");
+
+        let early_meta_data = Self::read_early_metadata(
+            &mut streamer,
+            &endpoint,
+            &statement,
+            &client_context_id,
+            status_code,
+        )
+        .await?;
 
         let mut reader = Self {
-            endpoint: endpoint.into(),
-            statement: statement.into(),
-            client_context_id: client_context_id.into(),
+            endpoint,
+            statement,
+            client_context_id,
             status_code,
             streamer: Some(streamer),
-            early_meta_data: None,
+            early_meta_data,
             meta_data: None,
             meta_data_error: None,
         };
-
-        reader.read_early_metadata().await?;
 
         // TODO: this is a bit absurd.
         if let Some(streamer) = &reader.streamer {
@@ -165,8 +175,8 @@ impl QueryRespReader {
         Ok(reader)
     }
 
-    pub fn early_metadata(&self) -> Option<&EarlyMetaData> {
-        self.early_meta_data.as_ref()
+    pub fn early_metadata(&self) -> &EarlyMetaData {
+        &self.early_meta_data
     }
 
     pub fn metadata(&self) -> error::Result<&MetaData> {
@@ -186,42 +196,31 @@ impl QueryRespReader {
         ))
     }
 
-    async fn read_early_metadata(&mut self) -> error::Result<()> {
-        if let Some(ref mut streamer) = self.streamer {
-            let prelude = streamer.read_prelude().await.map_err(|e| {
-                Error::new_server_error(
-                    ServerError::new(ServerErrorKind::Unknown { msg: e.to_string() }, None, None),
-                    &self.endpoint,
-                    &self.statement,
-                    &self.client_context_id,
-                    vec![],
-                    self.status_code,
-                )
-            })?;
+    async fn read_early_metadata(
+        streamer: &mut RawJsonRowStreamer,
+        endpoint: &str,
+        statement: &str,
+        client_context_id: &str,
+        status_code: StatusCode,
+    ) -> error::Result<EarlyMetaData> {
+        let prelude = streamer.read_prelude().await.map_err(|e| {
+            Error::new_server_error(
+                ServerError::new(ServerErrorKind::Unknown { msg: e.to_string() }, None, None),
+                endpoint,
+                statement,
+                client_context_id,
+                vec![],
+                status_code,
+            )
+        })?;
 
-            let early_metadata: QueryEarlyMetaData =
-                serde_json::from_slice(&prelude).map_err(|e| {
-                    Error::new_generic_error(
-                        e.to_string(),
-                        &self.endpoint,
-                        &self.statement,
-                        &self.client_context_id,
-                    )
-                })?;
+        let early_metadata: QueryEarlyMetaData = serde_json::from_slice(&prelude).map_err(|e| {
+            Error::new_generic_error(e.to_string(), endpoint, statement, client_context_id)
+        })?;
 
-            self.early_meta_data = Some(EarlyMetaData {
-                prepared: early_metadata.prepared,
-            });
-
-            return Ok(());
-        }
-
-        Err(Error::new_generic_error(
-            "streamer already consumed",
-            &self.endpoint,
-            &self.statement,
-            &self.client_context_id,
-        ))
+        Ok(EarlyMetaData {
+            prepared: early_metadata.prepared,
+        })
     }
 
     fn read_final_metadata(&mut self) {

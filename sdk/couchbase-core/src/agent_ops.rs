@@ -1,4 +1,6 @@
 use crate::agent::Agent;
+use crate::analyticscomponent::AnalyticsResultStream;
+use crate::analyticsoptions::AnalyticsOptions;
 use crate::crudoptions::{
     AddOptions, AppendOptions, DecrementOptions, DeleteOptions, GetAndLockOptions,
     GetAndTouchOptions, GetMetaOptions, GetOptions, IncrementOptions, LookupInOptions,
@@ -93,5 +95,12 @@ impl Agent {
 
     pub async fn search(&self, opts: SearchOptions) -> Result<SearchResultStream> {
         self.inner.search.query(opts).await
+    }
+
+    pub async fn analytics<'a>(
+        &self,
+        opts: &AnalyticsOptions<'a>,
+    ) -> Result<AnalyticsResultStream> {
+        self.inner.analytics.query(opts).await
     }
 }

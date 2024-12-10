@@ -117,6 +117,8 @@ impl SearchRespReader {
             .await
             .map_err(|e| error::Error::new_http_error(e, endpoint.clone()))?;
 
+        let has_more_rows = streamer.has_more_rows();
+
         let mut reader = Self {
             endpoint: endpoint.clone(),
             status_code,
@@ -126,12 +128,10 @@ impl SearchRespReader {
             epilogue_error: None,
         };
 
-        if let Some(streamer) = &reader.streamer {
-            if !streamer.has_more_rows() {
-                reader.read_final_metadata();
-                if let Some(e) = reader.epilogue_error {
-                    return Err(e);
-                }
+        if !has_more_rows {
+            reader.read_final_metadata();
+            if let Some(e) = reader.epilogue_error {
+                return Err(e);
             }
         }
 

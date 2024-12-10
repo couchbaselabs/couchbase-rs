@@ -43,7 +43,7 @@ impl QueryResultStream {
         &self.endpoint
     }
 
-    pub fn early_metadata(&self) -> Option<&EarlyMetaData> {
+    pub fn early_metadata(&self) -> &EarlyMetaData {
         self.inner.early_metadata()
     }
 
