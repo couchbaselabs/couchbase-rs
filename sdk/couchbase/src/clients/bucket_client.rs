@@ -1,7 +1,7 @@
+use crate::clients::agent_provider::CouchbaseAgentProvider;
 use crate::clients::scope_client::{
     Couchbase2ScopeClient, CouchbaseScopeClient, ScopeClient, ScopeClientBackend,
 };
-use couchbase_core::agent::Agent;
 use couchbase_core::retry::RetryStrategy;
 use std::sync::Arc;
 
@@ -40,15 +40,19 @@ pub(crate) enum BucketClientBackend {
 
 #[derive(Clone)]
 pub(crate) struct CouchbaseBucketClient {
-    agent: Agent,
+    agent_provider: CouchbaseAgentProvider,
     name: String,
     default_retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl CouchbaseBucketClient {
-    pub fn new(agent: Agent, name: String, default_retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+    pub fn new(
+        agent_provider: CouchbaseAgentProvider,
+        name: String,
+        default_retry_strategy: Arc<dyn RetryStrategy>,
+    ) -> Self {
         Self {
-            agent,
+            agent_provider,
             name,
             default_retry_strategy,
         }
@@ -61,7 +65,7 @@ impl CouchbaseBucketClient {
     pub fn scope(&self, name: String) -> ScopeClient {
         ScopeClient::new(ScopeClientBackend::CouchbaseScopeBackend(
             CouchbaseScopeClient::new(
-                self.agent.clone(),
+                self.agent_provider.clone(),
                 self.name().to_string(),
                 name,
                 self.default_retry_strategy.clone(),

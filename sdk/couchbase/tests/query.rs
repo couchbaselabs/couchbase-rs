@@ -95,7 +95,6 @@ async fn test_scope_query_basic() {
     let cluster = create_cluster_from_test_config().await;
     let scope = cluster
         .bucket(test_bucket().await)
-        .await
         .scope(test_scope().await);
 
     let opts = QueryOptions::builder().metrics(true).build();

@@ -1,8 +1,8 @@
+use crate::clients::agent_provider::CouchbaseAgentProvider;
 use crate::error;
 use crate::options::search_options::SearchOptions;
 use crate::results::search_results::SearchResult;
 use crate::search::request::SearchRequest;
-use couchbase_core::agent::Agent;
 use couchbase_core::searchx;
 use couchbase_core::searchx::query_options::{
     Consistency, ConsistencyLevel, ConsistencyVectors, Control, KnnOperator, KnnQuery,
@@ -46,21 +46,21 @@ pub(crate) struct SearchKeyspace {
 }
 
 pub(crate) struct CouchbaseSearchClient {
-    agent: Agent,
+    agent_provider: CouchbaseAgentProvider,
     keyspace: Option<SearchKeyspace>,
 }
 
 impl CouchbaseSearchClient {
-    pub fn new(agent: Agent) -> Self {
+    pub fn new(agent_provider: CouchbaseAgentProvider) -> Self {
         Self {
-            agent,
+            agent_provider,
             keyspace: None,
         }
     }
 
-    pub fn with_keyspace(agent: Agent, keyspace: SearchKeyspace) -> Self {
+    pub fn with_keyspace(agent_provider: CouchbaseAgentProvider, keyspace: SearchKeyspace) -> Self {
         Self {
-            agent,
+            agent_provider,
             keyspace: Some(keyspace),
         }
     }
@@ -196,7 +196,8 @@ impl CouchbaseSearchClient {
             .retry_strategy(opts.retry_strategy)
             .build();
 
-        Ok(SearchResult::from(self.agent.search(core_opts).await?))
+        let agent = self.agent_provider.get_agent().await;
+        Ok(SearchResult::from(agent.search(core_opts).await?))
     }
 }
 

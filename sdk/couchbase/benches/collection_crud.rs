@@ -10,16 +10,14 @@ use std::time::Duration;
 mod common;
 
 fn upsert(c: &mut Criterion) {
-    setup_tests(LevelFilter::Off);
-
     let rt = tokio::runtime::Runtime::new().unwrap();
 
     let collection = rt.block_on(async {
+        setup_tests(LevelFilter::Off).await;
         let cluster = create_cluster_from_test_config().await;
 
         cluster
             .bucket(test_bucket().await)
-            .await
             .scope(test_scope().await)
             .collection(test_collection().await)
     });
@@ -34,16 +32,14 @@ fn upsert(c: &mut Criterion) {
 }
 
 fn insert(c: &mut Criterion) {
-    setup_tests(LevelFilter::Off);
-
     let rt = tokio::runtime::Runtime::new().unwrap();
 
     let collection = rt.block_on(async {
+        setup_tests(LevelFilter::Off).await;
         let cluster = create_cluster_from_test_config().await;
 
         cluster
             .bucket(test_bucket().await)
-            .await
             .scope(test_scope().await)
             .collection(test_collection().await)
     });
@@ -58,16 +54,14 @@ fn insert(c: &mut Criterion) {
 }
 
 fn replace(c: &mut Criterion) {
-    setup_tests(LevelFilter::Off);
-
     let rt = tokio::runtime::Runtime::new().unwrap();
 
     let collection = rt.block_on(async {
+        setup_tests(LevelFilter::Off).await;
         let cluster = create_cluster_from_test_config().await;
 
         cluster
             .bucket(test_bucket().await)
-            .await
             .scope(test_scope().await)
             .collection(test_collection().await)
     });
@@ -86,16 +80,14 @@ fn replace(c: &mut Criterion) {
 }
 
 fn remove(c: &mut Criterion) {
-    setup_tests(LevelFilter::Off);
-
     let rt = tokio::runtime::Runtime::new().unwrap();
 
     let collection = rt.block_on(async {
+        setup_tests(LevelFilter::Off).await;
         let cluster = create_cluster_from_test_config().await;
 
         cluster
             .bucket(test_bucket().await)
-            .await
             .scope(test_scope().await)
             .collection(test_collection().await)
     });
@@ -111,16 +103,14 @@ fn remove(c: &mut Criterion) {
 }
 
 fn exists(c: &mut Criterion) {
-    setup_tests(LevelFilter::Off);
-
     let rt = tokio::runtime::Runtime::new().unwrap();
 
     let collection = rt.block_on(async {
+        setup_tests(LevelFilter::Off).await;
         let cluster = create_cluster_from_test_config().await;
 
         cluster
             .bucket(test_bucket().await)
-            .await
             .scope(test_scope().await)
             .collection(test_collection().await)
     });
@@ -136,16 +126,14 @@ fn exists(c: &mut Criterion) {
 }
 
 fn get(c: &mut Criterion) {
-    setup_tests(LevelFilter::Off);
-
     let rt = tokio::runtime::Runtime::new().unwrap();
 
     let collection = rt.block_on(async {
+        setup_tests(LevelFilter::Off).await;
         let cluster = create_cluster_from_test_config().await;
 
         cluster
             .bucket(test_bucket().await)
-            .await
             .scope(test_scope().await)
             .collection(test_collection().await)
     });
@@ -161,16 +149,14 @@ fn get(c: &mut Criterion) {
 }
 
 fn get_and_touch(c: &mut Criterion) {
-    setup_tests(LevelFilter::Off);
-
     let rt = tokio::runtime::Runtime::new().unwrap();
 
     let collection = rt.block_on(async {
+        setup_tests(LevelFilter::Off).await;
         let cluster = create_cluster_from_test_config().await;
 
         cluster
             .bucket(test_bucket().await)
-            .await
             .scope(test_scope().await)
             .collection(test_collection().await)
     });
@@ -189,16 +175,14 @@ fn get_and_touch(c: &mut Criterion) {
 }
 
 fn get_and_lock(c: &mut Criterion) {
-    setup_tests(LevelFilter::Off);
-
     let rt = tokio::runtime::Runtime::new().unwrap();
 
     let collection = rt.block_on(async {
+        setup_tests(LevelFilter::Off).await;
         let cluster = create_cluster_from_test_config().await;
 
         cluster
             .bucket(test_bucket().await)
-            .await
             .scope(test_scope().await)
             .collection(test_collection().await)
     });
@@ -217,16 +201,14 @@ fn get_and_lock(c: &mut Criterion) {
 }
 
 fn unlock(c: &mut Criterion) {
-    setup_tests(LevelFilter::Off);
-
     let rt = tokio::runtime::Runtime::new().unwrap();
 
     let collection = rt.block_on(async {
+        setup_tests(LevelFilter::Off).await;
         let cluster = create_cluster_from_test_config().await;
 
         cluster
             .bucket(test_bucket().await)
-            .await
             .scope(test_scope().await)
             .collection(test_collection().await)
     });
@@ -248,16 +230,14 @@ fn unlock(c: &mut Criterion) {
 }
 
 fn touch(c: &mut Criterion) {
-    setup_tests(LevelFilter::Off);
-
     let rt = tokio::runtime::Runtime::new().unwrap();
 
     let collection = rt.block_on(async {
+        setup_tests(LevelFilter::Off).await;
         let cluster = create_cluster_from_test_config().await;
 
         cluster
             .bucket(test_bucket().await)
-            .await
             .scope(test_scope().await)
             .collection(test_collection().await)
     });
@@ -276,16 +256,14 @@ fn touch(c: &mut Criterion) {
 }
 
 fn append(c: &mut Criterion) {
-    setup_tests(LevelFilter::Off);
-
     let rt = tokio::runtime::Runtime::new().unwrap();
 
     let collection = rt.block_on(async {
+        setup_tests(LevelFilter::Off).await;
         let cluster = create_cluster_from_test_config().await;
 
         cluster
             .bucket(test_bucket().await)
-            .await
             .scope(test_scope().await)
             .collection(test_collection().await)
     });
@@ -314,16 +292,14 @@ fn append(c: &mut Criterion) {
 }
 
 fn prepend(c: &mut Criterion) {
-    setup_tests(LevelFilter::Off);
-
     let rt = tokio::runtime::Runtime::new().unwrap();
 
     let collection = rt.block_on(async {
+        setup_tests(LevelFilter::Off).await;
         let cluster = create_cluster_from_test_config().await;
 
         cluster
             .bucket(test_bucket().await)
-            .await
             .scope(test_scope().await)
             .collection(test_collection().await)
     });
@@ -352,16 +328,14 @@ fn prepend(c: &mut Criterion) {
 }
 
 fn increment(c: &mut Criterion) {
-    setup_tests(LevelFilter::Off);
-
     let rt = tokio::runtime::Runtime::new().unwrap();
 
     let collection = rt.block_on(async {
+        setup_tests(LevelFilter::Off).await;
         let cluster = create_cluster_from_test_config().await;
 
         cluster
             .bucket(test_bucket().await)
-            .await
             .scope(test_scope().await)
             .collection(test_collection().await)
     });
@@ -377,16 +351,14 @@ fn increment(c: &mut Criterion) {
 }
 
 fn decrement(c: &mut Criterion) {
-    setup_tests(LevelFilter::Off);
-
     let rt = tokio::runtime::Runtime::new().unwrap();
 
     let collection = rt.block_on(async {
+        setup_tests(LevelFilter::Off).await;
         let cluster = create_cluster_from_test_config().await;
 
         cluster
             .bucket(test_bucket().await)
-            .await
             .scope(test_scope().await)
             .collection(test_collection().await)
     });

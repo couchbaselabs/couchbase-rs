@@ -1,7 +1,7 @@
+use crate::clients::agent_provider::CouchbaseAgentProvider;
 use crate::error;
 use crate::options::analytics_options::AnalyticsOptions;
 use crate::results::analytics_results::AnalyticsResult;
-use couchbase_core::agent::Agent;
 use couchbase_core::analyticsx;
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -42,21 +42,24 @@ pub(crate) struct AnalyticsKeyspace {
 }
 
 pub(crate) struct CouchbaseAnalyticsClient {
-    agent: Agent,
+    agent_provider: CouchbaseAgentProvider,
     keyspace: Option<AnalyticsKeyspace>,
 }
 
 impl CouchbaseAnalyticsClient {
-    pub fn new(agent: Agent) -> Self {
+    pub fn new(agent_provider: CouchbaseAgentProvider) -> Self {
         Self {
-            agent,
+            agent_provider,
             keyspace: None,
         }
     }
 
-    pub fn with_keyspace(agent: Agent, keyspace: AnalyticsKeyspace) -> Self {
+    pub fn with_keyspace(
+        agent_provider: CouchbaseAgentProvider,
+        keyspace: AnalyticsKeyspace,
+    ) -> Self {
         Self {
-            agent,
+            agent_provider,
             keyspace: Some(keyspace),
         }
     }
@@ -134,9 +137,8 @@ impl CouchbaseAnalyticsClient {
                 .raw(&raw)
                 .build();
 
-            Ok(AnalyticsResult::from(
-                self.agent.analytics(&query_opts).await?,
-            ))
+            let agent = self.agent_provider.get_agent().await;
+            Ok(AnalyticsResult::from(agent.analytics(&query_opts).await?))
         } else {
             let client_context_id = Uuid::new_v4().to_string();
 
@@ -146,9 +148,8 @@ impl CouchbaseAnalyticsClient {
                 .query_context(query_context.as_deref())
                 .build();
 
-            Ok(AnalyticsResult::from(
-                self.agent.analytics(&query_opts).await?,
-            ))
+            let agent = self.agent_provider.get_agent().await;
+            Ok(AnalyticsResult::from(agent.analytics(&query_opts).await?))
         }
     }
 }

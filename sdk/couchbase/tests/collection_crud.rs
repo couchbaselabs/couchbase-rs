@@ -24,7 +24,6 @@ async fn test_upsert() {
 
     let collection = cluster
         .bucket(test_bucket().await)
-        .await
         .scope(test_scope().await)
         .collection(test_collection().await);
 
@@ -47,7 +46,6 @@ async fn test_upsert_with_transcoder() {
 
     let collection = cluster
         .bucket(test_bucket().await)
-        .await
         .scope(test_scope().await)
         .collection(test_collection().await);
 
@@ -75,7 +73,6 @@ async fn test_upsert_with_custom_transcoder() {
 
     let collection = cluster
         .bucket(test_bucket().await)
-        .await
         .scope(test_scope().await)
         .collection(test_collection().await);
 
@@ -113,7 +110,6 @@ async fn test_insert() {
 
     let collection = cluster
         .bucket(test_bucket().await)
-        .await
         .scope(test_scope().await)
         .collection(test_collection().await);
 
@@ -136,7 +132,6 @@ async fn test_replace() {
 
     let collection = cluster
         .bucket(test_bucket().await)
-        .await
         .scope(test_scope().await)
         .collection(test_collection().await);
 
@@ -163,7 +158,6 @@ async fn test_remove() {
 
     let collection = cluster
         .bucket(test_bucket().await)
-        .await
         .scope(test_scope().await)
         .collection(test_collection().await);
 
@@ -185,7 +179,6 @@ async fn test_exists() {
 
     let collection = cluster
         .bucket(test_bucket().await)
-        .await
         .scope(test_scope().await)
         .collection(test_collection().await);
 
@@ -211,7 +204,6 @@ async fn test_get_and_touch() {
 
     let collection = cluster
         .bucket(test_bucket().await)
-        .await
         .scope(test_scope().await)
         .collection(test_collection().await);
 
@@ -237,7 +229,6 @@ async fn test_get_and_lock() {
 
     let collection = cluster
         .bucket(test_bucket().await)
-        .await
         .scope(test_scope().await)
         .collection(test_collection().await);
 
@@ -263,7 +254,6 @@ async fn test_unlock() {
 
     let collection = cluster
         .bucket(test_bucket().await)
-        .await
         .scope(test_scope().await)
         .collection(test_collection().await);
 
@@ -287,7 +277,6 @@ async fn test_touch() {
 
     let collection = cluster
         .bucket(test_bucket().await)
-        .await
         .scope(test_scope().await)
         .collection(test_collection().await);
 
@@ -309,7 +298,6 @@ async fn test_append() {
 
     let collection = cluster
         .bucket(test_bucket().await)
-        .await
         .scope(test_scope().await)
         .collection(test_collection().await);
 
@@ -346,7 +334,6 @@ async fn test_prepend() {
 
     let collection = cluster
         .bucket(test_bucket().await)
-        .await
         .scope(test_scope().await)
         .collection(test_collection().await);
 
@@ -383,7 +370,6 @@ async fn test_increment() {
 
     let collection = cluster
         .bucket(test_bucket().await)
-        .await
         .scope(test_scope().await)
         .collection(test_collection().await);
 
@@ -408,7 +394,6 @@ async fn test_decrement() {
 
     let collection = cluster
         .bucket(test_bucket().await)
-        .await
         .scope(test_scope().await)
         .collection(test_collection().await);
 
@@ -441,7 +426,6 @@ async fn test_lookup_in() {
 
     let collection = cluster
         .bucket(test_bucket().await)
-        .await
         .scope(test_scope().await)
         .collection(test_collection().await);
 
@@ -492,7 +476,6 @@ async fn test_mutate_in() {
 
     let collection = cluster
         .bucket(test_bucket().await)
-        .await
         .scope(test_scope().await)
         .collection(test_collection().await);
 

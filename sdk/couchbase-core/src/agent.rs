@@ -6,13 +6,13 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use futures::executor::block_on;
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use tokio::net;
 use tokio::runtime::{Handle, Runtime};
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::sync::{broadcast, mpsc, Mutex};
 use tokio::task::JoinHandle;
-use tokio::time::{timeout, timeout_at, Instant};
+use tokio::time::{sleep, timeout, timeout_at, Instant};
 
 use crate::agentoptions::AgentOptions;
 use crate::analyticscomponent::{
@@ -536,7 +536,10 @@ impl Agent {
                 let client: StdKvClient<Client> = match timeout_result {
                     Ok(client_result) => match client_result {
                         Ok(client) => client,
-                        Err(_e) => continue,
+                        Err(e) => {
+                            warn!("Failed to connect to endpoint: {}", e);
+                            continue;
+                        }
                     },
                     Err(_e) => continue,
                 };
@@ -557,6 +560,8 @@ impl Agent {
                     Err(_e) => continue,
                 };
             }
+            // TODO: Make configurable?
+            sleep(Duration::from_secs(1)).await;
         }
     }
 

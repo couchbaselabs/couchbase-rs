@@ -41,9 +41,8 @@ impl Cluster {
         })
     }
 
-    pub async fn bucket(&self, name: impl Into<String>) -> Bucket {
-        // TODO: unwrap
-        let bucket_client = self.client.bucket_client(name.into()).await.unwrap();
+    pub fn bucket(&self, name: impl Into<String>) -> Bucket {
+        let bucket_client = self.client.bucket_client(name.into());
 
         Bucket::new(bucket_client)
     }
