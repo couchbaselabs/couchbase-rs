@@ -42,6 +42,7 @@ impl ClusterClient {
             ClusterClientBackend::CouchbaseClusterBackend(
                 CouchbaseClusterBackend::connect(
                     resolved_conn_spec.memd_hosts,
+                    resolved_conn_spec.http_hosts,
                     resolved_conn_spec.srv_record,
                     resolved_conn_spec.use_ssl,
                     opts,
@@ -122,7 +123,8 @@ struct CouchbaseClusterBackend {
 
 impl CouchbaseClusterBackend {
     pub async fn connect(
-        hosts: Vec<Address>,
+        memd_hosts: Vec<Address>,
+        http_hosts: Vec<Address>,
         _srv_record: Option<SrvRecord>,
         use_ssl: bool,
         opts: ClusterOptions,
@@ -147,7 +149,8 @@ impl CouchbaseClusterBackend {
 
         Self::merge_options(&mut opts, extra_opts)?;
 
-        opts.seed_config.memd_addrs = hosts.iter().map(|a| a.to_string()).collect();
+        opts.seed_config.memd_addrs = memd_hosts.iter().map(|a| a.to_string()).collect();
+        opts.seed_config.http_addrs = http_hosts.iter().map(|a| a.to_string()).collect();
 
         let mgr = OnDemandAgentManager::new(opts).await?;
 

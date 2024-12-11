@@ -3,7 +3,7 @@ use url::Url;
 use crate::error;
 use crate::error::ErrorKind;
 
-pub(crate) fn get_host_from_uri(uri: &str) -> error::Result<Option<String>> {
+pub(crate) fn get_host_port_from_uri(uri: &str) -> error::Result<String> {
     let parsed = Url::parse(uri).map_err(|e| ErrorKind::Generic { msg: e.to_string() })?;
 
     let host = if let Some(host) = parsed.host() {
@@ -13,10 +13,13 @@ pub(crate) fn get_host_from_uri(uri: &str) -> error::Result<Option<String>> {
             host.to_string()
         }
     } else {
-        return Ok(None);
+        return Err(ErrorKind::Generic {
+            msg: "invalid endpoint".to_string(),
+        }
+        .into());
     };
 
-    Ok(Some(host))
+    Ok(host)
 }
 
 pub(crate) fn hostname_from_addr_str(addr: &str) -> String {
@@ -25,6 +28,16 @@ pub(crate) fn hostname_from_addr_str(addr: &str) -> String {
         Err(_e) => return addr.to_string(),
     };
     host.to_string()
+}
+
+pub(crate) fn get_hostname_from_host_port(host_port: &str) -> error::Result<String> {
+    let (host, _) = split_host_port(host_port)?;
+
+    if host.contains(':') {
+        return Ok(format!("[{}]", host));
+    }
+
+    Ok(host.to_string())
 }
 
 fn split_host_port(hostport: &str) -> error::Result<(&str, &str)> {

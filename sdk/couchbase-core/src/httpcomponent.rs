@@ -10,7 +10,7 @@ use crate::error;
 use crate::error::ErrorKind;
 use crate::httpx::client::Client;
 use crate::service_type::ServiceType;
-use crate::util::get_host_from_uri;
+use crate::util::get_host_port_from_uri;
 
 pub(crate) struct HttpComponent<C: Client> {
     service_type: ServiceType,
@@ -75,17 +75,11 @@ impl<C: Client> HttpComponent<C> {
             .into());
         };
 
-        let user_pass = if let Some(host) = get_host_from_uri(found_endpoint)? {
-            match state.authenticator.as_ref() {
-                Authenticator::PasswordAuthenticator(authenticator) => {
-                    authenticator.get_credentials(self.service_type, host)?
-                }
+        let host = get_host_port_from_uri(found_endpoint)?;
+        let user_pass = match state.authenticator.as_ref() {
+            Authenticator::PasswordAuthenticator(authenticator) => {
+                authenticator.get_credentials(self.service_type, host)?
             }
-        } else {
-            return Err(ErrorKind::Generic {
-                msg: "invalid endpoint".to_string(),
-            }
-            .into());
         };
 
         Ok((
@@ -101,7 +95,7 @@ impl<C: Client> HttpComponent<C> {
 
     pub fn select_endpoint(
         &self,
-        endpoint_ids_to_ignore: Vec<String>,
+        endpoint_ids_to_ignore: &[String],
     ) -> error::Result<Option<(Arc<C>, HttpEndpointProperties)>> {
         let mut guard = self.state.lock().unwrap();
         let state = &*guard;
@@ -129,17 +123,11 @@ impl<C: Client> HttpComponent<C> {
         let endpoint_id = endpoint_ids[endpoint_idx];
         let endpoint = remaining_endpoints[endpoint_id];
 
-        let user_pass = if let Some(host) = get_host_from_uri(endpoint)? {
-            match state.authenticator.as_ref() {
-                Authenticator::PasswordAuthenticator(authenticator) => {
-                    authenticator.get_credentials(self.service_type, host)?
-                }
+        let host = get_host_port_from_uri(endpoint)?;
+        let user_pass = match state.authenticator.as_ref() {
+            Authenticator::PasswordAuthenticator(authenticator) => {
+                authenticator.get_credentials(self.service_type, host)?
             }
-        } else {
-            return Err(ErrorKind::Generic {
-                msg: "invalid endpoint".to_string(),
-            }
-            .into());
         };
 
         Ok(Some((
@@ -180,7 +168,7 @@ impl<C: Client> HttpComponent<C> {
             .await;
         }
 
-        let (client, endpoint_properties) = if let Some(selected) = self.select_endpoint(vec![])? {
+        let (client, endpoint_properties) = if let Some(selected) = self.select_endpoint(&[])? {
             selected
         } else {
             return Err(ErrorKind::ServiceNotAvailable {
