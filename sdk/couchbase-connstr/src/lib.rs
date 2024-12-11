@@ -10,6 +10,7 @@ use std::fmt::{Display, Formatter};
 use url::form_urlencoded;
 
 pub const DEFAULT_LEGACY_HTTP_PORT: u16 = 8091;
+pub const DEFAULT_LEGACY_HTTPS_PORT: u16 = 18091;
 pub const DEFAULT_MEMD_PORT: u16 = 11210;
 pub const DEFAULT_SSL_MEMD_PORT: u16 = 11207;
 pub const DEFAULT_COUCHBASE2_PORT: u16 = 18098;
@@ -176,6 +177,7 @@ pub fn parse(conn_str: impl AsRef<str>) -> error::Result<ConnSpec> {
 pub struct ResolvedConnSpec {
     pub use_ssl: bool,
     pub memd_hosts: Vec<Address>,
+    pub http_hosts: Vec<Address>,
     pub couchbase2_host: Option<Address>,
     pub srv_record: Option<SrvRecord>,
     pub options: HashMap<String, Vec<String>>,
@@ -204,6 +206,7 @@ pub async fn resolve(conn_spec: ConnSpec) -> error::Result<ResolvedConnSpec> {
                 return Ok(ResolvedConnSpec {
                     use_ssl,
                     memd_hosts: srv_records,
+                    http_hosts: vec![],
                     couchbase2_host: None,
                     srv_record: Some(SrvRecord {
                         proto: srv_record.proto,
@@ -220,17 +223,21 @@ pub async fn resolve(conn_spec: ConnSpec) -> error::Result<ResolvedConnSpec> {
     };
 
     if conn_spec.hosts.is_empty() {
-        let port = if use_ssl {
-            DEFAULT_SSL_MEMD_PORT
+        let (memd_port, http_port) = if use_ssl {
+            (DEFAULT_SSL_MEMD_PORT, DEFAULT_LEGACY_HTTPS_PORT)
         } else {
-            DEFAULT_MEMD_PORT
+            (DEFAULT_MEMD_PORT, DEFAULT_LEGACY_HTTP_PORT)
         };
 
         return Ok(ResolvedConnSpec {
             use_ssl,
             memd_hosts: vec![Address {
                 host: "127.0.0.1".to_string(),
-                port,
+                port: memd_port,
+            }],
+            http_hosts: vec![Address {
+                host: "127.0.0.1".to_string(),
+                port: http_port,
             }],
             couchbase2_host: None,
             srv_record: None,
@@ -238,7 +245,8 @@ pub async fn resolve(conn_spec: ConnSpec) -> error::Result<ResolvedConnSpec> {
         });
     }
 
-    let mut hosts = vec![];
+    let mut memd_hosts = vec![];
+    let mut http_hosts = vec![];
     for address in conn_spec.hosts {
         if let Some(port) = &address.port {
             if *port == DEFAULT_LEGACY_HTTP_PORT {
@@ -249,27 +257,33 @@ pub async fn resolve(conn_spec: ConnSpec) -> error::Result<ResolvedConnSpec> {
                 return Err(ErrorKind::InvalidArgument("ambiguous port without scheme").into());
             }
 
-            hosts.push(Address {
+            memd_hosts.push(Address {
                 host: address.host,
                 port: *port,
             });
         } else {
-            let port = if use_ssl {
-                DEFAULT_SSL_MEMD_PORT
+            let (memd_port, http_port) = if use_ssl {
+                (DEFAULT_SSL_MEMD_PORT, DEFAULT_LEGACY_HTTPS_PORT)
             } else {
-                DEFAULT_MEMD_PORT
+                (DEFAULT_MEMD_PORT, DEFAULT_LEGACY_HTTP_PORT)
             };
 
-            hosts.push(Address {
+            memd_hosts.push(Address {
+                host: address.host.clone(),
+                port: memd_port,
+            });
+
+            http_hosts.push(Address {
                 host: address.host,
-                port,
+                port: http_port,
             });
         }
     }
 
     Ok(ResolvedConnSpec {
         use_ssl,
-        memd_hosts: hosts,
+        memd_hosts,
+        http_hosts,
         couchbase2_host: None,
         srv_record: None,
         options: conn_spec.options,
@@ -307,6 +321,7 @@ fn handle_couchbase2_scheme(conn_spec: ConnSpec) -> error::Result<ResolvedConnSp
     Ok(ResolvedConnSpec {
         use_ssl: true,
         memd_hosts: vec![],
+        http_hosts: vec![],
         couchbase2_host: Some(host),
         srv_record: None,
         options: conn_spec.options,

@@ -30,9 +30,8 @@ use crate::configwatcher::{
     ConfigWatcher, ConfigWatcherMemd, ConfigWatcherMemdConfig, ConfigWatcherMemdOptions,
 };
 use crate::crudcomponent::CrudComponent;
-use crate::error::{ErrorKind, Result};
+use crate::error::{Error, ErrorKind, Result};
 use crate::httpcomponent::HttpComponent;
-use crate::httpx;
 use crate::httpx::client::{ClientConfig, ReqwestClient};
 use crate::kvclient::{KvClient, KvClientConfig, KvClientOptions, StdKvClient};
 use crate::kvclient_ops::KvClientOps;
@@ -44,16 +43,20 @@ use crate::kvclientpool::{
 };
 use crate::memdx::client::Client;
 use crate::memdx::request::GetClusterConfigRequest;
+use crate::mgmtx::mgmt::{GetTerseBucketConfigOptions, GetTerseClusterConfigOptions};
 use crate::networktypeheuristic::NetworkTypeHeuristic;
 use crate::nmvbhandler::{ConfigUpdater, StdNotMyVbucketConfigHandler};
 use crate::parsedconfig::ParsedConfig;
 use crate::querycomponent::{QueryComponent, QueryComponentConfig, QueryComponentOptions};
 use crate::retry::RetryManager;
 use crate::searchcomponent::{SearchComponent, SearchComponentConfig, SearchComponentOptions};
+use crate::service_type::ServiceType;
 use crate::tls_config::TlsConfig;
+use crate::util::{get_host_port_from_uri, get_hostname_from_host_port};
 use crate::vbucketrouter::{
     StdVbucketRouter, VbucketRouter, VbucketRouterOptions, VbucketRoutingInfo,
 };
+use crate::{httpx, mgmtx};
 
 #[derive(Clone)]
 struct AgentState {
@@ -364,9 +367,21 @@ impl Agent {
         let connect_timeout = opts.connect_timeout.unwrap_or(Duration::from_secs(7));
         let connect_throttle_period = opts.connect_timeout.unwrap_or(Duration::from_secs(5));
 
+        let http_client = Arc::new(ReqwestClient::new(ClientConfig {
+            tls_config: state.tls_config.clone(),
+        })?);
+
         let first_kv_client_configs =
             Self::gen_first_kv_client_configs(&opts.seed_config.memd_addrs, &state);
-        let first_config = Self::get_first_config(first_kv_client_configs, connect_timeout).await?;
+        let first_http_client_configs =
+            Self::gen_first_http_endpoints(&opts.seed_config.http_addrs, &state);
+        let first_config = Self::get_first_config(
+            first_kv_client_configs,
+            first_http_client_configs,
+            http_client.clone(),
+            connect_timeout,
+        )
+        .await?;
 
         state.latest_config = first_config;
 
@@ -419,9 +434,6 @@ impl Agent {
 
         let retry_manager = Arc::new(RetryManager::default());
         let compression_manager = Arc::new(CompressionManager::new(opts.compression_config));
-        let http_client = Arc::new(ReqwestClient::new(
-            agent_component_configs.http_client_config,
-        )?);
 
         let crud = CrudComponent::new(
             nmvb_handler.clone(),
@@ -509,8 +521,10 @@ impl Agent {
         });
     }
 
-    async fn get_first_config(
+    async fn get_first_config<C: httpx::client::Client>(
         kv_client_manager_client_configs: HashMap<String, KvClientConfig>,
+        http_configs: HashMap<String, FirstHttpConfig>,
+        http_client: Arc<C>,
         connect_timeout: Duration,
     ) -> Result<ParsedConfig> {
         loop {
@@ -560,9 +574,88 @@ impl Agent {
                     Err(_e) => continue,
                 };
             }
+
+            info!("Failed to fetch config over kv, attempting http");
+            for endpoint_config in http_configs.values() {
+                let endpoint = endpoint_config.endpoint.clone();
+                let host = get_host_port_from_uri(&endpoint)?;
+                let user_pass = match endpoint_config.authenticator.as_ref() {
+                    Authenticator::PasswordAuthenticator(authenticator) => {
+                        authenticator.get_credentials(ServiceType::Mgmt, host)?
+                    }
+                };
+
+                match Self::fetch_http_config(
+                    http_client.clone(),
+                    endpoint,
+                    endpoint_config.user_agent.clone(),
+                    user_pass.username,
+                    user_pass.password,
+                    endpoint_config.bucket_name.clone(),
+                )
+                .await
+                {
+                    Ok(c) => {
+                        return Ok(c);
+                    }
+                    Err(_e) => {}
+                };
+            }
+
+            info!("Failed to fetch config from any source");
+
             // TODO: Make configurable?
             sleep(Duration::from_secs(1)).await;
         }
+    }
+
+    pub(crate) async fn fetch_http_config<C: httpx::client::Client>(
+        http_client: Arc<C>,
+        endpoint: String,
+        user_agent: String,
+        username: String,
+        password: String,
+        bucket_name: Option<String>,
+    ) -> Result<ParsedConfig> {
+        debug!("Polling config from {}", &endpoint);
+
+        let host_port = get_host_port_from_uri(&endpoint)?;
+        let hostname = get_hostname_from_host_port(&host_port)?;
+
+        let parsed = if let Some(bucket_name) = bucket_name {
+            let config = mgmtx::mgmt::Management {
+                http_client,
+                user_agent,
+                endpoint,
+                username,
+                password,
+            }
+            .get_terse_bucket_config(GetTerseBucketConfigOptions {
+                bucket_name,
+                on_behalf_of_info: None,
+            })
+            .await
+            .map_err(Error::from)?;
+
+            ConfigParser::parse_terse_config(config, &hostname)?
+        } else {
+            let config = mgmtx::mgmt::Management {
+                http_client,
+                user_agent,
+                endpoint,
+                username,
+                password,
+            }
+            .get_terse_cluster_config(GetTerseClusterConfigOptions {
+                on_behalf_of_info: None,
+            })
+            .await
+            .map_err(Error::from)?;
+
+            ConfigParser::parse_terse_config(config, &hostname)?
+        };
+
+        Ok(parsed)
     }
 
     fn gen_first_kv_client_configs(
@@ -588,11 +681,44 @@ impl Agent {
         clients
     }
 
+    fn gen_first_http_endpoints(
+        mgmt_addrs: &Vec<String>,
+        state: &AgentState,
+    ) -> HashMap<String, FirstHttpConfig> {
+        let mut clients = HashMap::new();
+        for addr in mgmt_addrs {
+            let node_id = format!("mgmt{}", addr);
+            let base = if state.tls_config.is_some() {
+                "https"
+            } else {
+                "http"
+            };
+            let config = FirstHttpConfig {
+                endpoint: format!("{}://{}", base, addr),
+                tls: state.tls_config.clone(),
+                user_agent: state.client_name.clone(),
+                authenticator: state.authenticator.clone(),
+                bucket_name: state.bucket.clone(),
+            };
+            clients.insert(node_id, config);
+        }
+
+        clients
+    }
+
     pub async fn close(&mut self) {
         self.config_watcher_shutdown_tx.send(()).unwrap_or_default();
 
         self.inner.conn_mgr.close().await.unwrap_or_default();
     }
+}
+
+struct FirstHttpConfig {
+    pub endpoint: String,
+    pub tls: Option<TlsConfig>,
+    pub user_agent: String,
+    pub authenticator: Arc<Authenticator>,
+    pub bucket_name: Option<String>,
 }
 
 // impl Drop for Agent {

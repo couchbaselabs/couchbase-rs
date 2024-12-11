@@ -31,6 +31,7 @@ mod kvclient_ops;
 mod kvclientmanager;
 mod kvclientpool;
 pub mod memdx;
+pub mod mgmtx;
 pub mod mutationtoken;
 mod networktypeheuristic;
 mod nmvbhandler;
