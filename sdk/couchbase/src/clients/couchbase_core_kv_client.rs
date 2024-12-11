@@ -1,3 +1,4 @@
+use crate::clients::agent_provider::CouchbaseAgentProvider;
 use crate::error;
 use crate::mutation_state::MutationToken;
 use crate::options::kv_binary_options::{
@@ -12,7 +13,6 @@ use crate::results::kv_results::{
 use crate::subdoc::lookup_in_specs::LookupInSpec;
 use crate::subdoc::mutate_in_specs::MutateInSpec;
 use bytes::Bytes;
-use couchbase_core::agent::Agent;
 use couchbase_core::memdx::subdoc::{reorder_subdoc_ops, SubdocDocFlag};
 use couchbase_core::retry::RetryStrategy;
 use std::sync::Arc;
@@ -20,7 +20,7 @@ use std::time::Duration;
 
 #[derive(Clone)]
 pub(crate) struct CouchbaseCoreKvClient {
-    agent: Agent,
+    agent_provider: CouchbaseAgentProvider,
     bucket_name: String,
     scope_name: String,
     collection_name: String,
@@ -30,14 +30,14 @@ pub(crate) struct CouchbaseCoreKvClient {
 
 impl CouchbaseCoreKvClient {
     pub fn new(
-        agent: Agent,
+        agent_provider: CouchbaseAgentProvider,
         bucket_name: String,
         scope_name: String,
         collection_name: String,
         default_retry_strategy: Arc<dyn RetryStrategy>,
     ) -> Self {
         Self {
-            agent,
+            agent_provider,
             bucket_name,
             scope_name,
             collection_name,
@@ -52,8 +52,8 @@ impl CouchbaseCoreKvClient {
         flags: u32,
         options: UpsertOptions,
     ) -> error::Result<MutationResult> {
-        let result = self
-            .agent
+        let agent = self.agent_provider.get_agent().await;
+        let result = agent
             .upsert(
                 couchbase_core::crudoptions::UpsertOptions::builder()
                     .key(id.as_bytes())
@@ -88,8 +88,8 @@ impl CouchbaseCoreKvClient {
         flags: u32,
         options: InsertOptions,
     ) -> error::Result<MutationResult> {
-        let result = self
-            .agent
+        let agent = self.agent_provider.get_agent().await;
+        let result = agent
             .add(
                 couchbase_core::crudoptions::AddOptions::builder()
                     .key(id.as_bytes())
@@ -123,8 +123,8 @@ impl CouchbaseCoreKvClient {
         flags: u32,
         options: ReplaceOptions,
     ) -> error::Result<MutationResult> {
-        let result = self
-            .agent
+        let agent = self.agent_provider.get_agent().await;
+        let result = agent
             .replace(
                 couchbase_core::crudoptions::ReplaceOptions::builder()
                     .key(id.as_bytes())
@@ -158,8 +158,8 @@ impl CouchbaseCoreKvClient {
         id: String,
         options: RemoveOptions,
     ) -> error::Result<MutationResult> {
-        let result = self
-            .agent
+        let agent = self.agent_provider.get_agent().await;
+        let result = agent
             .delete(
                 couchbase_core::crudoptions::DeleteOptions::builder()
                     .key(id.as_bytes())
@@ -185,8 +185,8 @@ impl CouchbaseCoreKvClient {
     }
 
     pub async fn get(&self, id: String, options: GetOptions) -> error::Result<GetResult> {
-        let res = self
-            .agent
+        let agent = self.agent_provider.get_agent().await;
+        let res = agent
             .get(
                 couchbase_core::crudoptions::GetOptions::builder()
                     .key(id.as_bytes())
@@ -205,8 +205,8 @@ impl CouchbaseCoreKvClient {
     }
 
     pub async fn exists(&self, id: String, options: ExistsOptions) -> error::Result<ExistsResult> {
-        let res = self
-            .agent
+        let agent = self.agent_provider.get_agent().await;
+        let res = agent
             .get_meta(
                 couchbase_core::crudoptions::GetMetaOptions::builder()
                     .key(id.as_bytes())
@@ -230,8 +230,8 @@ impl CouchbaseCoreKvClient {
         expiry: Duration,
         options: GetAndTouchOptions,
     ) -> error::Result<GetResult> {
-        let res = self
-            .agent
+        let agent = self.agent_provider.get_agent().await;
+        let res = agent
             .get_and_touch(
                 couchbase_core::crudoptions::GetAndTouchOptions::builder()
                     .key(id.as_bytes())
@@ -256,8 +256,8 @@ impl CouchbaseCoreKvClient {
         lock_time: Duration,
         options: GetAndLockOptions,
     ) -> error::Result<GetResult> {
-        let res = self
-            .agent
+        let agent = self.agent_provider.get_agent().await;
+        let res = agent
             .get_and_lock(
                 couchbase_core::crudoptions::GetAndLockOptions::builder()
                     .key(id.as_bytes())
@@ -277,7 +277,8 @@ impl CouchbaseCoreKvClient {
     }
 
     pub async fn unlock(&self, id: String, cas: u64, options: UnlockOptions) -> error::Result<()> {
-        self.agent
+        let agent = self.agent_provider.get_agent().await;
+        agent
             .unlock(
                 couchbase_core::crudoptions::UnlockOptions::builder()
                     .key(id.as_bytes())
@@ -302,8 +303,8 @@ impl CouchbaseCoreKvClient {
         expiry: Duration,
         options: TouchOptions,
     ) -> error::Result<TouchResult> {
-        let result = self
-            .agent
+        let agent = self.agent_provider.get_agent().await;
+        let result = agent
             .touch(
                 couchbase_core::crudoptions::TouchOptions::builder()
                     .key(id.as_bytes())
@@ -328,8 +329,8 @@ impl CouchbaseCoreKvClient {
         value: Vec<u8>,
         options: AppendOptions,
     ) -> error::Result<MutationResult> {
-        let result = self
-            .agent
+        let agent = self.agent_provider.get_agent().await;
+        let result = agent
             .append(
                 couchbase_core::crudoptions::AppendOptions::builder()
                     .key(id.as_bytes())
@@ -360,8 +361,8 @@ impl CouchbaseCoreKvClient {
         value: Vec<u8>,
         options: PrependOptions,
     ) -> error::Result<MutationResult> {
-        let result = self
-            .agent
+        let agent = self.agent_provider.get_agent().await;
+        let result = agent
             .prepend(
                 couchbase_core::crudoptions::PrependOptions::builder()
                     .key(id.as_bytes())
@@ -391,8 +392,8 @@ impl CouchbaseCoreKvClient {
         id: String,
         options: IncrementOptions,
     ) -> error::Result<CounterResult> {
-        let result = self
-            .agent
+        let agent = self.agent_provider.get_agent().await;
+        let result = agent
             .increment(
                 couchbase_core::crudoptions::IncrementOptions::builder()
                     .key(id.as_bytes())
@@ -425,8 +426,8 @@ impl CouchbaseCoreKvClient {
         id: String,
         options: DecrementOptions,
     ) -> error::Result<CounterResult> {
-        let result = self
-            .agent
+        let agent = self.agent_provider.get_agent().await;
+        let result = agent
             .decrement(
                 couchbase_core::crudoptions::DecrementOptions::builder()
                     .key(id.as_bytes())
@@ -460,10 +461,10 @@ impl CouchbaseCoreKvClient {
         specs: &[LookupInSpec],
         options: LookupInOptions,
     ) -> error::Result<LookupInResult> {
+        let agent = self.agent_provider.get_agent().await;
         let (ordered_specs, op_indexes) = reorder_subdoc_ops(specs);
 
-        let result = self
-            .agent
+        let result = agent
             .lookup_in(
                 couchbase_core::crudoptions::LookupInOptions::builder()
                     .key(id.as_bytes())
@@ -517,10 +518,10 @@ impl CouchbaseCoreKvClient {
         specs: &[MutateInSpec],
         options: MutateInOptions,
     ) -> error::Result<MutateInResult> {
+        let agent = self.agent_provider.get_agent().await;
         let (ordered_specs, op_indexes) = reorder_subdoc_ops(specs);
 
-        let result = self
-            .agent
+        let result = agent
             .mutate_in(
                 couchbase_core::crudoptions::MutateInOptions::builder()
                     .key(id.as_bytes())

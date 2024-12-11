@@ -29,7 +29,6 @@ async fn test_search_basic() {
 
     let scope = cluster
         .bucket(test_bucket().await)
-        .await
         .scope(test_scope().await);
 
     let collection = scope.collection(test_collection().await);

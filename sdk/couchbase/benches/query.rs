@@ -7,11 +7,12 @@ use log::LevelFilter;
 mod common;
 
 fn query(c: &mut Criterion) {
-    setup_tests(LevelFilter::Off);
-
     let rt = tokio::runtime::Runtime::new().unwrap();
 
-    let cluster = rt.block_on(async { create_cluster_from_test_config().await });
+    let cluster = rt.block_on(async {
+        setup_tests(LevelFilter::Off).await;
+        create_cluster_from_test_config().await
+    });
 
     c.bench_function("query", |b| {
         b.to_async(&rt).iter(|| async {

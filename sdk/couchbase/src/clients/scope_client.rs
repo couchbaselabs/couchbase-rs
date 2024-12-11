@@ -1,3 +1,4 @@
+use crate::clients::agent_provider::CouchbaseAgentProvider;
 use crate::clients::analytics_client::{
     AnalyticsClient, AnalyticsClientBackend, AnalyticsKeyspace, CouchbaseAnalyticsClient,
 };
@@ -11,7 +12,6 @@ use crate::clients::query_client::{
 use crate::clients::search_client::{
     CouchbaseSearchClient, SearchClient, SearchClientBackend, SearchKeyspace,
 };
-use couchbase_core::agent::Agent;
 use couchbase_core::retry::RetryStrategy;
 use std::sync::Arc;
 
@@ -95,7 +95,7 @@ pub(crate) enum ScopeClientBackend {
 
 #[derive(Clone)]
 pub(crate) struct CouchbaseScopeClient {
-    agent: Agent,
+    agent_provider: CouchbaseAgentProvider,
     bucket_name: String,
     name: String,
     default_retry_strategy: Arc<dyn RetryStrategy>,
@@ -103,13 +103,13 @@ pub(crate) struct CouchbaseScopeClient {
 
 impl CouchbaseScopeClient {
     pub fn new(
-        agent: Agent,
+        agent_provider: CouchbaseAgentProvider,
         bucket_name: String,
         name: String,
         default_retry_strategy: Arc<dyn RetryStrategy>,
     ) -> Self {
         Self {
-            agent,
+            agent_provider,
             bucket_name,
             name,
             default_retry_strategy,
@@ -127,7 +127,7 @@ impl CouchbaseScopeClient {
     pub fn collection(&self, name: String) -> CollectionClient {
         CollectionClient::new(CollectionClientBackend::CouchbaseCollectionBackend(
             CouchbaseCollectionClient::new(
-                self.agent.clone(),
+                self.agent_provider.clone(),
                 self.bucket_name().to_string(),
                 self.name().to_string(),
                 name,
@@ -138,7 +138,7 @@ impl CouchbaseScopeClient {
 
     pub fn query_client(&self) -> CouchbaseQueryClient {
         CouchbaseQueryClient::with_keyspace(
-            self.agent.clone(),
+            self.agent_provider.clone(),
             QueryKeyspace {
                 bucket_name: self.bucket_name().to_string(),
                 scope_name: self.name().to_string(),
@@ -148,7 +148,7 @@ impl CouchbaseScopeClient {
 
     pub fn search_client(&self) -> CouchbaseSearchClient {
         CouchbaseSearchClient::with_keyspace(
-            self.agent.clone(),
+            self.agent_provider.clone(),
             SearchKeyspace {
                 bucket_name: self.bucket_name().to_string(),
                 scope_name: self.name().to_string(),
@@ -158,7 +158,7 @@ impl CouchbaseScopeClient {
 
     pub fn analytics_client(&self) -> CouchbaseAnalyticsClient {
         CouchbaseAnalyticsClient::with_keyspace(
-            self.agent.clone(),
+            self.agent_provider.clone(),
             AnalyticsKeyspace {
                 bucket_name: self.bucket_name().to_string(),
                 scope_name: self.name().to_string(),

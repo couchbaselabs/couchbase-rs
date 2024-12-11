@@ -1,3 +1,4 @@
+mod agent_provider;
 pub mod analytics_client;
 pub mod bucket_client;
 pub mod cluster_client;

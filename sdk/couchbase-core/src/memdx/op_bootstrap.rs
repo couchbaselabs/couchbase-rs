@@ -117,6 +117,7 @@ impl OpBootstrap {
                 Ok(_) => {}
                 Err(e) => {
                     warn!("Auth failed {}", e);
+                    return Err(e);
                 }
             };
         }
@@ -128,7 +129,7 @@ impl OpBootstrap {
                 Ok(r) => Some(r),
                 Err(e) => {
                     warn!("Select bucket failed {}", e);
-                    None
+                    return Err(e);
                 }
             };
         }

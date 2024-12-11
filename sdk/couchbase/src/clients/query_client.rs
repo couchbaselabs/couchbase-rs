@@ -1,7 +1,7 @@
+use crate::clients::agent_provider::CouchbaseAgentProvider;
 use crate::error;
 use crate::options::query_options::QueryOptions;
 use crate::results::query_results::QueryResult;
-use couchbase_core::agent::Agent;
 use uuid::Uuid;
 
 pub(crate) struct QueryClient {
@@ -40,21 +40,21 @@ pub(crate) struct QueryKeyspace {
 }
 
 pub(crate) struct CouchbaseQueryClient {
-    agent: Agent,
+    agent_provider: CouchbaseAgentProvider,
     keyspace: Option<QueryKeyspace>,
 }
 
 impl CouchbaseQueryClient {
-    pub fn new(agent: Agent) -> Self {
+    pub fn new(agent_provider: CouchbaseAgentProvider) -> Self {
         Self {
-            agent,
+            agent_provider,
             keyspace: None,
         }
     }
 
-    pub fn with_keyspace(agent: Agent, keyspace: QueryKeyspace) -> Self {
+    pub fn with_keyspace(agent_provider: CouchbaseAgentProvider, keyspace: QueryKeyspace) -> Self {
         Self {
-            agent,
+            agent_provider,
             keyspace: Some(keyspace),
         }
     }
@@ -82,12 +82,11 @@ impl CouchbaseQueryClient {
             ));
         }
 
+        let agent = self.agent_provider.get_agent().await;
         if ad_hoc {
-            Ok(QueryResult::from(self.agent.query(query_opts).await?))
+            Ok(QueryResult::from(agent.query(query_opts).await?))
         } else {
-            Ok(QueryResult::from(
-                self.agent.prepared_query(query_opts).await?,
-            ))
+            Ok(QueryResult::from(agent.prepared_query(query_opts).await?))
         }
     }
 }

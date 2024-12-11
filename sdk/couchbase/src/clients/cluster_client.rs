@@ -1,3 +1,4 @@
+use crate::clients::agent_provider::CouchbaseAgentProvider;
 use crate::clients::analytics_client::{
     AnalyticsClient, AnalyticsClientBackend, CouchbaseAnalyticsClient,
 };
@@ -53,21 +54,17 @@ impl ClusterClient {
         Ok(ClusterClient { backend })
     }
 
-    pub async fn bucket_client(&self, name: String) -> error::Result<BucketClient> {
+    pub fn bucket_client(&self, name: String) -> BucketClient {
         match &self.backend {
             ClusterClientBackend::CouchbaseClusterBackend(backend) => {
-                let bucket_client = backend.bucket(name).await?;
+                let bucket_client = backend.bucket(name);
 
-                Ok(BucketClient::new(
-                    BucketClientBackend::CouchbaseBucketBackend(bucket_client),
-                ))
+                BucketClient::new(BucketClientBackend::CouchbaseBucketBackend(bucket_client))
             }
             ClusterClientBackend::Couchbase2ClusterBackend(backend) => {
-                let bucket_client = backend.bucket(name).await?;
+                let bucket_client = backend.bucket(name);
 
-                Ok(BucketClient::new(
-                    BucketClientBackend::Couchbase2BucketBackend(bucket_client),
-                ))
+                BucketClient::new(BucketClientBackend::Couchbase2BucketBackend(bucket_client))
             }
         }
     }
@@ -160,32 +157,36 @@ impl CouchbaseClusterBackend {
         })
     }
 
-    async fn bucket(&self, name: String) -> error::Result<CouchbaseBucketClient> {
-        let agent = self.agent_manager.get_bucket_agent(&name).await?;
-
-        Ok(CouchbaseBucketClient::new(
-            agent,
+    fn bucket(&self, name: String) -> CouchbaseBucketClient {
+        CouchbaseBucketClient::new(
+            CouchbaseAgentProvider::with_bucket(self.agent_manager.clone(), name.clone()),
             name,
             self.default_retry_strategy.clone(),
-        ))
+        )
     }
 
     fn query_client(&self) -> error::Result<CouchbaseQueryClient> {
         let agent = self.agent_manager.get_cluster_agent()?;
 
-        Ok(CouchbaseQueryClient::new(agent.clone()))
+        Ok(CouchbaseQueryClient::new(
+            CouchbaseAgentProvider::with_agent(agent.clone()),
+        ))
     }
 
     fn search_client(&self) -> error::Result<CouchbaseSearchClient> {
         let agent = self.agent_manager.get_cluster_agent()?;
 
-        Ok(CouchbaseSearchClient::new(agent.clone()))
+        Ok(CouchbaseSearchClient::new(
+            CouchbaseAgentProvider::with_agent(agent.clone()),
+        ))
     }
 
     fn analytics_client(&self) -> error::Result<CouchbaseAnalyticsClient> {
         let agent = self.agent_manager.get_cluster_agent()?;
 
-        Ok(CouchbaseAnalyticsClient::new(agent.clone()))
+        Ok(CouchbaseAnalyticsClient::new(
+            CouchbaseAgentProvider::with_agent(agent.clone()),
+        ))
     }
 
     fn merge_options(
@@ -222,7 +223,7 @@ impl Couchbase2ClusterBackend {
         unimplemented!()
     }
 
-    async fn bucket(&self, name: String) -> error::Result<Couchbase2BucketClient> {
-        Ok(Couchbase2BucketClient::new(name))
+    fn bucket(&self, name: String) -> Couchbase2BucketClient {
+        Couchbase2BucketClient::new(name)
     }
 }
