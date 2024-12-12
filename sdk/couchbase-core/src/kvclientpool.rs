@@ -201,7 +201,7 @@ where
             }
         }
 
-        self.new_client_watcher_notif.notified();
+        self.new_client_watcher_notif.notified().await;
         Box::pin(self.get_client_slow()).await
     }
 
