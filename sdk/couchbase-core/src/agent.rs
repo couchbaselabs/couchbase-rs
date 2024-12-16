@@ -31,6 +31,7 @@ use crate::configwatcher::{
 };
 use crate::crudcomponent::CrudComponent;
 use crate::error::{Error, ErrorKind, Result};
+use crate::features::BucketFeature;
 use crate::httpcomponent::HttpComponent;
 use crate::httpx::client::{ClientConfig, ReqwestClient};
 use crate::kvclient::{KvClient, KvClientConfig, KvClientOptions, StdKvClient};
@@ -43,10 +44,11 @@ use crate::kvclientpool::{
 };
 use crate::memdx::client::Client;
 use crate::memdx::request::GetClusterConfigRequest;
-use crate::mgmtx::mgmt::{GetTerseBucketConfigOptions, GetTerseClusterConfigOptions};
+use crate::mgmtcomponent::{MgmtComponent, MgmtComponentConfig, MgmtComponentOptions};
+use crate::mgmtx::options::{GetTerseBucketConfigOptions, GetTerseClusterConfigOptions};
 use crate::networktypeheuristic::NetworkTypeHeuristic;
 use crate::nmvbhandler::{ConfigUpdater, StdNotMyVbucketConfigHandler};
-use crate::parsedconfig::ParsedConfig;
+use crate::parsedconfig::{ParsedConfig, ParsedConfigBucketFeature, ParsedConfigFeature};
 use crate::querycomponent::{QueryComponent, QueryComponentConfig, QueryComponentOptions};
 use crate::retry::RetryManager;
 use crate::searchcomponent::{SearchComponent, SearchComponentConfig, SearchComponentOptions};
@@ -96,6 +98,7 @@ pub(crate) struct AgentInner {
     pub(crate) query: QueryComponent<ReqwestClient>,
     pub(crate) search: SearchComponent<ReqwestClient>,
     pub(crate) analytics: AnalyticsComponent<ReqwestClient>,
+    pub(crate) mgmt: MgmtComponent<ReqwestClient>,
 }
 
 #[derive(Clone)]
@@ -113,6 +116,7 @@ struct AgentComponentConfigs {
     pub query_config: QueryComponentConfig,
     pub search_config: SearchComponentConfig,
     pub analytics_config: AnalyticsComponentConfig,
+    pub mgmt_config: MgmtComponentConfig,
     pub http_client_config: ClientConfig,
 }
 
@@ -204,6 +208,7 @@ impl AgentInner {
             .reconfigure(agent_component_configs.search_config);
         self.analytics
             .reconfigure(agent_component_configs.analytics_config);
+        self.mgmt.reconfigure(agent_component_configs.mgmt_config);
     }
 
     fn can_update_config(new_config: &ParsedConfig, old_config: &ParsedConfig) -> bool {
@@ -230,12 +235,14 @@ impl AgentInner {
 
         let mut kv_data_node_ids = Vec::new();
         let mut kv_data_hosts: HashMap<String, String> = HashMap::new();
+        let mut mgmt_endpoints: HashMap<String, String> = HashMap::new();
         let mut query_endpoints: HashMap<String, String> = HashMap::new();
         let mut search_endpoints: HashMap<String, String> = HashMap::new();
         let mut analytics_endpoints: HashMap<String, String> = HashMap::new();
 
         for node in network_info.nodes {
             let kv_ep_id = format!("kv{}", node.node_id);
+            let mgmt_ep_id = format!("mgmt{}", node.node_id);
             let query_ep_id = format!("query{}", node.node_id);
             let search_ep_id = format!("search{}", node.node_id);
             let analytics_ep_id = format!("analytics{}", node.node_id);
@@ -248,6 +255,10 @@ impl AgentInner {
                 if let Some(p) = node.ssl_ports.kv {
                     kv_data_hosts.insert(kv_ep_id, format!("{}:{}", node.hostname, p));
                 }
+                mgmt_endpoints.insert(
+                    mgmt_ep_id,
+                    format!("https://{}:{}", node.hostname, node.ssl_ports.mgmt),
+                );
                 if let Some(p) = node.ssl_ports.query {
                     query_endpoints.insert(query_ep_id, format!("https://{}:{}", node.hostname, p));
                 }
@@ -263,6 +274,10 @@ impl AgentInner {
                 if let Some(p) = node.non_ssl_ports.kv {
                     kv_data_hosts.insert(kv_ep_id, format!("{}:{}", node.hostname, p));
                 }
+                mgmt_endpoints.insert(
+                    mgmt_ep_id,
+                    format!("http://{}:{}", node.hostname, node.non_ssl_ports.mgmt),
+                );
                 if let Some(p) = node.non_ssl_ports.query {
                     query_endpoints.insert(query_ep_id, format!("http://{}:{}", node.hostname, p));
                 }
@@ -321,7 +336,10 @@ impl AgentInner {
             search_config: SearchComponentConfig {
                 endpoints: search_endpoints,
                 authenticator: state.authenticator.clone(),
-                vector_search_enabled: state.latest_config.features.fts_vector_search,
+                vector_search_enabled: state
+                    .latest_config
+                    .features
+                    .contains(&ParsedConfigFeature::FtsVectorSearch),
             },
             analytics_config: AnalyticsComponentConfig {
                 endpoints: analytics_endpoints,
@@ -330,7 +348,48 @@ impl AgentInner {
             http_client_config: ClientConfig {
                 tls_config: state.tls_config.clone(),
             },
+            mgmt_config: MgmtComponentConfig {
+                endpoints: mgmt_endpoints,
+                authenticator: state.authenticator.clone(),
+            },
         }
+    }
+
+    // TODO: This really shouldn't be async
+    pub async fn bucket_features(&self) -> Result<Vec<BucketFeature>> {
+        let guard = self.state.lock().await;
+
+        if let Some(bucket) = &guard.latest_config.bucket {
+            let mut features = vec![];
+
+            for feature in &bucket.features {
+                match feature {
+                    ParsedConfigBucketFeature::CreateAsDeleted => {
+                        features.push(BucketFeature::CreateAsDeleted)
+                    }
+                    ParsedConfigBucketFeature::ReplaceBodyWithXattr => {
+                        features.push(BucketFeature::ReplaceBodyWithXattr)
+                    }
+                    ParsedConfigBucketFeature::RangeScan => features.push(BucketFeature::RangeScan),
+                    ParsedConfigBucketFeature::ReplicaRead => {
+                        features.push(BucketFeature::ReplicaRead)
+                    }
+                    ParsedConfigBucketFeature::NonDedupedHistory => {
+                        features.push(BucketFeature::NonDedupedHistory)
+                    }
+                    ParsedConfigBucketFeature::ReviveDocument => {
+                        features.push(BucketFeature::ReviveDocument)
+                    }
+                    _ => {}
+                }
+            }
+
+            return Ok(features);
+        }
+
+        Err(Error {
+            kind: Arc::new(ErrorKind::NoBucket),
+        })
     }
 }
 
@@ -444,6 +503,15 @@ impl Agent {
             compression_manager,
         );
 
+        let mgmt = MgmtComponent::new(
+            retry_manager.clone(),
+            http_client.clone(),
+            agent_component_configs.mgmt_config,
+            MgmtComponentOptions {
+                user_agent: client_name.clone(),
+            },
+        );
+
         let query = QueryComponent::new(
             retry_manager.clone(),
             http_client.clone(),
@@ -480,6 +548,7 @@ impl Agent {
             collections,
             retry_manager,
             http_client,
+            mgmt,
             query,
             search,
             analytics,

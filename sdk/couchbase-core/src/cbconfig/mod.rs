@@ -136,3 +136,36 @@ pub struct TerseConfig {
     #[serde(alias = "clusterCapabilities")]
     pub cluster_capabilities: HashMap<String, Vec<String>>,
 }
+
+#[derive(Deserialize, Debug, Clone)]
+#[non_exhaustive]
+pub struct CollectionManifestCollection {
+    #[serde(rename = "uid")]
+    pub uid: String,
+    #[serde(rename = "name")]
+    pub name: String,
+    #[serde(rename = "maxTTL", default)]
+    pub max_ttl: Option<i32>,
+    #[serde(rename = "history", default)]
+    pub history: Option<bool>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+#[non_exhaustive]
+pub struct CollectionManifestScope {
+    #[serde(rename = "uid")]
+    pub uid: String,
+    #[serde(rename = "name")]
+    pub name: String,
+    #[serde(rename = "collections", default)]
+    pub collections: Vec<CollectionManifestCollection>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+#[non_exhaustive]
+pub struct CollectionManifest {
+    #[serde(rename = "uid")]
+    pub uid: String,
+    #[serde(rename = "scopes", default)]
+    pub scopes: Vec<CollectionManifestScope>,
+}

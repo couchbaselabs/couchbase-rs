@@ -3,14 +3,14 @@ use std::future::Future;
 use std::hash::Hash;
 use std::sync::{Arc, Mutex};
 
-use rand::Rng;
-
 use crate::authenticator::Authenticator;
 use crate::error;
 use crate::error::ErrorKind;
 use crate::httpx::client::Client;
+use crate::retrybesteffort::BackoffCalculator;
 use crate::service_type::ServiceType;
 use crate::util::get_host_port_from_uri;
+use rand::Rng;
 
 pub(crate) struct HttpComponent<C: Client> {
     service_type: ServiceType,
@@ -186,6 +186,67 @@ impl<C: Client> HttpComponent<C> {
         )
         .await
     }
+
+    pub fn get_all_targets<T>(
+        &self,
+        endpoint_ids_to_ignore: &[String],
+    ) -> error::Result<(Arc<C>, Vec<T>)>
+    where
+        T: NodeTarget,
+    {
+        let guard = self.state.lock().unwrap();
+        let state = &*guard;
+
+        let mut remaining_endpoints = HashMap::new();
+        for (ep_id, endpoint) in &state.endpoints {
+            if !endpoint_ids_to_ignore.contains(ep_id) {
+                remaining_endpoints.insert(ep_id, endpoint);
+            }
+        }
+
+        let mut targets = Vec::with_capacity(remaining_endpoints.len());
+        for (_ep_id, endpoint) in remaining_endpoints {
+            let host = get_host_port_from_uri(endpoint)?;
+
+            let user_pass = match state.authenticator.as_ref() {
+                Authenticator::PasswordAuthenticator(authenticator) => {
+                    authenticator.get_credentials(self.service_type, host)?
+                }
+            };
+
+            targets.push(T::new(
+                endpoint.clone(),
+                user_pass.username,
+                user_pass.password,
+            ));
+        }
+
+        Ok((self.client.clone(), targets))
+    }
+
+    pub async fn ensure_resource<B, Fut, T>(
+        &self,
+        backoff: B,
+        mut poll_fn: impl FnMut(Arc<C>, Vec<T>) -> Fut + Send + Sync,
+    ) -> error::Result<()>
+    where
+        B: BackoffCalculator,
+        Fut: Future<Output = error::Result<bool>> + Send,
+        T: NodeTarget,
+    {
+        let mut attempt_idx = 0;
+        loop {
+            let (client, targets) = self.get_all_targets::<T>(&[])?;
+
+            let success = poll_fn(client, targets).await?;
+            if success {
+                return Ok(());
+            }
+
+            tokio::time::sleep(backoff.backoff(attempt_idx)).await;
+            attempt_idx += 1;
+        }
+    }
 }
 
 impl HttpComponentState {
@@ -195,4 +256,8 @@ impl HttpComponentState {
             authenticator,
         }
     }
+}
+
+pub(crate) trait NodeTarget {
+    fn new(endpoint: String, username: String, password: String) -> Self;
 }
