@@ -10,11 +10,19 @@ pub fn generate_key() -> Vec<u8> {
         .into_bytes()
 }
 
-pub fn generate_string_value(len: usize) -> Vec<u8> {
+pub fn generate_bytes_value(len: usize) -> Vec<u8> {
     rng()
         .sample_iter(&Alphanumeric)
         .take(len)
         .map(char::from)
         .collect::<String>()
         .into_bytes()
+}
+
+pub fn generate_string_value(len: usize) -> String {
+    rng()
+        .sample_iter(&Alphanumeric)
+        .take(len)
+        .map(char::from)
+        .collect::<String>()
 }

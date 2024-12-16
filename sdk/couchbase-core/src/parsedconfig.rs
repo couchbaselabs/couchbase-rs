@@ -34,9 +34,10 @@ pub(crate) struct ParsedConfigNode {
     pub alt_addresses: HashMap<String, ParsedConfigNodeAddresses>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Default)]
-pub(crate) struct ParsedConfigFeatures {
-    pub fts_vector_search: bool,
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub(crate) enum ParsedConfigFeature {
+    FtsVectorSearch,
+    Unknown,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -54,11 +55,38 @@ pub(crate) struct NetworkConfig {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
+#[non_exhaustive]
+pub(crate) enum ParsedConfigBucketFeature {
+    CreateAsDeleted,
+    ReplaceBodyWithXattr,
+    RangeScan,
+    ReplicaRead,
+    NonDedupedHistory,
+    ReviveDocument,
+    Unknown,
+}
+
+impl From<String> for ParsedConfigBucketFeature {
+    fn from(s: String) -> Self {
+        match s.as_str() {
+            "tombstonedUserXAttrs" => ParsedConfigBucketFeature::CreateAsDeleted,
+            "subdoc.ReplaceBodyWithXattr" => ParsedConfigBucketFeature::ReplaceBodyWithXattr,
+            "rangeScan" => ParsedConfigBucketFeature::RangeScan,
+            "subdoc.ReplicaRead" => ParsedConfigBucketFeature::ReplicaRead,
+            "nonDedupedHistory" => ParsedConfigBucketFeature::NonDedupedHistory,
+            "subdoc.ReviveDocument" => ParsedConfigBucketFeature::ReviveDocument,
+            _ => ParsedConfigBucketFeature::Unknown,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub(crate) struct ParsedConfigBucket {
     pub bucket_uuid: String,
     pub bucket_name: String,
     pub bucket_type: BucketType,
     pub vbucket_map: Option<VbucketMap>,
+    pub features: Vec<ParsedConfigBucketFeature>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -72,7 +100,7 @@ pub(crate) struct ParsedConfig {
 
     pub nodes: Vec<ParsedConfigNode>,
 
-    pub features: ParsedConfigFeatures,
+    pub features: Vec<ParsedConfigFeature>,
 }
 
 impl Default for ParsedConfig {
@@ -83,7 +111,7 @@ impl Default for ParsedConfig {
             source_hostname: "".to_string(),
             bucket: None,
             nodes: vec![],
-            features: Default::default(),
+            features: vec![],
         }
     }
 }

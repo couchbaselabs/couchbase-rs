@@ -20,8 +20,6 @@ log = "0.4.20"
 rand = "0.9.0-beta.0"
 regex = "1.10.5"
 reqwest = { version = "0.12.5", features = ["json", "stream"], default-features = false }
-serde = { version = "1.0.203", features = ["derive"] }
-serde_json = { version = "1.0.120", features = ["raw_value"] }
 sha1 = "0.10"
 sha2 = "0.10"
 snap = "1.1"
@@ -29,10 +27,13 @@ thiserror = "1.0"
 typed-builder = "0.20.0"
 url = "2.5.2"
 uuid = { version = "1.7.0", features = ["v4"] }
-webpki = "0.22.4"
 
 dhat = { version = "0.3.3", optional = true }
 futures-core = "0.3.30"
+
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = { version = "1.0.120", features = ["raw_value"] }
+serde_urlencoded = "0.7"
 
 tokio = { version = "1.38", features = ["full"] }
 tokio-io = { version = "0.2.0-alpha.6", features = ["util"] }

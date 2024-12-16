@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use crate::cbconfig::{TerseConfig, TerseExtNodePorts, VBucketServerMap};
 use crate::error::Result;
 use crate::parsedconfig::{
-    BucketType, ParsedConfig, ParsedConfigBucket, ParsedConfigFeatures, ParsedConfigNode,
-    ParsedConfigNodeAddresses, ParsedConfigNodePorts,
+    BucketType, ParsedConfig, ParsedConfigBucket, ParsedConfigBucketFeature, ParsedConfigFeature,
+    ParsedConfigNode, ParsedConfigNodeAddresses, ParsedConfigNodePorts,
 };
 use crate::vbucketmap::VbucketMap;
 
@@ -58,25 +58,33 @@ impl ConfigParser {
                 (BucketType::Invalid, None)
             };
 
+            let mut features = vec![];
+            if let Some(bucket_capabilities) = config.bucket_capabilities {
+                for cap in bucket_capabilities {
+                    let feat = ParsedConfigBucketFeature::from(cap);
+                    if feat != ParsedConfigBucketFeature::Unknown {
+                        features.push(feat);
+                    }
+                }
+            }
+
             Some(ParsedConfigBucket {
                 bucket_uuid,
                 bucket_name,
                 bucket_type,
                 vbucket_map,
+                features,
             })
         } else {
             None
         };
 
-        let features = if let Some(caps) = config.cluster_capabilities.get("fts") {
-            ParsedConfigFeatures {
-                fts_vector_search: caps.contains(&"vectorSearch".to_string()),
+        let mut features = vec![];
+        if let Some(caps) = config.cluster_capabilities.get("fts") {
+            if caps.contains(&"vectorSearch".to_string()) {
+                features.push(ParsedConfigFeature::FtsVectorSearch);
             }
-        } else {
-            ParsedConfigFeatures {
-                fts_vector_search: false,
-            }
-        };
+        }
 
         Ok(ParsedConfig {
             rev_id,

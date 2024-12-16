@@ -1,6 +1,7 @@
 use crate::agent::Agent;
 use crate::analyticscomponent::AnalyticsResultStream;
 use crate::analyticsoptions::AnalyticsOptions;
+use crate::cbconfig::CollectionManifest;
 use crate::crudoptions::{
     AddOptions, AppendOptions, DecrementOptions, DeleteOptions, GetAndLockOptions,
     GetAndTouchOptions, GetMetaOptions, GetOptions, IncrementOptions, LookupInOptions,
@@ -12,12 +13,25 @@ use crate::crudresults::{
     ReplaceResult, TouchResult, UnlockResult, UpsertResult,
 };
 use crate::error::Result;
+use crate::features::BucketFeature;
+use crate::mgmtoptions::{
+    CreateCollectionOptions, CreateScopeOptions, DeleteCollectionOptions, DeleteScopeOptions,
+    EnsureManifestOptions, GetCollectionManifestOptions, UpdateCollectionOptions,
+};
+use crate::mgmtx::responses::{
+    CreateCollectionResponse, CreateScopeResponse, DeleteCollectionResponse, DeleteScopeResponse,
+    UpdateCollectionResponse,
+};
 use crate::querycomponent::QueryResultStream;
 use crate::queryoptions::QueryOptions;
 use crate::searchcomponent::SearchResultStream;
 use crate::searchoptions::SearchOptions;
 
 impl Agent {
+    pub async fn bucket_features(&self) -> Result<Vec<BucketFeature>> {
+        self.inner.bucket_features().await
+    }
+
     pub async fn upsert<'a>(&self, opts: UpsertOptions<'a>) -> Result<UpsertResult> {
         self.inner.crud.upsert(opts).await
     }
@@ -102,5 +116,51 @@ impl Agent {
         opts: &AnalyticsOptions<'a>,
     ) -> Result<AnalyticsResultStream> {
         self.inner.analytics.query(opts).await
+    }
+
+    pub async fn get_collection_manifest<'a>(
+        &self,
+        opts: &GetCollectionManifestOptions<'a>,
+    ) -> Result<CollectionManifest> {
+        self.inner.mgmt.get_collection_manifest(opts).await
+    }
+
+    pub async fn create_scope<'a>(
+        &self,
+        opts: &CreateScopeOptions<'a>,
+    ) -> Result<CreateScopeResponse> {
+        self.inner.mgmt.create_scope(opts).await
+    }
+
+    pub async fn delete_scope<'a>(
+        &self,
+        opts: &DeleteScopeOptions<'a>,
+    ) -> Result<DeleteScopeResponse> {
+        self.inner.mgmt.delete_scope(opts).await
+    }
+
+    pub async fn create_collection<'a>(
+        &self,
+        opts: &CreateCollectionOptions<'a>,
+    ) -> Result<CreateCollectionResponse> {
+        self.inner.mgmt.create_collection(opts).await
+    }
+
+    pub async fn delete_collection<'a>(
+        &self,
+        opts: &DeleteCollectionOptions<'a>,
+    ) -> Result<DeleteCollectionResponse> {
+        self.inner.mgmt.delete_collection(opts).await
+    }
+
+    pub async fn update_collection<'a>(
+        &self,
+        opts: &UpdateCollectionOptions<'a>,
+    ) -> Result<UpdateCollectionResponse> {
+        self.inner.mgmt.update_collection(opts).await
+    }
+
+    pub async fn ensure_manifest<'a>(&self, opts: &EnsureManifestOptions<'a>) -> Result<()> {
+        self.inner.mgmt.ensure_manifest(opts).await
     }
 }

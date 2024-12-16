@@ -3,7 +3,7 @@ use couchbase_core::ondemand_agentmanager::{OnDemandAgentManager, OnDemandAgentM
 use couchbase_core::queryoptions::QueryOptions;
 
 use crate::common::default_agent_options::create_default_options;
-use crate::common::helpers::{generate_key, generate_string_value};
+use crate::common::helpers::{generate_bytes_value, generate_key};
 use crate::common::test_config::setup_tests;
 
 mod common;
@@ -42,7 +42,7 @@ async fn test_get_bucket_agent() {
     let agent = mgr.get_bucket_agent(bucket_name).await.unwrap();
 
     let key = generate_key();
-    let value = generate_string_value(32);
+    let value = generate_bytes_value(32);
 
     let upsert_opts = UpsertOptions::builder()
         .key(key.as_slice())

@@ -1,10 +1,20 @@
-use crate::cbconfig::TerseConfig;
+use crate::cbconfig::{CollectionManifest, TerseConfig};
 use crate::httpx::client::Client;
 use crate::httpx::request::{Auth, BasicAuth, OnBehalfOfInfo, Request};
 use crate::httpx::response::Response;
 use crate::mgmtx::error;
+use crate::mgmtx::options::{
+    CreateCollectionOptions, CreateScopeOptions, DeleteCollectionOptions, DeleteScopeOptions,
+    GetCollectionManifestOptions, GetTerseBucketConfigOptions, GetTerseClusterConfigOptions,
+    UpdateCollectionOptions,
+};
+use crate::mgmtx::responses::{
+    CreateCollectionResponse, CreateScopeResponse, DeleteCollectionResponse, DeleteScopeResponse,
+    UpdateCollectionResponse,
+};
 use bytes::Bytes;
 use http::Method;
+use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -80,10 +90,18 @@ impl<C: Client> Management<C> {
         on_behalf_of: Option<OnBehalfOfInfo>,
         headers: Option<HashMap<&str, &str>>,
         body: Option<Bytes>,
-    ) -> crate::httpx::error::Result<Response> {
+    ) -> error::Result<Response> {
         let req = self.new_request(method, path, content_type, on_behalf_of, headers, body);
 
-        self.http_client.execute(req).await
+        self.http_client
+            .execute(req)
+            .await
+            .map_err(|e| error::Error {
+                kind: Box::new(error::ErrorKind::Generic {
+                    msg: format!("could not execute request: {}", e),
+                }),
+                source: Some(Box::new(e)),
+            })
     }
 
     async fn decode_common_error(response: Response) -> error::Error {
@@ -194,31 +212,13 @@ impl<C: Client> Management<C> {
                 None,
                 None,
             )
-            .await
-            .map_err(|e| error::Error {
-                kind: Box::new(error::ErrorKind::Generic {
-                    msg: format!("could not get cluster config: {}", e),
-                }),
-                source: Some(Box::new(e)),
-            })?;
+            .await?;
 
         if resp.status() != 200 {
             return Err(Self::decode_common_error(resp).await);
         }
 
-        let body = resp.bytes().await.map_err(|e| error::Error {
-            kind: Box::new(error::ErrorKind::Generic {
-                msg: format!("could not read response: {}", e),
-            }),
-            source: Some(Box::new(e)),
-        })?;
-
-        serde_json::from_slice(&body).map_err(|e| error::Error {
-            kind: Box::new(error::ErrorKind::Generic {
-                msg: format!("could not parse response: {}", e),
-            }),
-            source: Some(Box::new(e)),
-        })
+        Self::parse_response(resp).await
     }
 
     pub async fn get_terse_bucket_config(
@@ -234,10 +234,32 @@ impl<C: Client> Management<C> {
                 None,
                 None,
             )
+            .await?;
+
+        if resp.status() != 200 {
+            return Err(Self::decode_common_error(resp).await);
+        }
+
+        Self::parse_response(resp).await
+    }
+
+    pub async fn get_collection_manifest<'a>(
+        &self,
+        opts: &GetCollectionManifestOptions<'a>,
+    ) -> error::Result<CollectionManifest> {
+        let resp = self
+            .execute(
+                Method::GET,
+                format!("/pools/default/buckets/{}/scopes", opts.bucket_name),
+                "",
+                opts.on_behalf_of_info.cloned(),
+                None,
+                None,
+            )
             .await
             .map_err(|e| error::Error {
                 kind: Box::new(error::ErrorKind::Generic {
-                    msg: format!("could not get cluster config: {}", e),
+                    msg: format!("could not get collections manifest: {}", e),
                 }),
                 source: Some(Box::new(e)),
             })?;
@@ -246,6 +268,193 @@ impl<C: Client> Management<C> {
             return Err(Self::decode_common_error(resp).await);
         }
 
+        Self::parse_response(resp).await
+    }
+
+    pub async fn create_scope<'a>(
+        &self,
+        opts: &CreateScopeOptions<'a>,
+    ) -> error::Result<CreateScopeResponse> {
+        let body = Self::url_encode(&[("name", opts.scope_name)])?;
+
+        let resp = self
+            .execute(
+                Method::POST,
+                format!("/pools/default/buckets/{}/scopes", opts.bucket_name),
+                "application/x-www-form-urlencoded",
+                opts.on_behalf_of_info.cloned(),
+                None,
+                Some(body),
+            )
+            .await?;
+
+        if resp.status() != 200 {
+            return Err(Self::decode_common_error(resp).await);
+        }
+
+        let manifest_uid: ManifestUidJson = Self::parse_response(resp).await?;
+
+        Ok(CreateScopeResponse {
+            manifest_uid: manifest_uid.manifest_uid,
+        })
+    }
+
+    pub async fn delete_scope<'a>(
+        &self,
+        opts: &DeleteScopeOptions<'a>,
+    ) -> error::Result<DeleteScopeResponse> {
+        let resp = self
+            .execute(
+                Method::DELETE,
+                format!(
+                    "/pools/default/buckets/{}/scopes/{}",
+                    opts.bucket_name, opts.scope_name
+                ),
+                "",
+                opts.on_behalf_of_info.cloned(),
+                None,
+                None,
+            )
+            .await?;
+
+        if resp.status() != 200 {
+            return Err(Self::decode_common_error(resp).await);
+        }
+
+        let manifest_uid: ManifestUidJson = Self::parse_response(resp).await?;
+
+        Ok(DeleteScopeResponse {
+            manifest_uid: manifest_uid.manifest_uid,
+        })
+    }
+
+    pub async fn create_collection<'a>(
+        &self,
+        opts: &CreateCollectionOptions<'a>,
+    ) -> error::Result<CreateCollectionResponse> {
+        let mut form = vec![("name", opts.collection_name)];
+        let max_ttl = opts.max_ttl.map(|m| m.to_string());
+        let max_ttl = max_ttl.as_deref();
+        let history = opts.history_enabled.map(|h| h.to_string());
+        let history = history.as_deref();
+        if let Some(max_ttl) = max_ttl {
+            form.push(("maxTTL", max_ttl));
+        }
+        if let Some(history) = history {
+            form.push(("history", history));
+        }
+
+        let body = Self::url_encode(form.as_slice())?;
+
+        let resp = self
+            .execute(
+                Method::POST,
+                format!(
+                    "/pools/default/buckets/{}/scopes/{}/collections",
+                    opts.bucket_name, opts.scope_name
+                ),
+                "application/x-www-form-urlencoded",
+                opts.on_behalf_of_info.cloned(),
+                None,
+                Some(body),
+            )
+            .await?;
+
+        if resp.status() != 200 {
+            return Err(Self::decode_common_error(resp).await);
+        }
+
+        let manifest_uid: ManifestUidJson = Self::parse_response(resp).await?;
+
+        Ok(CreateCollectionResponse {
+            manifest_uid: manifest_uid.manifest_uid,
+        })
+    }
+
+    pub async fn update_collection<'a>(
+        &self,
+        opts: &UpdateCollectionOptions<'a>,
+    ) -> error::Result<UpdateCollectionResponse> {
+        let mut form = vec![];
+        let max_ttl = opts.max_ttl.map(|m| m.to_string());
+        let max_ttl = max_ttl.as_deref();
+        let history = opts.history_enabled.map(|h| h.to_string());
+        let history = history.as_deref();
+        if let Some(max_ttl) = max_ttl {
+            form.push(("maxTTL", max_ttl));
+        }
+        if let Some(history) = history {
+            form.push(("history", history));
+        }
+
+        let body = Self::url_encode(form.as_slice())?;
+
+        let resp = self
+            .execute(
+                Method::PATCH,
+                format!(
+                    "/pools/default/buckets/{}/scopes/{}/collections/{}",
+                    opts.bucket_name, opts.scope_name, opts.collection_name
+                ),
+                "application/x-www-form-urlencoded",
+                opts.on_behalf_of_info.cloned(),
+                None,
+                Some(body),
+            )
+            .await?;
+
+        if resp.status() != 200 {
+            return Err(Self::decode_common_error(resp).await);
+        }
+
+        let manifest_uid: ManifestUidJson = Self::parse_response(resp).await?;
+
+        Ok(UpdateCollectionResponse {
+            manifest_uid: manifest_uid.manifest_uid,
+        })
+    }
+
+    pub async fn delete_collection<'a>(
+        &self,
+        opts: &DeleteCollectionOptions<'a>,
+    ) -> error::Result<DeleteCollectionResponse> {
+        let resp = self
+            .execute(
+                Method::DELETE,
+                format!(
+                    "/pools/default/buckets/{}/scopes/{}/collections/{}",
+                    opts.bucket_name, opts.scope_name, opts.collection_name
+                ),
+                "",
+                opts.on_behalf_of_info.cloned(),
+                None,
+                None,
+            )
+            .await?;
+
+        if resp.status() != 200 {
+            return Err(Self::decode_common_error(resp).await);
+        }
+
+        let manifest_uid: ManifestUidJson = Self::parse_response(resp).await?;
+
+        Ok(DeleteCollectionResponse {
+            manifest_uid: manifest_uid.manifest_uid,
+        })
+    }
+
+    fn url_encode(value: &[(&str, &str)]) -> error::Result<Bytes> {
+        let body = serde_urlencoded::to_string(value).map_err(|e| error::Error {
+            kind: Box::new(error::ErrorKind::Generic {
+                msg: format!("could not encode request body: {}", e),
+            }),
+            source: Some(Box::new(e)),
+        })?;
+
+        Ok(Bytes::from(body))
+    }
+
+    async fn parse_response<T: DeserializeOwned>(resp: Response) -> error::Result<T> {
         let body = resp.bytes().await.map_err(|e| error::Error {
             kind: Box::new(error::ErrorKind::Generic {
                 msg: format!("could not read response: {}", e),
@@ -262,18 +471,13 @@ impl<C: Client> Management<C> {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct GetTerseClusterConfigOptions {
-    pub on_behalf_of_info: Option<OnBehalfOfInfo>,
-}
-
-#[derive(Debug, Clone)]
-pub struct GetTerseBucketConfigOptions {
-    pub on_behalf_of_info: Option<OnBehalfOfInfo>,
-    pub bucket_name: String,
-}
-
 #[derive(Deserialize)]
 struct ServerErrors {
     errors: HashMap<String, String>,
+}
+
+#[derive(Deserialize)]
+struct ManifestUidJson {
+    #[serde(rename = "uid")]
+    pub manifest_uid: String,
 }

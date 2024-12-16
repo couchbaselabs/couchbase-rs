@@ -18,7 +18,7 @@ use serde::Serialize;
 use std::sync::Arc;
 
 use crate::common::default_agent_options::{create_default_options, create_options_without_bucket};
-use crate::common::helpers::{generate_key, generate_string_value};
+use crate::common::helpers::{generate_bytes_value, generate_key};
 use crate::common::test_config::setup_tests;
 
 mod common;
@@ -40,7 +40,7 @@ async fn test_upsert_and_get() {
     ));
 
     let key = generate_key();
-    let value = generate_string_value(32);
+    let value = generate_bytes_value(32);
 
     let upsert_opts = UpsertOptions::builder()
         .key(key.as_slice())
@@ -86,7 +86,7 @@ async fn test_add_and_delete() {
     ));
 
     let key = generate_key();
-    let value = generate_string_value(32);
+    let value = generate_bytes_value(32);
 
     let add_opts = AddOptions::builder()
         .key(key.as_slice())
@@ -153,7 +153,7 @@ async fn test_replace() {
     ));
 
     let key = generate_key();
-    let value = generate_string_value(32);
+    let value = generate_bytes_value(32);
 
     let upsert_opts = UpsertOptions::builder()
         .key(key.as_slice())
@@ -168,7 +168,7 @@ async fn test_replace() {
     assert_ne!(0, upsert_result.cas);
     assert!(upsert_result.mutation_token.is_some());
 
-    let new_value = generate_string_value(32);
+    let new_value = generate_bytes_value(32);
 
     let replace_result = agent
         .replace(
@@ -217,7 +217,7 @@ async fn test_lock_unlock() {
     ));
 
     let key = generate_key();
-    let value = generate_string_value(32);
+    let value = generate_bytes_value(32);
 
     let upsert_opts = UpsertOptions::builder()
         .key(key.as_slice())
@@ -323,7 +323,7 @@ async fn test_touch_operations() {
     ));
 
     let key = generate_key();
-    let value = generate_string_value(32);
+    let value = generate_bytes_value(32);
 
     let upsert_opts = UpsertOptions::builder()
         .key(key.as_slice())
@@ -792,7 +792,7 @@ async fn test_kv_without_a_bucket() {
     ));
 
     let key = generate_key();
-    let value = generate_string_value(32);
+    let value = generate_bytes_value(32);
 
     let upsert_result = agent
         .upsert(
@@ -834,7 +834,7 @@ async fn upsert_allocations() {
     let agent = Agent::new(agent_opts).await.unwrap();
 
     let key = generate_key();
-    let value = generate_string_value(32);
+    let value = generate_bytes_value(32);
 
     let strat = Arc::new(FailFastRetryStrategy::default());
 
