@@ -75,16 +75,11 @@ async fn test_collections() {
 
     ensure_manifest(&agent, &bucket_name, resp.manifest_uid).await;
 
-    let mut builder = CreateCollectionOptions::builder()
-        .bucket_name(bucket_name.as_str())
-        .scope_name(&*scope_name)
-        .collection_name(&*collection_name)
-        .max_ttl(25);
+    let mut opts =
+        CreateCollectionOptions::new(&bucket_name, &scope_name, &collection_name).max_ttl(25);
 
-    let opts = if history_supported {
-        builder.history_enabled(true).build()
-    } else {
-        builder.build()
+    if history_supported {
+        opts = opts.history_enabled(true)
     };
 
     let resp = agent.create_collection(&opts).await.unwrap();
@@ -131,7 +126,7 @@ async fn test_collections() {
 }
 
 fn find_scope(
-    manifest: &cbconfig::CollectionManifest,
+    manifest: &CollectionManifest,
     scope_name: &str,
 ) -> Option<cbconfig::CollectionManifestScope> {
     for scope in &manifest.scopes {
@@ -155,10 +150,9 @@ fn find_collection(
 }
 
 async fn ensure_manifest(agent: &Agent, bucket_name: &str, manifest_uid: String) {
-    let ensure_opts = &EnsureManifestOptions::builder()
-        .bucket_name(bucket_name)
-        .manifest_uid(u64::from_str_radix(&manifest_uid, 16).unwrap())
-        .build();
+    let ensure_opts =
+        &EnsureManifestOptions::new(bucket_name, u64::from_str_radix(&manifest_uid, 16).unwrap());
+
     agent.ensure_manifest(ensure_opts).await.unwrap();
 }
 
@@ -167,10 +161,7 @@ async fn delete_scope(
     bucket_name: &str,
     scope_name: &str,
 ) -> error::Result<DeleteScopeResponse> {
-    let opts = &DeleteScopeOptions::builder()
-        .bucket_name(bucket_name)
-        .scope_name(scope_name)
-        .build();
+    let opts = &DeleteScopeOptions::new(bucket_name, scope_name);
     agent.delete_scope(opts).await
 }
 
@@ -179,17 +170,12 @@ async fn create_scope(
     bucket_name: &str,
     scope_name: &str,
 ) -> error::Result<CreateScopeResponse> {
-    let opts = &CreateScopeOptions::builder()
-        .bucket_name(bucket_name)
-        .scope_name(scope_name)
-        .build();
+    let opts = &CreateScopeOptions::new(bucket_name, scope_name);
     agent.create_scope(opts).await
 }
 
 async fn get_manifest(agent: &Agent, bucket_name: &str) -> error::Result<CollectionManifest> {
-    let opts = &GetCollectionManifestOptions::builder()
-        .bucket_name(bucket_name)
-        .build();
+    let opts = &GetCollectionManifestOptions::new(bucket_name);
     agent.get_collection_manifest(opts).await
 }
 
@@ -199,10 +185,6 @@ async fn delete_collection(
     scope_name: &str,
     collection_name: &str,
 ) -> error::Result<DeleteCollectionResponse> {
-    let opts = &DeleteCollectionOptions::builder()
-        .bucket_name(bucket_name)
-        .scope_name(scope_name)
-        .collection_name(collection_name)
-        .build();
+    let opts = &DeleteCollectionOptions::new(bucket_name, scope_name, collection_name);
     agent.delete_collection(opts).await
 }

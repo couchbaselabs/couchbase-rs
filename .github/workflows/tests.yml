@@ -68,6 +68,7 @@ jobs:
           CBDC_CONNSTR: # from above
           RCBDINOID: ${{ env.CBDC_ID }}
           RCBCONNSTR: ${{ env.CBDC_CONNSTR }}
+          RCBSERVER_VERSION: ${{ matrix.server }}
         run: |
           cargo test --color=always --no-fail-fast -- --nocapture
 

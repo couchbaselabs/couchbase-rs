@@ -28,6 +28,7 @@ chrono = "0.4"
 criterion = { version = "0.5.1", features = ["html_reports", "async_tokio", "async"] }
 env_logger = "0.11"
 envconfig = "0.11.0"
+rand = "0.9.0-beta.0"
 serde_json = { version = "1.0", features = ["raw_value"] }
 serde_yaml = "0.9"
 tokio = "1.40"

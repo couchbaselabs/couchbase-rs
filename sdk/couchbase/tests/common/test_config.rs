@@ -1,6 +1,7 @@
 use std::io::Write;
 use std::sync::Arc;
 
+use crate::common::node_version::NodeVersion;
 use couchbase_connstr::ResolvedConnSpec;
 use envconfig::Envconfig;
 use lazy_static::lazy_static;
@@ -27,6 +28,8 @@ pub struct EnvTestConfig {
     pub default_collection: String,
     #[envconfig(from = "RCBDATA_TIMEOUT", default = "2500")]
     pub data_timeout: String,
+    #[envconfig(from = "RCBSERVER_VERSION", default = "7.6.2")]
+    pub server_version: String,
 }
 
 #[derive(Debug, Clone)]
@@ -39,9 +42,10 @@ pub struct TestConfig {
     pub default_collection: String,
     pub data_timeout: String,
     pub resolved_conn_spec: ResolvedConnSpec,
+    pub cluster_version: NodeVersion,
 }
 
-pub async fn setup_tests(log_level: LevelFilter) {
+pub async fn setup_tests(log_level: LevelFilter) -> Arc<TestConfig> {
     let mut config = TEST_CONFIG.write().await;
 
     if config.is_none() {
@@ -64,7 +68,7 @@ pub async fn setup_tests(log_level: LevelFilter) {
 
         let conn_spec = couchbase_connstr::parse(&test_config.conn_string).unwrap();
 
-        *config = Some(Arc::new(TestConfig {
+        let test_config = Arc::new(TestConfig {
             username: test_config.username,
             password: test_config.password,
             conn_str: test_config.conn_string,
@@ -73,8 +77,13 @@ pub async fn setup_tests(log_level: LevelFilter) {
             default_collection: test_config.default_collection,
             data_timeout: test_config.data_timeout,
             resolved_conn_spec: couchbase_connstr::resolve(conn_spec).await.unwrap(),
-        }));
+            cluster_version: NodeVersion::from(test_config.server_version),
+        });
+        *config = Some(test_config.clone());
+        return test_config;
     }
+
+    config.clone().unwrap()
 }
 
 pub async fn test_username() -> String {

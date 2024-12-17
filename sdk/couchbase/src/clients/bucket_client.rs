@@ -1,4 +1,7 @@
 use crate::clients::agent_provider::CouchbaseAgentProvider;
+use crate::clients::collections_mgmt_client::{
+    CollectionsMgmtClient, CollectionsMgmtClientBackend, CouchbaseCollectionsMgmtClient,
+};
 use crate::clients::scope_client::{
     Couchbase2ScopeClient, CouchbaseScopeClient, ScopeClient, ScopeClientBackend,
 };
@@ -28,6 +31,21 @@ impl BucketClient {
         match &self.backend {
             BucketClientBackend::CouchbaseBucketBackend(client) => client.scope(name),
             BucketClientBackend::Couchbase2BucketBackend(client) => client.scope(name),
+        }
+    }
+
+    pub fn collections_management_client(&self) -> CollectionsMgmtClient {
+        match &self.backend {
+            BucketClientBackend::CouchbaseBucketBackend(backend) => {
+                let client = backend.collections_management_client();
+
+                CollectionsMgmtClient::new(
+                    CollectionsMgmtClientBackend::CouchbaseCollectionsMgmtClientBackend(client),
+                )
+            }
+            BucketClientBackend::Couchbase2BucketBackend(_) => {
+                unimplemented!()
+            }
         }
     }
 }
@@ -72,6 +90,14 @@ impl CouchbaseBucketClient {
             ),
         ))
     }
+
+    pub fn collections_management_client(&self) -> CouchbaseCollectionsMgmtClient {
+        CouchbaseCollectionsMgmtClient::new(
+            self.agent_provider.clone(),
+            self.name.clone(),
+            self.default_retry_strategy.clone(),
+        )
+    }
 }
 
 #[derive(Clone)]
@@ -92,5 +118,9 @@ impl Couchbase2BucketClient {
         ScopeClient::new(ScopeClientBackend::Couchbase2ScopeBackend(
             Couchbase2ScopeClient::new(),
         ))
+    }
+
+    pub fn collections_management_client(&self) -> CouchbaseCollectionsMgmtClient {
+        unimplemented!()
     }
 }
