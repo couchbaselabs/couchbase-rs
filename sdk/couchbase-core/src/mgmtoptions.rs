@@ -2,18 +2,34 @@ use crate::httpx::request::OnBehalfOfInfo;
 use crate::mgmtx;
 use crate::retry::{RetryStrategy, DEFAULT_RETRY_STRATEGY};
 use std::sync::Arc;
-use typed_builder::TypedBuilder;
 
-#[derive(Debug, Clone, TypedBuilder)]
-#[builder(field_defaults(setter(into)))]
+#[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct GetCollectionManifestOptions<'a> {
-    #[builder(default, setter(strip_option))]
     pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
     pub bucket_name: &'a str,
 
-    #[builder(default=DEFAULT_RETRY_STRATEGY.clone())]
     pub retry_strategy: Arc<dyn RetryStrategy>,
+}
+
+impl<'a> GetCollectionManifestOptions<'a> {
+    pub fn new(bucket_name: &'a str) -> Self {
+        Self {
+            on_behalf_of_info: None,
+            bucket_name,
+            retry_strategy: DEFAULT_RETRY_STRATEGY.clone(),
+        }
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = retry_strategy;
+        self
+    }
+
+    pub fn on_behalf_of_info(mut self, on_behalf_of_info: &'a OnBehalfOfInfo) -> Self {
+        self.on_behalf_of_info = Some(on_behalf_of_info);
+        self
+    }
 }
 
 impl<'a> From<&GetCollectionManifestOptions<'a>>
@@ -27,17 +43,35 @@ impl<'a> From<&GetCollectionManifestOptions<'a>>
     }
 }
 
-#[derive(Debug, Clone, TypedBuilder)]
-#[builder(field_defaults(setter(into)))]
+#[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct CreateScopeOptions<'a> {
-    #[builder(default, setter(strip_option))]
     pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
     pub bucket_name: &'a str,
     pub scope_name: &'a str,
 
-    #[builder(default=DEFAULT_RETRY_STRATEGY.clone())]
     pub retry_strategy: Arc<dyn RetryStrategy>,
+}
+
+impl<'a> CreateScopeOptions<'a> {
+    pub fn new(bucket_name: &'a str, scope_name: &'a str) -> Self {
+        Self {
+            on_behalf_of_info: None,
+            bucket_name,
+            scope_name,
+            retry_strategy: DEFAULT_RETRY_STRATEGY.clone(),
+        }
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = retry_strategy;
+        self
+    }
+
+    pub fn on_behalf_of_info(mut self, on_behalf_of_info: &'a OnBehalfOfInfo) -> Self {
+        self.on_behalf_of_info = Some(on_behalf_of_info);
+        self
+    }
 }
 
 impl<'a> From<&CreateScopeOptions<'a>> for mgmtx::options::CreateScopeOptions<'a> {
@@ -50,17 +84,35 @@ impl<'a> From<&CreateScopeOptions<'a>> for mgmtx::options::CreateScopeOptions<'a
     }
 }
 
-#[derive(Debug, Clone, TypedBuilder)]
-#[builder(field_defaults(setter(into)))]
+#[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct DeleteScopeOptions<'a> {
-    #[builder(default, setter(strip_option))]
     pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
     pub bucket_name: &'a str,
     pub scope_name: &'a str,
 
-    #[builder(default=DEFAULT_RETRY_STRATEGY.clone())]
     pub retry_strategy: Arc<dyn RetryStrategy>,
+}
+
+impl<'a> DeleteScopeOptions<'a> {
+    pub fn new(bucket_name: &'a str, scope_name: &'a str) -> Self {
+        Self {
+            on_behalf_of_info: None,
+            bucket_name,
+            scope_name,
+            retry_strategy: DEFAULT_RETRY_STRATEGY.clone(),
+        }
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = retry_strategy;
+        self
+    }
+
+    pub fn on_behalf_of_info(mut self, on_behalf_of_info: &'a OnBehalfOfInfo) -> Self {
+        self.on_behalf_of_info = Some(on_behalf_of_info);
+        self
+    }
 }
 
 impl<'a> From<&DeleteScopeOptions<'a>> for mgmtx::options::DeleteScopeOptions<'a> {
@@ -73,22 +125,51 @@ impl<'a> From<&DeleteScopeOptions<'a>> for mgmtx::options::DeleteScopeOptions<'a
     }
 }
 
-#[derive(Debug, Clone, TypedBuilder)]
-#[builder(field_defaults(setter(into)))]
+#[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct CreateCollectionOptions<'a> {
-    #[builder(default, setter(strip_option))]
     pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
     pub bucket_name: &'a str,
     pub scope_name: &'a str,
     pub collection_name: &'a str,
-    #[builder(default, setter(strip_option))]
     pub max_ttl: Option<i32>,
-    #[builder(default, setter(strip_option))]
     pub history_enabled: Option<bool>,
 
-    #[builder(default=DEFAULT_RETRY_STRATEGY.clone())]
     pub retry_strategy: Arc<dyn RetryStrategy>,
+}
+
+impl<'a> CreateCollectionOptions<'a> {
+    pub fn new(bucket_name: &'a str, scope_name: &'a str, collection_name: &'a str) -> Self {
+        Self {
+            on_behalf_of_info: None,
+            bucket_name,
+            scope_name,
+            collection_name,
+            max_ttl: None,
+            history_enabled: None,
+            retry_strategy: DEFAULT_RETRY_STRATEGY.clone(),
+        }
+    }
+
+    pub fn max_ttl(mut self, max_ttl: i32) -> Self {
+        self.max_ttl = Some(max_ttl);
+        self
+    }
+
+    pub fn history_enabled(mut self, history_enabled: bool) -> Self {
+        self.history_enabled = Some(history_enabled);
+        self
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = retry_strategy;
+        self
+    }
+
+    pub fn on_behalf_of_info(mut self, on_behalf_of_info: &'a OnBehalfOfInfo) -> Self {
+        self.on_behalf_of_info = Some(on_behalf_of_info);
+        self
+    }
 }
 
 impl<'a> From<&CreateCollectionOptions<'a>> for mgmtx::options::CreateCollectionOptions<'a> {
@@ -104,22 +185,51 @@ impl<'a> From<&CreateCollectionOptions<'a>> for mgmtx::options::CreateCollection
     }
 }
 
-#[derive(Debug, Clone, TypedBuilder)]
-#[builder(field_defaults(setter(into)))]
+#[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct UpdateCollectionOptions<'a> {
-    #[builder(default, setter(strip_option))]
     pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
     pub bucket_name: &'a str,
     pub scope_name: &'a str,
     pub collection_name: &'a str,
-    #[builder(default, setter(strip_option))]
     pub max_ttl: Option<i32>,
-    #[builder(default, setter(strip_option))]
     pub history_enabled: Option<bool>,
 
-    #[builder(default=DEFAULT_RETRY_STRATEGY.clone())]
     pub retry_strategy: Arc<dyn RetryStrategy>,
+}
+
+impl<'a> UpdateCollectionOptions<'a> {
+    pub fn new(bucket_name: &'a str, scope_name: &'a str, collection_name: &'a str) -> Self {
+        Self {
+            on_behalf_of_info: None,
+            bucket_name,
+            scope_name,
+            collection_name,
+            max_ttl: None,
+            history_enabled: None,
+            retry_strategy: DEFAULT_RETRY_STRATEGY.clone(),
+        }
+    }
+
+    pub fn max_ttl(mut self, max_ttl: i32) -> Self {
+        self.max_ttl = Some(max_ttl);
+        self
+    }
+
+    pub fn history_enabled(mut self, history_enabled: bool) -> Self {
+        self.history_enabled = Some(history_enabled);
+        self
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = retry_strategy;
+        self
+    }
+
+    pub fn on_behalf_of_info(mut self, on_behalf_of_info: &'a OnBehalfOfInfo) -> Self {
+        self.on_behalf_of_info = Some(on_behalf_of_info);
+        self
+    }
 }
 
 impl<'a> From<&UpdateCollectionOptions<'a>> for mgmtx::options::UpdateCollectionOptions<'a> {
@@ -135,18 +245,37 @@ impl<'a> From<&UpdateCollectionOptions<'a>> for mgmtx::options::UpdateCollection
     }
 }
 
-#[derive(Debug, Clone, TypedBuilder)]
-#[builder(field_defaults(setter(into)))]
+#[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct DeleteCollectionOptions<'a> {
-    #[builder(default, setter(strip_option))]
     pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
     pub bucket_name: &'a str,
     pub scope_name: &'a str,
     pub collection_name: &'a str,
 
-    #[builder(default=DEFAULT_RETRY_STRATEGY.clone())]
     pub retry_strategy: Arc<dyn RetryStrategy>,
+}
+
+impl<'a> DeleteCollectionOptions<'a> {
+    pub fn new(bucket_name: &'a str, scope_name: &'a str, collection_name: &'a str) -> Self {
+        Self {
+            on_behalf_of_info: None,
+            bucket_name,
+            scope_name,
+            collection_name,
+            retry_strategy: DEFAULT_RETRY_STRATEGY.clone(),
+        }
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = retry_strategy;
+        self
+    }
+
+    pub fn on_behalf_of_info(mut self, on_behalf_of_info: &'a OnBehalfOfInfo) -> Self {
+        self.on_behalf_of_info = Some(on_behalf_of_info);
+        self
+    }
 }
 
 impl<'a> From<&DeleteCollectionOptions<'a>> for mgmtx::options::DeleteCollectionOptions<'a> {
@@ -160,13 +289,25 @@ impl<'a> From<&DeleteCollectionOptions<'a>> for mgmtx::options::DeleteCollection
     }
 }
 
-#[derive(Debug, Clone, TypedBuilder)]
-#[builder(field_defaults(setter(into)))]
+#[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct EnsureManifestOptions<'a> {
-    #[builder(default, setter(strip_option))]
     pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
     pub bucket_name: &'a str,
-    #[builder(setter(!into))]
     pub manifest_uid: u64,
+}
+
+impl<'a> EnsureManifestOptions<'a> {
+    pub fn new(bucket_name: &'a str, manifest_uid: u64) -> Self {
+        Self {
+            on_behalf_of_info: None,
+            bucket_name,
+            manifest_uid,
+        }
+    }
+
+    pub fn on_behalf_of_info(mut self, on_behalf_of_info: &'a OnBehalfOfInfo) -> Self {
+        self.on_behalf_of_info = Some(on_behalf_of_info);
+        self
+    }
 }
