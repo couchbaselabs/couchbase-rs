@@ -541,8 +541,8 @@ impl CouchbaseCoreKvClient {
                             flags |= SubdocDocFlag::AccessDeleted;
                         }
                         match options.store_semantics {
-                            Some(StoreSemantics::Insert) => flags |= SubdocDocFlag::MkDoc,
-                            Some(StoreSemantics::Upsert) => flags |= SubdocDocFlag::AddDoc,
+                            Some(StoreSemantics::Insert) => flags |= SubdocDocFlag::AddDoc,
+                            Some(StoreSemantics::Upsert) => flags |= SubdocDocFlag::MkDoc,
                             _ => {}
                         }
 
