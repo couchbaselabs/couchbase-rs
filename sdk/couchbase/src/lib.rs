@@ -7,6 +7,7 @@ pub mod cluster;
 pub mod collection;
 pub mod collection_binary_crud;
 pub mod collection_crud;
+pub mod collection_ds;
 pub mod collections_manager;
 pub mod durability_level;
 pub mod error;
