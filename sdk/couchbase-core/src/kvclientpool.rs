@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use arc_swap::ArcSwap;
-use log::debug;
+use log::{debug, warn};
 use tokio::sync::{Mutex, Notify};
 use tokio::time::{sleep, Instant};
 
@@ -13,6 +13,7 @@ use crate::error::Result;
 use crate::error::{Error, ErrorKind};
 use crate::kvclient::{KvClient, KvClientConfig, KvClientOptions, OnKvClientCloseHandler};
 use crate::kvclient_ops::KvClientOps;
+use crate::log::LogContext;
 use crate::memdx::dispatcher::{Dispatcher, OrphanResponseHandler};
 
 // TODO: This needs some work, some more thought should go into the locking strategy as it's possible
@@ -35,6 +36,7 @@ pub(crate) trait KvClientPool: Sized + Send + Sync {
 pub(crate) struct KvClientPoolConfig {
     pub num_connections: usize,
     pub client_config: KvClientConfig,
+    pub log_context: LogContext,
 }
 
 pub(crate) struct KvClientPoolOptions {
@@ -62,6 +64,8 @@ struct KvClientPoolClientSpawner {
     on_client_close: OnKvClientCloseHandler,
 
     disable_decompression: bool,
+
+    log_context: LogContext,
 }
 
 struct KvClientPoolClientHandler<K: KvClient> {
@@ -75,6 +79,8 @@ struct KvClientPoolClientHandler<K: KvClient> {
     new_client_watcher_notif: Notify,
 
     closed: AtomicBool,
+
+    log_context: LogContext,
 }
 
 pub(crate) struct NaiveKvClientPool<K: KvClient> {
@@ -105,10 +111,16 @@ where
             return Err(ErrorKind::Shutdown.into());
         }
 
+        debug!(context=&self.log_context; "Closing");
+
         let clients = self.clients.lock().await;
         for mut client in clients.iter() {
-            // TODO: probably log
-            client.close().await.unwrap_or_default();
+            match client.close().await {
+                Ok(_) => {}
+                Err(e) => {
+                    debug!(context=&self.log_context, e:err; "Client close failed");
+                }
+            }
         }
 
         drop(clients);
@@ -121,9 +133,13 @@ where
         let mut new_clients = vec![];
         for client in old_clients.iter() {
             if let Err(e) = client.reconfigure(config.client_config.clone()).await {
-                // TODO: log here.
-                dbg!(e);
-                client.close().await.unwrap_or_default();
+                warn!(context=&self.log_context, e:err; "Client reconfigure failed");
+                match client.close().await {
+                    Ok(_) => {}
+                    Err(e) => {
+                        debug!(context=&self.log_context, e:err; "Client close failed");
+                    }
+                }
                 continue;
             };
 
@@ -206,7 +222,11 @@ where
     }
 
     pub async fn handle_client_close(&self, client_id: String) {
-        debug!("Client id {} closed", &client_id);
+        debug!(
+            context = &self.log_context,
+            client_id = &client_id;
+            "Handling client closed",
+        );
 
         // TODO: not sure the ordering of close leading to here is great.
         if self.closed.load(Ordering::SeqCst) {
@@ -242,8 +262,12 @@ where
         drop(clients);
         self.rebuild_fast_map().await;
 
-        // TODO: Should log
-        client.close().await.unwrap_or_default();
+        match client.close().await {
+            Ok(_) => {}
+            Err(e) => {
+                debug!(context=&self.log_context, e:err; "Client close failed");
+            }
+        }
     }
 }
 
@@ -288,6 +312,12 @@ impl KvClientPoolClientSpawner {
                 orphan_handler: self.orphan_handler.clone(),
                 on_close: self.on_client_close.clone(),
                 disable_decompression: self.disable_decompression,
+                log_context: LogContext {
+                    parent_context: Some(Box::new(self.log_context.clone())),
+                    parent_component_type: "kvclientpool".to_string(),
+                    parent_component_id: self.log_context.parent_component_id.clone(),
+                    component_id: LogContext::new_logger_id(),
+                },
             },
         )
         .await
@@ -317,6 +347,7 @@ where
     type Client = K;
 
     async fn new(config: KvClientPoolConfig, opts: KvClientPoolOptions) -> Self {
+        let log_context = config.log_context;
         let mut clients = Arc::new(KvClientPoolClientHandler {
             num_connections: AtomicUsize::new(config.num_connections),
             clients: Arc::new(Default::default()),
@@ -332,10 +363,13 @@ where
                 config: Arc::new(Mutex::new(config.client_config)),
 
                 disable_decompression: opts.disable_decompression,
+
+                log_context: log_context.clone(),
             }),
 
             new_client_watcher_notif: Notify::new(),
             closed: AtomicBool::new(false),
+            log_context,
         });
 
         {

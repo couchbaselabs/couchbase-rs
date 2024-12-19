@@ -31,6 +31,7 @@ mod kvclient;
 mod kvclient_ops;
 mod kvclientmanager;
 mod kvclientpool;
+pub mod log;
 pub mod memdx;
 pub mod mgmtcomponent;
 pub mod mgmtoptions;

@@ -50,12 +50,6 @@ impl ClientPendingOp {
     }
 
     pub async fn cancel(&mut self, e: CancellationErrorKind) {
-        // match self.cancel_chan.send((self.opaque, e)) {
-        //     Ok(_) => {}
-        //     Err(e) => {
-        //         debug!("Failed to send cancel to channel {}", e);
-        //     }
-        // };
         let requests: Arc<Mutex<OpaqueMap>> = Arc::clone(&self.opaque_map);
         let mut map = requests.lock().await;
 
@@ -120,7 +114,7 @@ where
     match timeout_at(deadline, op.recv()).await {
         Ok(res) => res,
         Err(_e) => {
-            op.cancel(CancellationErrorKind::Timeout);
+            op.cancel(CancellationErrorKind::Timeout).await;
             op.recv().await
         }
     }
