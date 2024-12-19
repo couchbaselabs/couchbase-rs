@@ -8,20 +8,7 @@ use std::sync::Arc;
 use std::thread::spawn;
 use std::{env, mem};
 
-use async_trait::async_trait;
-use futures::{SinkExt, TryFutureExt};
-use log::{debug, error, trace, warn};
-use snap::raw::Decoder;
-use tokio::io::{AsyncRead, AsyncWrite, Join, ReadHalf, WriteHalf};
-use tokio::select;
-use tokio::sync::mpsc::unbounded_channel;
-use tokio::sync::mpsc::{Receiver, Sender, UnboundedReceiver, UnboundedSender};
-use tokio::sync::{mpsc, oneshot, Mutex, MutexGuard, RwLock, Semaphore};
-use tokio::task::JoinHandle;
-use tokio_stream::StreamExt;
-use tokio_util::codec::{FramedRead, FramedWrite};
-use uuid::Uuid;
-
+use crate::log::{LogContext, LogContextAware};
 use crate::memdx::client_response::ClientResponse;
 use crate::memdx::codec::KeyValueCodec;
 use crate::memdx::connection::{ConnectionType, Stream};
@@ -35,6 +22,19 @@ use crate::memdx::hello_feature::HelloFeature::DataType;
 use crate::memdx::packet::{RequestPacket, ResponsePacket};
 use crate::memdx::pendingop::ClientPendingOp;
 use crate::memdx::subdoc::SubdocRequestInfo;
+use async_trait::async_trait;
+use futures::{SinkExt, TryFutureExt};
+use log::{debug, error, log, trace, warn};
+use snap::raw::Decoder;
+use tokio::io::{AsyncRead, AsyncWrite, Join, ReadHalf, WriteHalf};
+use tokio::select;
+use tokio::sync::mpsc::unbounded_channel;
+use tokio::sync::mpsc::{Receiver, Sender, UnboundedReceiver, UnboundedSender};
+use tokio::sync::{mpsc, oneshot, Mutex, MutexGuard, RwLock, Semaphore};
+use tokio::task::JoinHandle;
+use tokio_stream::StreamExt;
+use tokio_util::codec::{FramedRead, FramedWrite};
+use uuid::Uuid;
 
 pub(crate) type ResponseSender = Sender<error::Result<ClientResponse>>;
 pub(crate) type OpaqueMap = HashMap<u32, Arc<SenderContext>>;
@@ -44,6 +44,7 @@ pub struct ResponseContext {
     pub cas: Option<u64>,
     pub subdoc_info: Option<SubdocRequestInfo>,
 }
+
 #[derive(Debug, Clone)]
 pub(crate) struct SenderContext {
     pub sender: ResponseSender,
@@ -51,7 +52,7 @@ pub(crate) struct SenderContext {
 }
 
 struct ReadLoopOptions {
-    pub client_id: String,
+    pub logger_context: LogContext,
     pub orphan_handler: OrphanResponseHandler,
     pub on_connection_close_tx: OnConnectionCloseHandler,
     pub on_client_close_rx: Receiver<()>,
@@ -74,8 +75,6 @@ pub struct Client {
     current_opaque: AtomicU32,
     opaque_map: Arc<std::sync::Mutex<OpaqueMap>>,
 
-    client_id: String,
-
     writer: Mutex<FramedWrite<WriteHalf<Box<dyn Stream>>, KeyValueCodec>>,
     read_handle: Mutex<ClientReadHandle>,
     close_tx: Sender<()>,
@@ -84,6 +83,8 @@ pub struct Client {
     peer_addr: SocketAddr,
 
     closed: AtomicBool,
+
+    log_context: LogContext,
 }
 
 impl Client {
@@ -147,11 +148,11 @@ impl Client {
                             match input {
                                 Ok(mut packet) => {
                                     trace!(
-                                        "Resolving response on {}. Opcode={}. Opaque={}. Status={}",
-                                        opts.client_id,
-                                        packet.op_code,
-                                        packet.opaque,
-                                        packet.status,
+                                        context=&opts.logger_context,
+                                        opcode=packet.op_code,
+                                        opaque=&packet.opaque,
+                                        status=packet.status;
+                                        "Resolving response",
                                     );
 
                                     let opaque = packet.opaque;
@@ -183,7 +184,7 @@ impl Client {
                                                             match sender.send(Err(ErrorKind::Json {msg: e.to_string()}.into())).await{
                                                                 Ok(_) => {}
                                                                 Err(e) => {
-                                                                    debug!("Sending response to caller failed: {}", e);
+                                                                    debug!(context = &opts.logger_context, e:err; "Sending response to caller failed");
                                                                 }
                                                             };
                                                          continue;
@@ -200,7 +201,7 @@ impl Client {
                                         match sender.send(Ok(resp)).await {
                                             Ok(_) => {}
                                             Err(e) => {
-                                                debug!("Sending response to caller failed: {}", e);
+                                                debug!(context=&opts.logger_context, e:err; "Sending response to caller failed");
                                             }
                                         };
                                         drop(context);
@@ -228,7 +229,7 @@ impl Client {
                                     drop(requests);
                                 }
                                 Err(e) => {
-                                    warn!("{} failed to read frame {}", opts.client_id, e.to_string());
+                                    warn!(context=&opts.logger_context, e:err; "Failed to read");
                                 }
                             }
                         }
@@ -249,6 +250,12 @@ impl Client {
     }
 }
 
+impl LogContextAware for Client {
+    fn log_context(&self) -> &LogContext {
+        &self.log_context
+    }
+}
+
 #[async_trait]
 impl Dispatcher for Client {
     fn new(conn: ConnectionType, opts: DispatcherOptions) -> Self {
@@ -261,25 +268,24 @@ impl Dispatcher for Client {
         let reader = FramedRead::new(r, codec);
         let writer = FramedWrite::new(w, codec);
 
-        let uuid = Uuid::new_v4().to_string();
-
         let (close_tx, close_rx) = mpsc::channel::<()>(1);
 
         let opaque_map = Arc::new(std::sync::Mutex::new(OpaqueMap::default()));
 
         let read_opaque_map = Arc::clone(&opaque_map);
-        let read_uuid = uuid.clone();
+
+        let logger_context_clone = opts.log_context.clone();
 
         let read_handle = tokio::spawn(async move {
             Client::read_loop(
                 reader,
                 read_opaque_map,
                 ReadLoopOptions {
-                    client_id: read_uuid,
                     orphan_handler: opts.orphan_handler,
                     on_connection_close_tx: opts.on_connection_close_handler,
                     on_client_close_rx: close_rx,
                     disable_decompression: opts.disable_decompression,
+                    logger_context: logger_context_clone,
                 },
             )
             .await;
@@ -288,7 +294,6 @@ impl Dispatcher for Client {
         Self {
             current_opaque: AtomicU32::new(1),
             opaque_map,
-            client_id: uuid,
 
             close_tx,
 
@@ -299,6 +304,8 @@ impl Dispatcher for Client {
             peer_addr,
 
             closed: AtomicBool::new(false),
+
+            log_context: opts.log_context,
         }
     }
 
@@ -319,10 +326,10 @@ impl Dispatcher for Client {
         let op_code = packet.op_code;
 
         trace!(
-            "Writing request on {}. Opcode={}. Opaque={}",
-            &self.client_id,
-            packet.op_code,
-            opaque,
+            context=&self.log_context,
+            opcode=packet.op_code,
+            opaque=opaque;
+            "Writing request",
         );
 
         let mut writer = self.writer.lock().await;
@@ -334,8 +341,8 @@ impl Dispatcher for Client {
             )),
             Err(e) => {
                 debug!(
-                    "{} failed to write packet {} {} {}",
-                    self.client_id, opaque, op_code, e
+                    context=&self.log_context, e:err; "Failed to write packet {} {}",
+                    opaque, op_code,
                 );
 
                 let requests: Arc<std::sync::Mutex<OpaqueMap>> = Arc::clone(&self.opaque_map);
@@ -353,6 +360,7 @@ impl Dispatcher for Client {
         if self.closed.swap(true, Ordering::SeqCst) {
             return Ok(());
         }
+        debug!(context=&self.log_context; "Closing");
 
         let mut close_err = None;
         let mut writer = self.writer.lock().await;

@@ -1,3 +1,4 @@
+use log::kv::ToValue;
 use std::fmt::{Display, Formatter, LowerHex};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -201,5 +202,11 @@ impl Display for Status {
         };
 
         write!(f, "{}", txt)
+    }
+}
+
+impl ToValue for Status {
+    fn to_value(&self) -> log::kv::Value {
+        log::kv::Value::from_display(self)
     }
 }

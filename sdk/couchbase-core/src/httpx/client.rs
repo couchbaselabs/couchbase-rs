@@ -4,6 +4,7 @@ use crate::httpx::error::ErrorKind::{Connect, Generic};
 use crate::httpx::error::Result as HttpxResult;
 use crate::httpx::request::{Auth, OboPasswordOrDomain, Request};
 use crate::httpx::response::Response;
+use crate::log::LogContext;
 use crate::tls_config::TlsConfig;
 use arc_swap::ArcSwap;
 use async_trait::async_trait;
@@ -28,18 +29,24 @@ pub struct ClientConfig {
     pub tls_config: Option<TlsConfig>,
 }
 
+#[derive(Clone, Debug, TypedBuilder)]
+#[non_exhaustive]
+pub struct ClientOptions {
+    pub log_context: LogContext,
+}
+
 #[derive(Debug)]
 pub struct ReqwestClient {
     inner: ArcSwap<reqwest::Client>,
-    client_id: String,
+    log_context: LogContext,
 }
 
 impl ReqwestClient {
-    pub fn new(cfg: ClientConfig) -> HttpxResult<Self> {
+    pub fn new(cfg: ClientConfig, opts: ClientOptions) -> HttpxResult<Self> {
         let inner = Self::new_client(cfg)?;
         Ok(Self {
             inner: ArcSwap::from_pointee(inner),
-            client_id: Uuid::new_v4().to_string(),
+            log_context: opts.log_context,
         })
     }
 
@@ -88,15 +95,16 @@ impl Client for ReqwestClient {
         let inner = self.inner.load();
 
         let id = req.unique_id;
+        let method = req.method;
         trace!(
-            "Writing request on {} to {}. Method={}. Request id={}",
-            &self.client_id,
-            &req.uri,
-            &req.method,
-            &id
+            context=&self.log_context,
+            uri = &req.uri,
+            method:%,
+            request_id=&id;
+            "Writing request.",
         );
 
-        let mut builder = inner.request(req.method, req.uri);
+        let mut builder = inner.request(method, req.uri);
 
         if let Some(body) = req.body {
             builder = builder.body(body);
@@ -136,32 +144,27 @@ impl Client for ReqwestClient {
 
         match builder.send().await {
             Ok(response) => Ok({
+                let status = response.status();
                 trace!(
-                    "Received response on {}. Request id={}. Status: {}",
-                    &self.client_id,
-                    &id,
-                    response.status()
+                context=&self.log_context,
+                request_id=&id,
+                status:%;
+                    "Received response"
                 );
                 Response::from(response)
             }),
             // TODO improve error handling
-            Err(err) => {
+            Err(e) => {
                 trace!(
-                    "Received error on {}. Request id={}. Err: {}",
-                    &self.client_id,
-                    &id,
-                    &err,
+                context=&self.log_context,
+                request_id=&id,
+                    e:err;
+                    "Received error",
                 );
-                if err.is_connect() {
-                    Err(Connect {
-                        msg: err.to_string(),
-                    }
-                    .into())
+                if e.is_connect() {
+                    Err(Connect { msg: e.to_string() }.into())
                 } else {
-                    Err(Generic {
-                        msg: err.to_string(),
-                    }
-                    .into())
+                    Err(Generic { msg: e.to_string() }.into())
                 }
             }
         }

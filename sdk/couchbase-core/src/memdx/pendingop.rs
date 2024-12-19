@@ -117,7 +117,7 @@ where
     match timeout_at(deadline, op.recv()).await {
         Ok(res) => res,
         Err(_e) => {
-            op.cancel(CancellationErrorKind::Timeout);
+            op.cancel(CancellationErrorKind::Timeout).await;
             op.recv().await
         }
     }

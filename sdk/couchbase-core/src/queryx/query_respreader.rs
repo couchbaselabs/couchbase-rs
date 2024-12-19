@@ -1,25 +1,16 @@
-use std::pin::{pin, Pin};
-use std::ptr::read;
-use std::sync::Arc;
+use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
-use arc_swap::ArcSwap;
-use async_trait::async_trait;
 use bytes::Bytes;
-use futures::future::err;
-use futures::{FutureExt, Stream, StreamExt, TryStreamExt};
+use futures::{Stream, StreamExt, TryStreamExt};
 use http::StatusCode;
-use log::debug;
 use regex::Regex;
-use tokio::sync::Mutex;
 
 use crate::helpers::durations::parse_duration_from_golang_string;
-use crate::httpx::error::ErrorKind::Generic;
 use crate::httpx::json_row_stream::JsonRowStream;
 use crate::httpx::raw_json_row_streamer::RawJsonRowStreamer;
 use crate::httpx::response::Response;
-use crate::memdx::magic::Magic::Res;
 use crate::queryx::error;
 use crate::queryx::error::{
     Error, ErrorDesc, ErrorKind, ResourceError, ServerError, ServerErrorKind,
@@ -86,7 +77,6 @@ impl QueryRespReader {
             let body = match resp.bytes().await {
                 Ok(b) => b,
                 Err(e) => {
-                    debug!("Failed to read response body on error {}", e);
                     return Err(Error::new_server_error(
                         ServerError::new(
                             ServerErrorKind::Unknown { msg: e.to_string() },

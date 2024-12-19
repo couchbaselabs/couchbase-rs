@@ -88,7 +88,7 @@ impl OpBootstrap {
                 {
                     Ok(r) => Some(r),
                     Err(e) => {
-                        warn!("Hello failed {}", e);
+                        warn!(context=dispatcher.log_context(), e:err; "Hello failed");
                         None
                     }
                 };
@@ -103,7 +103,7 @@ impl OpBootstrap {
             {
                 Ok(r) => Some(r),
                 Err(e) => {
-                    warn!("Get error map failed {}", e);
+                    warn!(context=dispatcher.log_context(), e:err; "Get error map failed");
                     None
                 }
             };
@@ -116,7 +116,7 @@ impl OpBootstrap {
             {
                 Ok(_) => {}
                 Err(e) => {
-                    warn!("Auth failed {}", e);
+                    warn!(context=dispatcher.log_context(), e:err; "Auth failed");
                     return Err(e);
                 }
             };
@@ -128,7 +128,7 @@ impl OpBootstrap {
             {
                 Ok(r) => Some(r),
                 Err(e) => {
-                    warn!("Select bucket failed {}", e);
+                    warn!(context=dispatcher.log_context(), e:err; "Select bucket failed");
                     return Err(e);
                 }
             };
@@ -143,7 +143,10 @@ impl OpBootstrap {
             {
                 Ok(r) => Some(r),
                 Err(e) => {
-                    warn!("Get cluster config failed {}", e);
+                    warn!(
+                        context=dispatcher.log_context(), e:err;
+                        "Get cluster config failed",
+                    );
                     None
                 }
             }

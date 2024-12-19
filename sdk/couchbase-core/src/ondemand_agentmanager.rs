@@ -12,6 +12,7 @@ use crate::agentoptions::{AgentOptions, CompressionConfig, ConfigPollerConfig, S
 use crate::authenticator::Authenticator;
 use crate::error;
 use crate::error::ErrorKind;
+use crate::log::LogContext;
 use crate::tls_config::TlsConfig;
 
 #[derive(Clone, TypedBuilder)]
@@ -46,6 +47,7 @@ impl From<OnDemandAgentManagerOptions> for AgentOptions {
             seed_config: opts.seed_config,
             compression_config: opts.compression_config,
             config_poller_config: opts.config_poller_config,
+            log_context: None,
         }
     }
 }
@@ -71,12 +73,22 @@ pub struct OnDemandAgentManager {
     slow_map: Mutex<HashMap<String, Agent>>,
     notif_map: Mutex<HashMap<String, Arc<Notify>>>,
 
+    manager_id: String,
     closed: std::sync::Mutex<bool>,
 }
 
 impl OnDemandAgentManager {
     pub async fn new(opts: OnDemandAgentManagerOptions) -> error::Result<Self> {
-        let cluster_agent = Agent::new(opts.clone().into()).await?;
+        let mut agent_opts: AgentOptions = opts.clone().into();
+        let manager_id = LogContext::new_logger_id();
+        agent_opts.log_context = Some(LogContext {
+            parent_context: None,
+            parent_component_type: "agent_mgr".to_string(),
+            parent_component_id: manager_id.clone(),
+            component_id: LogContext::new_logger_id(),
+        });
+
+        let cluster_agent = Agent::new(agent_opts).await?;
 
         Ok(Self {
             opts,
@@ -85,6 +97,7 @@ impl OnDemandAgentManager {
             slow_map: Default::default(),
             notif_map: Default::default(),
             closed: Default::default(),
+            manager_id,
         })
     }
 
@@ -129,8 +142,9 @@ impl OnDemandAgentManager {
             }
 
             debug!(
-                "Bucket name {} not in slow map, checking notif map",
-                &bucket_name
+                manager_id = &self.manager_id,
+                bucket_name = &bucket_name;
+                "Bucket name not in slow map, checking notif map",
             );
             // If we don't have an agent then check the notif map to see if someone else is getting
             // an agent already. Note that we're still inside the slow_map lock here.
@@ -140,13 +154,22 @@ impl OnDemandAgentManager {
                 drop(slow_map);
                 drop(notif_map);
 
-                debug!("Bucket name {} in notif map, awaiting update", &bucket_name);
+                debug!(
+                    manager_id = &self.manager_id,
+                    bucket_name = &bucket_name;
+                    "Bucket name in notif map, awaiting update");
                 notif.notified().await;
-                debug!("Bucket name {} received updated", &bucket_name);
+                debug!(
+                    manager_id = &self.manager_id,
+                    bucket_name = &bucket_name;
+                    "Bucket name received updated");
                 return Box::pin(self.get_bucket_agent_slow(bucket_name)).await;
             };
 
-            debug!("Bucket name {} not in any map, creating new", &bucket_name);
+            debug!(
+                manager_id = &self.manager_id,
+                bucket_name = &bucket_name;
+                "Bucket name not in any map, creating new");
             let notif = Arc::new(Notify::new());
             notif_map.insert(bucket_name.clone(), notif.clone());
 
@@ -155,6 +178,12 @@ impl OnDemandAgentManager {
 
         let mut opts: AgentOptions = self.opts.clone().into();
         opts.bucket_name = Some(bucket_name.clone());
+        opts.log_context = Some(LogContext {
+            parent_context: None,
+            parent_component_type: "agent_mgr".to_string(),
+            parent_component_id: self.manager_id.clone(),
+            component_id: LogContext::new_logger_id(),
+        });
 
         let agent = Agent::new(opts).await?;
 

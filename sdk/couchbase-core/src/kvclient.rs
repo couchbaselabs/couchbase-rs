@@ -8,11 +8,11 @@ use std::time::Duration;
 use futures::future::BoxFuture;
 use tokio::sync::Mutex;
 use tokio::time::Instant;
-use uuid::Uuid;
 
 use crate::authenticator::Authenticator;
 use crate::error::Result;
 use crate::error::{Error, ErrorKind};
+use crate::log::LogContext;
 use crate::memdx::auth_mechanism::AuthMechanism;
 use crate::memdx::connection::{ConnectOptions, ConnectionType, TcpConnection, TlsConnection};
 use crate::memdx::dispatcher::{Dispatcher, DispatcherOptions, OrphanResponseHandler};
@@ -58,6 +58,7 @@ pub(crate) struct KvClientOptions {
     pub orphan_handler: OrphanResponseHandler,
     pub on_close: OnKvClientCloseHandler,
     pub disable_decompression: bool,
+    pub log_context: LogContext,
 }
 
 pub(crate) trait KvClient: Sized + PartialEq + Send + Sync {
@@ -93,7 +94,7 @@ pub(crate) struct StdKvClient<D: Dispatcher> {
     // asynchronously and we do not support changing selected buckets.
     selected_bucket: Mutex<Option<String>>,
 
-    id: String,
+    log_context: LogContext,
 }
 
 impl<D> StdKvClient<D>
@@ -181,8 +182,7 @@ where
 
         let closed = Arc::new(AtomicBool::new(false));
         let closed_clone = closed.clone();
-        let id = Uuid::new_v4().to_string();
-        let read_id = id.clone();
+        let read_id = opts.log_context.component_id.clone();
 
         let on_close = opts.on_close.clone();
         let memdx_client_opts = DispatcherOptions {
@@ -198,6 +198,12 @@ where
             }),
             orphan_handler: opts.orphan_handler,
             disable_decompression: opts.disable_decompression,
+            log_context: LogContext {
+                parent_context: Some(Box::new(opts.log_context.clone())),
+                parent_component_type: "kvclient".to_string(),
+                parent_component_id: opts.log_context.component_id.clone(),
+                component_id: LogContext::new_logger_id(),
+            },
         };
 
         let conn = if let Some(tls) = config.tls.clone() {
@@ -248,7 +254,7 @@ where
             current_config: Mutex::new(config),
             supported_features: vec![],
             selected_bucket: Mutex::new(None),
-            id: id.clone(),
+            log_context: opts.log_context,
         };
 
         if should_bootstrap {
@@ -371,7 +377,7 @@ where
     }
 
     fn id(&self) -> &str {
-        &self.id
+        &self.log_context.component_id
     }
 }
 
@@ -380,6 +386,6 @@ where
     D: Dispatcher,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
+        self.id() == other.id()
     }
 }

@@ -3,15 +3,16 @@ use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 
-use arc_swap::ArcSwap;
-use tokio::sync::Mutex;
-
 use crate::error::ErrorKind;
 use crate::error::Result;
 use crate::kvclient::{KvClient, KvClientConfig};
 use crate::kvclient_ops::KvClientOps;
 use crate::kvclientpool::{KvClientPool, KvClientPoolConfig, KvClientPoolOptions};
+use crate::log::LogContext;
 use crate::memdx::dispatcher::OrphanResponseHandler;
+use arc_swap::ArcSwap;
+use log::debug;
+use tokio::sync::Mutex;
 
 pub(crate) type KvClientManagerClientType<M> =
     <<M as KvClientManager>::Pool as KvClientPool>::Client;
@@ -51,6 +52,7 @@ pub(crate) struct KvClientManagerOptions {
     pub connect_throttle_period: Duration,
     pub orphan_handler: OrphanResponseHandler,
     pub disable_decompression: bool,
+    pub log_context: LogContext,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -168,6 +170,12 @@ where
             let pool_config = KvClientPoolConfig {
                 num_connections: config.num_pool_connections,
                 client_config: endpoint_config,
+                log_context: LogContext {
+                    parent_context: Some(Box::new(self.opts.log_context.clone())),
+                    parent_component_type: "kvclientmanager".to_string(),
+                    parent_component_id: self.opts.log_context.component_id.clone(),
+                    component_id: LogContext::new_logger_id(),
+                },
             };
 
             let old_pool = old_pools.remove(&endpoint);
@@ -256,6 +264,7 @@ where
 pub(crate) async fn orchestrate_memd_client<Resp, M, Fut>(
     manager: Arc<M>,
     endpoint: String,
+    log_context: &LogContext,
     mut operation: impl FnMut(Arc<KvClientManagerClientType<M>>) -> Fut,
 ) -> Result<Resp>
 where
@@ -271,9 +280,7 @@ where
             Err(e) => {
                 if let Some(memdx_err) = e.is_memdx_error() {
                     if memdx_err.is_dispatch_error() {
-                        // This was a dispatch error, so we can just try with
-                        // a different client instead...
-                        // TODO: Log something
+                        debug!(context=&log_context, e:err; "Dispatch error, retrying with a different client");
                         manager
                             .shutdown_client(Some(endpoint.clone()), client)
                             .await
@@ -290,6 +297,7 @@ where
 
 pub(crate) async fn orchestrate_random_memd_client<Resp, M, Fut>(
     manager: Arc<M>,
+    log_context: &LogContext,
     mut operation: impl FnMut(Arc<KvClientManagerClientType<M>>) -> Fut,
 ) -> Result<Resp>
 where
@@ -305,9 +313,7 @@ where
             Err(e) => {
                 if let Some(memdx_err) = e.is_memdx_error() {
                     if memdx_err.is_dispatch_error() {
-                        // This was a dispatch error, so we can just try with
-                        // a different client instead...
-                        // TODO: Log something
+                        debug!(context=&log_context, e:err; "Dispatch error, retrying with a different client");
                         manager
                             .shutdown_client(None, client)
                             .await

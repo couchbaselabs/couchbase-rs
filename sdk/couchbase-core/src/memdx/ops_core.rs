@@ -72,7 +72,7 @@ impl OpBootstrapEncoder for OpsCore {
     {
         let mut features: Vec<u8> = Vec::new();
         for feature in request.requested_features {
-            features.write_u16::<BigEndian>(feature.into()).unwrap();
+            features.write_u16::<BigEndian>(feature.into())?;
         }
 
         let op = dispatcher
@@ -105,7 +105,7 @@ impl OpBootstrapEncoder for OpsCore {
         D: Dispatcher,
     {
         let mut value = Vec::new();
-        value.write_u16::<BigEndian>(request.version).unwrap();
+        value.write_u16::<BigEndian>(request.version)?;
 
         let op = dispatcher
             .dispatch(
@@ -137,7 +137,7 @@ impl OpBootstrapEncoder for OpsCore {
         D: Dispatcher,
     {
         let mut key = Vec::new();
-        key.write_all(request.bucket_name.as_bytes()).unwrap();
+        key.write_all(request.bucket_name.as_bytes())?;
 
         let op = dispatcher
             .dispatch(
@@ -200,7 +200,7 @@ impl OpSASLPlainEncoder for OpsCore {
         D: Dispatcher,
     {
         let mut value = Vec::new();
-        value.write_all(request.payload.as_slice()).unwrap();
+        value.write_all(request.payload.as_slice())?;
 
         let op = dispatcher
             .dispatch(
@@ -267,7 +267,7 @@ impl OpSASLScramEncoder for OpsCore {
         D: Dispatcher,
     {
         let mut value = Vec::new();
-        value.write_all(request.payload.as_slice()).unwrap();
+        value.write_all(request.payload.as_slice())?;
 
         let op = dispatcher
             .dispatch(

@@ -2,8 +2,6 @@ use std::fmt::Debug;
 use std::future::Future;
 use std::sync::Arc;
 
-use futures::{FutureExt, TryFutureExt};
-
 use crate::collectionresolver::{orchestrate_memd_collection_id, CollectionResolver};
 use crate::compressionmanager::{CompressionManager, Compressor};
 use crate::crudoptions::{
@@ -20,6 +18,7 @@ use crate::error::Result;
 use crate::kvclient::KvClient;
 use crate::kvclient_ops::KvClientOps;
 use crate::kvclientmanager::{orchestrate_memd_client, KvClientManager, KvClientManagerClientType};
+use crate::log::LogContext;
 use crate::memdx::datatype::DataTypeFlag;
 use crate::memdx::hello_feature::HelloFeature;
 use crate::memdx::request::{
@@ -31,6 +30,7 @@ use crate::mutationtoken::MutationToken;
 use crate::nmvbhandler::NotMyVbucketConfigHandler;
 use crate::retry::{orchestrate_retries, RetryInfo, RetryManager};
 use crate::vbucketrouter::{orchestrate_memd_routing, VbucketRouter};
+use futures::{FutureExt, TryFutureExt};
 
 pub(crate) struct CrudComponent<
     M: KvClientManager,
@@ -45,6 +45,8 @@ pub(crate) struct CrudComponent<
     collections: Arc<C>,
     retry_manager: Arc<RetryManager>,
     compression_manager: Arc<CompressionManager<Comp>>,
+
+    log_context: LogContext,
 }
 
 // TODO: So much clone.
@@ -63,6 +65,7 @@ impl<
         collections: Arc<C>,
         retry_manager: Arc<RetryManager>,
         compression_manager: Arc<CompressionManager<Comp>>,
+        log_context: LogContext,
     ) -> Self {
         CrudComponent {
             conn_manager,
@@ -71,6 +74,7 @@ impl<
             collections,
             retry_manager,
             compression_manager,
+            log_context,
         }
     }
 
@@ -692,6 +696,7 @@ impl<
                             orchestrate_memd_client(
                                 self.conn_manager.clone(),
                                 endpoint.clone(),
+                                &self.log_context,
                                 async |client: Arc<KvClientManagerClientType<M>>| {
                                     operation(
                                         collection_id,

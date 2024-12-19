@@ -6,13 +6,10 @@ use crate::httpx::json_row_stream::JsonRowStream;
 use crate::httpx::raw_json_row_streamer::RawJsonRowStreamer;
 use crate::httpx::response::Response;
 use bytes::Bytes;
-use futures::future::err;
 use futures::StreamExt;
 use futures_core::Stream;
 use http::StatusCode;
-use log::debug;
 use serde::Deserialize;
-use std::fmt::format;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
@@ -36,7 +33,7 @@ pub struct QueryRespReader {
 
     streamer: Option<RawJsonRowStreamer>,
     meta_data: Option<MetaData>,
-    meta_data_error: Option<error::Error>,
+    meta_data_error: Option<Error>,
 }
 
 impl Stream for QueryRespReader {
@@ -52,7 +49,7 @@ impl Stream for QueryRespReader {
 
         match streamer.poll_next_unpin(cx) {
             Poll::Ready(Some(Ok(row_data))) => Poll::Ready(Some(Ok(Bytes::from(row_data)))),
-            Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(error::Error::new_generic_error(
+            Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(Error::new_generic_error(
                 e.to_string(),
                 &this.endpoint,
                 &this.statement,
@@ -79,8 +76,7 @@ impl QueryRespReader {
             let body = match resp.bytes().await {
                 Ok(b) => b,
                 Err(e) => {
-                    debug!("Failed to read response body on error {}", e);
-                    return Err(error::Error {
+                    return Err(Error {
                         kind: Box::new(ErrorKind::Generic { msg: e.to_string() }),
                         source: Some(Arc::new(e)),
                         endpoint: endpoint.into(),
@@ -94,7 +90,7 @@ impl QueryRespReader {
             let errors: QueryErrorResponse = match serde_json::from_slice(&body) {
                 Ok(e) => e,
                 Err(e) => {
-                    return Err(error::Error {
+                    return Err(Error {
                         kind: Box::new(ErrorKind::Generic { msg: format!(
                             "non-200 status code received {} but parsing error response body failed {}",
                             status_code,
@@ -110,7 +106,7 @@ impl QueryRespReader {
             };
 
             if errors.errors.is_empty() {
-                return Err(error::Error {
+                return Err(Error {
                     kind: Box::new(ErrorKind::Generic {
                         msg: format!(
                             "Non-200 status code received {} but response body contained no errors",

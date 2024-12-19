@@ -1,14 +1,14 @@
+use crate::common::test_config::{setup_tests, test_mem_addrs, test_password, test_username};
 use bytes::Bytes;
-use couchbase_core::httpx::client::{Client, ClientConfig, ReqwestClient};
+use couchbase_core::httpx::client::{Client, ClientConfig, ClientOptions, ReqwestClient};
 use couchbase_core::httpx::json_row_stream::JsonRowStream;
 use couchbase_core::httpx::raw_json_row_streamer::RawJsonRowStreamer;
 use couchbase_core::httpx::request::{Auth, BasicAuth, Request};
+use couchbase_core::log::LogContext;
 use http::Method;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use tokio_stream::StreamExt;
-
-use crate::common::test_config::{setup_tests, test_mem_addrs, test_password, test_username};
 
 mod common;
 
@@ -50,7 +50,18 @@ async fn test_row_streamer() {
         .body(Bytes::from(serde_json::to_vec(&request_body).unwrap()))
         .build();
 
-    let client = ReqwestClient::new(ClientConfig::default()).unwrap();
+    let client = ReqwestClient::new(
+        ClientConfig::default(),
+        ClientOptions::builder()
+            .log_context(LogContext {
+                parent_context: None,
+                parent_component_type: "".to_string(),
+                parent_component_id: "".to_string(),
+                component_id: "".to_string(),
+            })
+            .build(),
+    )
+    .unwrap();
 
     let resp = client.execute(request).await.unwrap();
 
@@ -118,7 +129,18 @@ async fn test_json_block_read() {
         .uri(uri.as_str())
         .build();
 
-    let client = ReqwestClient::new(ClientConfig::default()).expect("could not create client");
+    let client = ReqwestClient::new(
+        ClientConfig::default(),
+        ClientOptions::builder()
+            .log_context(LogContext {
+                parent_context: None,
+                parent_component_type: "".to_string(),
+                parent_component_id: "".to_string(),
+                component_id: "".to_string(),
+            })
+            .build(),
+    )
+    .expect("could not create client");
 
     let res = client.execute(request).await.expect("Failed http request");
 

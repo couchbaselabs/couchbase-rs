@@ -1,6 +1,6 @@
-use std::fmt::{Display, Formatter};
-
 use crate::memdx::error::Error;
+use log::kv::{ToValue, Value};
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum OpCode {
@@ -182,5 +182,11 @@ impl Display for OpCode {
             }
         };
         write!(f, "{}", txt)
+    }
+}
+
+impl ToValue for OpCode {
+    fn to_value(&self) -> Value {
+        Value::from_display(self)
     }
 }

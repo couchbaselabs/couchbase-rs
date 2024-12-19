@@ -26,6 +26,9 @@ pub struct AgentOptions {
     pub compression_config: CompressionConfig,
     #[builder(default)]
     pub config_poller_config: ConfigPollerConfig,
+
+    #[builder(default)]
+    pub(crate) log_context: Option<crate::log::LogContext>,
 }
 
 #[derive(Default, Clone, Debug, PartialEq, TypedBuilder)]
