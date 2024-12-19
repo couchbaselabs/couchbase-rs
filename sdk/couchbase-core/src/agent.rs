@@ -1,18 +1,10 @@
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::net::ToSocketAddrs;
 use std::ops::Add;
 use std::sync::Arc;
 use std::time::Duration;
-
-use futures::executor::block_on;
-use log::{debug, error, info, warn};
-use tokio::net;
-use tokio::runtime::{Handle, Runtime};
-use tokio::sync::broadcast::{Receiver, Sender};
-use tokio::sync::{broadcast, mpsc, Mutex};
-use tokio::task::JoinHandle;
-use tokio::time::{sleep, timeout, timeout_at, Instant};
 
 use crate::agentoptions::AgentOptions;
 use crate::analyticscomponent::{
@@ -33,7 +25,7 @@ use crate::crudcomponent::CrudComponent;
 use crate::error::{Error, ErrorKind, Result};
 use crate::features::BucketFeature;
 use crate::httpcomponent::HttpComponent;
-use crate::httpx::client::{ClientConfig, ReqwestClient};
+use crate::httpx::client::{ClientConfig, ClientOptions, ReqwestClient};
 use crate::kvclient::{KvClient, KvClientConfig, KvClientOptions, StdKvClient};
 use crate::kvclient_ops::KvClientOps;
 use crate::kvclientmanager::{
@@ -42,6 +34,7 @@ use crate::kvclientmanager::{
 use crate::kvclientpool::{
     KvClientPool, KvClientPoolConfig, KvClientPoolOptions, NaiveKvClientPool,
 };
+use crate::log::{LogContext, LogContextOrAgentId};
 use crate::memdx::client::Client;
 use crate::memdx::request::GetClusterConfigRequest;
 use crate::mgmtcomponent::{MgmtComponent, MgmtComponentConfig, MgmtComponentOptions};
@@ -59,6 +52,16 @@ use crate::vbucketrouter::{
     StdVbucketRouter, VbucketRouter, VbucketRouterOptions, VbucketRoutingInfo,
 };
 use crate::{httpx, mgmtx};
+use futures::executor::block_on;
+use log::kv::{ToValue, Value};
+use log::{debug, error, info, warn};
+use tokio::net;
+use tokio::runtime::{Handle, Runtime};
+use tokio::sync::broadcast::{Receiver, Sender};
+use tokio::sync::{broadcast, mpsc, Mutex};
+use tokio::task::JoinHandle;
+use tokio::time::{sleep, timeout, timeout_at, Instant};
+use uuid::Uuid;
 
 #[derive(Clone)]
 struct AgentState {
@@ -86,6 +89,8 @@ pub(crate) struct AgentInner {
     collections: Arc<AgentCollectionResolver>,
     retry_manager: Arc<RetryManager>,
     http_client: Arc<ReqwestClient>,
+
+    log_context: LogContextOrAgentId,
 
     pub(crate) crud: CrudComponent<
         AgentClientManager,
@@ -124,7 +129,7 @@ impl AgentInner {
     pub async fn apply_config(&self, config: ParsedConfig) {
         let mut state = self.state.lock().await;
 
-        if !Self::can_update_config(&config, &state.latest_config) {
+        if !self.can_update_config(&config, &state.latest_config) {
             return;
         }
 
@@ -164,8 +169,9 @@ impl AgentInner {
             .await
         {
             error!(
-                "Failed to reconfigure connection manager (old clients); {}",
-                e.to_string()
+                context=&self.log_context,
+                e:err;
+                "Failed to reconfigure connection manager (old clients)",
             );
         };
 
@@ -177,8 +183,9 @@ impl AgentInner {
             .reconfigure(agent_component_configs.config_watcher_memd_config)
         {
             error!(
-                "Failed to reconfigure memd config watcher component; {}",
-                e.to_string()
+                context=&self.log_context,
+                e:err;
+                "Failed to reconfigure memd config watcher component",
             );
         }
 
@@ -191,8 +198,9 @@ impl AgentInner {
             .await
         {
             error!(
-                "Failed to reconfigure connection manager (updated clients); {}",
-                e.to_string()
+                context=&self.log_context,
+                e:err;
+                "Failed to reconfigure connection manager (updated clients)",
             );
         }
 
@@ -200,7 +208,10 @@ impl AgentInner {
             .http_client
             .reconfigure(agent_component_configs.http_client_config)
         {
-            error!("Failed to reconfigure http client: {}", e.to_string());
+            error!(
+                context=&self.log_context,
+                e:err;
+                "Failed to reconfigure http client");
         }
 
         self.query.reconfigure(agent_component_configs.query_config);
@@ -211,15 +222,24 @@ impl AgentInner {
         self.mgmt.reconfigure(agent_component_configs.mgmt_config);
     }
 
-    fn can_update_config(new_config: &ParsedConfig, old_config: &ParsedConfig) -> bool {
+    fn can_update_config(&self, new_config: &ParsedConfig, old_config: &ParsedConfig) -> bool {
         if new_config.bucket != old_config.bucket {
-            debug!("Switching config due to changed bucket type (bucket takeover)");
+            debug!(
+                context = &self.log_context;
+                "Switching config due to changed bucket type (bucket takeover)"
+            );
             return true;
         } else if let Some(cmp) = new_config.partial_cmp(old_config) {
             if cmp == Ordering::Less {
-                debug!("Skipping config due to new config being an older revision")
+                debug!(
+                context = &self.log_context;
+                    "Skipping config due to new config being an older revision"
+                )
             } else if cmp == Ordering::Equal {
-                debug!("Skipping config due to matching revisions")
+                debug!(
+                context = &self.log_context;
+                    "Skipping config due to matching revisions"
+                )
             } else {
                 return true;
             }
@@ -410,7 +430,12 @@ impl ConfigUpdater for AgentInner {
 impl Agent {
     pub async fn new(opts: AgentOptions) -> Result<Self> {
         let build_version = env!("CARGO_PKG_VERSION");
-        let client_name = format!("couchbase-rs-core {}", build_version);
+        let client_name = format!("couchbase-rs-core-{}", build_version,);
+
+        let log_context = match opts.log_context {
+            Some(lc) => LogContextOrAgentId::LogContext(lc),
+            None => LogContextOrAgentId::AgentId(LogContext::new_logger_id()),
+        };
 
         let mut state = AgentState {
             bucket: opts.bucket_name,
@@ -426,9 +451,21 @@ impl Agent {
         let connect_timeout = opts.connect_timeout.unwrap_or(Duration::from_secs(7));
         let connect_throttle_period = opts.connect_timeout.unwrap_or(Duration::from_secs(5));
 
-        let http_client = Arc::new(ReqwestClient::new(ClientConfig {
-            tls_config: state.tls_config.clone(),
-        })?);
+        let parent_context: Option<Box<LogContext>> = (&log_context).into();
+
+        let http_client = Arc::new(ReqwestClient::new(
+            ClientConfig {
+                tls_config: state.tls_config.clone(),
+            },
+            ClientOptions {
+                log_context: LogContext {
+                    parent_context: parent_context.clone(),
+                    parent_component_id: log_context.logger_id().to_string(),
+                    parent_component_type: "agent".to_string(),
+                    component_id: LogContext::new_logger_id(),
+                },
+            },
+        )?);
 
         let first_kv_client_configs =
             Self::gen_first_kv_client_configs(&opts.seed_config.memd_addrs, &state);
@@ -439,6 +476,7 @@ impl Agent {
             first_http_client_configs,
             http_client.clone(),
             connect_timeout,
+            &log_context,
         )
         .await?;
 
@@ -462,6 +500,12 @@ impl Agent {
                         info!("Orphan : {:?}", packet);
                     }),
                     disable_decompression: opts.compression_config.disable_decompression,
+                    log_context: LogContext {
+                        parent_context: parent_context.clone(),
+                        parent_component_id: log_context.logger_id().to_string(),
+                        parent_component_type: "agent".to_string(),
+                        component_id: LogContext::new_logger_id(),
+                    },
                 },
             )
             .await?,
@@ -472,6 +516,12 @@ impl Agent {
             ConfigWatcherMemdOptions {
                 polling_period: opts.config_poller_config.poll_interval,
                 kv_client_manager: conn_mgr.clone(),
+                log_context: LogContext {
+                    parent_context: parent_context.clone(),
+                    parent_component_id: log_context.logger_id().to_string(),
+                    parent_component_type: "agent".to_string(),
+                    component_id: LogContext::new_logger_id(),
+                },
             },
         ));
         let vb_router = Arc::new(StdVbucketRouter::new(
@@ -483,6 +533,12 @@ impl Agent {
 
         let memd_resolver = CollectionResolverMemd::new(CollectionResolverMemdOptions {
             conn_mgr: conn_mgr.clone(),
+            log_context: LogContext {
+                parent_context: parent_context.clone(),
+                parent_component_id: log_context.logger_id().to_string(),
+                parent_component_type: "agent".to_string(),
+                component_id: LogContext::new_logger_id(),
+            },
         });
 
         let collections = Arc::new(CollectionResolverCached::new(
@@ -501,6 +557,12 @@ impl Agent {
             collections.clone(),
             retry_manager.clone(),
             compression_manager,
+            LogContext {
+                parent_context: None,
+                parent_component_id: log_context.logger_id().to_string(),
+                parent_component_type: "agent".to_string(),
+                component_id: LogContext::new_logger_id(),
+            },
         );
 
         let mgmt = MgmtComponent::new(
@@ -552,6 +614,7 @@ impl Agent {
             query,
             search,
             analytics,
+            log_context,
         });
 
         nmvb_handler.set_watcher(inner.clone()).await;
@@ -595,6 +658,7 @@ impl Agent {
         http_configs: HashMap<String, FirstHttpConfig>,
         http_client: Arc<C>,
         connect_timeout: Duration,
+        log_context: &LogContextOrAgentId,
     ) -> Result<ParsedConfig> {
         loop {
             for endpoint_config in kv_client_manager_client_configs.values() {
@@ -605,12 +669,14 @@ impl Agent {
                         endpoint_config.clone(),
                         KvClientOptions {
                             orphan_handler: Arc::new(|packet| {}),
-                            on_close: Arc::new(|id| {
-                                Box::pin(async move {
-                                    debug!("Bootstrap client {} closed", id);
-                                })
-                            }),
+                            on_close: Arc::new(|_id| Box::pin(async move {})),
                             disable_decompression: false,
+                            log_context: LogContext {
+                                parent_context: log_context.into(),
+                                parent_component_id: log_context.logger_id().to_string(),
+                                parent_component_type: "agent".to_string(),
+                                component_id: LogContext::new_logger_id(),
+                            },
                         },
                     ),
                 )
@@ -620,11 +686,14 @@ impl Agent {
                     Ok(client_result) => match client_result {
                         Ok(client) => client,
                         Err(e) => {
-                            warn!("Failed to connect to endpoint: {}", e);
+                            warn!(context=&log_context, e:err; "Failed to connect to endpoint");
                             continue;
                         }
                     },
-                    Err(_e) => continue,
+                    Err(e) => {
+                        warn!(context=&log_context, e:err; "Timeout connecting to endpoint");
+                        continue;
+                    }
                 };
 
                 let raw_config = match client.get_cluster_config(GetClusterConfigRequest {}).await {
@@ -640,11 +709,13 @@ impl Agent {
                     Ok(c) => {
                         return Ok(c);
                     }
-                    Err(_e) => continue,
+                    Err(e) => {
+                        warn!(context=&log_context, e:err; "Failed to parse config");
+                    }
                 };
             }
 
-            info!("Failed to fetch config over kv, attempting http");
+            info!(context=&log_context; "Failed to fetch config over kv, attempting http");
             for endpoint_config in http_configs.values() {
                 let endpoint = endpoint_config.endpoint.clone();
                 let host = get_host_port_from_uri(&endpoint)?;
@@ -654,6 +725,7 @@ impl Agent {
                     }
                 };
 
+                debug!(context=&log_context, endpoint=&endpoint; "Polling http config");
                 match Self::fetch_http_config(
                     http_client.clone(),
                     endpoint,
@@ -667,11 +739,13 @@ impl Agent {
                     Ok(c) => {
                         return Ok(c);
                     }
-                    Err(_e) => {}
+                    Err(e) => {
+                        warn!(context=&log_context, e:err; "Failed to fetch config over http");
+                    }
                 };
             }
 
-            info!("Failed to fetch config from any source");
+            info!(context=&log_context; "Failed to fetch config from any source");
 
             // TODO: Make configurable?
             sleep(Duration::from_secs(1)).await;
@@ -686,8 +760,6 @@ impl Agent {
         password: String,
         bucket_name: Option<String>,
     ) -> Result<ParsedConfig> {
-        debug!("Polling config from {}", &endpoint);
-
         let host_port = get_host_port_from_uri(&endpoint)?;
         let hostname = get_hostname_from_host_port(&host_port)?;
 

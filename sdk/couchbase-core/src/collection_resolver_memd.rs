@@ -6,15 +6,18 @@ use crate::kvclient_ops::KvClientOps;
 use crate::kvclientmanager::{
     orchestrate_random_memd_client, KvClientManager, KvClientManagerClientType,
 };
+use crate::log::LogContext;
 use crate::memdx::request::GetCollectionIdRequest;
 use crate::memdx::response::GetCollectionIdResponse;
 
 pub(crate) struct CollectionResolverMemd<K> {
     conn_mgr: Arc<K>,
+    log_context: LogContext,
 }
 
 pub(crate) struct CollectionResolverMemdOptions<K> {
     pub conn_mgr: Arc<K>,
+    pub log_context: LogContext,
 }
 
 impl<K> CollectionResolverMemd<K>
@@ -24,6 +27,7 @@ where
     pub fn new(opts: CollectionResolverMemdOptions<K>) -> Self {
         Self {
             conn_mgr: opts.conn_mgr,
+            log_context: opts.log_context,
         }
     }
 }
@@ -39,6 +43,7 @@ where
     ) -> Result<(u32, u64)> {
         let resp: GetCollectionIdResponse = orchestrate_random_memd_client(
             self.conn_mgr.clone(),
+            &self.log_context,
             async |client: Arc<KvClientManagerClientType<K>>| {
                 client
                     .get_collection_id(GetCollectionIdRequest {

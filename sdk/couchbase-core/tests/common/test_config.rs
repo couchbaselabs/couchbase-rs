@@ -1,10 +1,13 @@
-use std::io::Write;
-use std::sync::Arc;
-
+use env_logger::fmt::style::Style;
+use env_logger::fmt::Formatter;
+use env_logger::WriteStyle;
 use envconfig::Envconfig;
 use futures::executor::block_on;
 use lazy_static::lazy_static;
-use log::{trace, LevelFilter};
+use log::kv::{Error, Key, Source, ToValue, Value, VisitSource};
+use log::{debug, kv, trace, LevelFilter};
+use std::io::Write;
+use std::sync::Arc;
 use tokio::runtime::{Handle, Runtime};
 use tokio::sync::Mutex;
 
@@ -42,15 +45,21 @@ pub async fn setup_tests() {
     if config.is_none() {
         env_logger::Builder::new()
             .format(|buf, record| {
-                writeln!(
+                write!(
                     buf,
                     "{}:{} {} [{}] - {}",
                     record.file().unwrap_or("unknown"),
                     record.line().unwrap_or(0),
                     chrono::Local::now().format("%Y-%m-%dT%H:%M:%S"),
                     record.level(),
-                    record.args()
-                )
+                    record.args(),
+                )?;
+                record
+                    .key_values()
+                    .visit(&mut DefaultVisitSource(buf))
+                    .unwrap();
+
+                writeln!(buf)
             })
             .filter(Some("rustls"), LevelFilter::Warn)
             .filter_level(LevelFilter::Trace)
@@ -70,7 +79,7 @@ pub async fn setup_tests() {
             use_ssl: resolved.use_ssl,
         }));
 
-        trace!("{:?}", &config);
+        debug!("{:?}", &config);
     }
 }
 
@@ -102,4 +111,13 @@ pub async fn test_data_timeout() -> String {
     let guard = TEST_CONFIG.lock().await;
     let config = guard.clone().unwrap();
     config.data_timeout.clone()
+}
+
+struct DefaultVisitSource<'a>(&'a mut Formatter);
+
+impl<'a, 'kvs> VisitSource<'kvs> for DefaultVisitSource<'a> {
+    fn visit_pair(&mut self, key: Key<'_>, value: Value<'kvs>) -> Result<(), Error> {
+        write!(self.0, " {}={}", key, value)?;
+        Ok(())
+    }
 }

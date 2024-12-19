@@ -5,6 +5,7 @@ use crate::error::Result;
 use crate::kvclient::KvClient;
 use crate::kvclient_ops::KvClientOps;
 use crate::kvclientmanager::KvClientManager;
+use crate::log::LogContext;
 use crate::memdx::request::GetClusterConfigRequest;
 use crate::parsedconfig::ParsedConfig;
 use futures::future::err;
@@ -31,12 +32,14 @@ pub(crate) struct ConfigWatcherMemdConfig {
 pub(crate) struct ConfigWatcherMemdOptions<M: KvClientManager> {
     pub polling_period: Duration,
     pub kv_client_manager: Arc<M>,
+    pub log_context: LogContext,
 }
 
 pub struct ConfigWatcherMemdInner<M: KvClientManager> {
-    pub polling_period: Duration,
-    pub kv_client_manager: Arc<M>,
+    polling_period: Duration,
+    kv_client_manager: Arc<M>,
     endpoints: Mutex<Vec<String>>,
+    log_context: LogContext,
 }
 
 impl<M> ConfigWatcherMemdInner<M>
@@ -144,7 +147,7 @@ where
     }
 
     async fn poll_one(&self, endpoint: String) -> Result<ParsedConfig> {
-        debug!("Polling config from {}", &endpoint);
+        debug!(context=&self.log_context, endpoit = &endpoint; "Polling config");
 
         let client = self.kv_client_manager.get_client(endpoint).await?;
 
@@ -156,7 +159,7 @@ where
 
         let config = cbconfig::parse::parse_terse_config(&resp.config, hostname)?;
 
-        trace!("Poller fetched new config {:?}", &config);
+        trace!(context=&self.log_context, config:?=&config; "Poller fetched new config");
 
         ConfigParser::parse_terse_config(config, hostname)
     }
@@ -164,6 +167,7 @@ where
 
 pub(crate) struct ConfigWatcherMemd<M: KvClientManager> {
     inner: Arc<ConfigWatcherMemdInner<M>>,
+    log_context: LogContext,
 }
 
 impl<M> ConfigWatcherMemd<M>
@@ -176,7 +180,9 @@ where
                 polling_period: opts.polling_period,
                 kv_client_manager: opts.kv_client_manager,
                 endpoints: Mutex::new(config.endpoints),
+                log_context: opts.log_context.clone(),
             }),
+            log_context: opts.log_context,
         }
     }
 }
@@ -189,9 +195,10 @@ where
         let (on_new_config_tx, on_new_config_rx) = broadcast::channel::<ParsedConfig>(1);
 
         let inner = self.inner.clone();
+        let log_context = self.log_context.clone();
         tokio::spawn(async move {
             inner.watch(on_shutdown_rx, on_new_config_tx).await;
-            debug!("config poll exit")
+            debug!(context=log_context; "config poll exit")
         });
 
         on_new_config_rx

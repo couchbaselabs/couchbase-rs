@@ -2,14 +2,11 @@ use crate::httpx::json_row_stream::JsonRowStream;
 use crate::httpx::raw_json_row_streamer::RawJsonRowStreamer;
 use crate::httpx::response::Response;
 use crate::searchx::error::{ErrorKind, ServerErrorKind};
-use crate::searchx::search::{decode_common_error, Search};
+use crate::searchx::search::decode_common_error;
 use crate::searchx::search_result::{FacetResult, MetaData, Metrics, ResultHit};
 use crate::searchx::{error, search_json};
-use bytes::Bytes;
-use futures::{FutureExt, Stream, StreamExt};
+use futures::{Stream, StreamExt};
 use http::StatusCode;
-use log::debug;
-use std::backtrace::Backtrace;
 use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -78,7 +75,6 @@ impl SearchRespReader {
             let body = match resp.bytes().await {
                 Ok(b) => b,
                 Err(e) => {
-                    debug!("Failed to read response body on error {}", e);
                     return Err(error::Error::new_server_error_with_source(
                         ServerErrorKind::Unknown,
                         e.to_string(),
