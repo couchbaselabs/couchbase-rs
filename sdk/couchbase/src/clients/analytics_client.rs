@@ -3,7 +3,6 @@ use crate::error;
 use crate::options::analytics_options::AnalyticsOptions;
 use crate::results::analytics_results::AnalyticsResult;
 use couchbase_core::analyticsx;
-use std::collections::HashMap;
 use uuid::Uuid;
 
 pub(crate) struct AnalyticsClient {
@@ -18,7 +17,7 @@ impl AnalyticsClient {
     pub async fn query<'a>(
         &self,
         statement: &str,
-        opts: Option<&AnalyticsOptions<'a>>,
+        opts: Option<AnalyticsOptions>,
     ) -> error::Result<AnalyticsResult> {
         match &self.backend {
             AnalyticsClientBackend::CouchbaseAnalyticsClientBackend(backend) => {
@@ -64,10 +63,10 @@ impl CouchbaseAnalyticsClient {
         }
     }
 
-    pub async fn query<'a>(
+    pub async fn query(
         &self,
         statement: &str,
-        opts: Option<&AnalyticsOptions<'a>>,
+        opts: Option<AnalyticsOptions>,
     ) -> error::Result<AnalyticsResult> {
         let query_context = self.keyspace.as_ref().map(|keyspace| {
             format!(
@@ -78,39 +77,8 @@ impl CouchbaseAnalyticsClient {
         });
 
         if let Some(opts) = opts {
-            let named_args = if let Some(named_args) = opts.named_parameters {
-                let mut collected = HashMap::default();
-                for (k, v) in named_args {
-                    collected.insert(*k, *v);
-                }
-                Some(collected)
-            } else {
-                None
-            };
-            let raw = if let Some(raw) = opts.raw {
-                let mut collected = HashMap::default();
-                for (k, v) in raw {
-                    collected.insert(*k, *v);
-                }
-                Some(collected)
-            } else {
-                None
-            };
-            let positional_params = if let Some(positional_params) = opts.positional_parameters {
-                let mut collected = vec![];
-                for v in positional_params {
-                    collected.push(*v);
-                }
-                Some(collected)
-            } else {
-                None
-            };
-
-            // TODO: this isn't great.
-            let client_context_id = opts
-                .client_context_id
-                .map(|id| id.to_string())
-                .unwrap_or_else(|| Uuid::new_v4().to_string());
+            // TODO: Be nice to not always allocate this string.
+            let client_context_id = opts.client_context_id.unwrap_or(Uuid::new_v4().to_string());
 
             let priority = if let Some(priority) = opts.priority {
                 if priority {
@@ -122,7 +90,7 @@ impl CouchbaseAnalyticsClient {
                 None
             };
 
-            let query_opts = couchbase_core::analyticsoptions::AnalyticsOptions::builder()
+            let query_opts = couchbase_core::analyticsoptions::AnalyticsOptions::new(statement)
                 .client_context_id(client_context_id.as_str())
                 .priority(priority)
                 .query_context(query_context.as_deref())
@@ -131,25 +99,21 @@ impl CouchbaseAnalyticsClient {
                     opts.scan_consistency
                         .map(analyticsx::query_options::ScanConsistency::from),
                 )
-                .statement(statement)
-                .args(positional_params.as_deref())
-                .named_args(&named_args)
-                .raw(&raw)
-                .build();
+                .args(opts.positional_parameters.as_deref())
+                .named_args(opts.named_parameters.as_ref())
+                .raw(opts.raw.as_ref());
 
             let agent = self.agent_provider.get_agent().await;
-            Ok(AnalyticsResult::from(agent.analytics(&query_opts).await?))
+            Ok(AnalyticsResult::from(agent.analytics(query_opts).await?))
         } else {
             let client_context_id = Uuid::new_v4().to_string();
 
-            let query_opts = couchbase_core::analyticsoptions::AnalyticsOptions::builder()
-                .statement(statement)
+            let query_opts = couchbase_core::analyticsoptions::AnalyticsOptions::new(statement)
                 .client_context_id(client_context_id.as_str())
-                .query_context(query_context.as_deref())
-                .build();
+                .query_context(query_context.as_deref());
 
             let agent = self.agent_provider.get_agent().await;
-            Ok(AnalyticsResult::from(agent.analytics(&query_opts).await?))
+            Ok(AnalyticsResult::from(agent.analytics(query_opts).await?))
         }
     }
 }
@@ -161,10 +125,10 @@ impl Couchbase2AnalyticsClient {
         unimplemented!()
     }
 
-    pub async fn query<'a>(
+    pub async fn query(
         &self,
         _statement: &str,
-        _opts: Option<&AnalyticsOptions<'a>>,
+        _opts: Option<AnalyticsOptions>,
     ) -> error::Result<AnalyticsResult> {
         unimplemented!()
     }

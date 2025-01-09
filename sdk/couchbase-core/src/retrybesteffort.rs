@@ -5,7 +5,7 @@ use async_trait::async_trait;
 
 use crate::retry::{RetryAction, RetryInfo, RetryReason, RetryStrategy};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BestEffortRetryStrategy<Calc> {
     backoff_calc: Calc,
 }

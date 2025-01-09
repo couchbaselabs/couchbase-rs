@@ -84,7 +84,7 @@ impl<C: Client> AnalyticsComponent<C> {
 
     pub async fn query<'a>(
         &self,
-        opts: &AnalyticsOptions<'a>,
+        opts: AnalyticsOptions<'a>,
     ) -> error::Result<AnalyticsResultStream> {
         let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
             retry_strategy
@@ -95,6 +95,7 @@ impl<C: Client> AnalyticsComponent<C> {
         let retry_info = RetryInfo::new(opts.read_only.unwrap_or_default(), retry);
 
         let endpoint = opts.endpoint.clone();
+
         let copts = opts.into();
 
         orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
