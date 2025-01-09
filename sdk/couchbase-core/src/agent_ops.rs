@@ -111,10 +111,7 @@ impl Agent {
         self.inner.search.query(opts).await
     }
 
-    pub async fn analytics<'a>(
-        &self,
-        opts: &AnalyticsOptions<'a>,
-    ) -> Result<AnalyticsResultStream> {
+    pub async fn analytics<'a>(&self, opts: AnalyticsOptions<'a>) -> Result<AnalyticsResultStream> {
         self.inner.analytics.query(opts).await
     }
 

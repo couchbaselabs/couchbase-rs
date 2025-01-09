@@ -64,11 +64,11 @@ impl Scope {
 
     pub async fn analytics_query<'a>(
         &self,
-        statement: impl Into<&str>,
-        opts: impl Into<Option<&'a AnalyticsOptions<'a>>>,
+        statement: impl AsRef<str>,
+        opts: impl Into<Option<AnalyticsOptions>>,
     ) -> error::Result<AnalyticsResult> {
         self.analytics_client
-            .query(statement.into(), opts.into())
+            .query(statement.as_ref(), opts.into())
             .await
     }
 }

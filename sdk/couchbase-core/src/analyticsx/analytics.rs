@@ -77,12 +77,40 @@ impl<C: Client> Analytics<C> {
         let statement = opts.statement;
         let on_behalf_of = opts.on_behalf_of;
 
-        let body = serde_json::to_vec(opts).map_err(|e| {
+        let mut body = serde_json::to_value(opts).map_err(|e| {
             Error::new_generic_error(
                 e.to_string(),
                 &self.endpoint,
                 statement,
-                client_context_id.clone().map(|s| s.to_string()),
+                client_context_id.clone(),
+            )
+        })?;
+
+        // Unwrap is fine, we know this is an object.
+        let mut body_obj = body.as_object_mut().unwrap();
+        if let Some(named_args) = &opts.named_args {
+            for (k, v) in named_args.iter() {
+                let key = if k.starts_with("$") {
+                    k.clone()
+                } else {
+                    format!("${}", k)
+                };
+                body_obj.insert(key, v.clone());
+            }
+        }
+
+        if let Some(raw) = &opts.raw {
+            for (k, v) in raw.iter() {
+                body_obj.insert(k.to_string(), v.clone());
+            }
+        }
+
+        let body = serde_json::to_vec(body_obj).map_err(|e| {
+            Error::new_generic_error(
+                e.to_string(),
+                &self.endpoint,
+                statement,
+                client_context_id.clone(),
             )
         })?;
 
@@ -116,6 +144,6 @@ impl<C: Client> Analytics<C> {
                 )
             })?;
 
-        QueryRespReader::new(res, &self.endpoint, statement, client_context_id).await
+        QueryRespReader::new(res, &self.endpoint, statement, client_context_id.clone()).await
     }
 }
