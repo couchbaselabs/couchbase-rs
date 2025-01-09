@@ -1,9 +1,8 @@
+use futures::executor::block_on;
 use std::future::Future;
 use std::marker::PhantomData;
-use std::sync::Arc;
-
+use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc::Receiver;
-use tokio::sync::Mutex;
 use tokio::time::{timeout_at, Instant};
 
 use crate::memdx::client::OpaqueMap;
@@ -50,31 +49,29 @@ impl ClientPendingOp {
     }
 
     pub async fn cancel(&mut self, e: CancellationErrorKind) {
-        // match self.cancel_chan.send((self.opaque, e)) {
-        //     Ok(_) => {}
-        //     Err(e) => {
-        //         debug!("Failed to send cancel to channel {}", e);
-        //     }
-        // };
-        let requests: Arc<Mutex<OpaqueMap>> = Arc::clone(&self.opaque_map);
-        let mut map = requests.lock().await;
+        let context = {
+            let requests: Arc<Mutex<OpaqueMap>> = Arc::clone(&self.opaque_map);
+            let mut map = requests.lock().unwrap();
 
-        let t = map.remove(&self.opaque);
+            let t = map.remove(&self.opaque);
 
-        if let Some(map_entry) = t {
-            let context = Arc::clone(&map_entry);
+            t.map(|map_entry| Arc::clone(&map_entry))
+        };
+
+        if let Some(context) = context {
             let sender = &context.sender;
-            drop(map);
 
             sender
                 .send(Err(ErrorKind::Cancelled(e).into()))
                 .await
                 .unwrap();
-        } else {
-            drop(map);
         }
+    }
+}
 
-        drop(requests);
+impl Drop for ClientPendingOp {
+    fn drop(&mut self) {
+        block_on(self.cancel(CancellationErrorKind::RequestCancelled));
     }
 }
 

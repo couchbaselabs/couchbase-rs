@@ -72,7 +72,7 @@ impl ClientReadHandle {
 #[derive(Debug)]
 pub struct Client {
     current_opaque: AtomicU32,
-    opaque_map: Arc<Mutex<OpaqueMap>>,
+    opaque_map: Arc<std::sync::Mutex<OpaqueMap>>,
 
     client_id: String,
 
@@ -87,8 +87,8 @@ pub struct Client {
 }
 
 impl Client {
-    async fn register_handler(&self, response_context: SenderContext) -> u32 {
-        let mut map = self.opaque_map.lock().await;
+    fn register_handler(&self, response_context: SenderContext) -> u32 {
+        let mut map = self.opaque_map.lock().unwrap();
 
         let opaque = self.current_opaque.fetch_add(1, Ordering::SeqCst);
 
@@ -97,10 +97,17 @@ impl Client {
         opaque
     }
 
-    async fn drain_opaque_map(opaque_map: MutexGuard<'_, OpaqueMap>) {
-        for entry in opaque_map.iter() {
-            entry
-                .1
+    async fn drain_opaque_map(opaque_map: Arc<std::sync::Mutex<OpaqueMap>>) {
+        let mut senders = vec![];
+        {
+            let mut guard = opaque_map.lock().unwrap();
+            guard.drain().for_each(|(_, v)| {
+                senders.push(v);
+            });
+        }
+
+        for sender in senders {
+            sender
                 .sender
                 .send(Err(ErrorKind::Cancelled(
                     CancellationErrorKind::ClosedInFlight,
@@ -113,7 +120,7 @@ impl Client {
 
     async fn on_read_loop_close(
         stream: FramedRead<ReadHalf<Box<dyn Stream>>, KeyValueCodec>,
-        opaque_map: MutexGuard<'_, OpaqueMap>,
+        opaque_map: Arc<std::sync::Mutex<OpaqueMap>>,
         on_connection_close: OnConnectionCloseHandler,
     ) {
         drop(stream);
@@ -125,14 +132,13 @@ impl Client {
 
     async fn read_loop(
         mut stream: FramedRead<ReadHalf<Box<dyn Stream>>, KeyValueCodec>,
-        opaque_map: Arc<Mutex<OpaqueMap>>,
+        opaque_map: Arc<std::sync::Mutex<OpaqueMap>>,
         mut opts: ReadLoopOptions,
     ) {
         loop {
             select! {
                 (_) = opts.on_client_close_rx.recv() => {
-                    let guard = opaque_map.lock().await;
-                    Self::on_read_loop_close(stream, guard, opts.on_connection_close_tx).await;
+                    Self::on_read_loop_close(stream, opaque_map, opts.on_connection_close_tx).await;
                     return;
                 },
                 (next) = stream.next() => {
@@ -150,17 +156,20 @@ impl Client {
 
                                     let opaque = packet.opaque;
 
-                                    let requests: Arc<Mutex<OpaqueMap>> = Arc::clone(&opaque_map);
-                                    let map = requests.lock().await;
+                                    let requests: Arc<std::sync::Mutex<OpaqueMap>> = Arc::clone(&opaque_map);
+                                    let context = {
+                                        let map = requests.lock().unwrap();
 
-                                    // We remove and then re-add if there are more packets so that we don't have
-                                    // to hold the opaque map mutex across the callback.
-                                    let t = map.get(&opaque);
+                                        // We remove and then re-add if there are more packets so that we don't have
+                                        // to hold the opaque map mutex across the callback.
+                                        let t = map.get(&opaque);
 
-                                    if let Some(map_entry) = t {
-                                        let context = Arc::clone(map_entry);
+                                        t.map(Arc::clone)
+                                    };
+
+
+                                    if let Some(context) = context {
                                         let sender = &context.sender;
-                                        drop(map);
                                         let (more_tx, more_rx) = oneshot::channel();
 
                                         if let Some(value) = &packet.value {
@@ -199,7 +208,7 @@ impl Client {
                                         match more_rx.await {
                                             Ok(has_more_packets) => {
                                                 if !has_more_packets {
-                                                    let mut map = requests.lock().await;
+                                                    let mut map = requests.lock().unwrap();
                                                     map.remove(&opaque);
                                                     drop(map);
                                                 }
@@ -207,13 +216,12 @@ impl Client {
                                             Err(_) => {
                                                 // If the response gets dropped then the receiver will be closed,
                                                 // which we treat as an implicit !has_more_packets.
-                                                let mut map = requests.lock().await;
+                                                let mut map = requests.lock().unwrap();
                                                 map.remove(&opaque);
                                                 drop(map);
                                             }
                                         }
                                     } else {
-                                        drop(map);
                                         let opaque = packet.opaque;
                                         (opts.orphan_handler)(packet);
                                     }
@@ -225,8 +233,7 @@ impl Client {
                             }
                         }
                         None => {
-                            let guard = opaque_map.lock().await;
-                            Self::on_read_loop_close(stream, guard, opts.on_connection_close_tx).await;
+                            Self::on_read_loop_close(stream, opaque_map, opts.on_connection_close_tx).await;
                             return;
                         }
                     }
@@ -258,7 +265,7 @@ impl Dispatcher for Client {
 
         let (close_tx, close_rx) = mpsc::channel::<()>(1);
 
-        let opaque_map = Arc::new(Mutex::new(OpaqueMap::default()));
+        let opaque_map = Arc::new(std::sync::Mutex::new(OpaqueMap::default()));
 
         let read_opaque_map = Arc::clone(&opaque_map);
         let read_uuid = uuid.clone();
@@ -301,15 +308,13 @@ impl Dispatcher for Client {
         response_context: Option<ResponseContext>,
     ) -> error::Result<ClientPendingOp> {
         let (response_tx, response_rx) = mpsc::channel(1);
-        let opaque = self
-            .register_handler(SenderContext {
-                sender: response_tx,
-                context: response_context.unwrap_or(ResponseContext {
-                    cas: packet.cas,
-                    subdoc_info: None,
-                }),
-            })
-            .await;
+        let opaque = self.register_handler(SenderContext {
+            sender: response_tx,
+            context: response_context.unwrap_or(ResponseContext {
+                cas: packet.cas,
+                subdoc_info: None,
+            }),
+        });
         packet.opaque = Some(opaque);
         let op_code = packet.op_code;
 
@@ -333,9 +338,11 @@ impl Dispatcher for Client {
                     self.client_id, opaque, op_code, e
                 );
 
-                let requests: Arc<Mutex<OpaqueMap>> = Arc::clone(&self.opaque_map);
-                let mut map = requests.lock().await;
-                map.remove(&opaque);
+                let requests: Arc<std::sync::Mutex<OpaqueMap>> = Arc::clone(&self.opaque_map);
+                {
+                    let mut map = requests.lock().unwrap();
+                    map.remove(&opaque);
+                }
 
                 Err(Error::dispatch_error(opaque, op_code, Box::new(e)))
             }
@@ -364,8 +371,7 @@ impl Dispatcher for Client {
         let mut read_handle = self.read_handle.lock().await;
         read_handle.await_completion().await;
 
-        let map = self.opaque_map.lock().await;
-        Self::drain_opaque_map(map).await;
+        Self::drain_opaque_map(self.opaque_map.clone()).await;
 
         if let Some(e) = close_err {
             return Err(Error::close_error(e.to_string(), Box::new(e)));
