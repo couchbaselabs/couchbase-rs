@@ -12,7 +12,9 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
 use std::collections::BTreeMap;
+use std::ops::Add;
 use std::time::Duration;
+use tokio::time::{timeout_at, Instant};
 
 mod common;
 
@@ -30,6 +32,34 @@ async fn test_upsert() {
     let key = new_key();
 
     collection.upsert(&key, "test", None).await.unwrap();
+
+    let res = collection.get(key, None).await.unwrap();
+
+    let content: String = res.content_as().unwrap();
+
+    assert_eq!("test", content);
+}
+
+#[tokio::test]
+async fn test_upsert_operation_cancellation() {
+    setup_tests(LevelFilter::Trace).await;
+
+    let cluster = create_cluster_from_test_config().await;
+
+    let collection = cluster
+        .bucket(test_bucket().await)
+        .scope(test_scope().await)
+        .collection(test_collection().await);
+
+    let key = new_key();
+
+    collection.upsert(&key, "test", None).await.unwrap();
+
+    let _res = timeout_at(
+        Instant::now().add(Duration::from_micros(1)),
+        collection.get(&key, None),
+    )
+    .await;
 
     let res = collection.get(key, None).await.unwrap();
 
