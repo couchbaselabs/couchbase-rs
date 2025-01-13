@@ -43,14 +43,11 @@ impl<C: Client> Query<C> {
             })
         };
 
-        Request::builder()
-            .method(method)
-            .uri(format!("{}/{}", self.endpoint, path.into()))
+        Request::new(method, format!("{}/{}", self.endpoint, path.into()))
             .auth(auth)
             .user_agent(self.user_agent.clone())
             .content_type(content_type.into())
             .body(body)
-            .build()
     }
 
     pub async fn execute(
@@ -98,6 +95,23 @@ impl<C: Client> Query<C> {
                 "client_context_id".to_string(),
                 Value::String(client_context_id.clone()),
             );
+        }
+
+        if let Some(named_args) = &opts.named_args {
+            for (k, v) in named_args.iter() {
+                let key = if k.starts_with("$") {
+                    k.clone()
+                } else {
+                    format!("${}", k)
+                };
+                obj.insert(key, v.clone());
+            }
+        }
+
+        if let Some(raw) = &opts.raw {
+            for (k, v) in raw.iter() {
+                obj.insert(k.to_string(), v.clone());
+            }
         }
 
         let body = Bytes::from(serde_json::to_vec(&serialized).map_err(|e| {

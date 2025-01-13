@@ -1,5 +1,5 @@
 use crate::common::test_config::TEST_CONFIG;
-use couchbase_core::agentoptions::{AgentOptions, CompressionConfig, SeedConfig};
+use couchbase_core::agentoptions::{AgentOptions, SeedConfig};
 use couchbase_core::authenticator::{Authenticator, PasswordAuthenticator};
 #[cfg(feature = "rustls-tls")]
 use {
@@ -26,22 +26,15 @@ pub async fn create_default_options() -> AgentOptions {
         None
     };
 
-    AgentOptions::builder()
-        .tls_config(tls_config)
-        .authenticator(Authenticator::PasswordAuthenticator(
-            PasswordAuthenticator {
-                username: config.username.clone(),
-                password: config.password.clone(),
-            },
-        ))
-        .bucket_name(config.default_bucket.clone())
-        .seed_config(
-            SeedConfig::builder()
-                .memd_addrs(config.memd_addrs.clone())
-                .build(),
-        )
-        .compression_config(CompressionConfig::default())
-        .build()
+    AgentOptions::new(
+        SeedConfig::new().memd_addrs(config.memd_addrs.clone()),
+        Authenticator::PasswordAuthenticator(PasswordAuthenticator {
+            username: config.username.clone(),
+            password: config.password.clone(),
+        }),
+    )
+    .tls_config(tls_config)
+    .bucket_name(config.default_bucket.clone())
 }
 
 pub async fn create_options_without_bucket() -> AgentOptions {
@@ -62,21 +55,14 @@ pub async fn create_options_without_bucket() -> AgentOptions {
         None
     };
 
-    AgentOptions::builder()
-        .tls_config(tls_config)
-        .authenticator(Authenticator::PasswordAuthenticator(
-            PasswordAuthenticator {
-                username: config.username.clone(),
-                password: config.password.clone(),
-            },
-        ))
-        .seed_config(
-            SeedConfig::builder()
-                .memd_addrs(config.memd_addrs.clone())
-                .build(),
-        )
-        .compression_config(CompressionConfig::default())
-        .build()
+    AgentOptions::new(
+        SeedConfig::new().memd_addrs(config.memd_addrs.clone()),
+        Authenticator::PasswordAuthenticator(PasswordAuthenticator {
+            username: config.username.clone(),
+            password: config.password.clone(),
+        }),
+    )
+    .tls_config(tls_config)
 }
 
 #[cfg(feature = "rustls-tls")]

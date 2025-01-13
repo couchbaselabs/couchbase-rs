@@ -9,9 +9,7 @@ use couchbase_core::crudoptions::{
 use couchbase_core::memdx::error::ErrorKind::Server;
 use couchbase_core::memdx::error::ServerErrorKind::KeyExists;
 use couchbase_core::memdx::error::{ErrorKind, ServerError, ServerErrorKind, SubdocErrorKind};
-use couchbase_core::memdx::subdoc::{
-    LookupInOp, LookupInOpType, MutateInOp, MutateInOpType, SubdocOpFlag,
-};
+use couchbase_core::memdx::subdoc::{LookupInOp, LookupInOpType, MutateInOp, MutateInOpType};
 use couchbase_core::retrybesteffort::{BestEffortRetryStrategy, ExponentialBackoffCalculator};
 use couchbase_core::retryfailfast::FailFastRetryStrategy;
 use serde::Serialize;
@@ -42,13 +40,8 @@ async fn test_upsert_and_get() {
     let key = generate_key();
     let value = generate_bytes_value(32);
 
-    let upsert_opts = UpsertOptions::builder()
-        .key(key.as_slice())
-        .retry_strategy(strat.clone())
-        .scope_name("")
-        .collection_name("")
-        .value(value.as_slice())
-        .build();
+    let upsert_opts =
+        UpsertOptions::new(key.as_slice(), "", "", value.as_slice()).retry_strategy(strat.clone());
 
     let upsert_result = agent.upsert(upsert_opts).await.unwrap();
 
@@ -56,14 +49,7 @@ async fn test_upsert_and_get() {
     assert!(upsert_result.mutation_token.is_some());
 
     let get_result = agent
-        .get(
-            GetOptions::builder()
-                .key(&key)
-                .scope_name("")
-                .collection_name("")
-                .retry_strategy(strat)
-                .build(),
-        )
+        .get(GetOptions::new(&key, "", "").retry_strategy(strat))
         .await
         .unwrap();
 
@@ -88,13 +74,8 @@ async fn test_add_and_delete() {
     let key = generate_key();
     let value = generate_bytes_value(32);
 
-    let add_opts = AddOptions::builder()
-        .key(key.as_slice())
-        .retry_strategy(strat.clone())
-        .scope_name("")
-        .collection_name("")
-        .value(value.as_slice())
-        .build();
+    let add_opts =
+        AddOptions::new(key.as_slice(), "", "", value.as_slice()).retry_strategy(strat.clone());
 
     let add_result = agent.add(add_opts.clone()).await.unwrap();
 
@@ -118,14 +99,7 @@ async fn test_add_and_delete() {
     ));
 
     let delete_result = agent
-        .delete(
-            DeleteOptions::builder()
-                .key(&key)
-                .scope_name("")
-                .collection_name("")
-                .retry_strategy(strat)
-                .build(),
-        )
+        .delete(DeleteOptions::new(&key, "", "").retry_strategy(strat))
         .await
         .unwrap();
 
@@ -155,13 +129,8 @@ async fn test_replace() {
     let key = generate_key();
     let value = generate_bytes_value(32);
 
-    let upsert_opts = UpsertOptions::builder()
-        .key(key.as_slice())
-        .retry_strategy(strat.clone())
-        .scope_name("")
-        .collection_name("")
-        .value(value.as_slice())
-        .build();
+    let upsert_opts =
+        UpsertOptions::new(key.as_slice(), "", "", value.as_slice()).retry_strategy(strat.clone());
 
     let upsert_result = agent.upsert(upsert_opts).await.unwrap();
 
@@ -172,13 +141,7 @@ async fn test_replace() {
 
     let replace_result = agent
         .replace(
-            ReplaceOptions::builder()
-                .key(&key)
-                .scope_name("")
-                .collection_name("")
-                .retry_strategy(strat.clone())
-                .value(new_value.as_slice())
-                .build(),
+            ReplaceOptions::new(&key, "", "", new_value.as_slice()).retry_strategy(strat.clone()),
         )
         .await
         .unwrap();
@@ -187,14 +150,7 @@ async fn test_replace() {
     assert!(replace_result.mutation_token.is_some());
 
     let get_result = agent
-        .get(
-            GetOptions::builder()
-                .key(&key)
-                .scope_name("")
-                .collection_name("")
-                .retry_strategy(strat.clone())
-                .build(),
-        )
+        .get(GetOptions::new(&key, "", "").retry_strategy(strat.clone()))
         .await
         .unwrap();
 
@@ -219,13 +175,8 @@ async fn test_lock_unlock() {
     let key = generate_key();
     let value = generate_bytes_value(32);
 
-    let upsert_opts = UpsertOptions::builder()
-        .key(key.as_slice())
-        .retry_strategy(strat.clone())
-        .scope_name("")
-        .collection_name("")
-        .value(value.as_slice())
-        .build();
+    let upsert_opts =
+        UpsertOptions::new(key.as_slice(), "", "", value.as_slice()).retry_strategy(strat.clone());
 
     let upsert_result = agent.upsert(upsert_opts).await.unwrap();
 
@@ -233,14 +184,7 @@ async fn test_lock_unlock() {
     assert!(upsert_result.mutation_token.is_some());
 
     let get_result = agent
-        .get(
-            GetOptions::builder()
-                .key(&key)
-                .scope_name("")
-                .collection_name("")
-                .retry_strategy(strat.clone())
-                .build(),
-        )
+        .get(GetOptions::new(&key, "", "").retry_strategy(strat.clone()))
         .await
         .unwrap();
 
@@ -248,13 +192,8 @@ async fn test_lock_unlock() {
 
     let unlock_result = agent
         .unlock(
-            UnlockOptions::builder()
-                .key(key.as_slice())
-                .retry_strategy(Arc::new(FailFastRetryStrategy::default()))
-                .scope_name("")
-                .collection_name("")
-                .cas(cas)
-                .build(),
+            UnlockOptions::new(key.as_slice(), "", "", cas)
+                .retry_strategy(Arc::new(FailFastRetryStrategy::default())),
         )
         .await;
 
@@ -277,13 +216,7 @@ async fn test_lock_unlock() {
 
     let get_and_lock_result = agent
         .get_and_lock(
-            GetAndLockOptions::builder()
-                .key(key.as_slice())
-                .retry_strategy(strat.clone())
-                .scope_name("")
-                .collection_name("")
-                .lock_time(10)
-                .build(),
+            GetAndLockOptions::new(key.as_slice(), "", "", 10).retry_strategy(strat.clone()),
         )
         .await
         .unwrap();
@@ -292,15 +225,7 @@ async fn test_lock_unlock() {
     assert_eq!(value, get_and_lock_result.value);
 
     let unlock_result = agent
-        .unlock(
-            UnlockOptions::builder()
-                .key(key.as_slice())
-                .retry_strategy(strat.clone())
-                .scope_name("")
-                .collection_name("")
-                .cas(cas)
-                .build(),
-        )
+        .unlock(UnlockOptions::new(key.as_slice(), "", "", cas).retry_strategy(strat.clone()))
         .await;
 
     assert!(unlock_result.is_ok());
@@ -325,14 +250,9 @@ async fn test_touch_operations() {
     let key = generate_key();
     let value = generate_bytes_value(32);
 
-    let upsert_opts = UpsertOptions::builder()
-        .key(key.as_slice())
+    let upsert_opts = UpsertOptions::new(key.as_slice(), "", "", value.as_slice())
         .retry_strategy(strat.clone())
-        .scope_name("")
-        .collection_name("")
-        .value(value.as_slice())
-        .expiry(10)
-        .build();
+        .expiry(10);
 
     let upsert_result = agent.upsert(upsert_opts).await.unwrap();
 
@@ -340,15 +260,7 @@ async fn test_touch_operations() {
     assert!(upsert_result.mutation_token.is_some());
 
     let touch_result = agent
-        .touch(
-            TouchOptions::builder()
-                .key(key.as_slice())
-                .retry_strategy(strat.clone())
-                .scope_name("")
-                .collection_name("")
-                .expiry(12)
-                .build(),
-        )
+        .touch(TouchOptions::new(key.as_slice(), "", "", 12).retry_strategy(strat.clone()))
         .await
         .unwrap();
 
@@ -356,13 +268,7 @@ async fn test_touch_operations() {
 
     let get_and_touch_result = agent
         .get_and_touch(
-            GetAndTouchOptions::builder()
-                .key(key.as_slice())
-                .retry_strategy(strat.clone())
-                .scope_name("")
-                .collection_name("")
-                .expiry(15)
-                .build(),
+            GetAndTouchOptions::new(key.as_slice(), "", "", 15).retry_strategy(strat.clone()),
         )
         .await
         .unwrap();
@@ -390,13 +296,8 @@ async fn test_append_and_prepend() {
 
     let upsert_result = agent
         .upsert(
-            UpsertOptions::builder()
-                .key(key.as_slice())
-                .retry_strategy(strat.clone())
-                .scope_name("")
-                .collection_name("")
-                .value(value.as_slice())
-                .build(),
+            UpsertOptions::new(key.as_slice(), "", "", value.as_slice())
+                .retry_strategy(strat.clone()),
         )
         .await
         .unwrap();
@@ -407,15 +308,7 @@ async fn test_append_and_prepend() {
     let value = "the ".as_bytes();
 
     let prepend_result = agent
-        .prepend(
-            PrependOptions::builder()
-                .key(&key)
-                .scope_name("")
-                .collection_name("")
-                .retry_strategy(strat.clone())
-                .value(value)
-                .build(),
-        )
+        .prepend(PrependOptions::new(&key, "", "", value).retry_strategy(strat.clone()))
         .await
         .unwrap();
 
@@ -425,15 +318,7 @@ async fn test_append_and_prepend() {
     let value = " 42".as_bytes();
 
     let append_result = agent
-        .append(
-            AppendOptions::builder()
-                .key(&key)
-                .scope_name("")
-                .collection_name("")
-                .retry_strategy(strat.clone())
-                .value(value)
-                .build(),
-        )
+        .append(AppendOptions::new(&key, "", "", value).retry_strategy(strat.clone()))
         .await
         .unwrap();
 
@@ -441,14 +326,7 @@ async fn test_append_and_prepend() {
     assert!(append_result.mutation_token.is_some());
 
     let get_result = agent
-        .get(
-            GetOptions::builder()
-                .key(&key)
-                .scope_name("")
-                .collection_name("")
-                .retry_strategy(strat.clone())
-                .build(),
-        )
+        .get(GetOptions::new(&key, "", "").retry_strategy(strat.clone()))
         .await
         .unwrap();
 
@@ -475,13 +353,8 @@ async fn test_append_and_prepend_cas_mismatch() {
 
     let upsert_result = agent
         .upsert(
-            UpsertOptions::builder()
-                .key(key.as_slice())
-                .retry_strategy(strat.clone())
-                .scope_name("")
-                .collection_name("")
-                .value(value.as_slice())
-                .build(),
+            UpsertOptions::new(key.as_slice(), "", "", value.as_slice())
+                .retry_strategy(strat.clone()),
         )
         .await
         .unwrap();
@@ -493,14 +366,9 @@ async fn test_append_and_prepend_cas_mismatch() {
 
     let prepend_result = agent
         .prepend(
-            PrependOptions::builder()
-                .key(&key)
-                .scope_name("")
-                .collection_name("")
+            PrependOptions::new(&key, "", "", value)
                 .retry_strategy(strat.clone())
-                .value(value)
-                .cas(1234)
-                .build(),
+                .cas(1234),
         )
         .await;
 
@@ -517,14 +385,9 @@ async fn test_append_and_prepend_cas_mismatch() {
 
     let append_result = agent
         .append(
-            AppendOptions::builder()
-                .key(&key)
-                .scope_name("")
-                .collection_name("")
+            AppendOptions::new(&key, "", "", value)
                 .retry_strategy(strat.clone())
-                .value(value)
-                .cas(1234)
-                .build(),
+                .cas(1234),
         )
         .await;
 
@@ -556,14 +419,10 @@ async fn test_increment_and_decrement() {
 
     let increment_result = agent
         .increment(
-            IncrementOptions::builder()
-                .key(key.as_slice())
+            IncrementOptions::new(key.as_slice(), "", "")
                 .retry_strategy(strat.clone())
-                .scope_name("")
-                .collection_name("")
                 .delta(1)
-                .initial(42)
-                .build(),
+                .initial(42),
         )
         .await
         .unwrap();
@@ -574,13 +433,9 @@ async fn test_increment_and_decrement() {
 
     let decrement_result = agent
         .decrement(
-            DecrementOptions::builder()
-                .key(key.as_slice())
+            DecrementOptions::new(key.as_slice(), "", "")
                 .retry_strategy(strat.clone())
-                .scope_name("")
-                .collection_name("")
-                .delta(2)
-                .build(),
+                .delta(2),
         )
         .await
         .unwrap();
@@ -620,13 +475,8 @@ async fn test_lookup_in() {
 
     let value = serde_json::to_vec(&obj).unwrap();
 
-    let upsert_opts = UpsertOptions::builder()
-        .key(key.as_slice())
-        .retry_strategy(strat.clone())
-        .scope_name("")
-        .collection_name("")
-        .value(value.as_slice())
-        .build();
+    let upsert_opts =
+        UpsertOptions::new(key.as_slice(), "", "", value.as_slice()).retry_strategy(strat.clone());
 
     let upsert_result = agent.upsert(upsert_opts).await.unwrap();
 
@@ -634,35 +484,14 @@ async fn test_lookup_in() {
     assert!(upsert_result.mutation_token.is_some());
 
     let ops = [
-        LookupInOp {
-            op: LookupInOpType::Get,
-            flags: SubdocOpFlag::empty(),
-            path: "baz".as_bytes(),
-        },
-        LookupInOp {
-            op: LookupInOpType::Exists,
-            flags: SubdocOpFlag::empty(),
-            path: "not-exists".as_bytes(),
-        },
-        LookupInOp {
-            op: LookupInOpType::GetCount,
-            flags: SubdocOpFlag::empty(),
-            path: "arr".as_bytes(),
-        },
-        LookupInOp {
-            op: LookupInOpType::GetDoc,
-            flags: SubdocOpFlag::empty(),
-            path: "".as_bytes(),
-        },
+        LookupInOp::new(LookupInOpType::Get, "baz".as_bytes()),
+        LookupInOp::new(LookupInOpType::Exists, "not-exists".as_bytes()),
+        LookupInOp::new(LookupInOpType::GetCount, "arr".as_bytes()),
+        LookupInOp::new(LookupInOpType::GetDoc, "".as_bytes()),
     ];
 
-    let lookup_in_opts = LookupInOptions::builder()
-        .key(key.as_slice())
-        .retry_strategy(strat.clone())
-        .scope_name("")
-        .collection_name("")
-        .ops(&ops)
-        .build();
+    let lookup_in_opts =
+        LookupInOptions::new(key.as_slice(), "", "", &ops).retry_strategy(strat.clone());
 
     let lookup_in_result = agent.lookup_in(lookup_in_opts).await.unwrap();
 
@@ -722,13 +551,8 @@ async fn test_mutate_in() {
 
     let value = serde_json::to_vec(&obj).unwrap();
 
-    let upsert_opts = UpsertOptions::builder()
-        .key(key.as_slice())
-        .retry_strategy(strat.clone())
-        .scope_name("")
-        .collection_name("")
-        .value(value.as_slice())
-        .build();
+    let upsert_opts =
+        UpsertOptions::new(key.as_slice(), "", "", value.as_slice()).retry_strategy(strat.clone());
 
     let upsert_result = agent.upsert(upsert_opts).await.unwrap();
 
@@ -736,34 +560,22 @@ async fn test_mutate_in() {
     assert!(upsert_result.mutation_token.is_some());
 
     let ops = [
-        MutateInOp {
-            op: MutateInOpType::Counter,
-            flags: SubdocOpFlag::empty(),
-            path: "bar".as_bytes(),
-            value: "3".as_bytes(),
-        },
-        MutateInOp {
-            op: MutateInOpType::DictSet,
-            flags: SubdocOpFlag::empty(),
-            path: "baz".as_bytes(),
-            value: "\"world\"".as_bytes(),
-        },
-        MutateInOp {
-            op: MutateInOpType::ArrayPushLast,
-            flags: SubdocOpFlag::empty(),
-            path: "arr".as_bytes(),
-            value: "4".as_bytes(),
-        },
+        MutateInOp::new(MutateInOpType::Counter, "bar".as_bytes(), "3".as_bytes()),
+        MutateInOp::new(
+            MutateInOpType::DictSet,
+            "baz".as_bytes(),
+            "\"world\"".as_bytes(),
+        ),
+        MutateInOp::new(
+            MutateInOpType::ArrayPushLast,
+            "arr".as_bytes(),
+            "4".as_bytes(),
+        ),
     ];
 
-    let mutate_in_options = MutateInOptions::builder()
-        .key(key.as_slice())
+    let mutate_in_options = MutateInOptions::new(key.as_slice(), "", "", &ops)
         .retry_strategy(strat.clone())
-        .scope_name("")
-        .collection_name("")
-        .ops(&ops)
-        .expiry(10)
-        .build();
+        .expiry(10);
 
     let mutate_in_result = agent.mutate_in(mutate_in_options).await.unwrap();
 
@@ -796,13 +608,8 @@ async fn test_kv_without_a_bucket() {
 
     let upsert_result = agent
         .upsert(
-            UpsertOptions::builder()
-                .key(key.as_slice())
-                .retry_strategy(strat.clone())
-                .scope_name("")
-                .collection_name("")
-                .value(value.as_slice())
-                .build(),
+            UpsertOptions::new(key.as_slice(), "", "", value.as_slice())
+                .retry_strategy(strat.clone()),
         )
         .await;
 
@@ -838,13 +645,8 @@ async fn upsert_allocations() {
 
     let strat = Arc::new(FailFastRetryStrategy::default());
 
-    let upsert_opts = UpsertOptions::builder()
-        .key(key.as_slice())
-        .retry_strategy(strat.clone())
-        .scope_name("")
-        .collection_name("")
-        .value(value.as_slice())
-        .build();
+    let upsert_opts =
+        UpsertOptions::new(key.as_slice(), "", "", value.as_slice()).retry_strategy(strat.clone());
 
     // make sure that all the underlying resources are setup.
     agent.upsert(upsert_opts.clone()).await.unwrap();

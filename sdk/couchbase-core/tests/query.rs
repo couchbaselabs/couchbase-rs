@@ -19,9 +19,7 @@ async fn test_query_basic() {
     let agent_opts = create_default_options().await;
 
     let mut agent = Agent::new(agent_opts).await.unwrap();
-    let opts = QueryOptions::builder()
-        .statement("SELECT 1=1".to_string())
-        .build();
+    let opts = QueryOptions::default().statement("SELECT 1=1".to_string());
     let mut res = agent.query(opts).await.unwrap();
 
     let mut rows = vec![];
@@ -74,9 +72,7 @@ async fn test_prepared_query_basic() {
     let agent_opts = create_default_options().await;
 
     let mut agent = Agent::new(agent_opts).await.unwrap();
-    let opts = QueryOptions::builder()
-        .statement("SELECT 1=1".to_string())
-        .build();
+    let opts = QueryOptions::default().statement("SELECT 1=1".to_string());
     let mut res = agent.prepared_query(opts).await.unwrap();
 
     let mut rows = vec![];

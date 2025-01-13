@@ -44,6 +44,7 @@ pub struct ResponseContext {
     pub cas: Option<u64>,
     pub subdoc_info: Option<SubdocRequestInfo>,
 }
+
 #[derive(Debug, Clone)]
 pub(crate) struct SenderContext {
     pub sender: ResponseSender,

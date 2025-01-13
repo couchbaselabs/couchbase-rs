@@ -12,7 +12,6 @@ use base64::Engine;
 use http::header::{CONTENT_TYPE, USER_AGENT};
 use log::trace;
 use reqwest::redirect::Policy;
-use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 #[async_trait]
@@ -20,12 +19,21 @@ pub trait Client: Send + Sync {
     async fn execute(&self, req: Request) -> HttpxResult<Response>;
 }
 
-#[derive(Clone, Debug, Default, TypedBuilder)]
-#[builder(field_defaults(setter(into)))]
+#[derive(Clone, Debug, Default)]
 #[non_exhaustive]
 pub struct ClientConfig {
-    #[builder(default)]
     pub tls_config: Option<TlsConfig>,
+}
+
+impl ClientConfig {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn tls_config(mut self, tls_config: impl Into<Option<TlsConfig>>) -> Self {
+        self.tls_config = tls_config.into();
+        self
+    }
 }
 
 #[derive(Debug)]
@@ -87,7 +95,12 @@ impl Client for ReqwestClient {
     async fn execute(&self, req: Request) -> HttpxResult<Response> {
         let inner = self.inner.load();
 
-        let id = req.unique_id;
+        let id = if let Some(unique_id) = req.unique_id {
+            unique_id
+        } else {
+            Uuid::new_v4().to_string()
+        };
+
         trace!(
             "Writing request on {} to {}. Method={}. Request id={}",
             &self.client_id,

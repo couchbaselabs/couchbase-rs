@@ -6,7 +6,6 @@ use log::debug;
 use std::io::Cursor;
 use std::sync::Arc;
 use std::time::Duration;
-use typed_builder::TypedBuilder;
 
 use crate::capella_ca::CAPELLA_CERT;
 use crate::error;
@@ -18,37 +17,98 @@ use {
     webpki_roots::TLS_SERVER_ROOTS,
 };
 
-#[derive(Clone, Debug, TypedBuilder)]
-#[builder(field_defaults(default, setter(into)))]
+#[derive(Clone, Debug)]
 #[non_exhaustive]
 pub struct ClusterOptions {
     // authenticator specifies the authenticator to use with the cluster.
-    #[builder(!default)]
-    pub authenticator: Authenticator,
+    pub(crate) authenticator: Authenticator,
     // timeout_options specifies various operation timeouts.
-    pub timeout_options: TimeoutOptions,
+    pub(crate) timeout_options: Option<TimeoutOptions>,
     // compression_mode specifies compression related configuration options.
-    pub compression_mode: CompressionMode,
-    pub retry_strategy: Option<Arc<dyn crate::retry::RetryStrategy>>,
-    pub tls_options: Option<TlsOptions>,
+    pub(crate) compression_mode: Option<CompressionMode>,
+    pub(crate) retry_strategy: Option<Arc<dyn crate::retry::RetryStrategy>>,
+    pub(crate) tls_options: Option<TlsOptions>,
 }
 
-#[derive(Clone, Debug, PartialEq, TypedBuilder)]
-#[builder(field_defaults(default, setter(into)))]
+impl ClusterOptions {
+    pub fn new(authenticator: Authenticator) -> Self {
+        Self {
+            authenticator,
+            timeout_options: None,
+            compression_mode: None,
+            retry_strategy: None,
+            tls_options: None,
+        }
+    }
+
+    pub fn timeout_options(mut self, timeout_options: TimeoutOptions) -> Self {
+        self.timeout_options = Some(timeout_options);
+        self
+    }
+
+    pub fn compression_mode(mut self, compression_mode: CompressionMode) -> Self {
+        self.compression_mode = Some(compression_mode);
+        self
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn crate::retry::RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
+    }
+
+    pub fn tls_options(mut self, tls_options: TlsOptions) -> Self {
+        self.tls_options = Some(tls_options);
+        self
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub struct TimeoutOptions {
-    pub kv_connect_timeout: Option<Duration>,
+    pub(crate) kv_connect_timeout: Option<Duration>,
 }
 
-#[derive(Clone, Debug, PartialEq, TypedBuilder)]
-#[builder(field_defaults(default, setter(into)))]
+impl TimeoutOptions {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn kv_connect_timeout(mut self, timeout: Duration) -> Self {
+        self.kv_connect_timeout = Some(timeout);
+        self
+    }
+}
+
+#[derive(Clone, Default, Debug, PartialEq)]
 #[non_exhaustive]
 pub struct TlsOptions {
-    pub danger_accept_invalid_certs: Option<bool>,
-    pub ca_certificate: Option<Vec<u8>>,
+    pub(crate) danger_accept_invalid_certs: Option<bool>,
+    pub(crate) ca_certificate: Option<Vec<u8>>,
 
     #[cfg(feature = "native-tls")]
-    pub danger_accept_invalid_hostnames: Option<bool>,
+    pub(crate) danger_accept_invalid_hostnames: Option<bool>,
+}
+
+impl TlsOptions {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn danger_accept_invalid_certs(mut self, danger: bool) -> Self {
+        self.danger_accept_invalid_certs = Some(danger);
+        self
+    }
+
+    pub fn ca_certificate(mut self, cert: Vec<u8>) -> Self {
+        self.ca_certificate = Some(cert);
+        self
+    }
+
+    #[cfg(feature = "native-tls")]
+    pub fn danger_accept_invalid_hostnames(mut self, danger: bool) -> Self {
+        self.danger_accept_invalid_hostnames = Some(danger);
+        self
+    }
 }
 
 #[cfg(all(feature = "rustls-tls", not(feature = "native-tls")))]
@@ -132,34 +192,5 @@ impl Default for TimeoutOptions {
         Self {
             kv_connect_timeout: Some(Duration::from_secs(10)),
         }
-    }
-}
-
-impl TryFrom<ClusterOptions> for OnDemandAgentManagerOptions {
-    type Error = error::Error;
-
-    fn try_from(opts: ClusterOptions) -> Result<Self, Self::Error> {
-        let tls_config = if let Some(tls_config) = opts.tls_options {
-            Some(tls_config.try_into().map_err(|e| error::Error {
-                msg: format!("{:?}", e),
-            })?)
-        } else {
-            None
-        };
-        let builder = OnDemandAgentManagerOptions::builder()
-            .authenticator(opts.authenticator)
-            .connect_timeout(
-                opts.timeout_options
-                    .kv_connect_timeout
-                    .unwrap_or(Duration::from_secs(10)),
-            )
-            .compression_config(
-                CompressionConfig::builder()
-                    .mode(opts.compression_mode)
-                    .build(),
-            )
-            .tls_config(tls_config);
-
-        Ok(builder.build())
     }
 }

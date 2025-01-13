@@ -35,50 +35,33 @@ async fn test_search_basic() {
 
     let import_results = import_sample_beer_dataset("search", &collection).await;
 
-    let query = TermQuery::builder()
-        .term("search")
-        .field("service".to_string())
-        .build();
+    let query = TermQuery::new("search").field("service".to_string());
 
     let mut facets = HashMap::new();
     facets.insert(
         "type".to_string(),
-        Facet::Term(TermFacet::builder().field("country").size(5).build()),
+        Facet::Term(TermFacet::new("country").size(5)),
     );
     facets.insert(
         "date".to_string(),
         Facet::DateRange(
-            DateRangeFacet::builder()
-                .field("updated")
-                .size(5)
-                .add_date_range(
-                    DateRange::builder()
-                        .name("updated")
-                        .start(DateTime::parse_from_rfc3339("2000-07-22 20:00:20Z").unwrap())
-                        .end(DateTime::parse_from_rfc3339("2020-07-22 20:00:20Z").unwrap())
-                        .build(),
-                )
-                .build(),
+            DateRangeFacet::new("updated").size(5).add_date_range(
+                DateRange::new("updated")
+                    .start(DateTime::parse_from_rfc3339("2000-07-22 20:00:20Z").unwrap())
+                    .end(DateTime::parse_from_rfc3339("2020-07-22 20:00:20Z").unwrap()),
+            ),
         ),
     );
     facets.insert(
         "numeric".to_string(),
         Facet::NumericRange(
-            NumericRangeFacet::builder()
-                .field("geo.lat")
+            NumericRangeFacet::new("geo.lat")
                 .size(5)
-                .add_numeric_range(
-                    NumericRange::builder()
-                        .name("lat")
-                        .min(30f64)
-                        .max(31f64)
-                        .build(),
-                )
-                .build(),
+                .add_numeric_range(NumericRange::new("lat").min(30f64).max(31f64)),
         ),
     );
 
-    let sort = Sort::Id(SortId::builder().descending(true).build());
+    let sort = Sort::Id(SortId::new().descending(true));
 
     let deadline = Instant::now() + std::time::Duration::from_secs(60);
 
@@ -89,13 +72,12 @@ async fn test_search_basic() {
             .search(
                 BASIC_INDEX_NAME,
                 SearchRequest::with_search_query(Query::Term(query.clone())),
-                SearchOptions::builder()
+                SearchOptions::new()
                     .include_locations(true)
                     .server_timeout(Duration::from_secs(5))
                     .facets(facets.clone())
                     .sort(vec![sort.clone()])
-                    .fields(vec!["city".to_string()])
-                    .build(),
+                    .fields(vec!["city".to_string()]),
             )
             .await
             .unwrap();

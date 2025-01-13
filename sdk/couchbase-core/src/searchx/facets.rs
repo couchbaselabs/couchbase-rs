@@ -1,23 +1,31 @@
 use chrono::{DateTime, FixedOffset};
 use serde::ser::SerializeMap;
 use serde::{Serialize, Serializer};
-use typed_builder::TypedBuilder;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, TypedBuilder)]
-#[builder(field_defaults(default, setter(into)))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[non_exhaustive]
 pub struct TermFacet {
-    #[builder(!default)]
     pub field: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub size: Option<u64>,
 }
+impl TermFacet {
+    pub fn new(field: impl Into<String>) -> Self {
+        Self {
+            field: field.into(),
+            size: None,
+        }
+    }
 
-#[derive(Debug, Clone, PartialEq, Serialize, TypedBuilder)]
-#[builder(field_defaults(default, setter(into)))]
+    pub fn size(mut self, size: impl Into<Option<u64>>) -> Self {
+        self.size = size.into();
+        self
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[non_exhaustive]
 pub struct NumericRange {
-    #[builder(!default)]
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub min: Option<f64>,
@@ -25,30 +33,92 @@ pub struct NumericRange {
     pub max: Option<f64>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, TypedBuilder)]
-#[builder(field_defaults(default, setter(into)))]
+impl NumericRange {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            min: None,
+            max: None,
+        }
+    }
+
+    pub fn min(mut self, min: impl Into<Option<f64>>) -> Self {
+        self.min = min.into();
+        self
+    }
+
+    pub fn max(mut self, max: impl Into<Option<f64>>) -> Self {
+        self.max = max.into();
+        self
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[non_exhaustive]
 pub struct NumericRangeFacet {
-    #[builder(!default)]
     pub field: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub size: Option<u64>,
-    #[builder(mutators(
-        pub fn add_numeric_range(&mut self, range: NumericRange) {
-            self.numeric_ranges.push(range);
-        }
-    ))]
     pub numeric_ranges: Vec<NumericRange>,
 }
 
-#[derive(Debug, Clone, PartialEq, TypedBuilder)]
-#[builder(field_defaults(default, setter(into)))]
+impl NumericRangeFacet {
+    pub fn new(field: impl Into<String>) -> Self {
+        Self {
+            field: field.into(),
+            size: None,
+            numeric_ranges: Vec::new(),
+        }
+    }
+
+    pub fn with_numeric_ranges(
+        field: impl Into<String>,
+        numeric_ranges: impl Into<Vec<NumericRange>>,
+    ) -> Self {
+        Self {
+            field: field.into(),
+            size: None,
+            numeric_ranges: numeric_ranges.into(),
+        }
+    }
+
+    pub fn size(mut self, size: impl Into<Option<u64>>) -> Self {
+        self.size = size.into();
+        self
+    }
+
+    pub fn add_numeric_range(mut self, range: NumericRange) -> Self {
+        self.numeric_ranges.push(range);
+        self
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct DateRange {
-    #[builder(!default)]
     pub name: String,
     pub start: Option<DateTime<FixedOffset>>,
     pub end: Option<DateTime<FixedOffset>>,
+}
+
+impl DateRange {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            start: None,
+            end: None,
+        }
+    }
+
+    pub fn start(mut self, start: impl Into<Option<DateTime<FixedOffset>>>) -> Self {
+        self.start = start.into();
+        self
+    }
+
+    pub fn end(mut self, end: impl Into<Option<DateTime<FixedOffset>>>) -> Self {
+        self.end = end.into();
+        self
+    }
 }
 
 impl Serialize for DateRange {
@@ -70,20 +140,44 @@ impl Serialize for DateRange {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, TypedBuilder)]
-#[builder(field_defaults(default, setter(into)))]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[non_exhaustive]
 pub struct DateRangeFacet {
-    #[builder(!default)]
     pub field: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub size: Option<u64>,
-    #[builder(mutators(
-        pub fn add_date_range(&mut self, range: DateRange) {
-            self.date_ranges.push(range);
-        }
-    ))]
     pub date_ranges: Vec<DateRange>,
+}
+
+impl DateRangeFacet {
+    pub fn new(field: impl Into<String>) -> Self {
+        Self {
+            field: field.into(),
+            size: None,
+            date_ranges: Vec::new(),
+        }
+    }
+
+    pub fn with_date_ranges(
+        field: impl Into<String>,
+        date_ranges: impl Into<Vec<DateRange>>,
+    ) -> Self {
+        Self {
+            field: field.into(),
+            size: None,
+            date_ranges: date_ranges.into(),
+        }
+    }
+
+    pub fn size(mut self, size: impl Into<Option<u64>>) -> Self {
+        self.size = size.into();
+        self
+    }
+
+    pub fn add_date_range(mut self, range: DateRange) -> Self {
+        self.date_ranges.push(range);
+        self
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]

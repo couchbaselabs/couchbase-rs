@@ -3,7 +3,7 @@ use std::sync::Arc;
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct GetAllScopesOptions {
-    pub retry_strategy: Option<Arc<dyn crate::retry::RetryStrategy>>,
+    pub(crate) retry_strategy: Option<Arc<dyn crate::retry::RetryStrategy>>,
 }
 
 impl GetAllScopesOptions {
@@ -20,7 +20,7 @@ impl GetAllScopesOptions {
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct CreateScopeOptions {
-    pub retry_strategy: Option<Arc<dyn crate::retry::RetryStrategy>>,
+    pub(crate) retry_strategy: Option<Arc<dyn crate::retry::RetryStrategy>>,
 }
 
 impl CreateScopeOptions {
@@ -37,7 +37,7 @@ impl CreateScopeOptions {
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct DropScopeOptions {
-    pub retry_strategy: Option<Arc<dyn crate::retry::RetryStrategy>>,
+    pub(crate) retry_strategy: Option<Arc<dyn crate::retry::RetryStrategy>>,
 }
 
 impl DropScopeOptions {
@@ -54,7 +54,7 @@ impl DropScopeOptions {
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct CreateCollectionOptions {
-    pub retry_strategy: Option<Arc<dyn crate::retry::RetryStrategy>>,
+    pub(crate) retry_strategy: Option<Arc<dyn crate::retry::RetryStrategy>>,
 }
 
 impl CreateCollectionOptions {
@@ -71,7 +71,7 @@ impl CreateCollectionOptions {
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct UpdateCollectionOptions {
-    pub retry_strategy: Option<Arc<dyn crate::retry::RetryStrategy>>,
+    pub(crate) retry_strategy: Option<Arc<dyn crate::retry::RetryStrategy>>,
 }
 
 impl UpdateCollectionOptions {
@@ -88,7 +88,7 @@ impl UpdateCollectionOptions {
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct DropCollectionOptions {
-    pub retry_strategy: Option<Arc<dyn crate::retry::RetryStrategy>>,
+    pub(crate) retry_strategy: Option<Arc<dyn crate::retry::RetryStrategy>>,
 }
 
 impl DropCollectionOptions {

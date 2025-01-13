@@ -5,7 +5,6 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
-use typed_builder::TypedBuilder;
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 #[non_exhaustive]
@@ -59,30 +58,135 @@ impl From<ProfileMode> for queryx::query_options::ProfileMode {
     }
 }
 
-#[derive(Default, Debug, Clone, TypedBuilder)]
-#[builder(field_defaults(default, setter(into, strip_option)))]
+#[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct QueryOptions {
-    pub ad_hoc: Option<bool>,
-    pub client_context_id: Option<String>,
-    pub consistent_with: Option<MutationState>,
-    pub flex_index: Option<bool>,
-    pub max_parallelism: Option<u32>,
-    pub metrics: Option<bool>,
-    pub named_parameters: Option<HashMap<String, Value>>,
-    pub pipeline_batch: Option<u32>,
-    pub pipeline_cap: Option<u32>,
-    pub positional_parameters: Option<Vec<Value>>,
-    pub preserve_expiry: Option<bool>,
-    pub profile: Option<ProfileMode>,
-    pub raw: Option<HashMap<String, Value>>,
-    pub read_only: Option<bool>,
-    pub retry_strategy: Option<Arc<dyn crate::retry::RetryStrategy>>,
-    pub scan_cap: Option<u32>,
-    pub scan_consistency: Option<ScanConsistency>,
-    pub scan_wait: Option<Duration>,
-    pub server_timeout: Option<Duration>,
-    pub use_replica: Option<ReplicaLevel>,
+    pub(crate) ad_hoc: Option<bool>,
+    pub(crate) client_context_id: Option<String>,
+    pub(crate) consistent_with: Option<MutationState>,
+    pub(crate) flex_index: Option<bool>,
+    pub(crate) max_parallelism: Option<u32>,
+    pub(crate) metrics: Option<bool>,
+    pub(crate) named_parameters: Option<HashMap<String, Value>>,
+    pub(crate) pipeline_batch: Option<u32>,
+    pub(crate) pipeline_cap: Option<u32>,
+    pub(crate) positional_parameters: Option<Vec<Value>>,
+    pub(crate) preserve_expiry: Option<bool>,
+    pub(crate) profile: Option<ProfileMode>,
+    pub(crate) raw: Option<HashMap<String, Value>>,
+    pub(crate) read_only: Option<bool>,
+    pub(crate) retry_strategy: Option<Arc<dyn crate::retry::RetryStrategy>>,
+    pub(crate) scan_cap: Option<u32>,
+    pub(crate) scan_consistency: Option<ScanConsistency>,
+    pub(crate) scan_wait: Option<Duration>,
+    pub(crate) server_timeout: Option<Duration>,
+    pub(crate) use_replica: Option<ReplicaLevel>,
+}
+
+impl QueryOptions {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn ad_hoc(mut self, ad_hoc: bool) -> Self {
+        self.ad_hoc = Some(ad_hoc);
+        self
+    }
+
+    pub fn client_context_id(mut self, client_context_id: impl Into<String>) -> Self {
+        self.client_context_id = Some(client_context_id.into());
+        self
+    }
+
+    pub fn consistent_with(mut self, consistent_with: MutationState) -> Self {
+        self.consistent_with = Some(consistent_with);
+        self
+    }
+
+    pub fn flex_index(mut self, flex_index: bool) -> Self {
+        self.flex_index = Some(flex_index);
+        self
+    }
+
+    pub fn max_parallelism(mut self, max_parallelism: u32) -> Self {
+        self.max_parallelism = Some(max_parallelism);
+        self
+    }
+
+    pub fn metrics(mut self, metrics: bool) -> Self {
+        self.metrics = Some(metrics);
+        self
+    }
+
+    pub fn named_parameters(mut self, named_parameters: HashMap<String, Value>) -> Self {
+        self.named_parameters = Some(named_parameters);
+        self
+    }
+
+    pub fn pipeline_batch(mut self, pipeline_batch: u32) -> Self {
+        self.pipeline_batch = Some(pipeline_batch);
+        self
+    }
+
+    pub fn pipeline_cap(mut self, pipeline_cap: u32) -> Self {
+        self.pipeline_cap = Some(pipeline_cap);
+        self
+    }
+
+    pub fn positional_parameters(mut self, positional_parameters: Vec<Value>) -> Self {
+        self.positional_parameters = Some(positional_parameters);
+        self
+    }
+
+    pub fn preserve_expiry(mut self, preserve_expiry: bool) -> Self {
+        self.preserve_expiry = Some(preserve_expiry);
+        self
+    }
+
+    pub fn profile(mut self, profile: ProfileMode) -> Self {
+        self.profile = Some(profile);
+        self
+    }
+
+    pub fn raw(mut self, raw: HashMap<String, Value>) -> Self {
+        self.raw = Some(raw);
+        self
+    }
+
+    pub fn read_only(mut self, read_only: bool) -> Self {
+        self.read_only = Some(read_only);
+        self
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn crate::retry::RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
+    }
+
+    pub fn scan_cap(mut self, scan_cap: u32) -> Self {
+        self.scan_cap = Some(scan_cap);
+        self
+    }
+
+    pub fn scan_consistency(mut self, scan_consistency: ScanConsistency) -> Self {
+        self.scan_consistency = Some(scan_consistency);
+        self
+    }
+
+    pub fn scan_wait(mut self, scan_wait: Duration) -> Self {
+        self.scan_wait = Some(scan_wait);
+        self
+    }
+
+    pub fn server_timeout(mut self, server_timeout: Duration) -> Self {
+        self.server_timeout = Some(server_timeout);
+        self
+    }
+
+    pub fn use_replica(mut self, use_replica: ReplicaLevel) -> Self {
+        self.use_replica = Some(use_replica);
+        self
+    }
 }
 
 impl TryFrom<QueryOptions> for queryoptions::QueryOptions {
@@ -99,36 +203,8 @@ impl TryFrom<QueryOptions> for queryoptions::QueryOptions {
             (None, opts.scan_consistency.map(|sc| sc.into()))
         };
 
-        let named_args = if let Some(named_args) = opts.named_parameters {
-            let mut collected = HashMap::default();
-            for (k, v) in named_args {
-                collected.insert(k, serde_json::to_vec(&v)?);
-            }
-            Some(collected)
-        } else {
-            None
-        };
-        let raw = if let Some(raw) = opts.raw {
-            let mut collected = HashMap::default();
-            for (k, v) in raw {
-                collected.insert(k, serde_json::to_vec(&v)?);
-            }
-            Some(collected)
-        } else {
-            None
-        };
-        let positional_params = if let Some(positional_params) = opts.positional_parameters {
-            let mut collected = vec![];
-            for v in positional_params {
-                collected.push(serde_json::to_vec(&v)?);
-            }
-            Some(collected)
-        } else {
-            None
-        };
-
-        let mut builder = queryoptions::QueryOptions::builder()
-            .args(positional_params)
+        let mut builder = queryoptions::QueryOptions::new()
+            .args(opts.positional_parameters)
             .client_context_id(opts.client_context_id)
             .max_parallelism(opts.max_parallelism)
             .metrics(opts.metrics)
@@ -143,10 +219,10 @@ impl TryFrom<QueryOptions> for queryoptions::QueryOptions {
             .sparse_scan_vectors(mutation_state)
             .timeout(opts.server_timeout)
             .use_replica(opts.use_replica.map(|r| r.into()))
-            .named_args(named_args)
-            .raw(raw)
+            .named_args(opts.named_parameters)
+            .raw(opts.raw)
             .retry_strategy(opts.retry_strategy);
 
-        Ok(builder.build())
+        Ok(builder)
     }
 }

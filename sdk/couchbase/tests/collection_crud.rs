@@ -7,6 +7,7 @@ use couchbase::subdoc::macros::{LookupInMacros, MutateInMacros};
 use couchbase::subdoc::mutate_in_specs::MutateInSpec;
 use couchbase::transcoding;
 use couchbase::transcoding::{encode_common_flags, DataType};
+use couchbase_core::memdx::subdoc::SubdocOp;
 use log::LevelFilter;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -409,7 +410,7 @@ async fn test_increment() {
 
     let res = collection
         .binary()
-        .increment(&key, IncrementOptions::builder().delta(1u64).build())
+        .increment(&key, IncrementOptions::new().delta(1u64))
         .await
         .unwrap();
 
@@ -433,7 +434,7 @@ async fn test_decrement() {
 
     let res = collection
         .binary()
-        .decrement(&key, DecrementOptions::builder().delta(1u64).build())
+        .decrement(&key, DecrementOptions::new().delta(1u64))
         .await
         .unwrap();
 
@@ -474,10 +475,7 @@ async fn test_lookup_in() {
         LookupInSpec::get("baz", None),
         LookupInSpec::exists("not-exists", None),
         LookupInSpec::count("arr", None),
-        LookupInSpec::get(
-            LookupInMacros::IsDeleted,
-            GetSpecOptions::builder().is_xattr(true).build(),
-        ),
+        LookupInSpec::get(LookupInMacros::IsDeleted, GetSpecOptions::new().xattr(true)),
         LookupInSpec::get("", None),
     ];
 
@@ -521,9 +519,6 @@ async fn test_mutate_in() {
     collection.upsert(&key, &obj, None).await.unwrap();
 
     let xattr_spec = MutateInSpec::insert("my-cas", MutateInMacros::CAS, None).unwrap();
-
-    assert!(xattr_spec.is_xattr);
-    assert!(xattr_spec.expand_macros);
 
     let ops = [
         MutateInSpec::decrement("bar", 1, None).unwrap(),

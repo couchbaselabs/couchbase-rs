@@ -33,22 +33,16 @@ async fn test_row_streamer() {
 
     let ip = addrs.first().unwrap().split(":").next().unwrap();
 
-    let basic_auth = BasicAuth {
-        username: test_username().await,
-        password: test_password().await,
-    };
+    let basic_auth = BasicAuth::new(test_username().await, test_password().await);
 
     let request_body = json!({"statement": "FROM RANGE(0, 999) AS i SELECT *"});
     let uri = format!("http://{}:8095/analytics/service", ip);
 
-    let request = Request::builder()
+    let request = Request::new(Method::POST, uri)
         .user_agent("rscbcorex".to_string())
         .auth(Auth::BasicAuth(basic_auth))
-        .method(Method::POST)
         .content_type("application/json".to_string())
-        .uri(uri.as_str())
-        .body(Bytes::from(serde_json::to_vec(&request_body).unwrap()))
-        .build();
+        .body(Bytes::from(serde_json::to_vec(&request_body).unwrap()));
 
     let client = ReqwestClient::new(ClientConfig::default()).unwrap();
 
@@ -104,19 +98,13 @@ async fn test_json_block_read() {
     let addrs = test_mem_addrs().await;
     let ip = addrs.first().unwrap().split(":").next().unwrap();
 
-    let basic_auth = BasicAuth {
-        username: test_username().await,
-        password: test_password().await,
-    };
+    let basic_auth = BasicAuth::new(test_username().await, test_password().await);
     let uri = format!("http://{}:8091/pools/default/terseClusterInfo", ip);
 
-    let request = Request::builder()
+    let request = Request::new(Method::GET, uri)
         .user_agent("rscbcorex".to_string())
         .auth(Auth::BasicAuth(basic_auth))
-        .method(Method::GET)
-        .content_type("application/json".to_string())
-        .uri(uri.as_str())
-        .build();
+        .content_type("application/json".to_string());
 
     let client = ReqwestClient::new(ClientConfig::default()).expect("could not create client");
 

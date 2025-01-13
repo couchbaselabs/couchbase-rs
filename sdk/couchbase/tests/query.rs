@@ -15,7 +15,7 @@ async fn test_query_basic() {
 
     let cluster = create_cluster_from_test_config().await;
 
-    let opts = QueryOptions::builder().metrics(true).build();
+    let opts = QueryOptions::new().metrics(true);
     let mut res = cluster.query("SELECT 1=1", opts).await.unwrap();
 
     let mut rows: Vec<Value> = vec![];
@@ -41,7 +41,7 @@ async fn test_query_raw_result() {
 
     let cluster = create_cluster_from_test_config().await;
 
-    let opts = QueryOptions::builder().metrics(true).build();
+    let opts = QueryOptions::new().metrics(true);
     let mut res = cluster.query("SELECT 1=1", opts).await.unwrap();
 
     let mut rows: Vec<Box<RawValue>> = vec![];
@@ -68,7 +68,7 @@ async fn test_prepared_query_basic() {
 
     let cluster = create_cluster_from_test_config().await;
 
-    let opts = QueryOptions::builder().metrics(true).build();
+    let opts = QueryOptions::new().metrics(true);
     let mut res = cluster.query("SELECT 1=1", opts).await.unwrap();
 
     let mut rows: Vec<Value> = vec![];
@@ -97,7 +97,7 @@ async fn test_scope_query_basic() {
         .bucket(test_bucket().await)
         .scope(test_scope().await);
 
-    let opts = QueryOptions::builder().metrics(true).build();
+    let opts = QueryOptions::new().metrics(true);
     let mut res = scope.query("SELECT 1=1", opts).await.unwrap();
 
     let mut rows: Vec<Value> = vec![];

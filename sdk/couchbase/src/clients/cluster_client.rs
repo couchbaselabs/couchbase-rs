@@ -11,6 +11,7 @@ use crate::error;
 use crate::options::cluster_options::ClusterOptions;
 use crate::retry::DEFAULT_RETRY_STRATEGY;
 use couchbase_connstr::{parse, resolve, Address, SrvRecord};
+use couchbase_core::agentoptions::{CompressionConfig, SeedConfig};
 use couchbase_core::ondemand_agentmanager::{OnDemandAgentManager, OnDemandAgentManagerOptions};
 use couchbase_core::retry::RetryStrategy;
 use std::collections::HashMap;
@@ -135,24 +136,43 @@ impl CouchbaseClusterBackend {
             None => DEFAULT_RETRY_STRATEGY.clone(),
         };
 
-        let mut opts: OnDemandAgentManagerOptions = opts.try_into()?;
+        let tls_config = if let Some(tls_config) = opts.tls_options {
+            Some(tls_config.try_into().map_err(|e| error::Error {
+                msg: format!("{:?}", e),
+            })?)
+        } else {
+            None
+        };
 
-        if opts.tls_config.is_some() && !use_ssl {
+        let seed_config = SeedConfig::new()
+            .memd_addrs(memd_hosts.iter().map(|a| a.to_string()).collect())
+            .http_addrs(http_hosts.iter().map(|a| a.to_string()).collect());
+
+        let mut core_opts: OnDemandAgentManagerOptions =
+            OnDemandAgentManagerOptions::new(seed_config, opts.authenticator)
+                .tls_config(tls_config);
+
+        if let Some(timeout_opts) = opts.timeout_options {
+            core_opts = core_opts.connect_timeout(timeout_opts.kv_connect_timeout);
+        }
+
+        if let Some(compression_mode) = opts.compression_mode {
+            core_opts = core_opts.compression_config(CompressionConfig::new(compression_mode));
+        }
+
+        if core_opts.tls_config.is_some() && !use_ssl {
             return Err(error::Error {
                 msg: "TLS config provided but couchbase scheme used".into(),
             });
-        } else if opts.tls_config.is_none() && use_ssl {
+        } else if core_opts.tls_config.is_none() && use_ssl {
             return Err(error::Error {
                 msg: "No TLS config provided but couchbases scheme used".into(),
             });
         }
 
-        Self::merge_options(&mut opts, extra_opts)?;
+        Self::merge_options(&mut core_opts, extra_opts)?;
 
-        opts.seed_config.memd_addrs = memd_hosts.iter().map(|a| a.to_string()).collect();
-        opts.seed_config.http_addrs = http_hosts.iter().map(|a| a.to_string()).collect();
-
-        let mgr = OnDemandAgentManager::new(opts).await?;
+        let mgr = OnDemandAgentManager::new(core_opts).await?;
 
         Ok(Self {
             agent_manager: Arc::new(mgr),

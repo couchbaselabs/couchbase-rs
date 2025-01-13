@@ -8,17 +8,17 @@ use couchbase_core::memdx::subdoc::MutateInOpType::{
 };
 use couchbase_core::memdx::subdoc::{MutateInOp, SubdocOp, SubdocOpFlag};
 use serde::Serialize;
-use typed_builder::TypedBuilder;
 
-#[derive(Debug, Clone, PartialEq, Eq, TypedBuilder)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
+// TODO: Should this be an enum?
 pub struct MutateInSpec {
-    pub op: MutateInOpType,
-    pub path: String,
-    pub value: Bytes,
-    pub create_path: bool,
-    pub is_xattr: bool,
-    pub expand_macros: bool,
+    pub(crate) op: MutateInOpType,
+    pub(crate) path: String,
+    pub(crate) value: Bytes,
+    pub(crate) create_path: bool,
+    pub(crate) is_xattr: bool,
+    pub(crate) expand_macros: bool,
 }
 
 impl SubdocOp for MutateInSpec {
@@ -41,82 +41,222 @@ pub enum MutateInOpType {
     Counter,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Default, TypedBuilder)]
-#[builder(field_defaults(default, setter(into, strip_option)))]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct InsertSpecOptions {
-    pub create_path: Option<bool>,
-    pub is_xattr: Option<bool>,
+    pub(crate) create_path: Option<bool>,
+    pub(crate) is_xattr: Option<bool>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Default, TypedBuilder)]
-#[builder(field_defaults(default, setter(into, strip_option)))]
+impl InsertSpecOptions {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn xattr(mut self, is_xattr: bool) -> Self {
+        self.is_xattr = Some(is_xattr);
+        self
+    }
+
+    pub fn create_path(mut self, create_path: bool) -> Self {
+        self.create_path = Some(create_path);
+        self
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct UpsertSpecOptions {
-    pub create_path: Option<bool>,
-    pub is_xattr: Option<bool>,
+    pub(crate) create_path: Option<bool>,
+    pub(crate) is_xattr: Option<bool>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Default, TypedBuilder)]
-#[builder(field_defaults(default, setter(into, strip_option)))]
+impl UpsertSpecOptions {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn xattr(mut self, is_xattr: bool) -> Self {
+        self.is_xattr = Some(is_xattr);
+        self
+    }
+
+    pub fn create_path(mut self, create_path: bool) -> Self {
+        self.create_path = Some(create_path);
+        self
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct ReplaceSpecOptions {
-    pub is_xattr: Option<bool>,
+    pub(crate) is_xattr: Option<bool>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Default, TypedBuilder)]
-#[builder(field_defaults(default, setter(into, strip_option)))]
+impl ReplaceSpecOptions {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn xattr(mut self, is_xattr: bool) -> Self {
+        self.is_xattr = Some(is_xattr);
+        self
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct RemoveSpecOptions {
-    pub is_xattr: Option<bool>,
+    pub(crate) is_xattr: Option<bool>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Default, TypedBuilder)]
-#[builder(field_defaults(default, setter(into, strip_option)))]
+impl RemoveSpecOptions {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn xattr(mut self, is_xattr: bool) -> Self {
+        self.is_xattr = Some(is_xattr);
+        self
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct ArrayAppendSpecOptions {
-    pub create_path: Option<bool>,
-    pub is_xattr: Option<bool>,
+    pub(crate) create_path: Option<bool>,
+    pub(crate) is_xattr: Option<bool>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Default, TypedBuilder)]
-#[builder(field_defaults(default, setter(into, strip_option)))]
+impl ArrayAppendSpecOptions {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn xattr(mut self, is_xattr: bool) -> Self {
+        self.is_xattr = Some(is_xattr);
+        self
+    }
+
+    pub fn create_path(mut self, create_path: bool) -> Self {
+        self.create_path = Some(create_path);
+        self
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct ArrayPrependSpecOptions {
-    pub create_path: Option<bool>,
-    pub is_xattr: Option<bool>,
+    pub(crate) create_path: Option<bool>,
+    pub(crate) is_xattr: Option<bool>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Default, TypedBuilder)]
-#[builder(field_defaults(default, setter(into, strip_option)))]
+impl ArrayPrependSpecOptions {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn xattr(mut self, is_xattr: bool) -> Self {
+        self.is_xattr = Some(is_xattr);
+        self
+    }
+
+    pub fn create_path(mut self, create_path: bool) -> Self {
+        self.create_path = Some(create_path);
+        self
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct ArrayInsertSpecOptions {
-    pub create_path: Option<bool>,
-    pub is_xattr: Option<bool>,
+    pub(crate) create_path: Option<bool>,
+    pub(crate) is_xattr: Option<bool>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Default, TypedBuilder)]
-#[builder(field_defaults(default, setter(into, strip_option)))]
+impl ArrayInsertSpecOptions {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn xattr(mut self, is_xattr: bool) -> Self {
+        self.is_xattr = Some(is_xattr);
+        self
+    }
+
+    pub fn create_path(mut self, create_path: bool) -> Self {
+        self.create_path = Some(create_path);
+        self
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct ArrayAddUniqueSpecOptions {
-    pub create_path: Option<bool>,
-    pub is_xattr: Option<bool>,
+    pub(crate) create_path: Option<bool>,
+    pub(crate) is_xattr: Option<bool>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Default, TypedBuilder)]
-#[builder(field_defaults(default, setter(into, strip_option)))]
+impl ArrayAddUniqueSpecOptions {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn xattr(mut self, is_xattr: bool) -> Self {
+        self.is_xattr = Some(is_xattr);
+        self
+    }
+
+    pub fn create_path(mut self, create_path: bool) -> Self {
+        self.create_path = Some(create_path);
+        self
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct IncrementSpecOptions {
-    pub create_path: Option<bool>,
-    pub is_xattr: Option<bool>,
+    pub(crate) create_path: Option<bool>,
+    pub(crate) is_xattr: Option<bool>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Default, TypedBuilder)]
-#[builder(field_defaults(default, setter(into, strip_option)))]
+impl IncrementSpecOptions {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn xattr(mut self, is_xattr: bool) -> Self {
+        self.is_xattr = Some(is_xattr);
+        self
+    }
+
+    pub fn create_path(mut self, create_path: bool) -> Self {
+        self.create_path = Some(create_path);
+        self
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct DecrementSpecOptions {
-    pub create_path: Option<bool>,
-    pub is_xattr: Option<bool>,
+    pub(crate) create_path: Option<bool>,
+    pub(crate) is_xattr: Option<bool>,
+}
+
+impl DecrementSpecOptions {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn xattr(mut self, is_xattr: bool) -> Self {
+        self.is_xattr = Some(is_xattr);
+        self
+    }
+
+    pub fn create_path(mut self, create_path: bool) -> Self {
+        self.create_path = Some(create_path);
+        self
+    }
 }
 
 fn join_values(values: &[Bytes]) -> Bytes {
@@ -450,11 +590,6 @@ impl<'a> From<&'a MutateInSpec> for MutateInOp<'a> {
             op_flags |= SubdocOpFlag::EXPAND_MACROS;
         }
 
-        MutateInOp {
-            op: op_type,
-            flags: op_flags,
-            path: value.path.as_bytes(),
-            value: &value.value,
-        }
+        MutateInOp::new(op_type, value.path.as_bytes(), &value.value).flags(op_flags)
     }
 }

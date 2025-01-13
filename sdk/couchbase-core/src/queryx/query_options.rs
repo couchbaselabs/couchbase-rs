@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use serde::ser::{SerializeMap, SerializeSeq};
 use serde::{Serialize, Serializer};
-use typed_builder::TypedBuilder;
+use serde_json::Value;
 
 use crate::helpers;
 use crate::httpx::request::OnBehalfOfInfo;
@@ -64,14 +64,22 @@ pub enum Format {
     Tsv,
 }
 
-#[derive(Debug, Clone, Serialize, TypedBuilder)]
-#[builder(field_defaults(setter(into)))]
+#[derive(Debug, Clone, Serialize)]
 #[non_exhaustive]
 pub struct CredsJson {
     #[serde(skip_serializing_if = "String::is_empty")]
-    pub user: String,
+    pub(crate) user: String,
     #[serde(skip_serializing_if = "String::is_empty")]
-    pub pass: String,
+    pub(crate) pass: String,
+}
+
+impl CredsJson {
+    pub fn new(user: impl Into<String>, pass: impl Into<String>) -> Self {
+        Self {
+            user: user.into(),
+            pass: pass.into(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -82,12 +90,20 @@ pub enum ReplicaLevel {
     On,
 }
 
-#[derive(Debug, Clone, TypedBuilder)]
-#[builder(field_defaults(setter(into)))]
+#[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct ScanVectorEntry {
-    pub seq_no: u64,
-    pub vb_uuid: String,
+    pub(crate) seq_no: u64,
+    pub(crate) vb_uuid: String,
+}
+
+impl ScanVectorEntry {
+    pub fn new(seq_no: u64, vb_uuid: impl Into<String>) -> Self {
+        Self {
+            seq_no,
+            vb_uuid: vb_uuid.into(),
+        }
+    }
 }
 
 impl Serialize for ScanVectorEntry {
@@ -106,58 +122,311 @@ impl Serialize for ScanVectorEntry {
 pub type FullScanVectors = Vec<ScanVectorEntry>;
 pub type SparseScanVectors = HashMap<String, ScanVectorEntry>;
 
-#[derive(Debug, Clone, TypedBuilder)]
-#[builder(field_defaults(setter(into)))]
+#[derive(Debug, Clone, Default)]
 #[non_exhaustive]
 pub struct QueryOptions {
-    pub args: Option<Vec<Vec<u8>>>,
-    pub atr_collection: Option<String>,
-    pub auto_execute: Option<bool>,
-    pub client_context_id: Option<String>,
-    pub compression: Option<Compression>,
-    pub controls: Option<bool>,
-    pub creds: Option<Vec<CredsJson>>,
-    pub durability_level: Option<DurabilityLevel>,
-    pub encoded_plan: Option<String>,
-    pub encoding: Option<Encoding>,
-    pub format: Option<Format>,
-    pub kv_timeout: Option<Duration>,
-    pub max_parallelism: Option<u32>,
-    pub memory_quota: Option<u32>,
-    pub metrics: Option<bool>,
-    pub namespace: Option<String>,
-    pub num_atrs: Option<u32>,
-    pub pipeline_batch: Option<u32>,
-    pub pipeline_cap: Option<u32>,
-    pub prepared: Option<String>,
-    pub preserve_expiry: Option<bool>,
-    pub pretty: Option<bool>,
-    pub profile: Option<ProfileMode>,
-    pub query_context: Option<String>,
-    pub read_only: Option<bool>,
-    pub scan_cap: Option<u32>,
-    pub scan_consistency: Option<ScanConsistency>,
-    pub sparse_scan_vector: Option<SparseScanVectors>,
-    pub full_scan_vector: Option<FullScanVectors>,
-    pub sparse_scan_vectors: Option<HashMap<String, SparseScanVectors>>,
-    pub full_scan_vectors: Option<HashMap<String, FullScanVectors>>,
-    pub scan_wait: Option<Duration>,
-    pub signature: Option<bool>,
-    pub statement: Option<String>,
-    pub timeout: Option<Duration>,
-    pub tx_data: Option<Vec<u8>>,
-    pub tx_id: Option<String>,
-    pub tx_implicit: Option<bool>,
-    pub tx_stmt_num: Option<u32>,
-    pub tx_timeout: Option<Duration>,
-    pub use_cbo: Option<bool>,
-    pub use_fts: Option<bool>,
-    pub use_replica: Option<ReplicaLevel>,
+    pub(crate) args: Option<Vec<Value>>,
+    pub(crate) atr_collection: Option<String>,
+    pub(crate) auto_execute: Option<bool>,
+    pub(crate) client_context_id: Option<String>,
+    pub(crate) compression: Option<Compression>,
+    pub(crate) controls: Option<bool>,
+    pub(crate) creds: Option<Vec<CredsJson>>,
+    pub(crate) durability_level: Option<DurabilityLevel>,
+    pub(crate) encoded_plan: Option<String>,
+    pub(crate) encoding: Option<Encoding>,
+    pub(crate) format: Option<Format>,
+    pub(crate) kv_timeout: Option<Duration>,
+    pub(crate) max_parallelism: Option<u32>,
+    pub(crate) memory_quota: Option<u32>,
+    pub(crate) metrics: Option<bool>,
+    pub(crate) namespace: Option<String>,
+    pub(crate) num_atrs: Option<u32>,
+    pub(crate) pipeline_batch: Option<u32>,
+    pub(crate) pipeline_cap: Option<u32>,
+    pub(crate) prepared: Option<String>,
+    pub(crate) preserve_expiry: Option<bool>,
+    pub(crate) pretty: Option<bool>,
+    pub(crate) profile: Option<ProfileMode>,
+    pub(crate) query_context: Option<String>,
+    pub(crate) read_only: Option<bool>,
+    pub(crate) scan_cap: Option<u32>,
+    pub(crate) scan_consistency: Option<ScanConsistency>,
+    pub(crate) sparse_scan_vector: Option<SparseScanVectors>,
+    pub(crate) full_scan_vector: Option<FullScanVectors>,
+    pub(crate) sparse_scan_vectors: Option<HashMap<String, SparseScanVectors>>,
+    pub(crate) full_scan_vectors: Option<HashMap<String, FullScanVectors>>,
+    pub(crate) scan_wait: Option<Duration>,
+    pub(crate) signature: Option<bool>,
+    pub(crate) statement: Option<String>,
+    pub(crate) timeout: Option<Duration>,
+    pub(crate) tx_data: Option<Vec<u8>>,
+    pub(crate) tx_id: Option<String>,
+    pub(crate) tx_implicit: Option<bool>,
+    pub(crate) tx_stmt_num: Option<u32>,
+    pub(crate) tx_timeout: Option<Duration>,
+    pub(crate) use_cbo: Option<bool>,
+    pub(crate) use_fts: Option<bool>,
+    pub(crate) use_replica: Option<ReplicaLevel>,
 
-    pub named_args: Option<HashMap<String, Vec<u8>>>,
-    pub raw: Option<HashMap<String, Vec<u8>>>,
+    pub(crate) named_args: Option<HashMap<String, Value>>,
+    pub(crate) raw: Option<HashMap<String, Value>>,
 
-    pub on_behalf_of: Option<OnBehalfOfInfo>,
+    pub(crate) on_behalf_of: Option<OnBehalfOfInfo>,
+}
+
+impl QueryOptions {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn args(mut self, args: impl Into<Option<Vec<Value>>>) -> Self {
+        self.args = args.into();
+        self
+    }
+
+    pub fn atr_collection(mut self, atr_collection: impl Into<Option<String>>) -> Self {
+        self.atr_collection = atr_collection.into();
+        self
+    }
+
+    pub fn auto_execute(mut self, auto_execute: impl Into<Option<bool>>) -> Self {
+        self.auto_execute = auto_execute.into();
+        self
+    }
+
+    pub fn client_context_id(mut self, client_context_id: impl Into<Option<String>>) -> Self {
+        self.client_context_id = client_context_id.into();
+        self
+    }
+
+    pub fn compression(mut self, compression: impl Into<Option<Compression>>) -> Self {
+        self.compression = compression.into();
+        self
+    }
+
+    pub fn controls(mut self, controls: impl Into<Option<bool>>) -> Self {
+        self.controls = controls.into();
+        self
+    }
+
+    pub fn creds(mut self, creds: impl Into<Option<Vec<CredsJson>>>) -> Self {
+        self.creds = creds.into();
+        self
+    }
+
+    pub fn durability_level(
+        mut self,
+        durability_level: impl Into<Option<DurabilityLevel>>,
+    ) -> Self {
+        self.durability_level = durability_level.into();
+        self
+    }
+
+    pub fn encoded_plan(mut self, encoded_plan: impl Into<Option<String>>) -> Self {
+        self.encoded_plan = encoded_plan.into();
+        self
+    }
+
+    pub fn encoding(mut self, encoding: impl Into<Option<Encoding>>) -> Self {
+        self.encoding = encoding.into();
+        self
+    }
+
+    pub fn format(mut self, format: impl Into<Option<Format>>) -> Self {
+        self.format = format.into();
+        self
+    }
+
+    pub fn kv_timeout(mut self, kv_timeout: impl Into<Option<Duration>>) -> Self {
+        self.kv_timeout = kv_timeout.into();
+        self
+    }
+
+    pub fn max_parallelism(mut self, max_parallelism: impl Into<Option<u32>>) -> Self {
+        self.max_parallelism = max_parallelism.into();
+        self
+    }
+
+    pub fn memory_quota(mut self, memory_quota: impl Into<Option<u32>>) -> Self {
+        self.memory_quota = memory_quota.into();
+        self
+    }
+
+    pub fn metrics(mut self, metrics: impl Into<Option<bool>>) -> Self {
+        self.metrics = metrics.into();
+        self
+    }
+
+    pub fn namespace(mut self, namespace: impl Into<Option<String>>) -> Self {
+        self.namespace = namespace.into();
+        self
+    }
+
+    pub fn num_atrs(mut self, num_atrs: impl Into<Option<u32>>) -> Self {
+        self.num_atrs = num_atrs.into();
+        self
+    }
+
+    pub fn pipeline_batch(mut self, pipeline_batch: impl Into<Option<u32>>) -> Self {
+        self.pipeline_batch = pipeline_batch.into();
+        self
+    }
+
+    pub fn pipeline_cap(mut self, pipeline_cap: impl Into<Option<u32>>) -> Self {
+        self.pipeline_cap = pipeline_cap.into();
+        self
+    }
+
+    pub fn prepared(mut self, prepared: impl Into<Option<String>>) -> Self {
+        self.prepared = prepared.into();
+        self
+    }
+
+    pub fn preserve_expiry(mut self, preserve_expiry: impl Into<Option<bool>>) -> Self {
+        self.preserve_expiry = preserve_expiry.into();
+        self
+    }
+
+    pub fn pretty(mut self, pretty: impl Into<Option<bool>>) -> Self {
+        self.pretty = pretty.into();
+        self
+    }
+
+    pub fn profile(mut self, profile: impl Into<Option<ProfileMode>>) -> Self {
+        self.profile = profile.into();
+        self
+    }
+
+    pub fn query_context(mut self, query_context: impl Into<Option<String>>) -> Self {
+        self.query_context = query_context.into();
+        self
+    }
+
+    pub fn read_only(mut self, read_only: impl Into<Option<bool>>) -> Self {
+        self.read_only = read_only.into();
+        self
+    }
+
+    pub fn scan_cap(mut self, scan_cap: impl Into<Option<u32>>) -> Self {
+        self.scan_cap = scan_cap.into();
+        self
+    }
+
+    pub fn scan_consistency(
+        mut self,
+        scan_consistency: impl Into<Option<ScanConsistency>>,
+    ) -> Self {
+        self.scan_consistency = scan_consistency.into();
+        self
+    }
+
+    pub fn sparse_scan_vector(
+        mut self,
+        sparse_scan_vector: impl Into<Option<SparseScanVectors>>,
+    ) -> Self {
+        self.sparse_scan_vector = sparse_scan_vector.into();
+        self
+    }
+
+    pub fn full_scan_vector(
+        mut self,
+        full_scan_vector: impl Into<Option<FullScanVectors>>,
+    ) -> Self {
+        self.full_scan_vector = full_scan_vector.into();
+        self
+    }
+
+    pub fn sparse_scan_vectors(
+        mut self,
+        sparse_scan_vectors: impl Into<Option<HashMap<String, SparseScanVectors>>>,
+    ) -> Self {
+        self.sparse_scan_vectors = sparse_scan_vectors.into();
+        self
+    }
+
+    pub fn full_scan_vectors(
+        mut self,
+        full_scan_vectors: impl Into<Option<HashMap<String, FullScanVectors>>>,
+    ) -> Self {
+        self.full_scan_vectors = full_scan_vectors.into();
+        self
+    }
+
+    pub fn scan_wait(mut self, scan_wait: impl Into<Option<Duration>>) -> Self {
+        self.scan_wait = scan_wait.into();
+        self
+    }
+
+    pub fn signature(mut self, signature: impl Into<Option<bool>>) -> Self {
+        self.signature = signature.into();
+        self
+    }
+
+    pub fn statement(mut self, statement: impl Into<Option<String>>) -> Self {
+        self.statement = statement.into();
+        self
+    }
+
+    pub fn timeout(mut self, timeout: impl Into<Option<Duration>>) -> Self {
+        self.timeout = timeout.into();
+        self
+    }
+
+    pub fn tx_data(mut self, tx_data: impl Into<Option<Vec<u8>>>) -> Self {
+        self.tx_data = tx_data.into();
+        self
+    }
+
+    pub fn tx_id(mut self, tx_id: impl Into<Option<String>>) -> Self {
+        self.tx_id = tx_id.into();
+        self
+    }
+
+    pub fn tx_implicit(mut self, tx_implicit: impl Into<Option<bool>>) -> Self {
+        self.tx_implicit = tx_implicit.into();
+        self
+    }
+
+    pub fn tx_stmt_num(mut self, tx_stmt_num: impl Into<Option<u32>>) -> Self {
+        self.tx_stmt_num = tx_stmt_num.into();
+        self
+    }
+
+    pub fn tx_timeout(mut self, tx_timeout: impl Into<Option<Duration>>) -> Self {
+        self.tx_timeout = tx_timeout.into();
+        self
+    }
+
+    pub fn use_cbo(mut self, use_cbo: impl Into<Option<bool>>) -> Self {
+        self.use_cbo = use_cbo.into();
+        self
+    }
+
+    pub fn use_fts(mut self, use_fts: impl Into<Option<bool>>) -> Self {
+        self.use_fts = use_fts.into();
+        self
+    }
+
+    pub fn use_replica(mut self, use_replica: impl Into<Option<ReplicaLevel>>) -> Self {
+        self.use_replica = use_replica.into();
+        self
+    }
+
+    pub fn named_args(mut self, named_args: impl Into<Option<HashMap<String, Value>>>) -> Self {
+        self.named_args = named_args.into();
+        self
+    }
+
+    pub fn raw(mut self, raw: impl Into<Option<HashMap<String, Value>>>) -> Self {
+        self.raw = raw.into();
+        self
+    }
+
+    pub fn on_behalf_of(mut self, on_behalf_of: impl Into<Option<OnBehalfOfInfo>>) -> Self {
+        self.on_behalf_of = on_behalf_of.into();
+        self
+    }
 }
 
 impl Serialize for QueryOptions {

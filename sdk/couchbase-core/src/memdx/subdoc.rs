@@ -1,7 +1,6 @@
 use crate::memdx::error;
 use crate::memdx::opcode::OpCode;
 use bitflags::bitflags;
-use typed_builder::TypedBuilder;
 
 pub trait SubdocOp {
     fn is_xattr_op(&self) -> bool;
@@ -31,8 +30,8 @@ pub fn reorder_subdoc_ops<T: SubdocOp>(ops: &[T]) -> (Vec<&T>, Vec<usize>) {
 // Request-info needed for response parsing
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SubdocRequestInfo {
-    pub flags: SubdocDocFlag,
-    pub op_count: u8,
+    pub(crate) flags: SubdocDocFlag,
+    pub(crate) op_count: u8,
 }
 
 #[derive(Clone, Debug)]
@@ -41,11 +40,26 @@ pub struct SubDocResult {
     pub value: Option<Vec<u8>>,
 }
 
-#[derive(Clone, Debug, Copy, TypedBuilder)]
+#[derive(Clone, Debug, Copy, Eq, PartialEq)]
 pub struct LookupInOp<'a> {
-    pub op: LookupInOpType,
-    pub flags: SubdocOpFlag,
-    pub path: &'a [u8],
+    pub(crate) op: LookupInOpType,
+    pub(crate) flags: SubdocOpFlag,
+    pub(crate) path: &'a [u8],
+}
+
+impl<'a> LookupInOp<'a> {
+    pub fn new(op: LookupInOpType, path: &'a [u8]) -> Self {
+        Self {
+            op,
+            flags: SubdocOpFlag::empty(),
+            path,
+        }
+    }
+
+    pub fn flags(mut self, flags: SubdocOpFlag) -> Self {
+        self.flags = flags;
+        self
+    }
 }
 
 impl<'a> SubdocOp for LookupInOp<'a> {
@@ -53,12 +67,29 @@ impl<'a> SubdocOp for LookupInOp<'a> {
         self.flags.contains(SubdocOpFlag::XATTR_PATH)
     }
 }
-#[derive(Clone, Debug, TypedBuilder)]
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MutateInOp<'a> {
-    pub op: MutateInOpType,
-    pub flags: SubdocOpFlag,
-    pub path: &'a [u8],
-    pub value: &'a [u8],
+    pub(crate) op: MutateInOpType,
+    pub(crate) flags: SubdocOpFlag,
+    pub(crate) path: &'a [u8],
+    pub(crate) value: &'a [u8],
+}
+
+impl<'a> MutateInOp<'a> {
+    pub fn new(op: MutateInOpType, path: &'a [u8], value: &'a [u8]) -> Self {
+        Self {
+            op,
+            flags: SubdocOpFlag::empty(),
+            path,
+            value,
+        }
+    }
+
+    pub fn flags(mut self, flags: SubdocOpFlag) -> Self {
+        self.flags = flags;
+        self
+    }
 }
 
 impl<'a> SubdocOp for MutateInOp<'a> {
@@ -68,7 +99,7 @@ impl<'a> SubdocOp for MutateInOp<'a> {
 }
 
 bitflags! {
-    #[derive(Copy, Clone, Debug, Eq, PartialEq)]
+    #[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
     pub struct SubdocOpFlag: u8 {
         // SubdocOpFlagMkDirP indicates that the path should be created if it does not already exist.
         const MKDIR_P = 0x01;
@@ -85,7 +116,7 @@ bitflags! {
         const EXPAND_MACROS = 0x10;
     }
 
-    #[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
+    #[derive(Copy, Clone, Debug, Eq, PartialEq, Default, Ord, PartialOrd, Hash)]
     pub struct SubdocDocFlag: u8 {
         // SubdocDocFlagMkDoc indicates that the document should be created if it does not already exist.
         const MkDoc = 0x01;
@@ -108,7 +139,7 @@ bitflags! {
 }
 
 // LookupInOpType specifies the type of lookup in operation.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub enum LookupInOpType {
     // LookupInOpTypeGet indicates the operation is a sub-document `Get` operation.
     Get,

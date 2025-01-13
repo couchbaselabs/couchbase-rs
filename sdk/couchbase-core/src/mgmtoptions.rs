@@ -6,10 +6,10 @@ use std::sync::Arc;
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct GetCollectionManifestOptions<'a> {
-    pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
-    pub bucket_name: &'a str,
+    pub(crate) on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+    pub(crate) bucket_name: &'a str,
 
-    pub retry_strategy: Arc<dyn RetryStrategy>,
+    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> GetCollectionManifestOptions<'a> {
@@ -46,11 +46,11 @@ impl<'a> From<&GetCollectionManifestOptions<'a>>
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct CreateScopeOptions<'a> {
-    pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
-    pub bucket_name: &'a str,
-    pub scope_name: &'a str,
+    pub(crate) on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+    pub(crate) bucket_name: &'a str,
+    pub(crate) scope_name: &'a str,
 
-    pub retry_strategy: Arc<dyn RetryStrategy>,
+    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> CreateScopeOptions<'a> {
@@ -87,11 +87,11 @@ impl<'a> From<&CreateScopeOptions<'a>> for mgmtx::options::CreateScopeOptions<'a
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct DeleteScopeOptions<'a> {
-    pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
-    pub bucket_name: &'a str,
-    pub scope_name: &'a str,
+    pub(crate) on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+    pub(crate) bucket_name: &'a str,
+    pub(crate) scope_name: &'a str,
 
-    pub retry_strategy: Arc<dyn RetryStrategy>,
+    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> DeleteScopeOptions<'a> {
@@ -128,14 +128,14 @@ impl<'a> From<&DeleteScopeOptions<'a>> for mgmtx::options::DeleteScopeOptions<'a
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct CreateCollectionOptions<'a> {
-    pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
-    pub bucket_name: &'a str,
-    pub scope_name: &'a str,
-    pub collection_name: &'a str,
-    pub max_ttl: Option<i32>,
-    pub history_enabled: Option<bool>,
+    pub(crate) on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+    pub(crate) bucket_name: &'a str,
+    pub(crate) scope_name: &'a str,
+    pub(crate) collection_name: &'a str,
+    pub(crate) max_ttl: Option<i32>,
+    pub(crate) history_enabled: Option<bool>,
 
-    pub retry_strategy: Arc<dyn RetryStrategy>,
+    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> CreateCollectionOptions<'a> {
@@ -188,14 +188,14 @@ impl<'a> From<&CreateCollectionOptions<'a>> for mgmtx::options::CreateCollection
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct UpdateCollectionOptions<'a> {
-    pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
-    pub bucket_name: &'a str,
-    pub scope_name: &'a str,
-    pub collection_name: &'a str,
-    pub max_ttl: Option<i32>,
-    pub history_enabled: Option<bool>,
+    pub(crate) on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+    pub(crate) bucket_name: &'a str,
+    pub(crate) scope_name: &'a str,
+    pub(crate) collection_name: &'a str,
+    pub(crate) max_ttl: Option<i32>,
+    pub(crate) history_enabled: Option<bool>,
 
-    pub retry_strategy: Arc<dyn RetryStrategy>,
+    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> UpdateCollectionOptions<'a> {
@@ -248,12 +248,12 @@ impl<'a> From<&UpdateCollectionOptions<'a>> for mgmtx::options::UpdateCollection
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct DeleteCollectionOptions<'a> {
-    pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
-    pub bucket_name: &'a str,
-    pub scope_name: &'a str,
-    pub collection_name: &'a str,
+    pub(crate) on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+    pub(crate) bucket_name: &'a str,
+    pub(crate) scope_name: &'a str,
+    pub(crate) collection_name: &'a str,
 
-    pub retry_strategy: Arc<dyn RetryStrategy>,
+    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> DeleteCollectionOptions<'a> {
@@ -292,9 +292,9 @@ impl<'a> From<&DeleteCollectionOptions<'a>> for mgmtx::options::DeleteCollection
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct EnsureManifestOptions<'a> {
-    pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
-    pub bucket_name: &'a str,
-    pub manifest_uid: u64,
+    pub(crate) on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+    pub(crate) bucket_name: &'a str,
+    pub(crate) manifest_uid: u64,
 }
 
 impl<'a> EnsureManifestOptions<'a> {

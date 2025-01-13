@@ -17,11 +17,11 @@ pub struct QueryOptions<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub client_context_id: Option<&'a str>,
     #[serde(skip_serializing)]
-    pub priority: Option<i32>,
+    pub(crate) priority: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub query_context: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none", rename = "readonly")]
-    pub read_only: Option<bool>,
+    pub(crate) read_only: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scan_consistency: Option<ScanConsistency>,
     pub statement: &'a str,

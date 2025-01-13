@@ -41,9 +41,7 @@ impl<C: Client> Analytics<C> {
             })
         };
 
-        let mut builder = Request::builder()
-            .method(method)
-            .uri(format!("{}/{}", self.endpoint, path.as_ref()))
+        let mut req = Request::new(method, format!("{}/{}", self.endpoint, path.as_ref()))
             .auth(auth)
             .user_agent(self.user_agent.clone())
             .content_type(content_type.as_ref().to_string())
@@ -51,11 +49,11 @@ impl<C: Client> Analytics<C> {
 
         if let Some(headers) = headers {
             for (key, value) in headers.into_iter() {
-                builder = builder.add_header(key, value);
+                req = req.add_header(key, value);
             }
         }
 
-        builder.build()
+        req
     }
 
     pub async fn execute(
