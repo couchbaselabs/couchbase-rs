@@ -5,7 +5,6 @@ use std::time::Duration;
 use arc_swap::ArcSwap;
 use log::debug;
 use tokio::sync::{Mutex, Notify};
-use typed_builder::TypedBuilder;
 
 use crate::agent::Agent;
 use crate::agentoptions::{AgentOptions, CompressionConfig, ConfigPollerConfig, SeedConfig};
@@ -14,25 +13,71 @@ use crate::error;
 use crate::error::ErrorKind;
 use crate::tls_config::TlsConfig;
 
-#[derive(Clone, TypedBuilder)]
-#[builder(field_defaults(setter(into)))]
+#[derive(Clone)]
 #[non_exhaustive]
 pub struct OnDemandAgentManagerOptions {
-    #[builder(default)]
-    pub tls_config: Option<TlsConfig>,
+    pub seed_config: SeedConfig,
     pub authenticator: Authenticator,
 
-    #[builder(default)]
+    pub tls_config: Option<TlsConfig>,
+
     pub connect_timeout: Option<Duration>,
-    #[builder(default)]
     pub connect_throttle_timeout: Option<Duration>,
 
-    #[builder(default)]
-    pub seed_config: SeedConfig,
-    #[builder(default)]
     pub compression_config: CompressionConfig,
-    #[builder(default)]
     pub config_poller_config: ConfigPollerConfig,
+}
+
+impl OnDemandAgentManagerOptions {
+    pub fn new(seed_config: SeedConfig, authenticator: Authenticator) -> Self {
+        Self {
+            tls_config: None,
+            authenticator,
+            connect_timeout: None,
+            connect_throttle_timeout: None,
+            seed_config,
+            compression_config: CompressionConfig::default(),
+            config_poller_config: ConfigPollerConfig::default(),
+        }
+    }
+
+    pub fn seed_config(mut self, seed_config: SeedConfig) -> Self {
+        self.seed_config = seed_config;
+        self
+    }
+
+    pub fn authenticator(mut self, authenticator: Authenticator) -> Self {
+        self.authenticator = authenticator;
+        self
+    }
+
+    pub fn tls_config(mut self, tls_config: impl Into<Option<TlsConfig>>) -> Self {
+        self.tls_config = tls_config.into();
+        self
+    }
+
+    pub fn connect_timeout(mut self, connect_timeout: impl Into<Option<Duration>>) -> Self {
+        self.connect_timeout = connect_timeout.into();
+        self
+    }
+
+    pub fn connect_throttle_timeout(
+        mut self,
+        connect_throttle_timeout: impl Into<Option<Duration>>,
+    ) -> Self {
+        self.connect_throttle_timeout = connect_throttle_timeout.into();
+        self
+    }
+
+    pub fn compression_config(mut self, compression_config: CompressionConfig) -> Self {
+        self.compression_config = compression_config;
+        self
+    }
+
+    pub fn config_poller_config(mut self, config_poller_config: ConfigPollerConfig) -> Self {
+        self.config_poller_config = config_poller_config;
+        self
+    }
 }
 
 impl From<OnDemandAgentManagerOptions> for AgentOptions {

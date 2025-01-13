@@ -9,7 +9,6 @@ use bytes::Bytes;
 use http::{Method, StatusCode};
 use std::collections::HashMap;
 use std::sync::Arc;
-use typed_builder::TypedBuilder;
 
 #[derive(Debug)]
 pub struct Search<C: Client> {
@@ -44,9 +43,7 @@ impl<C: Client> Search<C> {
             })
         };
 
-        let mut builder = Request::builder()
-            .method(method)
-            .uri(format!("{}/{}", self.endpoint, path.into()))
+        let mut req = Request::new(method, format!("{}/{}", self.endpoint, path.into()))
             .auth(auth)
             .user_agent(self.user_agent.clone())
             .content_type(content_type.into())
@@ -54,11 +51,11 @@ impl<C: Client> Search<C> {
 
         if let Some(headers) = headers {
             for (key, value) in headers.into_iter() {
-                builder = builder.add_header(key, value);
+                req = req.add_header(key, value);
             }
         }
 
-        builder.build()
+        req
     }
 
     pub async fn execute(
@@ -303,24 +300,72 @@ pub(crate) fn decode_common_error(
     error::Error::new_server_error(error_kind, body_str, endpoint, status)
 }
 
-#[derive(Debug, TypedBuilder)]
-#[builder(field_defaults(default, setter(into)))]
+#[derive(Debug)]
 #[non_exhaustive]
 pub struct UpsertIndexOptions<'a> {
-    #[builder(!default)]
     pub index: &'a Index,
     pub bucket_name: Option<&'a str>,
     pub scope_name: Option<&'a str>,
     pub on_behalf_of: Option<&'a OnBehalfOfInfo>,
 }
 
-#[derive(Debug, TypedBuilder)]
-#[builder(field_defaults(default, setter(into)))]
+impl<'a> UpsertIndexOptions<'a> {
+    pub fn new(index: &'a Index) -> Self {
+        Self {
+            index,
+            bucket_name: None,
+            scope_name: None,
+            on_behalf_of: None,
+        }
+    }
+
+    pub fn bucket_name(mut self, bucket_name: impl Into<Option<&'a str>>) -> Self {
+        self.bucket_name = bucket_name.into();
+        self
+    }
+
+    pub fn scope_name(mut self, scope_name: impl Into<Option<&'a str>>) -> Self {
+        self.scope_name = scope_name.into();
+        self
+    }
+
+    pub fn on_behalf_of(mut self, on_behalf_of: impl Into<Option<&'a OnBehalfOfInfo>>) -> Self {
+        self.on_behalf_of = on_behalf_of.into();
+        self
+    }
+}
+
+#[derive(Debug)]
 #[non_exhaustive]
 pub struct DeleteIndexOptions<'a> {
-    #[builder(!default)]
     pub index_name: &'a str,
     pub bucket_name: Option<&'a str>,
     pub scope_name: Option<&'a str>,
     pub on_behalf_of: Option<&'a OnBehalfOfInfo>,
+}
+
+impl<'a> DeleteIndexOptions<'a> {
+    pub fn new(index_name: &'a str) -> Self {
+        Self {
+            index_name,
+            bucket_name: None,
+            scope_name: None,
+            on_behalf_of: None,
+        }
+    }
+
+    pub fn bucket_name(mut self, bucket_name: impl Into<Option<&'a str>>) -> Self {
+        self.bucket_name = bucket_name.into();
+        self
+    }
+
+    pub fn scope_name(mut self, scope_name: impl Into<Option<&'a str>>) -> Self {
+        self.scope_name = scope_name.into();
+        self
+    }
+
+    pub fn on_behalf_of(mut self, on_behalf_of: impl Into<Option<&'a OnBehalfOfInfo>>) -> Self {
+        self.on_behalf_of = on_behalf_of.into();
+        self
+    }
 }

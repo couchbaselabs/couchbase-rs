@@ -72,10 +72,10 @@ impl CouchbaseQueryClient {
         let ad_hoc = opts.ad_hoc.unwrap_or(true);
 
         let mut query_opts = couchbase_core::queryoptions::QueryOptions::try_from(opts)?;
-        query_opts.statement = Some(statement);
+        query_opts = query_opts.statement(statement);
 
         if let Some(keyspace) = &self.keyspace {
-            query_opts.query_context = Some(format!(
+            query_opts = query_opts.query_context(format!(
                 "{}.{}",
                 keyspace.bucket_name.clone(),
                 keyspace.scope_name.clone()

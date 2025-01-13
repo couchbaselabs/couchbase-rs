@@ -18,7 +18,6 @@ use futures_core::Stream;
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::Arc;
-use typed_builder::TypedBuilder;
 
 pub(crate) struct SearchComponent<C: Client> {
     http_component: HttpComponent<C>,
@@ -250,11 +249,9 @@ impl<C: Client> SearchComponent<C> {
     }
 }
 
-#[derive(Debug, TypedBuilder)]
-#[builder(field_defaults(default, setter(into)))]
+#[derive(Debug)]
 #[non_exhaustive]
 pub struct UpsertIndexOptions<'a> {
-    #[builder(!default)]
     pub index: &'a searchx::index::Index,
     pub bucket_name: Option<&'a str>,
     pub scope_name: Option<&'a str>,
@@ -265,11 +262,47 @@ pub struct UpsertIndexOptions<'a> {
     pub on_behalf_of: Option<&'a OnBehalfOfInfo>,
 }
 
-#[derive(Debug, TypedBuilder)]
-#[builder(field_defaults(default, setter(into)))]
+impl<'a> UpsertIndexOptions<'a> {
+    pub fn new(index: &'a searchx::index::Index) -> Self {
+        Self {
+            index,
+            bucket_name: None,
+            scope_name: None,
+            retry_strategy: None,
+            endpoint: None,
+            on_behalf_of: None,
+        }
+    }
+
+    pub fn bucket_name(mut self, bucket_name: &'a str) -> Self {
+        self.bucket_name = Some(bucket_name);
+        self
+    }
+
+    pub fn scope_name(mut self, scope_name: &'a str) -> Self {
+        self.scope_name = Some(scope_name);
+        self
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
+    }
+
+    pub fn endpoint(mut self, endpoint: &'a str) -> Self {
+        self.endpoint = Some(endpoint);
+        self
+    }
+
+    pub fn on_behalf_of(mut self, on_behalf_of: &'a OnBehalfOfInfo) -> Self {
+        self.on_behalf_of = Some(on_behalf_of);
+        self
+    }
+}
+
+#[derive(Debug)]
 #[non_exhaustive]
 pub struct DeleteIndexOptions<'a> {
-    #[builder(!default)]
     pub index_name: &'a str,
     pub bucket_name: Option<&'a str>,
     pub scope_name: Option<&'a str>,
@@ -278,6 +311,44 @@ pub struct DeleteIndexOptions<'a> {
     pub endpoint: Option<&'a str>,
 
     pub on_behalf_of: Option<&'a OnBehalfOfInfo>,
+}
+
+impl<'a> DeleteIndexOptions<'a> {
+    pub fn new(index_name: &'a str) -> Self {
+        Self {
+            index_name,
+            bucket_name: None,
+            scope_name: None,
+            retry_strategy: None,
+            endpoint: None,
+            on_behalf_of: None,
+        }
+    }
+
+    pub fn bucket_name(mut self, bucket_name: &'a str) -> Self {
+        self.bucket_name = Some(bucket_name);
+        self
+    }
+
+    pub fn scope_name(mut self, scope_name: &'a str) -> Self {
+        self.scope_name = Some(scope_name);
+        self
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
+    }
+
+    pub fn endpoint(mut self, endpoint: &'a str) -> Self {
+        self.endpoint = Some(endpoint);
+        self
+    }
+
+    pub fn on_behalf_of(mut self, on_behalf_of: &'a OnBehalfOfInfo) -> Self {
+        self.on_behalf_of = Some(on_behalf_of);
+        self
+    }
 }
 
 impl<'a> From<&UpsertIndexOptions<'a>> for searchx::search::UpsertIndexOptions<'a> {

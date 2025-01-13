@@ -55,21 +55,21 @@ impl CouchbaseCoreKvClient {
         let agent = self.agent_provider.get_agent().await;
         let result = agent
             .upsert(
-                couchbase_core::crudoptions::UpsertOptions::builder()
-                    .key(id.as_bytes())
-                    .value(&value)
-                    .flags(flags)
-                    .scope_name(&self.scope_name)
-                    .collection_name(&self.collection_name)
-                    .expiry(options.expiry.map(|e| e.as_millis() as u32))
-                    .durability_level(options.durability_level.map(|l| l.into()))
-                    .retry_strategy(
-                        options
-                            .retry_strategy
-                            .unwrap_or(self.default_retry_strategy.clone()),
-                    )
-                    .preserve_expiry(options.preserve_expiry)
-                    .build(),
+                couchbase_core::crudoptions::UpsertOptions::new(
+                    id.as_bytes(),
+                    &self.scope_name,
+                    &self.collection_name,
+                    &value,
+                )
+                .flags(flags)
+                .expiry(options.expiry.map(|e| e.as_millis() as u32))
+                .durability_level(options.durability_level.map(|l| l.into()))
+                .retry_strategy(
+                    options
+                        .retry_strategy
+                        .unwrap_or(self.default_retry_strategy.clone()),
+                )
+                .preserve_expiry(options.preserve_expiry),
             )
             .await?;
 
@@ -91,20 +91,20 @@ impl CouchbaseCoreKvClient {
         let agent = self.agent_provider.get_agent().await;
         let result = agent
             .add(
-                couchbase_core::crudoptions::AddOptions::builder()
-                    .key(id.as_bytes())
-                    .value(&value)
-                    .flags(flags)
-                    .scope_name(&self.scope_name)
-                    .collection_name(&self.collection_name)
-                    .expiry(options.expiry.map(|e| e.as_millis() as u32))
-                    .durability_level(options.durability_level.map(|l| l.into()))
-                    .retry_strategy(
-                        options
-                            .retry_strategy
-                            .unwrap_or(self.default_retry_strategy.clone()),
-                    )
-                    .build(),
+                couchbase_core::crudoptions::AddOptions::new(
+                    id.as_bytes(),
+                    &self.scope_name,
+                    &self.collection_name,
+                    &value,
+                )
+                .flags(flags)
+                .expiry(options.expiry.map(|e| e.as_millis() as u32))
+                .durability_level(options.durability_level.map(|l| l.into()))
+                .retry_strategy(
+                    options
+                        .retry_strategy
+                        .unwrap_or(self.default_retry_strategy.clone()),
+                ),
             )
             .await?;
 
@@ -126,22 +126,22 @@ impl CouchbaseCoreKvClient {
         let agent = self.agent_provider.get_agent().await;
         let result = agent
             .replace(
-                couchbase_core::crudoptions::ReplaceOptions::builder()
-                    .key(id.as_bytes())
-                    .value(&value)
-                    .flags(flags)
-                    .scope_name(&self.scope_name)
-                    .collection_name(&self.collection_name)
-                    .expiry(options.expiry.map(|e| e.as_millis() as u32))
-                    .durability_level(options.durability_level.map(|l| l.into()))
-                    .retry_strategy(
-                        options
-                            .retry_strategy
-                            .unwrap_or(self.default_retry_strategy.clone()),
-                    )
-                    .preserve_expiry(options.preserve_expiry)
-                    .cas(options.cas)
-                    .build(),
+                couchbase_core::crudoptions::ReplaceOptions::new(
+                    id.as_bytes(),
+                    &self.scope_name,
+                    &self.collection_name,
+                    &value,
+                )
+                .flags(flags)
+                .expiry(options.expiry.map(|e| e.as_millis() as u32))
+                .durability_level(options.durability_level.map(|l| l.into()))
+                .retry_strategy(
+                    options
+                        .retry_strategy
+                        .unwrap_or(self.default_retry_strategy.clone()),
+                )
+                .preserve_expiry(options.preserve_expiry)
+                .cas(options.cas),
             )
             .await?;
 
@@ -161,18 +161,18 @@ impl CouchbaseCoreKvClient {
         let agent = self.agent_provider.get_agent().await;
         let result = agent
             .delete(
-                couchbase_core::crudoptions::DeleteOptions::builder()
-                    .key(id.as_bytes())
-                    .scope_name(&self.scope_name)
-                    .collection_name(&self.collection_name)
-                    .durability_level(options.durability_level.map(|l| l.into()))
-                    .retry_strategy(
-                        options
-                            .retry_strategy
-                            .unwrap_or(self.default_retry_strategy.clone()),
-                    )
-                    .cas(options.cas)
-                    .build(),
+                couchbase_core::crudoptions::DeleteOptions::new(
+                    id.as_bytes(),
+                    &self.scope_name,
+                    &self.collection_name,
+                )
+                .durability_level(options.durability_level.map(|l| l.into()))
+                .retry_strategy(
+                    options
+                        .retry_strategy
+                        .unwrap_or(self.default_retry_strategy.clone()),
+                )
+                .cas(options.cas),
             )
             .await?;
 
@@ -188,16 +188,16 @@ impl CouchbaseCoreKvClient {
         let agent = self.agent_provider.get_agent().await;
         let res = agent
             .get(
-                couchbase_core::crudoptions::GetOptions::builder()
-                    .key(id.as_bytes())
-                    .scope_name(&self.scope_name)
-                    .collection_name(&self.collection_name)
-                    .retry_strategy(
-                        options
-                            .retry_strategy
-                            .unwrap_or(self.default_retry_strategy.clone()),
-                    )
-                    .build(),
+                couchbase_core::crudoptions::GetOptions::new(
+                    id.as_bytes(),
+                    &self.scope_name,
+                    &self.collection_name,
+                )
+                .retry_strategy(
+                    options
+                        .retry_strategy
+                        .unwrap_or(self.default_retry_strategy.clone()),
+                ),
             )
             .await?;
 
@@ -208,16 +208,16 @@ impl CouchbaseCoreKvClient {
         let agent = self.agent_provider.get_agent().await;
         let res = agent
             .get_meta(
-                couchbase_core::crudoptions::GetMetaOptions::builder()
-                    .key(id.as_bytes())
-                    .scope_name(&self.scope_name)
-                    .collection_name(&self.collection_name)
-                    .retry_strategy(
-                        options
-                            .retry_strategy
-                            .unwrap_or(self.default_retry_strategy.clone()),
-                    )
-                    .build(),
+                couchbase_core::crudoptions::GetMetaOptions::new(
+                    id.as_bytes(),
+                    &self.scope_name,
+                    &self.collection_name,
+                )
+                .retry_strategy(
+                    options
+                        .retry_strategy
+                        .unwrap_or(self.default_retry_strategy.clone()),
+                ),
             )
             .await?;
 
@@ -233,17 +233,17 @@ impl CouchbaseCoreKvClient {
         let agent = self.agent_provider.get_agent().await;
         let res = agent
             .get_and_touch(
-                couchbase_core::crudoptions::GetAndTouchOptions::builder()
-                    .key(id.as_bytes())
-                    .scope_name(&self.scope_name)
-                    .collection_name(&self.collection_name)
-                    .retry_strategy(
-                        options
-                            .retry_strategy
-                            .unwrap_or(self.default_retry_strategy.clone()),
-                    )
-                    .expiry(expiry.as_secs() as u32)
-                    .build(),
+                couchbase_core::crudoptions::GetAndTouchOptions::new(
+                    id.as_bytes(),
+                    &self.scope_name,
+                    &self.collection_name,
+                    expiry.as_secs() as u32,
+                )
+                .retry_strategy(
+                    options
+                        .retry_strategy
+                        .unwrap_or(self.default_retry_strategy.clone()),
+                ),
             )
             .await?;
 
@@ -259,17 +259,17 @@ impl CouchbaseCoreKvClient {
         let agent = self.agent_provider.get_agent().await;
         let res = agent
             .get_and_lock(
-                couchbase_core::crudoptions::GetAndLockOptions::builder()
-                    .key(id.as_bytes())
-                    .scope_name(&self.scope_name)
-                    .collection_name(&self.collection_name)
-                    .retry_strategy(
-                        options
-                            .retry_strategy
-                            .unwrap_or(self.default_retry_strategy.clone()),
-                    )
-                    .lock_time(lock_time.as_secs() as u32)
-                    .build(),
+                couchbase_core::crudoptions::GetAndLockOptions::new(
+                    id.as_bytes(),
+                    &self.scope_name,
+                    &self.collection_name,
+                    lock_time.as_secs() as u32,
+                )
+                .retry_strategy(
+                    options
+                        .retry_strategy
+                        .unwrap_or(self.default_retry_strategy.clone()),
+                ),
             )
             .await?;
 
@@ -280,17 +280,17 @@ impl CouchbaseCoreKvClient {
         let agent = self.agent_provider.get_agent().await;
         agent
             .unlock(
-                couchbase_core::crudoptions::UnlockOptions::builder()
-                    .key(id.as_bytes())
-                    .scope_name(&self.scope_name)
-                    .collection_name(&self.collection_name)
-                    .retry_strategy(
-                        options
-                            .retry_strategy
-                            .unwrap_or(self.default_retry_strategy.clone()),
-                    )
-                    .cas(cas)
-                    .build(),
+                couchbase_core::crudoptions::UnlockOptions::new(
+                    id.as_bytes(),
+                    &self.scope_name,
+                    &self.collection_name,
+                    cas,
+                )
+                .retry_strategy(
+                    options
+                        .retry_strategy
+                        .unwrap_or(self.default_retry_strategy.clone()),
+                ),
             )
             .await?;
 
@@ -306,17 +306,17 @@ impl CouchbaseCoreKvClient {
         let agent = self.agent_provider.get_agent().await;
         let result = agent
             .touch(
-                couchbase_core::crudoptions::TouchOptions::builder()
-                    .key(id.as_bytes())
-                    .scope_name(&self.scope_name)
-                    .collection_name(&self.collection_name)
-                    .retry_strategy(
-                        options
-                            .retry_strategy
-                            .unwrap_or(self.default_retry_strategy.clone()),
-                    )
-                    .expiry(expiry.as_secs() as u32)
-                    .build(),
+                couchbase_core::crudoptions::TouchOptions::new(
+                    id.as_bytes(),
+                    &self.scope_name,
+                    &self.collection_name,
+                    expiry.as_secs() as u32,
+                )
+                .retry_strategy(
+                    options
+                        .retry_strategy
+                        .unwrap_or(self.default_retry_strategy.clone()),
+                ),
             )
             .await?;
 
@@ -332,18 +332,18 @@ impl CouchbaseCoreKvClient {
         let agent = self.agent_provider.get_agent().await;
         let result = agent
             .append(
-                couchbase_core::crudoptions::AppendOptions::builder()
-                    .key(id.as_bytes())
-                    .value(&value)
-                    .scope_name(&self.scope_name)
-                    .collection_name(&self.collection_name)
-                    .durability_level(options.durability_level.map(|l| l.into()))
-                    .retry_strategy(
-                        options
-                            .retry_strategy
-                            .unwrap_or(self.default_retry_strategy.clone()),
-                    )
-                    .build(),
+                couchbase_core::crudoptions::AppendOptions::new(
+                    id.as_bytes(),
+                    &self.scope_name,
+                    &self.collection_name,
+                    &value,
+                )
+                .durability_level(options.durability_level.map(|l| l.into()))
+                .retry_strategy(
+                    options
+                        .retry_strategy
+                        .unwrap_or(self.default_retry_strategy.clone()),
+                ),
             )
             .await?;
 
@@ -364,18 +364,18 @@ impl CouchbaseCoreKvClient {
         let agent = self.agent_provider.get_agent().await;
         let result = agent
             .prepend(
-                couchbase_core::crudoptions::PrependOptions::builder()
-                    .key(id.as_bytes())
-                    .value(&value)
-                    .scope_name(&self.scope_name)
-                    .collection_name(&self.collection_name)
-                    .durability_level(options.durability_level.map(|l| l.into()))
-                    .retry_strategy(
-                        options
-                            .retry_strategy
-                            .unwrap_or(self.default_retry_strategy.clone()),
-                    )
-                    .build(),
+                couchbase_core::crudoptions::PrependOptions::new(
+                    id.as_bytes(),
+                    &self.scope_name,
+                    &self.collection_name,
+                    &value,
+                )
+                .durability_level(options.durability_level.map(|l| l.into()))
+                .retry_strategy(
+                    options
+                        .retry_strategy
+                        .unwrap_or(self.default_retry_strategy.clone()),
+                ),
             )
             .await?;
 
@@ -395,20 +395,20 @@ impl CouchbaseCoreKvClient {
         let agent = self.agent_provider.get_agent().await;
         let result = agent
             .increment(
-                couchbase_core::crudoptions::IncrementOptions::builder()
-                    .key(id.as_bytes())
-                    .scope_name(&self.scope_name)
-                    .collection_name(&self.collection_name)
-                    .durability_level(options.durability_level.map(|l| l.into()))
-                    .retry_strategy(
-                        options
-                            .retry_strategy
-                            .unwrap_or(self.default_retry_strategy.clone()),
-                    )
-                    .expiry(options.expiry.map(|e| e.as_secs() as u32))
-                    .initial(options.initial)
-                    .delta(options.delta)
-                    .build(),
+                couchbase_core::crudoptions::IncrementOptions::new(
+                    id.as_bytes(),
+                    &self.scope_name,
+                    &self.collection_name,
+                )
+                .durability_level(options.durability_level.map(|l| l.into()))
+                .retry_strategy(
+                    options
+                        .retry_strategy
+                        .unwrap_or(self.default_retry_strategy.clone()),
+                )
+                .expiry(options.expiry.map(|e| e.as_secs() as u32))
+                .initial(options.initial)
+                .delta(options.delta),
             )
             .await?;
 
@@ -429,20 +429,20 @@ impl CouchbaseCoreKvClient {
         let agent = self.agent_provider.get_agent().await;
         let result = agent
             .decrement(
-                couchbase_core::crudoptions::DecrementOptions::builder()
-                    .key(id.as_bytes())
-                    .scope_name(&self.scope_name)
-                    .collection_name(&self.collection_name)
-                    .durability_level(options.durability_level.map(|l| l.into()))
-                    .retry_strategy(
-                        options
-                            .retry_strategy
-                            .unwrap_or(self.default_retry_strategy.clone()),
-                    )
-                    .expiry(options.expiry.map(|e| e.as_secs() as u32))
-                    .initial(options.initial)
-                    .delta(options.delta)
-                    .build(),
+                couchbase_core::crudoptions::DecrementOptions::new(
+                    id.as_bytes(),
+                    &self.scope_name,
+                    &self.collection_name,
+                )
+                .durability_level(options.durability_level.map(|l| l.into()))
+                .retry_strategy(
+                    options
+                        .retry_strategy
+                        .unwrap_or(self.default_retry_strategy.clone()),
+                )
+                .expiry(options.expiry.map(|e| e.as_secs() as u32))
+                .initial(options.initial)
+                .delta(options.delta),
             )
             .await?;
 
@@ -466,31 +466,28 @@ impl CouchbaseCoreKvClient {
 
         let result = agent
             .lookup_in(
-                couchbase_core::crudoptions::LookupInOptions::builder()
-                    .key(id.as_bytes())
-                    .scope_name(&self.scope_name)
-                    .collection_name(&self.collection_name)
-                    .ops(
-                        ordered_specs
-                            .iter()
-                            .map(|spec| (*spec).into())
-                            .collect::<Vec<_>>()
-                            .as_slice(),
-                    )
-                    .flags({
-                        let mut flags = SubdocDocFlag::empty();
-
-                        if options.access_deleted.unwrap_or(false) {
-                            flags |= SubdocDocFlag::AccessDeleted;
-                        }
-                        flags
-                    })
-                    .retry_strategy(
-                        options
-                            .retry_strategy
-                            .unwrap_or(self.default_retry_strategy.clone()),
-                    )
-                    .build(),
+                couchbase_core::crudoptions::LookupInOptions::new(
+                    id.as_bytes(),
+                    &self.scope_name,
+                    &self.collection_name,
+                    ordered_specs
+                        .iter()
+                        .map(|spec| (*spec).into())
+                        .collect::<Vec<_>>()
+                        .as_slice(),
+                )
+                .flags({
+                    let mut flags = SubdocDocFlag::empty();
+                    if options.access_deleted.unwrap_or(false) {
+                        flags |= SubdocDocFlag::AccessDeleted;
+                    }
+                    flags
+                })
+                .retry_strategy(
+                    options
+                        .retry_strategy
+                        .unwrap_or(self.default_retry_strategy.clone()),
+                ),
             )
             .await?;
 
@@ -523,40 +520,36 @@ impl CouchbaseCoreKvClient {
 
         let result = agent
             .mutate_in(
-                couchbase_core::crudoptions::MutateInOptions::builder()
-                    .key(id.as_bytes())
-                    .scope_name(&self.scope_name)
-                    .collection_name(&self.collection_name)
-                    .ops(
-                        ordered_specs
-                            .iter()
-                            .map(|spec| (*spec).into())
-                            .collect::<Vec<_>>()
-                            .as_slice(),
-                    )
-                    .flags({
-                        let mut flags = SubdocDocFlag::empty();
-
-                        if options.access_deleted.unwrap_or(false) {
-                            flags |= SubdocDocFlag::AccessDeleted;
-                        }
-                        match options.store_semantics {
-                            Some(StoreSemantics::Insert) => flags |= SubdocDocFlag::AddDoc,
-                            Some(StoreSemantics::Upsert) => flags |= SubdocDocFlag::MkDoc,
-                            _ => {}
-                        }
-
-                        flags
-                    })
-                    .preserve_expiry(options.preserve_expiry)
-                    .expiry(options.expiry.map(|e| e.as_secs() as u32))
-                    .cas(options.cas)
-                    .retry_strategy(
-                        options
-                            .retry_strategy
-                            .unwrap_or(self.default_retry_strategy.clone()),
-                    )
-                    .build(),
+                couchbase_core::crudoptions::MutateInOptions::new(
+                    id.as_bytes(),
+                    &self.scope_name,
+                    &self.collection_name,
+                    ordered_specs
+                        .iter()
+                        .map(|spec| (*spec).into())
+                        .collect::<Vec<_>>()
+                        .as_slice(),
+                )
+                .flags({
+                    let mut flags = SubdocDocFlag::empty();
+                    if options.access_deleted.unwrap_or(false) {
+                        flags |= SubdocDocFlag::AccessDeleted;
+                    }
+                    match options.store_semantics {
+                        Some(StoreSemantics::Insert) => flags |= SubdocDocFlag::AddDoc,
+                        Some(StoreSemantics::Upsert) => flags |= SubdocDocFlag::MkDoc,
+                        _ => {}
+                    }
+                    flags
+                })
+                .preserve_expiry(options.preserve_expiry)
+                .expiry(options.expiry.map(|e| e.as_secs() as u32))
+                .cas(options.cas)
+                .retry_strategy(
+                    options
+                        .retry_strategy
+                        .unwrap_or(self.default_retry_strategy.clone()),
+                ),
             )
             .await?;
 

@@ -91,22 +91,21 @@ impl CouchbaseSearchClient {
 
         let control = {
             let scan_consistency = if let Some(scan_consistency) = opts.scan_consistency {
-                Some(Consistency::builder().level(scan_consistency).build())
+                Some(Consistency::default().level(scan_consistency))
             } else if let Some(consistent_with) = opts.consistent_with {
                 let mut vectors: ConsistencyVectors = HashMap::default();
                 for token in consistent_with.tokens() {
                     let vector = vectors.entry(index_name.clone()).or_default();
                     vector.insert(
-                        format!("{}/{}", token.token.vbid, token.token.vbuuid),
-                        token.token.seqno,
+                        format!("{}/{}", token.token.vbid(), token.token.vbuuid()),
+                        token.token.seqno(),
                     );
                 }
 
                 Some(
-                    Consistency::builder()
+                    Consistency::default()
                         .level(ConsistencyLevel::AtPlus)
-                        .vectors(vectors)
-                        .build(),
+                        .vectors(vectors),
                 )
             } else {
                 None
@@ -114,10 +113,9 @@ impl CouchbaseSearchClient {
 
             if scan_consistency.is_some() || opts.server_timeout.is_some() {
                 Some(
-                    Control::builder()
+                    Control::default()
                         .consistency(scan_consistency)
-                        .timeout(opts.server_timeout.map(|t| t.as_millis() as u64))
-                        .build(),
+                        .timeout(opts.server_timeout.map(|t| t.as_millis() as u64)),
                 )
             } else {
                 None
@@ -130,11 +128,7 @@ impl CouchbaseSearchClient {
                 .into_iter()
                 .map(KnnQuery::try_from)
                 .collect::<error::Result<Vec<KnnQuery>>>()?;
-            let operator: Option<KnnOperator> = if let Some(opts) = vector_search.options {
-                opts.query_combination.map(|qc| qc.into())
-            } else {
-                None
-            };
+            let operator: Option<KnnOperator> = vector_search.query_combination.map(|qc| qc.into());
 
             (Some(queries), operator)
         } else {
@@ -154,7 +148,7 @@ impl CouchbaseSearchClient {
             Some(query.into())
         } else {
             Some(searchx::queries::Query::MatchNone(
-                searchx::queries::MatchNoneQuery::builder().build(),
+                searchx::queries::MatchNoneQuery::default(),
             ))
         };
 
@@ -169,7 +163,7 @@ impl CouchbaseSearchClient {
             None
         };
 
-        let core_opts = couchbase_core::searchoptions::SearchOptions::builder()
+        let core_opts = couchbase_core::searchoptions::SearchOptions::new(index_name)
             .collections(opts.collections)
             .control(control)
             .explain(opts.explain)
@@ -188,13 +182,11 @@ impl CouchbaseSearchClient {
             .knn(knn)
             .knn_operator(knn_operator)
             .raw(opts.raw)
-            .index_name(index_name)
             .scope_name(scope_name)
             .bucket_name(bucket_name)
             .on_behalf_of(None)
             .endpoint(None)
-            .retry_strategy(opts.retry_strategy)
-            .build();
+            .retry_strategy(opts.retry_strategy);
 
         let agent = self.agent_provider.get_agent().await;
         Ok(SearchResult::from(agent.search(core_opts).await?))

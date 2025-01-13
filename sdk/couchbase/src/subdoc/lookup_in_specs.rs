@@ -1,13 +1,12 @@
 use crate::subdoc::lookup_in_specs::LookupInOpType::{Count, Exists, Get};
 use couchbase_core::memdx::subdoc::{LookupInOp, SubdocOp, SubdocOpFlag};
-use typed_builder::TypedBuilder;
 
-#[derive(Debug, Clone, PartialEq, Eq, TypedBuilder)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct LookupInSpec {
-    pub op: LookupInOpType,
-    pub path: String,
-    pub is_xattr: bool,
+    pub(crate) op: LookupInOpType,
+    pub(crate) path: String,
+    pub(crate) is_xattr: bool,
 }
 
 impl SubdocOp for LookupInSpec {
@@ -24,25 +23,54 @@ pub enum LookupInOpType {
     Count,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Default, TypedBuilder)]
-#[builder(field_defaults(default, setter(into, strip_option)))]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct GetSpecOptions {
-    pub is_xattr: Option<bool>,
+    pub(crate) is_xattr: Option<bool>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Default, TypedBuilder)]
-#[builder(field_defaults(default, setter(into, strip_option)))]
-#[non_exhaustive]
+impl GetSpecOptions {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn xattr(mut self, is_xattr: bool) -> Self {
+        self.is_xattr = Some(is_xattr);
+        self
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 pub struct ExistsSpecOptions {
-    pub is_xattr: Option<bool>,
+    pub(crate) is_xattr: Option<bool>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Default, TypedBuilder)]
-#[builder(field_defaults(default, setter(into, strip_option)))]
+impl ExistsSpecOptions {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn xattr(mut self, is_xattr: bool) -> Self {
+        self.is_xattr = Some(is_xattr);
+        self
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct CountSpecOptions {
-    pub is_xattr: Option<bool>,
+    pub(crate) is_xattr: Option<bool>,
+}
+
+impl CountSpecOptions {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn xattr(mut self, is_xattr: bool) -> Self {
+        self.is_xattr = Some(is_xattr);
+        self
+    }
 }
 
 impl LookupInSpec {
@@ -51,7 +79,7 @@ impl LookupInSpec {
         Self {
             op: Get,
             path: path.into(),
-            is_xattr: opts.is_xattr.unwrap_or(false),
+            is_xattr: opts.is_xattr.unwrap_or_default(),
         }
     }
 
@@ -60,7 +88,7 @@ impl LookupInSpec {
         Self {
             op: Exists,
             path: path.into(),
-            is_xattr: opts.is_xattr.unwrap_or(false),
+            is_xattr: opts.is_xattr.unwrap_or_default(),
         }
     }
 
@@ -69,14 +97,14 @@ impl LookupInSpec {
         Self {
             op: Count,
             path: path.into(),
-            is_xattr: opts.is_xattr.unwrap_or(false),
+            is_xattr: opts.is_xattr.unwrap_or_default(),
         }
     }
 }
 
 impl<'a> From<&'a LookupInSpec> for LookupInOp<'a> {
     fn from(value: &'a LookupInSpec) -> Self {
-        let mut op_type = match value.op {
+        let op_type = match value.op {
             Get => {
                 if value.path.is_empty() {
                     couchbase_core::memdx::subdoc::LookupInOpType::GetDoc
@@ -90,14 +118,10 @@ impl<'a> From<&'a LookupInSpec> for LookupInOp<'a> {
 
         let mut op_flags = SubdocOpFlag::empty();
 
-        if value.is_xattr {
+        if value.is_xattr_op() {
             op_flags |= SubdocOpFlag::XATTR_PATH;
         }
 
-        LookupInOp {
-            op: op_type,
-            flags: op_flags,
-            path: value.path.as_bytes(),
-        }
+        LookupInOp::new(op_type, value.path.as_bytes()).flags(op_flags)
     }
 }

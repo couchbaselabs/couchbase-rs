@@ -1,20 +1,39 @@
 use crate::searchx::query_options::Location;
 use serde::ser::{SerializeMap, SerializeSeq};
 use serde::{Serialize, Serializer};
-use typed_builder::TypedBuilder;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, TypedBuilder)]
-#[builder(field_defaults(default, setter(into)))]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize)]
 #[non_exhaustive]
 pub struct SortScore {
     pub descending: Option<bool>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, TypedBuilder)]
-#[builder(field_defaults(default, setter(into)))]
+impl SortScore {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn descending(mut self, descending: impl Into<Option<bool>>) -> Self {
+        self.descending = descending.into();
+        self
+    }
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize)]
 #[non_exhaustive]
 pub struct SortId {
     pub descending: Option<bool>,
+}
+
+impl SortId {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn descending(mut self, descending: impl Into<Option<bool>>) -> Self {
+        self.descending = descending.into();
+        self
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize)]
@@ -44,16 +63,46 @@ pub enum SortFieldMissing {
     Last,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, TypedBuilder)]
-#[builder(field_defaults(default, setter(into)))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[non_exhaustive]
 pub struct SortField {
-    #[builder(!default)]
     pub field: String,
     pub descending: Option<bool>,
     pub sort_type: Option<SortFieldType>,
     pub mode: Option<SortFieldMode>,
     pub missing: Option<SortFieldMissing>,
+}
+
+impl SortField {
+    pub fn new(field: impl Into<String>) -> Self {
+        Self {
+            field: field.into(),
+            descending: None,
+            sort_type: None,
+            mode: None,
+            missing: None,
+        }
+    }
+
+    pub fn descending(mut self, descending: impl Into<Option<bool>>) -> Self {
+        self.descending = descending.into();
+        self
+    }
+
+    pub fn sort_type(mut self, sort_type: impl Into<Option<SortFieldType>>) -> Self {
+        self.sort_type = sort_type.into();
+        self
+    }
+
+    pub fn mode(mut self, mode: impl Into<Option<SortFieldMode>>) -> Self {
+        self.mode = mode.into();
+        self
+    }
+
+    pub fn missing(mut self, missing: impl Into<Option<SortFieldMissing>>) -> Self {
+        self.missing = missing.into();
+        self
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize)]
@@ -71,16 +120,34 @@ pub enum SortGeoDistanceUnit {
     Inches,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, TypedBuilder)]
-#[builder(field_defaults(default, setter(into)))]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[non_exhaustive]
 pub struct SortGeoDistance {
-    #[builder(!default)]
     pub field: String,
     pub descending: Option<bool>,
-    #[builder(!default)]
     pub location: Location,
     pub unit: Option<SortGeoDistanceUnit>,
+}
+
+impl SortGeoDistance {
+    pub fn new(field: impl Into<String>, location: impl Into<Location>) -> Self {
+        Self {
+            field: field.into(),
+            location: location.into(),
+            descending: None,
+            unit: None,
+        }
+    }
+
+    pub fn descending(mut self, descending: impl Into<Option<bool>>) -> Self {
+        self.descending = descending.into();
+        self
+    }
+
+    pub fn unit(mut self, unit: impl Into<Option<SortGeoDistanceUnit>>) -> Self {
+        self.unit = unit.into();
+        self
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

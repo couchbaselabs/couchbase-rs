@@ -104,9 +104,7 @@ impl CouchbaseList<'_> {
             .mutate_in(
                 &self.id,
                 &[MutateInSpec::array_append("", &[value], None)?],
-                MutateInOptions::builder()
-                    .store_semantics(StoreSemantics::Upsert)
-                    .build(),
+                MutateInOptions::new().store_semantics(StoreSemantics::Upsert),
             )
             .await?;
 
@@ -118,9 +116,7 @@ impl CouchbaseList<'_> {
             .mutate_in(
                 &self.id,
                 &[MutateInSpec::array_prepend("", &[value], None)?],
-                MutateInOptions::builder()
-                    .store_semantics(StoreSemantics::Upsert)
-                    .build(),
+                MutateInOptions::new().store_semantics(StoreSemantics::Upsert),
             )
             .await?;
 
@@ -193,9 +189,7 @@ impl CouchbaseMap<'_> {
             .mutate_in(
                 &self.id,
                 &[MutateInSpec::upsert(id, value, None)?],
-                MutateInOptions::builder()
-                    .store_semantics(StoreSemantics::Upsert)
-                    .build(),
+                MutateInOptions::new().store_semantics(StoreSemantics::Upsert),
             )
             .await?;
 
@@ -269,9 +263,7 @@ impl CouchbaseSet<'_> {
             .mutate_in(
                 &self.id,
                 &[MutateInSpec::array_add_unique("", value, None)?],
-                MutateInOptions::builder()
-                    .store_semantics(StoreSemantics::Upsert)
-                    .build(),
+                MutateInOptions::new().store_semantics(StoreSemantics::Upsert),
             )
             .await;
 
@@ -309,7 +301,7 @@ impl CouchbaseSet<'_> {
                     .mutate_in(
                         &self.id,
                         &[MutateInSpec::remove(format!("[{}]", index), None)],
-                        MutateInOptions::builder().cas(cas).build(),
+                        MutateInOptions::new().cas(cas),
                     )
                     .await;
                 if let Err(e) = res {
@@ -389,9 +381,7 @@ impl CouchbaseQueue<'_> {
             .mutate_in(
                 &self.id,
                 &[MutateInSpec::array_prepend("", &[value], None)?],
-                MutateInOptions::builder()
-                    .store_semantics(StoreSemantics::Upsert)
-                    .build(),
+                MutateInOptions::new().store_semantics(StoreSemantics::Upsert),
             )
             .await?;
 
@@ -412,7 +402,7 @@ impl CouchbaseQueue<'_> {
                 .mutate_in(
                     &self.id,
                     &[MutateInSpec::remove("[-1]", None)],
-                    MutateInOptions::builder().cas(cas).build(),
+                    MutateInOptions::new().cas(cas),
                 )
                 .await;
             if let Err(e) = res {

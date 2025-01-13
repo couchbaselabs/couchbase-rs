@@ -24,7 +24,6 @@ sha1 = "0.10"
 sha2 = "0.10"
 snap = "1.1"
 thiserror = "1.0"
-typed-builder = "0.20.0"
 url = "2.5.2"
 uuid = { version = "1.7.0", features = ["v4"] }
 

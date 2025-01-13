@@ -66,11 +66,11 @@ impl MutationState {
     pub fn push_token(&mut self, token: MutationToken) {
         let key = MutationStateKey {
             bucket_name: token.bucket_name,
-            vbid: token.token.vbid,
+            vbid: token.token.vbid(),
         };
 
         if let Some(entry) = self.tokens.get(&key) {
-            if entry.seqno < token.token.seqno {
+            if entry.seqno() < token.token.seqno() {
                 self.tokens.insert(key, token.token);
             }
         } else {
@@ -93,10 +93,7 @@ impl From<MutationState> for HashMap<String, SparseScanVectors> {
             let bucket = buckets.entry(key.bucket_name.clone()).or_default();
             bucket.insert(
                 key.vbid.to_string(),
-                ScanVectorEntry::builder()
-                    .seq_no(token.seqno)
-                    .vb_uuid(token.vbuuid.to_string())
-                    .build(),
+                ScanVectorEntry::new(token.seqno(), token.vbuuid().to_string()),
             );
         }
 
@@ -116,7 +113,7 @@ impl Serialize for MutationState {
             let bucket = buckets.entry(key.bucket_name.clone()).or_default();
             bucket.insert(
                 key.vbid.to_string(),
-                (token.seqno, token.vbuuid.to_string()),
+                (token.seqno(), token.vbuuid().to_string()),
             );
         }
 
@@ -156,11 +153,11 @@ impl<'de> Deserialize<'de> for MutationState {
                             bucket_name: bucket_name.clone(),
                             vbid: vbid.parse().map_err(de::Error::custom)?,
                         };
-                        let token = couchbase_core::mutationtoken::MutationToken {
-                            vbid: key.vbid,
+                        let token = couchbase_core::mutationtoken::MutationToken::new(
+                            key.vbid,
+                            vbuuid.parse().map_err(de::Error::custom)?,
                             seqno,
-                            vbuuid: vbuuid.parse().map_err(de::Error::custom)?,
-                        };
+                        );
                         tokens.insert(key, token);
                     }
                 }
@@ -195,19 +192,11 @@ mod tests {
     fn serialization() {
         let mutation_state = mutation_state! {
              MutationToken::new(
-                couchbase_core::mutationtoken::MutationToken {
-                    vbid: 1,
-                    vbuuid: 1234,
-                    seqno: 1,
-                },
+                couchbase_core::mutationtoken::MutationToken::new(1, 1234, 1),
                 "default".to_string(),
                 ),
              MutationToken::new(
-                couchbase_core::mutationtoken::MutationToken {
-                    vbid: 25,
-                    vbuuid: 5678,
-                    seqno: 10,
-                },
+                couchbase_core::mutationtoken::MutationToken::new(25, 5678, 10),
                 "beer-sample".to_string(),
                 )
         };
@@ -224,19 +213,11 @@ mod tests {
         let mutation_state: MutationState = serde_json::from_str(json).unwrap();
         let tokens = mutation_state.tokens();
         assert!(tokens.contains(&MutationToken::new(
-            couchbase_core::mutationtoken::MutationToken {
-                vbid: 1,
-                vbuuid: 1234,
-                seqno: 1,
-            },
+            couchbase_core::mutationtoken::MutationToken::new(1, 1234, 1),
             "default".to_string(),
         )));
         assert!(tokens.contains(&MutationToken::new(
-            couchbase_core::mutationtoken::MutationToken {
-                vbid: 25,
-                vbuuid: 5678,
-                seqno: 10,
-            },
+            couchbase_core::mutationtoken::MutationToken::new(25, 5678, 10),
             "beer-sample".to_string(),
         )));
     }

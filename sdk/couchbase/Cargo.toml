@@ -11,7 +11,6 @@ lazy_static = "1.5.0"
 log = "0.4.22"
 serde = "1.0"
 serde_json = "1.0"
-typed-builder = "0.20.0"
 uuid = { version = "1.10.0", features = ["v4"] }
 webpki-roots = "0.26"
 

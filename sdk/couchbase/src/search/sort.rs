@@ -1,33 +1,48 @@
 use crate::search::location::Location;
-use typed_builder::TypedBuilder;
 
-#[derive(Debug, Clone, PartialEq, Eq, TypedBuilder)]
-#[builder(field_defaults(default, setter(into)))]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct SortScore {
-    pub descending: Option<bool>,
+    pub(crate) descending: Option<bool>,
+}
+
+impl SortScore {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn descending(mut self, descending: impl Into<Option<bool>>) -> Self {
+        self.descending = descending.into();
+        self
+    }
 }
 
 impl From<SortScore> for couchbase_core::searchx::sort::SortScore {
     fn from(sort_score: SortScore) -> Self {
-        couchbase_core::searchx::sort::SortScore::builder()
-            .descending(sort_score.descending)
-            .build()
+        couchbase_core::searchx::sort::SortScore::default().descending(sort_score.descending)
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, TypedBuilder)]
-#[builder(field_defaults(default, setter(into)))]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct SortId {
-    pub descending: Option<bool>,
+    pub(crate) descending: Option<bool>,
+}
+
+impl SortId {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn descending(mut self, descending: impl Into<Option<bool>>) -> Self {
+        self.descending = descending.into();
+        self
+    }
 }
 
 impl From<SortId> for couchbase_core::searchx::sort::SortId {
     fn from(sort_id: SortId) -> Self {
-        couchbase_core::searchx::sort::SortId::builder()
-            .descending(sort_id.descending)
-            .build()
+        couchbase_core::searchx::sort::SortId::default().descending(sort_id.descending)
     }
 }
 
@@ -103,27 +118,55 @@ impl From<SortFieldMissing> for Option<couchbase_core::searchx::sort::SortFieldM
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, TypedBuilder)]
-#[builder(field_defaults(default, setter(into)))]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct SortField {
-    #[builder(!default)]
-    pub field: String,
-    pub descending: Option<bool>,
-    pub sort_type: Option<SortFieldType>,
-    pub mode: Option<SortFieldMode>,
-    pub missing: Option<SortFieldMissing>,
+    pub(crate) field: String,
+    pub(crate) descending: Option<bool>,
+    pub(crate) sort_type: Option<SortFieldType>,
+    pub(crate) mode: Option<SortFieldMode>,
+    pub(crate) missing: Option<SortFieldMissing>,
+}
+
+impl SortField {
+    pub fn new(field: impl Into<String>) -> Self {
+        Self {
+            field: field.into(),
+            descending: None,
+            sort_type: None,
+            mode: None,
+            missing: None,
+        }
+    }
+
+    pub fn descending(mut self, descending: impl Into<Option<bool>>) -> Self {
+        self.descending = descending.into();
+        self
+    }
+
+    pub fn sort_type(mut self, sort_type: impl Into<Option<SortFieldType>>) -> Self {
+        self.sort_type = sort_type.into();
+        self
+    }
+
+    pub fn mode(mut self, mode: impl Into<Option<SortFieldMode>>) -> Self {
+        self.mode = mode.into();
+        self
+    }
+
+    pub fn missing(mut self, missing: impl Into<Option<SortFieldMissing>>) -> Self {
+        self.missing = missing.into();
+        self
+    }
 }
 
 impl From<SortField> for couchbase_core::searchx::sort::SortField {
     fn from(sort_field: SortField) -> Self {
-        couchbase_core::searchx::sort::SortField::builder()
-            .field(sort_field.field)
+        couchbase_core::searchx::sort::SortField::new(sort_field.field)
             .descending(sort_field.descending)
             .sort_type(sort_field.sort_type.map(|st| st.into()))
             .mode(sort_field.mode.map(|m| m.into()))
             .missing(sort_field.missing.map(|m| m.into()))
-            .build()
     }
 }
 
@@ -175,26 +218,44 @@ impl From<SortGeoDistanceUnit> for Option<couchbase_core::searchx::sort::SortGeo
     }
 }
 
-#[derive(Debug, Clone, PartialEq, TypedBuilder)]
-#[builder(field_defaults(setter(into)))]
+#[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct SortGeoDistance {
-    pub field: String,
-    #[builder(default)]
-    pub descending: Option<bool>,
-    pub location: Location,
-    #[builder(default)]
-    pub unit: Option<SortGeoDistanceUnit>,
+    pub(crate) field: String,
+    pub(crate) descending: Option<bool>,
+    pub(crate) location: Location,
+    pub(crate) unit: Option<SortGeoDistanceUnit>,
+}
+
+impl SortGeoDistance {
+    pub fn new(field: impl Into<String>, location: Location) -> Self {
+        Self {
+            field: field.into(),
+            location,
+            descending: None,
+            unit: None,
+        }
+    }
+
+    pub fn descending(mut self, descending: impl Into<Option<bool>>) -> Self {
+        self.descending = descending.into();
+        self
+    }
+
+    pub fn unit(mut self, unit: impl Into<Option<SortGeoDistanceUnit>>) -> Self {
+        self.unit = unit.into();
+        self
+    }
 }
 
 impl From<SortGeoDistance> for couchbase_core::searchx::sort::SortGeoDistance {
     fn from(sort_geo_distance: SortGeoDistance) -> Self {
-        couchbase_core::searchx::sort::SortGeoDistance::builder()
-            .field(sort_geo_distance.field)
-            .descending(sort_geo_distance.descending)
-            .location(sort_geo_distance.location)
-            .unit(sort_geo_distance.unit.map(|u| u.into()))
-            .build()
+        couchbase_core::searchx::sort::SortGeoDistance::new(
+            sort_geo_distance.field,
+            sort_geo_distance.location,
+        )
+        .descending(sort_geo_distance.descending)
+        .unit(sort_geo_distance.unit.map(|u| u.into()))
     }
 }
 
