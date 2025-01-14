@@ -1,5 +1,4 @@
 use serde::Deserialize;
-use std::backtrace::Backtrace;
 use std::error::Error as StdError;
 use std::fmt::{Display, Formatter, Pointer};
 use std::io;
@@ -19,7 +18,6 @@ pub struct Error {
     /// A larger `Error` type was substantially slower due to all the functions
     /// that pass around `Result<T, Error>`.
     pub kind: Box<ErrorKind>,
-    pub backtrace: Backtrace,
     pub source: Option<Box<dyn StdError + 'static + Send + Sync>>,
 }
 
@@ -27,7 +25,6 @@ impl Error {
     pub(crate) fn protocol_error(msg: impl Into<String>) -> Self {
         Self {
             kind: Box::new(ErrorKind::Protocol { msg: msg.into() }),
-            backtrace: Backtrace::capture(),
             source: None,
         }
     }
@@ -38,7 +35,6 @@ impl Error {
     ) -> Self {
         Self {
             kind: Box::new(ErrorKind::Protocol { msg: msg.into() }),
-            backtrace: Backtrace::capture(),
             source: Some(source),
         }
     }
@@ -49,7 +45,6 @@ impl Error {
                 msg: msg.into(),
                 arg: arg.into(),
             }),
-            backtrace: Backtrace::capture(),
             source: None,
         }
     }
@@ -64,7 +59,6 @@ impl Error {
                 msg: msg.into(),
                 arg: arg.into(),
             }),
-            backtrace: Backtrace::capture(),
             source: Some(source),
         }
     }
@@ -75,7 +69,6 @@ impl Error {
     ) -> Self {
         Error {
             kind: Box::new(ErrorKind::ConnectionFailed { msg: reason.into() }),
-            backtrace: Backtrace::capture(),
             source: Some(source),
         }
     }
@@ -87,7 +80,6 @@ impl Error {
     ) -> Self {
         Error {
             kind: Box::new(ErrorKind::Dispatch { opaque, op_code }),
-            backtrace: Backtrace::capture(),
             source: Some(source),
         }
     }
@@ -95,7 +87,6 @@ impl Error {
     pub(crate) fn close_error(msg: String, source: Box<dyn StdError + Send + Sync>) -> Self {
         Error {
             kind: Box::new(ErrorKind::Close { msg }),
-            backtrace: Backtrace::capture(),
             source: Some(source),
         }
     }
@@ -502,7 +493,6 @@ where
     fn from(err: E) -> Self {
         Self {
             kind: Box::new(err.into()),
-            backtrace: Backtrace::capture(),
             source: None,
         }
     }
@@ -512,7 +502,6 @@ impl From<ServerError> for Error {
     fn from(value: ServerError) -> Self {
         Self {
             kind: Box::new(ErrorKind::Server(value)),
-            backtrace: Backtrace::capture(),
             source: None,
         }
     }
@@ -524,7 +513,6 @@ impl From<io::Error> for Error {
             kind: Box::new(ErrorKind::UnknownIo {
                 msg: value.to_string(),
             }),
-            backtrace: Backtrace::capture(),
             source: Some(Box::new(value)),
         }
     }

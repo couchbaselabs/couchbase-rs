@@ -9,7 +9,6 @@ use bytes::Bytes;
 use futures::{FutureExt, Stream, StreamExt};
 use http::StatusCode;
 use log::debug;
-use std::backtrace::Backtrace;
 use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::Arc;

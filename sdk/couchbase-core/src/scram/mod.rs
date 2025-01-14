@@ -4,7 +4,6 @@ use hmac::digest::KeyInit;
 use hmac::Mac;
 use rand::RngCore;
 use sha2::Digest;
-use std::backtrace::Backtrace;
 use std::error::Error;
 use std::marker::PhantomData;
 use std::str;
@@ -223,7 +222,6 @@ where
 pub struct ScramError {
     message: String,
     source: Option<Box<dyn Error + Sync + Send>>,
-    backtrace: Backtrace,
 }
 
 impl ScramError {
@@ -231,7 +229,6 @@ impl ScramError {
         ScramError {
             message: message.into(),
             source: None,
-            backtrace: Backtrace::capture(),
         }
     }
 
@@ -239,7 +236,6 @@ impl ScramError {
         ScramError {
             message: message.into(),
             source: Some(source),
-            backtrace: Backtrace::capture(),
         }
     }
 }
