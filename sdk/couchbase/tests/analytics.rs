@@ -10,7 +10,6 @@ use couchbase::options::analytics_options::{AnalyticsOptions, ScanConsistency};
 use couchbase::results::analytics_results::{AnalyticsMetaData, AnalyticsResult, AnalyticsStatus};
 use futures::StreamExt;
 use log::LevelFilter;
-use serde_json::Value;
 use std::collections::HashMap;
 use std::future::Future;
 use std::time::Duration;
@@ -59,7 +58,8 @@ async fn test_cluster_analytics_query_positional_param() {
         );
 
         let opts = AnalyticsOptions::default()
-            .positional_parameters(vec![Value::String("analytics".into())]);
+            .add_positional_parameter("analytics")
+            .unwrap();
 
         let deadline = Instant::now() + Duration::from_secs(60);
 
@@ -88,10 +88,9 @@ async fn test_cluster_analytics_query_named_param() {
             bucket_name, scope_name, collection_name
         );
 
-        let opts = AnalyticsOptions::default().named_parameters(HashMap::from([(
-            "service".into(),
-            Value::String("analytics".into()),
-        )]));
+        let opts = AnalyticsOptions::default()
+            .add_named_parameter("service", "analytics")
+            .unwrap();
 
         let deadline = Instant::now() + Duration::from_secs(60);
 

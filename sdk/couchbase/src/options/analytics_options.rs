@@ -1,4 +1,5 @@
 use couchbase_core::analyticsx;
+use serde::Serialize;
 use serde_json::Value;
 use std::borrow::Borrow;
 use std::collections::HashMap;
@@ -56,7 +57,12 @@ impl AnalyticsOptions {
         self
     }
 
-    pub fn add_positional_parameter(mut self, parameters: Value) -> Self {
+    pub fn add_positional_parameter<T: Serialize>(
+        mut self,
+        parameters: T,
+    ) -> crate::error::Result<Self> {
+        let parameters = serde_json::to_value(&parameters)?;
+
         match self.positional_parameters {
             Some(mut params) => {
                 params.push(parameters);
@@ -66,15 +72,16 @@ impl AnalyticsOptions {
                 self.positional_parameters = Some(vec![parameters]);
             }
         }
-        self
+        Ok(self)
     }
 
-    pub fn positional_parameters(mut self, positional_parameters: Vec<Value>) -> Self {
-        self.positional_parameters = Some(positional_parameters);
-        self
-    }
+    pub fn add_named_parameter<T: Serialize>(
+        mut self,
+        key: impl Into<String>,
+        value: T,
+    ) -> crate::error::Result<Self> {
+        let value = serde_json::to_value(&value)?;
 
-    pub fn add_named_parameter(mut self, key: impl Into<String>, value: Value) -> Self {
         match self.named_parameters {
             Some(mut params) => {
                 params.insert(key.into(), value);
@@ -86,15 +93,16 @@ impl AnalyticsOptions {
                 self.named_parameters = Some(params);
             }
         }
-        self
+        Ok(self)
     }
 
-    pub fn named_parameters(mut self, named_parameters: HashMap<String, Value>) -> Self {
-        self.named_parameters = Some(named_parameters);
-        self
-    }
+    pub fn add_raw<T: Serialize>(
+        mut self,
+        key: impl Into<String>,
+        value: T,
+    ) -> crate::error::Result<Self> {
+        let value = serde_json::to_value(&value)?;
 
-    pub fn add_raw(mut self, key: impl Into<String>, value: Value) -> Self {
         match self.raw {
             Some(mut params) => {
                 params.insert(key.into(), value);
@@ -106,12 +114,7 @@ impl AnalyticsOptions {
                 self.raw = Some(params);
             }
         }
-        self
-    }
-
-    pub fn raw(mut self, raw: HashMap<String, Value>) -> Self {
-        self.raw = Some(raw);
-        self
+        Ok(self)
     }
 
     pub fn retry_strategy(mut self, retry_strategy: Arc<dyn crate::retry::RetryStrategy>) -> Self {

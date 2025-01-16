@@ -1,6 +1,7 @@
 use crate::error;
 use crate::mutation_state::MutationState;
 use couchbase_core::{queryoptions, queryx};
+use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -118,9 +119,25 @@ impl QueryOptions {
         self
     }
 
-    pub fn named_parameters(mut self, named_parameters: HashMap<String, Value>) -> Self {
-        self.named_parameters = Some(named_parameters);
-        self
+    pub fn add_named_parameter<T: Serialize>(
+        mut self,
+        key: impl Into<String>,
+        value: T,
+    ) -> error::Result<Self> {
+        let value = serde_json::to_value(&value)?;
+
+        match self.named_parameters {
+            Some(mut params) => {
+                params.insert(key.into(), value);
+                self.named_parameters = Some(params);
+            }
+            None => {
+                let mut params = HashMap::new();
+                params.insert(key.into(), value);
+                self.named_parameters = Some(params);
+            }
+        }
+        Ok(self)
     }
 
     pub fn pipeline_batch(mut self, pipeline_batch: u32) -> Self {
@@ -133,9 +150,19 @@ impl QueryOptions {
         self
     }
 
-    pub fn positional_parameters(mut self, positional_parameters: Vec<Value>) -> Self {
-        self.positional_parameters = Some(positional_parameters);
-        self
+    pub fn add_positional_parameter<T: Serialize>(mut self, parameters: T) -> error::Result<Self> {
+        let parameters = serde_json::to_value(&parameters)?;
+
+        match self.positional_parameters {
+            Some(mut params) => {
+                params.push(parameters);
+                self.positional_parameters = Some(params);
+            }
+            None => {
+                self.positional_parameters = Some(vec![parameters]);
+            }
+        }
+        Ok(self)
     }
 
     pub fn preserve_expiry(mut self, preserve_expiry: bool) -> Self {
@@ -148,9 +175,25 @@ impl QueryOptions {
         self
     }
 
-    pub fn raw(mut self, raw: HashMap<String, Value>) -> Self {
-        self.raw = Some(raw);
-        self
+    pub fn add_raw<T: Serialize>(
+        mut self,
+        key: impl Into<String>,
+        value: T,
+    ) -> error::Result<Self> {
+        let value = serde_json::to_value(&value)?;
+
+        match self.raw {
+            Some(mut params) => {
+                params.insert(key.into(), value);
+                self.raw = Some(params);
+            }
+            None => {
+                let mut params = HashMap::new();
+                params.insert(key.into(), value);
+                self.raw = Some(params);
+            }
+        }
+        Ok(self)
     }
 
     pub fn read_only(mut self, read_only: bool) -> Self {
