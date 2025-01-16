@@ -6,7 +6,6 @@ use crate::results::kv_binary_results::CounterResult;
 use crate::results::kv_results::*;
 use crate::subdoc::lookup_in_specs::LookupInSpec;
 use crate::subdoc::mutate_in_specs::MutateInSpec;
-use bytes::Bytes;
 use std::time::Duration;
 
 #[derive(Clone)]
@@ -21,8 +20,8 @@ impl CoreKvClient {
 
     pub async fn upsert(
         &self,
-        id: String,
-        value: Bytes,
+        id: &str,
+        value: &[u8],
         flags: u32,
         options: UpsertOptions,
     ) -> error::Result<MutationResult> {
@@ -38,8 +37,8 @@ impl CoreKvClient {
 
     pub async fn insert(
         &self,
-        id: String,
-        value: Bytes,
+        id: &str,
+        value: &[u8],
         flags: u32,
         options: InsertOptions,
     ) -> error::Result<MutationResult> {
@@ -55,8 +54,8 @@ impl CoreKvClient {
 
     pub async fn replace(
         &self,
-        id: String,
-        value: Bytes,
+        id: &str,
+        value: &[u8],
         flags: u32,
         options: ReplaceOptions,
     ) -> error::Result<MutationResult> {
@@ -70,11 +69,7 @@ impl CoreKvClient {
         }
     }
 
-    pub async fn remove(
-        &self,
-        id: String,
-        options: RemoveOptions,
-    ) -> error::Result<MutationResult> {
+    pub async fn remove(&self, id: &str, options: RemoveOptions) -> error::Result<MutationResult> {
         match &self.backend {
             CoreKvClientBackend::CouchbaseCoreKvClientBackend(client) => {
                 client.remove(id, options).await
@@ -85,7 +80,7 @@ impl CoreKvClient {
         }
     }
 
-    pub async fn get(&self, id: String, options: GetOptions) -> error::Result<GetResult> {
+    pub async fn get(&self, id: &str, options: GetOptions) -> error::Result<GetResult> {
         match &self.backend {
             CoreKvClientBackend::CouchbaseCoreKvClientBackend(client) => {
                 client.get(id, options).await
@@ -96,7 +91,7 @@ impl CoreKvClient {
         }
     }
 
-    pub async fn exists(&self, id: String, options: ExistsOptions) -> error::Result<ExistsResult> {
+    pub async fn exists(&self, id: &str, options: ExistsOptions) -> error::Result<ExistsResult> {
         match &self.backend {
             CoreKvClientBackend::CouchbaseCoreKvClientBackend(client) => {
                 client.exists(id, options).await
@@ -109,7 +104,7 @@ impl CoreKvClient {
 
     pub async fn get_and_touch(
         &self,
-        id: String,
+        id: &str,
         expiry: Duration,
         options: GetAndTouchOptions,
     ) -> error::Result<GetResult> {
@@ -125,7 +120,7 @@ impl CoreKvClient {
 
     pub async fn get_and_lock(
         &self,
-        id: String,
+        id: &str,
         lock_time: Duration,
         options: GetAndLockOptions,
     ) -> error::Result<GetResult> {
@@ -139,7 +134,7 @@ impl CoreKvClient {
         }
     }
 
-    pub async fn unlock(&self, id: String, cas: u64, options: UnlockOptions) -> error::Result<()> {
+    pub async fn unlock(&self, id: &str, cas: u64, options: UnlockOptions) -> error::Result<()> {
         match &self.backend {
             CoreKvClientBackend::CouchbaseCoreKvClientBackend(client) => {
                 client.unlock(id, cas, options).await
@@ -152,7 +147,7 @@ impl CoreKvClient {
 
     pub async fn touch(
         &self,
-        id: String,
+        id: &str,
         expiry: Duration,
         options: TouchOptions,
     ) -> error::Result<TouchResult> {
@@ -168,8 +163,8 @@ impl CoreKvClient {
 
     pub async fn append(
         &self,
-        id: String,
-        value: Vec<u8>,
+        id: &str,
+        value: &[u8],
         options: AppendOptions,
     ) -> error::Result<MutationResult> {
         match &self.backend {
@@ -184,8 +179,8 @@ impl CoreKvClient {
 
     pub async fn prepend(
         &self,
-        id: String,
-        value: Vec<u8>,
+        id: &str,
+        value: &[u8],
         options: PrependOptions,
     ) -> error::Result<MutationResult> {
         match &self.backend {
@@ -200,7 +195,7 @@ impl CoreKvClient {
 
     pub async fn increment(
         &self,
-        id: String,
+        id: &str,
         options: IncrementOptions,
     ) -> error::Result<CounterResult> {
         match &self.backend {
@@ -215,7 +210,7 @@ impl CoreKvClient {
 
     pub async fn decrement(
         &self,
-        id: String,
+        id: &str,
         options: DecrementOptions,
     ) -> error::Result<CounterResult> {
         match &self.backend {
@@ -230,7 +225,7 @@ impl CoreKvClient {
 
     pub async fn lookup_in(
         &self,
-        id: String,
+        id: &str,
         specs: &[LookupInSpec],
         options: LookupInOptions,
     ) -> error::Result<LookupInResult> {
@@ -246,7 +241,7 @@ impl CoreKvClient {
 
     pub async fn mutate_in(
         &self,
-        id: String,
+        id: &str,
         specs: &[MutateInSpec],
         options: MutateInOptions,
     ) -> error::Result<MutateInResult> {
@@ -277,8 +272,8 @@ impl Couchbase2CoreKvClient {
 
     pub async fn upsert(
         &self,
-        _id: String,
-        _value: Bytes,
+        _id: &str,
+        _value: &[u8],
         _flags: u32,
         _options: impl Into<Option<UpsertOptions>>,
     ) -> error::Result<MutationResult> {
@@ -287,8 +282,8 @@ impl Couchbase2CoreKvClient {
 
     pub async fn insert(
         &self,
-        _id: String,
-        _value: Bytes,
+        _id: &str,
+        _value: &[u8],
         _flags: u32,
         _options: InsertOptions,
     ) -> error::Result<MutationResult> {
@@ -297,8 +292,8 @@ impl Couchbase2CoreKvClient {
 
     pub async fn replace(
         &self,
-        _id: String,
-        _value: Bytes,
+        _id: &str,
+        _value: &[u8],
         _flags: u32,
         _options: ReplaceOptions,
     ) -> error::Result<MutationResult> {
@@ -307,27 +302,23 @@ impl Couchbase2CoreKvClient {
 
     pub async fn remove(
         &self,
-        _id: String,
+        _id: &str,
         _options: RemoveOptions,
     ) -> error::Result<MutationResult> {
         unimplemented!()
     }
 
-    pub async fn get(&self, _id: String, _options: GetOptions) -> error::Result<GetResult> {
+    pub async fn get(&self, _id: &str, _options: GetOptions) -> error::Result<GetResult> {
         unimplemented!()
     }
 
-    pub async fn exists(
-        &self,
-        _id: String,
-        _options: ExistsOptions,
-    ) -> error::Result<ExistsResult> {
+    pub async fn exists(&self, _id: &str, _options: ExistsOptions) -> error::Result<ExistsResult> {
         unimplemented!()
     }
 
     pub async fn get_and_touch(
         &self,
-        _id: String,
+        _id: &str,
         _expiry: Duration,
         _options: GetAndTouchOptions,
     ) -> error::Result<GetResult> {
@@ -336,25 +327,20 @@ impl Couchbase2CoreKvClient {
 
     pub async fn get_and_lock(
         &self,
-        _id: String,
+        _id: &str,
         _lock_time: Duration,
         _options: GetAndLockOptions,
     ) -> error::Result<GetResult> {
         unimplemented!()
     }
 
-    pub async fn unlock(
-        &self,
-        _id: String,
-        _cas: u64,
-        _options: UnlockOptions,
-    ) -> error::Result<()> {
+    pub async fn unlock(&self, _id: &str, _cas: u64, _options: UnlockOptions) -> error::Result<()> {
         unimplemented!()
     }
 
     pub async fn touch(
         &self,
-        _id: String,
+        _id: &str,
         _expiry: Duration,
         _options: TouchOptions,
     ) -> error::Result<TouchResult> {
@@ -363,8 +349,8 @@ impl Couchbase2CoreKvClient {
 
     pub async fn append(
         &self,
-        _id: String,
-        _value: Vec<u8>,
+        _id: &str,
+        _value: &[u8],
         _options: AppendOptions,
     ) -> error::Result<MutationResult> {
         unimplemented!()
@@ -372,8 +358,8 @@ impl Couchbase2CoreKvClient {
 
     pub async fn prepend(
         &self,
-        _id: String,
-        _value: Vec<u8>,
+        _id: &str,
+        _value: &[u8],
         _options: PrependOptions,
     ) -> error::Result<MutationResult> {
         unimplemented!()
@@ -381,7 +367,7 @@ impl Couchbase2CoreKvClient {
 
     pub async fn increment(
         &self,
-        _id: String,
+        _id: &str,
         _options: IncrementOptions,
     ) -> error::Result<CounterResult> {
         unimplemented!()
@@ -389,7 +375,7 @@ impl Couchbase2CoreKvClient {
 
     pub async fn decrement(
         &self,
-        _id: String,
+        _id: &str,
         _options: DecrementOptions,
     ) -> error::Result<CounterResult> {
         unimplemented!()
@@ -397,7 +383,7 @@ impl Couchbase2CoreKvClient {
 
     pub async fn lookup_in(
         &self,
-        _id: String,
+        _id: &str,
         _specs: &[LookupInSpec],
         _options: LookupInOptions,
     ) -> error::Result<LookupInResult> {
@@ -406,7 +392,7 @@ impl Couchbase2CoreKvClient {
 
     pub async fn mutate_in(
         &self,
-        _id: String,
+        _id: &str,
         _specs: &[MutateInSpec],
         _options: MutateInOptions,
     ) -> error::Result<MutateInResult> {

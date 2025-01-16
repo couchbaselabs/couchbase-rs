@@ -12,7 +12,6 @@ use crate::results::kv_results::{
 };
 use crate::subdoc::lookup_in_specs::LookupInSpec;
 use crate::subdoc::mutate_in_specs::MutateInSpec;
-use bytes::Bytes;
 use couchbase_core::memdx::subdoc::{reorder_subdoc_ops, SubdocDocFlag};
 use couchbase_core::retry::RetryStrategy;
 use std::sync::Arc;
@@ -47,8 +46,8 @@ impl CouchbaseCoreKvClient {
 
     pub async fn upsert(
         &self,
-        id: String,
-        value: Bytes,
+        id: &str,
+        value: &[u8],
         flags: u32,
         options: UpsertOptions,
     ) -> error::Result<MutationResult> {
@@ -59,7 +58,7 @@ impl CouchbaseCoreKvClient {
                     id.as_bytes(),
                     &self.scope_name,
                     &self.collection_name,
-                    &value,
+                    value,
                 )
                 .flags(flags)
                 .expiry(options.expiry.map(|e| e.as_millis() as u32))
@@ -83,8 +82,8 @@ impl CouchbaseCoreKvClient {
 
     pub async fn insert(
         &self,
-        id: String,
-        value: Bytes,
+        id: &str,
+        value: &[u8],
         flags: u32,
         options: InsertOptions,
     ) -> error::Result<MutationResult> {
@@ -95,7 +94,7 @@ impl CouchbaseCoreKvClient {
                     id.as_bytes(),
                     &self.scope_name,
                     &self.collection_name,
-                    &value,
+                    value,
                 )
                 .flags(flags)
                 .expiry(options.expiry.map(|e| e.as_millis() as u32))
@@ -118,8 +117,8 @@ impl CouchbaseCoreKvClient {
 
     pub async fn replace(
         &self,
-        id: String,
-        value: Bytes,
+        id: &str,
+        value: &[u8],
         flags: u32,
         options: ReplaceOptions,
     ) -> error::Result<MutationResult> {
@@ -130,7 +129,7 @@ impl CouchbaseCoreKvClient {
                     id.as_bytes(),
                     &self.scope_name,
                     &self.collection_name,
-                    &value,
+                    value,
                 )
                 .flags(flags)
                 .expiry(options.expiry.map(|e| e.as_millis() as u32))
@@ -153,11 +152,7 @@ impl CouchbaseCoreKvClient {
         })
     }
 
-    pub async fn remove(
-        &self,
-        id: String,
-        options: RemoveOptions,
-    ) -> error::Result<MutationResult> {
+    pub async fn remove(&self, id: &str, options: RemoveOptions) -> error::Result<MutationResult> {
         let agent = self.agent_provider.get_agent().await;
         let result = agent
             .delete(
@@ -184,7 +179,7 @@ impl CouchbaseCoreKvClient {
         })
     }
 
-    pub async fn get(&self, id: String, options: GetOptions) -> error::Result<GetResult> {
+    pub async fn get(&self, id: &str, options: GetOptions) -> error::Result<GetResult> {
         let agent = self.agent_provider.get_agent().await;
         let res = agent
             .get(
@@ -204,7 +199,7 @@ impl CouchbaseCoreKvClient {
         Ok(res.into())
     }
 
-    pub async fn exists(&self, id: String, options: ExistsOptions) -> error::Result<ExistsResult> {
+    pub async fn exists(&self, id: &str, options: ExistsOptions) -> error::Result<ExistsResult> {
         let agent = self.agent_provider.get_agent().await;
         let res = agent
             .get_meta(
@@ -226,7 +221,7 @@ impl CouchbaseCoreKvClient {
 
     pub async fn get_and_touch(
         &self,
-        id: String,
+        id: &str,
         expiry: Duration,
         options: GetAndTouchOptions,
     ) -> error::Result<GetResult> {
@@ -252,7 +247,7 @@ impl CouchbaseCoreKvClient {
 
     pub async fn get_and_lock(
         &self,
-        id: String,
+        id: &str,
         lock_time: Duration,
         options: GetAndLockOptions,
     ) -> error::Result<GetResult> {
@@ -276,7 +271,7 @@ impl CouchbaseCoreKvClient {
         Ok(res.into())
     }
 
-    pub async fn unlock(&self, id: String, cas: u64, options: UnlockOptions) -> error::Result<()> {
+    pub async fn unlock(&self, id: &str, cas: u64, options: UnlockOptions) -> error::Result<()> {
         let agent = self.agent_provider.get_agent().await;
         agent
             .unlock(
@@ -299,7 +294,7 @@ impl CouchbaseCoreKvClient {
 
     pub async fn touch(
         &self,
-        id: String,
+        id: &str,
         expiry: Duration,
         options: TouchOptions,
     ) -> error::Result<TouchResult> {
@@ -325,8 +320,8 @@ impl CouchbaseCoreKvClient {
 
     pub async fn append(
         &self,
-        id: String,
-        value: Vec<u8>,
+        id: &str,
+        value: &[u8],
         options: AppendOptions,
     ) -> error::Result<MutationResult> {
         let agent = self.agent_provider.get_agent().await;
@@ -336,7 +331,7 @@ impl CouchbaseCoreKvClient {
                     id.as_bytes(),
                     &self.scope_name,
                     &self.collection_name,
-                    &value,
+                    value,
                 )
                 .durability_level(options.durability_level.map(|l| l.into()))
                 .retry_strategy(
@@ -357,8 +352,8 @@ impl CouchbaseCoreKvClient {
 
     pub async fn prepend(
         &self,
-        id: String,
-        value: Vec<u8>,
+        id: &str,
+        value: &[u8],
         options: PrependOptions,
     ) -> error::Result<MutationResult> {
         let agent = self.agent_provider.get_agent().await;
@@ -368,7 +363,7 @@ impl CouchbaseCoreKvClient {
                     id.as_bytes(),
                     &self.scope_name,
                     &self.collection_name,
-                    &value,
+                    value,
                 )
                 .durability_level(options.durability_level.map(|l| l.into()))
                 .retry_strategy(
@@ -389,7 +384,7 @@ impl CouchbaseCoreKvClient {
 
     pub async fn increment(
         &self,
-        id: String,
+        id: &str,
         options: IncrementOptions,
     ) -> error::Result<CounterResult> {
         let agent = self.agent_provider.get_agent().await;
@@ -423,7 +418,7 @@ impl CouchbaseCoreKvClient {
 
     pub async fn decrement(
         &self,
-        id: String,
+        id: &str,
         options: DecrementOptions,
     ) -> error::Result<CounterResult> {
         let agent = self.agent_provider.get_agent().await;
@@ -457,7 +452,7 @@ impl CouchbaseCoreKvClient {
 
     pub async fn lookup_in(
         &self,
-        id: String,
+        id: &str,
         specs: &[LookupInSpec],
         options: LookupInOptions,
     ) -> error::Result<LookupInResult> {
@@ -511,7 +506,7 @@ impl CouchbaseCoreKvClient {
 
     pub async fn mutate_in(
         &self,
-        id: String,
+        id: &str,
         specs: &[MutateInSpec],
         options: MutateInOptions,
     ) -> error::Result<MutateInResult> {
