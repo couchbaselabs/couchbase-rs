@@ -1,120 +1,113 @@
-use crate::common::create_cluster_from_test_config;
-use crate::common::test_config::{setup_tests, test_bucket, test_scope};
+#![feature(async_closure)]
+
+use crate::common::test_config::run_test;
 use couchbase::options::query_options::QueryOptions;
 use couchbase::results::query_results::{QueryMetaData, QueryStatus};
 use futures::StreamExt;
-use log::LevelFilter;
 use serde_json::value::RawValue;
 use serde_json::Value;
 
 mod common;
 
-#[tokio::test]
-async fn test_query_basic() {
-    setup_tests(LevelFilter::Trace).await;
+#[test]
+fn test_query_basic() {
+    run_test(async |cluster| {
+        let opts = QueryOptions::new().metrics(true);
+        let mut res = cluster.query("SELECT 1=1", opts).await.unwrap();
 
-    let cluster = create_cluster_from_test_config().await;
+        let mut rows: Vec<Value> = vec![];
+        while let Some(row) = res.rows().next().await {
+            rows.push(row.unwrap());
+        }
 
-    let opts = QueryOptions::new().metrics(true);
-    let mut res = cluster.query("SELECT 1=1", opts).await.unwrap();
+        assert_eq!(1, rows.len());
 
-    let mut rows: Vec<Value> = vec![];
-    while let Some(row) = res.rows().next().await {
-        rows.push(row.unwrap());
-    }
+        let row = rows.first().unwrap();
 
-    assert_eq!(1, rows.len());
+        let row_obj = row.as_object().unwrap();
 
-    let row = rows.first().unwrap();
+        assert!(row_obj.get("$1").unwrap().as_bool().unwrap());
 
-    let row_obj = row.as_object().unwrap();
-
-    assert!(row_obj.get("$1").unwrap().as_bool().unwrap());
-
-    let meta = res.metadata().await.unwrap();
-    assert_metadata(meta);
+        let meta = res.metadata().await.unwrap();
+        assert_metadata(meta);
+    })
 }
 
-#[tokio::test]
-async fn test_query_raw_result() {
-    setup_tests(LevelFilter::Trace).await;
+#[test]
+fn test_query_raw_result() {
+    run_test(async |cluster| {
+        let opts = QueryOptions::new().metrics(true);
+        let mut res = cluster.query("SELECT 1=1", opts).await.unwrap();
 
-    let cluster = create_cluster_from_test_config().await;
+        let mut rows: Vec<Box<RawValue>> = vec![];
+        while let Some(row) = res.rows().next().await {
+            rows.push(row.unwrap());
+        }
 
-    let opts = QueryOptions::new().metrics(true);
-    let mut res = cluster.query("SELECT 1=1", opts).await.unwrap();
+        assert_eq!(1, rows.len());
 
-    let mut rows: Vec<Box<RawValue>> = vec![];
-    while let Some(row) = res.rows().next().await {
-        rows.push(row.unwrap());
-    }
+        let row = rows.first().unwrap();
 
-    assert_eq!(1, rows.len());
+        let row_value: Value = serde_json::from_str(row.get()).unwrap();
+        let row_obj = row_value.as_object().unwrap();
 
-    let row = rows.first().unwrap();
+        assert!(row_obj.get("$1").unwrap().as_bool().unwrap());
 
-    let row_value: Value = serde_json::from_str(row.get()).unwrap();
-    let row_obj = row_value.as_object().unwrap();
-
-    assert!(row_obj.get("$1").unwrap().as_bool().unwrap());
-
-    let meta = res.metadata().await.unwrap();
-    assert_metadata(meta);
+        let meta = res.metadata().await.unwrap();
+        assert_metadata(meta);
+    })
 }
 
-#[tokio::test]
-async fn test_prepared_query_basic() {
-    setup_tests(LevelFilter::Trace).await;
+#[test]
+fn test_prepared_query_basic() {
+    run_test(async |cluster| {
+        let opts = QueryOptions::new().metrics(true);
+        let mut res = cluster.query("SELECT 1=1", opts).await.unwrap();
 
-    let cluster = create_cluster_from_test_config().await;
+        let mut rows: Vec<Value> = vec![];
+        while let Some(row) = res.rows().next().await {
+            rows.push(row.unwrap());
+        }
 
-    let opts = QueryOptions::new().metrics(true);
-    let mut res = cluster.query("SELECT 1=1", opts).await.unwrap();
+        assert_eq!(1, rows.len());
 
-    let mut rows: Vec<Value> = vec![];
-    while let Some(row) = res.rows().next().await {
-        rows.push(row.unwrap());
-    }
+        let row = rows.first().unwrap();
 
-    assert_eq!(1, rows.len());
+        let row_obj = row.as_object().unwrap();
 
-    let row = rows.first().unwrap();
+        assert!(row_obj.get("$1").unwrap().as_bool().unwrap());
 
-    let row_obj = row.as_object().unwrap();
-
-    assert!(row_obj.get("$1").unwrap().as_bool().unwrap());
-
-    let meta = res.metadata().await.unwrap();
-    assert_metadata(meta);
+        let meta = res.metadata().await.unwrap();
+        assert_metadata(meta);
+    })
 }
 
-#[tokio::test]
-async fn test_scope_query_basic() {
-    setup_tests(LevelFilter::Trace).await;
+#[test]
+fn test_scope_query_basic() {
+    run_test(async |cluster| {
+        let scope = cluster
+            .bucket(&cluster.default_bucket)
+            .scope(&cluster.default_scope);
 
-    let cluster = create_cluster_from_test_config().await;
-    let scope = cluster
-        .bucket(test_bucket().await)
-        .scope(test_scope().await);
+        let opts = QueryOptions::new().metrics(true);
+        let mut res = scope.query("SELECT 1=1", opts).await.unwrap();
 
-    let opts = QueryOptions::new().metrics(true);
-    let mut res = scope.query("SELECT 1=1", opts).await.unwrap();
+        let mut rows: Vec<Value> = vec![];
+        while let Some(row) = res.rows().next().await {
+            rows.push(row.unwrap());
+        }
 
-    let mut rows: Vec<Value> = vec![];
-    while let Some(row) = res.rows().next().await {
-        rows.push(row.unwrap());
-    }
+        assert_eq!(1, rows.len());
 
-    assert_eq!(1, rows.len());
+        let row = rows.first().unwrap();
 
-    let row = rows.first().unwrap();
+        let row_obj = row.as_object().unwrap();
 
-    let row_obj = row.as_object().unwrap();
+        assert!(row_obj.get("$1").unwrap().as_bool().unwrap());
 
-    assert!(row_obj.get("$1").unwrap().as_bool().unwrap());
-
-    let meta = res.metadata().await.unwrap();
-    assert_metadata(meta);
+        let meta = res.metadata().await.unwrap();
+        assert_metadata(meta);
+    })
 }
 
 fn assert_metadata(meta: QueryMetaData) {

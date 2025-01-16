@@ -1,15 +1,21 @@
+use std::env;
+use std::future::Future;
 use std::io::Write;
-use std::sync::Arc;
+use std::ops::Deref;
+use std::sync::LazyLock;
 
+use crate::common::default_cluster_options;
 use crate::common::node_version::NodeVersion;
+use couchbase::cluster::Cluster;
 use couchbase_connstr::ResolvedConnSpec;
 use envconfig::Envconfig;
 use lazy_static::lazy_static;
 use log::LevelFilter;
+use tokio::runtime::Runtime;
 use tokio::sync::RwLock;
 
 lazy_static! {
-    pub static ref TEST_CONFIG: RwLock<Option<Arc<TestConfig>>> = RwLock::new(None);
+    pub static ref TEST_CONFIG: RwLock<Option<TestCluster>> = RwLock::new(None);
 }
 
 #[derive(Debug, Clone, Envconfig)]
@@ -33,22 +39,63 @@ pub struct EnvTestConfig {
 }
 
 #[derive(Debug, Clone)]
-pub struct TestConfig {
+pub struct TestSetupConfig {
     pub username: String,
     pub password: String,
     pub conn_str: String,
+    pub data_timeout: String,
+    pub resolved_conn_spec: ResolvedConnSpec,
+}
+
+impl TestSetupConfig {
+    pub async fn setup_cluster(&self) -> Cluster {
+        Cluster::connect(
+            self.conn_str.clone(),
+            default_cluster_options::create_default_options(self.clone()).await,
+        )
+        .await
+        .unwrap()
+    }
+}
+
+#[derive(Clone)]
+pub struct TestCluster {
     pub default_bucket: String,
     pub default_scope: String,
     pub default_collection: String,
-    pub data_timeout: String,
-    pub resolved_conn_spec: ResolvedConnSpec,
     pub cluster_version: NodeVersion,
+    test_setup_config: TestSetupConfig,
+    cluster: Cluster,
 }
 
-pub async fn setup_tests(log_level: LevelFilter) -> Arc<TestConfig> {
-    let mut config = TEST_CONFIG.write().await;
+impl Deref for TestCluster {
+    type Target = Cluster;
 
-    if config.is_none() {
+    fn deref(&self) -> &Self::Target {
+        &self.cluster
+    }
+}
+
+static RUNTIME: LazyLock<Runtime> = LazyLock::new(|| {
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+});
+
+pub fn run_test<T, Fut>(test: T)
+where
+    T: FnOnce(TestCluster) -> Fut,
+    Fut: Future<Output = ()>,
+{
+    RUNTIME.block_on(async {
+        let mut config = TEST_CONFIG.write().await;
+
+        if let Some(cluster) = config.deref() {
+            test(cluster.clone()).await;
+            return;
+        }
+
         env_logger::Builder::new()
             .format(|buf, record| {
                 writeln!(
@@ -62,68 +109,43 @@ pub async fn setup_tests(log_level: LevelFilter) -> Arc<TestConfig> {
                 )
             })
             .filter(Some("rustls"), LevelFilter::Warn)
-            .filter_level(log_level)
+            .filter_level(
+                env::var("RUST_LOG")
+                    .unwrap_or("TRACE".to_string())
+                    .parse()
+                    .unwrap(),
+            )
             .init();
-        let test_config = EnvTestConfig::init_from_env().unwrap();
 
-        let conn_spec = couchbase_connstr::parse(&test_config.conn_string).unwrap();
+        let test_cluster = create_test_cluster().await;
 
-        let test_config = Arc::new(TestConfig {
-            username: test_config.username,
-            password: test_config.password,
-            conn_str: test_config.conn_string,
-            default_bucket: test_config.default_bucket,
-            default_scope: test_config.default_scope,
-            default_collection: test_config.default_collection,
-            data_timeout: test_config.data_timeout,
-            resolved_conn_spec: couchbase_connstr::resolve(conn_spec).await.unwrap(),
-            cluster_version: NodeVersion::from(test_config.server_version),
-        });
-        *config = Some(test_config.clone());
-        return test_config;
+        *config = Some(test_cluster.clone());
+
+        test(test_cluster).await;
+    });
+}
+
+pub async fn create_test_cluster() -> TestCluster {
+    let test_config = EnvTestConfig::init_from_env().unwrap();
+
+    let conn_spec = couchbase_connstr::parse(&test_config.conn_string).unwrap();
+
+    let test_setup_config = TestSetupConfig {
+        username: test_config.username,
+        password: test_config.password,
+        conn_str: test_config.conn_string,
+        data_timeout: test_config.data_timeout,
+        resolved_conn_spec: couchbase_connstr::resolve(conn_spec).await.unwrap(),
+    };
+
+    let cluster = test_setup_config.setup_cluster().await;
+
+    TestCluster {
+        default_bucket: test_config.default_bucket,
+        default_scope: test_config.default_scope,
+        default_collection: test_config.default_collection,
+        cluster_version: NodeVersion::from(test_config.server_version),
+        test_setup_config,
+        cluster,
     }
-
-    config.clone().unwrap()
-}
-
-pub async fn test_username() -> String {
-    let guard = TEST_CONFIG.read().await;
-    let config = guard.clone().unwrap();
-    config.username.clone()
-}
-
-pub async fn test_password() -> String {
-    let guard = TEST_CONFIG.read().await;
-    let config = guard.clone().unwrap();
-    config.password.clone()
-}
-
-pub async fn test_conn_str() -> String {
-    let guard = TEST_CONFIG.read().await;
-    let config = guard.clone().unwrap();
-    config.conn_str.clone()
-}
-
-pub async fn test_bucket() -> String {
-    let guard = TEST_CONFIG.read().await;
-    let config = guard.clone().unwrap();
-    config.default_bucket.clone()
-}
-
-pub async fn test_scope() -> String {
-    let guard = TEST_CONFIG.read().await;
-    let config = guard.clone().unwrap();
-    config.default_scope.clone()
-}
-
-pub async fn test_collection() -> String {
-    let guard = TEST_CONFIG.read().await;
-    let config = guard.clone().unwrap();
-    config.default_collection.clone()
-}
-
-pub async fn test_data_timeout() -> String {
-    let guard = TEST_CONFIG.read().await;
-    let config = guard.clone().unwrap();
-    config.data_timeout.clone()
 }

@@ -1,32 +1,30 @@
-use crate::common::test_config::{setup_tests, test_collection, test_scope};
-use crate::common::{create_cluster_from_test_config, new_key};
-use log::LevelFilter;
+#![feature(async_closure)]
+
+use crate::common::new_key;
+use crate::common::test_config::run_test;
 use std::ops::Add;
 use std::time::Duration;
 use tokio::time::{timeout_at, Instant};
 
 mod common;
 
-#[tokio::test]
-async fn test_upsert() {
-    setup_tests(LevelFilter::Trace).await;
+#[test]
+#[should_panic]
+fn test_upsert() {
+    run_test(async |cluster| {
+        let collection = cluster
+            .bucket("idonotexistonthiscluster")
+            .scope(cluster.default_scope)
+            .collection(cluster.default_collection);
 
-    let cluster = create_cluster_from_test_config().await;
+        let key = new_key();
 
-    let collection = cluster
-        .bucket("idonotexistonthiscluster")
-        .scope(test_scope().await)
-        .collection(test_collection().await);
-
-    let key = new_key();
-
-    if timeout_at(
-        Instant::now().add(Duration::from_millis(2500)),
-        collection.upsert(&key, "test", None),
-    )
-    .await
-    .is_ok()
-    {
-        panic!("expected timeout");
-    }
+        timeout_at(
+            Instant::now().add(Duration::from_millis(2500)),
+            collection.upsert(&key, "test", None),
+        )
+        .await
+        .unwrap()
+        .expect("Expected panic due to timeout");
+    })
 }

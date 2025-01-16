@@ -1,5 +1,5 @@
 use crate::common::node_version::NodeVersion;
-use crate::common::test_config::TestConfig;
+use crate::common::test_config::TestCluster;
 
 const SERVER_VERSION_722: NodeVersion = NodeVersion {
     major: 7,
@@ -32,7 +32,7 @@ pub enum TestFeatureCode {
     CollectionUpdates,
 }
 
-impl TestConfig {
+impl TestCluster {
     pub fn supports_feature(&self, code: &TestFeatureCode) -> bool {
         match code {
             TestFeatureCode::KV => true,

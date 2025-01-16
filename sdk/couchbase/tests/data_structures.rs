@@ -1,177 +1,171 @@
-use crate::common::test_config::{setup_tests, test_bucket, test_collection, test_scope};
-use crate::common::{create_cluster_from_test_config, new_key};
-use log::LevelFilter;
+#![feature(async_closure)]
+
+use crate::common::new_key;
+use crate::common::test_config::run_test;
 
 mod common;
 
-#[tokio::test]
-async fn test_list() {
-    setup_tests(LevelFilter::Trace).await;
+#[test]
+fn test_list() {
+    run_test(async |cluster| {
+        let collection = cluster
+            .bucket(&cluster.default_bucket)
+            .scope(&cluster.default_scope)
+            .collection(&cluster.default_collection);
+        let key = new_key();
 
-    let cluster = create_cluster_from_test_config().await;
+        let list = collection.list(&key, None);
 
-    let collection = cluster
-        .bucket(test_bucket().await)
-        .scope(test_scope().await)
-        .collection(test_collection().await);
-    let key = new_key();
+        list.append("test2").await.unwrap();
+        list.prepend("test1").await.unwrap();
 
-    let list = collection.list(&key, None);
+        let index = list.position("test2".to_string()).await.unwrap();
+        assert_eq!(index, 1);
 
-    list.append("test2").await.unwrap();
-    list.prepend("test1").await.unwrap();
+        let size = list.len().await.unwrap();
+        assert_eq!(size, 2);
 
-    let index = list.position("test2".to_string()).await.unwrap();
-    assert_eq!(index, 1);
+        let mut iter = list.iter::<String>().await.unwrap();
+        assert_eq!(Some("test1".to_string()), iter.next());
+        assert_eq!(Some("test2".to_string()), iter.next());
+        assert_eq!(None, iter.next());
 
-    let size = list.len().await.unwrap();
-    assert_eq!(size, 2);
+        list.remove(0).await.unwrap();
 
-    let mut iter = list.iter::<String>().await.unwrap();
-    assert_eq!(Some("test1".to_string()), iter.next());
-    assert_eq!(Some("test2".to_string()), iter.next());
-    assert_eq!(None, iter.next());
+        let item: String = list.get(0).await.unwrap();
+        assert_eq!(item, "test2");
 
-    list.remove(0).await.unwrap();
+        list.clear().await.unwrap();
 
-    let item: String = list.get(0).await.unwrap();
-    assert_eq!(item, "test2");
-
-    list.clear().await.unwrap();
-
-    let res = collection.exists(key, None).await.unwrap();
-    assert!(!res.exists());
+        let res = collection.exists(key, None).await.unwrap();
+        assert!(!res.exists());
+    })
 }
 
-#[tokio::test]
-async fn test_map() {
-    setup_tests(LevelFilter::Trace).await;
+#[test]
+fn test_map() {
+    run_test(async |cluster| {
+        let collection = cluster
+            .bucket(&cluster.default_bucket)
+            .scope(&cluster.default_scope)
+            .collection(&cluster.default_collection);
+        let key = new_key();
 
-    let cluster = create_cluster_from_test_config().await;
+        let map = collection.map(&key, None);
 
-    let collection = cluster
-        .bucket(test_bucket().await)
-        .scope(test_scope().await)
-        .collection(test_collection().await);
-    let key = new_key();
+        map.insert("foo", "test2".to_string()).await.unwrap();
+        map.insert("bar", "test4".to_string()).await.unwrap();
 
-    let map = collection.map(&key, None);
+        let res: String = map.get("bar").await.unwrap();
+        assert_eq!(res, "test4");
 
-    map.insert("foo", "test2".to_string()).await.unwrap();
-    map.insert("bar", "test4".to_string()).await.unwrap();
+        let res = map.contains_key("bar").await.unwrap();
+        assert!(res);
 
-    let res: String = map.get("bar").await.unwrap();
-    assert_eq!(res, "test4");
+        let res = map.len().await.unwrap();
+        assert_eq!(res, 2);
 
-    let res = map.contains_key("bar").await.unwrap();
-    assert!(res);
+        let mut res = map.keys().await.unwrap();
+        res.sort();
+        assert_eq!(res, vec!["bar", "foo"]);
 
-    let res = map.len().await.unwrap();
-    assert_eq!(res, 2);
+        let mut res: Vec<String> = map.values().await.unwrap();
+        res.sort();
+        assert_eq!(res, vec!["test2", "test4"]);
 
-    let mut res = map.keys().await.unwrap();
-    res.sort();
-    assert_eq!(res, vec!["bar", "foo"]);
+        let mut res: Vec<(String, String)> =
+            map.iter::<String>().await.unwrap().collect::<Vec<_>>();
+        res.sort();
 
-    let mut res: Vec<String> = map.values().await.unwrap();
-    res.sort();
-    assert_eq!(res, vec!["test2", "test4"]);
+        assert_eq!(
+            res,
+            vec![
+                ("bar".to_string(), "test4".to_string()),
+                ("foo".to_string(), "test2".to_string()),
+            ]
+        );
 
-    let mut res: Vec<(String, String)> = map.iter::<String>().await.unwrap().collect::<Vec<_>>();
-    res.sort();
+        map.remove("foo").await.unwrap();
 
-    assert_eq!(
-        res,
-        vec![
-            ("bar".to_string(), "test4".to_string()),
-            ("foo".to_string(), "test2".to_string()),
-        ]
-    );
+        let res = map.contains_key("foo").await.unwrap();
+        assert!(!res);
 
-    map.remove("foo").await.unwrap();
+        map.clear().await.unwrap();
 
-    let res = map.contains_key("foo").await.unwrap();
-    assert!(!res);
-
-    map.clear().await.unwrap();
-
-    let res = collection.exists(key, None).await.unwrap();
-    assert!(!res.exists());
+        let res = collection.exists(key, None).await.unwrap();
+        assert!(!res.exists());
+    })
 }
 
-#[tokio::test]
-async fn test_set() {
-    setup_tests(LevelFilter::Trace).await;
+#[test]
+fn test_set() {
+    run_test(async |cluster| {
+        let collection = cluster
+            .bucket(&cluster.default_bucket)
+            .scope(&cluster.default_scope)
+            .collection(&cluster.default_collection);
+        let key = new_key();
 
-    let cluster = create_cluster_from_test_config().await;
+        let set = collection.set(&key, None);
 
-    let collection = cluster
-        .bucket(test_bucket().await)
-        .scope(test_scope().await)
-        .collection(test_collection().await);
-    let key = new_key();
+        set.insert("test1").await.unwrap();
+        set.insert("test2").await.unwrap();
+        set.insert("test2").await.unwrap();
 
-    let set = collection.set(&key, None);
+        let res = set.len().await.unwrap();
+        assert_eq!(res, 2);
 
-    set.insert("test1").await.unwrap();
-    set.insert("test2").await.unwrap();
-    set.insert("test2").await.unwrap();
+        let res: Vec<String> = set.values().await.unwrap();
+        assert_eq!(res, vec!["test1", "test2"]);
 
-    let res = set.len().await.unwrap();
-    assert_eq!(res, 2);
+        let res = set.contains("test1".to_string()).await.unwrap();
+        assert!(res);
 
-    let res: Vec<String> = set.values().await.unwrap();
-    assert_eq!(res, vec!["test1", "test2"]);
+        let mut iter = set.iter::<String>().await.unwrap();
+        assert_eq!(Some("test1".to_string()), iter.next());
+        assert_eq!(Some("test2".to_string()), iter.next());
+        assert_eq!(None, iter.next());
 
-    let res = set.contains("test1".to_string()).await.unwrap();
-    assert!(res);
+        set.remove("test1".to_string()).await.unwrap();
 
-    let mut iter = set.iter::<String>().await.unwrap();
-    assert_eq!(Some("test1".to_string()), iter.next());
-    assert_eq!(Some("test2".to_string()), iter.next());
-    assert_eq!(None, iter.next());
+        let res = set.contains("test1".to_string()).await.unwrap();
+        assert!(!res);
 
-    set.remove("test1".to_string()).await.unwrap();
+        set.clear().await.unwrap();
 
-    let res = set.contains("test1".to_string()).await.unwrap();
-    assert!(!res);
-
-    set.clear().await.unwrap();
-
-    let res = collection.exists(key, None).await.unwrap();
-    assert!(!res.exists());
+        let res = collection.exists(key, None).await.unwrap();
+        assert!(!res.exists());
+    })
 }
 
-#[tokio::test]
-async fn test_queue() {
-    setup_tests(LevelFilter::Trace).await;
+#[test]
+fn test_queue() {
+    run_test(async |cluster| {
+        let collection = cluster
+            .bucket(&cluster.default_bucket)
+            .scope(&cluster.default_scope)
+            .collection(&cluster.default_collection);
+        let key = new_key();
 
-    let cluster = create_cluster_from_test_config().await;
+        let queue = collection.queue(&key, None);
 
-    let collection = cluster
-        .bucket(test_bucket().await)
-        .scope(test_scope().await)
-        .collection(test_collection().await);
-    let key = new_key();
+        queue.push("test1").await.unwrap();
+        queue.push("test2").await.unwrap();
 
-    let queue = collection.queue(&key, None);
+        let res = queue.len().await.unwrap();
+        assert_eq!(res, 2);
 
-    queue.push("test1").await.unwrap();
-    queue.push("test2").await.unwrap();
+        let mut iter = queue.iter::<String>().await.unwrap();
+        assert_eq!(Some("test1".to_string()), iter.next());
+        assert_eq!(Some("test2".to_string()), iter.next());
+        assert_eq!(None, iter.next());
 
-    let res = queue.len().await.unwrap();
-    assert_eq!(res, 2);
+        let res: String = queue.pop().await.unwrap();
+        assert_eq!(res, "test1");
 
-    let mut iter = queue.iter::<String>().await.unwrap();
-    assert_eq!(Some("test1".to_string()), iter.next());
-    assert_eq!(Some("test2".to_string()), iter.next());
-    assert_eq!(None, iter.next());
+        queue.clear().await.unwrap();
 
-    let res: String = queue.pop().await.unwrap();
-    assert_eq!(res, "test1");
-
-    queue.clear().await.unwrap();
-
-    let res = collection.exists(key, None).await.unwrap();
-    assert!(!res.exists());
+        let res = collection.exists(key, None).await.unwrap();
+        assert!(!res.exists());
+    })
 }
