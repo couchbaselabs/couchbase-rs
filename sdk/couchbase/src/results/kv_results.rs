@@ -1,28 +1,24 @@
 use crate::mutation_state::MutationToken;
 use crate::subdoc::lookup_in_specs::LookupInOpType;
-use crate::transcoding::RawValue;
 use crate::{error, transcoding};
 use bytes::Bytes;
 use serde::de::DeserializeOwned;
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct GetResult {
-    content: Bytes,
+    content: Vec<u8>,
     flags: u32,
     cas: u64,
 }
 
 impl GetResult {
-    pub fn content_as<V: DeserializeOwned>(self) -> error::Result<V> {
-        let content = self.content_as_raw();
-        transcoding::json::decode(&content)
+    pub fn content_as<V: DeserializeOwned>(&self) -> error::Result<V> {
+        let (content, flags) = self.content_as_raw();
+        transcoding::json::decode(content, flags)
     }
 
-    pub fn content_as_raw(self) -> RawValue {
-        RawValue {
-            content: self.content,
-            flags: self.flags,
-        }
+    pub fn content_as_raw(&self) -> (&[u8], u32) {
+        (&self.content, self.flags)
     }
 
     pub fn cas(&self) -> u64 {
@@ -33,7 +29,7 @@ impl GetResult {
 impl From<couchbase_core::crudresults::GetResult> for GetResult {
     fn from(result: couchbase_core::crudresults::GetResult) -> Self {
         Self {
-            content: Bytes::from(result.value),
+            content: result.value,
             flags: result.flags,
             cas: result.cas,
         }
@@ -43,7 +39,7 @@ impl From<couchbase_core::crudresults::GetResult> for GetResult {
 impl From<couchbase_core::crudresults::GetAndTouchResult> for GetResult {
     fn from(result: couchbase_core::crudresults::GetAndTouchResult) -> Self {
         Self {
-            content: Bytes::from(result.value),
+            content: result.value,
             flags: result.flags,
             cas: result.cas,
         }
@@ -53,7 +49,7 @@ impl From<couchbase_core::crudresults::GetAndTouchResult> for GetResult {
 impl From<couchbase_core::crudresults::GetAndLockResult> for GetResult {
     fn from(result: couchbase_core::crudresults::GetAndLockResult) -> Self {
         Self {
-            content: Bytes::from(result.value),
+            content: result.value,
             flags: result.flags,
             cas: result.cas,
         }

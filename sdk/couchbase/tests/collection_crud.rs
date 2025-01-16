@@ -1,6 +1,5 @@
 use crate::common::test_config::{setup_tests, test_bucket, test_collection, test_scope};
 use crate::common::{create_cluster_from_test_config, new_key};
-use bytes::Bytes;
 use couchbase::options::kv_binary_options::{DecrementOptions, IncrementOptions};
 use couchbase::subdoc::lookup_in_specs::{GetSpecOptions, LookupInSpec};
 use couchbase::subdoc::macros::{LookupInMacros, MutateInMacros};
@@ -84,8 +83,9 @@ async fn test_upsert_with_transcoder() {
 
     let key = new_key();
 
+    let (content, flags) = transcoding::json::encode(value).unwrap();
     collection
-        .upsert_raw(&key, transcoding::json::encode(value).unwrap(), None)
+        .upsert_raw(&key, &content, flags, None)
         .await
         .unwrap();
 
@@ -116,10 +116,8 @@ async fn test_upsert_with_custom_transcoder() {
     collection
         .upsert_raw(
             &key,
-            transcoding::RawValue {
-                content: Bytes::from(serde_yaml::to_string(&value).unwrap()),
-                flags: encode_common_flags(DataType::Binary),
-            },
+            serde_yaml::to_string(&value).unwrap().as_bytes(),
+            encode_common_flags(DataType::Binary),
             None,
         )
         .await
@@ -127,8 +125,8 @@ async fn test_upsert_with_custom_transcoder() {
 
     let res = collection.get(key, None).await.unwrap();
 
-    let content = res.content_as_raw();
-    let content: BTreeMap<String, f64> = serde_yaml::from_slice(&content.content).unwrap();
+    let (content, flags) = res.content_as_raw();
+    let content: BTreeMap<String, f64> = serde_yaml::from_slice(content).unwrap();
 
     assert_eq!(value, content);
 }
@@ -334,27 +332,24 @@ async fn test_append() {
 
     let key = new_key();
 
+    let (content, flags) = transcoding::raw_binary::encode("test".as_bytes()).unwrap();
     collection
-        .insert_raw(
-            &key,
-            transcoding::raw_binary::encode(Bytes::from("test")).unwrap(),
-            None,
-        )
+        .insert_raw(&key, content, flags, None)
         .await
         .unwrap();
 
     collection
         .binary()
-        .append(&key, "append".as_bytes().to_vec(), None)
+        .append(&key, "append".as_bytes(), None)
         .await
         .unwrap();
 
     let res = collection.get(key, None).await.unwrap();
 
-    let raw = res.content_as_raw();
-    let content = transcoding::raw_binary::decode(raw).unwrap();
+    let (raw, flags) = res.content_as_raw();
+    let content = transcoding::raw_binary::decode(raw, flags).unwrap();
 
-    assert_eq!("testappend", content);
+    assert_eq!("testappend".as_bytes(), content);
 }
 
 #[tokio::test]
@@ -370,27 +365,24 @@ async fn test_prepend() {
 
     let key = new_key();
 
+    let (content, flags) = transcoding::raw_binary::encode("test".as_bytes()).unwrap();
     collection
-        .insert_raw(
-            &key,
-            transcoding::raw_binary::encode(Bytes::from("test")).unwrap(),
-            None,
-        )
+        .insert_raw(&key, content, flags, None)
         .await
         .unwrap();
 
     collection
         .binary()
-        .prepend(&key, "prepend".as_bytes().to_vec(), None)
+        .prepend(&key, "prepend".as_bytes(), None)
         .await
         .unwrap();
 
     let res = collection.get(key, None).await.unwrap();
 
-    let raw = res.content_as_raw();
-    let content = transcoding::raw_binary::decode(raw).unwrap();
+    let (raw, flags) = res.content_as_raw();
+    let content = transcoding::raw_binary::decode(raw, flags).unwrap();
 
-    assert_eq!("prependtest", content);
+    assert_eq!("prependtest".as_bytes(), content);
 }
 
 #[tokio::test]

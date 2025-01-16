@@ -1,20 +1,16 @@
-use crate::transcoding::{decode_common_flags, encode_common_flags, DataType, RawValue};
-use bytes::Bytes;
+use crate::transcoding::{decode_common_flags, encode_common_flags, DataType};
 
-pub fn encode(value: Bytes) -> crate::error::Result<RawValue> {
-    Ok(RawValue {
-        content: value,
-        flags: encode_common_flags(DataType::Binary),
-    })
+pub fn encode(value: &[u8]) -> crate::error::Result<(&[u8], u32)> {
+    Ok((value, encode_common_flags(DataType::Binary)))
 }
 
-pub fn decode(value: RawValue) -> crate::error::Result<Bytes> {
-    let datatype = decode_common_flags(value.flags);
+pub fn decode(value: &[u8], flags: u32) -> crate::error::Result<&[u8]> {
+    let datatype = decode_common_flags(flags);
     if datatype != DataType::Binary {
         return Err(crate::error::Error {
             msg: "datatype not supported".to_string(),
         });
     }
 
-    Ok(value.content)
+    Ok(value)
 }

@@ -14,7 +14,7 @@ impl AnalyticsClient {
         Self { backend }
     }
 
-    pub async fn query<'a>(
+    pub async fn query(
         &self,
         statement: &str,
         opts: Option<AnalyticsOptions>,

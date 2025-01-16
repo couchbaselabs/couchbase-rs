@@ -62,7 +62,7 @@ impl Scope {
             .await
     }
 
-    pub async fn analytics_query<'a>(
+    pub async fn analytics_query(
         &self,
         statement: impl AsRef<str>,
         opts: impl Into<Option<AnalyticsOptions>>,

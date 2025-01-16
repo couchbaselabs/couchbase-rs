@@ -1,7 +1,5 @@
 use crate::error;
 use crate::subdoc::macros::MUTATE_IN_MACROS;
-use crate::transcoding::json;
-use bytes::{BufMut, Bytes, BytesMut};
 use couchbase_core::memdx::subdoc::MutateInOpType::{
     ArrayAddUnique, ArrayInsert, ArrayPushFirst, ArrayPushLast, Counter, Delete, DictAdd, DictSet,
     Replace,
@@ -15,7 +13,7 @@ use serde::Serialize;
 pub struct MutateInSpec {
     pub(crate) op: MutateInOpType,
     pub(crate) path: String,
-    pub(crate) value: Bytes,
+    pub(crate) value: Vec<u8>,
     pub(crate) create_path: bool,
     pub(crate) is_xattr: bool,
     pub(crate) expand_macros: bool,
@@ -259,46 +257,18 @@ impl DecrementSpecOptions {
     }
 }
 
-fn join_values(values: &[Bytes]) -> Bytes {
-    if values.is_empty() {
-        return Bytes::new();
-    }
-
-    if values.len() == 1 {
-        return values[0].clone();
-    }
-
-    let mut total_length = values.len() - 1;
-    for v in values {
-        total_length += v.len();
-    }
-
-    let mut result = BytesMut::with_capacity(total_length);
-    let mut first = true;
-
-    for value in values {
-        if !first {
-            result.put(&[b','][..]);
-        }
-        result.extend_from_slice(value);
-        first = false;
-    }
-
-    result.freeze()
-}
-
 impl MutateInSpec {
     pub fn insert<V: Serialize>(
         path: impl Into<String>,
         value: V,
         opts: impl Into<Option<InsertSpecOptions>>,
     ) -> error::Result<Self> {
-        Ok(Self::insert_raw(path, json::encode(value)?.content, opts))
+        Ok(Self::insert_raw(path, serde_json::to_vec(&value)?, opts))
     }
 
     pub fn insert_raw(
         path: impl Into<String>,
-        value: Bytes,
+        value: Vec<u8>,
         opts: impl Into<Option<InsertSpecOptions>>,
     ) -> Self {
         let opts = opts.into().unwrap_or_default();
@@ -319,12 +289,12 @@ impl MutateInSpec {
         value: V,
         opts: impl Into<Option<UpsertSpecOptions>>,
     ) -> error::Result<Self> {
-        Ok(Self::upsert_raw(path, json::encode(value)?.content, opts))
+        Ok(Self::upsert_raw(path, serde_json::to_vec(&value)?, opts))
     }
 
     pub fn upsert_raw(
         path: impl Into<String>,
-        value: Bytes,
+        value: Vec<u8>,
         opts: impl Into<Option<UpsertSpecOptions>>,
     ) -> Self {
         let opts = opts.into().unwrap_or_default();
@@ -345,12 +315,12 @@ impl MutateInSpec {
         value: V,
         opts: impl Into<Option<ReplaceSpecOptions>>,
     ) -> error::Result<Self> {
-        Ok(Self::replace_raw(path, json::encode(value)?.content, opts))
+        Ok(Self::replace_raw(path, serde_json::to_vec(&value)?, opts))
     }
 
     pub fn replace_raw(
         path: impl Into<String>,
-        value: Bytes,
+        value: Vec<u8>,
         opts: impl Into<Option<ReplaceSpecOptions>>,
     ) -> Self {
         let opts = opts.into().unwrap_or_default();
@@ -375,7 +345,7 @@ impl MutateInSpec {
             expand_macros: false,
             op: MutateInOpType::Remove,
             path: path.into(),
-            value: Bytes::new(),
+            value: Vec::new(),
         }
     }
 
@@ -384,21 +354,20 @@ impl MutateInSpec {
         value: &[V],
         opts: impl Into<Option<ArrayAppendSpecOptions>>,
     ) -> error::Result<Self> {
-        let serialized_values = value
-            .iter()
-            .map(|value| json::encode(value).map(|encoded| encoded.content))
-            .collect::<Result<Vec<_>, _>>()?;
+        let mut value = serde_json::to_vec(&value)?;
+        if !value.is_empty() {
+            value.remove(0);
+            if !value.is_empty() {
+                value.remove(value.len() - 1);
+            }
+        }
 
-        Ok(Self::array_append_raw(
-            path,
-            join_values(&serialized_values),
-            opts,
-        ))
+        Ok(Self::array_append_raw(path, value, opts))
     }
 
     pub fn array_append_raw(
         path: impl Into<String>,
-        value: Bytes,
+        value: Vec<u8>,
         opts: impl Into<Option<ArrayAppendSpecOptions>>,
     ) -> Self {
         let opts = opts.into().unwrap_or_default();
@@ -418,21 +387,20 @@ impl MutateInSpec {
         value: &[V],
         opts: impl Into<Option<ArrayPrependSpecOptions>>,
     ) -> error::Result<Self> {
-        let serialized_values = value
-            .iter()
-            .map(|value| json::encode(value).map(|encoded| encoded.content))
-            .collect::<Result<Vec<_>, _>>()?;
+        let mut value = serde_json::to_vec(&value)?;
+        if !value.is_empty() {
+            value.remove(0);
+            if !value.is_empty() {
+                value.remove(value.len() - 1);
+            }
+        }
 
-        Ok(Self::array_prepend_raw(
-            path,
-            join_values(&serialized_values),
-            opts,
-        ))
+        Ok(Self::array_prepend_raw(path, value, opts))
     }
 
     pub fn array_prepend_raw(
         path: impl Into<String>,
-        value: Bytes,
+        value: Vec<u8>,
         opts: impl Into<Option<ArrayPrependSpecOptions>>,
     ) -> Self {
         let opts = opts.into().unwrap_or_default();
@@ -452,21 +420,20 @@ impl MutateInSpec {
         value: &[V],
         opts: impl Into<Option<ArrayInsertSpecOptions>>,
     ) -> error::Result<Self> {
-        let serialized_values = value
-            .iter()
-            .map(|value| json::encode(value).map(|encoded| encoded.content))
-            .collect::<Result<Vec<_>, _>>()?;
+        let mut value = serde_json::to_vec(&value)?;
+        if !value.is_empty() {
+            value.remove(0);
+            if !value.is_empty() {
+                value.remove(value.len() - 1);
+            }
+        }
 
-        Ok(Self::array_insert_raw(
-            path,
-            join_values(&serialized_values),
-            opts,
-        ))
+        Ok(Self::array_insert_raw(path, value, opts))
     }
 
     pub fn array_insert_raw(
         path: impl Into<String>,
-        value: Bytes,
+        value: Vec<u8>,
         opts: impl Into<Option<ArrayInsertSpecOptions>>,
     ) -> Self {
         let opts = opts.into().unwrap_or_default();
@@ -488,14 +455,14 @@ impl MutateInSpec {
     ) -> error::Result<Self> {
         Ok(Self::array_add_unique_raw(
             path,
-            json::encode(value)?.content,
+            serde_json::to_vec(&value)?,
             opts,
         ))
     }
 
     pub fn array_add_unique_raw(
         path: impl Into<String>,
-        value: Bytes,
+        value: Vec<u8>,
         opts: impl Into<Option<ArrayAddUniqueSpecOptions>>,
     ) -> Self {
         let opts = opts.into().unwrap_or_default();
@@ -522,7 +489,7 @@ impl MutateInSpec {
             });
         }
 
-        let value = json::encode(delta)?.content;
+        let value = serde_json::to_vec(&delta)?;
         let opts = opts.into().unwrap_or_default();
 
         Ok(Self {
@@ -546,7 +513,8 @@ impl MutateInSpec {
             });
         }
 
-        let value = json::encode(-delta)?.content;
+        let delta = -delta;
+        let value = serde_json::to_vec(&delta)?;
         let opts = opts.into().unwrap_or_default();
 
         Ok(Self {
@@ -559,8 +527,8 @@ impl MutateInSpec {
         })
     }
 
-    fn check_is_macro(value: &Bytes) -> bool {
-        MUTATE_IN_MACROS.contains(&value.as_ref())
+    fn check_is_macro(value: &[u8]) -> bool {
+        MUTATE_IN_MACROS.contains(&value)
     }
 }
 

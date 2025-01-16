@@ -1,15 +1,8 @@
 pub mod json;
 pub mod raw_binary;
 
-use bytes::Bytes;
 use serde::de::DeserializeOwned;
 use serde::{Serialize, Serializer};
-
-#[derive(Debug, PartialEq, Clone, Hash, Ord, PartialOrd, Eq)]
-pub struct RawValue {
-    pub content: Bytes,
-    pub flags: u32,
-}
 
 #[derive(Debug, PartialEq, Clone, Hash, Ord, PartialOrd, Eq)]
 pub enum DataType {

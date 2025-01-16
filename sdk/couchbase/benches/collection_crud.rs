@@ -1,6 +1,5 @@
 use crate::common::test_config::{setup_tests, test_bucket, test_collection, test_scope};
 use crate::common::{create_cluster_from_test_config, new_key};
-use bytes::Bytes;
 use couchbase::transcoding;
 use criterion::{criterion_group, criterion_main, Criterion};
 use log::LevelFilter;
@@ -269,13 +268,10 @@ fn append(c: &mut Criterion) {
     });
 
     let key = new_key();
+    let (content, flags) = transcoding::raw_binary::encode("test".as_bytes()).unwrap();
     rt.block_on(async {
         collection
-            .insert_raw(
-                &key,
-                transcoding::raw_binary::encode(Bytes::from("test")).unwrap(),
-                None,
-            )
+            .insert_raw(&key, content, flags, None)
             .await
             .unwrap()
     });
@@ -284,7 +280,7 @@ fn append(c: &mut Criterion) {
         b.to_async(&rt).iter(|| async {
             collection
                 .binary()
-                .append(&key, "append".as_bytes().to_vec(), None)
+                .append(&key, "append".as_bytes(), None)
                 .await
                 .unwrap();
         })
@@ -305,13 +301,10 @@ fn prepend(c: &mut Criterion) {
     });
 
     let key = new_key();
+    let (content, flags) = transcoding::raw_binary::encode("test".as_bytes()).unwrap();
     rt.block_on(async {
         collection
-            .insert_raw(
-                &key,
-                transcoding::raw_binary::encode(Bytes::from("test")).unwrap(),
-                None,
-            )
+            .insert_raw(&key, content, flags, None)
             .await
             .unwrap()
     });
@@ -320,7 +313,7 @@ fn prepend(c: &mut Criterion) {
         b.to_async(&rt).iter(|| async {
             collection
                 .binary()
-                .prepend(&key, "prepend".as_bytes().to_vec(), None)
+                .prepend(&key, "prepend".as_bytes(), None)
                 .await
                 .unwrap();
         })
