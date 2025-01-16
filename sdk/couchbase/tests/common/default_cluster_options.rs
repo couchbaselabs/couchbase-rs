@@ -1,12 +1,8 @@
-use crate::common::test_config::TEST_CONFIG;
+use crate::common::test_config::TestSetupConfig;
 use couchbase::options::cluster_options::{ClusterOptions, TlsOptions};
 use couchbase_core::authenticator::{Authenticator, PasswordAuthenticator};
 
-pub async fn create_default_options() -> ClusterOptions {
-    let guard = TEST_CONFIG.read().await;
-    let config = guard.clone().unwrap();
-    drop(guard);
-
+pub async fn create_default_options(config: TestSetupConfig) -> ClusterOptions {
     let mut opts = ClusterOptions::new(Authenticator::PasswordAuthenticator(
         PasswordAuthenticator {
             username: config.username.clone(),

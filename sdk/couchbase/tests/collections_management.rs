@@ -1,181 +1,166 @@
+#![feature(async_closure)]
+
 use crate::common::features::TestFeatureCode;
-use crate::common::test_config::{setup_tests, test_bucket};
-use crate::common::{create_cluster_from_test_config, generate_string_value, try_until};
+use crate::common::test_config::run_test;
+use crate::common::{generate_string_value, try_until};
 use couchbase::collections_manager::{
     CollectionManager, CreateCollectionSettings, MaxExpiryValue, UpdateCollectionSettings,
 };
-use couchbase::error;
 use couchbase::results::collections_mgmt_results::CollectionSpec;
-use log::LevelFilter;
 use std::time::Duration;
 
 mod common;
 
-#[tokio::test]
-async fn test_create_scope() -> error::Result<()> {
-    setup_tests(LevelFilter::Trace).await;
+#[test]
+fn test_create_scope() {
+    run_test(async |cluster| {
+        let manager = cluster.bucket(&cluster.default_bucket).collections();
 
-    let cluster = create_cluster_from_test_config().await;
+        let name = generate_string_value(10);
+        manager.create_scope(&name, None).await.unwrap();
 
-    let manager = cluster.bucket(test_bucket().await).collections();
-
-    let name = generate_string_value(10);
-    manager.create_scope(&name, None).await?;
-
-    verify_scope_created(&manager, &name).await;
-
-    Ok(())
+        verify_scope_created(&manager, &name).await;
+    })
 }
 
-#[tokio::test]
-async fn test_drop_scope() -> error::Result<()> {
-    setup_tests(LevelFilter::Trace).await;
+#[test]
+fn test_drop_scope() {
+    run_test(async |cluster| {
+        let manager = cluster.bucket(&cluster.default_bucket).collections();
 
-    let cluster = create_cluster_from_test_config().await;
+        let name = generate_string_value(10);
+        manager.create_scope(&name, None).await.unwrap();
 
-    let manager = cluster.bucket(test_bucket().await).collections();
+        verify_scope_created(&manager, &name).await;
 
-    let name = generate_string_value(10);
-    manager.create_scope(&name, None).await?;
+        manager.drop_scope(&name, None).await.unwrap();
 
-    verify_scope_created(&manager, &name).await;
-
-    manager.drop_scope(&name, None).await?;
-
-    verify_scope_dropped(&manager, &name).await;
-
-    Ok(())
+        verify_scope_dropped(&manager, &name).await;
+    })
 }
 
-#[tokio::test]
-async fn test_create_collection() -> error::Result<()> {
-    setup_tests(LevelFilter::Trace).await;
+#[test]
+fn test_create_collection() {
+    run_test(async |cluster| {
+        let manager = cluster.bucket(&cluster.default_bucket).collections();
 
-    let cluster = create_cluster_from_test_config().await;
+        let scope_name = generate_string_value(10);
+        let collection_name = generate_string_value(10);
 
-    let manager = cluster.bucket(test_bucket().await).collections();
+        manager.create_scope(&scope_name, None).await.unwrap();
+        verify_scope_created(&manager, &scope_name).await;
 
-    let scope_name = generate_string_value(10);
-    let collection_name = generate_string_value(10);
+        let settings = CreateCollectionSettings::new()
+            .max_expiry(MaxExpiryValue::Seconds(Duration::from_secs(2000)));
 
-    manager.create_scope(&scope_name, None).await?;
-    verify_scope_created(&manager, &scope_name).await;
+        manager
+            .create_collection(&scope_name, &collection_name, settings, None)
+            .await
+            .unwrap();
 
-    let settings = CreateCollectionSettings::new()
-        .max_expiry(MaxExpiryValue::Seconds(Duration::from_secs(2000)));
+        let collection = verify_collection_created(&manager, &scope_name, &collection_name).await;
 
-    manager
-        .create_collection(&scope_name, &collection_name, settings, None)
-        .await?;
-
-    let collection = verify_collection_created(&manager, &scope_name, &collection_name).await;
-
-    assert_eq!(collection_name, collection.name());
-    assert_eq!(scope_name, collection.scope_name());
-    assert_eq!(
-        MaxExpiryValue::Seconds(Duration::from_secs(2000)),
-        collection.max_expiry()
-    );
-    assert!(!collection.history());
-
-    Ok(())
+        assert_eq!(collection_name, collection.name());
+        assert_eq!(scope_name, collection.scope_name());
+        assert_eq!(
+            MaxExpiryValue::Seconds(Duration::from_secs(2000)),
+            collection.max_expiry()
+        );
+        assert!(!collection.history());
+    })
 }
 
-#[tokio::test]
-async fn test_update_collection() -> error::Result<()> {
-    let test_config = setup_tests(LevelFilter::Trace).await;
+#[test]
+fn test_update_collection() {
+    run_test(async |cluster| {
+        if !cluster.supports_feature(&TestFeatureCode::CollectionUpdates) {
+            return;
+        }
 
-    if !test_config.supports_feature(&TestFeatureCode::CollectionUpdates) {
-        return Ok(());
-    }
+        let manager = cluster.bucket(&cluster.default_bucket).collections();
 
-    let cluster = create_cluster_from_test_config().await;
+        let scope_name = generate_string_value(10);
+        let collection_name = generate_string_value(10);
+        manager.create_scope(&scope_name, None).await.unwrap();
+        verify_scope_created(&manager, &scope_name).await;
 
-    let manager = cluster.bucket(test_bucket().await).collections();
+        let settings = CreateCollectionSettings::new()
+            .max_expiry(MaxExpiryValue::Seconds(Duration::from_secs(2000)));
 
-    let scope_name = generate_string_value(10);
-    let collection_name = generate_string_value(10);
-    manager.create_scope(&scope_name, None).await?;
-    verify_scope_created(&manager, &scope_name).await;
+        manager
+            .create_collection(&scope_name, &collection_name, settings, None)
+            .await
+            .unwrap();
+        verify_collection_created(&manager, &scope_name, &collection_name).await;
 
-    let settings = CreateCollectionSettings::new()
-        .max_expiry(MaxExpiryValue::Seconds(Duration::from_secs(2000)));
+        let settings = UpdateCollectionSettings::new()
+            .max_expiry(MaxExpiryValue::Seconds(Duration::from_secs(7000)));
 
-    manager
-        .create_collection(&scope_name, &collection_name, settings, None)
-        .await?;
-    verify_collection_created(&manager, &scope_name, &collection_name).await;
+        manager
+            .update_collection(&scope_name, &collection_name, settings, None)
+            .await
+            .unwrap();
 
-    let settings = UpdateCollectionSettings::new()
-        .max_expiry(MaxExpiryValue::Seconds(Duration::from_secs(7000)));
+        let collection = try_until(
+            tokio::time::Instant::now() + Duration::from_secs(5),
+            Duration::from_millis(100),
+            "Collection was not updated in time",
+            || async {
+                let scopes = manager.get_all_scopes(None).await.unwrap();
+                if !scopes.iter().any(|s| s.name() == scope_name) {
+                    return Ok(None);
+                };
+                let scope = scopes.iter().find(|s| s.name() == scope_name).unwrap();
+                let collection = scope
+                    .collections()
+                    .iter()
+                    .find(|c| c.name() == collection_name)
+                    .unwrap();
 
-    manager
-        .update_collection(&scope_name, &collection_name, settings, None)
-        .await?;
+                if collection.max_expiry() != MaxExpiryValue::Seconds(Duration::from_secs(7000)) {
+                    return Ok(None);
+                }
 
-    let collection = try_until(
-        tokio::time::Instant::now() + Duration::from_secs(5),
-        Duration::from_millis(100),
-        "Collection was not updated in time",
-        || async {
-            let scopes = manager.get_all_scopes(None).await?;
-            if !scopes.iter().any(|s| s.name() == scope_name) {
-                return Ok(None);
-            };
-            let scope = scopes.iter().find(|s| s.name() == scope_name).unwrap();
-            let collection = scope
-                .collections()
-                .iter()
-                .find(|c| c.name() == collection_name)
-                .unwrap();
+                Ok(Some(collection.clone()))
+            },
+        )
+        .await;
 
-            if collection.max_expiry() != MaxExpiryValue::Seconds(Duration::from_secs(7000)) {
-                return Ok(None);
-            }
-
-            Ok(Some(collection.clone()))
-        },
-    )
-    .await;
-
-    assert_eq!(collection_name, collection.name());
-    assert_eq!(scope_name, collection.scope_name());
-    assert_eq!(
-        MaxExpiryValue::Seconds(Duration::from_secs(7000)),
-        collection.max_expiry()
-    );
-    assert!(!collection.history());
-
-    Ok(())
+        assert_eq!(collection_name, collection.name());
+        assert_eq!(scope_name, collection.scope_name());
+        assert_eq!(
+            MaxExpiryValue::Seconds(Duration::from_secs(7000)),
+            collection.max_expiry()
+        );
+        assert!(!collection.history());
+    })
 }
 
-#[tokio::test]
-async fn test_drop_collection() -> error::Result<()> {
-    setup_tests(LevelFilter::Trace).await;
+#[test]
+fn test_drop_collection() {
+    run_test(async |cluster| {
+        let manager = cluster.bucket(&cluster.default_bucket).collections();
 
-    let cluster = create_cluster_from_test_config().await;
+        let scope_name = generate_string_value(10);
+        let collection_name = generate_string_value(10);
 
-    let manager = cluster.bucket(test_bucket().await).collections();
+        manager.create_scope(&scope_name, None).await.unwrap();
+        verify_scope_created(&manager, &scope_name).await;
 
-    let scope_name = generate_string_value(10);
-    let collection_name = generate_string_value(10);
+        let create_settings = CreateCollectionSettings::new();
 
-    manager.create_scope(&scope_name, None).await?;
-    verify_scope_created(&manager, &scope_name).await;
+        manager
+            .create_collection(&scope_name, &collection_name, create_settings, None)
+            .await
+            .unwrap();
+        verify_collection_created(&manager, &scope_name, &collection_name).await;
 
-    let create_settings = CreateCollectionSettings::new();
-
-    manager
-        .create_collection(&scope_name, &collection_name, create_settings, None)
-        .await?;
-    verify_collection_created(&manager, &scope_name, &collection_name).await;
-
-    manager
-        .drop_collection(&scope_name, &collection_name, None)
-        .await?;
-    verify_collection_dropped(&manager, &scope_name, &collection_name).await;
-
-    Ok(())
+        manager
+            .drop_collection(&scope_name, &collection_name, None)
+            .await
+            .unwrap();
+        verify_collection_dropped(&manager, &scope_name, &collection_name).await;
+    })
 }
 
 async fn verify_scope_created(manager: &CollectionManager, scope_name: &str) {
@@ -201,7 +186,7 @@ async fn verify_scope_dropped(manager: &CollectionManager, scope_name: &str) {
         Duration::from_millis(100),
         "Scope was not dropped in time",
         || async {
-            let scopes = manager.get_all_scopes(None).await?;
+            let scopes = manager.get_all_scopes(None).await.unwrap();
             if scopes.iter().any(|s| s.name() == scope_name) {
                 return Ok(None);
             };
@@ -222,7 +207,7 @@ async fn verify_collection_created(
         Duration::from_millis(100),
         "Collection was not created in time",
         || async {
-            let scopes = manager.get_all_scopes(None).await?;
+            let scopes = manager.get_all_scopes(None).await.unwrap();
             if !scopes.iter().any(|s| s.name() == scope_name) {
                 return Ok(None);
             };
@@ -248,7 +233,7 @@ async fn verify_collection_dropped(
         Duration::from_millis(100),
         "Collection was not dropped in time",
         || async {
-            let scopes = manager.get_all_scopes(None).await?;
+            let scopes = manager.get_all_scopes(None).await.unwrap();
             let scope = scopes.iter().find(|s| s.name() == scope_name).unwrap();
             if scope
                 .collections()

@@ -1,15 +1,13 @@
 #![feature(async_closure)]
 
-use crate::common::create_cluster_from_test_config;
 use crate::common::doc_generation::{
     import_sample_beer_dataset, TestBreweryDocumentJson, TestMutationResult,
 };
-use crate::common::test_config::{setup_tests, test_bucket, test_collection, test_scope};
+use crate::common::test_config::{run_test, TestCluster};
 use couchbase::cluster::Cluster;
 use couchbase::options::analytics_options::{AnalyticsOptions, ScanConsistency};
 use couchbase::results::analytics_results::{AnalyticsMetaData, AnalyticsResult, AnalyticsStatus};
 use futures::StreamExt;
-use log::LevelFilter;
 use std::collections::HashMap;
 use std::future::Future;
 use std::time::Duration;
@@ -18,12 +16,12 @@ use tokio::time::{timeout_at, Instant};
 
 mod common;
 
-#[tokio::test]
-async fn test_cluster_analytics_query_basic() {
-    run_test("analytics", async |cluster, import_data| {
-        let bucket_name = test_bucket().await;
-        let scope_name = test_scope().await;
-        let collection_name = test_collection().await;
+#[test]
+fn test_cluster_analytics_query_basic() {
+    setup_tests("analytics", async |cluster, import_data| {
+        let bucket_name = &cluster.default_bucket;
+        let scope_name = &cluster.default_scope;
+        let collection_name = &cluster.default_collection;
 
         let query = format!(
             r#"SELECT c.* FROM `{}`.`{}`.`{}` AS c WHERE `service`="analytics""#,
@@ -42,15 +40,14 @@ async fn test_cluster_analytics_query_basic() {
         let meta = res.metadata().await.unwrap();
         assert_metadata(meta);
     })
-    .await;
 }
 
-#[tokio::test]
-async fn test_cluster_analytics_query_positional_param() {
-    run_test("analytics", async |cluster, import_data| {
-        let bucket_name = test_bucket().await;
-        let scope_name = test_scope().await;
-        let collection_name = test_collection().await;
+#[test]
+fn test_cluster_analytics_query_positional_param() {
+    setup_tests("analytics", async |cluster, import_data| {
+        let bucket_name = &cluster.default_bucket;
+        let scope_name = &cluster.default_scope;
+        let collection_name = &cluster.default_collection;
 
         let query = format!(
             "SELECT c.* FROM `{}`.`{}`.`{}` AS c WHERE `service`=$1",
@@ -73,15 +70,14 @@ async fn test_cluster_analytics_query_positional_param() {
         let meta = res.metadata().await.unwrap();
         assert_metadata(meta);
     })
-    .await;
 }
 
-#[tokio::test]
-async fn test_cluster_analytics_query_named_param() {
-    run_test("analytics", async |cluster, import_data| {
-        let bucket_name = test_bucket().await;
-        let scope_name = test_scope().await;
-        let collection_name = test_collection().await;
+#[test]
+fn test_cluster_analytics_query_named_param() {
+    setup_tests("analytics", async |cluster, import_data| {
+        let bucket_name = &cluster.default_bucket;
+        let scope_name = &cluster.default_scope;
+        let collection_name = &cluster.default_collection;
 
         let query = format!(
             "SELECT c.* FROM `{}`.`{}`.`{}` AS c WHERE `service`=$service",
@@ -104,15 +100,14 @@ async fn test_cluster_analytics_query_named_param() {
         let meta = res.metadata().await.unwrap();
         assert_metadata(meta);
     })
-    .await;
 }
 
-#[tokio::test]
-async fn test_cluster_analytics_query_read_only() {
-    run_test("analytics", async |cluster, import_data| {
-        let bucket_name = test_bucket().await;
-        let scope_name = test_scope().await;
-        let collection_name = test_collection().await;
+#[test]
+fn test_cluster_analytics_query_read_only() {
+    setup_tests("analytics", async |cluster, import_data| {
+        let bucket_name = &cluster.default_bucket;
+        let scope_name = &cluster.default_scope;
+        let collection_name = &cluster.default_collection;
 
         let query = format!(
             "CREATE PRIMARY INDEX IF NOT EXISTS ON `{}`.`{}`.`{}`",
@@ -126,41 +121,40 @@ async fn test_cluster_analytics_query_read_only() {
         // TODO: Replace with a more precise error when able to.
         assert!(res.is_err());
     })
-    .await;
 }
 
-#[tokio::test]
-async fn test_cluster_analytics_query_scan_consistency() {
-    run_test("analytics_scan_consistency", async |_cluster, import_data| {
-        let bucket_name = test_bucket().await;
-        let scope_name = test_scope().await;
-        let collection_name = test_collection().await;
+#[test]
+fn test_cluster_analytics_query_scan_consistency() {
+    setup_tests(
+        "analytics_scan_consistency",
+        async |cluster, import_data| {
+            let bucket_name = &cluster.default_bucket;
+            let scope_name = &cluster.default_scope;
+            let collection_name = &cluster.default_collection;
 
-        let cluster = create_cluster_from_test_config().await;
+            let query = format!(
+                r#"SELECT c.* FROM `{}`.`{}`.`{}` AS c WHERE `service`="analytics_scan_consistency""#,
+                bucket_name, scope_name, collection_name
+            );
 
-        let query = format!(
-            r#"SELECT c.* FROM `{}`.`{}`.`{}` AS c WHERE `service`="analytics_scan_consistency""#,
-            bucket_name, scope_name, collection_name
-        );
+            let opts = AnalyticsOptions::default().scan_consistency(ScanConsistency::RequestPlus);
 
-        let opts = AnalyticsOptions::default().scan_consistency(ScanConsistency::RequestPlus);
+            let deadline = Instant::now() + Duration::from_secs(60);
 
-        let deadline = Instant::now() + Duration::from_secs(60);
+            let mut res = timeout_at(deadline, cluster.analytics_query(query, opts))
+                .await
+                .unwrap()
+                .unwrap();
 
-        let mut res = timeout_at(deadline, cluster.analytics_query(query, opts))
-            .await
-            .unwrap()
-            .unwrap();
+            while let Some(row) = res.rows().next().await {
+                let row = row.unwrap();
+                import_data.values().find(|doc| doc.doc == row).unwrap();
+            }
 
-        while let Some(row) = res.rows().next().await {
-            let row = row.unwrap();
-            import_data.values().find(|doc| doc.doc == row).unwrap();
-        }
-
-        let meta = res.metadata().await.unwrap();
-        assert_metadata(meta);
-    })
-        .await;
+            let meta = res.metadata().await.unwrap();
+            assert_metadata(meta);
+        },
+    )
 }
 
 fn assert_metadata(meta: AnalyticsMetaData) {
@@ -207,31 +201,29 @@ async fn run_query_until(
     }
 }
 
-async fn run_test<T, Fut>(data_import_tag: &str, test: T)
+fn setup_tests<T, Fut>(data_import_tag: &str, test: T)
 where
-    T: FnOnce(Cluster, HashMap<String, TestMutationResult>) -> Fut,
+    T: FnOnce(TestCluster, HashMap<String, TestMutationResult>) -> Fut,
     Fut: Future<Output = ()>,
 {
-    setup_tests(LevelFilter::Trace).await;
+    run_test(async |cluster| {
+        let bucket_name = cluster.default_bucket.clone();
+        let scope_name = cluster.default_scope.clone();
+        let collection_name = cluster.default_collection.clone();
 
-    let cluster = create_cluster_from_test_config().await;
+        enable_analytics_on_collection(&cluster, &bucket_name, &scope_name, &collection_name).await;
 
-    let bucket_name = test_bucket().await;
-    let scope_name = test_scope().await;
-    let collection_name = test_collection().await;
+        let import = import_sample_beer_dataset(
+            data_import_tag,
+            &cluster
+                .bucket(&bucket_name)
+                .scope(&scope_name)
+                .collection(&collection_name),
+        )
+        .await;
 
-    enable_analytics_on_collection(&cluster, &bucket_name, &scope_name, &collection_name).await;
-
-    let import = import_sample_beer_dataset(
-        data_import_tag,
-        &cluster
-            .bucket(&bucket_name)
-            .scope(&scope_name)
-            .collection(&collection_name),
-    )
-    .await;
-
-    test(cluster, import).await
+        test(cluster, import).await
+    });
 }
 
 async fn enable_analytics_on_collection(
