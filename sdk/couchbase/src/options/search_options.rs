@@ -1,6 +1,7 @@
 use crate::mutation_state::MutationState;
 use crate::search::facets::Facet;
 use crate::search::sort::Sort;
+use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -165,9 +166,25 @@ impl SearchOptions {
         self
     }
 
-    pub fn raw(mut self, raw: HashMap<String, Value>) -> Self {
-        self.raw = Some(raw);
-        self
+    pub fn add_raw<T: Serialize>(
+        mut self,
+        key: impl Into<String>,
+        value: T,
+    ) -> crate::error::Result<Self> {
+        let value = serde_json::to_value(&value)?;
+
+        match self.raw {
+            Some(mut params) => {
+                params.insert(key.into(), value);
+                self.raw = Some(params);
+            }
+            None => {
+                let mut params = HashMap::new();
+                params.insert(key.into(), value);
+                self.raw = Some(params);
+            }
+        }
+        Ok(self)
     }
 
     pub fn include_locations(mut self, include_locations: bool) -> Self {
