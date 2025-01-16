@@ -86,85 +86,85 @@ pub struct CollectionManager {
 impl CollectionManager {
     pub async fn create_scope(
         &self,
-        scope_name: impl AsRef<str>,
-        opts: impl Into<Option<&CreateScopeOptions>>,
+        scope_name: impl Into<String>,
+        opts: impl Into<Option<CreateScopeOptions>>,
     ) -> error::Result<()> {
         self.client
             .create_scope(
                 scope_name,
-                opts.into().unwrap_or(&CreateScopeOptions::default()),
+                opts.into().unwrap_or(CreateScopeOptions::default()),
             )
             .await
     }
 
     pub async fn drop_scope(
         &self,
-        scope_name: impl AsRef<str>,
-        opts: impl Into<Option<&DropScopeOptions>>,
+        scope_name: impl Into<String>,
+        opts: impl Into<Option<DropScopeOptions>>,
     ) -> error::Result<()> {
         self.client
             .drop_scope(
                 scope_name,
-                opts.into().unwrap_or(&DropScopeOptions::default()),
+                opts.into().unwrap_or(DropScopeOptions::default()),
             )
             .await
     }
 
     pub async fn create_collection(
         &self,
-        scope_name: impl AsRef<str>,
-        collection_name: impl AsRef<str>,
-        settings: &CreateCollectionSettings,
-        opts: impl Into<Option<&CreateCollectionOptions>>,
+        scope_name: impl Into<String>,
+        collection_name: impl Into<String>,
+        settings: CreateCollectionSettings,
+        opts: impl Into<Option<CreateCollectionOptions>>,
     ) -> error::Result<()> {
         self.client
             .create_collection(
                 scope_name,
                 collection_name,
                 settings,
-                opts.into().unwrap_or(&CreateCollectionOptions::default()),
+                opts.into().unwrap_or(CreateCollectionOptions::default()),
             )
             .await
     }
 
     pub async fn update_collection(
         &self,
-        scope_name: impl AsRef<str>,
-        collection_name: impl AsRef<str>,
-        settings: &UpdateCollectionSettings,
-        opts: impl Into<Option<&UpdateCollectionOptions>>,
+        scope_name: impl Into<String>,
+        collection_name: impl Into<String>,
+        settings: UpdateCollectionSettings,
+        opts: impl Into<Option<UpdateCollectionOptions>>,
     ) -> error::Result<()> {
         self.client
             .update_collection(
                 scope_name,
                 collection_name,
                 settings,
-                opts.into().unwrap_or(&UpdateCollectionOptions::default()),
+                opts.into().unwrap_or(UpdateCollectionOptions::default()),
             )
             .await
     }
 
     pub async fn drop_collection(
         &self,
-        scope_name: impl AsRef<str>,
-        collection_name: impl AsRef<str>,
-        opts: impl Into<Option<&DropCollectionOptions>>,
+        scope_name: impl Into<String>,
+        collection_name: impl Into<String>,
+        opts: impl Into<Option<DropCollectionOptions>>,
     ) -> error::Result<()> {
         self.client
             .drop_collection(
                 scope_name,
                 collection_name,
-                opts.into().unwrap_or(&DropCollectionOptions::default()),
+                opts.into().unwrap_or(DropCollectionOptions::default()),
             )
             .await
     }
 
     pub async fn get_all_scopes(
         &self,
-        opts: impl Into<Option<&GetAllScopesOptions>>,
+        opts: impl Into<Option<GetAllScopesOptions>>,
     ) -> error::Result<Vec<ScopeSpec>> {
         self.client
-            .get_all_scopes(opts.into().unwrap_or(&GetAllScopesOptions::default()))
+            .get_all_scopes(opts.into().unwrap_or(GetAllScopesOptions::default()))
             .await
     }
 }

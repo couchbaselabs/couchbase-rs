@@ -65,7 +65,7 @@ async fn test_create_collection() -> error::Result<()> {
         .max_expiry(MaxExpiryValue::Seconds(Duration::from_secs(2000)));
 
     manager
-        .create_collection(&scope_name, &collection_name, &settings, &None)
+        .create_collection(&scope_name, &collection_name, settings, None)
         .await?;
 
     let collection = verify_collection_created(&manager, &scope_name, &collection_name).await;
@@ -102,7 +102,7 @@ async fn test_update_collection() -> error::Result<()> {
         .max_expiry(MaxExpiryValue::Seconds(Duration::from_secs(2000)));
 
     manager
-        .create_collection(&scope_name, &collection_name, &settings, &None)
+        .create_collection(&scope_name, &collection_name, settings, None)
         .await?;
     verify_collection_created(&manager, &scope_name, &collection_name).await;
 
@@ -110,7 +110,7 @@ async fn test_update_collection() -> error::Result<()> {
         .max_expiry(MaxExpiryValue::Seconds(Duration::from_secs(7000)));
 
     manager
-        .update_collection(&scope_name, &collection_name, &settings, &None)
+        .update_collection(&scope_name, &collection_name, settings, None)
         .await?;
 
     let collection = try_until(
@@ -166,7 +166,7 @@ async fn test_drop_collection() -> error::Result<()> {
     let create_settings = CreateCollectionSettings::new();
 
     manager
-        .create_collection(&scope_name, &collection_name, &create_settings, None)
+        .create_collection(&scope_name, &collection_name, create_settings, None)
         .await?;
     verify_collection_created(&manager, &scope_name, &collection_name).await;
 

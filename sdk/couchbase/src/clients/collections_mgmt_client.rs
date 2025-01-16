@@ -19,8 +19,8 @@ impl CollectionsMgmtClient {
 
     pub async fn create_scope(
         &self,
-        scope_name: impl AsRef<str>,
-        opts: &CreateScopeOptions,
+        scope_name: impl Into<String>,
+        opts: CreateScopeOptions,
     ) -> error::Result<()> {
         match &self.backend {
             CollectionsMgmtClientBackend::CouchbaseCollectionsMgmtClientBackend(client) => {
@@ -34,8 +34,8 @@ impl CollectionsMgmtClient {
 
     pub async fn drop_scope(
         &self,
-        scope_name: impl AsRef<str>,
-        opts: &DropScopeOptions,
+        scope_name: impl Into<String>,
+        opts: DropScopeOptions,
     ) -> error::Result<()> {
         match &self.backend {
             CollectionsMgmtClientBackend::CouchbaseCollectionsMgmtClientBackend(client) => {
@@ -49,10 +49,10 @@ impl CollectionsMgmtClient {
 
     pub async fn create_collection(
         &self,
-        scope_name: impl AsRef<str>,
-        collection_name: impl AsRef<str>,
-        settings: &CreateCollectionSettings,
-        opts: &CreateCollectionOptions,
+        scope_name: impl Into<String>,
+        collection_name: impl Into<String>,
+        settings: CreateCollectionSettings,
+        opts: CreateCollectionOptions,
     ) -> error::Result<()> {
         match &self.backend {
             CollectionsMgmtClientBackend::CouchbaseCollectionsMgmtClientBackend(client) => {
@@ -70,10 +70,10 @@ impl CollectionsMgmtClient {
 
     pub async fn update_collection(
         &self,
-        scope_name: impl AsRef<str>,
-        collection_name: impl AsRef<str>,
-        settings: &UpdateCollectionSettings,
-        opts: &UpdateCollectionOptions,
+        scope_name: impl Into<String>,
+        collection_name: impl Into<String>,
+        settings: UpdateCollectionSettings,
+        opts: UpdateCollectionOptions,
     ) -> error::Result<()> {
         match &self.backend {
             CollectionsMgmtClientBackend::CouchbaseCollectionsMgmtClientBackend(client) => {
@@ -91,9 +91,9 @@ impl CollectionsMgmtClient {
 
     pub async fn drop_collection(
         &self,
-        scope_name: impl AsRef<str>,
-        collection_name: impl AsRef<str>,
-        opts: &DropCollectionOptions,
+        scope_name: impl Into<String>,
+        collection_name: impl Into<String>,
+        opts: DropCollectionOptions,
     ) -> error::Result<()> {
         match &self.backend {
             CollectionsMgmtClientBackend::CouchbaseCollectionsMgmtClientBackend(client) => {
@@ -109,10 +109,7 @@ impl CollectionsMgmtClient {
         }
     }
 
-    pub async fn get_all_scopes(
-        &self,
-        opts: &GetAllScopesOptions,
-    ) -> error::Result<Vec<ScopeSpec>> {
+    pub async fn get_all_scopes(&self, opts: GetAllScopesOptions) -> error::Result<Vec<ScopeSpec>> {
         match &self.backend {
             CollectionsMgmtClientBackend::CouchbaseCollectionsMgmtClientBackend(client) => {
                 client.get_all_scopes(opts).await
@@ -151,15 +148,15 @@ impl CouchbaseCollectionsMgmtClient {
 
     pub async fn create_scope(
         &self,
-        scope_name: impl AsRef<str>,
-        opts: &CreateScopeOptions,
+        scope_name: impl Into<String>,
+        opts: CreateScopeOptions,
     ) -> error::Result<()> {
         let agent = self.agent_provider.get_agent().await;
         agent
             .create_scope(
                 &couchbase_core::mgmtoptions::CreateScopeOptions::new(
                     &self.bucket_name,
-                    scope_name.as_ref(),
+                    scope_name.into().as_str(),
                 )
                 .retry_strategy(
                     opts.retry_strategy
@@ -174,15 +171,15 @@ impl CouchbaseCollectionsMgmtClient {
 
     pub async fn drop_scope(
         &self,
-        scope_name: impl AsRef<str>,
-        opts: &DropScopeOptions,
+        scope_name: impl Into<String>,
+        opts: DropScopeOptions,
     ) -> error::Result<()> {
         let agent = self.agent_provider.get_agent().await;
         agent
             .delete_scope(
                 &couchbase_core::mgmtoptions::DeleteScopeOptions::new(
                     &self.bucket_name,
-                    scope_name.as_ref(),
+                    scope_name.into().as_str(),
                 )
                 .retry_strategy(
                     opts.retry_strategy
@@ -197,16 +194,18 @@ impl CouchbaseCollectionsMgmtClient {
 
     pub async fn create_collection(
         &self,
-        scope_name: impl AsRef<str>,
-        collection_name: impl AsRef<str>,
-        settings: &CreateCollectionSettings,
-        opts: &CreateCollectionOptions,
+        scope_name: impl Into<String>,
+        collection_name: impl Into<String>,
+        settings: CreateCollectionSettings,
+        opts: CreateCollectionOptions,
     ) -> error::Result<()> {
         let agent = self.agent_provider.get_agent().await;
+        let scope_name = scope_name.into();
+        let collection_name = collection_name.into();
         let mut opts = couchbase_core::mgmtoptions::CreateCollectionOptions::new(
             &self.bucket_name,
-            scope_name.as_ref(),
-            collection_name.as_ref(),
+            scope_name.as_str(),
+            collection_name.as_str(),
         )
         .retry_strategy(
             opts.retry_strategy
@@ -229,16 +228,18 @@ impl CouchbaseCollectionsMgmtClient {
 
     pub async fn update_collection(
         &self,
-        scope_name: impl AsRef<str>,
-        collection_name: impl AsRef<str>,
-        settings: &UpdateCollectionSettings,
-        opts: &UpdateCollectionOptions,
+        scope_name: impl Into<String>,
+        collection_name: impl Into<String>,
+        settings: UpdateCollectionSettings,
+        opts: UpdateCollectionOptions,
     ) -> error::Result<()> {
         let agent = self.agent_provider.get_agent().await;
+        let scope_name = scope_name.into();
+        let collection_name = collection_name.into();
         let mut opts = couchbase_core::mgmtoptions::UpdateCollectionOptions::new(
             &self.bucket_name,
-            scope_name.as_ref(),
-            collection_name.as_ref(),
+            scope_name.as_str(),
+            collection_name.as_str(),
         )
         .retry_strategy(
             opts.retry_strategy
@@ -261,17 +262,17 @@ impl CouchbaseCollectionsMgmtClient {
 
     pub async fn drop_collection(
         &self,
-        scope_name: impl AsRef<str>,
-        collection_name: impl AsRef<str>,
-        opts: &DropCollectionOptions,
+        scope_name: impl Into<String>,
+        collection_name: impl Into<String>,
+        opts: DropCollectionOptions,
     ) -> error::Result<()> {
         let agent = self.agent_provider.get_agent().await;
         agent
             .delete_collection(
                 &couchbase_core::mgmtoptions::DeleteCollectionOptions::new(
                     &self.bucket_name,
-                    scope_name.as_ref(),
-                    collection_name.as_ref(),
+                    scope_name.into().as_str(),
+                    collection_name.into().as_str(),
                 )
                 .retry_strategy(
                     opts.retry_strategy
@@ -284,10 +285,7 @@ impl CouchbaseCollectionsMgmtClient {
         Ok(())
     }
 
-    pub async fn get_all_scopes(
-        &self,
-        opts: &GetAllScopesOptions,
-    ) -> error::Result<Vec<ScopeSpec>> {
+    pub async fn get_all_scopes(&self, opts: GetAllScopesOptions) -> error::Result<Vec<ScopeSpec>> {
         let agent = self.agent_provider.get_agent().await;
         let manifest = agent
             .get_collection_manifest(
@@ -334,52 +332,52 @@ impl Couchbase2CollectionsMgmtClient {
 
     pub async fn create_scope(
         &self,
-        _scope_name: impl AsRef<str>,
-        _opts: &CreateScopeOptions,
+        _scope_name: impl Into<String>,
+        _opts: CreateScopeOptions,
     ) -> error::Result<()> {
         unimplemented!()
     }
 
     pub async fn drop_scope(
         &self,
-        _scope_name: impl AsRef<str>,
-        _opts: &DropScopeOptions,
+        _scope_name: impl Into<String>,
+        _opts: DropScopeOptions,
     ) -> error::Result<()> {
         unimplemented!()
     }
 
     pub async fn create_collection(
         &self,
-        _scope_name: impl AsRef<str>,
-        _collection_name: impl AsRef<str>,
-        _settings: &CreateCollectionSettings,
-        _opts: &CreateCollectionOptions,
+        _scope_name: impl Into<String>,
+        _collection_name: impl Into<String>,
+        _settings: CreateCollectionSettings,
+        _opts: CreateCollectionOptions,
     ) -> error::Result<()> {
         unimplemented!()
     }
 
     pub async fn update_collection(
         &self,
-        _scope_name: impl AsRef<str>,
-        _collection_name: impl AsRef<str>,
-        _settings: &UpdateCollectionSettings,
-        _opts: &UpdateCollectionOptions,
+        _scope_name: impl Into<String>,
+        _collection_name: impl Into<String>,
+        _settings: UpdateCollectionSettings,
+        _opts: UpdateCollectionOptions,
     ) -> error::Result<()> {
         unimplemented!()
     }
 
     pub async fn drop_collection(
         &self,
-        _scope_name: impl AsRef<str>,
-        _collection_name: impl AsRef<str>,
-        _opts: &DropCollectionOptions,
+        _scope_name: impl Into<String>,
+        _collection_name: impl Into<String>,
+        _opts: DropCollectionOptions,
     ) -> error::Result<()> {
         unimplemented!()
     }
 
     pub async fn get_all_scopes(
         &self,
-        _opts: &GetAllScopesOptions,
+        _opts: GetAllScopesOptions,
     ) -> error::Result<Vec<ScopeSpec>> {
         unimplemented!()
     }
