@@ -216,9 +216,9 @@ where
         Ok(res)
     }
 
-    async fn get_collection_id(
+    async fn get_collection_id<'a>(
         &self,
-        req: GetCollectionIdRequest,
+        req: GetCollectionIdRequest<'a>,
     ) -> Result<GetCollectionIdResponse> {
         let mut op = self
             .handle_dispatch_side_result(OpsUtil {}.get_collection_id(self.client(), req).await)?;

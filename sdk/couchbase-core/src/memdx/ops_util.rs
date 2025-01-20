@@ -10,19 +10,15 @@ use crate::memdx::response::GetCollectionIdResponse;
 pub struct OpsUtil {}
 
 impl OpsUtil {
-    pub async fn get_collection_id<D>(
+    pub async fn get_collection_id<'a, D>(
         &self,
         dispatcher: &D,
-        request: GetCollectionIdRequest,
+        request: GetCollectionIdRequest<'a>,
     ) -> Result<StandardPendingOp<GetCollectionIdResponse>>
     where
         D: Dispatcher,
     {
-        let value = Some(
-            format!("{}.{}", request.scope_name, request.collection_name)
-                .as_bytes()
-                .to_vec(),
-        );
+        let full_name = format!("{}.{}", request.scope_name, request.collection_name);
 
         let op = dispatcher
             .dispatch(
@@ -34,7 +30,7 @@ impl OpsUtil {
                     cas: None,
                     extras: None,
                     key: None,
-                    value,
+                    value: Some(full_name.as_bytes()),
                     framing_extras: None,
                     opaque: None,
                 },

@@ -42,8 +42,8 @@ where
             async |client: Arc<KvClientManagerClientType<K>>| {
                 client
                     .get_collection_id(GetCollectionIdRequest {
-                        scope_name: scope_name.to_string(),
-                        collection_name: collection_name.to_string(),
+                        scope_name,
+                        collection_name,
                     })
                     .await
             },

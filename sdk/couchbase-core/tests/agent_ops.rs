@@ -656,8 +656,8 @@ async fn upsert_allocations() {
     let upsert_result = agent.upsert(upsert_opts).await.unwrap();
 
     let stats2 = dhat::HeapStats::get();
-    dbg!(stats1);
-    dbg!(stats2);
+
+    assert!(stats2.total_blocks - stats1.total_blocks <= 23);
 
     drop(profiler);
 }

@@ -72,7 +72,7 @@ impl OpBootstrapEncoder for OpsCore {
     {
         let mut features: Vec<u8> = Vec::new();
         for feature in request.requested_features {
-            features.write_u16::<BigEndian>(feature.into()).unwrap();
+            features.write_u16::<BigEndian>(feature.into())?;
         }
 
         let op = dispatcher
@@ -85,7 +85,7 @@ impl OpBootstrapEncoder for OpsCore {
                     cas: None,
                     extras: None,
                     key: None,
-                    value: Some(features),
+                    value: Some(&features),
                     framing_extras: None,
                     opaque: None,
                 },
@@ -105,7 +105,7 @@ impl OpBootstrapEncoder for OpsCore {
         D: Dispatcher,
     {
         let mut value = Vec::new();
-        value.write_u16::<BigEndian>(request.version).unwrap();
+        value.write_u16::<BigEndian>(request.version)?;
 
         let op = dispatcher
             .dispatch(
@@ -117,7 +117,7 @@ impl OpBootstrapEncoder for OpsCore {
                     cas: None,
                     extras: None,
                     key: None,
-                    value: Some(value),
+                    value: Some(&value),
                     framing_extras: None,
                     opaque: None,
                 },
@@ -137,7 +137,7 @@ impl OpBootstrapEncoder for OpsCore {
         D: Dispatcher,
     {
         let mut key = Vec::new();
-        key.write_all(request.bucket_name.as_bytes()).unwrap();
+        key.write_all(request.bucket_name.as_bytes())?;
 
         let op = dispatcher
             .dispatch(
@@ -148,7 +148,7 @@ impl OpBootstrapEncoder for OpsCore {
                     vbucket_id: None,
                     cas: None,
                     extras: None,
-                    key: Some(key),
+                    key: Some(&key),
                     value: None,
                     framing_extras: None,
                     opaque: None,
@@ -200,7 +200,8 @@ impl OpSASLPlainEncoder for OpsCore {
         D: Dispatcher,
     {
         let mut value = Vec::new();
-        value.write_all(request.payload.as_slice()).unwrap();
+        value.write_all(request.payload.as_slice())?;
+        let key: Vec<u8> = request.auth_mechanism.into();
 
         let op = dispatcher
             .dispatch(
@@ -211,8 +212,8 @@ impl OpSASLPlainEncoder for OpsCore {
                     vbucket_id: None,
                     cas: None,
                     extras: None,
-                    key: Some(request.auth_mechanism.into()),
-                    value: Some(value),
+                    key: Some(&key),
+                    value: Some(&value),
                     framing_extras: None,
                     opaque: None,
                 },
@@ -267,7 +268,8 @@ impl OpSASLScramEncoder for OpsCore {
         D: Dispatcher,
     {
         let mut value = Vec::new();
-        value.write_all(request.payload.as_slice()).unwrap();
+        value.write_all(request.payload.as_slice())?;
+        let key: Vec<u8> = request.auth_mechanism.into();
 
         let op = dispatcher
             .dispatch(
@@ -278,8 +280,8 @@ impl OpSASLScramEncoder for OpsCore {
                     vbucket_id: None,
                     cas: None,
                     extras: None,
-                    key: Some(request.auth_mechanism.into()),
-                    value: Some(value),
+                    key: Some(&key),
+                    value: Some(&value),
                     framing_extras: None,
                     opaque: None,
                 },
