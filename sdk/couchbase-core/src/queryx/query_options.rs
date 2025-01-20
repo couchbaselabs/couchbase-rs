@@ -523,3 +523,338 @@ impl Serialize for QueryOptions {
         map.end()
     }
 }
+
+#[derive(Debug, Clone, Default)]
+#[non_exhaustive]
+pub struct GetAllIndexesOptions<'a> {
+    pub(crate) bucket_name: &'a str,
+    pub(crate) scope_name: Option<&'a str>,
+    pub(crate) collection_name: Option<&'a str>,
+    pub(crate) on_behalf_of: Option<&'a OnBehalfOfInfo>,
+}
+
+impl<'a> GetAllIndexesOptions<'a> {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn bucket_name(mut self, bucket_name: &'a str) -> Self {
+        self.bucket_name = bucket_name;
+        self
+    }
+
+    pub fn scope_name(mut self, scope_name: impl Into<Option<&'a str>>) -> Self {
+        self.scope_name = scope_name.into();
+        self
+    }
+
+    pub fn collection_name(mut self, collection_name: impl Into<Option<&'a str>>) -> Self {
+        self.collection_name = collection_name.into();
+        self
+    }
+
+    pub fn on_behalf_of(mut self, on_behalf_of: impl Into<Option<&'a OnBehalfOfInfo>>) -> Self {
+        self.on_behalf_of = on_behalf_of.into();
+        self
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+#[non_exhaustive]
+pub struct CreatePrimaryIndexOptions<'a> {
+    pub(crate) bucket_name: &'a str,
+    pub(crate) scope_name: Option<&'a str>,
+    pub(crate) collection_name: Option<&'a str>,
+    pub(crate) index_name: Option<&'a str>,
+    pub(crate) num_replicas: Option<u32>,
+    pub(crate) deferred: Option<bool>,
+    pub(crate) ignore_if_exists: Option<bool>,
+    pub(crate) on_behalf_of: Option<&'a OnBehalfOfInfo>,
+}
+
+impl<'a> CreatePrimaryIndexOptions<'a> {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn bucket_name(mut self, bucket_name: &'a str) -> Self {
+        self.bucket_name = bucket_name;
+        self
+    }
+
+    pub fn scope_name(mut self, scope_name: impl Into<Option<&'a str>>) -> Self {
+        self.scope_name = scope_name.into();
+        self
+    }
+
+    pub fn collection_name(mut self, collection_name: impl Into<Option<&'a str>>) -> Self {
+        self.collection_name = collection_name.into();
+        self
+    }
+
+    pub fn index_name(mut self, index_name: impl Into<Option<&'a str>>) -> Self {
+        self.index_name = index_name.into();
+        self
+    }
+
+    pub fn num_replicas(mut self, num_replicas: impl Into<Option<u32>>) -> Self {
+        self.num_replicas = num_replicas.into();
+        self
+    }
+
+    pub fn deferred(mut self, deferred: impl Into<Option<bool>>) -> Self {
+        self.deferred = deferred.into();
+        self
+    }
+
+    pub fn ignore_if_exists(mut self, ignore_if_exists: impl Into<Option<bool>>) -> Self {
+        self.ignore_if_exists = ignore_if_exists.into();
+        self
+    }
+
+    pub fn on_behalf_of(mut self, on_behalf_of: impl Into<Option<&'a OnBehalfOfInfo>>) -> Self {
+        self.on_behalf_of = on_behalf_of.into();
+        self
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+#[non_exhaustive]
+pub struct CreateIndexOptions<'a> {
+    pub(crate) bucket_name: &'a str,
+    pub(crate) scope_name: Option<&'a str>,
+    pub(crate) collection_name: Option<&'a str>,
+    pub(crate) index_name: &'a str,
+    pub(crate) num_replicas: Option<u32>,
+    pub(crate) fields: &'a [&'a str],
+    pub(crate) deferred: Option<bool>,
+    pub(crate) ignore_if_exists: Option<bool>,
+    pub(crate) on_behalf_of: Option<&'a OnBehalfOfInfo>,
+}
+
+impl<'a> CreateIndexOptions<'a> {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn bucket_name(mut self, bucket_name: &'a str) -> Self {
+        self.bucket_name = bucket_name;
+        self
+    }
+
+    pub fn scope_name(mut self, scope_name: impl Into<Option<&'a str>>) -> Self {
+        self.scope_name = scope_name.into();
+        self
+    }
+
+    pub fn collection_name(mut self, collection_name: impl Into<Option<&'a str>>) -> Self {
+        self.collection_name = collection_name.into();
+        self
+    }
+
+    pub fn index_name(mut self, index_name: &'a str) -> Self {
+        self.index_name = index_name;
+        self
+    }
+
+    pub fn num_replicas(mut self, num_replicas: impl Into<Option<u32>>) -> Self {
+        self.num_replicas = num_replicas.into();
+        self
+    }
+
+    pub fn fields(mut self, fields: &'a [&'a str]) -> Self {
+        self.fields = fields;
+        self
+    }
+
+    pub fn deferred(mut self, deferred: impl Into<Option<bool>>) -> Self {
+        self.deferred = deferred.into();
+        self
+    }
+
+    pub fn ignore_if_exists(mut self, ignore_if_exists: impl Into<Option<bool>>) -> Self {
+        self.ignore_if_exists = ignore_if_exists.into();
+        self
+    }
+
+    pub fn on_behalf_of(mut self, on_behalf_of: impl Into<Option<&'a OnBehalfOfInfo>>) -> Self {
+        self.on_behalf_of = on_behalf_of.into();
+        self
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+#[non_exhaustive]
+pub struct DropPrimaryIndexOptions<'a> {
+    pub(crate) bucket_name: &'a str,
+    pub(crate) scope_name: Option<&'a str>,
+    pub(crate) collection_name: Option<&'a str>,
+    pub(crate) index_name: Option<&'a str>,
+    pub(crate) ignore_if_not_exists: Option<bool>,
+    pub(crate) on_behalf_of: Option<&'a OnBehalfOfInfo>,
+}
+
+impl<'a> DropPrimaryIndexOptions<'a> {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn bucket_name(mut self, bucket_name: &'a str) -> Self {
+        self.bucket_name = bucket_name;
+        self
+    }
+
+    pub fn scope_name(mut self, scope_name: impl Into<Option<&'a str>>) -> Self {
+        self.scope_name = scope_name.into();
+        self
+    }
+
+    pub fn collection_name(mut self, collection_name: impl Into<Option<&'a str>>) -> Self {
+        self.collection_name = collection_name.into();
+        self
+    }
+
+    pub fn index_name(mut self, index_name: impl Into<Option<&'a str>>) -> Self {
+        self.index_name = index_name.into();
+        self
+    }
+
+    pub fn ignore_if_not_exists(mut self, ignore_if_not_exists: impl Into<Option<bool>>) -> Self {
+        self.ignore_if_not_exists = ignore_if_not_exists.into();
+        self
+    }
+
+    pub fn on_behalf_of(mut self, on_behalf_of: impl Into<Option<&'a OnBehalfOfInfo>>) -> Self {
+        self.on_behalf_of = on_behalf_of.into();
+        self
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+#[non_exhaustive]
+pub struct DropIndexOptions<'a> {
+    pub(crate) bucket_name: &'a str,
+    pub(crate) scope_name: Option<&'a str>,
+    pub(crate) collection_name: Option<&'a str>,
+    pub(crate) index_name: &'a str,
+    pub(crate) ignore_if_not_exists: Option<bool>,
+    pub(crate) on_behalf_of: Option<&'a OnBehalfOfInfo>,
+}
+
+impl<'a> DropIndexOptions<'a> {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn bucket_name(mut self, bucket_name: &'a str) -> Self {
+        self.bucket_name = bucket_name;
+        self
+    }
+
+    pub fn scope_name(mut self, scope_name: impl Into<Option<&'a str>>) -> Self {
+        self.scope_name = scope_name.into();
+        self
+    }
+
+    pub fn collection_name(mut self, collection_name: impl Into<Option<&'a str>>) -> Self {
+        self.collection_name = collection_name.into();
+        self
+    }
+
+    pub fn index_name(mut self, index_name: &'a str) -> Self {
+        self.index_name = index_name;
+        self
+    }
+
+    pub fn ignore_if_not_exists(mut self, ignore_if_not_exists: impl Into<Option<bool>>) -> Self {
+        self.ignore_if_not_exists = ignore_if_not_exists.into();
+        self
+    }
+
+    pub fn on_behalf_of(mut self, on_behalf_of: impl Into<Option<&'a OnBehalfOfInfo>>) -> Self {
+        self.on_behalf_of = on_behalf_of.into();
+        self
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+#[non_exhaustive]
+pub struct BuildDeferredIndexesOptions<'a> {
+    pub(crate) bucket_name: &'a str,
+    pub(crate) scope_name: Option<&'a str>,
+    pub(crate) collection_name: Option<&'a str>,
+    pub(crate) on_behalf_of: Option<&'a OnBehalfOfInfo>,
+}
+
+impl<'a> BuildDeferredIndexesOptions<'a> {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn bucket_name(mut self, bucket_name: &'a str) -> Self {
+        self.bucket_name = bucket_name;
+        self
+    }
+
+    pub fn scope_name(mut self, scope_name: impl Into<Option<&'a str>>) -> Self {
+        self.scope_name = scope_name.into();
+        self
+    }
+
+    pub fn collection_name(mut self, collection_name: impl Into<Option<&'a str>>) -> Self {
+        self.collection_name = collection_name.into();
+        self
+    }
+
+    pub fn on_behalf_of(mut self, on_behalf_of: impl Into<Option<&'a OnBehalfOfInfo>>) -> Self {
+        self.on_behalf_of = on_behalf_of.into();
+        self
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+#[non_exhaustive]
+pub struct WatchIndexesOptions<'a> {
+    pub(crate) bucket_name: &'a str,
+    pub(crate) scope_name: Option<&'a str>,
+    pub(crate) collection_name: Option<&'a str>,
+    pub(crate) indexes: &'a [&'a str],
+    pub(crate) watch_primary: Option<bool>,
+    pub(crate) on_behalf_of: Option<&'a OnBehalfOfInfo>,
+}
+
+impl<'a> WatchIndexesOptions<'a> {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn bucket_name(mut self, bucket_name: &'a str) -> Self {
+        self.bucket_name = bucket_name;
+        self
+    }
+
+    pub fn scope_name(mut self, scope_name: impl Into<Option<&'a str>>) -> Self {
+        self.scope_name = scope_name.into();
+        self
+    }
+
+    pub fn collection_name(mut self, collection_name: impl Into<Option<&'a str>>) -> Self {
+        self.collection_name = collection_name.into();
+        self
+    }
+
+    pub fn indexes(mut self, indexes: &'a [&'a str]) -> Self {
+        self.indexes = indexes;
+        self
+    }
+
+    pub fn watch_primary(mut self, watch_primary: impl Into<Option<bool>>) -> Self {
+        self.watch_primary = watch_primary.into();
+        self
+    }
+
+    pub fn on_behalf_of(mut self, on_behalf_of: impl Into<Option<&'a OnBehalfOfInfo>>) -> Self {
+        self.on_behalf_of = on_behalf_of.into();
+        self
+    }
+}

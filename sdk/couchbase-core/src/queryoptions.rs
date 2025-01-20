@@ -399,3 +399,527 @@ impl From<QueryOptions> for queryx::query_options::QueryOptions {
         }
     }
 }
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct GetAllIndexesOptions<'a> {
+    pub(crate) bucket_name: &'a str,
+    pub(crate) scope_name: Option<&'a str>,
+    pub(crate) collection_name: Option<&'a str>,
+    pub(crate) on_behalf_of: Option<&'a OnBehalfOfInfo>,
+    pub(crate) endpoint: Option<String>,
+    pub(crate) retry_strategy: Option<Arc<dyn RetryStrategy>>,
+}
+
+impl<'a> GetAllIndexesOptions<'a> {
+    pub fn new(bucket_name: &'a str) -> Self {
+        Self {
+            bucket_name,
+            scope_name: None,
+            collection_name: None,
+            on_behalf_of: None,
+            endpoint: None,
+            retry_strategy: None,
+        }
+    }
+
+    pub fn scope_name(mut self, scope_name: &'a str) -> Self {
+        self.scope_name = Some(scope_name);
+        self
+    }
+
+    pub fn collection_name(mut self, collection_name: &'a str) -> Self {
+        self.collection_name = Some(collection_name);
+        self
+    }
+
+    pub fn on_behalf_of(mut self, on_behalf_of: &'a OnBehalfOfInfo) -> Self {
+        self.on_behalf_of = Some(on_behalf_of);
+        self
+    }
+
+    pub fn endpoint(mut self, endpoint: String) -> Self {
+        self.endpoint = Some(endpoint);
+        self
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
+    }
+}
+
+impl<'a> From<&GetAllIndexesOptions<'a>> for queryx::query_options::GetAllIndexesOptions<'a> {
+    fn from(opts: &GetAllIndexesOptions<'a>) -> Self {
+        queryx::query_options::GetAllIndexesOptions {
+            bucket_name: opts.bucket_name,
+            scope_name: opts.scope_name,
+            collection_name: opts.collection_name,
+            on_behalf_of: opts.on_behalf_of,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct CreatePrimaryIndexOptions<'a> {
+    pub(crate) bucket_name: &'a str,
+    pub(crate) scope_name: Option<&'a str>,
+    pub(crate) collection_name: Option<&'a str>,
+    pub(crate) index_name: Option<&'a str>,
+    pub(crate) num_replicas: Option<u32>,
+    pub(crate) deferred: Option<bool>,
+    pub(crate) ignore_if_exists: Option<bool>,
+    pub(crate) on_behalf_of: Option<&'a OnBehalfOfInfo>,
+    pub(crate) endpoint: Option<String>,
+    pub(crate) retry_strategy: Option<Arc<dyn RetryStrategy>>,
+}
+
+impl<'a> CreatePrimaryIndexOptions<'a> {
+    pub fn new(bucket_name: &'a str) -> Self {
+        Self {
+            bucket_name,
+            scope_name: None,
+            collection_name: None,
+            index_name: None,
+            num_replicas: None,
+            deferred: None,
+            ignore_if_exists: None,
+            on_behalf_of: None,
+            endpoint: None,
+            retry_strategy: None,
+        }
+    }
+
+    pub fn scope_name(mut self, scope_name: &'a str) -> Self {
+        self.scope_name = Some(scope_name);
+        self
+    }
+
+    pub fn collection_name(mut self, collection_name: &'a str) -> Self {
+        self.collection_name = Some(collection_name);
+        self
+    }
+
+    pub fn index_name(mut self, index_name: &'a str) -> Self {
+        self.index_name = Some(index_name);
+        self
+    }
+
+    pub fn num_replicas(mut self, num_replicas: u32) -> Self {
+        self.num_replicas = Some(num_replicas);
+        self
+    }
+
+    pub fn deferred(mut self, deferred: bool) -> Self {
+        self.deferred = Some(deferred);
+        self
+    }
+
+    pub fn ignore_if_exists(mut self, ignore_if_exists: bool) -> Self {
+        self.ignore_if_exists = Some(ignore_if_exists);
+        self
+    }
+
+    pub fn on_behalf_of(mut self, on_behalf_of: &'a OnBehalfOfInfo) -> Self {
+        self.on_behalf_of = Some(on_behalf_of);
+        self
+    }
+
+    pub fn endpoint(mut self, endpoint: String) -> Self {
+        self.endpoint = Some(endpoint);
+        self
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
+    }
+}
+
+impl<'a> From<&CreatePrimaryIndexOptions<'a>>
+    for queryx::query_options::CreatePrimaryIndexOptions<'a>
+{
+    fn from(opts: &CreatePrimaryIndexOptions<'a>) -> Self {
+        queryx::query_options::CreatePrimaryIndexOptions {
+            bucket_name: opts.bucket_name,
+            scope_name: opts.scope_name,
+            collection_name: opts.collection_name,
+            index_name: opts.index_name,
+            num_replicas: opts.num_replicas,
+            deferred: opts.deferred,
+            ignore_if_exists: opts.ignore_if_exists,
+            on_behalf_of: opts.on_behalf_of,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct CreateIndexOptions<'a> {
+    pub(crate) bucket_name: &'a str,
+    pub(crate) scope_name: Option<&'a str>,
+    pub(crate) collection_name: Option<&'a str>,
+    pub(crate) index_name: &'a str,
+    pub(crate) num_replicas: Option<u32>,
+    pub(crate) fields: &'a [&'a str],
+    pub(crate) deferred: Option<bool>,
+    pub(crate) ignore_if_exists: Option<bool>,
+    pub(crate) on_behalf_of: Option<&'a OnBehalfOfInfo>,
+    pub(crate) endpoint: Option<String>,
+    pub(crate) retry_strategy: Option<Arc<dyn RetryStrategy>>,
+}
+
+impl<'a> CreateIndexOptions<'a> {
+    pub fn new(bucket_name: &'a str, index_name: &'a str, fields: &'a [&'a str]) -> Self {
+        Self {
+            bucket_name,
+            scope_name: None,
+            collection_name: None,
+            index_name,
+            num_replicas: None,
+            fields,
+            deferred: None,
+            ignore_if_exists: None,
+            on_behalf_of: None,
+            endpoint: None,
+            retry_strategy: None,
+        }
+    }
+
+    pub fn scope_name(mut self, scope_name: &'a str) -> Self {
+        self.scope_name = Some(scope_name);
+        self
+    }
+
+    pub fn collection_name(mut self, collection_name: &'a str) -> Self {
+        self.collection_name = Some(collection_name);
+        self
+    }
+
+    pub fn num_replicas(mut self, num_replicas: u32) -> Self {
+        self.num_replicas = Some(num_replicas);
+        self
+    }
+
+    pub fn deferred(mut self, deferred: bool) -> Self {
+        self.deferred = Some(deferred);
+        self
+    }
+
+    pub fn ignore_if_exists(mut self, ignore_if_exists: bool) -> Self {
+        self.ignore_if_exists = Some(ignore_if_exists);
+        self
+    }
+
+    pub fn on_behalf_of(mut self, on_behalf_of: &'a OnBehalfOfInfo) -> Self {
+        self.on_behalf_of = Some(on_behalf_of);
+        self
+    }
+
+    pub fn endpoint(mut self, endpoint: String) -> Self {
+        self.endpoint = Some(endpoint);
+        self
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
+    }
+}
+
+impl<'a> From<&CreateIndexOptions<'a>> for queryx::query_options::CreateIndexOptions<'a> {
+    fn from(opts: &CreateIndexOptions<'a>) -> Self {
+        queryx::query_options::CreateIndexOptions {
+            bucket_name: opts.bucket_name,
+            scope_name: opts.scope_name,
+            collection_name: opts.collection_name,
+            index_name: opts.index_name,
+            num_replicas: opts.num_replicas,
+            fields: opts.fields,
+            deferred: opts.deferred,
+            ignore_if_exists: opts.ignore_if_exists,
+            on_behalf_of: opts.on_behalf_of,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct DropPrimaryIndexOptions<'a> {
+    pub(crate) bucket_name: &'a str,
+    pub(crate) scope_name: Option<&'a str>,
+    pub(crate) collection_name: Option<&'a str>,
+    pub(crate) index_name: Option<&'a str>,
+    pub(crate) ignore_if_not_exists: Option<bool>,
+    pub(crate) on_behalf_of: Option<&'a OnBehalfOfInfo>,
+    pub(crate) endpoint: Option<String>,
+    pub(crate) retry_strategy: Option<Arc<dyn RetryStrategy>>,
+}
+
+impl<'a> DropPrimaryIndexOptions<'a> {
+    pub fn new(bucket_name: &'a str) -> Self {
+        Self {
+            bucket_name,
+            scope_name: None,
+            collection_name: None,
+            index_name: None,
+            ignore_if_not_exists: None,
+            on_behalf_of: None,
+            endpoint: None,
+            retry_strategy: None,
+        }
+    }
+
+    pub fn scope_name(mut self, scope_name: &'a str) -> Self {
+        self.scope_name = Some(scope_name);
+        self
+    }
+
+    pub fn collection_name(mut self, collection_name: &'a str) -> Self {
+        self.collection_name = Some(collection_name);
+        self
+    }
+
+    pub fn index_name(mut self, index_name: &'a str) -> Self {
+        self.index_name = Some(index_name);
+        self
+    }
+
+    pub fn ignore_if_not_exists(mut self, ignore_if_not_exists: bool) -> Self {
+        self.ignore_if_not_exists = Some(ignore_if_not_exists);
+        self
+    }
+
+    pub fn on_behalf_of(mut self, on_behalf_of: &'a OnBehalfOfInfo) -> Self {
+        self.on_behalf_of = Some(on_behalf_of);
+        self
+    }
+
+    pub fn endpoint(mut self, endpoint: String) -> Self {
+        self.endpoint = Some(endpoint);
+        self
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
+    }
+}
+
+impl<'a> From<&DropPrimaryIndexOptions<'a>> for queryx::query_options::DropPrimaryIndexOptions<'a> {
+    fn from(opts: &DropPrimaryIndexOptions<'a>) -> Self {
+        queryx::query_options::DropPrimaryIndexOptions {
+            bucket_name: opts.bucket_name,
+            scope_name: opts.scope_name,
+            collection_name: opts.collection_name,
+            index_name: opts.index_name,
+            ignore_if_not_exists: opts.ignore_if_not_exists,
+            on_behalf_of: opts.on_behalf_of,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct DropIndexOptions<'a> {
+    pub(crate) bucket_name: &'a str,
+    pub(crate) scope_name: Option<&'a str>,
+    pub(crate) collection_name: Option<&'a str>,
+    pub(crate) index_name: &'a str,
+    pub(crate) ignore_if_not_exists: Option<bool>,
+    pub(crate) on_behalf_of: Option<&'a OnBehalfOfInfo>,
+    pub(crate) endpoint: Option<String>,
+    pub(crate) retry_strategy: Option<Arc<dyn RetryStrategy>>,
+}
+
+impl<'a> DropIndexOptions<'a> {
+    pub fn new(bucket_name: &'a str, index_name: &'a str) -> Self {
+        Self {
+            bucket_name,
+            scope_name: None,
+            collection_name: None,
+            index_name,
+            ignore_if_not_exists: None,
+            on_behalf_of: None,
+            endpoint: None,
+            retry_strategy: None,
+        }
+    }
+
+    pub fn scope_name(mut self, scope_name: &'a str) -> Self {
+        self.scope_name = Some(scope_name);
+        self
+    }
+
+    pub fn collection_name(mut self, collection_name: &'a str) -> Self {
+        self.collection_name = Some(collection_name);
+        self
+    }
+
+    pub fn ignore_if_not_exists(mut self, ignore_if_not_exists: bool) -> Self {
+        self.ignore_if_not_exists = Some(ignore_if_not_exists);
+        self
+    }
+
+    pub fn on_behalf_of(mut self, on_behalf_of: &'a OnBehalfOfInfo) -> Self {
+        self.on_behalf_of = Some(on_behalf_of);
+        self
+    }
+
+    pub fn endpoint(mut self, endpoint: String) -> Self {
+        self.endpoint = Some(endpoint);
+        self
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
+    }
+}
+
+impl<'a> From<&DropIndexOptions<'a>> for queryx::query_options::DropIndexOptions<'a> {
+    fn from(opts: &DropIndexOptions<'a>) -> Self {
+        queryx::query_options::DropIndexOptions {
+            bucket_name: opts.bucket_name,
+            scope_name: opts.scope_name,
+            collection_name: opts.collection_name,
+            index_name: opts.index_name,
+            ignore_if_not_exists: opts.ignore_if_not_exists,
+            on_behalf_of: opts.on_behalf_of,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct BuildDeferredIndexesOptions<'a> {
+    pub(crate) bucket_name: &'a str,
+    pub(crate) scope_name: Option<&'a str>,
+    pub(crate) collection_name: Option<&'a str>,
+    pub(crate) on_behalf_of: Option<&'a OnBehalfOfInfo>,
+    pub(crate) endpoint: Option<String>,
+    pub(crate) retry_strategy: Option<Arc<dyn RetryStrategy>>,
+}
+
+impl<'a> BuildDeferredIndexesOptions<'a> {
+    pub fn new(bucket_name: &'a str) -> Self {
+        Self {
+            bucket_name,
+            scope_name: None,
+            collection_name: None,
+            on_behalf_of: None,
+            endpoint: None,
+            retry_strategy: None,
+        }
+    }
+
+    pub fn scope_name(mut self, scope_name: &'a str) -> Self {
+        self.scope_name = Some(scope_name);
+        self
+    }
+
+    pub fn collection_name(mut self, collection_name: &'a str) -> Self {
+        self.collection_name = Some(collection_name);
+        self
+    }
+
+    pub fn on_behalf_of(mut self, on_behalf_of: &'a OnBehalfOfInfo) -> Self {
+        self.on_behalf_of = Some(on_behalf_of);
+        self
+    }
+
+    pub fn endpoint(mut self, endpoint: String) -> Self {
+        self.endpoint = Some(endpoint);
+        self
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
+    }
+}
+
+impl<'a> From<&BuildDeferredIndexesOptions<'a>>
+    for queryx::query_options::BuildDeferredIndexesOptions<'a>
+{
+    fn from(opts: &BuildDeferredIndexesOptions<'a>) -> Self {
+        queryx::query_options::BuildDeferredIndexesOptions {
+            bucket_name: opts.bucket_name,
+            scope_name: opts.scope_name,
+            collection_name: opts.collection_name,
+            on_behalf_of: opts.on_behalf_of,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct WatchIndexesOptions<'a> {
+    pub(crate) bucket_name: &'a str,
+    pub(crate) scope_name: Option<&'a str>,
+    pub(crate) collection_name: Option<&'a str>,
+    pub(crate) indexes: &'a [&'a str],
+    pub(crate) watch_primary: Option<bool>,
+    pub(crate) on_behalf_of: Option<&'a OnBehalfOfInfo>,
+    pub(crate) endpoint: Option<String>,
+    pub(crate) retry_strategy: Option<Arc<dyn RetryStrategy>>,
+}
+
+impl<'a> WatchIndexesOptions<'a> {
+    pub fn new(bucket_name: &'a str, indexes: &'a [&'a str]) -> Self {
+        Self {
+            bucket_name,
+            scope_name: None,
+            collection_name: None,
+            indexes,
+            watch_primary: None,
+            on_behalf_of: None,
+            endpoint: None,
+            retry_strategy: None,
+        }
+    }
+
+    pub fn scope_name(mut self, scope_name: &'a str) -> Self {
+        self.scope_name = Some(scope_name);
+        self
+    }
+
+    pub fn collection_name(mut self, collection_name: &'a str) -> Self {
+        self.collection_name = Some(collection_name);
+        self
+    }
+
+    pub fn watch_primary(mut self, watch_primary: bool) -> Self {
+        self.watch_primary = Some(watch_primary);
+        self
+    }
+
+    pub fn on_behalf_of(mut self, on_behalf_of: &'a OnBehalfOfInfo) -> Self {
+        self.on_behalf_of = Some(on_behalf_of);
+        self
+    }
+
+    pub fn endpoint(mut self, endpoint: String) -> Self {
+        self.endpoint = Some(endpoint);
+        self
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
+    }
+}
+
+impl<'a> From<&WatchIndexesOptions<'a>> for queryx::query_options::WatchIndexesOptions<'a> {
+    fn from(opts: &WatchIndexesOptions<'a>) -> Self {
+        queryx::query_options::WatchIndexesOptions {
+            bucket_name: opts.bucket_name,
+            scope_name: opts.scope_name,
+            collection_name: opts.collection_name,
+            indexes: opts.indexes,
+            watch_primary: opts.watch_primary,
+            on_behalf_of: opts.on_behalf_of,
+        }
+    }
+}

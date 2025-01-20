@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::future::Future;
 use std::sync::{Arc, Mutex};
 
 use crate::authenticator::Authenticator;
@@ -6,7 +7,11 @@ use crate::error;
 use crate::error::ErrorKind;
 use crate::httpcomponent::{HttpComponent, HttpComponentState};
 use crate::httpx::client::Client;
-use crate::queryoptions::QueryOptions;
+use crate::queryoptions::{
+    BuildDeferredIndexesOptions, CreateIndexOptions, CreatePrimaryIndexOptions, DropIndexOptions,
+    DropPrimaryIndexOptions, GetAllIndexesOptions, QueryOptions, WatchIndexesOptions,
+};
+use crate::queryx::index::Index;
 use crate::queryx::preparedquery::{PreparedQuery, PreparedStatementCache};
 use crate::queryx::query::Query;
 use crate::queryx::query_respreader::QueryRespReader;
@@ -176,6 +181,245 @@ impl<C: Client> QueryComponent<C> {
                             inner: res,
                             endpoint,
                         })
+                    },
+                )
+                .await
+        })
+        .await
+    }
+
+    pub async fn get_all_indexes(
+        &self,
+        opts: &GetAllIndexesOptions<'_>,
+    ) -> error::Result<Vec<Index>> {
+        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
+            retry_strategy
+        } else {
+            DEFAULT_RETRY_STRATEGY.clone()
+        };
+
+        let retry_info = RetryInfo::new(true, retry);
+
+        let endpoint = opts.endpoint.clone();
+        let copts = opts.into();
+
+        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
+            self.http_component
+                .orchestrate_endpoint(
+                    endpoint.clone(),
+                    async |client: Arc<C>,
+                           endpoint_id: String,
+                           endpoint: String,
+                           username: String,
+                           password: String| {
+                        let res = match (Query::<C> {
+                            http_client: client,
+                            user_agent: self.http_component.user_agent().to_string(),
+                            endpoint: endpoint.clone(),
+                            username,
+                            password,
+                        }
+                        .get_all_indexes(&copts)
+                        .await)
+                        {
+                            Ok(r) => r,
+                            Err(e) => return Err(ErrorKind::Query(e).into()),
+                        };
+
+                        Ok(res)
+                    },
+                )
+                .await
+        })
+        .await
+    }
+
+    pub async fn create_primary_index(
+        &self,
+        opts: &CreatePrimaryIndexOptions<'_>,
+    ) -> error::Result<()> {
+        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
+            retry_strategy
+        } else {
+            DEFAULT_RETRY_STRATEGY.clone()
+        };
+
+        let retry_info = RetryInfo::new(false, retry);
+
+        let endpoint = opts.endpoint.clone();
+        let copts = opts.into();
+
+        self.orchestrate_no_res_mgmt_call(
+            retry_info,
+            endpoint.map(|e| e.to_string()),
+            async |query| {
+                query
+                    .create_primary_index(&copts)
+                    .await
+                    .map_err(|e| ErrorKind::Query(e).into())
+            },
+        )
+        .await
+    }
+
+    pub async fn create_index(&self, opts: &CreateIndexOptions<'_>) -> error::Result<()> {
+        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
+            retry_strategy
+        } else {
+            DEFAULT_RETRY_STRATEGY.clone()
+        };
+
+        let retry_info = RetryInfo::new(false, retry);
+
+        let endpoint = opts.endpoint.clone();
+        let copts = opts.into();
+
+        self.orchestrate_no_res_mgmt_call(
+            retry_info,
+            endpoint.map(|e| e.to_string()),
+            async |query| {
+                query
+                    .create_index(&copts)
+                    .await
+                    .map_err(|e| ErrorKind::Query(e).into())
+            },
+        )
+        .await
+    }
+
+    pub async fn drop_primary_index(
+        &self,
+        opts: &DropPrimaryIndexOptions<'_>,
+    ) -> error::Result<()> {
+        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
+            retry_strategy
+        } else {
+            DEFAULT_RETRY_STRATEGY.clone()
+        };
+
+        let retry_info = RetryInfo::new(false, retry);
+
+        let endpoint = opts.endpoint.clone();
+        let copts = opts.into();
+
+        self.orchestrate_no_res_mgmt_call(
+            retry_info,
+            endpoint.map(|e| e.to_string()),
+            async |query| {
+                query
+                    .drop_primary_index(&copts)
+                    .await
+                    .map_err(|e| ErrorKind::Query(e).into())
+            },
+        )
+        .await
+    }
+
+    pub async fn drop_index(&self, opts: &DropIndexOptions<'_>) -> error::Result<()> {
+        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
+            retry_strategy
+        } else {
+            DEFAULT_RETRY_STRATEGY.clone()
+        };
+
+        let retry_info = RetryInfo::new(false, retry);
+
+        let endpoint = opts.endpoint.clone();
+        let copts = opts.into();
+
+        self.orchestrate_no_res_mgmt_call(
+            retry_info,
+            endpoint.map(|e| e.to_string()),
+            async |query| {
+                query
+                    .drop_index(&copts)
+                    .await
+                    .map_err(|e| ErrorKind::Query(e).into())
+            },
+        )
+        .await
+    }
+
+    pub async fn build_deferred_indexes(
+        &self,
+        opts: &BuildDeferredIndexesOptions<'_>,
+    ) -> error::Result<()> {
+        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
+            retry_strategy
+        } else {
+            DEFAULT_RETRY_STRATEGY.clone()
+        };
+
+        let retry_info = RetryInfo::new(false, retry);
+
+        let endpoint = opts.endpoint.clone();
+        let copts = opts.into();
+
+        self.orchestrate_no_res_mgmt_call(
+            retry_info,
+            endpoint.map(|e| e.to_string()),
+            async |query| {
+                query
+                    .build_deferred_indexes(&copts)
+                    .await
+                    .map_err(|e| ErrorKind::Query(e).into())
+            },
+        )
+        .await
+    }
+
+    pub async fn watch_indexes(&self, opts: &WatchIndexesOptions<'_>) -> error::Result<()> {
+        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
+            retry_strategy
+        } else {
+            DEFAULT_RETRY_STRATEGY.clone()
+        };
+
+        let retry_info = RetryInfo::new(true, retry);
+
+        let endpoint = opts.endpoint.clone();
+        let copts = opts.into();
+
+        self.orchestrate_no_res_mgmt_call(
+            retry_info,
+            endpoint.map(|e| e.to_string()),
+            async |query| {
+                query
+                    .watch_indexes(&copts)
+                    .await
+                    .map_err(|e| ErrorKind::Query(e).into())
+            },
+        )
+        .await
+    }
+
+    async fn orchestrate_no_res_mgmt_call<Fut>(
+        &self,
+        retry_info: RetryInfo,
+        endpoint: Option<String>,
+        operation: impl Fn(Query<C>) -> Fut + Send + Sync,
+    ) -> error::Result<()>
+    where
+        Fut: Future<Output = error::Result<()>> + Send,
+        C: Client,
+    {
+        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
+            self.http_component
+                .orchestrate_endpoint(
+                    endpoint.clone(),
+                    async |client: Arc<C>,
+                           endpoint_id: String,
+                           endpoint: String,
+                           username: String,
+                           password: String| {
+                        operation(Query::<C> {
+                            http_client: client,
+                            user_agent: self.http_component.user_agent().to_string(),
+                            endpoint: endpoint.clone(),
+                            username,
+                            password,
+                        })
+                        .await
                     },
                 )
                 .await

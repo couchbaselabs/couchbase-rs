@@ -24,7 +24,11 @@ use crate::mgmtx::responses::{
     UpdateCollectionResponse,
 };
 use crate::querycomponent::QueryResultStream;
-use crate::queryoptions::QueryOptions;
+use crate::queryoptions::{
+    BuildDeferredIndexesOptions, CreateIndexOptions, CreatePrimaryIndexOptions, DropIndexOptions,
+    DropPrimaryIndexOptions, GetAllIndexesOptions, QueryOptions, WatchIndexesOptions,
+};
+use crate::queryx::index::Index;
 use crate::searchcomponent::SearchResultStream;
 use crate::searchoptions::SearchOptions;
 
@@ -110,6 +114,37 @@ impl Agent {
 
     pub async fn prepared_query(&self, opts: QueryOptions) -> Result<QueryResultStream> {
         self.inner.query.prepared_query(opts).await
+    }
+
+    pub async fn get_all_indexes(&self, opts: &GetAllIndexesOptions<'_>) -> Result<Vec<Index>> {
+        self.inner.query.get_all_indexes(opts).await
+    }
+
+    pub async fn create_primary_index(&self, opts: &CreatePrimaryIndexOptions<'_>) -> Result<()> {
+        self.inner.query.create_primary_index(opts).await
+    }
+
+    pub async fn create_index(&self, opts: &CreateIndexOptions<'_>) -> Result<()> {
+        self.inner.query.create_index(opts).await
+    }
+
+    pub async fn drop_primary_index(&self, opts: &DropPrimaryIndexOptions<'_>) -> Result<()> {
+        self.inner.query.drop_primary_index(opts).await
+    }
+
+    pub async fn drop_index(&self, opts: &DropIndexOptions<'_>) -> Result<()> {
+        self.inner.query.drop_index(opts).await
+    }
+
+    pub async fn build_deferred_indexes(
+        &self,
+        opts: &BuildDeferredIndexesOptions<'_>,
+    ) -> Result<()> {
+        self.inner.query.build_deferred_indexes(opts).await
+    }
+
+    pub async fn watch_indexes(&self, opts: &WatchIndexesOptions<'_>) -> Result<()> {
+        self.inner.query.watch_indexes(opts).await
     }
 
     pub async fn search(&self, opts: SearchOptions) -> Result<SearchResultStream> {
