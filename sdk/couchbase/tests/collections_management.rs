@@ -1,5 +1,3 @@
-#![feature(async_closure)]
-
 use crate::common::features::TestFeatureCode;
 use crate::common::test_config::run_test;
 use crate::common::{generate_string_value, try_until};

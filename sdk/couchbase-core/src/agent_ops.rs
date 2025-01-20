@@ -32,70 +32,67 @@ impl Agent {
         self.inner.bucket_features().await
     }
 
-    pub async fn upsert<'a>(&self, opts: UpsertOptions<'a>) -> Result<UpsertResult> {
+    pub async fn upsert(&self, opts: UpsertOptions<'_>) -> Result<UpsertResult> {
         self.inner.crud.upsert(opts).await
     }
 
-    pub async fn get<'a>(&self, opts: GetOptions<'a>) -> Result<GetResult> {
+    pub async fn get(&self, opts: GetOptions<'_>) -> Result<GetResult> {
         self.inner.crud.get(opts).await
     }
 
-    pub async fn get_meta<'a>(&self, opts: GetMetaOptions<'a>) -> Result<GetMetaResult> {
+    pub async fn get_meta(&self, opts: GetMetaOptions<'_>) -> Result<GetMetaResult> {
         self.inner.crud.get_meta(opts).await
     }
 
-    pub async fn delete<'a>(&self, opts: DeleteOptions<'a>) -> Result<DeleteResult> {
+    pub async fn delete(&self, opts: DeleteOptions<'_>) -> Result<DeleteResult> {
         self.inner.crud.delete(opts).await
     }
 
-    pub async fn get_and_lock<'a>(&self, opts: GetAndLockOptions<'a>) -> Result<GetAndLockResult> {
+    pub async fn get_and_lock(&self, opts: GetAndLockOptions<'_>) -> Result<GetAndLockResult> {
         self.inner.crud.get_and_lock(opts).await
     }
 
-    pub async fn get_and_touch<'a>(
-        &self,
-        opts: GetAndTouchOptions<'a>,
-    ) -> Result<GetAndTouchResult> {
+    pub async fn get_and_touch(&self, opts: GetAndTouchOptions<'_>) -> Result<GetAndTouchResult> {
         self.inner.crud.get_and_touch(opts).await
     }
 
-    pub async fn unlock<'a>(&self, opts: UnlockOptions<'a>) -> Result<UnlockResult> {
+    pub async fn unlock(&self, opts: UnlockOptions<'_>) -> Result<UnlockResult> {
         self.inner.crud.unlock(opts).await
     }
 
-    pub async fn touch<'a>(&self, opts: TouchOptions<'a>) -> Result<TouchResult> {
+    pub async fn touch(&self, opts: TouchOptions<'_>) -> Result<TouchResult> {
         self.inner.crud.touch(opts).await
     }
 
-    pub async fn add<'a>(&self, opts: AddOptions<'a>) -> Result<AddResult> {
+    pub async fn add(&self, opts: AddOptions<'_>) -> Result<AddResult> {
         self.inner.crud.add(opts).await
     }
 
-    pub async fn replace<'a>(&self, opts: ReplaceOptions<'a>) -> Result<ReplaceResult> {
+    pub async fn replace(&self, opts: ReplaceOptions<'_>) -> Result<ReplaceResult> {
         self.inner.crud.replace(opts).await
     }
 
-    pub async fn append<'a>(&self, opts: AppendOptions<'a>) -> Result<AppendResult> {
+    pub async fn append(&self, opts: AppendOptions<'_>) -> Result<AppendResult> {
         self.inner.crud.append(opts).await
     }
 
-    pub async fn prepend<'a>(&self, opts: PrependOptions<'a>) -> Result<PrependResult> {
+    pub async fn prepend(&self, opts: PrependOptions<'_>) -> Result<PrependResult> {
         self.inner.crud.prepend(opts).await
     }
 
-    pub async fn increment<'a>(&self, opts: IncrementOptions<'a>) -> Result<IncrementResult> {
+    pub async fn increment(&self, opts: IncrementOptions<'_>) -> Result<IncrementResult> {
         self.inner.crud.increment(opts).await
     }
 
-    pub async fn decrement<'a>(&self, opts: DecrementOptions<'a>) -> Result<DecrementResult> {
+    pub async fn decrement(&self, opts: DecrementOptions<'_>) -> Result<DecrementResult> {
         self.inner.crud.decrement(opts).await
     }
 
-    pub async fn lookup_in<'a>(&self, opts: LookupInOptions<'a>) -> Result<LookupInResult> {
+    pub async fn lookup_in(&self, opts: LookupInOptions<'_>) -> Result<LookupInResult> {
         self.inner.crud.lookup_in(opts).await
     }
 
-    pub async fn mutate_in<'a>(&self, opts: MutateInOptions<'a>) -> Result<MutateInResult> {
+    pub async fn mutate_in(&self, opts: MutateInOptions<'_>) -> Result<MutateInResult> {
         self.inner.crud.mutate_in(opts).await
     }
 
@@ -111,53 +108,47 @@ impl Agent {
         self.inner.search.query(opts).await
     }
 
-    pub async fn analytics<'a>(&self, opts: AnalyticsOptions<'a>) -> Result<AnalyticsResultStream> {
+    pub async fn analytics(&self, opts: AnalyticsOptions<'_>) -> Result<AnalyticsResultStream> {
         self.inner.analytics.query(opts).await
     }
 
-    pub async fn get_collection_manifest<'a>(
+    pub async fn get_collection_manifest(
         &self,
-        opts: &GetCollectionManifestOptions<'a>,
+        opts: &GetCollectionManifestOptions<'_>,
     ) -> Result<CollectionManifest> {
         self.inner.mgmt.get_collection_manifest(opts).await
     }
 
-    pub async fn create_scope<'a>(
-        &self,
-        opts: &CreateScopeOptions<'a>,
-    ) -> Result<CreateScopeResponse> {
+    pub async fn create_scope(&self, opts: &CreateScopeOptions<'_>) -> Result<CreateScopeResponse> {
         self.inner.mgmt.create_scope(opts).await
     }
 
-    pub async fn delete_scope<'a>(
-        &self,
-        opts: &DeleteScopeOptions<'a>,
-    ) -> Result<DeleteScopeResponse> {
+    pub async fn delete_scope(&self, opts: &DeleteScopeOptions<'_>) -> Result<DeleteScopeResponse> {
         self.inner.mgmt.delete_scope(opts).await
     }
 
-    pub async fn create_collection<'a>(
+    pub async fn create_collection(
         &self,
-        opts: &CreateCollectionOptions<'a>,
+        opts: &CreateCollectionOptions<'_>,
     ) -> Result<CreateCollectionResponse> {
         self.inner.mgmt.create_collection(opts).await
     }
 
-    pub async fn delete_collection<'a>(
+    pub async fn delete_collection(
         &self,
-        opts: &DeleteCollectionOptions<'a>,
+        opts: &DeleteCollectionOptions<'_>,
     ) -> Result<DeleteCollectionResponse> {
         self.inner.mgmt.delete_collection(opts).await
     }
 
-    pub async fn update_collection<'a>(
+    pub async fn update_collection(
         &self,
-        opts: &UpdateCollectionOptions<'a>,
+        opts: &UpdateCollectionOptions<'_>,
     ) -> Result<UpdateCollectionResponse> {
         self.inner.mgmt.update_collection(opts).await
     }
 
-    pub async fn ensure_manifest<'a>(&self, opts: &EnsureManifestOptions<'a>) -> Result<()> {
+    pub async fn ensure_manifest(&self, opts: &EnsureManifestOptions<'_>) -> Result<()> {
         self.inner.mgmt.ensure_manifest(opts).await
     }
 }

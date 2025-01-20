@@ -106,7 +106,7 @@ where
 
             recent_endpoints.push(endpoint.clone());
 
-            let parsed_config = match self.poll_one(endpoint).await {
+            let parsed_config = match self.poll_one(&endpoint).await {
                 Ok(c) => c,
                 Err(e) => {
                     // TODO: log
@@ -143,7 +143,7 @@ where
         }
     }
 
-    async fn poll_one(&self, endpoint: String) -> Result<ParsedConfig> {
+    async fn poll_one(&self, endpoint: &str) -> Result<ParsedConfig> {
         debug!("Polling config from {}", &endpoint);
 
         let client = self.kv_client_manager.get_client(endpoint).await?;

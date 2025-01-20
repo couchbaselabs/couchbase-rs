@@ -1,6 +1,3 @@
-#![feature(async_closure)]
-#![feature(async_fn_traits)]
-#![feature(unboxed_closures)]
 extern crate core;
 #[macro_use]
 extern crate lazy_static;

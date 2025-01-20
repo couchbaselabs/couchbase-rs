@@ -246,7 +246,7 @@ struct SearchRows<'a> {
     wrapped: &'a mut SearchResultStream,
 }
 
-impl<'a> Stream for SearchRows<'a> {
+impl Stream for SearchRows<'_> {
     type Item = error::Result<SearchRow>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {

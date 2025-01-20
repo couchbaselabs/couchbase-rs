@@ -1,5 +1,3 @@
-#![feature(async_closure)]
-
 use crate::common::new_key;
 use crate::common::test_config::run_test;
 use couchbase::options::kv_binary_options::{DecrementOptions, IncrementOptions};

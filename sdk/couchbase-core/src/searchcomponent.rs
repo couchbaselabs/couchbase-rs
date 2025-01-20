@@ -164,7 +164,7 @@ impl<C: Client> SearchComponent<C> {
         .await
     }
 
-    pub async fn upsert_index<'a>(&self, opts: &UpsertIndexOptions<'a>) -> error::Result<()> {
+    pub async fn upsert_index(&self, opts: &UpsertIndexOptions<'_>) -> error::Result<()> {
         let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
             retry_strategy
         } else {
@@ -188,7 +188,7 @@ impl<C: Client> SearchComponent<C> {
         .await
     }
 
-    pub async fn delete_index<'a>(&self, opts: &DeleteIndexOptions<'a>) -> error::Result<()> {
+    pub async fn delete_index(&self, opts: &DeleteIndexOptions<'_>) -> error::Result<()> {
         let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
             retry_strategy
         } else {
@@ -214,7 +214,7 @@ impl<C: Client> SearchComponent<C> {
 
     async fn orchestrate_no_res_mgmt_call<Fut>(
         &self,
-        mut retry_info: RetryInfo,
+        retry_info: RetryInfo,
         endpoint: Option<String>,
         operation: impl Fn(Search<C>) -> Fut + Send + Sync,
     ) -> error::Result<()>

@@ -70,7 +70,7 @@ impl<C: Client> Analytics<C> {
         self.http_client.execute(req).await
     }
 
-    pub async fn query<'a>(&self, opts: &QueryOptions<'a>) -> error::Result<QueryRespReader> {
+    pub async fn query(&self, opts: &QueryOptions<'_>) -> error::Result<QueryRespReader> {
         let client_context_id = opts.client_context_id.map(|c| c.to_string());
         let statement = opts.statement;
         let on_behalf_of = opts.on_behalf_of;

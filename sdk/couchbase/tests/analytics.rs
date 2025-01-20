@@ -1,5 +1,3 @@
-#![feature(async_closure)]
-
 use crate::common::doc_generation::{
     import_sample_beer_dataset, TestBreweryDocumentJson, TestMutationResult,
 };
