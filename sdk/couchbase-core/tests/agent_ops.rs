@@ -649,7 +649,7 @@ async fn upsert_allocations() {
     // make sure that all the underlying resources are setup.
     agent.upsert(upsert_opts.clone()).await.unwrap();
 
-    let profiler = dhat::Profiler::builder().testing().build();
+    let profiler = dhat::Profiler::builder().build();
 
     let stats1 = dhat::HeapStats::get();
 
@@ -659,9 +659,9 @@ async fn upsert_allocations() {
 
     let total_allocs = stats2.total_blocks - stats1.total_blocks;
 
-    let expected_allocs = if test_is_ssl().await { 23 } else { 21 };
+    let expected_allocs = if test_is_ssl().await { 19 } else { 21 };
     dhat::assert!(
-        total_allocs <= 23,
+        total_allocs <= expected_allocs,
         "Expected max {} allocations, was {}",
         expected_allocs,
         total_allocs

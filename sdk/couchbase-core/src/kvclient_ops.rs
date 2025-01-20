@@ -77,7 +77,7 @@ impl<D> KvClientOps for StdKvClient<D>
 where
     D: Dispatcher,
 {
-    async fn set<'a>(&self, req: SetRequest<'a>) -> Result<SetResponse> {
+    async fn set(&self, req: SetRequest<'_>) -> Result<SetResponse> {
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().set(self.client(), req).await)?;
 
@@ -85,7 +85,7 @@ where
         Ok(res)
     }
 
-    async fn get<'a>(&self, req: GetRequest<'a>) -> Result<GetResponse> {
+    async fn get(&self, req: GetRequest<'_>) -> Result<GetResponse> {
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().get(self.client(), req).await)?;
 
@@ -93,7 +93,7 @@ where
         Ok(res)
     }
 
-    async fn get_meta<'a>(&self, req: GetMetaRequest<'a>) -> Result<GetMetaResponse> {
+    async fn get_meta(&self, req: GetMetaRequest<'_>) -> Result<GetMetaResponse> {
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().get_meta(self.client(), req).await)?;
 
@@ -101,7 +101,7 @@ where
         Ok(res)
     }
 
-    async fn delete<'a>(&self, req: DeleteRequest<'a>) -> Result<DeleteResponse> {
+    async fn delete(&self, req: DeleteRequest<'_>) -> Result<DeleteResponse> {
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().delete(self.client(), req).await)?;
 
@@ -109,7 +109,7 @@ where
         Ok(res)
     }
 
-    async fn get_and_lock<'a>(&self, req: GetAndLockRequest<'a>) -> Result<GetAndLockResponse> {
+    async fn get_and_lock(&self, req: GetAndLockRequest<'_>) -> Result<GetAndLockResponse> {
         let mut op = self
             .handle_dispatch_side_result(self.ops_crud().get_and_lock(self.client(), req).await)?;
 
@@ -117,7 +117,7 @@ where
         Ok(res)
     }
 
-    async fn get_and_touch<'a>(&self, req: GetAndTouchRequest<'a>) -> Result<GetAndTouchResponse> {
+    async fn get_and_touch(&self, req: GetAndTouchRequest<'_>) -> Result<GetAndTouchResponse> {
         let mut op = self
             .handle_dispatch_side_result(self.ops_crud().get_and_touch(self.client(), req).await)?;
 
@@ -125,7 +125,7 @@ where
         Ok(res)
     }
 
-    async fn unlock<'a>(&self, req: UnlockRequest<'a>) -> Result<UnlockResponse> {
+    async fn unlock(&self, req: UnlockRequest<'_>) -> Result<UnlockResponse> {
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().unlock(self.client(), req).await)?;
 
@@ -133,7 +133,7 @@ where
         Ok(res)
     }
 
-    async fn touch<'a>(&self, req: TouchRequest<'a>) -> Result<TouchResponse> {
+    async fn touch(&self, req: TouchRequest<'_>) -> Result<TouchResponse> {
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().touch(self.client(), req).await)?;
 
@@ -141,7 +141,7 @@ where
         Ok(res)
     }
 
-    async fn add<'a>(&self, req: AddRequest<'a>) -> Result<AddResponse> {
+    async fn add(&self, req: AddRequest<'_>) -> Result<AddResponse> {
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().add(self.client(), req).await)?;
 
@@ -149,7 +149,7 @@ where
         Ok(res)
     }
 
-    async fn replace<'a>(&self, req: ReplaceRequest<'a>) -> Result<ReplaceResponse> {
+    async fn replace(&self, req: ReplaceRequest<'_>) -> Result<ReplaceResponse> {
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().replace(self.client(), req).await)?;
 
@@ -157,7 +157,7 @@ where
         Ok(res)
     }
 
-    async fn append<'a>(&self, req: AppendRequest<'a>) -> Result<AppendResponse> {
+    async fn append(&self, req: AppendRequest<'_>) -> Result<AppendResponse> {
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().append(self.client(), req).await)?;
 
@@ -165,7 +165,7 @@ where
         Ok(res)
     }
 
-    async fn prepend<'a>(&self, req: PrependRequest<'a>) -> Result<PrependResponse> {
+    async fn prepend(&self, req: PrependRequest<'_>) -> Result<PrependResponse> {
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().prepend(self.client(), req).await)?;
 
@@ -173,7 +173,7 @@ where
         Ok(res)
     }
 
-    async fn increment<'a>(&self, req: IncrementRequest<'a>) -> Result<IncrementResponse> {
+    async fn increment(&self, req: IncrementRequest<'_>) -> Result<IncrementResponse> {
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().increment(self.client(), req).await)?;
 
@@ -181,7 +181,7 @@ where
         Ok(res)
     }
 
-    async fn decrement<'a>(&self, req: DecrementRequest<'a>) -> Result<DecrementResponse> {
+    async fn decrement(&self, req: DecrementRequest<'_>) -> Result<DecrementResponse> {
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().decrement(self.client(), req).await)?;
 
@@ -189,7 +189,7 @@ where
         Ok(res)
     }
 
-    async fn lookup_in<'a>(&self, req: LookupInRequest<'a>) -> Result<LookupInResponse> {
+    async fn lookup_in(&self, req: LookupInRequest<'_>) -> Result<LookupInResponse> {
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().lookup_in(self.client(), req).await)?;
 
@@ -197,7 +197,7 @@ where
         Ok(res)
     }
 
-    async fn mutate_in<'a>(&self, req: MutateInRequest<'a>) -> Result<MutateInResponse> {
+    async fn mutate_in(&self, req: MutateInRequest<'_>) -> Result<MutateInResponse> {
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().mutate_in(self.client(), req).await)?;
 
@@ -216,9 +216,9 @@ where
         Ok(res)
     }
 
-    async fn get_collection_id<'a>(
+    async fn get_collection_id(
         &self,
-        req: GetCollectionIdRequest<'a>,
+        req: GetCollectionIdRequest<'_>,
     ) -> Result<GetCollectionIdResponse> {
         let mut op = self
             .handle_dispatch_side_result(OpsUtil {}.get_collection_id(self.client(), req).await)?;

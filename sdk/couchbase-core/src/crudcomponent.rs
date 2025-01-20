@@ -74,13 +74,13 @@ impl<
         }
     }
 
-    pub(crate) async fn upsert<'a>(&self, opts: UpsertOptions<'a>) -> Result<UpsertResult> {
+    pub(crate) async fn upsert(&self, opts: UpsertOptions<'_>) -> Result<UpsertResult> {
         self.orchestrate_simple_crud(
             opts.key,
             RetryInfo::new(false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
-            async |collection_id, _manifest_id, endpoint, vbucket_id, client| {
+            async |collection_id, _manifest_id, vbucket_id, client| {
                 let mut compressor = self.compression_manager.compressor();
                 let (value, datatype) = match compressor.compress(
                     client.has_feature(HelloFeature::Snappy),
@@ -126,13 +126,13 @@ impl<
         .await
     }
 
-    pub(crate) async fn get<'a>(&self, opts: GetOptions<'a>) -> Result<GetResult> {
+    pub(crate) async fn get(&self, opts: GetOptions<'_>) -> Result<GetResult> {
         self.orchestrate_simple_crud(
             opts.key,
             RetryInfo::new(true, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
-            async |collection_id, _manifest_id, endpoint, vbucket_id, client| {
+            async |collection_id, _manifest_id, vbucket_id, client| {
                 client
                     .get(GetRequest {
                         collection_id,
@@ -152,13 +152,13 @@ impl<
         .await
     }
 
-    pub(crate) async fn get_meta<'a>(&self, opts: GetMetaOptions<'a>) -> Result<GetMetaResult> {
+    pub(crate) async fn get_meta(&self, opts: GetMetaOptions<'_>) -> Result<GetMetaResult> {
         self.orchestrate_simple_crud(
             opts.key,
             RetryInfo::new(true, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
-            async |collection_id, _manifest_id, endpoint, vbucket_id, client| {
+            async |collection_id, _manifest_id, vbucket_id, client| {
                 client
                     .get_meta(GetMetaRequest {
                         collection_id,
@@ -182,13 +182,13 @@ impl<
         .await
     }
 
-    pub async fn delete<'a>(&self, opts: DeleteOptions<'a>) -> Result<DeleteResult> {
+    pub async fn delete(&self, opts: DeleteOptions<'_>) -> Result<DeleteResult> {
         self.orchestrate_simple_crud(
             opts.key,
             RetryInfo::new(false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
-            async |collection_id, manifest_id, endpoint, vbucket_id, client| {
+            async |collection_id, manifest_id, vbucket_id, client| {
                 client
                     .delete(DeleteRequest {
                         collection_id,
@@ -217,13 +217,13 @@ impl<
         .await
     }
 
-    pub async fn get_and_lock<'a>(&self, opts: GetAndLockOptions<'a>) -> Result<GetAndLockResult> {
+    pub async fn get_and_lock(&self, opts: GetAndLockOptions<'_>) -> Result<GetAndLockResult> {
         self.orchestrate_simple_crud(
             opts.key,
             RetryInfo::new(false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
-            async |collection_id, manifest_id, endpoint, vbucket_id, client| {
+            async |collection_id, manifest_id, vbucket_id, client| {
                 client
                     .get_and_lock(GetAndLockRequest {
                         collection_id,
@@ -244,16 +244,13 @@ impl<
         .await
     }
 
-    pub async fn get_and_touch<'a>(
-        &self,
-        opts: GetAndTouchOptions<'a>,
-    ) -> Result<GetAndTouchResult> {
+    pub async fn get_and_touch(&self, opts: GetAndTouchOptions<'_>) -> Result<GetAndTouchResult> {
         self.orchestrate_simple_crud(
             opts.key,
             RetryInfo::new(false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
-            async |collection_id, manifest_id, endpoint, vbucket_id, client| {
+            async |collection_id, manifest_id, vbucket_id, client| {
                 client
                     .get_and_touch(GetAndTouchRequest {
                         collection_id,
@@ -274,13 +271,13 @@ impl<
         .await
     }
 
-    pub async fn unlock<'a>(&self, opts: UnlockOptions<'a>) -> Result<UnlockResult> {
+    pub async fn unlock(&self, opts: UnlockOptions<'_>) -> Result<UnlockResult> {
         self.orchestrate_simple_crud(
             opts.key,
             RetryInfo::new(false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
-            async |collection_id, manifest_id, endpoint, vbucket_id, client| {
+            async |collection_id, manifest_id, vbucket_id, client| {
                 client
                     .unlock(UnlockRequest {
                         collection_id,
@@ -298,13 +295,13 @@ impl<
         .await
     }
 
-    pub async fn touch<'a>(&self, opts: TouchOptions<'a>) -> Result<TouchResult> {
+    pub async fn touch(&self, opts: TouchOptions<'_>) -> Result<TouchResult> {
         self.orchestrate_simple_crud(
             opts.key,
             RetryInfo::new(false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
-            async |collection_id, manifest_id, endpoint, vbucket_id, client| {
+            async |collection_id, manifest_id, vbucket_id, client| {
                 client
                     .touch(TouchRequest {
                         collection_id,
@@ -320,13 +317,13 @@ impl<
         .await
     }
 
-    pub async fn add<'a>(&self, opts: AddOptions<'a>) -> Result<AddResult> {
+    pub async fn add(&self, opts: AddOptions<'_>) -> Result<AddResult> {
         self.orchestrate_simple_crud(
             opts.key,
             RetryInfo::new(false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
-            async |collection_id, manifest_id, endpoint, vbucket_id, client| {
+            async |collection_id, manifest_id, vbucket_id, client| {
                 let mut compressor = self.compression_manager.compressor();
                 let (value, datatype) = match compressor.compress(
                     client.has_feature(HelloFeature::Snappy),
@@ -370,13 +367,13 @@ impl<
         .await
     }
 
-    pub async fn replace<'a>(&self, opts: ReplaceOptions<'a>) -> Result<ReplaceResult> {
+    pub async fn replace(&self, opts: ReplaceOptions<'_>) -> Result<ReplaceResult> {
         self.orchestrate_simple_crud(
             opts.key,
             RetryInfo::new(false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
-            async |collection_id, manifest_id, endpoint, vbucket_id, client| {
+            async |collection_id, manifest_id, vbucket_id, client| {
                 let mut compressor = self.compression_manager.compressor();
                 let (value, datatype) = match compressor.compress(
                     client.has_feature(HelloFeature::Snappy),
@@ -422,13 +419,13 @@ impl<
         .await
     }
 
-    pub async fn append<'a>(&self, opts: AppendOptions<'a>) -> Result<AppendResult> {
+    pub async fn append(&self, opts: AppendOptions<'_>) -> Result<AppendResult> {
         self.orchestrate_simple_crud(
             opts.key,
             RetryInfo::new(false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
-            async |collection_id, manifest_id, endpoint, vbucket_id, client| {
+            async |collection_id, manifest_id, vbucket_id, client| {
                 let mut compressor = self.compression_manager.compressor();
                 let (value, datatype) = match compressor.compress(
                     client.has_feature(HelloFeature::Snappy),
@@ -471,13 +468,13 @@ impl<
         .await
     }
 
-    pub async fn prepend<'a>(&self, opts: PrependOptions<'a>) -> Result<PrependResult> {
+    pub async fn prepend(&self, opts: PrependOptions<'_>) -> Result<PrependResult> {
         self.orchestrate_simple_crud(
             opts.key,
             RetryInfo::new(false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
-            async |collection_id, manifest_id, endpoint, vbucket_id, client| {
+            async |collection_id, manifest_id, vbucket_id, client| {
                 let mut compressor = self.compression_manager.compressor();
                 let (value, datatype) = match compressor.compress(
                     client.has_feature(HelloFeature::Snappy),
@@ -520,13 +517,13 @@ impl<
         .await
     }
 
-    pub async fn increment<'a>(&self, opts: IncrementOptions<'a>) -> Result<IncrementResult> {
+    pub async fn increment(&self, opts: IncrementOptions<'_>) -> Result<IncrementResult> {
         self.orchestrate_simple_crud(
             opts.key,
             RetryInfo::new(false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
-            async |collection_id, manifest_id, endpoint, vbucket_id, client| {
+            async |collection_id, manifest_id, vbucket_id, client| {
                 client
                     .increment(IncrementRequest {
                         collection_id,
@@ -558,13 +555,13 @@ impl<
         .await
     }
 
-    pub async fn decrement<'a>(&self, opts: DecrementOptions<'a>) -> Result<DecrementResult> {
+    pub async fn decrement(&self, opts: DecrementOptions<'_>) -> Result<DecrementResult> {
         self.orchestrate_simple_crud(
             opts.key,
             RetryInfo::new(false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
-            async |collection_id, manifest_id, endpoint, vbucket_id, client| {
+            async |collection_id, manifest_id, vbucket_id, client| {
                 client
                     .decrement(DecrementRequest {
                         collection_id,
@@ -596,13 +593,13 @@ impl<
         .await
     }
 
-    pub async fn lookup_in<'a>(&self, opts: LookupInOptions<'a>) -> Result<LookupInResult> {
+    pub async fn lookup_in(&self, opts: LookupInOptions<'_>) -> Result<LookupInResult> {
         self.orchestrate_simple_crud(
             opts.key,
             RetryInfo::new(true, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
-            async |collection_id, manifest_id, endpoint, vbucket_id, client| {
+            async |collection_id, manifest_id, vbucket_id, client| {
                 client
                     .lookup_in(LookupInRequest {
                         collection_id,
@@ -623,13 +620,13 @@ impl<
         .await
     }
 
-    pub async fn mutate_in<'a>(&self, opts: MutateInOptions<'a>) -> Result<MutateInResult> {
+    pub async fn mutate_in(&self, opts: MutateInOptions<'_>) -> Result<MutateInResult> {
         self.orchestrate_simple_crud(
             opts.key,
             RetryInfo::new(false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
-            async |collection_id, manifest_id, endpoint, vbucket_id, client| {
+            async |collection_id, manifest_id, vbucket_id, client| {
                 client
                     .mutate_in(MutateInRequest {
                         collection_id,
@@ -669,9 +666,7 @@ impl<
         retry_info: RetryInfo,
         scope_name: &str,
         collection_name: &str,
-        operation: impl Fn(u32, u64, String, u16, Arc<KvClientManagerClientType<M>>) -> Fut
-            + Send
-            + Sync,
+        operation: impl Fn(u32, u64, u16, Arc<KvClientManagerClientType<M>>) -> Fut + Send + Sync,
     ) -> Result<Resp>
     where
         Fut: Future<Output = Result<Resp>> + Send,
@@ -691,16 +686,9 @@ impl<
                         async |endpoint: String, vb_id: u16| {
                             orchestrate_memd_client(
                                 self.conn_manager.clone(),
-                                endpoint.clone(),
+                                &endpoint,
                                 async |client: Arc<KvClientManagerClientType<M>>| {
-                                    operation(
-                                        collection_id,
-                                        manifest_rev,
-                                        endpoint.clone(),
-                                        vb_id,
-                                        client,
-                                    )
-                                    .await
+                                    operation(collection_id, manifest_rev, vb_id, client).await
                                 },
                             )
                             .await

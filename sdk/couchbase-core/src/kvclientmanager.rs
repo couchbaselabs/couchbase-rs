@@ -27,14 +27,14 @@ pub(crate) trait KvClientManager: Sized + Send + Sync {
         -> impl Future<Output = Result<()>> + Send;
     fn get_client(
         &self,
-        endpoint: String,
+        endpoint: &str,
     ) -> impl Future<Output = Result<Arc<KvClientManagerClientType<Self>>>> + Send;
     fn get_random_client(
         &self,
     ) -> impl Future<Output = Result<Arc<KvClientManagerClientType<Self>>>> + Send;
     fn shutdown_client(
         &self,
-        endpoint: Option<String>,
+        endpoint: Option<&str>,
         client: Arc<KvClientManagerClientType<Self>>,
     ) -> impl Future<Output = Result<()>> + Send;
     fn close(&self) -> impl Future<Output = Result<()>> + Send;
@@ -74,13 +74,16 @@ impl<P> StdKvClientManager<P>
 where
     P: KvClientPool,
 {
-    async fn get_pool(&self, endpoint: String) -> Result<Arc<P>> {
+    async fn get_pool(&self, endpoint: &str) -> Result<Arc<P>> {
         let state = self.state.load();
 
-        let pool = match state.client_pools.get(&endpoint) {
+        let pool = match state.client_pools.get(endpoint) {
             Some(p) => p,
             None => {
-                return Err(ErrorKind::EndpointNotKnown { endpoint }.into());
+                return Err(ErrorKind::EndpointNotKnown {
+                    endpoint: endpoint.to_string(),
+                }
+                .into());
             }
         };
 
@@ -195,7 +198,7 @@ where
         Ok(())
     }
 
-    async fn get_client(&self, endpoint: String) -> Result<Arc<KvClientManagerClientType<Self>>> {
+    async fn get_client(&self, endpoint: &str) -> Result<Arc<KvClientManagerClientType<Self>>> {
         let pool = self.get_pool(endpoint).await?;
 
         pool.get_client().await
@@ -209,7 +212,7 @@ where
 
     async fn shutdown_client(
         &self,
-        endpoint: Option<String>,
+        endpoint: Option<&str>,
         client: Arc<KvClientManagerClientType<Self>>,
     ) -> Result<()> {
         if let Some(ep) = endpoint {
@@ -255,7 +258,7 @@ where
 
 pub(crate) async fn orchestrate_memd_client<Resp, M, Fut>(
     manager: Arc<M>,
-    endpoint: String,
+    endpoint: &str,
     mut operation: impl FnMut(Arc<KvClientManagerClientType<M>>) -> Fut,
 ) -> Result<Resp>
 where
@@ -263,7 +266,7 @@ where
     Fut: Future<Output = Result<Resp>> + Send,
 {
     loop {
-        let client = manager.get_client(endpoint.clone()).await?;
+        let client = manager.get_client(endpoint).await?;
 
         let res = operation(client.clone()).await;
         return match res {
@@ -275,7 +278,7 @@ where
                         // a different client instead...
                         // TODO: Log something
                         manager
-                            .shutdown_client(Some(endpoint.clone()), client)
+                            .shutdown_client(Some(endpoint), client)
                             .await
                             .unwrap_or_default();
                         continue;

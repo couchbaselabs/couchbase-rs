@@ -241,9 +241,9 @@ impl<C: Client> Management<C> {
         Self::parse_response(resp).await
     }
 
-    pub async fn get_collection_manifest<'a>(
+    pub async fn get_collection_manifest(
         &self,
-        opts: &GetCollectionManifestOptions<'a>,
+        opts: &GetCollectionManifestOptions<'_>,
     ) -> error::Result<CollectionManifest> {
         let resp = self
             .execute(
@@ -269,9 +269,9 @@ impl<C: Client> Management<C> {
         Self::parse_response(resp).await
     }
 
-    pub async fn create_scope<'a>(
+    pub async fn create_scope(
         &self,
-        opts: &CreateScopeOptions<'a>,
+        opts: &CreateScopeOptions<'_>,
     ) -> error::Result<CreateScopeResponse> {
         let body = Self::url_encode(&[("name", opts.scope_name)])?;
 
@@ -297,9 +297,9 @@ impl<C: Client> Management<C> {
         })
     }
 
-    pub async fn delete_scope<'a>(
+    pub async fn delete_scope(
         &self,
-        opts: &DeleteScopeOptions<'a>,
+        opts: &DeleteScopeOptions<'_>,
     ) -> error::Result<DeleteScopeResponse> {
         let resp = self
             .execute(
@@ -326,9 +326,9 @@ impl<C: Client> Management<C> {
         })
     }
 
-    pub async fn create_collection<'a>(
+    pub async fn create_collection(
         &self,
-        opts: &CreateCollectionOptions<'a>,
+        opts: &CreateCollectionOptions<'_>,
     ) -> error::Result<CreateCollectionResponse> {
         let mut form = vec![("name", opts.collection_name)];
         let max_ttl = opts.max_ttl.map(|m| m.to_string());
@@ -369,9 +369,9 @@ impl<C: Client> Management<C> {
         })
     }
 
-    pub async fn update_collection<'a>(
+    pub async fn update_collection(
         &self,
-        opts: &UpdateCollectionOptions<'a>,
+        opts: &UpdateCollectionOptions<'_>,
     ) -> error::Result<UpdateCollectionResponse> {
         let mut form = vec![];
         let max_ttl = opts.max_ttl.map(|m| m.to_string());
@@ -412,9 +412,9 @@ impl<C: Client> Management<C> {
         })
     }
 
-    pub async fn delete_collection<'a>(
+    pub async fn delete_collection(
         &self,
-        opts: &DeleteCollectionOptions<'a>,
+        opts: &DeleteCollectionOptions<'_>,
     ) -> error::Result<DeleteCollectionResponse> {
         let resp = self
             .execute(

@@ -1,5 +1,3 @@
-#![feature(async_closure)]
-
 use crate::common::doc_generation::import_sample_beer_dataset;
 use crate::common::test_config::run_test;
 use chrono::DateTime;

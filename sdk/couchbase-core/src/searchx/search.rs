@@ -126,7 +126,7 @@ impl<C: Client> Search<C> {
         SearchRespReader::new(res, &self.endpoint).await
     }
 
-    pub async fn upsert_index<'a>(&self, opts: &UpsertIndexOptions<'a>) -> error::Result<()> {
+    pub async fn upsert_index(&self, opts: &UpsertIndexOptions<'_>) -> error::Result<()> {
         let req_uri = if let Some(bucket) = &opts.bucket_name {
             if let Some(scope) = &opts.scope_name {
                 format!(
@@ -175,7 +175,7 @@ impl<C: Client> Search<C> {
         Ok(())
     }
 
-    pub async fn delete_index<'a>(&self, opts: &DeleteIndexOptions<'a>) -> error::Result<()> {
+    pub async fn delete_index(&self, opts: &DeleteIndexOptions<'_>) -> error::Result<()> {
         let req_uri = if let Some(bucket) = &opts.bucket_name {
             if let Some(scope) = &opts.scope_name {
                 format!(
@@ -269,7 +269,7 @@ pub(crate) fn decode_common_error(
         || body_str.contains("requested resource not found")
         || body_str.contains("non existent bucket")
     {
-        // In server 7.2.4 and later, ns_server produces "non existent bucket" instead of "requested resource not found".
+        // In server 7.2.4 and later, ns_server produces "non-existent bucket" instead of "requested resource not found".
         // However in 7.6.0, FTS reordered their handling here and produces the "vbucket count for bucket" instead.
         // So we need to check for all the variants of this.
         error::ServerErrorKind::SourceNotFound

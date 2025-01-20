@@ -1,5 +1,3 @@
-#![feature(async_closure)]
-
 use crate::common::test_config::run_test;
 use couchbase::options::query_options::QueryOptions;
 use couchbase::results::query_results::{QueryMetaData, QueryStatus};

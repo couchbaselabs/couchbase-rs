@@ -63,9 +63,9 @@ impl<C: Client> MgmtComponent<C> {
         ))
     }
 
-    pub async fn get_collection_manifest<'a>(
+    pub async fn get_collection_manifest(
         &self,
-        opts: &GetCollectionManifestOptions<'a>,
+        opts: &GetCollectionManifestOptions<'_>,
     ) -> error::Result<CollectionManifest> {
         let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
 
@@ -102,9 +102,9 @@ impl<C: Client> MgmtComponent<C> {
         .await
     }
 
-    pub async fn create_scope<'a>(
+    pub async fn create_scope(
         &self,
-        opts: &CreateScopeOptions<'a>,
+        opts: &CreateScopeOptions<'_>,
     ) -> error::Result<CreateScopeResponse> {
         let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
 
@@ -141,9 +141,9 @@ impl<C: Client> MgmtComponent<C> {
         .await
     }
 
-    pub async fn delete_scope<'a>(
+    pub async fn delete_scope(
         &self,
-        opts: &DeleteScopeOptions<'a>,
+        opts: &DeleteScopeOptions<'_>,
     ) -> error::Result<DeleteScopeResponse> {
         let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
 
@@ -180,9 +180,9 @@ impl<C: Client> MgmtComponent<C> {
         .await
     }
 
-    pub async fn create_collection<'a>(
+    pub async fn create_collection(
         &self,
-        opts: &CreateCollectionOptions<'a>,
+        opts: &CreateCollectionOptions<'_>,
     ) -> error::Result<CreateCollectionResponse> {
         let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
 
@@ -219,9 +219,9 @@ impl<C: Client> MgmtComponent<C> {
         .await
     }
 
-    pub async fn delete_collection<'a>(
+    pub async fn delete_collection(
         &self,
-        opts: &DeleteCollectionOptions<'a>,
+        opts: &DeleteCollectionOptions<'_>,
     ) -> error::Result<DeleteCollectionResponse> {
         let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
 
@@ -258,9 +258,9 @@ impl<C: Client> MgmtComponent<C> {
         .await
     }
 
-    pub async fn update_collection<'a>(
+    pub async fn update_collection(
         &self,
-        opts: &UpdateCollectionOptions<'a>,
+        opts: &UpdateCollectionOptions<'_>,
     ) -> error::Result<UpdateCollectionResponse> {
         let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
 
@@ -297,7 +297,7 @@ impl<C: Client> MgmtComponent<C> {
         .await
     }
 
-    pub async fn ensure_manifest<'a>(&self, opts: &EnsureManifestOptions<'a>) -> error::Result<()> {
+    pub async fn ensure_manifest(&self, opts: &EnsureManifestOptions<'_>) -> error::Result<()> {
         let mut helper = EnsureManifestHelper::new(
             self.http_component.user_agent(),
             opts.bucket_name,

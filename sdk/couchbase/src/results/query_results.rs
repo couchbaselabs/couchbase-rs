@@ -128,7 +128,7 @@ struct QueryRows<'a, V: DeserializeOwned> {
     phantom_data: PhantomData<&'a V>,
 }
 
-impl<'a, V: DeserializeOwned> Stream for QueryRows<'a, V> {
+impl<V: DeserializeOwned> Stream for QueryRows<'_, V> {
     type Item = error::Result<V>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {

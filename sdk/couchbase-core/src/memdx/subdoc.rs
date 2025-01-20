@@ -62,7 +62,7 @@ impl<'a> LookupInOp<'a> {
     }
 }
 
-impl<'a> SubdocOp for LookupInOp<'a> {
+impl SubdocOp for LookupInOp<'_> {
     fn is_xattr_op(&self) -> bool {
         self.flags.contains(SubdocOpFlag::XATTR_PATH)
     }
@@ -92,7 +92,7 @@ impl<'a> MutateInOp<'a> {
     }
 }
 
-impl<'a> SubdocOp for MutateInOp<'a> {
+impl SubdocOp for MutateInOp<'_> {
     fn is_xattr_op(&self) -> bool {
         self.flags.contains(SubdocOpFlag::XATTR_PATH)
     }

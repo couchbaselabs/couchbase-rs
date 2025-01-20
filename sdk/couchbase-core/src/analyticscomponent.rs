@@ -82,10 +82,7 @@ impl<C: Client> AnalyticsComponent<C> {
         ))
     }
 
-    pub async fn query<'a>(
-        &self,
-        opts: AnalyticsOptions<'a>,
-    ) -> error::Result<AnalyticsResultStream> {
+    pub async fn query(&self, opts: AnalyticsOptions<'_>) -> error::Result<AnalyticsResultStream> {
         let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
             retry_strategy
         } else {

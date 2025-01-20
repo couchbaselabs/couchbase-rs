@@ -108,7 +108,7 @@ impl Decoder for KeyValueCodec {
     }
 }
 
-impl<'a> Encoder<RequestPacket<'a>> for KeyValueCodec {
+impl Encoder<RequestPacket<'_>> for KeyValueCodec {
     type Error = io::Error;
 
     fn encode(&mut self, item: RequestPacket, dst: &mut BytesMut) -> Result<(), Self::Error> {

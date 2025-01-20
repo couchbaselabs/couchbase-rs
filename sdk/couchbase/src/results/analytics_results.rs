@@ -108,7 +108,7 @@ struct AnalyticsRows<'a, V: DeserializeOwned> {
     phantom_data: PhantomData<&'a V>,
 }
 
-impl<'a, V: DeserializeOwned> Stream for AnalyticsRows<'a, V> {
+impl<V: DeserializeOwned> Stream for AnalyticsRows<'_, V> {
     type Item = error::Result<V>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {

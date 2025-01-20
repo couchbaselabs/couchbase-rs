@@ -34,10 +34,10 @@ pub struct OpsCrud {
 }
 
 impl OpsCrud {
-    pub async fn set<'a, D>(
+    pub async fn set<D>(
         &self,
         dispatcher: &D,
-        request: SetRequest<'a>,
+        request: SetRequest<'_>,
     ) -> Result<StandardPendingOp<SetResponse>>
     where
         D: Dispatcher,
@@ -98,10 +98,10 @@ impl OpsCrud {
         Ok(StandardPendingOp::new(pending_op))
     }
 
-    pub async fn get<'a, D>(
+    pub async fn get<D>(
         &self,
         dispatcher: &D,
-        request: GetRequest<'a>,
+        request: GetRequest<'_>,
     ) -> Result<StandardPendingOp<GetResponse>>
     where
         D: Dispatcher,
@@ -137,10 +137,10 @@ impl OpsCrud {
         Ok(StandardPendingOp::new(pending_op))
     }
 
-    pub async fn get_meta<'a, D>(
+    pub async fn get_meta<D>(
         &self,
         dispatcher: &D,
-        request: GetMetaRequest<'a>,
+        request: GetMetaRequest<'_>,
     ) -> Result<StandardPendingOp<GetMetaResponse>>
     where
         D: Dispatcher,
@@ -180,10 +180,10 @@ impl OpsCrud {
         Ok(StandardPendingOp::new(pending_op))
     }
 
-    pub async fn delete<'a, D>(
+    pub async fn delete<D>(
         &self,
         dispatcher: &D,
-        request: DeleteRequest<'a>,
+        request: DeleteRequest<'_>,
     ) -> Result<StandardPendingOp<DeleteResponse>>
     where
         D: Dispatcher,
@@ -224,10 +224,10 @@ impl OpsCrud {
         Ok(StandardPendingOp::new(pending_op))
     }
 
-    pub async fn get_and_lock<'a, D>(
+    pub async fn get_and_lock<D>(
         &self,
         dispatcher: &D,
-        request: GetAndLockRequest<'a>,
+        request: GetAndLockRequest<'_>,
     ) -> Result<StandardPendingOp<GetAndLockResponse>>
     where
         D: Dispatcher,
@@ -274,10 +274,10 @@ impl OpsCrud {
         Ok(StandardPendingOp::new(pending_op))
     }
 
-    pub async fn get_and_touch<'a, D>(
+    pub async fn get_and_touch<D>(
         &self,
         dispatcher: &D,
-        request: GetAndTouchRequest<'a>,
+        request: GetAndTouchRequest<'_>,
     ) -> Result<StandardPendingOp<GetAndTouchResponse>>
     where
         D: Dispatcher,
@@ -324,10 +324,10 @@ impl OpsCrud {
         Ok(StandardPendingOp::new(pending_op))
     }
 
-    pub async fn unlock<'a, D>(
+    pub async fn unlock<D>(
         &self,
         dispatcher: &D,
-        request: UnlockRequest<'a>,
+        request: UnlockRequest<'_>,
     ) -> Result<StandardPendingOp<UnlockResponse>>
     where
         D: Dispatcher,
@@ -363,10 +363,10 @@ impl OpsCrud {
         Ok(StandardPendingOp::new(pending_op))
     }
 
-    pub async fn touch<'a, D>(
+    pub async fn touch<D>(
         &self,
         dispatcher: &D,
-        request: TouchRequest<'a>,
+        request: TouchRequest<'_>,
     ) -> Result<StandardPendingOp<TouchResponse>>
     where
         D: Dispatcher,
@@ -413,10 +413,10 @@ impl OpsCrud {
         Ok(StandardPendingOp::new(pending_op))
     }
 
-    pub async fn add<'a, D>(
+    pub async fn add<D>(
         &self,
         dispatcher: &D,
-        request: AddRequest<'a>,
+        request: AddRequest<'_>,
     ) -> Result<StandardPendingOp<AddResponse>>
     where
         D: Dispatcher,
@@ -477,10 +477,10 @@ impl OpsCrud {
         Ok(StandardPendingOp::new(pending_op))
     }
 
-    pub async fn replace<'a, D>(
+    pub async fn replace<D>(
         &self,
         dispatcher: &D,
-        request: ReplaceRequest<'a>,
+        request: ReplaceRequest<'_>,
     ) -> Result<StandardPendingOp<ReplaceResponse>>
     where
         D: Dispatcher,
@@ -547,10 +547,10 @@ impl OpsCrud {
         Ok(StandardPendingOp::new(pending_op))
     }
 
-    pub async fn append<'a, D>(
+    pub async fn append<D>(
         &self,
         dispatcher: &D,
-        request: AppendRequest<'a>,
+        request: AppendRequest<'_>,
     ) -> Result<StandardPendingOp<AppendResponse>>
     where
         D: Dispatcher,
@@ -591,10 +591,10 @@ impl OpsCrud {
         Ok(StandardPendingOp::new(pending_op))
     }
 
-    pub async fn prepend<'a, D>(
+    pub async fn prepend<D>(
         &self,
         dispatcher: &D,
-        request: PrependRequest<'a>,
+        request: PrependRequest<'_>,
     ) -> Result<StandardPendingOp<PrependResponse>>
     where
         D: Dispatcher,
@@ -677,10 +677,10 @@ impl OpsCrud {
         Ok(buf)
     }
 
-    pub async fn increment<'a, D>(
+    pub async fn increment<D>(
         &self,
         dispatcher: &D,
-        request: IncrementRequest<'a>,
+        request: IncrementRequest<'_>,
     ) -> Result<StandardPendingOp<IncrementResponse>>
     where
         D: Dispatcher,
@@ -724,10 +724,10 @@ impl OpsCrud {
         Ok(StandardPendingOp::new(pending_op))
     }
 
-    pub async fn decrement<'a, D>(
+    pub async fn decrement<D>(
         &self,
         dispatcher: &D,
-        request: DecrementRequest<'a>,
+        request: DecrementRequest<'_>,
     ) -> Result<StandardPendingOp<DecrementResponse>>
     where
         D: Dispatcher,
@@ -771,10 +771,10 @@ impl OpsCrud {
         Ok(StandardPendingOp::new(pending_op))
     }
 
-    pub async fn lookup_in<'a, D>(
+    pub async fn lookup_in<D>(
         &self,
         dispatcher: &D,
-        request: LookupInRequest<'a>,
+        request: LookupInRequest<'_>,
     ) -> Result<StandardPendingOp<LookupInResponse>>
     where
         D: Dispatcher,
@@ -851,10 +851,10 @@ impl OpsCrud {
         Ok(StandardPendingOp::new(pending_op))
     }
 
-    pub async fn mutate_in<'a, D>(
+    pub async fn mutate_in<D>(
         &self,
         dispatcher: &D,
-        request: MutateInRequest<'a>,
+        request: MutateInRequest<'_>,
     ) -> Result<StandardPendingOp<MutateInResponse>>
     where
         D: Dispatcher,
@@ -1236,7 +1236,7 @@ pub(crate) fn decode_server_duration_ext_frame(mut data: &[u8]) -> Result<Durati
         ));
     }
 
-    let dura_enc = (data[0] as u32) << 8 | (data[1] as u32);
+    let dura_enc = ((data[0] as u32) << 8) | (data[1] as u32);
     let dura_micros = ((dura_enc as f32).powf(1.74) / 2.0).round();
 
     Ok(Duration::from_micros(dura_micros as u64))
@@ -1251,7 +1251,7 @@ pub(crate) fn decode_durability_level_ext_frame(
         return Ok(DurabilityLevelSettings::new(durability));
     } else if data.len() == 3 {
         let durability = DurabilityLevel::from(data.remove(0));
-        let timeout_millis = (data.remove(0) as u32) << 8 | (data.remove(0) as u32);
+        let timeout_millis = ((data.remove(0) as u32) << 8) | (data.remove(0) as u32);
 
         return Ok(DurabilityLevelSettings::new_with_timeout(
             durability,
