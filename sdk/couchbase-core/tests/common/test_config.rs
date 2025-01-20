@@ -103,3 +103,9 @@ pub async fn test_data_timeout() -> String {
     let config = guard.clone().unwrap();
     config.data_timeout.clone()
 }
+
+pub async fn test_is_ssl() -> bool {
+    let guard = TEST_CONFIG.lock().await;
+    let config = guard.clone().unwrap();
+    config.use_ssl
+}
