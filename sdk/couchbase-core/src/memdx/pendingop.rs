@@ -1,6 +1,7 @@
 use futures::executor::block_on;
 use std::future::Future;
 use std::marker::PhantomData;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc::Receiver;
 use tokio::time::{timeout_at, Instant};
@@ -26,6 +27,9 @@ pub struct ClientPendingOp {
     opaque: u32,
     response_receiver: Receiver<Result<ClientResponse>>,
     opaque_map: Arc<Mutex<OpaqueMap>>,
+
+    is_persistent: bool,
+    completed: AtomicBool,
 }
 
 impl ClientPendingOp {
@@ -33,15 +37,22 @@ impl ClientPendingOp {
         opaque: u32,
         opaque_map: Arc<Mutex<OpaqueMap>>,
         response_receiver: Receiver<Result<ClientResponse>>,
+        is_persistent: bool,
     ) -> Self {
         ClientPendingOp {
             opaque,
             opaque_map,
             response_receiver,
+            is_persistent,
+            completed: AtomicBool::new(false),
         }
     }
 
     pub async fn recv(&mut self) -> Result<ClientResponse> {
+        if !self.is_persistent {
+            self.completed.store(true, Ordering::SeqCst);
+        }
+
         match self.response_receiver.recv().await {
             Some(r) => r,
             None => Err(ErrorKind::Cancelled(CancellationErrorKind::RequestCancelled).into()),
@@ -49,6 +60,10 @@ impl ClientPendingOp {
     }
 
     pub async fn cancel(&mut self, e: CancellationErrorKind) {
+        if self.completed.load(Ordering::SeqCst) {
+            return;
+        }
+
         let context = {
             let requests: Arc<Mutex<OpaqueMap>> = Arc::clone(&self.opaque_map);
             let mut map = requests.lock().unwrap();

@@ -43,6 +43,7 @@ pub(crate) type OpaqueMap = HashMap<u32, Arc<SenderContext>>;
 pub struct ResponseContext {
     pub cas: Option<u64>,
     pub subdoc_info: Option<SubdocRequestInfo>,
+    pub is_persistent: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -161,8 +162,6 @@ impl Client {
                                     let context = {
                                         let map = requests.lock().unwrap();
 
-                                        // We remove and then re-add if there are more packets so that we don't have
-                                        // to hold the opaque map mutex across the callback.
                                         let t = map.get(&opaque);
 
                                         t.map(Arc::clone)
@@ -171,7 +170,6 @@ impl Client {
 
                                     if let Some(context) = context {
                                         let sender = &context.sender;
-                                        let (more_tx, more_rx) = oneshot::channel();
 
                                         if let Some(value) = &packet.value {
                                             if !opts.disable_decompression && (packet.datatype & u8::from(DataTypeFlag::Compressed) != 0) {
@@ -196,8 +194,13 @@ impl Client {
                                             }
                                         }
 
-                                        // TODO: clone
-                                        let resp = ClientResponse::new(packet, more_tx, context.context);
+                                        if !context.context.is_persistent {
+                                                    let mut map = requests.lock().unwrap();
+                                                    map.remove(&opaque);
+                                                    drop(map);
+                                        }
+
+                                        let resp = ClientResponse::new(packet, context.context);
                                         match sender.send(Ok(resp)).await {
                                             Ok(_) => {}
                                             Err(e) => {
@@ -205,23 +208,6 @@ impl Client {
                                             }
                                         };
                                         drop(context);
-
-                                        match more_rx.await {
-                                            Ok(has_more_packets) => {
-                                                if !has_more_packets {
-                                                    let mut map = requests.lock().unwrap();
-                                                    map.remove(&opaque);
-                                                    drop(map);
-                                                }
-                                            }
-                                            Err(_) => {
-                                                // If the response gets dropped then the receiver will be closed,
-                                                // which we treat as an implicit !has_more_packets.
-                                                let mut map = requests.lock().unwrap();
-                                                map.remove(&opaque);
-                                                drop(map);
-                                            }
-                                        }
                                     } else {
                                         let opaque = packet.opaque;
                                         (opts.orphan_handler)(packet);
@@ -309,12 +295,15 @@ impl Dispatcher for Client {
         response_context: Option<ResponseContext>,
     ) -> error::Result<ClientPendingOp> {
         let (response_tx, response_rx) = mpsc::channel(1);
+        let context = response_context.unwrap_or(ResponseContext {
+            cas: packet.cas,
+            subdoc_info: None,
+            is_persistent: false,
+        });
+        let is_persistent = context.is_persistent;
         let opaque = self.register_handler(SenderContext {
             sender: response_tx,
-            context: response_context.unwrap_or(ResponseContext {
-                cas: packet.cas,
-                subdoc_info: None,
-            }),
+            context,
         });
         packet.opaque = Some(opaque);
         let op_code = packet.op_code;
@@ -332,6 +321,7 @@ impl Dispatcher for Client {
                 opaque,
                 self.opaque_map.clone(),
                 response_rx,
+                is_persistent,
             )),
             Err(e) => {
                 debug!(

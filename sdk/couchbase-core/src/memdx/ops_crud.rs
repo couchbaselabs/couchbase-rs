@@ -843,6 +843,7 @@ impl OpsCrud {
                 flags: request.flags,
                 op_count: request.ops.len() as u8,
             }),
+            is_persistent: false,
         };
 
         let pending_op = dispatcher.dispatch(packet, Some(response_context)).await?;
@@ -960,6 +961,7 @@ impl OpsCrud {
                 flags: request.flags,
                 op_count: request.ops.len() as u8,
             }),
+            is_persistent: false,
         };
 
         let pending_op = dispatcher.dispatch(packet, Some(response_context)).await?;

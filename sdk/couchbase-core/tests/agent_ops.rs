@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use crate::common::default_agent_options::{create_default_options, create_options_without_bucket};
 use crate::common::helpers::{generate_bytes_value, generate_key};
-use crate::common::test_config::setup_tests;
+use crate::common::test_config::{setup_tests, test_is_ssl};
 
 mod common;
 
@@ -634,8 +634,6 @@ async fn test_kv_without_a_bucket() {
 async fn upsert_allocations() {
     setup_tests().await;
 
-    let profiler = dhat::Profiler::builder().build();
-
     let agent_opts = create_default_options().await;
 
     let agent = Agent::new(agent_opts).await.unwrap();
@@ -651,13 +649,23 @@ async fn upsert_allocations() {
     // make sure that all the underlying resources are setup.
     agent.upsert(upsert_opts.clone()).await.unwrap();
 
+    let profiler = dhat::Profiler::builder().testing().build();
+
     let stats1 = dhat::HeapStats::get();
 
     let upsert_result = agent.upsert(upsert_opts).await.unwrap();
 
     let stats2 = dhat::HeapStats::get();
 
-    assert!(stats2.total_blocks - stats1.total_blocks <= 23);
+    let total_allocs = stats2.total_blocks - stats1.total_blocks;
+
+    let expected_allocs = if test_is_ssl().await { 23 } else { 21 };
+    dhat::assert!(
+        total_allocs <= 23,
+        "Expected max {} allocations, was {}",
+        expected_allocs,
+        total_allocs
+    );
 
     drop(profiler);
 }
