@@ -52,13 +52,13 @@ impl GetClusterConfigRequest {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct GetCollectionIdRequest {
-    pub(crate) scope_name: String,
-    pub(crate) collection_name: String,
+pub struct GetCollectionIdRequest<'a> {
+    pub(crate) scope_name: &'a str,
+    pub(crate) collection_name: &'a str,
 }
 
-impl GetCollectionIdRequest {
-    pub fn new(scope_name: String, collection_name: String) -> Self {
+impl<'a> GetCollectionIdRequest<'a> {
+    pub fn new(scope_name: &'a str, collection_name: &'a str) -> Self {
         Self {
             scope_name,
             collection_name,
@@ -116,7 +116,7 @@ pub struct SetRequest<'a> {
     pub(crate) expiry: Option<u32>,
     pub(crate) preserve_expiry: Option<bool>,
     pub(crate) cas: Option<u64>,
-    pub(crate) on_behalf_of: Option<String>,
+    pub(crate) on_behalf_of: Option<&'a str>,
     pub(crate) durability_level: Option<DurabilityLevel>,
     pub(crate) durability_level_timeout: Option<Duration>,
 }
@@ -161,7 +161,7 @@ impl<'a> SetRequest<'a> {
         self
     }
 
-    pub fn on_behalf_of(mut self, on_behalf_of: String) -> Self {
+    pub fn on_behalf_of(mut self, on_behalf_of: &'a str) -> Self {
         self.on_behalf_of = Some(on_behalf_of);
         self
     }
@@ -182,7 +182,7 @@ pub struct GetRequest<'a> {
     pub(crate) collection_id: u32,
     pub(crate) key: &'a [u8],
     pub(crate) vbucket_id: u16,
-    pub(crate) on_behalf_of: Option<String>,
+    pub(crate) on_behalf_of: Option<&'a str>,
 }
 
 impl<'a> GetRequest<'a> {
@@ -195,7 +195,7 @@ impl<'a> GetRequest<'a> {
         }
     }
 
-    pub fn on_behalf_of(mut self, on_behalf_of: String) -> Self {
+    pub fn on_behalf_of(mut self, on_behalf_of: &'a str) -> Self {
         self.on_behalf_of = Some(on_behalf_of);
         self
     }
@@ -206,7 +206,7 @@ pub struct GetMetaRequest<'a> {
     pub(crate) collection_id: u32,
     pub(crate) key: &'a [u8],
     pub(crate) vbucket_id: u16,
-    pub(crate) on_behalf_of: Option<String>,
+    pub(crate) on_behalf_of: Option<&'a str>,
 }
 
 impl<'a> GetMetaRequest<'a> {
@@ -219,7 +219,7 @@ impl<'a> GetMetaRequest<'a> {
         }
     }
 
-    pub fn on_behalf_of(mut self, on_behalf_of: String) -> Self {
+    pub fn on_behalf_of(mut self, on_behalf_of: &'a str) -> Self {
         self.on_behalf_of = Some(on_behalf_of);
         self
     }
@@ -231,7 +231,7 @@ pub struct DeleteRequest<'a> {
     pub(crate) key: &'a [u8],
     pub(crate) vbucket_id: u16,
     pub(crate) cas: Option<u64>,
-    pub(crate) on_behalf_of: Option<String>,
+    pub(crate) on_behalf_of: Option<&'a str>,
     pub(crate) durability_level: Option<DurabilityLevel>,
     pub(crate) durability_level_timeout: Option<Duration>,
 }
@@ -254,7 +254,7 @@ impl<'a> DeleteRequest<'a> {
         self
     }
 
-    pub fn on_behalf_of(mut self, on_behalf_of: String) -> Self {
+    pub fn on_behalf_of(mut self, on_behalf_of: &'a str) -> Self {
         self.on_behalf_of = Some(on_behalf_of);
         self
     }
@@ -276,7 +276,7 @@ pub struct GetAndLockRequest<'a> {
     pub(crate) key: &'a [u8],
     pub(crate) vbucket_id: u16,
     pub(crate) lock_time: u32,
-    pub(crate) on_behalf_of: Option<String>,
+    pub(crate) on_behalf_of: Option<&'a str>,
 }
 
 impl<'a> GetAndLockRequest<'a> {
@@ -290,7 +290,7 @@ impl<'a> GetAndLockRequest<'a> {
         }
     }
 
-    pub fn on_behalf_of(mut self, on_behalf_of: String) -> Self {
+    pub fn on_behalf_of(mut self, on_behalf_of: &'a str) -> Self {
         self.on_behalf_of = Some(on_behalf_of);
         self
     }
@@ -302,7 +302,7 @@ pub struct GetAndTouchRequest<'a> {
     pub(crate) key: &'a [u8],
     pub(crate) vbucket_id: u16,
     pub(crate) expiry: u32,
-    pub(crate) on_behalf_of: Option<String>,
+    pub(crate) on_behalf_of: Option<&'a str>,
 }
 
 impl<'a> GetAndTouchRequest<'a> {
@@ -316,7 +316,7 @@ impl<'a> GetAndTouchRequest<'a> {
         }
     }
 
-    pub fn on_behalf_of(mut self, on_behalf_of: String) -> Self {
+    pub fn on_behalf_of(mut self, on_behalf_of: &'a str) -> Self {
         self.on_behalf_of = Some(on_behalf_of);
         self
     }
@@ -328,7 +328,7 @@ pub struct UnlockRequest<'a> {
     pub(crate) key: &'a [u8],
     pub(crate) vbucket_id: u16,
     pub(crate) cas: u64,
-    pub(crate) on_behalf_of: Option<String>,
+    pub(crate) on_behalf_of: Option<&'a str>,
 }
 
 impl<'a> UnlockRequest<'a> {
@@ -342,7 +342,7 @@ impl<'a> UnlockRequest<'a> {
         }
     }
 
-    pub fn on_behalf_of(mut self, on_behalf_of: String) -> Self {
+    pub fn on_behalf_of(mut self, on_behalf_of: &'a str) -> Self {
         self.on_behalf_of = Some(on_behalf_of);
         self
     }
@@ -354,7 +354,7 @@ pub struct TouchRequest<'a> {
     pub(crate) key: &'a [u8],
     pub(crate) vbucket_id: u16,
     pub(crate) expiry: u32,
-    pub(crate) on_behalf_of: Option<String>,
+    pub(crate) on_behalf_of: Option<&'a str>,
 }
 
 impl<'a> TouchRequest<'a> {
@@ -368,7 +368,7 @@ impl<'a> TouchRequest<'a> {
         }
     }
 
-    pub fn on_behalf_of(mut self, on_behalf_of: String) -> Self {
+    pub fn on_behalf_of(mut self, on_behalf_of: &'a str) -> Self {
         self.on_behalf_of = Some(on_behalf_of);
         self
     }
@@ -383,7 +383,7 @@ pub struct AddRequest<'a> {
     pub(crate) value: &'a [u8],
     pub(crate) datatype: u8,
     pub(crate) expiry: Option<u32>,
-    pub(crate) on_behalf_of: Option<String>,
+    pub(crate) on_behalf_of: Option<&'a str>,
     pub(crate) durability_level: Option<DurabilityLevel>,
     pub(crate) durability_level_timeout: Option<Duration>,
 }
@@ -416,7 +416,7 @@ impl<'a> AddRequest<'a> {
         self
     }
 
-    pub fn on_behalf_of(mut self, on_behalf_of: String) -> Self {
+    pub fn on_behalf_of(mut self, on_behalf_of: &'a str) -> Self {
         self.on_behalf_of = Some(on_behalf_of);
         self
     }
@@ -443,7 +443,7 @@ pub struct ReplaceRequest<'a> {
     pub(crate) expiry: Option<u32>,
     pub(crate) preserve_expiry: Option<bool>,
     pub(crate) cas: Option<u64>,
-    pub(crate) on_behalf_of: Option<String>,
+    pub(crate) on_behalf_of: Option<&'a str>,
     pub(crate) durability_level: Option<DurabilityLevel>,
     pub(crate) durability_level_timeout: Option<Duration>,
 }
@@ -488,7 +488,7 @@ impl<'a> ReplaceRequest<'a> {
         self
     }
 
-    pub fn on_behalf_of(mut self, on_behalf_of: String) -> Self {
+    pub fn on_behalf_of(mut self, on_behalf_of: &'a str) -> Self {
         self.on_behalf_of = Some(on_behalf_of);
         self
     }
@@ -512,7 +512,7 @@ pub struct AppendRequest<'a> {
     pub(crate) value: &'a [u8],
     pub(crate) datatype: u8,
     pub(crate) cas: Option<u64>,
-    pub(crate) on_behalf_of: Option<String>,
+    pub(crate) on_behalf_of: Option<&'a str>,
     pub(crate) durability_level: Option<DurabilityLevel>,
     pub(crate) durability_level_timeout: Option<Duration>,
 }
@@ -543,7 +543,7 @@ impl<'a> AppendRequest<'a> {
         self
     }
 
-    pub fn on_behalf_of(mut self, on_behalf_of: String) -> Self {
+    pub fn on_behalf_of(mut self, on_behalf_of: &'a str) -> Self {
         self.on_behalf_of = Some(on_behalf_of);
         self
     }
@@ -567,7 +567,7 @@ pub struct PrependRequest<'a> {
     pub(crate) value: &'a [u8],
     pub(crate) datatype: u8,
     pub(crate) cas: Option<u64>,
-    pub(crate) on_behalf_of: Option<String>,
+    pub(crate) on_behalf_of: Option<&'a str>,
     pub(crate) durability_level: Option<DurabilityLevel>,
     pub(crate) durability_level_timeout: Option<Duration>,
 }
@@ -598,7 +598,7 @@ impl<'a> PrependRequest<'a> {
         self
     }
 
-    pub fn on_behalf_of(mut self, on_behalf_of: String) -> Self {
+    pub fn on_behalf_of(mut self, on_behalf_of: &'a str) -> Self {
         self.on_behalf_of = Some(on_behalf_of);
         self
     }
@@ -622,7 +622,7 @@ pub struct IncrementRequest<'a> {
     pub(crate) initial: Option<u64>,
     pub(crate) delta: Option<u64>,
     pub(crate) expiry: Option<u32>,
-    pub(crate) on_behalf_of: Option<String>,
+    pub(crate) on_behalf_of: Option<&'a str>,
     pub(crate) durability_level: Option<DurabilityLevel>,
     pub(crate) durability_level_timeout: Option<Duration>,
 }
@@ -657,7 +657,7 @@ impl<'a> IncrementRequest<'a> {
         self
     }
 
-    pub fn on_behalf_of(mut self, on_behalf_of: String) -> Self {
+    pub fn on_behalf_of(mut self, on_behalf_of: &'a str) -> Self {
         self.on_behalf_of = Some(on_behalf_of);
         self
     }
@@ -681,7 +681,7 @@ pub struct DecrementRequest<'a> {
     pub(crate) initial: Option<u64>,
     pub(crate) delta: Option<u64>,
     pub(crate) expiry: Option<u32>,
-    pub(crate) on_behalf_of: Option<String>,
+    pub(crate) on_behalf_of: Option<&'a str>,
     pub(crate) durability_level: Option<DurabilityLevel>,
     pub(crate) durability_level_timeout: Option<Duration>,
 }
@@ -716,7 +716,7 @@ impl<'a> DecrementRequest<'a> {
         self
     }
 
-    pub fn on_behalf_of(mut self, on_behalf_of: String) -> Self {
+    pub fn on_behalf_of(mut self, on_behalf_of: &'a str) -> Self {
         self.on_behalf_of = Some(on_behalf_of);
         self
     }
@@ -739,7 +739,7 @@ pub struct LookupInRequest<'a> {
     pub(crate) vbucket_id: u16,
     pub(crate) flags: SubdocDocFlag,
     pub(crate) ops: &'a [LookupInOp<'a>],
-    pub(crate) on_behalf_of: Option<String>,
+    pub(crate) on_behalf_of: Option<&'a str>,
 }
 
 impl<'a> LookupInRequest<'a> {
@@ -760,7 +760,7 @@ impl<'a> LookupInRequest<'a> {
         }
     }
 
-    pub fn on_behalf_of(mut self, on_behalf_of: String) -> Self {
+    pub fn on_behalf_of(mut self, on_behalf_of: &'a str) -> Self {
         self.on_behalf_of = Some(on_behalf_of);
         self
     }
@@ -776,7 +776,7 @@ pub struct MutateInRequest<'a> {
     pub(crate) expiry: Option<u32>,
     pub(crate) preserve_expiry: Option<bool>,
     pub(crate) cas: Option<u64>,
-    pub(crate) on_behalf_of: Option<String>,
+    pub(crate) on_behalf_of: Option<&'a str>,
     pub(crate) durability_level: Option<DurabilityLevel>,
     pub(crate) durability_level_timeout: Option<Duration>,
 }
@@ -819,7 +819,7 @@ impl<'a> MutateInRequest<'a> {
         self
     }
 
-    pub fn on_behalf_of(mut self, on_behalf_of: String) -> Self {
+    pub fn on_behalf_of(mut self, on_behalf_of: &'a str) -> Self {
         self.on_behalf_of = Some(on_behalf_of);
         self
     }

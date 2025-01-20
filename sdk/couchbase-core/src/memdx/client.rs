@@ -303,9 +303,9 @@ impl Dispatcher for Client {
         }
     }
 
-    async fn dispatch(
+    async fn dispatch<'a>(
         &self,
-        mut packet: RequestPacket,
+        mut packet: RequestPacket<'a>,
         response_context: Option<ResponseContext>,
     ) -> error::Result<ClientPendingOp> {
         let (response_tx, response_rx) = mpsc::channel(1);

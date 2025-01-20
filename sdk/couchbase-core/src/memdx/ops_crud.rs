@@ -22,7 +22,7 @@ use crate::memdx::response::{
 use crate::memdx::status::Status;
 use crate::memdx::subdoc::SubdocRequestInfo;
 use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
-use bytes::{BufMut, BytesMut};
+use bytes::BufMut;
 use std::time::Duration;
 
 #[derive(Debug)]
@@ -52,12 +52,13 @@ impl OpsCrud {
         )?;
 
         let framing_extras = if !ext_frame_buf.is_empty() {
-            Some(ext_frame_buf)
+            Some(ext_frame_buf.as_slice())
         } else {
             None
         };
 
-        let key = self.encode_collection_and_key(request.collection_id, request.key)?;
+        let buf = &mut [0; 255];
+        let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
 
         let mut extra_buf: Vec<u8> = Vec::with_capacity(8);
         extra_buf
@@ -85,9 +86,9 @@ impl OpsCrud {
             datatype: request.datatype,
             vbucket_id: Some(request.vbucket_id),
             cas: request.cas,
-            extras: Some(extra_buf),
+            extras: Some(&extra_buf),
             key: Some(key),
-            value: Some(request.value.to_vec()),
+            value: Some(request.value),
             framing_extras,
             opaque: None,
         };
@@ -109,10 +110,11 @@ impl OpsCrud {
         let magic =
             self.encode_req_ext_frames(None, None, None, request.on_behalf_of, &mut ext_frame_buf)?;
 
-        let key = self.encode_collection_and_key(request.collection_id, request.key)?;
+        let buf = &mut [0; 255];
+        let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
 
         let framing_extras = if !ext_frame_buf.is_empty() {
-            Some(ext_frame_buf)
+            Some(ext_frame_buf.as_slice())
         } else {
             None
         };
@@ -147,10 +149,11 @@ impl OpsCrud {
         let magic =
             self.encode_req_ext_frames(None, None, None, request.on_behalf_of, &mut ext_frame_buf)?;
 
-        let key = self.encode_collection_and_key(request.collection_id, request.key)?;
+        let buf = &mut [0; 255];
+        let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
 
         let framing_extras = if !ext_frame_buf.is_empty() {
-            Some(ext_frame_buf)
+            Some(ext_frame_buf.as_slice())
         } else {
             None
         };
@@ -165,7 +168,7 @@ impl OpsCrud {
             datatype: 0,
             vbucket_id: Some(request.vbucket_id),
             cas: None,
-            extras: Some(extras.to_vec()),
+            extras: Some(&extras),
             key: Some(key),
             value: None,
             framing_extras,
@@ -195,12 +198,13 @@ impl OpsCrud {
         )?;
 
         let framing_extras = if !ext_frame_buf.is_empty() {
-            Some(ext_frame_buf)
+            Some(ext_frame_buf.as_slice())
         } else {
             None
         };
 
-        let key = self.encode_collection_and_key(request.collection_id, request.key)?;
+        let buf = &mut [0; 255];
+        let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
 
         let packet = RequestPacket {
             magic,
@@ -232,10 +236,11 @@ impl OpsCrud {
         let magic =
             self.encode_req_ext_frames(None, None, None, request.on_behalf_of, &mut ext_frame_buf)?;
 
-        let key = self.encode_collection_and_key(request.collection_id, request.key)?;
+        let buf = &mut [0; 255];
+        let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
 
         let framing_extras = if !ext_frame_buf.is_empty() {
-            Some(ext_frame_buf)
+            Some(ext_frame_buf.as_slice())
         } else {
             None
         };
@@ -257,7 +262,7 @@ impl OpsCrud {
             datatype: 0,
             vbucket_id: Some(request.vbucket_id),
             cas: None,
-            extras: Some(extra_buf),
+            extras: Some(&extra_buf),
             key: Some(key),
             value: None,
             framing_extras,
@@ -281,10 +286,11 @@ impl OpsCrud {
         let magic =
             self.encode_req_ext_frames(None, None, None, request.on_behalf_of, &mut ext_frame_buf)?;
 
-        let key = self.encode_collection_and_key(request.collection_id, request.key)?;
+        let buf = &mut [0; 255];
+        let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
 
         let framing_extras = if !ext_frame_buf.is_empty() {
-            Some(ext_frame_buf)
+            Some(ext_frame_buf.as_slice())
         } else {
             None
         };
@@ -306,7 +312,7 @@ impl OpsCrud {
             datatype: 0,
             vbucket_id: Some(request.vbucket_id),
             cas: None,
-            extras: Some(extra_buf),
+            extras: Some(&extra_buf),
             key: Some(key),
             value: None,
             framing_extras,
@@ -330,10 +336,11 @@ impl OpsCrud {
         let magic =
             self.encode_req_ext_frames(None, None, None, request.on_behalf_of, &mut ext_frame_buf)?;
 
-        let key = self.encode_collection_and_key(request.collection_id, request.key)?;
+        let buf = &mut [0; 255];
+        let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
 
         let framing_extras = if !ext_frame_buf.is_empty() {
-            Some(ext_frame_buf)
+            Some(ext_frame_buf.as_slice())
         } else {
             None
         };
@@ -368,10 +375,11 @@ impl OpsCrud {
         let magic =
             self.encode_req_ext_frames(None, None, None, request.on_behalf_of, &mut ext_frame_buf)?;
 
-        let key = self.encode_collection_and_key(request.collection_id, request.key)?;
+        let buf = &mut [0; 255];
+        let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
 
         let framing_extras = if !ext_frame_buf.is_empty() {
-            Some(ext_frame_buf)
+            Some(ext_frame_buf.as_slice())
         } else {
             None
         };
@@ -393,7 +401,7 @@ impl OpsCrud {
             datatype: 0,
             vbucket_id: Some(request.vbucket_id),
             cas: None,
-            extras: Some(extra_buf),
+            extras: Some(&extra_buf),
             key: Some(key),
             value: None,
             framing_extras,
@@ -423,12 +431,13 @@ impl OpsCrud {
         )?;
 
         let framing_extras = if !ext_frame_buf.is_empty() {
-            Some(ext_frame_buf)
+            Some(ext_frame_buf.as_slice())
         } else {
             None
         };
 
-        let key = self.encode_collection_and_key(request.collection_id, request.key)?;
+        let buf = &mut [0; 255];
+        let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
 
         let mut extra_buf: Vec<u8> = Vec::with_capacity(8);
         extra_buf
@@ -456,9 +465,9 @@ impl OpsCrud {
             datatype: request.datatype,
             vbucket_id: Some(request.vbucket_id),
             cas: None,
-            extras: Some(extra_buf),
+            extras: Some(&extra_buf),
             key: Some(key),
-            value: Some(request.value.to_vec()),
+            value: Some(request.value),
             framing_extras,
             opaque: None,
         };
@@ -492,12 +501,13 @@ impl OpsCrud {
         )?;
 
         let framing_extras = if !ext_frame_buf.is_empty() {
-            Some(ext_frame_buf)
+            Some(ext_frame_buf.as_slice())
         } else {
             None
         };
 
-        let key = self.encode_collection_and_key(request.collection_id, request.key)?;
+        let buf = &mut [0; 255];
+        let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
 
         let mut extra_buf: Vec<u8> = Vec::with_capacity(8);
         extra_buf
@@ -525,9 +535,9 @@ impl OpsCrud {
             datatype: request.datatype,
             vbucket_id: Some(request.vbucket_id),
             cas: request.cas,
-            extras: Some(extra_buf),
+            extras: Some(&extra_buf),
             key: Some(key),
-            value: Some(request.value.to_vec()),
+            value: Some(request.value),
             framing_extras,
             opaque: None,
         };
@@ -555,12 +565,13 @@ impl OpsCrud {
         )?;
 
         let framing_extras = if !ext_frame_buf.is_empty() {
-            Some(ext_frame_buf)
+            Some(ext_frame_buf.as_slice())
         } else {
             None
         };
 
-        let key = self.encode_collection_and_key(request.collection_id, request.key)?;
+        let buf = &mut [0; 255];
+        let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
 
         let packet = RequestPacket {
             magic,
@@ -570,7 +581,7 @@ impl OpsCrud {
             cas: request.cas,
             extras: None,
             key: Some(key),
-            value: Some(request.value.to_vec()),
+            value: Some(request.value),
             framing_extras,
             opaque: None,
         };
@@ -598,12 +609,13 @@ impl OpsCrud {
         )?;
 
         let framing_extras = if !ext_frame_buf.is_empty() {
-            Some(ext_frame_buf)
+            Some(ext_frame_buf.as_slice())
         } else {
             None
         };
 
-        let key = self.encode_collection_and_key(request.collection_id, request.key)?;
+        let buf = &mut [0; 255];
+        let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
 
         let packet = RequestPacket {
             magic,
@@ -613,7 +625,7 @@ impl OpsCrud {
             cas: request.cas,
             extras: None,
             key: Some(key),
-            value: Some(request.value.to_vec()),
+            value: Some(request.value),
             framing_extras,
             opaque: None,
         };
@@ -683,12 +695,13 @@ impl OpsCrud {
         )?;
 
         let framing_extras = if !ext_frame_buf.is_empty() {
-            Some(ext_frame_buf)
+            Some(ext_frame_buf.as_slice())
         } else {
             None
         };
 
-        let key = self.encode_collection_and_key(request.collection_id, request.key)?;
+        let buf = &mut [0; 255];
+        let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
 
         let extra_buf =
             Self::encode_counter_values(request.delta, request.initial, request.expiry)?;
@@ -699,7 +712,7 @@ impl OpsCrud {
             datatype: 0,
             vbucket_id: Some(request.vbucket_id),
             cas: None,
-            extras: Some(extra_buf),
+            extras: Some(&extra_buf),
             key: Some(key),
             value: None,
             framing_extras,
@@ -729,12 +742,13 @@ impl OpsCrud {
         )?;
 
         let framing_extras = if !ext_frame_buf.is_empty() {
-            Some(ext_frame_buf)
+            Some(ext_frame_buf.as_slice())
         } else {
             None
         };
 
-        let key = self.encode_collection_and_key(request.collection_id, request.key)?;
+        let buf = &mut [0; 255];
+        let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
 
         let extra_buf =
             Self::encode_counter_values(request.delta, request.initial, request.expiry)?;
@@ -745,7 +759,7 @@ impl OpsCrud {
             datatype: 0,
             vbucket_id: Some(request.vbucket_id),
             cas: None,
-            extras: Some(extra_buf),
+            extras: Some(&extra_buf),
             key: Some(key),
             value: None,
             framing_extras,
@@ -770,12 +784,13 @@ impl OpsCrud {
             self.encode_req_ext_frames(None, None, None, request.on_behalf_of, &mut ext_frame_buf)?;
 
         let framing_extras = if !ext_frame_buf.is_empty() {
-            Some(ext_frame_buf)
+            Some(ext_frame_buf.as_slice())
         } else {
             None
         };
 
-        let key = self.encode_collection_and_key(request.collection_id, request.key)?;
+        let buf = &mut [0; 255];
+        let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
 
         let len_ops = request.ops.len();
         let mut path_bytes_list: Vec<Vec<u8>> = vec![vec![]; len_ops];
@@ -815,9 +830,9 @@ impl OpsCrud {
             datatype: 0,
             vbucket_id: Some(request.vbucket_id),
             cas: None,
-            extras: Some(extra_buf),
+            extras: Some(&extra_buf),
             key: Some(key),
-            value: Some(value_buf),
+            value: Some(&value_buf),
             framing_extras,
             opaque: None,
         };
@@ -859,12 +874,13 @@ impl OpsCrud {
         )?;
 
         let framing_extras = if !ext_frame_buf.is_empty() {
-            Some(ext_frame_buf)
+            Some(ext_frame_buf.as_slice())
         } else {
             None
         };
 
-        let key = self.encode_collection_and_key(request.collection_id, request.key)?;
+        let buf = &mut [0; 255];
+        let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
 
         let len_ops = request.ops.len();
         let mut path_bytes_list: Vec<Vec<u8>> = vec![vec![]; len_ops];
@@ -931,9 +947,9 @@ impl OpsCrud {
             datatype: 0,
             vbucket_id: Some(request.vbucket_id),
             cas: request.cas,
-            extras: Some(extra_buf),
+            extras: Some(&extra_buf),
             key: Some(key),
-            value: Some(value_buf),
+            value: Some(&value_buf),
             framing_extras,
             opaque: None,
         };
@@ -951,7 +967,12 @@ impl OpsCrud {
         Ok(StandardPendingOp::new(pending_op))
     }
 
-    fn encode_collection_and_key(&self, collection_id: u32, key: &[u8]) -> Result<Vec<u8>> {
+    fn encode_collection_and_key<'a>(
+        &self,
+        collection_id: u32,
+        key: &'a [u8],
+        buf: &'a mut [u8],
+    ) -> Result<&'a [u8]> {
         if !self.collections_enabled {
             if collection_id != 0 {
                 return Err(Error::invalid_argument_error(
@@ -960,10 +981,14 @@ impl OpsCrud {
                 ));
             }
 
-            return Ok(key.to_vec());
+            return Ok(key);
         }
 
-        Ok(make_uleb128_32(key, collection_id))
+        let encoded_size = make_uleb128_32(collection_id, buf);
+        for (i, k) in key.iter().enumerate() {
+            buf[i + encoded_size] = *k;
+        }
+        Ok(&buf[0..key.len() + encoded_size])
     }
 
     fn encode_req_ext_frames(
@@ -971,11 +996,11 @@ impl OpsCrud {
         durability_level: Option<DurabilityLevel>,
         durability_timeout: Option<Duration>,
         preserve_expiry: Option<bool>,
-        on_behalf_of: Option<String>,
+        on_behalf_of: Option<&str>,
         buf: &mut Vec<u8>,
     ) -> Result<Magic> {
         if let Some(obo) = on_behalf_of {
-            append_ext_frame(ExtReqFrameCode::OnBehalfOf, obo.into_bytes(), buf)?;
+            append_ext_frame(ExtReqFrameCode::OnBehalfOf, obo.as_bytes(), buf)?;
         }
 
         if let Some(dura) = durability_level {
@@ -988,10 +1013,10 @@ impl OpsCrud {
 
             let dura_buf = encode_durability_ext_frame(dura, durability_timeout)?;
 
-            append_ext_frame(ExtReqFrameCode::Durability, dura_buf, buf)?;
+            append_ext_frame(ExtReqFrameCode::Durability, &dura_buf, buf)?;
         } else if durability_timeout.is_some() {
             return Err(Error::invalid_argument_error(
-                "Cannot encode durability timeout without durability level",
+                "cannot encode durability timeout without durability level",
                 "durability_timeout",
             ));
         }
@@ -999,18 +1024,18 @@ impl OpsCrud {
         if preserve_expiry.is_some() {
             if !self.preserve_expiry_enabled {
                 return Err(Error::invalid_argument_error(
-                    "Cannot use preserve expiry when its not enabled",
+                    "cannot use preserve expiry when its not enabled",
                     "preserve_expiry",
                 ));
             }
 
-            append_ext_frame(ExtReqFrameCode::PreserveTTL, vec![], buf)?;
+            append_ext_frame(ExtReqFrameCode::PreserveTTL, &[], buf)?;
         }
 
         let magic = if !buf.is_empty() {
             if !self.ext_frames_enabled {
                 return Err(Error::invalid_argument_error(
-                    "Cannot use framing extras when its not enabled",
+                    "cannot use framing extras when its not enabled",
                     "ext_frames_enabled",
                 ));
             }
@@ -1122,7 +1147,7 @@ fn iter_ext_frames(buf: &[u8], mut cb: impl FnMut(ExtResFrameCode, &[u8])) -> Re
 
 pub fn append_ext_frame(
     frame_code: ExtReqFrameCode,
-    frame_body: Vec<u8>,
+    frame_body: &[u8],
     buf: &mut Vec<u8>,
 ) -> Result<()> {
     let frame_len = frame_body.len();
@@ -1147,15 +1172,15 @@ pub fn append_ext_frame(
     }
 
     if frame_len > 0 {
-        buf.extend_from_slice(&frame_body);
+        buf.extend_from_slice(frame_body);
     }
 
     Ok(())
 }
 
-pub fn make_uleb128_32(key: &[u8], collection_id: u32) -> Vec<u8> {
+pub fn make_uleb128_32(collection_id: u32, buf: &mut [u8]) -> usize {
     let mut cid = collection_id;
-    let mut builder = BytesMut::with_capacity(key.len() + 5);
+    let mut count = 0;
     loop {
         let mut c: u8 = (cid & 0x7f) as u8;
         cid >>= 7;
@@ -1163,16 +1188,14 @@ pub fn make_uleb128_32(key: &[u8], collection_id: u32) -> Vec<u8> {
             c |= 0x80;
         }
 
-        builder.put_u8(c);
+        buf[count] = c;
+        count += 1;
         if c & 0x80 == 0 {
             break;
         }
     }
-    for k in key {
-        builder.put_u8(*k);
-    }
 
-    builder.freeze().to_vec()
+    count
 }
 
 fn encode_durability_ext_frame(

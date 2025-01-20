@@ -21,9 +21,9 @@ pub struct DispatcherOptions {
 #[async_trait]
 pub trait Dispatcher: Send + Sync {
     fn new(conn: ConnectionType, opts: DispatcherOptions) -> Self;
-    async fn dispatch(
+    async fn dispatch<'a>(
         &self,
-        packet: RequestPacket,
+        packet: RequestPacket<'a>,
         response_context: Option<ResponseContext>,
     ) -> Result<ClientPendingOp>;
     async fn close(&self) -> Result<()>;

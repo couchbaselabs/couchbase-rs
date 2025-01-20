@@ -38,20 +38,20 @@ impl ResponsePacket {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct RequestPacket {
+pub struct RequestPacket<'a> {
     pub(crate) magic: Magic,
     pub(crate) op_code: OpCode,
     pub(crate) datatype: u8,
     pub(crate) vbucket_id: Option<u16>,
     pub(crate) cas: Option<u64>,
-    pub(crate) extras: Option<Vec<u8>>,
-    pub(crate) key: Option<Vec<u8>>,
-    pub(crate) value: Option<Vec<u8>>,
-    pub(crate) framing_extras: Option<Vec<u8>>,
+    pub(crate) extras: Option<&'a [u8]>,
+    pub(crate) key: Option<&'a [u8]>,
+    pub(crate) value: Option<&'a [u8]>,
+    pub(crate) framing_extras: Option<&'a [u8]>,
     pub(crate) opaque: Option<u32>,
 }
 
-impl RequestPacket {
+impl<'a> RequestPacket<'a> {
     pub fn new(magic: Magic, op_code: OpCode, datatype: u8) -> Self {
         Self {
             magic,
@@ -92,22 +92,22 @@ impl RequestPacket {
         self
     }
 
-    pub fn extras(mut self, extras: Vec<u8>) -> Self {
+    pub fn extras(mut self, extras: &'a [u8]) -> Self {
         self.extras = Some(extras);
         self
     }
 
-    pub fn key(mut self, key: Vec<u8>) -> Self {
+    pub fn key(mut self, key: &'a [u8]) -> Self {
         self.key = Some(key);
         self
     }
 
-    pub fn value(mut self, value: Vec<u8>) -> Self {
+    pub fn value(mut self, value: &'a [u8]) -> Self {
         self.value = Some(value);
         self
     }
 
-    pub fn framing_extras(mut self, framing_extras: Vec<u8>) -> Self {
+    pub fn framing_extras(mut self, framing_extras: &'a [u8]) -> Self {
         self.framing_extras = Some(framing_extras);
         self
     }
