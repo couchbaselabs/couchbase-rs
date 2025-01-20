@@ -1,4 +1,5 @@
 pub mod error;
+pub mod index;
 pub mod preparedquery;
 pub mod query;
 mod query_json;

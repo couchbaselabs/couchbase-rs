@@ -4,11 +4,14 @@ use futures::StreamExt;
 use serde_json::Value;
 
 use couchbase_core::agent::Agent;
-use couchbase_core::queryoptions::QueryOptions;
+use couchbase_core::queryoptions::{
+    BuildDeferredIndexesOptions, CreateIndexOptions, CreatePrimaryIndexOptions, DropIndexOptions,
+    DropPrimaryIndexOptions, GetAllIndexesOptions, QueryOptions, WatchIndexesOptions,
+};
 use couchbase_core::queryx::query_result::Status;
 
 use crate::common::default_agent_options::create_default_options;
-use crate::common::test_config::setup_tests;
+use crate::common::test_config::{setup_tests, test_bucket};
 
 mod common;
 
@@ -116,4 +119,56 @@ async fn test_prepared_query_basic() {
             .as_str()
             .unwrap()
     );
+}
+
+#[tokio::test]
+async fn test_query_indexes() {
+    setup_tests().await;
+
+    let agent_opts = create_default_options().await;
+
+    let mut agent = Agent::new(agent_opts).await.unwrap();
+    let bucket_name = test_bucket().await;
+
+    let opts = CreatePrimaryIndexOptions::new(bucket_name.as_str()).ignore_if_exists(true);
+
+    agent.create_primary_index(&opts).await.unwrap();
+
+    let opts = CreateIndexOptions::new(bucket_name.as_str(), "test_index", &["name"])
+        .ignore_if_exists(true)
+        .deferred(true);
+
+    agent.create_index(&opts).await.unwrap();
+
+    let opts = GetAllIndexesOptions::new(bucket_name.as_str());
+
+    let indexes = agent.get_all_indexes(&opts).await.unwrap();
+    assert_eq!(2, indexes.len());
+
+    let opts = BuildDeferredIndexesOptions::new(bucket_name.as_str());
+
+    agent.build_deferred_indexes(&opts).await.unwrap();
+
+    let opts = WatchIndexesOptions::new(bucket_name.as_str(), &["test_index"]);
+
+    tokio::time::timeout(
+        std::time::Duration::from_secs(15),
+        agent.watch_indexes(&opts),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+
+    let opts = DropPrimaryIndexOptions::new(bucket_name.as_str()).ignore_if_not_exists(true);
+
+    agent.drop_primary_index(&opts).await.unwrap();
+
+    let opts = DropIndexOptions::new(bucket_name.as_str(), "test_index").ignore_if_not_exists(true);
+
+    agent.drop_index(&opts).await.unwrap();
+    let opts = GetAllIndexesOptions::new(bucket_name.as_str());
+
+    let indexes = agent.get_all_indexes(&opts).await.unwrap();
+
+    assert_eq!(0, indexes.len());
 }
