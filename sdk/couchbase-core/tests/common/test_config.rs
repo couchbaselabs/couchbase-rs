@@ -22,6 +22,10 @@ pub struct EnvTestConfig {
     pub conn_string: String,
     #[envconfig(from = "RCBBUCKET", default = "default")]
     pub default_bucket: String,
+    #[envconfig(from = "RCBSCOPE", default = "_default")]
+    pub default_scope: String,
+    #[envconfig(from = "RCBCOLLECTION", default = "_default")]
+    pub default_collection: String,
     #[envconfig(from = "RCBDATA_TIMEOUT", default = "2500")]
     pub data_timeout: String,
 }
@@ -32,6 +36,8 @@ pub struct TestConfig {
     pub password: String,
     pub memd_addrs: Vec<String>,
     pub default_bucket: String,
+    pub default_scope: String,
+    pub default_collection: String,
     pub data_timeout: String,
     pub use_ssl: bool,
 }
@@ -47,7 +53,7 @@ pub async fn setup_tests() {
                     "{}:{} {} [{}] - {}",
                     record.file().unwrap_or("unknown"),
                     record.line().unwrap_or(0),
-                    chrono::Local::now().format("%Y-%m-%dT%H:%M:%S"),
+                    chrono::Local::now().format("%Y-%m-%dT%H:%M:%S%.3f"),
                     record.level(),
                     record.args()
                 )
@@ -66,6 +72,8 @@ pub async fn setup_tests() {
             password: test_config.password,
             memd_addrs: resolved.memd_hosts.iter().map(|h| h.to_string()).collect(),
             default_bucket: test_config.default_bucket,
+            default_scope: test_config.default_scope,
+            default_collection: test_config.default_collection,
             data_timeout: test_config.data_timeout,
             use_ssl: resolved.use_ssl,
         }));
@@ -96,6 +104,18 @@ pub async fn test_bucket() -> String {
     let guard = TEST_CONFIG.lock().await;
     let config = guard.clone().unwrap();
     config.default_bucket.clone()
+}
+
+pub async fn test_scope() -> String {
+    let guard = TEST_CONFIG.lock().await;
+    let config = guard.clone().unwrap();
+    config.default_scope.clone()
+}
+
+pub async fn test_collection() -> String {
+    let guard = TEST_CONFIG.lock().await;
+    let config = guard.clone().unwrap();
+    config.default_collection.clone()
 }
 
 pub async fn test_data_timeout() -> String {

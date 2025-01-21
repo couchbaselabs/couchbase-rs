@@ -109,3 +109,9 @@ pub struct MutateInResult {
     pub cas: u64,
     pub mutation_token: Option<MutationToken>,
 }
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub struct GetCollectionIdResult {
+    pub manifest_rev: u64,
+    pub collection_id: u32,
+}

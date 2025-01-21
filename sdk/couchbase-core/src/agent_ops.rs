@@ -4,13 +4,14 @@ use crate::analyticsoptions::AnalyticsOptions;
 use crate::cbconfig::CollectionManifest;
 use crate::crudoptions::{
     AddOptions, AppendOptions, DecrementOptions, DeleteOptions, GetAndLockOptions,
-    GetAndTouchOptions, GetMetaOptions, GetOptions, IncrementOptions, LookupInOptions,
-    MutateInOptions, PrependOptions, ReplaceOptions, TouchOptions, UnlockOptions, UpsertOptions,
+    GetAndTouchOptions, GetCollectionIdOptions, GetMetaOptions, GetOptions, IncrementOptions,
+    LookupInOptions, MutateInOptions, PrependOptions, ReplaceOptions, TouchOptions, UnlockOptions,
+    UpsertOptions,
 };
 use crate::crudresults::{
     AddResult, AppendResult, DecrementResult, DeleteResult, GetAndLockResult, GetAndTouchResult,
-    GetMetaResult, GetResult, IncrementResult, LookupInResult, MutateInResult, PrependResult,
-    ReplaceResult, TouchResult, UnlockResult, UpsertResult,
+    GetCollectionIdResult, GetMetaResult, GetResult, IncrementResult, LookupInResult,
+    MutateInResult, PrependResult, ReplaceResult, TouchResult, UnlockResult, UpsertResult,
 };
 use crate::error::Result;
 use crate::features::BucketFeature;
@@ -86,6 +87,13 @@ impl Agent {
 
     pub async fn decrement(&self, opts: DecrementOptions<'_>) -> Result<DecrementResult> {
         self.inner.crud.decrement(opts).await
+    }
+
+    pub async fn get_collection_id(
+        &self,
+        opts: GetCollectionIdOptions<'_>,
+    ) -> Result<GetCollectionIdResult> {
+        self.inner.crud.get_collection_id(opts).await
     }
 
     pub async fn lookup_in(&self, opts: LookupInOptions<'_>) -> Result<LookupInResult> {

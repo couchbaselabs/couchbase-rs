@@ -102,6 +102,8 @@ impl Error {
     pub fn has_server_error_context(&self) -> Option<&Vec<u8>> {
         if let ErrorKind::Server(ServerError { context, .. }) = self.kind.as_ref() {
             context.as_ref()
+        } else if let ErrorKind::Resource(ResourceError { cause, .. }) = self.kind.as_ref() {
+            cause.context.as_ref()
         } else {
             None
         }
@@ -121,6 +123,13 @@ impl Error {
     pub fn is_unknown_collection_id_error(&self) -> bool {
         match self.kind.as_ref() {
             ErrorKind::Server(e) => e.kind == ServerErrorKind::UnknownCollectionID,
+            _ => false,
+        }
+    }
+
+    pub fn is_unknown_collection_name_error(&self) -> bool {
+        match self.kind.as_ref() {
+            ErrorKind::Resource(e) => e.cause.kind == ServerErrorKind::UnknownCollectionName,
             _ => false,
         }
     }
@@ -314,7 +323,7 @@ impl ServerError {
         Self {
             kind,
             config: None,
-            context: None,
+            context: resp.value.clone(),
             op_code: resp.op_code,
             status: resp.status,
             opaque: resp.opaque,
@@ -339,7 +348,7 @@ impl ServerError {
 
         let manifest_rev = context_json
             .manifest_rev
-            .map(|manifest_rev| manifest_rev.parse().unwrap_or_default());
+            .map(|manifest_rev| u64::from_str_radix(&manifest_rev, 16).unwrap_or_default());
 
         Some(ServerErrorContext {
             text,
@@ -358,8 +367,8 @@ struct ServerErrorContextJsonContext {
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 struct ServerErrorContextJson {
-    #[serde(alias = "text", default)]
-    pub error: ServerErrorContextJsonContext,
+    #[serde(alias = "error", default)]
+    error: ServerErrorContextJsonContext,
     #[serde(alias = "ref")]
     pub error_ref: Option<String>,
     #[serde(alias = "manifest_uid")]

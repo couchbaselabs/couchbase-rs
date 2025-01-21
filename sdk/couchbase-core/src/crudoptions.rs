@@ -752,3 +752,26 @@ impl<'a> MutateInOptions<'a> {
         self
     }
 }
+
+#[derive(Clone, Debug)]
+#[non_exhaustive]
+pub struct GetCollectionIdOptions<'a> {
+    pub(crate) scope_name: &'a str,
+    pub(crate) collection_name: &'a str,
+    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
+}
+
+impl<'a> GetCollectionIdOptions<'a> {
+    pub fn new(scope_name: &'a str, collection_name: &'a str) -> Self {
+        Self {
+            scope_name,
+            collection_name,
+            retry_strategy: DEFAULT_RETRY_STRATEGY.clone(),
+        }
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = retry_strategy;
+        self
+    }
+}
