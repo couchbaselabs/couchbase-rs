@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use arc_swap::ArcSwap;
-use tokio::select;
 use tokio::sync::{Mutex, Notify};
 
 use crate::collectionresolver::CollectionResolver;
@@ -28,7 +27,6 @@ struct CollectionCacheEntry {
     manifest_rev: u64,
 
     pending: Option<Arc<Notify>>,
-    done: Option<Arc<Notify>>,
 }
 
 type CollectionResolverSlowMap = Arc<Mutex<HashMap<String, Arc<Mutex<CollectionCacheEntry>>>>>;
@@ -64,68 +62,59 @@ where
         collection_name: &str,
         full_key_path: &str,
     ) -> Result<(u32, u64)> {
-        let mut slow_map = self.slow_map.lock().await;
+        loop {
+            let mut slow_map = self.slow_map.lock().await;
 
-        let slow_entry = if let Some(entry) = slow_map.get(full_key_path) {
-            entry
-        } else {
-            let entry = CollectionCacheEntry {
-                resolve_err: None,
-                collection_id: 0,
-                manifest_rev: 0,
-                pending: Some(Arc::new(Notify::new())),
-                done: Some(Arc::new(Notify::new())),
+            let slow_entry = if let Some(entry) = slow_map.get(full_key_path) {
+                entry.clone()
+            } else {
+                let entry = Arc::new(Mutex::new(CollectionCacheEntry {
+                    resolve_err: None,
+                    collection_id: 0,
+                    manifest_rev: 0,
+                    pending: Some(Arc::new(Notify::new())),
+                }));
+
+                slow_map.insert(full_key_path.to_string(), entry.clone());
+
+                {
+                    let s_map = self.slow_map.clone();
+                    let scope_name = scope_name.to_string();
+                    let collection_name = collection_name.to_string();
+                    let fast_cache = self.fast_cache.clone();
+                    let resolver = self.resolver.clone();
+                    let entry = entry.clone();
+
+                    tokio::spawn(Self::resolve_collection(
+                        entry,
+                        s_map,
+                        fast_cache,
+                        resolver,
+                        scope_name,
+                        collection_name,
+                    ));
+                }
+
+                entry
             };
 
-            slow_map.insert(full_key_path.to_string(), Arc::new(Mutex::new(entry)));
+            let entry_guard = slow_entry.lock().await;
+            if let Some(pending) = &entry_guard.pending {
+                let pending = pending.clone();
+                drop(entry_guard);
+                drop(slow_map);
 
-            // TODO: Probably a better way to do this.
-            let entry = slow_map.get(full_key_path).unwrap();
+                pending.notified().await;
 
-            {
-                let s_map = self.slow_map.clone();
-                let scope_name = scope_name.to_string();
-                let collection_name = collection_name.to_string();
-                let fast_cache = self.fast_cache.clone();
-                let resolver = self.resolver.clone();
-                let entry = entry.clone();
-
-                tokio::spawn(Self::resolve_collection(
-                    entry,
-                    s_map,
-                    fast_cache,
-                    resolver,
-                    scope_name,
-                    collection_name,
-                ));
+                continue;
             }
 
-            entry
-        };
-
-        let entry_guard = slow_entry.lock().await;
-        if let Some(pending) = &entry_guard.pending {
-            let pending = pending.clone();
-            drop(entry_guard);
-            drop(slow_map);
-
-            select! {
-                () = pending.notified() => {}
+            if let Some(e) = &entry_guard.resolve_err {
+                return Err(e.clone());
             }
 
-            return Box::pin(self.resolve_collection_id_slow(
-                scope_name,
-                collection_name,
-                full_key_path,
-            ))
-            .await;
+            return Ok((entry_guard.collection_id, entry_guard.manifest_rev));
         }
-
-        if let Some(e) = &entry_guard.resolve_err {
-            return Err(e.clone());
-        }
-
-        Ok((entry_guard.collection_id, entry_guard.manifest_rev))
     }
 
     async fn resolve_collection(
@@ -136,58 +125,40 @@ where
         scope_name: String,
         collection_name: String,
     ) {
-        loop {
-            let (collection_id, manifest_rev) = match resolver
-                .resolve_collection_id(&scope_name, &collection_name)
-                .await
-            {
-                Ok((id, rev)) => (id, rev),
-                Err(e) => {
-                    {
-                        let mut guard = entry.lock().await;
-                        guard.resolve_err = Some(e);
-                        guard.collection_id = 0;
+        let res = resolver
+            .resolve_collection_id(&scope_name, &collection_name)
+            .await;
 
-                        let pending = guard.pending.clone();
-                        guard.pending = None;
+        let pending = {
+            let mut guard = entry.lock().await;
+            match res {
+                Ok((id, rev)) => {
+                    guard.resolve_err = None;
+                    guard.collection_id = id;
+                    guard.manifest_rev = rev;
 
-                        if let Some(p) = pending {
-                            p.notify_waiters();
-                        }
-                    }
+                    let pending = guard.pending.clone();
+                    guard.pending = None;
 
-                    Self::rebuild_fast_cache(slow_map.clone(), fast_cache.clone()).await;
-
-                    continue;
+                    pending
                 }
-            };
+                Err(e) => {
+                    guard.resolve_err = Some(e);
+                    guard.collection_id = 0;
+                    guard.manifest_rev = 0;
 
-            let (pending, done) = {
-                let mut guard = entry.lock().await;
-                guard.resolve_err = None;
-                guard.collection_id = collection_id;
-                guard.manifest_rev = manifest_rev;
+                    let pending = guard.pending.clone();
+                    guard.pending = None;
 
-                let done = guard.done.clone();
-                guard.done = None;
-
-                let pending = guard.pending.clone();
-                guard.pending = None;
-
-                (pending, done)
-            };
-
-            Self::rebuild_fast_cache(slow_map.clone(), fast_cache.clone()).await;
-
-            if let Some(p) = pending {
-                p.notify_waiters();
+                    pending
+                }
             }
+        };
 
-            if let Some(d) = done {
-                d.notify_waiters();
-            }
+        Self::rebuild_fast_cache(slow_map.clone(), fast_cache.clone()).await;
 
-            return;
+        if let Some(p) = pending {
+            p.notify_waiters();
         }
     }
 
@@ -257,56 +228,9 @@ where
 
         let full_key_path = scope_name.to_owned() + "." + collection_name;
 
-        let slow_map = self.slow_map.lock().await;
-        let entry = if let Some(entry) = slow_map.get(&full_key_path) {
-            entry
-        } else {
-            return;
-        };
-
         {
-            let mut entry_guard = entry.lock().await;
-
-            if entry_guard.done.is_some() {
-                // our entry is already being refetched, no need to do anything
-                return;
-            }
-
-            if entry_guard.manifest_rev > invalidating_manifest_rev {
-                // our entry is newer than is being invalidated, so leave it...
-                return;
-            }
-
-            // Reset the entry
-            entry_guard.resolve_err = None;
-            entry_guard.manifest_rev = 0;
-            entry_guard.collection_id = 0;
-
-            if entry_guard.pending.is_none() {
-                entry_guard.pending = Some(Arc::new(Notify::new()));
-            }
-
-            if entry_guard.done.is_none() {
-                entry_guard.done = Some(Arc::new(Notify::new()));
-
-                {
-                    let s_map = self.slow_map.clone();
-                    let scope_name = scope_name.to_string();
-                    let collection_name = collection_name.to_string();
-                    let fast_cache = self.fast_cache.clone();
-                    let resolver = self.resolver.clone();
-                    let entry = entry.clone();
-
-                    tokio::spawn(Self::resolve_collection(
-                        entry,
-                        s_map,
-                        fast_cache,
-                        resolver,
-                        scope_name,
-                        collection_name,
-                    ));
-                }
-            }
+            let mut slow_map = self.slow_map.lock().await;
+            slow_map.remove(&full_key_path);
         }
 
         Self::rebuild_fast_cache(self.slow_map.clone(), self.fast_cache.clone()).await;

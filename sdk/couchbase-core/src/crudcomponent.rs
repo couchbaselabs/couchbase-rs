@@ -2,35 +2,41 @@ use std::fmt::Debug;
 use std::future::Future;
 use std::sync::Arc;
 
-use futures::{FutureExt, TryFutureExt};
-
 use crate::collectionresolver::{orchestrate_memd_collection_id, CollectionResolver};
 use crate::compressionmanager::{CompressionManager, Compressor};
 use crate::crudoptions::{
     AddOptions, AppendOptions, DecrementOptions, DeleteOptions, GetAndLockOptions,
-    GetAndTouchOptions, GetMetaOptions, GetOptions, IncrementOptions, LookupInOptions,
-    MutateInOptions, PrependOptions, ReplaceOptions, TouchOptions, UnlockOptions, UpsertOptions,
+    GetAndTouchOptions, GetCollectionIdOptions, GetMetaOptions, GetOptions, IncrementOptions,
+    LookupInOptions, MutateInOptions, PrependOptions, ReplaceOptions, TouchOptions, UnlockOptions,
+    UpsertOptions,
 };
 use crate::crudresults::{
     AddResult, AppendResult, DecrementResult, DeleteResult, GetAndLockResult, GetAndTouchResult,
-    GetMetaResult, GetResult, IncrementResult, LookupInResult, MutateInResult, PrependResult,
-    ReplaceResult, TouchResult, UnlockResult, UpsertResult,
+    GetCollectionIdResult, GetMetaResult, GetResult, IncrementResult, LookupInResult,
+    MutateInResult, PrependResult, ReplaceResult, TouchResult, UnlockResult, UpsertResult,
 };
 use crate::error::Result;
 use crate::kvclient::KvClient;
 use crate::kvclient_ops::KvClientOps;
-use crate::kvclientmanager::{orchestrate_memd_client, KvClientManager, KvClientManagerClientType};
+use crate::kvclientmanager::{
+    orchestrate_memd_client, orchestrate_random_memd_client, KvClientManager,
+    KvClientManagerClientType,
+};
 use crate::memdx::datatype::DataTypeFlag;
 use crate::memdx::hello_feature::HelloFeature;
 use crate::memdx::request::{
     AddRequest, AppendRequest, DecrementRequest, DeleteRequest, GetAndLockRequest,
-    GetAndTouchRequest, GetMetaRequest, GetRequest, IncrementRequest, LookupInRequest,
-    MutateInRequest, PrependRequest, ReplaceRequest, SetRequest, TouchRequest, UnlockRequest,
+    GetAndTouchRequest, GetCollectionIdRequest, GetMetaRequest, GetRequest, IncrementRequest,
+    LookupInRequest, MutateInRequest, PrependRequest, ReplaceRequest, SetRequest, TouchRequest,
+    UnlockRequest,
 };
 use crate::mutationtoken::MutationToken;
 use crate::nmvbhandler::NotMyVbucketConfigHandler;
-use crate::retry::{orchestrate_retries, RetryInfo, RetryManager};
+use crate::retry::{error_to_retry_reason, orchestrate_retries, RetryInfo, RetryManager};
 use crate::vbucketrouter::{orchestrate_memd_routing, VbucketRouter};
+use futures::{FutureExt, TryFutureExt};
+use log::debug;
+use tokio::time::sleep;
 
 pub(crate) struct CrudComponent<
     M: KvClientManager,
@@ -658,6 +664,59 @@ impl<
             },
         )
         .await
+    }
+
+    pub(crate) async fn get_collection_id(
+        &self,
+        opts: GetCollectionIdOptions<'_>,
+    ) -> Result<GetCollectionIdResult> {
+        let mut retry_info = RetryInfo::new(true, opts.retry_strategy);
+
+        loop {
+            let err =
+                match orchestrate_random_memd_client(self.conn_manager.clone(), async |client| {
+                    client
+                        .get_collection_id(GetCollectionIdRequest {
+                            scope_name: opts.scope_name,
+                            collection_name: opts.collection_name,
+                        })
+                        .map_ok(|resp| GetCollectionIdResult {
+                            collection_id: resp.collection_id,
+                            manifest_rev: resp.manifest_rev,
+                        })
+                        .await
+                })
+                .await
+                {
+                    Ok(r) => {
+                        return Ok(r);
+                    }
+                    Err(e) => e,
+                };
+
+            if let Some(memdx_err) = err.is_memdx_error() {
+                if memdx_err.is_unknown_collection_name_error() {
+                    return Err(err);
+                }
+            }
+
+            if let Some(reason) = error_to_retry_reason(&err) {
+                if let Some(duration) = self
+                    .retry_manager
+                    .maybe_retry(&mut retry_info, reason)
+                    .await
+                {
+                    debug!(
+                        "Retrying operation after {:?} due to {:?}",
+                        duration, reason
+                    );
+                    sleep(duration).await;
+                    continue;
+                }
+            }
+
+            return Err(err);
+        }
     }
 
     pub(crate) async fn orchestrate_simple_crud<Fut, Resp>(

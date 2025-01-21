@@ -60,6 +60,5 @@ where
         endpoint: &str,
         manifest_rev: u64,
     ) {
-        todo!()
     }
 }

@@ -5,6 +5,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
+use log::debug;
 use tokio::time::sleep;
 
 use crate::error;
@@ -17,12 +18,13 @@ lazy_static! {
         Arc::new(FailFastRetryStrategy::default());
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum RetryReason {
     NotMyVbucket,
     InvalidVbucketMap,
     TempFail,
+    KvCollectionOutdated,
     Unknown,
 }
 
@@ -32,6 +34,7 @@ impl RetryReason {
             RetryReason::InvalidVbucketMap => true,
             RetryReason::NotMyVbucket => true,
             RetryReason::TempFail => true,
+            RetryReason::KvCollectionOutdated => true,
             RetryReason::Unknown => false,
             _ => false,
         }
@@ -42,6 +45,7 @@ impl RetryReason {
             RetryReason::InvalidVbucketMap => true,
             RetryReason::NotMyVbucket => true,
             RetryReason::TempFail => false,
+            RetryReason::KvCollectionOutdated => true,
             RetryReason::Unknown => false,
             _ => false,
         }
@@ -152,6 +156,10 @@ where
 
         if let Some(reason) = error_to_retry_reason(&err) {
             if let Some(duration) = rs.maybe_retry(&mut retry_info, reason).await {
+                debug!(
+                    "Retrying operation after {:?} due to {:?}",
+                    duration, reason
+                );
                 sleep(duration).await;
                 continue;
             }
@@ -169,6 +177,10 @@ pub(crate) fn error_to_retry_reason(err: &Error) -> Option<RetryReason> {
             }
             if source.is_tmp_fail_error() {
                 return Some(RetryReason::TempFail);
+            }
+            if source.is_unknown_collection_id_error() || source.is_unknown_collection_name_error()
+            {
+                return Some(RetryReason::KvCollectionOutdated);
             }
         }
         ErrorKind::InvalidVbucketMap => {

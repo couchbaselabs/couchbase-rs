@@ -1,23 +1,31 @@
 extern crate core;
 
+use crate::common::default_agent_options::{create_default_options, create_options_without_bucket};
+use crate::common::helpers::{
+    create_collection_and_wait_for_kv, delete_collection_and_wait_for_kv, generate_bytes_value,
+    generate_key,
+};
+use crate::common::test_config::{setup_tests, test_bucket, test_is_ssl, test_scope};
 use couchbase_core::agent::Agent;
 use couchbase_core::crudoptions::{
     AddOptions, AppendOptions, DecrementOptions, DeleteOptions, GetAndLockOptions,
-    GetAndTouchOptions, GetOptions, IncrementOptions, LookupInOptions, MutateInOptions,
-    PrependOptions, ReplaceOptions, TouchOptions, UnlockOptions, UpsertOptions,
+    GetAndTouchOptions, GetCollectionIdOptions, GetOptions, IncrementOptions, LookupInOptions,
+    MutateInOptions, PrependOptions, ReplaceOptions, TouchOptions, UnlockOptions, UpsertOptions,
 };
 use couchbase_core::memdx::error::ErrorKind::Server;
 use couchbase_core::memdx::error::ServerErrorKind::KeyExists;
 use couchbase_core::memdx::error::{ErrorKind, ServerError, ServerErrorKind, SubdocErrorKind};
 use couchbase_core::memdx::subdoc::{LookupInOp, LookupInOpType, MutateInOp, MutateInOpType};
+use couchbase_core::mgmtoptions::{CreateCollectionOptions, DeleteCollectionOptions};
 use couchbase_core::retrybesteffort::{BestEffortRetryStrategy, ExponentialBackoffCalculator};
 use couchbase_core::retryfailfast::FailFastRetryStrategy;
+use rand::distr::Alphanumeric;
+use rand::{rng, Rng};
 use serde::Serialize;
+use std::ops::Add;
 use std::sync::Arc;
-
-use crate::common::default_agent_options::{create_default_options, create_options_without_bucket};
-use crate::common::helpers::{generate_bytes_value, generate_key};
-use crate::common::test_config::{setup_tests, test_is_ssl};
+use std::time::Duration;
+use tokio::time::{timeout_at, Instant};
 
 mod common;
 
@@ -629,6 +637,197 @@ async fn test_kv_without_a_bucket() {
     }
 }
 
+#[tokio::test]
+async fn test_unknown_collection_id() {
+    setup_tests().await;
+
+    let agent_opts = create_default_options().await;
+    let bucket = test_bucket().await;
+    let scope_name = test_scope().await;
+    let collection_name = rng()
+        .sample_iter(&Alphanumeric)
+        .take(10)
+        .map(char::from)
+        .collect::<String>();
+
+    let mut agent = Agent::new(agent_opts).await.unwrap();
+
+    let strat = Arc::new(FailFastRetryStrategy::default());
+
+    let key = generate_key();
+    let value = generate_bytes_value(32);
+
+    agent
+        .create_collection(&CreateCollectionOptions::new(
+            &bucket,
+            &scope_name,
+            &collection_name,
+        ))
+        .await
+        .unwrap();
+
+    let fut = || async {
+        loop {
+            let resp = agent
+                .get_collection_id(GetCollectionIdOptions::new(&scope_name, &collection_name))
+                .await;
+            if resp.is_ok() {
+                break;
+            }
+
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    };
+
+    timeout_at(Instant::now().add(Duration::from_secs(5)), fut())
+        .await
+        .unwrap();
+
+    // Do an upsert to prep the cid cache.
+    let upsert_opts = UpsertOptions::new(
+        key.as_slice(),
+        &scope_name,
+        &collection_name,
+        value.as_slice(),
+    )
+    .retry_strategy(strat.clone());
+
+    let upsert_result = agent.upsert(upsert_opts).await.unwrap();
+
+    assert_ne!(0, upsert_result.cas);
+    assert!(upsert_result.mutation_token.is_some());
+
+    agent
+        .delete_collection(&DeleteCollectionOptions::new(
+            &bucket,
+            &scope_name,
+            &collection_name,
+        ))
+        .await
+        .unwrap();
+
+    let fut = || async {
+        loop {
+            let resp = agent
+                .get_collection_id(GetCollectionIdOptions::new(&scope_name, &collection_name))
+                .await;
+            if resp.is_err() {
+                break;
+            }
+
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    };
+
+    timeout_at(Instant::now().add(Duration::from_millis(2500)), fut())
+        .await
+        .unwrap();
+
+    let upsert_opts = UpsertOptions::new(
+        key.as_slice(),
+        &scope_name,
+        &collection_name,
+        value.as_slice(),
+    )
+    .retry_strategy(Arc::new(BestEffortRetryStrategy::new(
+        ExponentialBackoffCalculator::default(),
+    )));
+
+    let upsert_result = timeout_at(
+        Instant::now().add(Duration::from_millis(2500)),
+        agent.upsert(upsert_opts),
+    )
+    .await;
+
+    match upsert_result {
+        Ok(_) => {
+            panic!("Expected error due to timeout");
+        }
+        Err(_e) => {}
+    }
+
+    agent.close().await;
+}
+
+#[tokio::test]
+async fn test_changed_collection_id() {
+    setup_tests().await;
+
+    let agent_opts = create_default_options().await;
+    let bucket = test_bucket().await;
+    let scope_name = test_scope().await;
+    let collection_name = rng()
+        .sample_iter(&Alphanumeric)
+        .take(10)
+        .map(char::from)
+        .collect::<String>();
+
+    let mut agent = Agent::new(agent_opts).await.unwrap();
+
+    let strat = Arc::new(FailFastRetryStrategy::default());
+
+    let key = generate_key();
+    let value = generate_bytes_value(32);
+
+    create_collection_and_wait_for_kv(
+        agent.clone(),
+        &bucket,
+        &scope_name,
+        &collection_name,
+        Instant::now().add(Duration::from_secs(5)),
+    )
+    .await;
+
+    // Do an upsert to prep the cid cache.
+    let upsert_opts = UpsertOptions::new(
+        key.as_slice(),
+        &scope_name,
+        &collection_name,
+        value.as_slice(),
+    )
+    .retry_strategy(strat.clone());
+
+    let upsert_result = agent.upsert(upsert_opts).await.unwrap();
+
+    assert_ne!(0, upsert_result.cas);
+    assert!(upsert_result.mutation_token.is_some());
+
+    delete_collection_and_wait_for_kv(
+        agent.clone(),
+        &bucket,
+        &scope_name,
+        &collection_name,
+        Instant::now().add(Duration::from_secs(5)),
+    )
+    .await;
+
+    create_collection_and_wait_for_kv(
+        agent.clone(),
+        &bucket,
+        &scope_name,
+        &collection_name,
+        Instant::now().add(Duration::from_secs(5)),
+    )
+    .await;
+
+    let upsert_opts = UpsertOptions::new(
+        key.as_slice(),
+        &scope_name,
+        &collection_name,
+        value.as_slice(),
+    )
+    .retry_strategy(Arc::new(BestEffortRetryStrategy::new(
+        ExponentialBackoffCalculator::default(),
+    )));
+
+    // This call should now get a cid unknown error and fetch the new one.
+    let upsert_result = agent.upsert(upsert_opts).await.unwrap();
+
+    assert_ne!(0, upsert_result.cas);
+    assert!(upsert_result.mutation_token.is_some());
+
+    agent.close().await;
+}
 #[cfg(feature = "dhat-heap")]
 #[tokio::test]
 async fn upsert_allocations() {

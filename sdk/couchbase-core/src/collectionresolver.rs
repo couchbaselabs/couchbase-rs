@@ -1,9 +1,7 @@
+use crate::error::{Error, Result};
+use crate::memdx::error::ServerError;
 use std::future::Future;
 use std::sync::Arc;
-
-use crate::error::ErrorKind::CollectionManifestOutdated;
-use crate::error::Result;
-use crate::memdx::error::ServerError;
 
 pub(crate) trait CollectionResolver: Sized + Send + Sync {
     fn resolve_collection_id(
@@ -31,60 +29,77 @@ where
     Cr: CollectionResolver,
     Fut: Future<Output = Result<Resp>> + Send,
 {
-    let (mut collection_id, mut manifest_rev) = resolver
+    let (collection_id, mut manifest_rev) = match resolver
         .resolve_collection_id(scope_name, collection_name)
-        .await?;
-
-    loop {
-        let err = match operation(collection_id, manifest_rev).await {
-            Ok(r) => return Ok(r),
-            Err(e) => e,
-        };
-
-        let invalidating_manifest_rev = if let Some(memdx_err) = err.is_memdx_error() {
-            if memdx_err.is_dispatch_error() {
-                if let Some(ctx) = memdx_err.has_server_error_context() {
-                    if let Some(parsed) = ServerError::parse_context(ctx) {
-                        parsed.manifest_rev
-                    } else {
-                        return Err(err);
-                    }
-                } else {
-                    return Err(err);
-                }
-            } else {
-                return Err(err);
-            }
-        } else {
-            return Err(err);
-        };
-
-        let invalidating_manifest_rev = invalidating_manifest_rev.unwrap_or_default();
-        if invalidating_manifest_rev > 0 && invalidating_manifest_rev < manifest_rev {
-            return Err(CollectionManifestOutdated {
-                manifest_uid: manifest_rev,
-                server_manifest_uid: invalidating_manifest_rev,
-            }
-            .into());
+        .await
+    {
+        Ok(r) => r,
+        Err(e) => {
+            return Err(maybe_invalidate_collection_id(
+                resolver,
+                e,
+                0,
+                scope_name,
+                collection_name,
+            )
+            .await);
         }
+    };
 
-        resolver
-            .invalidate_collection_id(scope_name, collection_name, "", invalidating_manifest_rev)
-            .await;
+    let err = match operation(collection_id, manifest_rev).await {
+        Ok(r) => return Ok(r),
+        Err(e) => e,
+    };
 
-        let (new_collection_id, new_manifest_rev) = resolver
-            .resolve_collection_id(scope_name, collection_name)
-            .await?;
+    Err(
+        maybe_invalidate_collection_id(resolver, err, manifest_rev, scope_name, collection_name)
+            .await,
+    )
+}
 
-        if new_collection_id == collection_id {
-            return Err(CollectionManifestOutdated {
-                manifest_uid: manifest_rev,
-                server_manifest_uid: invalidating_manifest_rev,
-            }
-            .into());
-        }
+async fn maybe_invalidate_collection_id<Cr>(
+    resolver: Arc<Cr>,
+    err: Error,
+    our_manifest_rev: u64,
+    scope_name: &str,
+    collection_name: &str,
+) -> Error
+where
+    Cr: CollectionResolver,
+{
+    let invalidating_manifest_rev = if let Some(manifest_rev) = parse_manifest_rev_from_error(&err)
+    {
+        manifest_rev
+    } else {
+        return err;
+    };
 
-        collection_id = new_collection_id;
-        manifest_rev = new_manifest_rev;
+    if our_manifest_rev > 0
+        && invalidating_manifest_rev > 0
+        && invalidating_manifest_rev < our_manifest_rev
+    {
+        return err;
     }
+
+    resolver
+        .invalidate_collection_id(scope_name, collection_name, "", invalidating_manifest_rev)
+        .await;
+
+    err
+}
+
+fn parse_manifest_rev_from_error(e: &Error) -> Option<u64> {
+    if let Some(memdx_err) = e.is_memdx_error() {
+        if memdx_err.is_unknown_collection_id_error()
+            || memdx_err.is_unknown_collection_name_error()
+        {
+            if let Some(ctx) = memdx_err.has_server_error_context() {
+                if let Some(parsed) = ServerError::parse_context(ctx) {
+                    return parsed.manifest_rev;
+                }
+            }
+        }
+    }
+
+    None
 }
