@@ -64,8 +64,8 @@ impl OpsSASLAuthPlain {
             run_op_future_with_deadline(opts.deadline, encoder.sasl_auth(dispatcher, req)).await?;
 
         if resp.needs_more_steps {
-            return Err(error::Error::protocol_error(
-                "Server did not accept auth when the client expected",
+            return Err(error::Error::new_protocol_error(
+                "server did not accept auth when the client expected",
             ));
         }
 

@@ -18,7 +18,7 @@ pub struct EnvTestConfig {
     pub username: String,
     #[envconfig(from = "RCBPASSWORD", default = "password")]
     pub password: String,
-    #[envconfig(from = "RCBCONNSTR", default = "couchbases://192.168.107.128")]
+    #[envconfig(from = "RCBCONNSTR", default = "couchbase://192.168.107.128")]
     pub conn_string: String,
     #[envconfig(from = "RCBBUCKET", default = "default")]
     pub default_bucket: String,

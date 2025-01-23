@@ -65,12 +65,14 @@ impl TcpConnection {
         let tcp_socket = timeout_at(opts.deadline, TcpStream::connect(addr))
             .await
             .map_err(|e| {
-                Error::connection_failed_error(
+                Error::new_connection_failed_error(
                     "failed to connect to server within timeout",
                     Box::new(io::Error::new(io::ErrorKind::TimedOut, e)),
                 )
             })?
-            .map_err(|e| Error::connection_failed_error(&e.to_string(), Box::new(e)))?;
+            .map_err(|e| {
+                Error::new_connection_failed_error("failed to create tcp stream", Box::new(e))
+            })?;
 
         let local_addr = tcp_socket
             .local_addr()
@@ -81,7 +83,7 @@ impl TcpConnection {
             .unwrap_or_else(|_e| SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0));
 
         tcp_socket.set_nodelay(false).map_err(|e| {
-            Error::connection_failed_error("failed to set tcp nodelay", Box::new(e))
+            Error::new_connection_failed_error("failed to set tcp nodelay", Box::new(e))
         })?;
 
         Ok((tcp_socket, local_addr, peer_addr))
@@ -145,13 +147,13 @@ impl TlsConnection {
         )
         .await
         .map_err(|e| {
-            Error::connection_failed_error(
+            Error::new_connection_failed_error(
                 "failed to upgrade tcp stream to tls within timeout",
                 Box::new(io::Error::new(io::ErrorKind::TimedOut, e)),
             )
         })?
         .map_err(|e| {
-            Error::connection_failed_error("failed to upgrade tcp stream to tls", Box::new(e))
+            Error::new_connection_failed_error("failed to upgrade tcp stream to tls", Box::new(e))
         })?;
 
         Ok(TlsConnection {
@@ -178,13 +180,16 @@ impl TlsConnection {
         )
         .await
         .map_err(|e| {
-            Error::connection_failed_error(
+            Error::new_connection_failed_error(
                 "failed to upgrade tcp stream to tls within timeout",
                 Box::new(io::Error::new(io::ErrorKind::TimedOut, e)),
             )
         })?
         .map_err(|e| {
-            Error::connection_failed_error("failed to upgrade tcp stream to tls", Box::new(e))
+            Error::new_connection_failed_error(
+                "failed to upgrade tcp stream to tls",
+                Box::new(io::Error::new(io::ErrorKind::Other, e)),
+            )
         })?;
 
         Ok(TlsConnection {

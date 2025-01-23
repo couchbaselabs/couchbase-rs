@@ -1,3 +1,4 @@
+use crate::memdx::client::ResponseContext;
 use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::error::Result;
 use crate::memdx::magic::Magic;
@@ -18,7 +19,7 @@ impl OpsUtil {
     where
         D: Dispatcher,
     {
-        let full_name = format!("{}.{}", request.scope_name, request.collection_name);
+        let full_name = format!("{}.{}", &request.scope_name, &request.collection_name);
 
         let op = dispatcher
             .dispatch(
@@ -34,7 +35,13 @@ impl OpsUtil {
                     framing_extras: None,
                     opaque: None,
                 },
-                None,
+                Some(ResponseContext {
+                    cas: None,
+                    subdoc_info: None,
+                    is_persistent: false,
+                    scope_name: Some(request.scope_name.to_string()),
+                    collection_name: Some(request.collection_name.to_string()),
+                }),
             )
             .await?;
 

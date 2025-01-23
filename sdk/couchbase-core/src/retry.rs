@@ -10,6 +10,7 @@ use tokio::time::sleep;
 
 use crate::error;
 use crate::error::{Error, ErrorKind};
+use crate::memdx::error::ServerErrorKind;
 use crate::retrybesteffort::controlled_backoff;
 use crate::retryfailfast::FailFastRetryStrategy;
 
@@ -172,13 +173,14 @@ where
 pub(crate) fn error_to_retry_reason(err: &Error) -> Option<RetryReason> {
     match err.kind.as_ref() {
         ErrorKind::Memdx { source, .. } => {
-            if source.is_notmyvbucket_error() {
+            if source.is_server_error_kind(ServerErrorKind::NotMyVbucket) {
                 return Some(RetryReason::NotMyVbucket);
             }
-            if source.is_tmp_fail_error() {
+            if source.is_server_error_kind(ServerErrorKind::TmpFail) {
                 return Some(RetryReason::TempFail);
             }
-            if source.is_unknown_collection_id_error() || source.is_unknown_collection_name_error()
+            if source.is_server_error_kind(ServerErrorKind::UnknownCollectionID)
+                || source.is_server_error_kind(ServerErrorKind::UnknownCollectionName)
             {
                 return Some(RetryReason::KvCollectionOutdated);
             }

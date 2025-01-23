@@ -8,8 +8,8 @@ use tokio::time::{timeout_at, Instant};
 
 use crate::memdx::client::OpaqueMap;
 use crate::memdx::client_response::ClientResponse;
-use crate::memdx::error::Result;
-use crate::memdx::error::{CancellationErrorKind, ErrorKind};
+use crate::memdx::error::CancellationErrorKind;
+use crate::memdx::error::{Error, Result};
 use crate::memdx::response::TryFromClientResponse;
 
 pub trait PendingOp<T> {
@@ -55,7 +55,9 @@ impl ClientPendingOp {
 
         match self.response_receiver.recv().await {
             Some(r) => r,
-            None => Err(ErrorKind::Cancelled(CancellationErrorKind::RequestCancelled).into()),
+            None => Err(Error::new_cancelled_error(
+                CancellationErrorKind::RequestCancelled,
+            )),
         }
     }
 
@@ -77,7 +79,7 @@ impl ClientPendingOp {
             let sender = &context.sender;
 
             sender
-                .send(Err(ErrorKind::Cancelled(e).into()))
+                .send(Err(Error::new_cancelled_error(e)))
                 .await
                 .unwrap();
         }
@@ -125,14 +127,14 @@ where
     let mut op = match timeout_at(deadline, fut).await {
         Ok(op) => op?,
         Err(_e) => {
-            return Err(ErrorKind::Cancelled(CancellationErrorKind::Timeout).into());
+            return Err(Error::new_cancelled_error(CancellationErrorKind::Timeout));
         }
     };
 
     match timeout_at(deadline, op.recv()).await {
         Ok(res) => res,
         Err(_e) => {
-            op.cancel(CancellationErrorKind::Timeout);
+            op.cancel(CancellationErrorKind::Timeout).await;
             op.recv().await
         }
     }
