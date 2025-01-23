@@ -45,7 +45,7 @@ impl TryFrom<u8> for Magic {
             0x08 => Magic::ReqExt,
             0x18 => Magic::ResExt,
             _ => {
-                return Err(Error::protocol_error(format!("unknown magic {}", value)));
+                return Err(Error::new_message_error(format!("unknown magic {}", value)));
             }
         };
 

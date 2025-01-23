@@ -28,10 +28,7 @@ impl Decoder for KeyValueCodec {
         let total_body_len = match buf[8..12].try_into() {
             Ok(v) => u32::from_be_bytes(v),
             Err(e) => {
-                return Err(Error::protocol_error_with_source(
-                    "failed to read total body length",
-                    Box::new(e),
-                ));
+                return Err(Error::new_protocol_error("failed to read total body length").with(e));
             }
         } as usize;
 

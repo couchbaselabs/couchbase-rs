@@ -52,7 +52,7 @@ impl OpsSASLAuthScram {
     {
         // Perform the initial SASL step
         let payload = client.step1().map_err(|e| {
-            Error::protocol_error_with_source("failed to perform step1", Box::new(e))
+            Error::new_protocol_error("failed to perform initial sasl step").with(e)
         })?;
 
         let req = SASLAuthRequest {
@@ -67,9 +67,9 @@ impl OpsSASLAuthScram {
             return Ok(());
         }
 
-        let payload = client.step2(resp.payload.as_slice()).map_err(|e| {
-            Error::protocol_error_with_source("failed to perform step2", Box::new(e))
-        })?;
+        let payload = client
+            .step2(resp.payload.as_slice())
+            .map_err(|e| Error::new_protocol_error("failed to perform second sasl step").with(e))?;
 
         let req = SASLStepRequest {
             payload,
@@ -80,8 +80,8 @@ impl OpsSASLAuthScram {
             run_op_future_with_deadline(opts.deadline, encoder.sasl_step(dispatcher, req)).await?;
 
         if resp.needs_more_steps {
-            return Err(Error::protocol_error(
-                "Server did not accept auth when the client expected",
+            return Err(Error::new_protocol_error(
+                "server did not accept auth when the client expected",
             ));
         }
 

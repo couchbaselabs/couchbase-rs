@@ -31,8 +31,8 @@ impl TryFrom<&str> for AuthMechanism {
             "SCRAM-SHA256" => AuthMechanism::ScramSha256,
             "SCRAM-SHA512" => AuthMechanism::ScramSha512,
             _ => {
-                return Err(Error::protocol_error(format!(
-                    "unknown auth mechanism {}",
+                return Err(Error::new_protocol_error(format!(
+                    "unsupported auth mechanism {}",
                     value
                 )));
             }

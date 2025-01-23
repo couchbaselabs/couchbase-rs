@@ -1,5 +1,5 @@
 use crate::error::{Error, Result};
-use crate::memdx::error::ServerError;
+use crate::memdx::error::{ServerError, ServerErrorKind};
 use std::future::Future;
 use std::sync::Arc;
 
@@ -67,17 +67,9 @@ async fn maybe_invalidate_collection_id<Cr>(
 where
     Cr: CollectionResolver,
 {
-    let invalidating_manifest_rev = if let Some(manifest_rev) = parse_manifest_rev_from_error(&err)
-    {
-        manifest_rev
-    } else {
-        return err;
-    };
+    let invalidating_manifest_rev = parse_manifest_rev_from_error(&err).unwrap_or_default();
 
-    if our_manifest_rev > 0
-        && invalidating_manifest_rev > 0
-        && invalidating_manifest_rev < our_manifest_rev
-    {
+    if invalidating_manifest_rev > 0 && invalidating_manifest_rev < our_manifest_rev {
         return err;
     }
 
@@ -90,8 +82,8 @@ where
 
 fn parse_manifest_rev_from_error(e: &Error) -> Option<u64> {
     if let Some(memdx_err) = e.is_memdx_error() {
-        if memdx_err.is_unknown_collection_id_error()
-            || memdx_err.is_unknown_collection_name_error()
+        if memdx_err.is_server_error_kind(ServerErrorKind::UnknownCollectionID)
+            || memdx_err.is_server_error_kind(ServerErrorKind::UnknownCollectionName)
         {
             if let Some(ctx) = memdx_err.has_server_error_context() {
                 if let Some(parsed) = ServerError::parse_context(ctx) {

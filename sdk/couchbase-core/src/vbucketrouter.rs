@@ -4,6 +4,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use crate::cbconfig::TerseConfig;
 use crate::error::ErrorKind;
 use crate::error::Result;
+use crate::memdx::error::ServerErrorKind;
 use crate::memdx::response::TryFromClientResponse;
 use crate::nmvbhandler::NotMyVbucketConfigHandler;
 use crate::vbucketmap::VbucketMap;
@@ -104,7 +105,7 @@ where
         };
 
         let config = if let Some(memdx_err) = err.is_memdx_error() {
-            if memdx_err.is_notmyvbucket_error() {
+            if memdx_err.is_server_error_kind(ServerErrorKind::NotMyVbucket) {
                 if let Some(config) = memdx_err.has_server_config() {
                     config
                 } else {

@@ -23,6 +23,7 @@ use crate::kvclientmanager::{
     KvClientManagerClientType,
 };
 use crate::memdx::datatype::DataTypeFlag;
+use crate::memdx::error::ServerErrorKind;
 use crate::memdx::hello_feature::HelloFeature;
 use crate::memdx::request::{
     AddRequest, AppendRequest, DecrementRequest, DeleteRequest, GetAndLockRequest,
@@ -695,7 +696,7 @@ impl<
                 };
 
             if let Some(memdx_err) = err.is_memdx_error() {
-                if memdx_err.is_unknown_collection_name_error() {
+                if memdx_err.is_server_error_kind(ServerErrorKind::UnknownCollectionName) {
                     return Err(err);
                 }
             }

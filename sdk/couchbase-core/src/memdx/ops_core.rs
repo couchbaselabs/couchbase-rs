@@ -1,7 +1,3 @@
-use std::io::Write;
-
-use byteorder::{BigEndian, WriteBytesExt};
-
 use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::error::Result;
 use crate::memdx::error::{ServerError, ServerErrorKind};
@@ -31,14 +27,14 @@ impl OpsCore {
         resp: &ResponsePacket,
         kind: ServerErrorKind,
     ) -> ServerError {
-        let mut base_cause = ServerError::new(kind, resp);
+        let mut base_cause = ServerError::new(kind, resp.op_code, resp.status, resp.opaque);
 
         if let Some(value) = &resp.value {
             if resp.status == Status::NotMyVbucket {
                 // TODO: unsure what this actually does.
-                base_cause.config = Some(value.to_vec());
+                base_cause = base_cause.with_config(value.to_vec());
             } else {
-                base_cause.context = Some(value.to_vec())
+                base_cause = base_cause.with_context(value.to_vec());
             }
         }
 
@@ -72,7 +68,9 @@ impl OpBootstrapEncoder for OpsCore {
     {
         let mut features: Vec<u8> = Vec::new();
         for feature in request.requested_features {
-            features.write_u16::<BigEndian>(feature.into())?;
+            let feature: u16 = feature.into();
+            let bytes = feature.to_be_bytes();
+            features.extend_from_slice(&bytes);
         }
 
         let op = dispatcher
@@ -104,8 +102,7 @@ impl OpBootstrapEncoder for OpsCore {
     where
         D: Dispatcher,
     {
-        let mut value = Vec::new();
-        value.write_u16::<BigEndian>(request.version)?;
+        let version = request.version.to_be_bytes();
 
         let op = dispatcher
             .dispatch(
@@ -117,7 +114,7 @@ impl OpBootstrapEncoder for OpsCore {
                     cas: None,
                     extras: None,
                     key: None,
-                    value: Some(&value),
+                    value: Some(&version),
                     framing_extras: None,
                     opaque: None,
                 },
@@ -136,8 +133,7 @@ impl OpBootstrapEncoder for OpsCore {
     where
         D: Dispatcher,
     {
-        let mut key = Vec::new();
-        key.write_all(request.bucket_name.as_bytes())?;
+        let key = request.bucket_name.into_bytes();
 
         let op = dispatcher
             .dispatch(
@@ -200,7 +196,7 @@ impl OpSASLPlainEncoder for OpsCore {
         D: Dispatcher,
     {
         let mut value = Vec::new();
-        value.write_all(request.payload.as_slice())?;
+        value.extend_from_slice(request.payload.as_slice());
         let key: Vec<u8> = request.auth_mechanism.into();
 
         let op = dispatcher
@@ -268,7 +264,7 @@ impl OpSASLScramEncoder for OpsCore {
         D: Dispatcher,
     {
         let mut value = Vec::new();
-        value.write_all(request.payload.as_slice())?;
+        value.extend_from_slice(request.payload.as_slice());
         let key: Vec<u8> = request.auth_mechanism.into();
 
         let op = dispatcher

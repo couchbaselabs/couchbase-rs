@@ -9,6 +9,7 @@ use std::thread::spawn;
 use std::{env, mem};
 
 use async_trait::async_trait;
+use bytes::Bytes;
 use futures::{SinkExt, TryFutureExt};
 use log::{debug, error, trace, warn};
 use snap::raw::Decoder;
@@ -30,7 +31,7 @@ use crate::memdx::dispatcher::{
     Dispatcher, DispatcherOptions, OnConnectionCloseHandler, OrphanResponseHandler,
 };
 use crate::memdx::error;
-use crate::memdx::error::{CancellationErrorKind, Error, ErrorKind};
+use crate::memdx::error::{CancellationErrorKind, Error};
 use crate::memdx::hello_feature::HelloFeature::DataType;
 use crate::memdx::packet::{RequestPacket, ResponsePacket};
 use crate::memdx::pendingop::ClientPendingOp;
@@ -39,17 +40,19 @@ use crate::memdx::subdoc::SubdocRequestInfo;
 pub(crate) type ResponseSender = Sender<error::Result<ClientResponse>>;
 pub(crate) type OpaqueMap = HashMap<u32, Arc<SenderContext>>;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct ResponseContext {
     pub cas: Option<u64>,
     pub subdoc_info: Option<SubdocRequestInfo>,
     pub is_persistent: bool,
+    pub scope_name: Option<String>,
+    pub collection_name: Option<String>,
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct SenderContext {
     pub sender: ResponseSender,
-    pub context: ResponseContext,
+    pub context: Arc<ResponseContext>,
 }
 
 struct ReadLoopOptions {
@@ -111,10 +114,9 @@ impl Client {
         for sender in senders {
             sender
                 .sender
-                .send(Err(ErrorKind::Cancelled(
+                .send(Err(Error::new_cancelled_error(
                     CancellationErrorKind::ClosedInFlight,
-                )
-                .into()))
+                )))
                 .await
                 .unwrap_or_default();
         }
@@ -179,7 +181,7 @@ impl Client {
                                                      {
                                                         Ok(v) => v,
                                                         Err(e) => {
-                                                            match sender.send(Err(ErrorKind::Json {msg: e.to_string()}.into())).await{
+                                                            match sender.send(Err(Error::new_decompression_error().with(e))).await{
                                                                 Ok(_) => {}
                                                                 Err(e) => {
                                                                     debug!("Sending response to caller failed: {}", e);
@@ -200,7 +202,7 @@ impl Client {
                                                     drop(map);
                                         }
 
-                                        let resp = ClientResponse::new(packet, context.context);
+                                        let resp = ClientResponse::new(packet, context.context.clone());
                                         match sender.send(Ok(resp)).await {
                                             Ok(_) => {}
                                             Err(e) => {
@@ -299,11 +301,13 @@ impl Dispatcher for Client {
             cas: packet.cas,
             subdoc_info: None,
             is_persistent: false,
+            scope_name: None,
+            collection_name: None,
         });
         let is_persistent = context.is_persistent;
         let opaque = self.register_handler(SenderContext {
             sender: response_tx,
-            context,
+            context: Arc::new(context),
         });
         packet.opaque = Some(opaque);
         let op_code = packet.op_code;
@@ -335,7 +339,7 @@ impl Dispatcher for Client {
                     map.remove(&opaque);
                 }
 
-                Err(Error::dispatch_error(opaque, op_code, Box::new(e)))
+                Err(Error::new_dispatch_error(opaque, op_code, Box::new(e)))
             }
         }
     }
@@ -365,7 +369,7 @@ impl Dispatcher for Client {
         Self::drain_opaque_map(self.opaque_map.clone()).await;
 
         if let Some(e) = close_err {
-            return Err(Error::close_error(e.to_string(), Box::new(e)));
+            return Err(Error::new_close_error(e.to_string(), Box::new(e)));
         }
 
         Ok(())

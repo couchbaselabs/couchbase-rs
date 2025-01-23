@@ -9,14 +9,11 @@ use crate::common::test_config::{setup_tests, test_bucket, test_is_ssl, test_sco
 use couchbase_core::agent::Agent;
 use couchbase_core::crudoptions::{
     AddOptions, AppendOptions, DecrementOptions, DeleteOptions, GetAndLockOptions,
-    GetAndTouchOptions, GetCollectionIdOptions, GetOptions, IncrementOptions, LookupInOptions,
-    MutateInOptions, PrependOptions, ReplaceOptions, TouchOptions, UnlockOptions, UpsertOptions,
+    GetAndTouchOptions, GetOptions, IncrementOptions, LookupInOptions, MutateInOptions,
+    PrependOptions, ReplaceOptions, TouchOptions, UnlockOptions, UpsertOptions,
 };
-use couchbase_core::memdx::error::ErrorKind::Server;
-use couchbase_core::memdx::error::ServerErrorKind::KeyExists;
-use couchbase_core::memdx::error::{ErrorKind, ServerError, ServerErrorKind, SubdocErrorKind};
+use couchbase_core::memdx::error::{ServerErrorKind, SubdocErrorKind};
 use couchbase_core::memdx::subdoc::{LookupInOp, LookupInOpType, MutateInOp, MutateInOpType};
-use couchbase_core::mgmtoptions::{CreateCollectionOptions, DeleteCollectionOptions};
 use couchbase_core::retrybesteffort::{BestEffortRetryStrategy, ExponentialBackoffCalculator};
 use couchbase_core::retryfailfast::FailFastRetryStrategy;
 use rand::distr::Alphanumeric;
@@ -92,19 +89,12 @@ async fn test_add_and_delete() {
 
     let add_result = agent.add(add_opts.clone()).await;
 
-    assert!(matches!(
-        add_result
-            .err()
-            .unwrap()
-            .is_memdx_error()
-            .unwrap()
-            .kind
-            .as_ref(),
-        Server(ServerError {
-            kind: KeyExists,
-            ..
-        })
-    ));
+    assert!(add_result
+        .err()
+        .unwrap()
+        .is_memdx_error()
+        .unwrap()
+        .is_server_error_kind(ServerErrorKind::KeyExists));
 
     let delete_result = agent
         .delete(DeleteOptions::new(&key, "", "").retry_strategy(strat))
@@ -203,24 +193,15 @@ async fn test_lock_unlock() {
             UnlockOptions::new(key.as_slice(), "", "", cas)
                 .retry_strategy(Arc::new(FailFastRetryStrategy::default())),
         )
-        .await;
+        .await
+        .err()
+        .unwrap();
 
-    assert!(matches!(
-        unlock_result
-            .err()
-            .unwrap()
-            .is_memdx_error()
-            .unwrap()
-            .kind
-            .as_ref(),
-        Server(ServerError {
-            kind: ServerErrorKind::NotLocked,
-            ..
-        }) | Server(ServerError {
-            kind: ServerErrorKind::TmpFail,
-            ..
-        })
-    ));
+    let memdx_err = unlock_result.is_memdx_error().unwrap();
+    assert!(
+        memdx_err.is_server_error_kind(ServerErrorKind::NotLocked)
+            || memdx_err.is_server_error_kind(ServerErrorKind::TmpFail)
+    );
 
     let get_and_lock_result = agent
         .get_and_lock(
@@ -383,11 +364,7 @@ async fn test_append_and_prepend_cas_mismatch() {
     assert!(prepend_result.is_err());
     let e = prepend_result.err().unwrap();
     let e = e.is_memdx_error().unwrap();
-    let kind = e.kind.clone();
-    match *kind {
-        Server(err) => assert_eq!(ServerErrorKind::CasMismatch, err.kind),
-        _ => panic!("Error was not expected type, got {}", kind),
-    }
+    assert!(e.is_server_error_kind(ServerErrorKind::CasMismatch));
 
     let value = " 42".as_bytes();
 
@@ -402,11 +379,7 @@ async fn test_append_and_prepend_cas_mismatch() {
     assert!(append_result.is_err());
     let e = append_result.err().unwrap();
     let e = e.is_memdx_error().unwrap();
-    let kind = e.kind.clone();
-    match *kind {
-        Server(err) => assert_eq!(ServerErrorKind::CasMismatch, err.kind),
-        _ => panic!("Error was not expected type, got {}", kind),
-    }
+    assert!(e.is_server_error_kind(ServerErrorKind::CasMismatch));
 
     agent.close().await;
 }
@@ -517,9 +490,9 @@ async fn test_lookup_in() {
     assert!(lookup_in_result.value[1]
         .err
         .as_ref()
-        .is_some_and(|err| err.kind == SubdocErrorKind::PathNotFound));
+        .is_some_and(|err| err.is_error_kind(SubdocErrorKind::PathNotFound)));
     assert_eq!(
-        lookup_in_result.value[1].err.as_ref().unwrap().op_index,
+        lookup_in_result.value[1].err.as_ref().unwrap().op_index(),
         Some(1)
     );
     assert!(lookup_in_result.value[2].err.is_none());
@@ -625,16 +598,9 @@ async fn test_kv_without_a_bucket() {
     let err = upsert_result.err().unwrap();
     let memdx_err = err.is_memdx_error();
     assert!(memdx_err.is_some());
-    match memdx_err.unwrap().kind.as_ref() {
-        ErrorKind::Server(e) => {
-            assert_eq!(ServerErrorKind::NoBucket, e.kind);
-        }
-        _ => panic!(
-            "Error was not expected type, expected: {}, was {}",
-            ServerErrorKind::NoBucket,
-            memdx_err.unwrap().kind.as_ref()
-        ),
-    }
+    assert!(memdx_err
+        .unwrap()
+        .is_server_error_kind(ServerErrorKind::NoBucket));
 }
 
 #[tokio::test]
@@ -657,31 +623,14 @@ async fn test_unknown_collection_id() {
     let key = generate_key();
     let value = generate_bytes_value(32);
 
-    agent
-        .create_collection(&CreateCollectionOptions::new(
-            &bucket,
-            &scope_name,
-            &collection_name,
-        ))
-        .await
-        .unwrap();
-
-    let fut = || async {
-        loop {
-            let resp = agent
-                .get_collection_id(GetCollectionIdOptions::new(&scope_name, &collection_name))
-                .await;
-            if resp.is_ok() {
-                break;
-            }
-
-            tokio::time::sleep(Duration::from_millis(100)).await;
-        }
-    };
-
-    timeout_at(Instant::now().add(Duration::from_secs(5)), fut())
-        .await
-        .unwrap();
+    create_collection_and_wait_for_kv(
+        agent.clone(),
+        &bucket,
+        &scope_name,
+        &collection_name,
+        Instant::now().add(Duration::from_secs(5)),
+    )
+    .await;
 
     // Do an upsert to prep the cid cache.
     let upsert_opts = UpsertOptions::new(
@@ -697,31 +646,14 @@ async fn test_unknown_collection_id() {
     assert_ne!(0, upsert_result.cas);
     assert!(upsert_result.mutation_token.is_some());
 
-    agent
-        .delete_collection(&DeleteCollectionOptions::new(
-            &bucket,
-            &scope_name,
-            &collection_name,
-        ))
-        .await
-        .unwrap();
-
-    let fut = || async {
-        loop {
-            let resp = agent
-                .get_collection_id(GetCollectionIdOptions::new(&scope_name, &collection_name))
-                .await;
-            if resp.is_err() {
-                break;
-            }
-
-            tokio::time::sleep(Duration::from_millis(100)).await;
-        }
-    };
-
-    timeout_at(Instant::now().add(Duration::from_millis(2500)), fut())
-        .await
-        .unwrap();
+    delete_collection_and_wait_for_kv(
+        agent.clone(),
+        &bucket,
+        &scope_name,
+        &collection_name,
+        Instant::now().add(Duration::from_secs(5)),
+    )
+    .await;
 
     let upsert_opts = UpsertOptions::new(
         key.as_slice(),

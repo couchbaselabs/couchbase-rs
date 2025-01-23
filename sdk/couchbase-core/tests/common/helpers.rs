@@ -1,5 +1,6 @@
 use couchbase_core::agent::Agent;
 use couchbase_core::crudoptions::GetCollectionIdOptions;
+use couchbase_core::memdx::error::ServerErrorKind;
 use couchbase_core::mgmtoptions::{CreateCollectionOptions, DeleteCollectionOptions};
 use rand::distr::Alphanumeric;
 use rand::{rng, Rng};
@@ -85,8 +86,13 @@ pub async fn delete_collection_and_wait_for_kv(
             let resp = agent
                 .get_collection_id(GetCollectionIdOptions::new(scope_name, collection_name))
                 .await;
-            if resp.is_err() {
-                break;
+            if let Some(e) = resp.err() {
+                if e.is_memdx_error()
+                    .unwrap()
+                    .is_server_error_kind(ServerErrorKind::UnknownCollectionName)
+                {
+                    break;
+                }
             }
 
             tokio::time::sleep(Duration::from_millis(100)).await;

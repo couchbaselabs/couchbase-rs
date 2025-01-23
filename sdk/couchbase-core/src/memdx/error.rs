@@ -2,97 +2,99 @@ use serde::Deserialize;
 use std::error::Error as StdError;
 use std::fmt::{Display, Formatter, Pointer};
 use std::io;
-use thiserror::Error;
 
-use crate::memdx::error;
 use crate::memdx::opcode::OpCode;
-use crate::memdx::packet::ResponsePacket;
 use crate::memdx::status::Status;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
-#[non_exhaustive]
 pub struct Error {
-    /// Taken from serde_json: This `Box` allows us to keep the size of `Error` as small as possible.
-    /// A larger `Error` type was substantially slower due to all the functions
-    /// that pass around `Result<T, Error>`.
-    pub kind: Box<ErrorKind>,
-    pub source: Option<Box<dyn StdError + 'static + Send + Sync>>,
+    inner: Box<ErrorImpl>,
 }
 
 impl Error {
-    pub(crate) fn protocol_error(msg: impl Into<String>) -> Self {
+    pub(crate) fn new_protocol_error(msg: impl Into<String>) -> Self {
         Self {
-            kind: Box::new(ErrorKind::Protocol { msg: msg.into() }),
-            source: None,
-        }
-    }
-
-    pub(crate) fn protocol_error_with_source(
-        msg: impl Into<String>,
-        source: Box<dyn StdError + Send + Sync>,
-    ) -> Self {
-        Self {
-            kind: Box::new(ErrorKind::Protocol { msg: msg.into() }),
-            source: Some(source),
-        }
-    }
-
-    pub(crate) fn invalid_argument_error(msg: impl Into<String>, arg: impl Into<String>) -> Self {
-        Self {
-            kind: Box::new(ErrorKind::InvalidArgument {
-                msg: msg.into(),
-                arg: arg.into(),
+            inner: Box::new(ErrorImpl {
+                kind: ErrorKind::Protocol { msg: msg.into() },
+                source: None,
             }),
-            source: None,
+        }
+    }
+    pub(crate) fn new_decompression_error() -> Self {
+        Self {
+            inner: Box::new(ErrorImpl {
+                kind: ErrorKind::Decompression {},
+                source: None,
+            }),
         }
     }
 
-    pub(crate) fn invalid_argument_error_with_source(
+    pub(crate) fn new_message_error(msg: impl Into<String>) -> Self {
+        Self {
+            inner: Box::new(ErrorImpl {
+                kind: ErrorKind::Message(msg.into()),
+                source: None,
+            }),
+        }
+    }
+
+    pub(crate) fn new_cancelled_error(cancellation_kind: CancellationErrorKind) -> Self {
+        Self {
+            inner: Box::new(ErrorImpl {
+                kind: ErrorKind::Cancelled(cancellation_kind),
+                source: None,
+            }),
+        }
+    }
+
+    pub(crate) fn new_invalid_argument_error(
         msg: impl Into<String>,
-        arg: impl Into<String>,
-        source: Box<dyn StdError + Send + Sync>,
+        arg: impl Into<Option<String>>,
     ) -> Self {
         Self {
-            kind: Box::new(ErrorKind::InvalidArgument {
-                msg: msg.into(),
-                arg: arg.into(),
+            inner: Box::new(ErrorImpl {
+                kind: ErrorKind::InvalidArgument {
+                    msg: msg.into(),
+                    arg: arg.into(),
+                },
+                source: None,
             }),
-            source: Some(source),
         }
     }
-
-    pub(crate) fn connection_failed_error(
-        reason: &str,
-        source: Box<dyn StdError + Send + Sync>,
+    pub(crate) fn new_connection_failed_error(
+        reason: impl Into<String>,
+        source: Box<io::Error>,
     ) -> Self {
-        Error {
-            kind: Box::new(ErrorKind::ConnectionFailed { msg: reason.into() }),
-            source: Some(source),
+        Self {
+            inner: Box::new(ErrorImpl {
+                kind: ErrorKind::ConnectionFailed { msg: reason.into() },
+                source: Some(source),
+            }),
         }
     }
 
-    pub(crate) fn dispatch_error(
-        opaque: u32,
-        op_code: OpCode,
-        source: Box<dyn StdError + Send + Sync>,
-    ) -> Self {
-        Error {
-            kind: Box::new(ErrorKind::Dispatch { opaque, op_code }),
-            source: Some(source),
+    pub(crate) fn new_dispatch_error(opaque: u32, op_code: OpCode, source: Box<io::Error>) -> Self {
+        Self {
+            inner: Box::new(ErrorImpl {
+                kind: ErrorKind::Dispatch { opaque, op_code },
+                source: Some(source),
+            }),
         }
     }
 
-    pub(crate) fn close_error(msg: String, source: Box<dyn StdError + Send + Sync>) -> Self {
-        Error {
-            kind: Box::new(ErrorKind::Close { msg }),
-            source: Some(source),
+    pub(crate) fn new_close_error(msg: String, source: Box<io::Error>) -> Self {
+        Self {
+            inner: Box::new(ErrorImpl {
+                kind: ErrorKind::Close { msg },
+                source: Some(source),
+            }),
         }
     }
 
     pub fn has_server_config(&self) -> Option<&Vec<u8>> {
-        if let ErrorKind::Server(ServerError { config, .. }) = self.kind.as_ref() {
+        if let ErrorKind::Server(ServerError { config, .. }) = &self.inner.kind {
             config.as_ref()
         } else {
             None
@@ -100,70 +102,65 @@ impl Error {
     }
 
     pub fn has_server_error_context(&self) -> Option<&Vec<u8>> {
-        if let ErrorKind::Server(ServerError { context, .. }) = self.kind.as_ref() {
+        if let ErrorKind::Server(ServerError { context, .. }) = &self.inner.kind {
             context.as_ref()
-        } else if let ErrorKind::Resource(ResourceError { cause, .. }) = self.kind.as_ref() {
+        } else if let ErrorKind::Resource(ResourceError { cause, .. }) = &self.inner.kind {
             cause.context.as_ref()
         } else {
             None
         }
     }
 
+    pub fn is_cancellation_error(&self) -> bool {
+        matches!(self.inner.kind, ErrorKind::Cancelled { .. })
+    }
+
     pub fn is_dispatch_error(&self) -> bool {
-        matches!(self.kind.as_ref(), ErrorKind::Dispatch { .. })
+        matches!(self.inner.kind, ErrorKind::Dispatch { .. })
     }
 
-    pub fn is_notmyvbucket_error(&self) -> bool {
-        match self.kind.as_ref() {
-            ErrorKind::Server(e) => e.kind == ServerErrorKind::NotMyVbucket,
+    pub fn is_server_error_kind(&self, kind: ServerErrorKind) -> bool {
+        match &self.inner.kind {
+            ErrorKind::Server(e) => e.kind == kind,
+            ErrorKind::Resource(e) => e.cause.kind == kind,
             _ => false,
         }
     }
 
-    pub fn is_unknown_collection_id_error(&self) -> bool {
-        match self.kind.as_ref() {
-            ErrorKind::Server(e) => e.kind == ServerErrorKind::UnknownCollectionID,
-            _ => false,
-        }
+    pub fn kind(&self) -> &ErrorKind {
+        &self.inner.kind
     }
 
-    pub fn is_unknown_collection_name_error(&self) -> bool {
-        match self.kind.as_ref() {
-            ErrorKind::Resource(e) => e.cause.kind == ServerErrorKind::UnknownCollectionName,
-            _ => false,
-        }
+    pub(crate) fn with<C: Into<Source>>(mut self, source: C) -> Error {
+        self.inner.source = Some(source.into());
+        self
     }
+}
 
-    pub fn is_tmp_fail_error(&self) -> bool {
-        match self.kind.as_ref() {
-            ErrorKind::Server(e) => e.kind == ServerErrorKind::TmpFail,
-            _ => false,
-        }
-    }
+type Source = Box<dyn StdError + Send + Sync>;
+
+#[derive(Debug)]
+pub struct ErrorImpl {
+    pub kind: ErrorKind,
+    source: Option<Source>,
 }
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        if let Some(source) = &self.source {
-            write!(f, "{}, caused by: {}", self.kind, source)
-        } else {
-            write!(f, "{}", self.kind)
-        }
+        write!(f, "{}", self.inner.kind)
     }
 }
 
 impl StdError for Error {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
-        if let Some(source) = &self.source {
-            Some(source.as_ref())
-        } else {
-            None
-        }
+        self.inner
+            .source
+            .as_ref()
+            .map(|cause| &**cause as &(dyn StdError + 'static))
     }
 }
 
 #[derive(Debug, Clone)]
-#[non_exhaustive]
 pub enum ErrorKind {
     Server(ServerError),
     Resource(ResourceError),
@@ -181,25 +178,19 @@ pub enum ErrorKind {
         msg: String,
     },
     Cancelled(CancellationErrorKind),
-    UnknownBucketName,
     #[non_exhaustive]
     ConnectionFailed {
         msg: String,
     },
     #[non_exhaustive]
-    UnknownIo {
-        msg: String,
-    },
+    Io,
     #[non_exhaustive]
     InvalidArgument {
         msg: String,
-        arg: String,
+        arg: Option<String>,
     },
-    NoSupportedAuthMechanisms,
-    #[non_exhaustive]
-    Json {
-        msg: String,
-    },
+    Decompression,
+    Message(String),
 }
 
 impl Display for ErrorKind {
@@ -208,81 +199,95 @@ impl Display for ErrorKind {
             ErrorKind::Server(e) => write!(f, "{}", e),
             ErrorKind::Resource(e) => write!(f, "{}", e),
             ErrorKind::Dispatch { opaque, op_code } => {
-                write!(f, "Dispatch failed: opaque: {opaque}, op_code: {op_code}")
+                write!(f, "dispatch failed: opaque: {opaque}, op_code: {op_code}")
             }
             ErrorKind::Close { msg } => {
-                write!(f, "Close error {}", msg)
+                write!(f, "close error {msg}")
             }
             ErrorKind::Protocol { msg } => {
                 write!(f, "{msg}")
             }
             ErrorKind::Cancelled(kind) => {
-                write!(f, "Request cancelled: {}", kind)
+                write!(f, "request cancelled: {kind}")
             }
-            ErrorKind::UnknownBucketName => write!(f, "Unknown bucket name"),
             ErrorKind::ConnectionFailed { msg } => {
-                write!(f, "Connection failed {}", msg)
+                write!(f, "connection failed {msg}")
             }
-            ErrorKind::UnknownIo { msg } => {
-                write!(f, "Unknown IO error: {msg}")
+            ErrorKind::Io => {
+                write!(f, "connection error")
             }
             ErrorKind::InvalidArgument { msg, arg } => {
-                write!(f, "invalid argument: {arg}, arg: {msg}")
+                let base_msg = format!("invalid argument: {msg}");
+                if let Some(arg) = arg {
+                    write!(f, "{base_msg}, arg: {arg}")
+                } else {
+                    write!(f, "{base_msg}")
+                }
             }
-            ErrorKind::NoSupportedAuthMechanisms => {
-                write!(f, "No supported auth mechanism was found")
-            }
-            ErrorKind::Json { msg } => write!(f, "Json error: {}", msg),
+            ErrorKind::Decompression => write!(f, "decompression error"),
+            ErrorKind::Message(msg) => write!(f, "{msg}"),
         }
     }
 }
 
-impl ErrorKind {}
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ResourceError {
-    pub cause: ServerError,
-    pub scope_name: String,
-    pub collection_name: Option<String>,
-}
-
-impl Display for ResourceError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let msg = format!(
-            "resource error: {} (scope: {}, collection: {:?})",
-            self.cause, self.scope_name, self.collection_name,
-        );
-
-        write!(f, "{}", msg)
-    }
+    cause: ServerError,
+    scope_name: String,
+    collection_name: String,
 }
 
 impl StdError for ResourceError {}
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub struct SubdocError {
-    pub kind: SubdocErrorKind,
-    pub op_index: Option<u8>,
+impl ResourceError {
+    pub(crate) fn new(
+        cause: ServerError,
+        scope_name: impl Into<String>,
+        collection_name: impl Into<String>,
+    ) -> Self {
+        Self {
+            cause,
+            scope_name: scope_name.into(),
+            collection_name: collection_name.into(),
+        }
+    }
+
+    pub fn cause(&self) -> &ServerError {
+        &self.cause
+    }
+
+    pub fn scope_name(&self) -> &str {
+        &self.scope_name
+    }
+
+    pub fn collection_name(&self) -> &str {
+        &self.collection_name
+    }
 }
 
-impl SubdocError {
-    pub(crate) fn new(kind: SubdocErrorKind, op_index: Option<u8>) -> Self {
-        Self { kind, op_index }
+impl Display for ResourceError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Resource error: {}, scope: {}, collection: {}",
+            self.cause, self.scope_name, self.collection_name
+        )
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ServerError {
-    pub kind: ServerErrorKind,
-    pub config: Option<Vec<u8>>,
-    pub context: Option<Vec<u8>>,
-    pub op_code: OpCode,
-    pub status: Status,
-    pub opaque: u32,
+    kind: ServerErrorKind,
+    config: Option<Vec<u8>>,
+    context: Option<Vec<u8>>,
+    op_code: OpCode,
+    status: Status,
+    opaque: u32,
 }
+
+impl StdError for ServerError {}
 
 impl Display for ServerError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -304,30 +309,50 @@ impl Display for ServerError {
     }
 }
 
-impl Display for SubdocError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        if let Some(op_index) = self.op_index {
-            let base_msg = format!("Subdoc error: {}, op_index: {}", self.kind, op_index);
-            write!(f, "{}", base_msg)
-        } else {
-            let base_msg = format!("Subdoc error: {}", self.kind);
-            write!(f, "{}", base_msg)
-        }
-    }
-}
-
-impl StdError for ServerError {}
-
 impl ServerError {
-    pub(crate) fn new(kind: ServerErrorKind, resp: &ResponsePacket) -> Self {
+    pub(crate) fn new(kind: ServerErrorKind, op_code: OpCode, status: Status, opaque: u32) -> Self {
         Self {
             kind,
             config: None,
-            context: resp.value.clone(),
-            op_code: resp.op_code,
-            status: resp.status,
-            opaque: resp.opaque,
+            context: None,
+            op_code,
+            status,
+            opaque,
         }
+    }
+
+    pub(crate) fn with_context(mut self, context: Vec<u8>) -> Self {
+        self.context = Some(context);
+        self
+    }
+
+    pub(crate) fn with_config(mut self, config: Vec<u8>) -> Self {
+        self.config = Some(config);
+        self
+    }
+
+    pub fn kind(&self) -> &ServerErrorKind {
+        &self.kind
+    }
+
+    pub fn config(&self) -> Option<&Vec<u8>> {
+        self.config.as_ref()
+    }
+
+    pub fn context(&self) -> Option<&Vec<u8>> {
+        self.context.as_ref()
+    }
+
+    pub fn op_code(&self) -> OpCode {
+        self.op_code
+    }
+
+    pub fn status(&self) -> Status {
+        self.status
+    }
+
+    pub fn opaque(&self) -> u32 {
+        self.opaque
     }
 
     pub fn parse_context(context: &[u8]) -> Option<ServerErrorContext> {
@@ -358,23 +383,6 @@ impl ServerError {
     }
 }
 
-#[derive(Deserialize, Clone, Debug, PartialEq, Eq, Default)]
-struct ServerErrorContextJsonContext {
-    #[serde(alias = "context")]
-    context: Option<String>,
-}
-
-#[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
-#[non_exhaustive]
-struct ServerErrorContextJson {
-    #[serde(alias = "error", default)]
-    error: ServerErrorContextJsonContext,
-    #[serde(alias = "ref")]
-    pub error_ref: Option<String>,
-    #[serde(alias = "manifest_uid")]
-    pub manifest_rev: Option<String>,
-}
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ServerErrorContext {
@@ -383,96 +391,162 @@ pub struct ServerErrorContext {
     pub manifest_rev: Option<u64>,
 }
 
-#[derive(Error, Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum ServerErrorKind {
-    #[error("Not my vbucket")]
     NotMyVbucket,
-    #[error("Key exists")]
     KeyExists,
-    #[error("key not stored")]
     NotStored,
-    #[error("Key not found")]
     KeyNotFound,
-    #[error("Temporary failure")]
     TmpFail,
-    #[error("CAS mismatch")]
     CasMismatch,
-    #[error("Locked")]
     Locked,
-    #[error("Not Locked")]
     NotLocked,
-    #[error("Too big")]
     TooBig,
-    #[error("Unknown collection id")]
     UnknownCollectionID,
-    #[error("No bucket selected")]
     NoBucket,
-    #[error("Unknown bucket name")]
     UnknownBucketName,
-    #[error("Access error")]
     Access,
-    #[error("Auth error {msg}")]
     Auth { msg: String },
-    #[error("Config not set")]
     ConfigNotSet,
-    #[error("scope name unknown")]
     UnknownScopeName,
-    #[error("collection name unknown")]
     UnknownCollectionName,
-    #[error("{error}")]
     Subdoc { error: SubdocError },
-    #[error("Server status unexpected for operation: {status}")]
     UnknownStatus { status: Status },
 }
 
-#[derive(Error, Clone, Debug, Eq, Hash, PartialEq)]
+impl Display for ServerErrorKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ServerErrorKind::NotMyVbucket => write!(f, "not my vbucket"),
+            ServerErrorKind::KeyExists => write!(f, "key exists"),
+            ServerErrorKind::NotStored => write!(f, "key not stored"),
+            ServerErrorKind::KeyNotFound => write!(f, "key not found"),
+            ServerErrorKind::TmpFail => write!(f, "temporary failure"),
+            ServerErrorKind::CasMismatch => write!(f, "cas mismatch"),
+            ServerErrorKind::Locked => write!(f, "locked"),
+            ServerErrorKind::NotLocked => write!(f, "not locked"),
+            ServerErrorKind::TooBig => write!(f, "too big"),
+            ServerErrorKind::UnknownCollectionID => write!(f, "unknown collection id"),
+            ServerErrorKind::NoBucket => write!(f, "no bucket selected"),
+            ServerErrorKind::UnknownBucketName => write!(f, "unknown bucket name"),
+            ServerErrorKind::Access => write!(f, "access error"),
+            ServerErrorKind::Auth { msg } => write!(f, "auth error {}", msg),
+            ServerErrorKind::ConfigNotSet => write!(f, "config not set"),
+            ServerErrorKind::UnknownScopeName => write!(f, "scope name unknown"),
+            ServerErrorKind::UnknownCollectionName => write!(f, "collection name unknown"),
+            ServerErrorKind::Subdoc { error } => write!(f, "{}", error),
+            ServerErrorKind::UnknownStatus { status } => {
+                write!(f, "server status unexpected for operation: {}", status)
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub struct SubdocError {
+    kind: SubdocErrorKind,
+    op_index: Option<u8>,
+}
+
+impl StdError for SubdocError {}
+
+impl SubdocError {
+    pub(crate) fn new(kind: SubdocErrorKind, op_index: impl Into<Option<u8>>) -> Self {
+        Self {
+            kind,
+            op_index: op_index.into(),
+        }
+    }
+
+    pub fn is_error_kind(&self, kind: SubdocErrorKind) -> bool {
+        self.kind == kind
+    }
+
+    pub fn op_index(&self) -> Option<u8> {
+        self.op_index
+    }
+}
+
+impl Display for SubdocError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        if let Some(op_index) = self.op_index {
+            let base_msg = format!("Subdoc error: {}, op_index: {}", self.kind, op_index);
+            write!(f, "{}", base_msg)
+        } else {
+            let base_msg = format!("Subdoc error: {}", self.kind);
+            write!(f, "{}", base_msg)
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum SubdocErrorKind {
-    #[error("subdoc path not found")]
     PathNotFound,
-    #[error("subdoc path mismatch")]
     PathMismatch,
-    #[error("subdoc path invalid")]
     PathInvalid,
-    #[error("subdoc path too big")]
     PathTooBig,
-    #[error("subdoc doc too deep")]
     DocTooDeep,
-    #[error("subdoc can't insert")]
     CantInsert,
-    #[error("subdoc not JSON")]
     NotJSON,
-    #[error("subdoc bad range")]
     BadRange,
-    #[error("subdoc bad delta")]
     BadDelta,
-    #[error("subdoc path exists")]
     PathExists,
-    #[error("subdoc value too deep")]
     ValueTooDeep,
-    #[error("subdoc invalid combo")]
     InvalidCombo,
-    #[error("subdoc xattr invalid flag combo")]
     XattrInvalidFlagCombo,
-    #[error("subdoc xattr invalid key combo")]
     XattrInvalidKeyCombo,
-    #[error("subdoc xattr unknown macro")]
     XattrUnknownMacro,
-    #[error("subdoc xattr unknown vattr")]
     XattrUnknownVAttr,
-    #[error("subdoc xattr cannot modify vattr")]
     XattrCannotModifyVAttr,
-    #[error("subdoc invalid xattr order")]
     InvalidXattrOrder,
-    #[error("subdoc Xattr unknown vattr macro")]
     XattrUnknownVattrMacro,
-    #[error("subdoc can only revive deleted documents")]
     CanOnlyReviveDeletedDocuments,
-    #[error("subdoc deleted document can't have value")]
     DeletedDocumentCantHaveValue,
-    #[error("subdoc unknown status unexpected for operation: {status}")]
     UnknownStatus { status: Status },
+}
+
+impl Display for SubdocErrorKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SubdocErrorKind::PathNotFound => write!(f, "subdoc path not found"),
+            SubdocErrorKind::PathMismatch => write!(f, "subdoc path mismatch"),
+            SubdocErrorKind::PathInvalid => write!(f, "subdoc path invalid"),
+            SubdocErrorKind::PathTooBig => write!(f, "subdoc path too big"),
+            SubdocErrorKind::DocTooDeep => write!(f, "subdoc doc too deep"),
+            SubdocErrorKind::CantInsert => write!(f, "subdoc can't insert"),
+            SubdocErrorKind::NotJSON => write!(f, "subdoc not JSON"),
+            SubdocErrorKind::BadRange => write!(f, "subdoc bad range"),
+            SubdocErrorKind::BadDelta => write!(f, "subdoc bad delta"),
+            SubdocErrorKind::PathExists => write!(f, "subdoc path exists"),
+            SubdocErrorKind::ValueTooDeep => write!(f, "subdoc value too deep"),
+            SubdocErrorKind::InvalidCombo => write!(f, "subdoc invalid combo"),
+            SubdocErrorKind::XattrInvalidFlagCombo => write!(f, "subdoc xattr invalid flag combo"),
+            SubdocErrorKind::XattrInvalidKeyCombo => write!(f, "subdoc xattr invalid key combo"),
+            SubdocErrorKind::XattrUnknownMacro => write!(f, "subdoc xattr unknown macro"),
+            SubdocErrorKind::XattrUnknownVAttr => write!(f, "subdoc xattr unknown vattr"),
+            SubdocErrorKind::XattrCannotModifyVAttr => {
+                write!(f, "subdoc xattr cannot modify vattr")
+            }
+            SubdocErrorKind::InvalidXattrOrder => write!(f, "subdoc invalid xattr order"),
+            SubdocErrorKind::XattrUnknownVattrMacro => {
+                write!(f, "subdoc xattr unknown vattr macro")
+            }
+            SubdocErrorKind::CanOnlyReviveDeletedDocuments => {
+                write!(f, "subdoc can only revive deleted documents")
+            }
+            SubdocErrorKind::DeletedDocumentCantHaveValue => {
+                write!(f, "subdoc deleted document can't have value")
+            }
+            SubdocErrorKind::UnknownStatus { status } => write!(
+                f,
+                "subdoc unknown status unexpected for operation: {}",
+                status
+            ),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -501,8 +575,10 @@ where
 {
     fn from(err: E) -> Self {
         Self {
-            kind: Box::new(err.into()),
-            source: None,
+            inner: Box::new(ErrorImpl {
+                kind: ErrorKind::from(err),
+                source: None,
+            }),
         }
     }
 }
@@ -510,8 +586,21 @@ where
 impl From<ServerError> for Error {
     fn from(value: ServerError) -> Self {
         Self {
-            kind: Box::new(ErrorKind::Server(value)),
-            source: None,
+            inner: Box::new(ErrorImpl {
+                kind: ErrorKind::Server(value),
+                source: None,
+            }),
+        }
+    }
+}
+
+impl From<ResourceError> for Error {
+    fn from(value: ResourceError) -> Self {
+        Self {
+            inner: Box::new(ErrorImpl {
+                kind: ErrorKind::Resource(value),
+                source: None,
+            }),
         }
     }
 }
@@ -519,10 +608,26 @@ impl From<ServerError> for Error {
 impl From<io::Error> for Error {
     fn from(value: io::Error) -> Self {
         Self {
-            kind: Box::new(ErrorKind::UnknownIo {
-                msg: value.to_string(),
+            inner: Box::new(ErrorImpl {
+                kind: ErrorKind::Io,
+                source: Some(Box::new(value)),
             }),
-            source: Some(Box::new(value)),
         }
     }
+}
+
+#[derive(Deserialize, Clone, Debug, PartialEq, Eq, Default)]
+struct ServerErrorContextJsonContext {
+    #[serde(alias = "context")]
+    context: Option<String>,
+}
+
+#[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
+struct ServerErrorContextJson {
+    #[serde(alias = "error", default)]
+    error: ServerErrorContextJsonContext,
+    #[serde(alias = "ref")]
+    pub error_ref: Option<String>,
+    #[serde(alias = "manifest_uid")]
+    pub manifest_rev: Option<String>,
 }

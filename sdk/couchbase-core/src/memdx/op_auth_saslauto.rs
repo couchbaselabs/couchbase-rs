@@ -4,9 +4,7 @@ use tokio::time::Instant;
 
 use crate::memdx::auth_mechanism::AuthMechanism;
 use crate::memdx::dispatcher::Dispatcher;
-use crate::memdx::error;
-use crate::memdx::error::CancellationErrorKind::{RequestCancelled, Timeout};
-use crate::memdx::error::ErrorKind;
+use crate::memdx::error::Error;
 use crate::memdx::error::Result;
 use crate::memdx::op_auth_saslbyname::{
     OpSASLAuthByNameEncoder, OpsSASLAuthByName, SASLAuthByNameOptions,
@@ -52,9 +50,9 @@ impl OpsSASLAuthAuto {
         D: Dispatcher,
     {
         if opts.enabled_mechs.is_empty() {
-            return Err(error::Error::invalid_argument_error(
+            return Err(Error::new_invalid_argument_error(
                 "no enabled mechanisms",
-                "enabled_mechanisms",
+                "enabled_mechanisms".to_string(),
             ));
         }
 
@@ -82,11 +80,8 @@ impl OpsSASLAuthAuto {
         {
             Ok(()) => Ok(()),
             Err(e) => {
-                match e.kind.as_ref() {
-                    ErrorKind::Cancelled(Timeout) | ErrorKind::Cancelled(RequestCancelled) => {
-                        return Err(e);
-                    }
-                    _ => {}
+                if e.is_cancellation_error() {
+                    return Err(e);
                 }
 
                 // There is no obvious way to differentiate between a mechanism being unsupported
@@ -107,7 +102,7 @@ impl OpsSASLAuthAuto {
                 let selected_mech = match selected_mech {
                     Some(mech) => mech,
                     None => {
-                        return Err(ErrorKind::NoSupportedAuthMechanisms.into());
+                        return Err(Error::new_message_error("no supported mechanisms found"));
                     }
                 };
 
