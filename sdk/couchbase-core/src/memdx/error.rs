@@ -141,8 +141,8 @@ impl Error {
 type Source = Box<dyn StdError + Send + Sync>;
 
 #[derive(Debug)]
-pub struct ErrorImpl {
-    pub kind: ErrorKind,
+struct ErrorImpl {
+    kind: ErrorKind,
     source: Option<Source>,
 }
 

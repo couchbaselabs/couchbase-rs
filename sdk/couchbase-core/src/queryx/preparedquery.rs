@@ -44,11 +44,9 @@ impl<C: Client> PreparedQuery<C> {
         let statement = if let Some(statement) = opts.statement {
             statement
         } else {
-            return Err(Error::new_generic_error(
-                "Statement must be present if auto_execute is true".to_string(),
-                &self.executor.endpoint,
-                "",
-                opts.client_context_id.unwrap_or_default(),
+            return Err(Error::new_invalid_argument_error(
+                "statement must be present if auto_execute is true",
+                Some("statement".to_string()),
             ));
         };
 

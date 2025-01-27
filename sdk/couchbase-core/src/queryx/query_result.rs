@@ -1,9 +1,9 @@
 use std::time::Duration;
 
 use serde::Deserialize;
-use serde_json::Value;
+use serde_json::value::RawValue;
 
-#[derive(Debug, Clone, Deserialize, Ord, PartialOrd, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Copy, Deserialize, Ord, PartialOrd, Eq, PartialEq, Hash)]
 #[serde(rename_all = "lowercase")]
 pub enum Status {
     Running,
@@ -30,9 +30,9 @@ pub struct MetaData {
     pub client_context_id: String,
     pub status: Status,
     pub metrics: Metrics,
-    pub signature: Option<Value>,
+    pub signature: Option<Box<RawValue>>,
     pub warnings: Vec<Warning>,
-    pub profile: Option<Value>,
+    pub profile: Option<Box<RawValue>>,
 }
 
 #[derive(Debug, Clone)]
