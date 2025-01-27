@@ -780,7 +780,7 @@ async fn upsert_allocations() {
     // make sure that all the underlying resources are setup.
     agent.upsert(upsert_opts.clone()).await.unwrap();
 
-    let profiler = dhat::Profiler::builder().build();
+    let profiler = dhat::Profiler::builder().testing().build();
 
     let stats1 = dhat::HeapStats::get();
 

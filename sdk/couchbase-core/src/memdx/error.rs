@@ -63,6 +63,7 @@ impl Error {
             }),
         }
     }
+
     pub(crate) fn new_connection_failed_error(
         reason: impl Into<String>,
         source: Box<io::Error>,
@@ -161,6 +162,7 @@ impl StdError for Error {
 }
 
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum ErrorKind {
     Server(ServerError),
     Resource(ResourceError),
