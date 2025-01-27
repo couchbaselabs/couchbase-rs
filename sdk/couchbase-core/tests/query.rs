@@ -57,14 +57,8 @@ async fn test_query_basic() {
     assert_eq!(0, meta.metrics.warning_count);
 
     assert_eq!(
-        "boolean",
-        meta.signature
-            .as_ref()
-            .unwrap()
-            .get("$1")
-            .unwrap()
-            .as_str()
-            .unwrap()
+        "{\"$1\":\"boolean\"}",
+        meta.signature.as_ref().unwrap().get()
     );
 }
 
@@ -110,14 +104,8 @@ async fn test_prepared_query_basic() {
     assert_eq!(0, meta.metrics.warning_count);
 
     assert_eq!(
-        "boolean",
-        meta.signature
-            .as_ref()
-            .unwrap()
-            .get("$1")
-            .unwrap()
-            .as_str()
-            .unwrap()
+        "{\"$1\":\"boolean\"}",
+        meta.signature.as_ref().unwrap().get()
     );
 }
 

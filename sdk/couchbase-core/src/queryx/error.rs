@@ -1,161 +1,328 @@
-use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
-
-use bytes::Bytes;
 use http::StatusCode;
-use log::error;
 use serde::de::StdError;
 use serde_json::Value;
-use thiserror::Error;
-
-use crate::httpx;
-use crate::memdx::magic::Magic::Res;
+use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
+use std::sync::Arc;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Clone, Debug, Error)]
-#[error("{kind}")]
-#[non_exhaustive]
+#[derive(Debug, Clone)]
 pub struct Error {
-    pub kind: Box<ErrorKind>,
+    inner: ErrorImpl,
+}
 
-    pub endpoint: String,
-    pub statement: String,
-    pub client_context_id: String,
-
-    pub error_descs: Vec<ErrorDesc>,
-    pub status_code: Option<StatusCode>,
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.inner.kind)
+    }
 }
 
 impl Error {
-    pub fn new_server_error(
-        e: ServerError,
-        endpoint: impl Into<String>,
-        statement: impl Into<String>,
-        client_context_id: impl Into<String>,
-        error_descs: Vec<ErrorDesc>,
-        status_code: StatusCode,
-    ) -> Error {
+    pub(crate) fn new_server_error(e: ServerError) -> Error {
         Self {
-            kind: Box::new(ErrorKind::ServerError(e)),
-            endpoint: endpoint.into(),
-            statement: statement.into(),
-            client_context_id: client_context_id.into(),
-            error_descs,
-            status_code: Some(status_code),
+            inner: ErrorImpl {
+                kind: Box::new(ErrorKind::ServerError(e)),
+                source: None,
+            },
         }
     }
 
-    pub fn new_http_error(
-        e: httpx::error::Error,
-        endpoint: impl Into<String>,
-        statement: impl Into<String>,
-        client_context_id: impl Into<String>,
-    ) -> Error {
+    pub(crate) fn new_resource_error(e: ResourceError) -> Error {
         Self {
-            kind: Box::new(ErrorKind::HttpError(e)),
-            endpoint: endpoint.into(),
-            statement: statement.into(),
-            client_context_id: client_context_id.into(),
-            error_descs: vec![],
-            status_code: None,
+            inner: ErrorImpl {
+                kind: Box::new(ErrorKind::Resource(e)),
+                source: None,
+            },
         }
     }
 
-    pub fn new_generic_error(
+    pub(crate) fn new_message_error(
         msg: impl Into<String>,
-        endpoint: impl Into<String>,
-        statement: impl Into<String>,
-        client_context_id: impl Into<String>,
+        endpoint: impl Into<Option<String>>,
+        statement: impl Into<Option<String>>,
+        client_context_id: impl Into<Option<String>>,
     ) -> Error {
         Self {
-            kind: Box::new(ErrorKind::Generic { msg: msg.into() }),
-            endpoint: endpoint.into(),
-            statement: statement.into(),
-            client_context_id: client_context_id.into(),
-            error_descs: vec![],
-            status_code: None,
+            inner: ErrorImpl {
+                kind: Box::new(ErrorKind::Message {
+                    msg: msg.into(),
+                    endpoint: endpoint.into(),
+                    statement: statement.into(),
+                    client_context_id: client_context_id.into(),
+                }),
+                source: None,
+            },
+        }
+    }
+
+    pub(crate) fn new_encoding_error(msg: impl Into<String>) -> Error {
+        Self {
+            inner: ErrorImpl {
+                kind: Box::new(ErrorKind::Encoding { msg: msg.into() }),
+                source: None,
+            },
+        }
+    }
+
+    pub(crate) fn new_invalid_argument_error(
+        msg: impl Into<String>,
+        arg: impl Into<Option<String>>,
+    ) -> Self {
+        Self {
+            inner: ErrorImpl {
+                kind: Box::new(ErrorKind::InvalidArgument {
+                    msg: msg.into(),
+                    arg: arg.into(),
+                }),
+                source: None,
+            },
+        }
+    }
+
+    pub(crate) fn new_http_error(
+        endpoint: impl Into<String>,
+        statement: impl Into<Option<String>>,
+        client_context_id: impl Into<Option<String>>,
+    ) -> Self {
+        Self {
+            inner: ErrorImpl {
+                kind: Box::new(ErrorKind::HttpError {
+                    endpoint: endpoint.into(),
+                    statement: statement.into(),
+                    client_context_id: client_context_id.into(),
+                }),
+                source: None,
+            },
+        }
+    }
+
+    pub fn kind(&self) -> &ErrorKind {
+        &self.inner.kind
+    }
+
+    pub(crate) fn with(mut self, source: Source) -> Error {
+        self.inner.source = Some(source);
+        self
+    }
+}
+
+type Source = Arc<dyn StdError + Send + Sync>;
+
+#[derive(Debug, Clone)]
+pub struct ErrorImpl {
+    kind: Box<ErrorKind>,
+    source: Option<Source>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ErrorKind {
+    ServerError(ServerError),
+    #[non_exhaustive]
+    HttpError {
+        endpoint: String,
+        statement: Option<String>,
+        client_context_id: Option<String>,
+    },
+    Resource(ResourceError),
+    Message {
+        msg: String,
+        endpoint: Option<String>,
+        statement: Option<String>,
+        client_context_id: Option<String>,
+    },
+    #[non_exhaustive]
+    InvalidArgument {
+        msg: String,
+        arg: Option<String>,
+    },
+    Encoding {
+        msg: String,
+    },
+}
+
+impl Display for ErrorKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ErrorKind::ServerError(e) => write!(f, "{}", e),
+            ErrorKind::Resource(e) => write!(f, "{}", e),
+            ErrorKind::InvalidArgument { msg, arg } => {
+                let base_msg = format!("invalid argument: {msg}");
+                if let Some(arg) = arg {
+                    write!(f, "{base_msg}, arg: {arg}")
+                } else {
+                    write!(f, "{base_msg}")
+                }
+            }
+            ErrorKind::Encoding { msg } => write!(f, "encoding error: {msg}"),
+            ErrorKind::HttpError {
+                endpoint,
+                statement,
+                client_context_id,
+            } => {
+                write!(f, "http error: endpoint: {endpoint}")?;
+                if let Some(statement) = statement {
+                    write!(f, ", statement: {statement}")?;
+                }
+                if let Some(client_context_id) = client_context_id {
+                    write!(f, ", client context id: {client_context_id}")?;
+                }
+                Ok(())
+            }
+            ErrorKind::Message {
+                msg,
+                endpoint,
+                statement,
+                client_context_id,
+            } => {
+                write!(f, "{msg}")?;
+                if let Some(endpoint) = endpoint {
+                    write!(f, ", endpoint: {endpoint}")?;
+                }
+                if let Some(statement) = statement {
+                    write!(f, ", statement: {statement}")?;
+                }
+                if let Some(client_context_id) = client_context_id {
+                    write!(f, ", client context id: {client_context_id}")?;
+                }
+                Ok(())
+            }
         }
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
-pub struct ErrorDesc {
-    pub kind: Box<ErrorKind>,
-
-    pub code: u32,
-    pub message: String,
-    pub retry: bool,
-    pub reason: HashMap<String, Value>,
-}
-
-impl ErrorDesc {
-    pub fn new(
-        kind: ErrorKind,
-        code: u32,
-        message: String,
-        retry: bool,
-        reason: HashMap<String, Value>,
-    ) -> Self {
-        Self {
-            kind: Box::new(kind),
-            code,
-            message,
-            retry,
-            reason,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Error, PartialEq, Eq)]
-#[error("{kind}")]
-#[non_exhaustive]
 pub struct ServerError {
-    pub kind: Box<ServerErrorKind>,
+    kind: ServerErrorKind,
 
-    pub code: Option<u32>,
-    pub msg: Option<String>,
+    endpoint: String,
+    status_code: StatusCode,
+    code: u32,
+    msg: String,
+
+    statement: Option<String>,
+    client_context_id: Option<String>,
+
+    all_error_descs: Vec<ErrorDesc>,
 }
 
 impl ServerError {
-    pub fn new(
+    pub(crate) fn new(
         kind: ServerErrorKind,
-        code: impl Into<Option<u32>>,
-        msg: impl Into<Option<String>>,
+        endpoint: impl Into<String>,
+        status_code: StatusCode,
+        code: u32,
+        msg: impl Into<String>,
     ) -> Self {
         Self {
-            kind: Box::new(kind),
-            code: code.into(),
+            kind,
+            endpoint: endpoint.into(),
+            status_code,
+            code,
             msg: msg.into(),
+            statement: None,
+            client_context_id: None,
+            all_error_descs: vec![],
         }
+    }
+
+    pub fn kind(&self) -> &ServerErrorKind {
+        &self.kind
+    }
+
+    pub fn endpoint(&self) -> &str {
+        &self.endpoint
+    }
+
+    pub fn statement(&self) -> Option<&str> {
+        self.statement.as_deref()
+    }
+
+    pub fn status_code(&self) -> StatusCode {
+        self.status_code
+    }
+
+    pub fn client_context_id(&self) -> Option<&str> {
+        self.client_context_id.as_deref()
+    }
+
+    pub fn code(&self) -> u32 {
+        self.code
+    }
+
+    pub fn msg(&self) -> &str {
+        &self.msg
+    }
+
+    pub fn all_error_descs(&self) -> &[ErrorDesc] {
+        &self.all_error_descs
+    }
+
+    pub(crate) fn with_statement(mut self, statement: impl Into<String>) -> Self {
+        self.statement = Some(statement.into());
+        self
+    }
+
+    pub(crate) fn with_client_context_id(mut self, client_context_id: impl Into<String>) -> Self {
+        self.client_context_id = Some(client_context_id.into());
+        self
+    }
+
+    pub(crate) fn with_error_descs(mut self, error_descs: Vec<ErrorDesc>) -> Self {
+        self.all_error_descs = error_descs;
+        self
+    }
+}
+
+impl Display for ServerError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "server error of kind: {} code: {}, msg: {}",
+            self.kind, self.code, self.msg
+        )?;
+
+        if let Some(client_context_id) = &self.client_context_id {
+            write!(f, ", client context id: {}", client_context_id)?;
+        }
+        if let Some(statement) = &self.statement {
+            write!(f, ", statement: {}", statement)?;
+        }
+
+        write!(
+            f,
+            ", endpoint: {},  status code: {}",
+            self.endpoint, self.status_code
+        )?;
+
+        if !self.all_error_descs.is_empty() {
+            write!(f, ", all error descriptions: {:?}", self.all_error_descs)?;
+        }
+
+        Ok(())
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ResourceError {
-    pub cause: ServerError,
-    pub bucket_name: Option<String>,
-    pub scope_name: Option<String>,
-    pub collection_name: Option<String>,
-    pub index_name: Option<String>,
+    cause: ServerError,
+    bucket_name: Option<String>,
+    scope_name: Option<String>,
+    collection_name: Option<String>,
+    index_name: Option<String>,
 }
 
 impl ResourceError {
-    pub fn new(cause: ServerError, msg: impl Into<String>) -> Self {
-        match *cause.kind {
-            ServerErrorKind::CollectionNotFound => {
-                Self::parse_resource_not_found(cause, msg.into())
-            }
-            ServerErrorKind::ScopeNotFound => Self::parse_resource_not_found(cause, msg.into()),
-            ServerErrorKind::AuthenticationFailure => Self::parse_auth_failure(cause, msg.into()),
-            ServerErrorKind::IndexNotFound => {
-                Self::parse_index_not_found_or_exists(cause, msg.into())
-            }
-            ServerErrorKind::IndexExists => {
-                Self::parse_index_not_found_or_exists(cause, msg.into())
-            }
+    pub(crate) fn new(cause: ServerError) -> Self {
+        match cause.kind {
+            ServerErrorKind::CollectionNotFound => Self::parse_resource_not_found(cause),
+            ServerErrorKind::ScopeNotFound => Self::parse_resource_not_found(cause),
+            ServerErrorKind::AuthenticationFailure => Self::parse_auth_failure(cause),
+            ServerErrorKind::IndexNotFound => Self::parse_index_not_found_or_exists(cause),
+            ServerErrorKind::IndexExists => Self::parse_index_not_found_or_exists(cause),
             _ => Self {
                 cause,
                 bucket_name: None,
@@ -166,7 +333,28 @@ impl ResourceError {
         }
     }
 
-    fn parse_index_not_found_or_exists(cause: ServerError, msg: String) -> ResourceError {
+    pub fn cause(&self) -> &ServerError {
+        &self.cause
+    }
+
+    pub fn bucket_name(&self) -> Option<&str> {
+        self.bucket_name.as_deref()
+    }
+
+    pub fn scope_name(&self) -> Option<&str> {
+        self.scope_name.as_deref()
+    }
+
+    pub fn collection_name(&self) -> Option<&str> {
+        self.collection_name.as_deref()
+    }
+
+    pub fn index_name(&self) -> Option<&str> {
+        self.index_name.as_deref()
+    }
+
+    fn parse_index_not_found_or_exists(cause: ServerError) -> ResourceError {
+        let msg = cause.msg.clone();
         let mut fields = msg.split_whitespace();
 
         // msg for not found is of the form - "Index Not Found - cause: GSI index testingIndex not found."
@@ -192,7 +380,8 @@ impl ResourceError {
         }
     }
 
-    fn parse_resource_not_found(cause: ServerError, msg: String) -> ResourceError {
+    fn parse_resource_not_found(cause: ServerError) -> ResourceError {
+        let msg = cause.msg.clone();
         let mut fields = msg.split_whitespace();
         // Resource path is of the form bucket:bucket.scope.collection
         let path = fields.find(|f| f.contains('.') && f.contains(':'));
@@ -201,7 +390,7 @@ impl ResourceError {
             if let Some(trimmed_path) = p.split(':').nth(1) {
                 let fields: Vec<&str> = trimmed_path.split('.').collect();
 
-                if *cause.kind == ServerErrorKind::ScopeNotFound {
+                if cause.kind == ServerErrorKind::ScopeNotFound {
                     // Bucket names are the only one that can contain `.`, which is why we need to reconstruct the name if split
                     let bucket_name = fields[0..fields.len() - 1].join(".");
                     let scope_name = fields[fields.len() - 1];
@@ -213,7 +402,7 @@ impl ResourceError {
                         collection_name: None,
                         index_name: None,
                     };
-                } else if *cause.kind == ServerErrorKind::CollectionNotFound {
+                } else if cause.kind == ServerErrorKind::CollectionNotFound {
                     // Bucket names are the only one that can contain `.`, which is why we need to reconstruct the name if split
                     let bucket_name = fields[0..fields.len() - 2].join(".");
                     let scope_name = fields[fields.len() - 2];
@@ -239,7 +428,8 @@ impl ResourceError {
         }
     }
 
-    fn parse_auth_failure(cause: ServerError, msg: String) -> Self {
+    fn parse_auth_failure(cause: ServerError) -> Self {
+        let msg = &cause.msg;
         let mut fields = msg.split_whitespace();
         let path = fields.find(|f| f.contains(':'));
 
@@ -305,74 +495,329 @@ impl ResourceError {
 
 impl Display for ResourceError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let msg = format!(
-            "resource error: {} (bucket: {}, scope: {}, collection: {}, index: {})",
-            self.cause,
-            self.bucket_name.clone().unwrap_or_default(),
-            self.scope_name.clone().unwrap_or_default(),
-            self.collection_name.clone().unwrap_or_default(),
-            self.index_name.clone().unwrap_or_default()
-        );
+        write!(f, "resource error caused by: {}", self.cause)?;
 
-        write!(f, "{}", msg)
+        if let Some(bucket_name) = &self.bucket_name {
+            write!(f, ", bucket: {}", bucket_name)?;
+        }
+        if let Some(scope_name) = &self.scope_name {
+            write!(f, ", scope: {}", scope_name)?;
+        }
+        if let Some(collection_name) = &self.collection_name {
+            write!(f, ", collection: {}", collection_name)?;
+        }
+        if let Some(index_name) = &self.index_name {
+            write!(f, ", index: {}", index_name)?;
+        }
+
+        Ok(())
     }
 }
 
 impl StdError for ResourceError {}
 
-#[derive(Clone, Debug, Error, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum ErrorKind {
-    #[error("Server error {0:?}")]
-    ServerError(ServerError),
-    #[error("Http error sending request or receiving response {0:?}")]
-    HttpError(httpx::error::Error),
-    #[error("{0:?}")]
-    Resource(ResourceError),
-    #[error("{msg}")]
-    Generic { msg: String },
+pub struct ErrorDesc {
+    pub kind: ServerErrorKind,
+
+    pub code: u32,
+    pub message: String,
+    pub retry: bool,
+    pub reason: HashMap<String, Value>,
 }
 
-#[derive(Clone, Debug, Error, PartialEq, Eq)]
+impl ErrorDesc {
+    pub fn new(
+        kind: ServerErrorKind,
+        code: u32,
+        message: String,
+        retry: bool,
+        reason: HashMap<String, Value>,
+    ) -> Self {
+        Self {
+            kind,
+            code,
+            message,
+            retry,
+            reason,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ServerErrorKind {
-    #[error("Parsing failure")]
     ParsingFailure,
-    #[error("Internal server error")]
     Internal,
-    #[error("Authentication failure")]
     AuthenticationFailure,
-    #[error("Cas mismatch")]
     CasMismatch,
-    #[error("Doc not found")]
     DocNotFound,
-    #[error("Doc exists")]
     DocExists,
-    #[error("Planning failure")]
     PlanningFailure,
-    #[error("Index failure")]
     IndexFailure,
-    #[error("Prepared statement failure")]
     PreparedStatementFailure,
-    #[error("Data service returned an error during execution of DML statement")]
     DMLFailure,
-    #[error("Server timeout")]
     Timeout,
-    #[error("Index exists")]
     IndexExists,
-    #[error("Index not found")]
     IndexNotFound,
-    #[error("write statement used in a read-only query")]
     WriteInReadOnlyMode,
-    #[error("Scope not found")]
     ScopeNotFound,
-    #[error("Collection not found")]
     CollectionNotFound,
-    #[error("Server invalid argument: (argument: {argument}, reason: {reason})")]
     InvalidArgument { argument: String, reason: String },
-    #[error("Build already in progress")]
     BuildAlreadyInProgress,
-    #[error("Unknown query error: {msg}")]
-    #[non_exhaustive]
-    Unknown { msg: String },
+    Unknown,
+}
+
+impl Display for ServerErrorKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ServerErrorKind::ParsingFailure => write!(f, "parsing failure"),
+            ServerErrorKind::Internal => write!(f, "internal server error"),
+            ServerErrorKind::AuthenticationFailure => write!(f, "authentication failure"),
+            ServerErrorKind::CasMismatch => write!(f, "cas mismatch"),
+            ServerErrorKind::DocNotFound => write!(f, "doc not found"),
+            ServerErrorKind::DocExists => write!(f, "doc exists"),
+            ServerErrorKind::PlanningFailure => write!(f, "planning failure"),
+            ServerErrorKind::IndexFailure => write!(f, "index failure"),
+            ServerErrorKind::PreparedStatementFailure => write!(f, "prepared statement failure"),
+            ServerErrorKind::DMLFailure => write!(
+                f,
+                "data service returned an error during execution of DML statement"
+            ),
+            ServerErrorKind::Timeout => write!(f, "server timeout"),
+            ServerErrorKind::IndexExists => write!(f, "index exists"),
+            ServerErrorKind::IndexNotFound => write!(f, "index not found"),
+            ServerErrorKind::WriteInReadOnlyMode => {
+                write!(f, "write statement used in a read-only query")
+            }
+            ServerErrorKind::ScopeNotFound => write!(f, "scope not found"),
+            ServerErrorKind::CollectionNotFound => write!(f, "collection not found"),
+            ServerErrorKind::InvalidArgument { argument, reason } => write!(
+                f,
+                "server invalid argument: (argument: {}, reason: {})",
+                argument, reason
+            ),
+            ServerErrorKind::BuildAlreadyInProgress => write!(f, "build already in progress"),
+            ServerErrorKind::Unknown => write!(f, "unknown query error"),
+        }
+    }
+}
+
+impl Error {
+    pub fn is_parsing_failure(&self) -> bool {
+        matches!(
+            self.kind(),
+            ErrorKind::ServerError(ServerError {
+                kind: ServerErrorKind::ParsingFailure,
+                ..
+            })
+        )
+    }
+
+    pub fn is_internal(&self) -> bool {
+        matches!(
+            self.kind(),
+            ErrorKind::ServerError(ServerError {
+                kind: ServerErrorKind::Internal,
+                ..
+            })
+        )
+    }
+
+    pub fn is_authentication_failure(&self) -> bool {
+        matches!(
+            self.kind(),
+            ErrorKind::ServerError(ServerError {
+                kind: ServerErrorKind::AuthenticationFailure,
+                ..
+            })
+        )
+    }
+
+    pub fn is_cas_mismatch(&self) -> bool {
+        matches!(
+            self.kind(),
+            ErrorKind::ServerError(ServerError {
+                kind: ServerErrorKind::CasMismatch,
+                ..
+            })
+        )
+    }
+
+    pub fn is_doc_not_found(&self) -> bool {
+        matches!(
+            self.kind(),
+            ErrorKind::ServerError(ServerError {
+                kind: ServerErrorKind::DocNotFound,
+                ..
+            })
+        )
+    }
+
+    pub fn is_doc_exists(&self) -> bool {
+        matches!(
+            self.kind(),
+            ErrorKind::ServerError(ServerError {
+                kind: ServerErrorKind::DocExists,
+                ..
+            })
+        )
+    }
+
+    pub fn is_planning_failure(&self) -> bool {
+        matches!(
+            self.kind(),
+            ErrorKind::ServerError(ServerError {
+                kind: ServerErrorKind::PlanningFailure,
+                ..
+            })
+        )
+    }
+
+    pub fn is_index_failure(&self) -> bool {
+        matches!(
+            self.kind(),
+            ErrorKind::ServerError(ServerError {
+                kind: ServerErrorKind::IndexFailure,
+                ..
+            })
+        )
+    }
+
+    pub fn is_prepared_statement_failure(&self) -> bool {
+        matches!(
+            self.kind(),
+            ErrorKind::ServerError(ServerError {
+                kind: ServerErrorKind::PreparedStatementFailure,
+                ..
+            })
+        )
+    }
+
+    pub fn is_dml_failure(&self) -> bool {
+        matches!(
+            self.kind(),
+            ErrorKind::ServerError(ServerError {
+                kind: ServerErrorKind::DMLFailure,
+                ..
+            })
+        )
+    }
+
+    pub fn is_server_timeout(&self) -> bool {
+        matches!(
+            self.kind(),
+            ErrorKind::ServerError(ServerError {
+                kind: ServerErrorKind::Timeout,
+                ..
+            })
+        )
+    }
+
+    pub fn is_write_in_read_only_mode(&self) -> bool {
+        matches!(
+            self.kind(),
+            ErrorKind::ServerError(ServerError {
+                kind: ServerErrorKind::WriteInReadOnlyMode,
+                ..
+            })
+        )
+    }
+
+    pub fn is_invalid_argument(&self) -> bool {
+        matches!(
+            self.kind(),
+            ErrorKind::ServerError(ServerError {
+                kind: ServerErrorKind::InvalidArgument { .. },
+                ..
+            })
+        )
+    }
+
+    pub fn is_build_already_in_progress(&self) -> bool {
+        matches!(
+            self.kind(),
+            ErrorKind::ServerError(ServerError {
+                kind: ServerErrorKind::BuildAlreadyInProgress,
+                ..
+            })
+        )
+    }
+
+    pub fn is_scope_not_found(&self) -> bool {
+        matches!(
+            self.kind(),
+            ErrorKind::Resource(ResourceError {
+                cause: ServerError {
+                    kind: ServerErrorKind::ScopeNotFound,
+                    ..
+                },
+                ..
+            })
+        ) || matches!(
+            self.kind(),
+            ErrorKind::ServerError(ServerError {
+                kind: ServerErrorKind::ScopeNotFound,
+                ..
+            })
+        )
+    }
+
+    pub fn is_collection_not_found(&self) -> bool {
+        matches!(
+            self.kind(),
+            ErrorKind::Resource(ResourceError {
+                cause: ServerError {
+                    kind: ServerErrorKind::CollectionNotFound,
+                    ..
+                },
+                ..
+            })
+        ) || matches!(
+            self.kind(),
+            ErrorKind::ServerError(ServerError {
+                kind: ServerErrorKind::CollectionNotFound,
+                ..
+            })
+        )
+    }
+
+    pub fn is_index_not_found(&self) -> bool {
+        matches!(
+            self.kind(),
+            ErrorKind::Resource(ResourceError {
+                cause: ServerError {
+                    kind: ServerErrorKind::IndexNotFound,
+                    ..
+                },
+                ..
+            })
+        ) || matches!(
+            self.kind(),
+            ErrorKind::ServerError(ServerError {
+                kind: ServerErrorKind::IndexNotFound,
+                ..
+            })
+        )
+    }
+
+    pub fn is_index_exists(&self) -> bool {
+        matches!(
+            self.kind(),
+            ErrorKind::Resource(ResourceError {
+                cause: ServerError {
+                    kind: ServerErrorKind::IndexExists,
+                    ..
+                },
+                ..
+            })
+        ) || matches!(
+            self.kind(),
+            ErrorKind::ServerError(ServerError {
+                kind: ServerErrorKind::IndexExists,
+                ..
+            })
+        )
+    }
 }

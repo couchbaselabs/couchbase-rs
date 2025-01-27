@@ -232,7 +232,7 @@ fn assert_metadata(meta: QueryMetaData) {
     assert_eq!(0, meta.metrics.warning_count);
 
     assert_eq!(
-        "boolean",
-        meta.signature.unwrap().get("$1").unwrap().as_str().unwrap()
+        "{\"$1\":\"boolean\"}",
+        meta.signature.as_ref().unwrap().get()
     );
 }

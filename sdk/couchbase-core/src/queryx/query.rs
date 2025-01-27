@@ -2,7 +2,7 @@ use crate::httpx::client::Client;
 use crate::httpx::request::{Auth, BasicAuth, OnBehalfOfInfo, Request};
 use crate::httpx::response::Response;
 use crate::queryx::error;
-use crate::queryx::error::{Error, ErrorKind, ServerErrorKind};
+use crate::queryx::error::{Error, ErrorKind, ServerError, ServerErrorKind};
 use crate::queryx::index::{Index, IndexState};
 use crate::queryx::query_options::{
     BuildDeferredIndexesOptions, CreateIndexOptions, CreatePrimaryIndexOptions, DropIndexOptions,
@@ -12,11 +12,12 @@ use crate::queryx::query_respreader::QueryRespReader;
 use crate::retry::RetryStrategy;
 use bytes::Bytes;
 use futures::StreamExt;
-use http::Method;
+use http::{Method, StatusCode};
 use log::debug;
 use serde::Deserialize;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::fmt::format;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
@@ -88,14 +89,8 @@ impl<C: Client> Query<C> {
 
         let on_behalf_of = opts.on_behalf_of.clone();
 
-        let mut serialized = serde_json::to_value(opts).map_err(|e| {
-            Error::new_generic_error(
-                e.to_string(),
-                &self.endpoint,
-                &statement,
-                &client_context_id,
-            )
-        })?;
+        let mut serialized = serde_json::to_value(opts)
+            .map_err(|e| Error::new_encoding_error(format!("failed to encode options: {}", e)))?;
 
         let mut obj = serialized.as_object_mut().unwrap();
         let mut client_context_id_entry = obj.get("client_context_id");
@@ -123,16 +118,12 @@ impl<C: Client> Query<C> {
             }
         }
 
-        let body = Bytes::from(serde_json::to_vec(&serialized).map_err(|e| {
-            Error::new_generic_error(
-                e.to_string(),
-                &self.endpoint,
-                &statement,
-                &client_context_id,
-            )
-        })?);
+        let body =
+            Bytes::from(serde_json::to_vec(&serialized).map_err(|e| {
+                Error::new_encoding_error(format!("failed to encode options: {}", e))
+            })?);
 
-        let res = self
+        let res = match self
             .execute(
                 Method::POST,
                 "query/service",
@@ -141,9 +132,15 @@ impl<C: Client> Query<C> {
                 Some(body),
             )
             .await
-            .map_err(|e| {
-                Error::new_http_error(e, &self.endpoint, &statement, &client_context_id)
-            })?;
+        {
+            Ok(r) => r,
+            Err(e) => {
+                return Err(
+                    Error::new_http_error(&self.endpoint, statement, client_context_id)
+                        .with(Arc::new(e)),
+                );
+            }
+        };
 
         QueryRespReader::new(res, &self.endpoint, statement, client_context_id).await
     }
@@ -198,11 +195,9 @@ impl<C: Client> Query<C> {
                 )
             }
             _ => {
-                return Err(Error::new_generic_error(
-                    "Invalid combination of bucket, scope and collection".to_string(),
-                    &self.endpoint,
-                    "",
-                    "",
+                return Err(Error::new_invalid_argument_error(
+                    "invalid combination of bucket, scope and collection".to_string(),
+                    None,
                 ));
             }
         };
@@ -222,8 +217,14 @@ impl<C: Client> Query<C> {
 
         while let Some(row) = res.next().await {
             let bytes = row?;
-            let index: Index = serde_json::from_slice(&bytes)
-                .map_err(|e| Error::new_generic_error(e.to_string(), "", "", ""))?;
+            let index: Index = serde_json::from_slice(&bytes).map_err(|e| {
+                Error::new_message_error(
+                    format!("failed to parse index from response: {}", e),
+                    None,
+                    None,
+                    None,
+                )
+            })?;
 
             indexes.push(index);
         }
@@ -267,36 +268,18 @@ impl<C: Client> Query<C> {
 
         let mut res = self.query(&query_opts).await;
 
-        // This is a bit mad...
         match res {
             Err(e) => {
-                match &*e.kind {
-                    ErrorKind::ServerError(server_error) => {
-                        match &*server_error.kind {
-                            ServerErrorKind::IndexExists => {
-                                if opts.ignore_if_exists.unwrap_or(false) {
-                                    Ok(())
-                                } else {
-                                    Err(e)
-                                }
-                            }
-                            // this is considered a success
-                            ServerErrorKind::BuildAlreadyInProgress => Ok(()),
-                            _ => Err(e),
-                        }
+                if e.is_index_exists() {
+                    if opts.ignore_if_exists.unwrap_or(false) {
+                        Ok(())
+                    } else {
+                        Err(e)
                     }
-                    ErrorKind::Resource(resource_error) => match &*resource_error.cause.kind {
-                        ServerErrorKind::IndexExists => {
-                            if opts.ignore_if_exists.unwrap_or(false) {
-                                Ok(())
-                            } else {
-                                Err(e)
-                            }
-                        }
-                        _ => Err(e),
-                    },
-
-                    _ => Err(e),
+                } else if e.is_build_already_in_progress() {
+                    Ok(())
+                } else {
+                    Err(e)
                 }
             }
             Ok(_) => Ok(()),
@@ -338,36 +321,18 @@ impl<C: Client> Query<C> {
 
         let mut res = self.query(&query_opts).await;
 
-        // This is a bit mad...
         match res {
             Err(e) => {
-                match &*e.kind {
-                    ErrorKind::ServerError(server_error) => {
-                        match &*server_error.kind {
-                            ServerErrorKind::IndexExists => {
-                                if opts.ignore_if_exists.unwrap_or(false) {
-                                    Ok(())
-                                } else {
-                                    Err(e)
-                                }
-                            }
-                            // this is considered a success
-                            ServerErrorKind::BuildAlreadyInProgress => Ok(()),
-                            _ => Err(e),
-                        }
+                if e.is_index_exists() {
+                    if opts.ignore_if_exists.unwrap_or(false) {
+                        Ok(())
+                    } else {
+                        Err(e)
                     }
-                    ErrorKind::Resource(resource_error) => match &*resource_error.cause.kind {
-                        ServerErrorKind::IndexExists => {
-                            if opts.ignore_if_exists.unwrap_or(false) {
-                                Ok(())
-                            } else {
-                                Err(e)
-                            }
-                        }
-                        _ => Err(e),
-                    },
-
-                    _ => Err(e),
+                } else if e.is_build_already_in_progress() {
+                    Ok(())
+                } else {
+                    Err(e)
                 }
             }
             Ok(_) => Ok(()),
@@ -402,19 +367,17 @@ impl<C: Client> Query<C> {
         let mut res = self.query(&query_opts).await;
 
         match res {
-            Err(e) => match &*e.kind {
-                ErrorKind::Resource(resource_error) => match &*resource_error.cause.kind {
-                    ServerErrorKind::IndexNotFound => {
-                        if opts.ignore_if_not_exists.unwrap_or(false) {
-                            Ok(())
-                        } else {
-                            Err(e)
-                        }
+            Err(e) => {
+                if e.is_index_not_found() {
+                    if opts.ignore_if_not_exists.unwrap_or(false) {
+                        Ok(())
+                    } else {
+                        Err(e)
                     }
-                    _ => Err(e),
-                },
-                _ => Err(e),
-            },
+                } else {
+                    Err(e)
+                }
+            }
             Ok(_) => Ok(()),
         }
     }
@@ -438,19 +401,17 @@ impl<C: Client> Query<C> {
         let res = self.query(&query_opts).await;
 
         match res {
-            Err(e) => match &*e.kind {
-                ErrorKind::Resource(resource_error) => match &*resource_error.cause.kind {
-                    ServerErrorKind::IndexNotFound => {
-                        if opts.ignore_if_not_exists.unwrap_or(false) {
-                            Ok(())
-                        } else {
-                            Err(e)
-                        }
+            Err(e) => {
+                if e.is_index_not_found() {
+                    if opts.ignore_if_not_exists.unwrap_or(false) {
+                        Ok(())
+                    } else {
+                        Err(e)
                     }
-                    _ => Err(e),
-                },
-                _ => Err(e),
-            },
+                } else {
+                    Err(e)
+                }
+            }
             Ok(_) => Ok(()),
         }
     }
@@ -516,13 +477,13 @@ impl<C: Client> Query<C> {
             let res = self.query(&query_opts).await;
 
             match res {
-                Err(e) => match &*e.kind {
-                    ErrorKind::ServerError(server_error) => match &*server_error.kind {
-                        ServerErrorKind::BuildAlreadyInProgress => continue,
-                        _ => return Err(e),
-                    },
-                    _ => return Err(e),
-                },
+                Err(e) => {
+                    if e.is_build_already_in_progress() {
+                        continue;
+                    }
+
+                    return Err(e);
+                }
                 Ok(_) => continue,
             }
         }
@@ -630,12 +591,7 @@ fn check_indexes_active(indexes: &[Index], check_list: &Vec<&str>) -> error::Res
         if let Some(index) = indexes.iter().find(|idx| idx.name == *index_name) {
             check_indexes.push(index);
         } else {
-            return Err(Error::new_generic_error(
-                format!("Index {} not found", index_name),
-                "",
-                "",
-                "",
-            ));
+            return Ok(false);
         }
     }
 
@@ -659,7 +615,8 @@ fn encode_identifier(identifier: &str) -> String {
 }
 
 fn encode_value<T: serde::Serialize>(value: &T) -> error::Result<String> {
-    let bytes = serde_json::to_string(value)
-        .map_err(|e| Error::new_generic_error(e.to_string(), "", "", ""))?;
+    let bytes = serde_json::to_string(value).map_err(|e| {
+        Error::new_message_error(format!("failed to encode value: {}", e), None, None, None)
+    })?;
     Ok(bytes)
 }

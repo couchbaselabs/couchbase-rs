@@ -3,7 +3,7 @@ use couchbase_core::querycomponent::QueryResultStream;
 use couchbase_core::queryx;
 use futures::{Stream, StreamExt, TryStreamExt};
 use serde::de::DeserializeOwned;
-use serde_json::Value;
+use serde_json::value::RawValue;
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -28,7 +28,7 @@ impl From<queryx::query_result::Warning> for QueryWarning {
     }
 }
 
-#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub enum QueryStatus {
     Running,
     Success,
@@ -71,8 +71,8 @@ pub struct QueryMetrics {
     pub warning_count: u64,
 }
 
-impl From<queryx::query_result::Metrics> for QueryMetrics {
-    fn from(metrics: queryx::query_result::Metrics) -> Self {
+impl From<&queryx::query_result::Metrics> for QueryMetrics {
+    fn from(metrics: &queryx::query_result::Metrics) -> Self {
         Self {
             elapsed_time: metrics.elapsed_time,
             execution_time: metrics.execution_time,
@@ -87,32 +87,32 @@ impl From<queryx::query_result::Metrics> for QueryMetrics {
 }
 
 #[derive(Debug, Clone)]
-pub struct QueryMetaData {
-    pub request_id: String,
-    pub client_context_id: String,
+pub struct QueryMetaData<'a> {
+    pub request_id: &'a str,
+    pub client_context_id: &'a str,
     pub status: QueryStatus,
     pub metrics: QueryMetrics,
-    pub signature: Option<Value>,
+    pub signature: Option<&'a RawValue>,
     pub warnings: Vec<QueryWarning>,
-    pub profile: Option<Value>,
+    pub profile: Option<&'a RawValue>,
 }
 
 // TODO: fix ownership.
-impl From<&queryx::query_result::MetaData> for QueryMetaData {
-    fn from(meta: &queryx::query_result::MetaData) -> Self {
+impl<'a> From<&'a queryx::query_result::MetaData> for QueryMetaData<'a> {
+    fn from(meta: &'a queryx::query_result::MetaData) -> Self {
         Self {
-            request_id: meta.request_id.to_string(),
-            client_context_id: meta.client_context_id.to_string(),
-            status: meta.status.clone().into(),
-            metrics: meta.metrics.clone().into(),
-            signature: meta.signature.clone(),
+            request_id: meta.request_id.as_ref(),
+            client_context_id: meta.client_context_id.as_ref(),
+            status: meta.status.into(),
+            metrics: QueryMetrics::from(&meta.metrics),
+            signature: meta.signature.as_deref(),
             warnings: meta
                 .warnings
                 .clone()
                 .into_iter()
                 .map(|w| w.into())
                 .collect(),
-            profile: meta.profile.clone(),
+            profile: meta.profile.as_deref(),
         }
     }
 }

@@ -53,14 +53,12 @@ impl Stream for QueryRespReader {
 
         match streamer.poll_next_unpin(cx) {
             Poll::Ready(Some(Ok(row_data))) => Poll::Ready(Some(Ok(Bytes::from(row_data)))),
-            Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(Error::new_server_error(
-                ServerError::new(ServerErrorKind::Unknown { msg: e.to_string() }, None, None),
+            Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(Error::new_http_error(
                 &this.endpoint,
-                &this.statement,
-                &this.client_context_id,
-                vec![],
-                this.status_code,
-            )))),
+                this.statement.clone(),
+                this.client_context_id.clone(),
+            )
+            .with(Arc::new(e))))),
             Poll::Ready(None) => {
                 this.read_final_metadata();
                 Poll::Ready(None)
@@ -85,47 +83,38 @@ impl QueryRespReader {
             let body = match resp.bytes().await {
                 Ok(b) => b,
                 Err(e) => {
-                    debug!("Failed to read response body on error {}", e);
-                    return Err(Error::new_server_error(
-                        ServerError::new(
-                            ServerErrorKind::Unknown { msg: e.to_string() },
-                            None,
-                            None,
-                        ),
-                        endpoint,
-                        statement,
-                        client_context_id,
-                        vec![],
-                        status_code,
-                    ));
+                    debug!("Failed to read response body on error {}", &e);
+                    return Err(
+                        Error::new_http_error(endpoint, statement, client_context_id)
+                            .with(Arc::new(e)),
+                    );
                 }
             };
 
             let errors: QueryErrorResponse = match serde_json::from_slice(&body) {
                 Ok(e) => e,
                 Err(e) => {
-                    return Err(Error::new_generic_error(
-                            format!(
-                                "non-200 status code received {} but parsing error response body failed {}",
-                                status_code,
-                                e
-                            ),
-                            endpoint,
-                            statement,
-                            client_context_id,
-                        ));
+                    return Err(Error::new_message_error(
+                        format!(
+                        "non-200 status code received {} but parsing error response body failed {}",
+                        status_code, e
+                    ),
+                        None,
+                        None,
+                        None,
+                    ));
                 }
             };
 
             if errors.errors.is_empty() {
-                return Err(Error::new_generic_error(
+                return Err(Error::new_message_error(
                     format!(
                         "Non-200 status code received {} but response body contained no errors",
-                        status_code
+                        status_code,
                     ),
-                    endpoint,
-                    statement,
-                    client_context_id,
+                    None,
+                    None,
+                    None,
                 ));
             }
 
@@ -141,14 +130,11 @@ impl QueryRespReader {
         let stream = resp.bytes_stream();
         let mut streamer = RawJsonRowStreamer::new(JsonRowStream::new(stream), "results");
 
-        let early_meta_data = Self::read_early_metadata(
-            &mut streamer,
-            &endpoint,
-            &statement,
-            &client_context_id,
-            status_code,
-        )
-        .await?;
+        let early_meta_data =
+            Self::read_early_metadata(&mut streamer, &endpoint, &statement, &client_context_id)
+                .await?;
+
+        let has_more_rows = streamer.has_more_rows();
 
         let mut reader = Self {
             endpoint,
@@ -161,13 +147,10 @@ impl QueryRespReader {
             meta_data_error: None,
         };
 
-        // TODO: this is a bit absurd.
-        if let Some(streamer) = &reader.streamer {
-            if !streamer.has_more_rows() {
-                reader.read_final_metadata();
-                if let Some(e) = &reader.meta_data_error {
-                    return Err(e.clone());
-                }
+        if !has_more_rows {
+            reader.read_final_metadata();
+            if let Some(e) = reader.meta_data_error {
+                return Err(e);
             }
         }
 
@@ -187,11 +170,11 @@ impl QueryRespReader {
             return Ok(meta);
         }
 
-        Err(Error::new_generic_error(
+        Err(Error::new_message_error(
             "cannot read meta-data until after all rows are read",
-            &self.endpoint,
-            &self.statement,
-            &self.client_context_id,
+            None,
+            None,
+            None,
         ))
     }
 
@@ -200,21 +183,23 @@ impl QueryRespReader {
         endpoint: &str,
         statement: &str,
         client_context_id: &str,
-        status_code: StatusCode,
     ) -> error::Result<EarlyMetaData> {
         let prelude = streamer.read_prelude().await.map_err(|e| {
-            Error::new_server_error(
-                ServerError::new(ServerErrorKind::Unknown { msg: e.to_string() }, None, None),
+            Error::new_http_error(
                 endpoint,
-                statement,
-                client_context_id,
-                vec![],
-                status_code,
+                statement.to_string(),
+                client_context_id.to_string(),
             )
+            .with(Arc::new(e))
         })?;
 
         let early_metadata: QueryEarlyMetaData = serde_json::from_slice(&prelude).map_err(|e| {
-            Error::new_generic_error(e.to_string(), endpoint, statement, client_context_id)
+            Error::new_message_error(
+                format!("failed to parse metadata from response: {}", e),
+                endpoint.to_string(),
+                statement.to_string(),
+                client_context_id.to_string(),
+            )
         })?;
 
         Ok(EarlyMetaData {
@@ -230,18 +215,14 @@ impl QueryRespReader {
             let epilog = match streamer.epilog() {
                 Ok(e) => e,
                 Err(e) => {
-                    self.meta_data_error = Some(Error::new_server_error(
-                        ServerError::new(
-                            ServerErrorKind::Unknown { msg: e.to_string() },
-                            None,
-                            None,
-                        ),
-                        &self.endpoint,
-                        &self.statement,
-                        &self.client_context_id,
-                        vec![],
-                        self.status_code,
-                    ));
+                    self.meta_data_error = Some(
+                        Error::new_http_error(
+                            &self.endpoint,
+                            self.statement.clone(),
+                            self.client_context_id.clone(),
+                        )
+                        .with(Arc::new(e)),
+                    );
                     return;
                 }
             };
@@ -249,11 +230,11 @@ impl QueryRespReader {
             let metadata: QueryMetaData = match serde_json::from_slice(&epilog) {
                 Ok(m) => m,
                 Err(e) => {
-                    self.meta_data_error = Some(Error::new_generic_error(
-                        e.to_string(),
-                        &self.endpoint,
-                        &self.statement,
-                        &self.client_context_id,
+                    self.meta_data_error = Some(Error::new_message_error(
+                        format!("failed to parse metadata from response: {}", e),
+                        self.endpoint.clone(),
+                        self.statement.clone(),
+                        self.client_context_id.clone(),
                     ));
                     return;
                 }
@@ -348,7 +329,7 @@ impl QueryRespReader {
         let error_descs: Vec<ErrorDesc> = errors
             .iter()
             .map(|error| ErrorDesc {
-                kind: Box::new(Self::parse_error_kind(error)),
+                kind: Self::parse_error_kind(error),
                 code: error.code,
                 message: error.msg.clone(),
                 retry: error.retry.unwrap_or_default(),
@@ -361,17 +342,45 @@ impl QueryRespReader {
             .find(|desc| !desc.retry)
             .unwrap_or(&error_descs[0]);
 
-        Error {
-            kind: chosen_desc.kind.clone(),
-            endpoint: endpoint.into(),
-            statement: statement.into(),
-            client_context_id: client_context_id.into(),
-            error_descs,
-            status_code: Some(status_code),
+        let mut server_error = ServerError::new(
+            chosen_desc.kind.clone(),
+            endpoint,
+            status_code,
+            chosen_desc.code,
+            chosen_desc.message.clone(),
+        )
+        .with_client_context_id(client_context_id)
+        .with_statement(statement);
+
+        if error_descs.len() > 1 {
+            server_error = server_error.with_error_descs(error_descs);
+        }
+
+        match server_error.kind() {
+            ServerErrorKind::ScopeNotFound => {
+                Error::new_resource_error(ResourceError::new(server_error))
+            }
+            ServerErrorKind::CollectionNotFound => {
+                Error::new_resource_error(ResourceError::new(server_error))
+            }
+            ServerErrorKind::IndexNotFound => {
+                Error::new_resource_error(ResourceError::new(server_error))
+            }
+            ServerErrorKind::IndexExists => {
+                Error::new_resource_error(ResourceError::new(server_error))
+            }
+            ServerErrorKind::AuthenticationFailure => {
+                if server_error.code() == 13014 {
+                    Error::new_resource_error(ResourceError::new(server_error))
+                } else {
+                    Error::new_server_error(server_error)
+                }
+            }
+            _ => Error::new_server_error(server_error),
         }
     }
 
-    fn parse_error_kind(error: &QueryError) -> ErrorKind {
+    fn parse_error_kind(error: &QueryError) -> ServerErrorKind {
         let err_code = error.code;
         let err_code_group = err_code / 1000;
 
@@ -383,186 +392,76 @@ impl QueryRespReader {
                 || err_code == 4080
                 || err_code == 4090
             {
-                return ErrorKind::ServerError(ServerError::new(
-                    ServerErrorKind::PreparedStatementFailure,
-                    error.code,
-                    error.msg.clone(),
-                ));
+                ServerErrorKind::PreparedStatementFailure
             } else if err_code == 4300 {
-                return ErrorKind::Resource(ResourceError::new(
-                    ServerError::new(ServerErrorKind::IndexExists, error.code, error.msg.clone()),
-                    &error.msg,
-                ));
+                ServerErrorKind::IndexExists
+            } else {
+                ServerErrorKind::PlanningFailure
             }
-
-            return ErrorKind::ServerError(ServerError::new(
-                ServerErrorKind::PlanningFailure,
-                error.code,
-                error.msg.clone(),
-            ));
         } else if err_code_group == 5 {
             let msg = error.msg.to_lowercase();
             if msg.contains("not enough") && msg.contains("replica") {
-                return ErrorKind::ServerError(ServerError::new(
-                    ServerErrorKind::InvalidArgument {
-                        argument: "num_replicas".to_string(),
-                        reason: "not enough indexer nodes to create index with replica count"
-                            .to_string(),
-                    },
-                    error.code,
-                    error.msg.clone(),
-                ));
+                ServerErrorKind::InvalidArgument {
+                    argument: "num_replicas".to_string(),
+                    reason: "not enough indexer nodes to create index with replica count"
+                        .to_string(),
+                }
             } else if msg.contains("build already in progress") {
-                return ErrorKind::ServerError(ServerError::new(
-                    ServerErrorKind::BuildAlreadyInProgress,
-                    error.code,
-                    error.msg.clone(),
-                ));
+                ServerErrorKind::BuildAlreadyInProgress
             } else if Regex::new(".*?ndex .*? already exist.*")
                 .unwrap()
                 .is_match(&error.msg)
             {
-                return ErrorKind::ServerError(ServerError::new(
-                    ServerErrorKind::IndexExists,
-                    error.code,
-                    error.msg.clone(),
-                ));
+                ServerErrorKind::IndexExists
+            } else {
+                ServerErrorKind::Internal
             }
-
-            return ErrorKind::ServerError(ServerError::new(
-                ServerErrorKind::Internal,
-                error.code,
-                error.msg.clone(),
-            ));
         } else if err_code_group == 12 {
             if err_code == 12003 {
-                return ErrorKind::Resource(ResourceError::new(
-                    ServerError::new(
-                        ServerErrorKind::CollectionNotFound,
-                        error.code,
-                        error.msg.clone(),
-                    ),
-                    &error.msg,
-                ));
+                ServerErrorKind::CollectionNotFound
             } else if err_code == 12004 {
-                return ErrorKind::Resource(ResourceError::new(
-                    ServerError::new(
-                        ServerErrorKind::IndexNotFound,
-                        error.code,
-                        error.msg.clone(),
-                    ),
-                    &error.msg,
-                ));
+                ServerErrorKind::IndexNotFound
             } else if err_code == 12009 {
                 if !error.reason.is_empty() {
                     if let Some(code) = error.reason.get("code") {
-                        // if let Some(c) = code.as_f64() {
                         if code == 12033 {
-                            return ErrorKind::ServerError(ServerError::new(
-                                ServerErrorKind::CasMismatch,
-                                error.code,
-                                error.msg.clone(),
-                            ));
+                            ServerErrorKind::CasMismatch
                         } else if code == 17014 {
-                            return ErrorKind::ServerError(ServerError::new(
-                                ServerErrorKind::DocNotFound,
-                                error.code,
-                                error.msg.clone(),
-                            ));
+                            ServerErrorKind::DocNotFound
                         } else if code == 17012 {
-                            return ErrorKind::ServerError(ServerError::new(
-                                ServerErrorKind::DocExists,
-                                error.code,
-                                error.msg.clone(),
-                            ));
-                        };
-                        // }
+                            ServerErrorKind::DocExists
+                        } else {
+                            ServerErrorKind::DMLFailure
+                        }
+                    } else {
+                        ServerErrorKind::DMLFailure
                     }
                 } else if error.msg.to_lowercase().contains("cas mismatch") {
-                    return ErrorKind::ServerError(ServerError::new(
-                        ServerErrorKind::CasMismatch,
-                        error.code,
-                        error.msg.clone(),
-                    ));
+                    ServerErrorKind::CasMismatch
+                } else {
+                    ServerErrorKind::DMLFailure
                 }
-
-                return ErrorKind::ServerError(ServerError::new(
-                    ServerErrorKind::DMLFailure,
-                    error.code,
-                    error.msg.clone(),
-                ));
             } else if err_code == 12016 {
-                return ErrorKind::Resource(ResourceError::new(
-                    ServerError::new(
-                        ServerErrorKind::IndexNotFound,
-                        error.code,
-                        error.msg.clone(),
-                    ),
-                    &error.msg,
-                ));
+                ServerErrorKind::IndexNotFound
             } else if err_code == 12021 {
-                return ErrorKind::Resource(ResourceError::new(
-                    ServerError::new(
-                        ServerErrorKind::ScopeNotFound,
-                        error.code,
-                        error.msg.clone(),
-                    ),
-                    &error.msg,
-                ));
+                ServerErrorKind::ScopeNotFound
+            } else {
+                ServerErrorKind::IndexFailure
             }
-
-            return ErrorKind::ServerError(ServerError::new(
-                ServerErrorKind::IndexFailure,
-                error.code,
-                error.msg.clone(),
-            ));
         } else if err_code_group == 14 {
-            return ErrorKind::ServerError(ServerError::new(
-                ServerErrorKind::IndexFailure,
-                error.code,
-                error.msg.clone(),
-            ));
+            ServerErrorKind::IndexFailure
         } else if err_code_group == 10 {
-            return ErrorKind::ServerError(ServerError::new(
-                ServerErrorKind::AuthenticationFailure,
-                error.code,
-                error.msg.clone(),
-            ));
+            ServerErrorKind::AuthenticationFailure
         } else if err_code == 1000 {
-            return ErrorKind::ServerError(ServerError::new(
-                ServerErrorKind::WriteInReadOnlyMode,
-                error.code,
-                error.msg.clone(),
-            ));
+            ServerErrorKind::WriteInReadOnlyMode
         } else if err_code == 1080 {
-            return ErrorKind::ServerError(ServerError::new(
-                ServerErrorKind::Timeout,
-                error.code,
-                error.msg.clone(),
-            ));
+            ServerErrorKind::Timeout
         } else if err_code == 3000 {
-            return ErrorKind::ServerError(ServerError::new(
-                ServerErrorKind::ParsingFailure,
-                error.code,
-                error.msg.clone(),
-            ));
+            ServerErrorKind::ParsingFailure
         } else if err_code == 13014 {
-            return ErrorKind::Resource(ResourceError::new(
-                ServerError::new(
-                    ServerErrorKind::AuthenticationFailure,
-                    error.code,
-                    error.msg.clone(),
-                ),
-                &error.msg,
-            ));
+            ServerErrorKind::AuthenticationFailure
+        } else {
+            ServerErrorKind::Unknown
         }
-
-        ErrorKind::ServerError(ServerError::new(
-            ServerErrorKind::Unknown {
-                msg: "unknown query error".to_string(),
-            },
-            error.code,
-            error.msg.clone(),
-        ))
     }
 }

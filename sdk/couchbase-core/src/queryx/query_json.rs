@@ -1,8 +1,7 @@
-use bytes::Bytes;
-use serde::Deserialize;
-use serde_json::Value;
-
 use crate::queryx::query_result::Status;
+use serde::Deserialize;
+use serde_json::value::RawValue;
+use serde_json::Value;
 
 #[derive(Debug, Deserialize)]
 pub struct QueryErrorResponse {
@@ -29,8 +28,8 @@ pub struct QueryMetaData {
     #[serde(default)]
     pub warnings: Vec<QueryWarning>,
     pub metrics: Option<QueryMetrics>,
-    pub profile: Option<Value>,
-    pub signature: Option<Value>,
+    pub profile: Option<Box<RawValue>>,
+    pub signature: Option<Box<RawValue>>,
 }
 
 #[derive(Debug, Deserialize)]
