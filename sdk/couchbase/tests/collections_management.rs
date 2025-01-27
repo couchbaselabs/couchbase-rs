@@ -1,10 +1,13 @@
+use crate::common::consistency_utils::{
+    verify_collection_created, verify_collection_dropped, verify_scope_created,
+    verify_scope_dropped,
+};
 use crate::common::features::TestFeatureCode;
 use crate::common::test_config::run_test;
 use crate::common::{generate_string_value, try_until};
 use couchbase::collections_manager::{
-    CollectionManager, CreateCollectionSettings, MaxExpiryValue, UpdateCollectionSettings,
+    CreateCollectionSettings, MaxExpiryValue, UpdateCollectionSettings,
 };
-use couchbase::results::collections_mgmt_results::CollectionSpec;
 use std::time::Duration;
 
 mod common;
@@ -159,90 +162,4 @@ fn test_drop_collection() {
             .unwrap();
         verify_collection_dropped(&manager, &scope_name, &collection_name).await;
     })
-}
-
-async fn verify_scope_created(manager: &CollectionManager, scope_name: &str) {
-    try_until(
-        tokio::time::Instant::now() + Duration::from_secs(5),
-        Duration::from_millis(100),
-        "Scope was not created in time",
-        || async {
-            let scopes = manager.get_all_scopes(None).await.unwrap();
-            if !scopes.iter().any(|s| s.name() == scope_name) {
-                return Ok(None);
-            }
-
-            Ok(Some(()))
-        },
-    )
-    .await;
-}
-
-async fn verify_scope_dropped(manager: &CollectionManager, scope_name: &str) {
-    try_until(
-        tokio::time::Instant::now() + Duration::from_secs(5),
-        Duration::from_millis(100),
-        "Scope was not dropped in time",
-        || async {
-            let scopes = manager.get_all_scopes(None).await.unwrap();
-            if scopes.iter().any(|s| s.name() == scope_name) {
-                return Ok(None);
-            };
-
-            Ok(Some(()))
-        },
-    )
-    .await;
-}
-
-async fn verify_collection_created(
-    manager: &CollectionManager,
-    scope_name: &str,
-    collection_name: &str,
-) -> CollectionSpec {
-    try_until(
-        tokio::time::Instant::now() + Duration::from_secs(5),
-        Duration::from_millis(100),
-        "Collection was not created in time",
-        || async {
-            let scopes = manager.get_all_scopes(None).await.unwrap();
-            if !scopes.iter().any(|s| s.name() == scope_name) {
-                return Ok(None);
-            };
-            let scope = scopes.iter().find(|s| s.name() == scope_name).unwrap();
-            let collection = scope
-                .collections()
-                .iter()
-                .find(|c| c.name() == collection_name);
-
-            Ok(collection.cloned())
-        },
-    )
-    .await
-}
-
-async fn verify_collection_dropped(
-    manager: &CollectionManager,
-    scope_name: &str,
-    collection_name: &str,
-) {
-    try_until(
-        tokio::time::Instant::now() + Duration::from_secs(5),
-        Duration::from_millis(100),
-        "Collection was not dropped in time",
-        || async {
-            let scopes = manager.get_all_scopes(None).await.unwrap();
-            let scope = scopes.iter().find(|s| s.name() == scope_name).unwrap();
-            if scope
-                .collections()
-                .iter()
-                .any(|c| c.name() == collection_name)
-            {
-                return Ok(None);
-            }
-
-            Ok(Some(()))
-        },
-    )
-    .await;
 }

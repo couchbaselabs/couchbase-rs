@@ -1,6 +1,10 @@
 use crate::clients::agent_provider::CouchbaseAgentProvider;
 use crate::clients::core_kv_client::{CoreKvClient, CoreKvClientBackend, Couchbase2CoreKvClient};
 use crate::clients::couchbase_core_kv_client::CouchbaseCoreKvClient;
+use crate::clients::query_index_mgmt_client::{
+    CouchbaseQueryIndexMgmtClient, QueryIndexKeyspace, QueryIndexMgmtClient,
+    QueryIndexMgmtClientBackend,
+};
 use couchbase_core::retry::RetryStrategy;
 use std::sync::Arc;
 
@@ -25,6 +29,23 @@ impl CollectionClient {
         match &self.backend {
             CollectionClientBackend::CouchbaseCollectionBackend(client) => client.core_kv_client(),
             CollectionClientBackend::Couchbase2CollectionBackend(client) => client.core_kv_client(),
+        }
+    }
+
+    pub fn query_index_management_client(&self) -> QueryIndexMgmtClient {
+        match &self.backend {
+            CollectionClientBackend::CouchbaseCollectionBackend(client) => {
+                let query_index_mgmt_client = client.query_index_management_client();
+
+                QueryIndexMgmtClient::new(
+                    QueryIndexMgmtClientBackend::CouchbaseQueryIndexMgmtClientBackend(
+                        query_index_mgmt_client,
+                    ),
+                )
+            }
+            CollectionClientBackend::Couchbase2CollectionBackend(_) => {
+                unimplemented!()
+            }
         }
     }
 }
@@ -83,6 +104,17 @@ impl CouchbaseCollectionClient {
                 self.default_retry_strategy.clone(),
             ),
         ))
+    }
+
+    pub fn query_index_management_client(&self) -> CouchbaseQueryIndexMgmtClient {
+        CouchbaseQueryIndexMgmtClient::new(
+            self.agent_provider.clone(),
+            QueryIndexKeyspace {
+                bucket_name: self.bucket_name().to_string(),
+                scope_name: self.scope_name().to_string(),
+                collection_name: self.name().to_string(),
+            },
+        )
     }
 }
 

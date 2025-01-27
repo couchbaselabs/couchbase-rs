@@ -13,6 +13,7 @@ pub mod durability_level;
 pub mod error;
 pub mod mutation_state;
 pub mod options;
+pub mod query_index_manager;
 pub mod results;
 pub mod scope;
 pub mod search;

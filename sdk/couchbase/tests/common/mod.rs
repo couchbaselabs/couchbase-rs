@@ -1,5 +1,6 @@
 use uuid::Uuid;
 
+pub mod consistency_utils;
 pub mod default_cluster_options;
 pub mod doc_generation;
 pub mod features;
