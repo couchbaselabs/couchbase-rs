@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use crate::httpx::error::ErrorKind::{Connect, Generic};
-use crate::httpx::error::Result as HttpxResult;
+use crate::httpx::error::ErrorKind::Connection;
+use crate::httpx::error::{Error, Result as HttpxResult};
 use crate::httpx::request::{Auth, OboPasswordOrDomain, Request};
 use crate::httpx::response::Response;
 use crate::tls_config::TlsConfig;
@@ -71,9 +71,9 @@ impl ReqwestClient {
             // We have to deref the Arc, otherwise we'll get a runtime error from reqwest.
             builder = builder.use_preconfigured_tls((*config).clone());
         }
-        let client = builder.build().map_err(|err| Generic {
-            msg: err.to_string(),
-        })?;
+        let client = builder
+            .build()
+            .map_err(|e| Error::new_message_error(format!("failed to build http client {}", e)))?;
         Ok(client)
     }
 
@@ -83,9 +83,9 @@ impl ReqwestClient {
         if let Some(config) = cfg.tls_config {
             builder = builder.use_preconfigured_tls(config);
         }
-        let client = builder.build().map_err(|err| Generic {
-            msg: err.to_string(),
-        })?;
+        let client = builder
+            .build()
+            .map_err(|e| Error::new_message_error(format!("failed to build http client {}", e)))?;
         Ok(client)
     }
 }
@@ -157,7 +157,6 @@ impl Client for ReqwestClient {
                 );
                 Response::from(response)
             }),
-            // TODO improve error handling
             Err(err) => {
                 trace!(
                     "Received error on {}. Request id={}. Err: {}",
@@ -166,15 +165,9 @@ impl Client for ReqwestClient {
                     &err,
                 );
                 if err.is_connect() {
-                    Err(Connect {
-                        msg: err.to_string(),
-                    }
-                    .into())
+                    Err(Error::new_connection_error(err.to_string()))
                 } else {
-                    Err(Generic {
-                        msg: err.to_string(),
-                    }
-                    .into())
+                    Err(Error::new_message_error(err.to_string()))
                 }
             }
         }

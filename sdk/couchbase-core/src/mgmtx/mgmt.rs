@@ -94,12 +94,7 @@ impl<C: Client> Management<C> {
         self.http_client
             .execute(req)
             .await
-            .map_err(|e| error::Error {
-                kind: Box::new(error::ErrorKind::Generic {
-                    msg: format!("could not execute request: {}", e),
-                }),
-                source: Some(Box::new(e)),
-            })
+            .map_err(|e| error::Error::new_message_error("could not execute request").with(e))
     }
 
     async fn decode_common_error(response: Response) -> error::Error {
@@ -107,24 +102,14 @@ impl<C: Client> Management<C> {
         let body = match response.bytes().await {
             Ok(b) => b,
             Err(e) => {
-                return error::Error {
-                    kind: Box::new(error::ErrorKind::Generic {
-                        msg: format!("could not parse response body: {}", e),
-                    }),
-                    source: Some(Box::new(e)),
-                }
+                return error::Error::new_message_error("could not parse response body").with(e)
             }
         };
 
         let body_str = match String::from_utf8(body.to_vec()) {
             Ok(s) => s.to_lowercase(),
             Err(e) => {
-                return error::Error {
-                    kind: Box::new(error::ErrorKind::Generic {
-                        msg: format!("could not parse error response: {}", e),
-                    }),
-                    source: Some(Box::new(e)),
-                }
+                return error::Error::new_message_error("could not parse error response").with(e)
             }
         };
 
@@ -172,14 +157,7 @@ impl<C: Client> Management<C> {
             error::ServerErrorKind::Unknown
         };
 
-        error::Error {
-            kind: Box::new(error::ErrorKind::Server {
-                status_code: status,
-                body: body_str,
-                kind,
-            }),
-            source: None,
-        }
+        error::ServerError::new(status, body_str, kind).into()
     }
 
     fn parse_for_invalid_arg(body: &str) -> Option<(String, String)> {
@@ -255,11 +233,8 @@ impl<C: Client> Management<C> {
                 None,
             )
             .await
-            .map_err(|e| error::Error {
-                kind: Box::new(error::ErrorKind::Generic {
-                    msg: format!("could not get collections manifest: {}", e),
-                }),
-                source: Some(Box::new(e)),
+            .map_err(|e| {
+                error::Error::new_message_error("could not get collections manifest").with(e)
             })?;
 
         if resp.status() != 200 {
@@ -442,30 +417,20 @@ impl<C: Client> Management<C> {
     }
 
     fn url_encode(value: &[(&str, &str)]) -> error::Result<Bytes> {
-        let body = serde_urlencoded::to_string(value).map_err(|e| error::Error {
-            kind: Box::new(error::ErrorKind::Generic {
-                msg: format!("could not encode request body: {}", e),
-            }),
-            source: Some(Box::new(e)),
-        })?;
+        let body = serde_urlencoded::to_string(value)
+            .map_err(|e| error::Error::new_message_error(format!("encoding failed: {}", e)))?;
 
         Ok(Bytes::from(body))
     }
 
     async fn parse_response<T: DeserializeOwned>(resp: Response) -> error::Result<T> {
-        let body = resp.bytes().await.map_err(|e| error::Error {
-            kind: Box::new(error::ErrorKind::Generic {
-                msg: format!("could not read response: {}", e),
-            }),
-            source: Some(Box::new(e)),
-        })?;
+        let body = resp
+            .bytes()
+            .await
+            .map_err(|e| error::Error::new_message_error("could not read response").with(e))?;
 
-        serde_json::from_slice(&body).map_err(|e| error::Error {
-            kind: Box::new(error::ErrorKind::Generic {
-                msg: format!("could not parse response: {}", e),
-            }),
-            source: Some(Box::new(e)),
-        })
+        serde_json::from_slice(&body)
+            .map_err(|e| error::Error::new_message_error("could not parse response").with(e))
     }
 }
 

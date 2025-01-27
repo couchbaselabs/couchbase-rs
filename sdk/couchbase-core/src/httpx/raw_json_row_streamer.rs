@@ -1,4 +1,4 @@
-use crate::httpx::error::ErrorKind::Generic;
+use crate::httpx::error::Error;
 use crate::httpx::error::Result as HttpxResult;
 use crate::httpx::json_row_stream::JsonRowStream;
 use futures::{Stream, StreamExt, TryStreamExt};
@@ -38,33 +38,30 @@ impl RawJsonRowStreamer {
 
     async fn begin(&mut self) -> HttpxResult<()> {
         if self.state != RowStreamState::Start {
-            return Err(Generic {
-                msg: "Unexpected parsing state during begin".to_string(),
-            }
-            .into());
+            return Err(Error::new_message_error(
+                "unexpected parsing state during begin",
+            ));
         }
 
         let first = match self.stream.next().await {
             Some(result) => result?,
             None => {
-                return Err(Generic {
-                    msg: "Expected first line to be non-empty".to_string(),
-                }
-                .into())
+                return Err(Error::new_message_error(
+                    "expected first line to be non-empty",
+                ))
             }
         };
 
         if &first[..] != b"{" {
-            return Err(Generic {
-                msg: "Expected an opening brace for the result".to_string(),
-            }
-            .into());
+            return Err(Error::new_message_error(
+                "expected an opening brace for the result",
+            ));
         }
         loop {
             match self.stream.next().await {
                 Some(mut item) => {
-                    let mut item =
-                        String::from_utf8(item?).map_err(|e| Generic { msg: e.to_string() })?;
+                    let mut item = String::from_utf8(item?)
+                        .map_err(|e| Error::new_message_error("failed to parse utf8 string"))?;
                     if item.is_empty() || item == "}" {
                         self.state = RowStreamState::End;
                         break;
@@ -72,8 +69,9 @@ impl RawJsonRowStreamer {
                     if self.state < RowStreamState::PostRows && item.contains(&self.rows_attrib) {
                         if let Some(mut maybe_row) = self.stream.next().await {
                             let maybe_row = maybe_row?;
-                            let str_row = std::str::from_utf8(&maybe_row)
-                                .map_err(|e| Generic { msg: e.to_string() })?;
+                            let str_row = std::str::from_utf8(&maybe_row).map_err(|e| {
+                                Error::new_message_error("failed to parse utf8 string")
+                            })?;
                             // if there are no more rows, immediately move to post-rows
                             if str_row == "]" {
                                 self.state = RowStreamState::PostRows;
@@ -91,7 +89,9 @@ impl RawJsonRowStreamer {
                     // Wrap the line in a JSON object to deserialize
                     item = format!("{{{}}}", item);
                     let json_value: HashMap<String, Value> =
-                        serde_json::from_str(&item).map_err(|e| Generic { msg: e.to_string() })?;
+                        serde_json::from_str(&item).map_err(|e| {
+                            Error::new_message_error(format!("failed to parse response: {}", e))
+                        })?;
 
                     // Save the attribute for the metadata
                     for (k, v) in json_value {
@@ -118,11 +118,13 @@ impl RawJsonRowStreamer {
 
     pub async fn read_prelude(&mut self) -> HttpxResult<Vec<u8>> {
         self.begin().await?;
-        Ok(serde_json::to_vec(&self.attribs)?)
+        serde_json::to_vec(&self.attribs)
+            .map_err(|e| Error::new_message_error(format!("failed to read prelude: {}", e)))
     }
 
     pub fn epilog(&mut self) -> HttpxResult<Vec<u8>> {
-        Ok(serde_json::to_vec(&self.attribs)?)
+        serde_json::to_vec(&self.attribs)
+            .map_err(|e| Error::new_message_error(format!("failed to read epilogue: {}", e)))
     }
 }
 
@@ -137,10 +139,9 @@ impl Stream for RawJsonRowStreamer {
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         if self.state < RowStreamState::Rows {
-            return Poll::Ready(Some(Err(Generic {
-                msg: "unexpected parsing state during read rows".to_string(),
-            }
-            .into())));
+            return Poll::Ready(Some(Err(Error::new_message_error(
+                "unexpected parsing state during read rows",
+            ))));
         }
 
         let row = self.buffered_row.clone();
@@ -150,8 +151,8 @@ impl Stream for RawJsonRowStreamer {
         match this.stream.poll_next_unpin(cx) {
             Poll::Ready(Some(Ok(stream_row))) => {
                 if this.state == RowStreamState::PostRows {
-                    let mut item = String::from_utf8(stream_row).map_err(|e| Generic {
-                        msg: format!("failed to parse stream epilogue to string {}", &e),
+                    let mut item = String::from_utf8(stream_row).map_err(|e| {
+                        Error::new_message_error("failed to parse stream epilogue to string")
                     })?;
 
                     if item == "}" || item.is_empty() {
@@ -161,8 +162,11 @@ impl Stream for RawJsonRowStreamer {
 
                     item = format!("{{{}}}", item);
                     let json_value: HashMap<String, Value> =
-                        serde_json::from_str(&item).map_err(|e| Generic {
-                            msg: format!("failed to parse stream epilogue to value {}", &e),
+                        serde_json::from_str(&item).map_err(|e| {
+                            Error::new_message_error(format!(
+                                "failed to parse stream epilogue to value: {}",
+                                e
+                            ))
                         })?;
                     for (k, v) in json_value {
                         this.attribs.insert(k, v);
@@ -173,9 +177,8 @@ impl Stream for RawJsonRowStreamer {
                     return Poll::Pending;
                 }
 
-                let str_row = std::str::from_utf8(&stream_row).map_err(|e| Generic {
-                    msg: format!("failed to parse stream row {}", &e),
-                })?;
+                let str_row = std::str::from_utf8(&stream_row)
+                    .map_err(|e| Error::new_message_error("failed to parse stream row"))?;
                 if str_row == "]" {
                     this.state = RowStreamState::PostRows;
                 } else {

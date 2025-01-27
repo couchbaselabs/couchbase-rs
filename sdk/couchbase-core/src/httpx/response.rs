@@ -4,7 +4,7 @@ use http::StatusCode;
 use serde::de::DeserializeOwned;
 
 use crate::httpx::error;
-use crate::httpx::error::ErrorKind::Generic;
+use crate::httpx::error::Error;
 
 #[derive(Debug)]
 pub struct Response {
@@ -23,20 +23,20 @@ impl Response {
     }
 
     pub async fn bytes(self) -> error::Result<Bytes> {
-        Ok(self.inner.bytes().await?)
+        self.inner.bytes().await.map_err(|e| {
+            Error::new_message_error(format!("failed to read bytes from response: {}", e))
+        })
     }
 
     pub fn bytes_stream(self) -> impl Stream<Item = error::Result<Bytes>> + Unpin {
-        self.inner
-            .bytes_stream()
-            .map_err(|e| Generic { msg: e.to_string() }.into())
+        self.inner.bytes_stream().map_err(|e| {
+            Error::new_message_error(format!("failed to read bytes stream from response: {}", e))
+        })
     }
 
     pub async fn json<T: DeserializeOwned>(self) -> error::Result<T> {
-        Ok(self
-            .inner
-            .json()
-            .await
-            .map_err(|e| Generic { msg: e.to_string() })?)
+        self.inner.json().await.map_err(|e| {
+            Error::new_decoding_error(format!("failed to decode body into json: {}", e))
+        })
     }
 }

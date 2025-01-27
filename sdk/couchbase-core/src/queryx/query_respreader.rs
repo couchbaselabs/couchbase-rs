@@ -15,7 +15,6 @@ use regex::Regex;
 use tokio::sync::Mutex;
 
 use crate::helpers::durations::parse_duration_from_golang_string;
-use crate::httpx::error::ErrorKind::Generic;
 use crate::httpx::json_row_stream::JsonRowStream;
 use crate::httpx::raw_json_row_streamer::RawJsonRowStreamer;
 use crate::httpx::response::Response;
