@@ -1,9 +1,18 @@
+use crate::common::consistency_utils::{
+    verify_collection_created, verify_scope_created, verify_scope_dropped,
+};
 use crate::common::test_config::run_test;
+use crate::common::try_until;
+use couchbase::collections_manager::CollectionManager;
+use couchbase::options::query_index_mgmt_options::{
+    CreatePrimaryQueryIndexOptions, CreateQueryIndexOptions,
+};
 use couchbase::options::query_options::QueryOptions;
 use couchbase::results::query_results::{QueryMetaData, QueryStatus};
 use futures::StreamExt;
 use serde_json::value::RawValue;
 use serde_json::Value;
+use std::time::Duration;
 
 mod common;
 
@@ -106,6 +115,104 @@ fn test_scope_query_basic() {
         let meta = res.metadata().await.unwrap();
         assert_metadata(meta);
     })
+}
+
+#[test]
+fn test_query_indexes() {
+    run_test(async |cluster| {
+        let coll_manager = cluster.bucket(&cluster.default_bucket).collections();
+        let (scope, collection) = create_collection(&coll_manager).await;
+
+        let manager = cluster
+            .bucket(&cluster.default_bucket)
+            .scope(&scope)
+            .collection(&collection)
+            .query_indexes();
+
+        let opts = CreatePrimaryQueryIndexOptions::new().ignore_if_exists(true);
+
+        // Allow time for server to sync with the new collection
+        try_until(
+            tokio::time::Instant::now() + Duration::from_secs(5),
+            Duration::from_millis(100),
+            "Primary index was not created in time",
+            async || {
+                let res = manager.create_primary_index(opts.clone()).await;
+                if res.is_ok() {
+                    Ok(Some(()))
+                } else {
+                    Ok(None)
+                }
+            },
+        )
+        .await;
+
+        let opts = CreateQueryIndexOptions::new()
+            .ignore_if_exists(true)
+            .deferred(true);
+        manager
+            .create_index("test_index".to_string(), vec!["name".to_string()], opts)
+            .await
+            .unwrap();
+
+        let indexes = manager.get_all_indexes(None).await.unwrap();
+
+        assert_eq!(2, indexes.len());
+
+        let primary_index = indexes.iter().find(|idx| idx.name() == "#primary").unwrap();
+        assert!(primary_index.is_primary());
+        assert_eq!(primary_index.state(), "Online");
+
+        let test_index = indexes
+            .iter()
+            .find(|idx| idx.name() == "test_index")
+            .unwrap();
+        assert!(!test_index.is_primary());
+        assert_eq!(test_index.state(), "Deferred");
+        assert_eq!(test_index.keyspace(), &collection);
+
+        manager.build_deferred_indexes(None).await.unwrap();
+
+        manager
+            .watch_indexes(vec!["test_index".to_string()], None)
+            .await
+            .unwrap();
+
+        manager.drop_primary_index(None).await.unwrap();
+
+        manager
+            .drop_index("test_index".to_string(), None)
+            .await
+            .unwrap();
+
+        let indexes = manager.get_all_indexes(None).await.unwrap();
+        assert_eq!(0, indexes.len());
+
+        drop_scope(&coll_manager, &scope).await;
+    })
+}
+
+async fn create_collection(manager: &CollectionManager) -> (String, String) {
+    let scope_name = common::generate_string_value(10);
+    let collection_name = common::generate_string_value(10);
+
+    manager.create_scope(&scope_name, None).await.unwrap();
+    verify_scope_created(manager, &scope_name).await;
+
+    let settings = couchbase::collections_manager::CreateCollectionSettings::new();
+    manager
+        .create_collection(&scope_name, &collection_name, settings, None)
+        .await
+        .unwrap();
+
+    verify_collection_created(manager, &scope_name, &collection_name).await;
+
+    (scope_name, collection_name)
+}
+
+async fn drop_scope(manager: &CollectionManager, scope_name: &str) {
+    manager.drop_scope(scope_name, None).await.unwrap();
+    verify_scope_dropped(manager, scope_name).await;
 }
 
 fn assert_metadata(meta: QueryMetaData) {
