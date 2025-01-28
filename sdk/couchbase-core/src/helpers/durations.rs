@@ -19,25 +19,6 @@ lazy_static! {
     };
 }
 
-// serialize_duration_to_golang_string creates a golang formatted string to use with timeouts.
-// Unlike Golang strings it does not deal with fractional seconds, we do not need that accuracy.
-pub fn duration_to_golang_string(duration: &Duration) -> String {
-    let mut total_secs = duration.as_secs();
-    let secs = total_secs % 60;
-    total_secs /= 60;
-    let mut golang_string = format!("{}s", secs);
-    if total_secs > 0 {
-        let minutes = total_secs % 60;
-        total_secs /= 60;
-        golang_string = format!("{}m{}", minutes, golang_string);
-        if total_secs > 0 {
-            golang_string = format!("{}h{}", total_secs, golang_string)
-        }
-    }
-
-    golang_string
-}
-
 // Note that this will not parse negative durations, rust Durations do not support negative values.
 pub fn parse_duration_from_golang_string(s: &str) -> Result<Duration, String> {
     let orig = s;
@@ -177,11 +158,109 @@ fn quote(s: &str) -> String {
     format!("\"{}\"", s)
 }
 
+pub fn duration_to_golang_string(duration: &Duration) -> String {
+    let mut buf = [0u8; 32];
+    let mut w = buf.len();
+
+    let mut u = duration.as_nanos() as u64;
+
+    if u < 1_000_000_000 {
+        w -= 1;
+        buf[w] = b's';
+        w -= 1;
+        let prec;
+        if u == 0 {
+            buf[w] = b'0';
+            return String::from_utf8_lossy(&buf[w..]).to_string();
+        } else if u < 1_000 {
+            // print nanoseconds
+            prec = 0;
+            buf[w] = b'n';
+        } else if u < 1_000_000 {
+            // print microseconds
+            prec = 3;
+            buf[w] = 0xB5; // µ second byte
+            w -= 1;
+            buf[w] = 0xC2; // µ first byte
+        } else {
+            // print milliseconds
+            prec = 6;
+            buf[w] = b'm';
+        }
+        (w, u) = fmt_frac(&mut buf[..w], u, prec);
+        w = fmt_int(&mut buf[..w], u);
+    } else {
+        w -= 1;
+        buf[w] = b's';
+
+        (w, u) = fmt_frac(&mut buf[..w], u, 9);
+
+        // u is now integer seconds
+        w = fmt_int(&mut buf[..w], u % 60);
+        u /= 60;
+
+        // u is now integer minutes
+        if u > 0 {
+            w -= 1;
+            buf[w] = b'm';
+            w = fmt_int(&mut buf[..w], u % 60);
+            u /= 60;
+
+            // u is now integer hours
+            // Stop at hours because days can be different lengths.
+            if u > 0 {
+                w -= 1;
+                buf[w] = b'h';
+                w = fmt_int(&mut buf[..w], u);
+            }
+        }
+    }
+
+    String::from_utf8_lossy(&buf[w..]).to_string()
+}
+
+fn fmt_frac(buf: &mut [u8], mut v: u64, prec: usize) -> (usize, u64) {
+    let mut w = buf.len();
+    let mut print = false;
+    for _ in 0..prec {
+        let digit = v % 10;
+        print = print || digit != 0;
+        if print {
+            w -= 1;
+            buf[w] = (digit as u8) + b'0';
+        }
+        v /= 10;
+    }
+
+    if print {
+        w -= 1;
+        buf[w] = b'.';
+    }
+
+    (w, v)
+}
+
+fn fmt_int(buf: &mut [u8], mut v: u64) -> usize {
+    let mut w = buf.len();
+    if v == 0 {
+        w -= 1;
+        buf[w] = b'0';
+    } else {
+        while v > 0 {
+            w -= 1;
+            buf[w] = (v % 10) as u8 + b'0';
+            v /= 10;
+        }
+    }
+    w
+}
+
 #[cfg(test)]
 mod tests {
+    use std::ops::Sub;
     use std::time::Duration;
 
-    use crate::helpers::durations::parse_duration_from_golang_string;
+    use crate::helpers::durations::{duration_to_golang_string, parse_duration_from_golang_string};
 
     #[test]
     fn test_parse_duration() {
@@ -271,6 +350,37 @@ mod tests {
                     panic!("ParseDuration({}) returned error: {}", input, e);
                 }
             }
+        }
+    }
+
+    #[test]
+    fn test_duration_to_golang_string() {
+        let tests = vec![
+            (Duration::from_secs(0), "0s"),
+            (Duration::from_nanos(1), "1ns"),
+            (Duration::from_nanos(1100), "1.1µs"),
+            (Duration::from_micros(2200), "2.2ms"),
+            (Duration::from_millis(3300), "3.3s"),
+            (Duration::from_secs(245), "4m5s"),
+            // 4*Minute + 5001*Millisecond
+            (Duration::from_millis(245001), "4m5.001s"),
+            // 5*Hour + 6*Minute + 7001*Millisecond
+            (Duration::from_millis(18367001), "5h6m7.001s"),
+            //  8*Minute + 1*Nanosecond
+            (Duration::from_nanos(480000000001), "8m0.000000001s"),
+            (
+                Duration::from_nanos(1 << 63).sub(Duration::from_nanos(1)),
+                "2562047h47m16.854775807s",
+            ),
+        ];
+
+        for (input, expected) in tests {
+            let actual = duration_to_golang_string(&input);
+            assert_eq!(
+                actual, expected,
+                "DurationToString({:?}) = {:?}, want {:?}",
+                input, actual, expected
+            );
         }
     }
 }
