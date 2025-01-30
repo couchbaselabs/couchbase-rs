@@ -7,7 +7,6 @@ use chrono::DateTime;
 use serde::Deserialize;
 use serde_json::value::RawValue;
 use std::collections::HashMap;
-use std::sync::Arc;
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct SearchMetadataStatus {
@@ -76,21 +75,11 @@ impl TryFrom<DateFacet> for DateRangeFacetResult {
     fn try_from(value: DateFacet) -> Result<DateRangeFacetResult, Self::Error> {
         Ok(DateRangeFacetResult {
             name: value.name,
-            start: DateTime::parse_from_rfc3339(&value.start).map_err(|e| error::Error {
-                kind: Box::new(error::ErrorKind::Json {
-                    msg: format!("failed to parse date: {}", &e),
-                }),
-                source: Some(Arc::new(e)),
-                endpoint: "".to_string(),
-                status_code: None,
+            start: DateTime::parse_from_rfc3339(&value.start).map_err(|e| {
+                error::Error::new_message_error(format!("failed to parse date: {}", &e), None)
             })?,
-            end: DateTime::parse_from_rfc3339(&value.end).map_err(|e| error::Error {
-                kind: Box::new(error::ErrorKind::Json {
-                    msg: format!("failed to parse date: {}", &e),
-                }),
-                source: Some(Arc::new(e)),
-                endpoint: "".to_string(),
-                status_code: None,
+            end: DateTime::parse_from_rfc3339(&value.end).map_err(|e| {
+                error::Error::new_message_error(format!("failed to parse date: {}", &e), None)
             })?,
             count: value.count,
         })

@@ -2,6 +2,7 @@ use crate::httpx::client::Client;
 use crate::httpx::request::{Auth, BasicAuth, OnBehalfOfInfo, Request};
 use crate::httpx::response::Response;
 use crate::searchx::error;
+use crate::searchx::error::ServerError;
 use crate::searchx::index::Index;
 use crate::searchx::query_options::QueryOptions;
 use crate::searchx::search_respreader::SearchRespReader;
@@ -74,14 +75,9 @@ impl<C: Client> Search<C> {
 
     pub async fn query(&self, opts: &QueryOptions) -> error::Result<SearchRespReader> {
         if !self.vector_search_enabled && (opts.knn.is_some() || opts.knn_operator.is_some()) {
-            return Err(error::Error {
-                kind: Box::new(error::ErrorKind::UnsupportedFeature {
-                    feature: "vector search".to_string(),
-                }),
-                endpoint: self.endpoint.clone(),
-                status_code: None,
-                source: None,
-            });
+            return Err(error::Error::new_unsupported_feature_error(
+                "vector search".to_string(),
+            ));
         }
 
         let req_uri = if let Some(bucket) = &opts.bucket_name {
@@ -91,9 +87,9 @@ impl<C: Client> Search<C> {
                     bucket, scope, opts.index_name
                 )
             } else {
-                return Err(error::Error::new_generic_error(
+                return Err(error::Error::new_invalid_argument_error(
                     "must specify both or neither scope and bucket names",
-                    "".to_string(),
+                    None,
                 ));
             }
         } else {
@@ -102,13 +98,8 @@ impl<C: Client> Search<C> {
 
         let on_behalf_of = opts.on_behalf_of.clone();
 
-        let body = serde_json::to_vec(&opts).map_err(|e| error::Error {
-            kind: Box::new(error::ErrorKind::Json {
-                msg: format!("could not serialize query options: {}", e),
-            }),
-            endpoint: self.endpoint.clone(),
-            status_code: None,
-            source: Some(Arc::new(e)),
+        let body = serde_json::to_vec(&opts).map_err(|e| {
+            error::Error::new_encoding_error(format!("could not serialize query options: {}", e))
         })?;
 
         let res = self
@@ -121,9 +112,9 @@ impl<C: Client> Search<C> {
                 Some(Bytes::from(body)),
             )
             .await
-            .map_err(|e| error::Error::new_http_error(e, &self.endpoint))?;
+            .map_err(|e| error::Error::new_http_error(&self.endpoint).with(Arc::new(e)))?;
 
-        SearchRespReader::new(res, &self.endpoint).await
+        SearchRespReader::new(res, &opts.index_name, &self.endpoint).await
     }
 
     pub async fn upsert_index(&self, opts: &UpsertIndexOptions<'_>) -> error::Result<()> {
@@ -134,22 +125,17 @@ impl<C: Client> Search<C> {
                     bucket, scope, &opts.index.name
                 )
             } else {
-                return Err(error::Error::new_generic_error(
+                return Err(error::Error::new_invalid_argument_error(
                     "must specify both or neither scope and bucket names",
-                    "".to_string(),
+                    None,
                 ));
             }
         } else {
             format!("api/index/{}", &opts.index.name)
         };
 
-        let body = serde_json::to_vec(&opts.index).map_err(|e| error::Error {
-            kind: Box::new(error::ErrorKind::Json {
-                msg: format!("could not serialize index: {}", e),
-            }),
-            endpoint: self.endpoint.clone(),
-            status_code: None,
-            source: Some(Arc::new(e)),
+        let body = serde_json::to_vec(&opts.index).map_err(|e| {
+            error::Error::new_encoding_error(format!("could not serialize index: {}", e))
         })?;
 
         let mut headers = HashMap::new();
@@ -166,10 +152,12 @@ impl<C: Client> Search<C> {
                 Some(Bytes::from(body)),
             )
             .await
-            .map_err(|e| error::Error::new_http_error(e, &self.endpoint))?;
+            .map_err(|e| error::Error::new_http_error(&self.endpoint).with(Arc::new(e)))?;
 
         if res.status() != 200 {
-            return Err(decode_response_error(res, self.endpoint.clone()).await);
+            return Err(
+                decode_response_error(res, opts.index.name.clone(), self.endpoint.clone()).await,
+            );
         }
 
         Ok(())
@@ -183,9 +171,9 @@ impl<C: Client> Search<C> {
                     bucket, scope, &opts.index_name
                 )
             } else {
-                return Err(error::Error::new_generic_error(
+                return Err(error::Error::new_invalid_argument_error(
                     "must specify both or neither scope and bucket names",
-                    "".to_string(),
+                    None,
                 ));
             }
         } else {
@@ -206,50 +194,49 @@ impl<C: Client> Search<C> {
                 None,
             )
             .await
-            .map_err(|e| error::Error::new_http_error(e, &self.endpoint))?;
+            .map_err(|e| error::Error::new_http_error(&self.endpoint).with(Arc::new(e)))?;
 
         if res.status() != 200 {
-            return Err(decode_response_error(res, self.endpoint.clone()).await);
+            return Err(decode_response_error(
+                res,
+                opts.index_name.to_string(),
+                self.endpoint.clone(),
+            )
+            .await);
         }
 
         Ok(())
     }
 }
 
-pub(crate) async fn decode_response_error(response: Response, endpoint: String) -> error::Error {
+pub(crate) async fn decode_response_error(
+    response: Response,
+    index_name: String,
+    endpoint: String,
+) -> error::Error {
     let status = response.status();
     let body = match response.bytes().await {
         Ok(b) => b,
         Err(e) => {
-            return error::Error {
-                kind: Box::new(error::ErrorKind::Generic {
-                    msg: format!("could not parse response body: {}", e),
-                }),
-                endpoint,
-                status_code: Some(status),
-                source: Some(Arc::new(e)),
-            }
+            return error::Error::new_http_error(endpoint).with(Arc::new(e));
         }
     };
 
     let body_str = match String::from_utf8(body.to_vec()) {
         Ok(s) => s.to_lowercase(),
         Err(e) => {
-            return error::Error {
-                kind: Box::new(error::ErrorKind::Generic {
-                    msg: format!("could not parse error response: {}", e),
-                }),
+            return error::Error::new_message_error(
+                format!("could not parse error response: {}", e),
                 endpoint,
-                status_code: Some(status),
-                source: Some(Arc::new(e)),
-            }
+            );
         }
     };
 
-    decode_common_error(status, &body_str, endpoint)
+    decode_common_error(index_name, status, &body_str, endpoint)
 }
 
 pub(crate) fn decode_common_error(
+    index_name: String,
     status: StatusCode,
     body_str: &str,
     endpoint: String,
@@ -297,7 +284,9 @@ pub(crate) fn decode_common_error(
         error::ServerErrorKind::Unknown
     };
 
-    error::Error::new_server_error(error_kind, body_str, endpoint, status)
+    error::Error::new_server_error(ServerError::new(
+        error_kind, index_name, body_str, endpoint, status,
+    ))
 }
 
 #[derive(Debug)]
