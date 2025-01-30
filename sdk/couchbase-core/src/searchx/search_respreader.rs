@@ -1,7 +1,7 @@
 use crate::httpx::json_row_stream::JsonRowStream;
 use crate::httpx::raw_json_row_streamer::RawJsonRowStreamer;
 use crate::httpx::response::Response;
-use crate::searchx::error::{ErrorKind, ServerErrorKind};
+use crate::searchx::error::{ErrorKind, ServerError, ServerErrorKind};
 use crate::searchx::search::{decode_common_error, Search};
 use crate::searchx::search_result::{FacetResult, MetaData, Metrics, ResultHit};
 use crate::searchx::{error, search_json};
@@ -19,6 +19,7 @@ pub struct SearchRespReader {
     endpoint: String,
     status_code: StatusCode,
 
+    index_name: String,
     streamer: Option<RawJsonRowStreamer>,
     meta_data: Option<MetaData>,
     epilogue_error: Option<error::Error>,
@@ -38,27 +39,22 @@ impl Stream for SearchRespReader {
 
         match streamer.poll_next_unpin(cx) {
             Poll::Ready(Some(Ok(row_data))) => {
-                let row: search_json::Row =
-                    match serde_json::from_slice(&row_data).map_err(|e| error::Error {
-                        kind: Box::new(ErrorKind::Generic {
-                            msg: format!("failed to parse row: {}", &e),
-                        }),
-                        source: Some(Arc::new(e)),
-                        endpoint: this.endpoint.clone(),
-                        status_code: Some(this.status_code),
-                    }) {
-                        Ok(row) => row,
-                        Err(e) => return Poll::Ready(Some(Err(e))),
-                    };
+                let row: search_json::Row = match serde_json::from_slice(&row_data).map_err(|e| {
+                    error::Error::new_message_error(
+                        format!("failed to parse row: {}", &e),
+                        this.endpoint.clone(),
+                    )
+                }) {
+                    Ok(row) => row,
+                    Err(e) => return Poll::Ready(Some(Err(e))),
+                };
 
                 Poll::Ready(Some(Ok(ResultHit::from(row))))
             }
-            Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(error::Error {
-                kind: Box::new(ErrorKind::Generic { msg: e.to_string() }),
-                source: Some(Arc::new(e)),
-                endpoint: this.endpoint.clone(),
-                status_code: Some(this.status_code),
-            }))),
+            Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(error::Error::new_http_error(
+                this.endpoint.clone(),
+            )
+            .with(Arc::new(e))))),
             Poll::Ready(None) => {
                 this.read_final_metadata();
                 Poll::Ready(None)
@@ -69,8 +65,13 @@ impl Stream for SearchRespReader {
 }
 
 impl SearchRespReader {
-    pub async fn new(resp: Response, endpoint: impl Into<String>) -> error::Result<Self> {
+    pub async fn new(
+        resp: Response,
+        index_name: impl Into<String>,
+        endpoint: impl Into<String>,
+    ) -> error::Result<Self> {
         let endpoint = endpoint.into();
+        let index_name = index_name.into();
 
         let status_code = resp.status();
         if status_code != 200 {
@@ -78,49 +79,48 @@ impl SearchRespReader {
                 Ok(b) => b,
                 Err(e) => {
                     debug!("Failed to read response body on error {}", e);
-                    return Err(error::Error::new_server_error_with_source(
-                        ServerErrorKind::Unknown,
-                        e.to_string(),
-                        endpoint,
-                        status_code,
-                        Arc::new(e),
-                    ));
+                    return Err(error::Error::new_http_error(endpoint).with(Arc::new(e)));
                 }
             };
 
             let err: search_json::ErrorResponse = match serde_json::from_slice(&body) {
                 Ok(e) => e,
                 Err(e) => {
-                    return Err(error::Error {
-                        kind: Box::new(ErrorKind::Generic { msg:
+                    return Err(error::Error::new_message_error(
                         format!(
-                            "non-200 status code received {} but parsing error response body failed {}",
-                            status_code,
-                            e
-                        )}),
-                        source: Some(Arc::new(e)),
+                        "non-200 status code received {} but parsing error response body failed {}",
+                        status_code,
+                        e
+                    ),
                         endpoint,
-                        status_code: Some(status_code),
-                    });
+                    ));
                 }
             };
 
-            return Err(decode_common_error(status_code, &err.error, endpoint));
+            return Err(decode_common_error(
+                index_name,
+                status_code,
+                &err.error,
+                endpoint,
+            ));
         }
 
         let stream = resp.bytes_stream();
         let mut streamer = RawJsonRowStreamer::new(JsonRowStream::new(stream), "hits");
 
-        streamer
-            .read_prelude()
-            .await
-            .map_err(|e| error::Error::new_http_error(e, endpoint.clone()))?;
+        match streamer.read_prelude().await {
+            Ok(_) => {}
+            Err(e) => {
+                return Err(error::Error::new_http_error(endpoint).with(Arc::new(e)));
+            }
+        };
 
         let has_more_rows = streamer.has_more_rows();
 
         let mut reader = Self {
-            endpoint: endpoint.clone(),
+            endpoint,
             status_code,
+            index_name,
             streamer: Some(streamer),
             meta_data: None,
             facets: None,
@@ -146,9 +146,9 @@ impl SearchRespReader {
             return Ok(meta);
         }
 
-        Err(error::Error::new_generic_error(
+        Err(error::Error::new_message_error(
             "cannot read meta-data until after all rows are read",
-            self.endpoint.clone(),
+            None,
         ))
     }
 
@@ -161,9 +161,9 @@ impl SearchRespReader {
             return Ok(facets);
         }
 
-        Err(error::Error::new_generic_error(
+        Err(error::Error::new_message_error(
             "cannot read facets until after all rows are read",
-            self.endpoint.clone(),
+            None,
         ))
     }
 
@@ -175,13 +175,8 @@ impl SearchRespReader {
             let epilog = match streamer.epilog() {
                 Ok(e) => e,
                 Err(e) => {
-                    self.epilogue_error = Some(error::Error::new_server_error_with_source(
-                        ServerErrorKind::Unknown,
-                        e.to_string(),
-                        &self.endpoint,
-                        self.status_code,
-                        Arc::new(e),
-                    ));
+                    self.epilogue_error =
+                        Some(error::Error::new_http_error(&self.endpoint).with(Arc::new(e)));
                     return;
                 }
             };
@@ -189,14 +184,10 @@ impl SearchRespReader {
             let metadata_json: search_json::SearchMetaData = match serde_json::from_slice(&epilog) {
                 Ok(m) => m,
                 Err(e) => {
-                    self.epilogue_error = Some(error::Error {
-                        kind: Box::new(ErrorKind::Generic {
-                            msg: format!("failed to parse metadata: {}", &e),
-                        }),
-                        source: Some(Arc::new(e)),
-                        endpoint: self.endpoint.clone(),
-                        status_code: Some(self.status_code),
-                    });
+                    self.epilogue_error = Some(error::Error::new_message_error(
+                        format!("failed to parse metadata: {}", &e),
+                        self.endpoint.clone(),
+                    ));
                     return;
                 }
             };

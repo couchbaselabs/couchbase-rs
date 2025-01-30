@@ -1,7 +1,7 @@
 use http::StatusCode;
-use serde::de::StdError;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::error::Error as StdError;
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 
@@ -18,11 +18,20 @@ impl Display for Error {
     }
 }
 
+impl StdError for Error {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        self.inner
+            .source
+            .as_ref()
+            .map(|cause| &**cause as &(dyn StdError + 'static))
+    }
+}
+
 impl Error {
     pub(crate) fn new_server_error(e: ServerError) -> Error {
         Self {
             inner: ErrorImpl {
-                kind: Box::new(ErrorKind::ServerError(e)),
+                kind: Box::new(ErrorKind::Server(e)),
                 source: None,
             },
         }
@@ -87,7 +96,7 @@ impl Error {
     ) -> Self {
         Self {
             inner: ErrorImpl {
-                kind: Box::new(ErrorKind::HttpError {
+                kind: Box::new(ErrorKind::Http {
                     endpoint: endpoint.into(),
                     statement: statement.into(),
                     client_context_id: client_context_id.into(),
@@ -110,7 +119,7 @@ impl Error {
 type Source = Arc<dyn StdError + Send + Sync>;
 
 #[derive(Debug, Clone)]
-pub struct ErrorImpl {
+struct ErrorImpl {
     kind: Box<ErrorKind>,
     source: Option<Source>,
 }
@@ -118,14 +127,15 @@ pub struct ErrorImpl {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ErrorKind {
-    ServerError(ServerError),
+    Server(ServerError),
     #[non_exhaustive]
-    HttpError {
+    Http {
         endpoint: String,
         statement: Option<String>,
         client_context_id: Option<String>,
     },
     Resource(ResourceError),
+    #[non_exhaustive]
     Message {
         msg: String,
         endpoint: Option<String>,
@@ -137,6 +147,7 @@ pub enum ErrorKind {
         msg: String,
         arg: Option<String>,
     },
+    #[non_exhaustive]
     Encoding {
         msg: String,
     },
@@ -145,7 +156,7 @@ pub enum ErrorKind {
 impl Display for ErrorKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            ErrorKind::ServerError(e) => write!(f, "{}", e),
+            ErrorKind::Server(e) => write!(f, "{}", e),
             ErrorKind::Resource(e) => write!(f, "{}", e),
             ErrorKind::InvalidArgument { msg, arg } => {
                 let base_msg = format!("invalid argument: {msg}");
@@ -156,7 +167,7 @@ impl Display for ErrorKind {
                 }
             }
             ErrorKind::Encoding { msg } => write!(f, "encoding error: {msg}"),
-            ErrorKind::HttpError {
+            ErrorKind::Http {
                 endpoint,
                 statement,
                 client_context_id,
@@ -193,7 +204,6 @@ impl Display for ErrorKind {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-#[non_exhaustive]
 pub struct ServerError {
     kind: ServerErrorKind,
 
@@ -608,7 +618,7 @@ impl Error {
     pub fn is_parsing_failure(&self) -> bool {
         matches!(
             self.kind(),
-            ErrorKind::ServerError(ServerError {
+            ErrorKind::Server(ServerError {
                 kind: ServerErrorKind::ParsingFailure,
                 ..
             })
@@ -618,7 +628,7 @@ impl Error {
     pub fn is_internal(&self) -> bool {
         matches!(
             self.kind(),
-            ErrorKind::ServerError(ServerError {
+            ErrorKind::Server(ServerError {
                 kind: ServerErrorKind::Internal,
                 ..
             })
@@ -628,7 +638,7 @@ impl Error {
     pub fn is_authentication_failure(&self) -> bool {
         matches!(
             self.kind(),
-            ErrorKind::ServerError(ServerError {
+            ErrorKind::Server(ServerError {
                 kind: ServerErrorKind::AuthenticationFailure,
                 ..
             })
@@ -638,7 +648,7 @@ impl Error {
     pub fn is_cas_mismatch(&self) -> bool {
         matches!(
             self.kind(),
-            ErrorKind::ServerError(ServerError {
+            ErrorKind::Server(ServerError {
                 kind: ServerErrorKind::CasMismatch,
                 ..
             })
@@ -648,7 +658,7 @@ impl Error {
     pub fn is_doc_not_found(&self) -> bool {
         matches!(
             self.kind(),
-            ErrorKind::ServerError(ServerError {
+            ErrorKind::Server(ServerError {
                 kind: ServerErrorKind::DocNotFound,
                 ..
             })
@@ -658,7 +668,7 @@ impl Error {
     pub fn is_doc_exists(&self) -> bool {
         matches!(
             self.kind(),
-            ErrorKind::ServerError(ServerError {
+            ErrorKind::Server(ServerError {
                 kind: ServerErrorKind::DocExists,
                 ..
             })
@@ -668,7 +678,7 @@ impl Error {
     pub fn is_planning_failure(&self) -> bool {
         matches!(
             self.kind(),
-            ErrorKind::ServerError(ServerError {
+            ErrorKind::Server(ServerError {
                 kind: ServerErrorKind::PlanningFailure,
                 ..
             })
@@ -678,7 +688,7 @@ impl Error {
     pub fn is_index_failure(&self) -> bool {
         matches!(
             self.kind(),
-            ErrorKind::ServerError(ServerError {
+            ErrorKind::Server(ServerError {
                 kind: ServerErrorKind::IndexFailure,
                 ..
             })
@@ -688,7 +698,7 @@ impl Error {
     pub fn is_prepared_statement_failure(&self) -> bool {
         matches!(
             self.kind(),
-            ErrorKind::ServerError(ServerError {
+            ErrorKind::Server(ServerError {
                 kind: ServerErrorKind::PreparedStatementFailure,
                 ..
             })
@@ -698,7 +708,7 @@ impl Error {
     pub fn is_dml_failure(&self) -> bool {
         matches!(
             self.kind(),
-            ErrorKind::ServerError(ServerError {
+            ErrorKind::Server(ServerError {
                 kind: ServerErrorKind::DMLFailure,
                 ..
             })
@@ -708,7 +718,7 @@ impl Error {
     pub fn is_server_timeout(&self) -> bool {
         matches!(
             self.kind(),
-            ErrorKind::ServerError(ServerError {
+            ErrorKind::Server(ServerError {
                 kind: ServerErrorKind::Timeout,
                 ..
             })
@@ -718,7 +728,7 @@ impl Error {
     pub fn is_write_in_read_only_mode(&self) -> bool {
         matches!(
             self.kind(),
-            ErrorKind::ServerError(ServerError {
+            ErrorKind::Server(ServerError {
                 kind: ServerErrorKind::WriteInReadOnlyMode,
                 ..
             })
@@ -728,7 +738,7 @@ impl Error {
     pub fn is_invalid_argument(&self) -> bool {
         matches!(
             self.kind(),
-            ErrorKind::ServerError(ServerError {
+            ErrorKind::Server(ServerError {
                 kind: ServerErrorKind::InvalidArgument { .. },
                 ..
             })
@@ -738,7 +748,7 @@ impl Error {
     pub fn is_build_already_in_progress(&self) -> bool {
         matches!(
             self.kind(),
-            ErrorKind::ServerError(ServerError {
+            ErrorKind::Server(ServerError {
                 kind: ServerErrorKind::BuildAlreadyInProgress,
                 ..
             })
@@ -757,7 +767,7 @@ impl Error {
             })
         ) || matches!(
             self.kind(),
-            ErrorKind::ServerError(ServerError {
+            ErrorKind::Server(ServerError {
                 kind: ServerErrorKind::ScopeNotFound,
                 ..
             })
@@ -776,7 +786,7 @@ impl Error {
             })
         ) || matches!(
             self.kind(),
-            ErrorKind::ServerError(ServerError {
+            ErrorKind::Server(ServerError {
                 kind: ServerErrorKind::CollectionNotFound,
                 ..
             })
@@ -795,7 +805,7 @@ impl Error {
             })
         ) || matches!(
             self.kind(),
-            ErrorKind::ServerError(ServerError {
+            ErrorKind::Server(ServerError {
                 kind: ServerErrorKind::IndexNotFound,
                 ..
             })
@@ -814,7 +824,7 @@ impl Error {
             })
         ) || matches!(
             self.kind(),
-            ErrorKind::ServerError(ServerError {
+            ErrorKind::Server(ServerError {
                 kind: ServerErrorKind::IndexExists,
                 ..
             })

@@ -1,4 +1,3 @@
-use crate::httpx;
 use http::StatusCode;
 use std::error::Error as StdError;
 use std::fmt::{Display, Formatter};
@@ -7,105 +6,223 @@ use std::sync::Arc;
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, Clone)]
-#[non_exhaustive]
 pub struct Error {
-    pub kind: Box<ErrorKind>,
-
-    // TODO: This shouldn't be arc but I'm losing the will to live.
-    pub source: Option<Arc<dyn StdError + 'static + Send + Sync>>,
-
-    pub endpoint: String,
-    pub status_code: Option<StatusCode>,
+    inner: ErrorImpl,
 }
-
-impl StdError for Error {}
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        if let Some(source) = &self.source {
-            write!(f, "{}, caused by: {}", self.kind, source)
-        } else {
-            write!(f, "{}", self.kind)
-        }
+        write!(f, "{}", self.inner.kind)
+    }
+}
+
+impl StdError for Error {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        self.inner
+            .source
+            .as_ref()
+            .map(|cause| &**cause as &(dyn StdError + 'static))
     }
 }
 
 impl Error {
-    pub fn new_server_error(
-        kind: ServerErrorKind,
+    pub(crate) fn new_server_error(e: ServerError) -> Error {
+        Self {
+            inner: ErrorImpl {
+                kind: Box::new(ErrorKind::Server(e)),
+                source: None,
+            },
+        }
+    }
+
+    pub(crate) fn new_message_error(
         msg: impl Into<String>,
-        endpoint: impl Into<String>,
-        status_code: StatusCode,
+        endpoint: impl Into<Option<String>>,
     ) -> Error {
         Self {
-            kind: Box::new(ErrorKind::Server {
-                kind,
-                msg: msg.into(),
-            }),
-            endpoint: endpoint.into(),
-            status_code: Some(status_code),
-            source: None,
+            inner: ErrorImpl {
+                kind: Box::new(ErrorKind::Message {
+                    msg: msg.into(),
+                    endpoint: endpoint.into(),
+                }),
+                source: None,
+            },
         }
     }
 
-    pub fn new_server_error_with_source(
-        kind: ServerErrorKind,
+    pub(crate) fn new_encoding_error(msg: impl Into<String>) -> Error {
+        Self {
+            inner: ErrorImpl {
+                kind: Box::new(ErrorKind::Encoding { msg: msg.into() }),
+                source: None,
+            },
+        }
+    }
+
+    pub(crate) fn new_invalid_argument_error(
         msg: impl Into<String>,
-        endpoint: impl Into<String>,
-        status_code: StatusCode,
-        source: Arc<dyn StdError + 'static + Send + Sync>,
-    ) -> Error {
+        arg: impl Into<Option<String>>,
+    ) -> Self {
         Self {
-            kind: Box::new(ErrorKind::Server {
-                kind,
-                msg: msg.into(),
-            }),
-            endpoint: endpoint.into(),
-            status_code: Some(status_code),
-            source: Some(source),
+            inner: ErrorImpl {
+                kind: Box::new(ErrorKind::InvalidArgument {
+                    msg: msg.into(),
+                    arg: arg.into(),
+                }),
+                source: None,
+            },
         }
     }
 
-    pub fn new_http_error(e: httpx::error::Error, endpoint: impl Into<String>) -> Error {
+    pub(crate) fn new_http_error(endpoint: impl Into<String>) -> Self {
         Self {
-            kind: Box::new(ErrorKind::Http(e)),
-            endpoint: endpoint.into(),
-            status_code: None,
-            source: None,
+            inner: ErrorImpl {
+                kind: Box::new(ErrorKind::Http {
+                    endpoint: endpoint.into(),
+                }),
+                source: None,
+            },
         }
     }
 
-    pub fn new_generic_error(msg: impl Into<String>, endpoint: impl Into<String>) -> Error {
+    pub(crate) fn new_unsupported_feature_error(feature: String) -> Self {
         Self {
-            kind: Box::new(ErrorKind::Generic { msg: msg.into() }),
-            endpoint: endpoint.into(),
-            status_code: None,
-            source: None,
+            inner: ErrorImpl {
+                kind: Box::new(ErrorKind::UnsupportedFeature { feature }),
+                source: None,
+            },
         }
+    }
+
+    pub fn kind(&self) -> &ErrorKind {
+        &self.inner.kind
+    }
+
+    pub(crate) fn with(mut self, source: Source) -> Error {
+        self.inner.source = Some(source);
+        self
     }
 }
 
-#[derive(Clone, Debug)]
+type Source = Arc<dyn StdError + Send + Sync>;
+
+#[derive(Debug, Clone)]
+struct ErrorImpl {
+    kind: Box<ErrorKind>,
+    source: Option<Source>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ErrorKind {
-    Server { kind: ServerErrorKind, msg: String },
-    Http(httpx::error::Error),
-    Json { msg: String },
-    Generic { msg: String },
-    UnsupportedFeature { feature: String },
+    #[non_exhaustive]
+    Server(ServerError),
+    #[non_exhaustive]
+    Http {
+        endpoint: String,
+    },
+    #[non_exhaustive]
+    Message {
+        msg: String,
+        endpoint: Option<String>,
+    },
+    #[non_exhaustive]
+    InvalidArgument {
+        msg: String,
+        arg: Option<String>,
+    },
+    #[non_exhaustive]
+    Encoding {
+        msg: String,
+    },
+    UnsupportedFeature {
+        feature: String,
+    },
 }
 
 impl Display for ErrorKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            ErrorKind::Server { kind, msg } => write!(f, "{kind} - {msg}"),
-            ErrorKind::Http(e) => write!(f, "{}", e),
-            ErrorKind::Json { msg } => write!(f, "{}", msg),
-            ErrorKind::Generic { msg } => write!(f, "{}", msg),
+            ErrorKind::Server(e) => write!(f, "{}", e),
+            ErrorKind::Http { endpoint } => write!(f, "http error for endpoint {}", endpoint),
+            ErrorKind::Message { msg, endpoint } => {
+                if let Some(endpoint) = endpoint {
+                    write!(f, "message error for endpoint {}: {}", endpoint, msg)
+                } else {
+                    write!(f, "message error: {}", msg)
+                }
+            }
+            ErrorKind::InvalidArgument { msg, arg } => {
+                if let Some(arg) = arg {
+                    write!(f, "invalid argument error for argument {}: {}", arg, msg)
+                } else {
+                    write!(f, "invalid argument error: {}", msg)
+                }
+            }
+            ErrorKind::Encoding { msg } => write!(f, "encoding error: {}", msg),
             ErrorKind::UnsupportedFeature { feature } => {
-                write!(f, "feature unsupported: {}", feature)
+                write!(f, "unsupported feature: {}", feature)
             }
         }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ServerError {
+    kind: ServerErrorKind,
+
+    index_name: String,
+
+    error_text: String,
+    endpoint: String,
+    status_code: StatusCode,
+}
+
+impl Display for ServerError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "server error for index {} at endpoint {}, status code: {}: {}, error text: {}",
+            self.index_name, self.endpoint, self.status_code, self.kind, self.error_text
+        )
+    }
+}
+
+impl ServerError {
+    pub(crate) fn new(
+        kind: ServerErrorKind,
+        index_name: impl Into<String>,
+        error_text: impl Into<String>,
+        endpoint: impl Into<String>,
+        status_code: StatusCode,
+    ) -> Self {
+        Self {
+            kind,
+            error_text: error_text.into(),
+            index_name: index_name.into(),
+            endpoint: endpoint.into(),
+            status_code,
+        }
+    }
+
+    pub fn kind(&self) -> &ServerErrorKind {
+        &self.kind
+    }
+
+    pub fn index_name(&self) -> &str {
+        &self.index_name
+    }
+
+    pub fn endpoint(&self) -> &str {
+        &self.endpoint
+    }
+
+    pub fn status_code(&self) -> StatusCode {
+        self.status_code
+    }
+
+    pub fn error_text(&self) -> &str {
+        &self.error_text
     }
 }
 
