@@ -76,12 +76,7 @@ impl<C: Client> Analytics<C> {
         let on_behalf_of = opts.on_behalf_of;
 
         let mut body = serde_json::to_value(opts).map_err(|e| {
-            Error::new_generic_error(
-                e.to_string(),
-                &self.endpoint,
-                statement,
-                client_context_id.clone(),
-            )
+            Error::new_encoding_error(format!("failed to encode query options: {}", e))
         })?;
 
         // Unwrap is fine, we know this is an object.
@@ -104,12 +99,7 @@ impl<C: Client> Analytics<C> {
         }
 
         let body = serde_json::to_vec(body_obj).map_err(|e| {
-            Error::new_generic_error(
-                e.to_string(),
-                &self.endpoint,
-                statement,
-                client_context_id.clone(),
-            )
+            Error::new_encoding_error(format!("failed to encode query options: {}", e))
         })?;
 
         let priority = opts.priority.map(|p| p.to_string());
@@ -133,13 +123,12 @@ impl<C: Client> Analytics<C> {
             )
             .await
             .map_err(|e| {
-                Error::new_generic_error_with_source(
-                    e.to_string(),
+                Error::new_http_error(
                     &self.endpoint,
-                    statement,
+                    statement.to_string(),
                     client_context_id.clone(),
-                    Arc::new(e),
                 )
+                .with(Arc::new(e))
             })?;
 
         QueryRespReader::new(res, &self.endpoint, statement, client_context_id.clone()).await

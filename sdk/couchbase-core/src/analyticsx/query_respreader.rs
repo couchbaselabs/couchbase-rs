@@ -1,5 +1,5 @@
 use crate::analyticsx::error;
-use crate::analyticsx::error::{Error, ErrorDesc, ErrorKind, ServerErrorKind};
+use crate::analyticsx::error::{Error, ErrorDesc, ErrorKind, ServerError, ServerErrorKind};
 use crate::analyticsx::query_result::MetaData;
 use crate::analyticsx::response_json::{QueryError, QueryErrorResponse, QueryMetaData};
 use crate::httpx::json_row_stream::JsonRowStream;
@@ -36,7 +36,7 @@ pub struct QueryRespReader {
 
     streamer: Option<RawJsonRowStreamer>,
     meta_data: Option<MetaData>,
-    meta_data_error: Option<error::Error>,
+    meta_data_error: Option<Error>,
 }
 
 impl Stream for QueryRespReader {
@@ -52,12 +52,12 @@ impl Stream for QueryRespReader {
 
         match streamer.poll_next_unpin(cx) {
             Poll::Ready(Some(Ok(row_data))) => Poll::Ready(Some(Ok(Bytes::from(row_data)))),
-            Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(error::Error::new_generic_error(
-                e.to_string(),
+            Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(Error::new_http_error(
                 &this.endpoint,
                 &this.statement,
                 this.client_context_id.clone(),
-            )))),
+            )
+            .with(Arc::new(e))))),
             Poll::Ready(None) => {
                 this.read_final_metadata();
                 Poll::Ready(None)
@@ -74,55 +74,47 @@ impl QueryRespReader {
         statement: impl Into<String>,
         client_context_id: Option<String>,
     ) -> error::Result<Self> {
+        let endpoint = endpoint.into();
+        let statement = statement.into();
+
         let status_code = resp.status();
         if status_code != 200 {
             let body = match resp.bytes().await {
                 Ok(b) => b,
                 Err(e) => {
                     debug!("Failed to read response body on error {}", e);
-                    return Err(error::Error {
-                        kind: Box::new(ErrorKind::Generic { msg: e.to_string() }),
-                        source: Some(Arc::new(e)),
-                        endpoint: endpoint.into(),
-                        status_code: Some(status_code),
-                        statement: statement.into(),
-                        client_context_id,
-                    });
+                    return Err(
+                        Error::new_http_error(endpoint, statement, client_context_id)
+                            .with(Arc::new(e)),
+                    );
                 }
             };
 
             let errors: QueryErrorResponse = match serde_json::from_slice(&body) {
                 Ok(e) => e,
                 Err(e) => {
-                    return Err(error::Error {
-                        kind: Box::new(ErrorKind::Generic { msg: format!(
+                    return Err(Error::new_message_error(
+                        format!(
                             "non-200 status code received {} but parsing error response body failed {}",
-                            status_code,
-                            e
-                        ) }),
-                        source: Some(Arc::new(e)),
-                        endpoint: endpoint.into(),
-                        status_code: Some(status_code),
-                        statement: statement.into(),
+                            status_code, e
+                        ),
+                        endpoint,
+                        statement,
                         client_context_id,
-                    });
+                    ));
                 }
             };
 
             if errors.errors.is_empty() {
-                return Err(error::Error {
-                    kind: Box::new(ErrorKind::Generic {
-                        msg: format!(
-                            "Non-200 status code received {} but response body contained no errors",
-                            status_code
-                        ),
-                    }),
-                    source: None,
-                    endpoint: endpoint.into(),
-                    status_code: Some(status_code),
-                    statement: statement.into(),
+                return Err(Error::new_message_error(
+                    format!(
+                        "non-200 status code received {} but no error message in response body",
+                        status_code
+                    ),
+                    endpoint,
+                    statement,
                     client_context_id,
-                });
+                ));
             }
 
             return Err(Self::parse_errors(
@@ -140,21 +132,17 @@ impl QueryRespReader {
         match streamer.read_prelude().await {
             Ok(_) => {}
             Err(e) => {
-                return Err(Error::new_generic_error_with_source(
-                    e.to_string(),
-                    endpoint.into(),
-                    statement.into(),
-                    client_context_id,
-                    Arc::new(e),
-                ));
+                return Err(
+                    Error::new_http_error(endpoint, statement, client_context_id).with(Arc::new(e)),
+                );
             }
         };
 
         let has_more_rows = streamer.has_more_rows();
 
         let mut reader = Self {
-            endpoint: endpoint.into(),
-            statement: statement.into(),
+            endpoint,
+            statement,
             client_context_id,
             status_code,
             streamer: Some(streamer),
@@ -181,16 +169,12 @@ impl QueryRespReader {
             return Ok(meta);
         }
 
-        Err(error::Error {
-            kind: Box::new(ErrorKind::Generic {
-                msg: "cannot read meta-data until after all rows are read".to_string(),
-            }),
-            source: None,
-            endpoint: self.endpoint.clone(),
-            status_code: Some(self.status_code),
-            statement: self.statement.clone(),
-            client_context_id: self.client_context_id.clone(),
-        })
+        Err(Error::new_message_error(
+            "cannot read meta-data until after all rows are read",
+            self.endpoint.clone(),
+            self.statement.clone(),
+            self.client_context_id.clone(),
+        ))
     }
 
     fn read_final_metadata(&mut self) {
@@ -201,14 +185,14 @@ impl QueryRespReader {
             let epilog = match streamer.epilog() {
                 Ok(e) => e,
                 Err(e) => {
-                    self.meta_data_error = Some(error::Error {
-                        kind: Box::new(ErrorKind::Generic { msg: e.to_string() }),
-                        source: Some(Arc::new(e)),
-                        endpoint: self.endpoint.clone(),
-                        status_code: Some(self.status_code),
-                        statement: self.statement.clone(),
-                        client_context_id: self.client_context_id.clone(),
-                    });
+                    self.meta_data_error = Some(
+                        Error::new_http_error(
+                            self.endpoint.clone(),
+                            self.statement.clone(),
+                            self.client_context_id.clone(),
+                        )
+                        .with(Arc::new(e)),
+                    );
                     return;
                 }
             };
@@ -216,14 +200,12 @@ impl QueryRespReader {
             let metadata: QueryMetaData = match serde_json::from_slice(&epilog) {
                 Ok(m) => m,
                 Err(e) => {
-                    self.meta_data_error = Some(error::Error {
-                        kind: Box::new(ErrorKind::Generic { msg: e.to_string() }),
-                        source: Some(Arc::new(e)),
-                        endpoint: self.endpoint.clone(),
-                        status_code: Some(self.status_code),
-                        statement: self.statement.clone(),
-                        client_context_id: self.client_context_id.clone(),
-                    });
+                    self.meta_data_error = Some(Error::new_message_error(
+                        format!("failed to parse query metadata from epilog: {}", e),
+                        self.endpoint.clone(),
+                        self.statement.clone(),
+                        self.client_context_id.clone(),
+                    ));
                     return;
                 }
             };
@@ -260,69 +242,70 @@ impl QueryRespReader {
         statement: impl Into<String>,
         client_context_id: Option<String>,
         status_code: StatusCode,
-    ) -> error::Error {
+    ) -> Error {
         let error_descs: Vec<ErrorDesc> = errors
             .iter()
-            .map(|error| ErrorDesc {
-                kind: Box::new(Self::parse_error_kind(error)),
-                code: error.code,
-                message: error.msg.clone(),
+            .map(|error| {
+                ErrorDesc::new(Self::parse_error_kind(error), error.code, error.msg.clone())
             })
             .collect();
 
-        error::Error {
-            kind: Box::new(ErrorKind::Server { error_descs }),
-            source: None,
-            endpoint: endpoint.into(),
-            statement: statement.into(),
-            client_context_id,
-            status_code: Some(status_code),
+        let chosen_desc = &error_descs[0];
+
+        let mut server_error = ServerError::new(
+            chosen_desc.kind().clone(),
+            endpoint,
+            status_code,
+            chosen_desc.code(),
+            chosen_desc.message(),
+        )
+        .with_statement(statement);
+
+        if let Some(client_context_id) = client_context_id {
+            server_error = server_error.with_client_context_id(client_context_id);
         }
+
+        if error_descs.len() > 1 {
+            server_error = server_error.with_error_descs(error_descs);
+        }
+
+        Error::new_server_error(server_error)
     }
 
     fn parse_error_kind(error: &QueryError) -> ServerErrorKind {
-        if let Some(err_code) = error.code {
-            let err_code_group = err_code / 1000;
+        let err_code = error.code;
+        let err_code_group = err_code / 1000;
 
-            let kind = if err_code_group == 20 {
-                ServerErrorKind::AuthenticationFailure
-            } else if err_code_group == 24 {
-                if err_code == 24000 {
-                    ServerErrorKind::ParsingFailure
-                } else if err_code == 24006 {
-                    ServerErrorKind::LinkNotFound
-                } else if err_code == 24025 || err_code == 24044 || err_code == 24045 {
-                    ServerErrorKind::DatasetNotFound
-                } else if err_code == 24034 {
-                    ServerErrorKind::DataverseNotFound
-                } else if err_code == 24039 {
-                    ServerErrorKind::DataverseExists
-                } else if err_code == 24040 {
-                    ServerErrorKind::DatasetExists
-                } else if err_code == 24047 {
-                    ServerErrorKind::IndexNotFound
-                } else if err_code == 24048 {
-                    ServerErrorKind::IndexExists
-                } else {
-                    ServerErrorKind::CompilationFailure
-                }
-            } else if err_code_group == 25 {
-                ServerErrorKind::CompilationFailure
-            } else if err_code == 23000 || err_code == 23003 {
-                ServerErrorKind::TemporaryFailure
-            } else if err_code == 23007 {
-                ServerErrorKind::JobQueueFull
+        if err_code_group == 20 {
+            ServerErrorKind::AuthenticationFailure
+        } else if err_code_group == 24 {
+            if err_code == 24000 {
+                ServerErrorKind::ParsingFailure
+            } else if err_code == 24006 {
+                ServerErrorKind::LinkNotFound
+            } else if err_code == 24025 || err_code == 24044 || err_code == 24045 {
+                ServerErrorKind::DatasetNotFound
+            } else if err_code == 24034 {
+                ServerErrorKind::DataverseNotFound
+            } else if err_code == 24039 {
+                ServerErrorKind::DataverseExists
+            } else if err_code == 24040 {
+                ServerErrorKind::DatasetExists
+            } else if err_code == 24047 {
+                ServerErrorKind::IndexNotFound
+            } else if err_code == 24048 {
+                ServerErrorKind::IndexExists
             } else {
-                ServerErrorKind::Unknown {
-                    msg: format!("unknown error code {}", err_code),
-                }
-            };
-
-            return kind;
-        }
-
-        ServerErrorKind::Unknown {
-            msg: "no error code".to_string(),
+                ServerErrorKind::CompilationFailure
+            }
+        } else if err_code_group == 25 {
+            ServerErrorKind::CompilationFailure
+        } else if err_code == 23000 || err_code == 23003 {
+            ServerErrorKind::TemporaryFailure
+        } else if err_code == 23007 {
+            ServerErrorKind::JobQueueFull
+        } else {
+            ServerErrorKind::Unknown
         }
     }
 }

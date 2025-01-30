@@ -529,12 +529,12 @@ impl StdError for ResourceError {}
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ErrorDesc {
-    pub kind: ServerErrorKind,
+    kind: ServerErrorKind,
 
-    pub code: u32,
-    pub message: String,
-    pub retry: bool,
-    pub reason: HashMap<String, Value>,
+    code: u32,
+    message: String,
+    retry: bool,
+    reason: HashMap<String, Value>,
 }
 
 impl ErrorDesc {
@@ -552,6 +552,36 @@ impl ErrorDesc {
             retry,
             reason,
         }
+    }
+
+    pub fn kind(&self) -> &ServerErrorKind {
+        &self.kind
+    }
+
+    pub fn code(&self) -> u32 {
+        self.code
+    }
+
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+
+    pub fn retry(&self) -> bool {
+        self.retry
+    }
+
+    pub fn reason(&self) -> &HashMap<String, Value> {
+        &self.reason
+    }
+}
+
+impl Display for ErrorDesc {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "error description of kind: {}, code: {}, message: {}, retry: {}, reason: {:?}",
+            self.kind, self.code, self.message, self.retry, self.reason
+        )
     }
 }
 
