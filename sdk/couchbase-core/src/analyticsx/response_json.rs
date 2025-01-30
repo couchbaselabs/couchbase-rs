@@ -28,8 +28,8 @@ impl From<QueryWarning> for query_result::Warning {
 
 #[derive(Debug, Deserialize)]
 pub struct QueryError {
-    pub code: Option<u32>,
-    pub msg: Option<String>,
+    pub code: u32,
+    pub msg: String,
 }
 
 #[derive(Debug, Deserialize)]

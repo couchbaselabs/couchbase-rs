@@ -328,26 +328,28 @@ impl QueryRespReader {
     ) -> Error {
         let error_descs: Vec<ErrorDesc> = errors
             .iter()
-            .map(|error| ErrorDesc {
-                kind: Self::parse_error_kind(error),
-                code: error.code,
-                message: error.msg.clone(),
-                retry: error.retry.unwrap_or_default(),
-                reason: error.reason.clone(),
+            .map(|error| {
+                ErrorDesc::new(
+                    Self::parse_error_kind(error),
+                    error.code,
+                    error.msg.clone(),
+                    error.retry.unwrap_or_default(),
+                    error.reason.clone(),
+                )
             })
             .collect();
 
         let chosen_desc = error_descs
             .iter()
-            .find(|desc| !desc.retry)
+            .find(|desc| !desc.retry())
             .unwrap_or(&error_descs[0]);
 
         let mut server_error = ServerError::new(
-            chosen_desc.kind.clone(),
+            chosen_desc.kind().clone(),
             endpoint,
             status_code,
-            chosen_desc.code,
-            chosen_desc.message.clone(),
+            chosen_desc.code(),
+            chosen_desc.message(),
         )
         .with_client_context_id(client_context_id)
         .with_statement(statement);
