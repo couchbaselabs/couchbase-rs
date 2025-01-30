@@ -6,6 +6,7 @@ use crate::common::helpers::{
     generate_key,
 };
 use crate::common::test_config::{setup_tests, test_bucket, test_is_ssl, test_scope};
+use crate::common::try_until;
 use couchbase_core::agent::Agent;
 use couchbase_core::crudoptions::{
     AddOptions, AppendOptions, DecrementOptions, DeleteOptions, GetAndLockOptions,
@@ -665,18 +666,26 @@ async fn test_unknown_collection_id() {
         ExponentialBackoffCalculator::default(),
     )));
 
-    let upsert_result = timeout_at(
-        Instant::now().add(Duration::from_millis(2500)),
-        agent.upsert(upsert_opts),
+    // Even though we wait for the delete collection to be acknowledged, it still may persist in kv
+    // on some nodes.
+    try_until(
+        Instant::now().add(Duration::from_secs(30)),
+        Duration::from_millis(100),
+        "upsert didn't fail with timeout in allowed time",
+        || async {
+            let upsert_result = timeout_at(
+                Instant::now().add(Duration::from_millis(2500)),
+                agent.upsert(upsert_opts.clone()),
+            )
+            .await;
+
+            match upsert_result {
+                Ok(_) => Ok(None),
+                Err(_e) => Ok(Some(())),
+            }
+        },
     )
     .await;
-
-    match upsert_result {
-        Ok(_) => {
-            panic!("Expected error due to timeout");
-        }
-        Err(_e) => {}
-    }
 
     agent.close().await;
 }
