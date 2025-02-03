@@ -69,8 +69,8 @@ impl<C: Client> HttpComponent<C> {
         let found_endpoint = if let Some(ep) = found_endpoint {
             ep
         } else {
-            return Err(ErrorKind::Generic {
-                msg: "invalid endpoint".to_string(),
+            return Err(ErrorKind::EndpointNotKnown {
+                endpoint: endpoint_id.to_string(),
             }
             .into());
         };

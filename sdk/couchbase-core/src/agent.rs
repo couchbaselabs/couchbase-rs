@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::fmt::format;
 use std::net::ToSocketAddrs;
 use std::ops::Add;
 use std::sync::Arc;
@@ -387,9 +388,7 @@ impl AgentInner {
             return Ok(features);
         }
 
-        Err(Error {
-            kind: Arc::new(ErrorKind::NoBucket),
-        })
+        Err(ErrorKind::NoBucket.into())
     }
 }
 
@@ -634,7 +633,10 @@ impl Agent {
 
                 client.close().await?;
 
-                let config: TerseConfig = serde_json::from_slice(raw_config.as_slice())?;
+                let config: TerseConfig =
+                    serde_json::from_slice(raw_config.as_slice()).map_err(|e| {
+                        Error::new_message_error(format!("failed to deserialize config: {}", e))
+                    })?;
 
                 match ConfigParser::parse_terse_config(config, host) {
                     Ok(c) => {

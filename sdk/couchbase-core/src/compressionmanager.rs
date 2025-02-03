@@ -99,7 +99,7 @@ impl Compressor for StdCompressor {
         let mut encoder = Encoder::new();
         let compressed_value = encoder
             .compress_vec(input)
-            .map_err(|e| ErrorKind::JSONError { msg: e.to_string() })?;
+            .map_err(|e| ErrorKind::Compression { msg: e.to_string() })?;
 
         // Only return the compressed value if the ratio of compressed:original is small enough.
         if compressed_value.len() as f64 / packet_size as f64 > self.compression_min_ratio {

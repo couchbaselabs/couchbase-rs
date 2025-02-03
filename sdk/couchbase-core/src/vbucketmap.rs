@@ -1,5 +1,5 @@
-use crate::error::Error;
 use crate::error::Result;
+use crate::error::{Error, ErrorKind};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub(crate) struct VbucketMap {
@@ -10,7 +10,7 @@ pub(crate) struct VbucketMap {
 impl VbucketMap {
     pub fn new(entries: Vec<Vec<i16>>, num_replicas: usize) -> Result<Self> {
         if entries.is_empty() {
-            return Err(Error::new_internal_error(
+            return Err(Error::new_message_error(
                 "vbucket map must have at least a single entry",
             ));
         }
@@ -46,7 +46,11 @@ impl VbucketMap {
     pub fn node_by_vbucket(&self, vb_id: u16, vb_server_idx: u32) -> Result<i16> {
         let num_servers = (self.num_replicas as u32) + 1;
         if vb_server_idx > num_servers {
-            return Err(Error::new_invalid_arguments_error("invalid replica"));
+            return Err(ErrorKind::InvalidReplica {
+                requested_replica: vb_server_idx,
+                num_servers: num_servers as usize,
+            }
+            .into());
         }
 
         if let Some(idx) = self.entries.get(vb_id as usize) {
@@ -56,7 +60,11 @@ impl VbucketMap {
                 Ok(-1)
             }
         } else {
-            Err(Error::new_invalid_arguments_error("invalid vbucket"))
+            Err(ErrorKind::InvalidVbucket {
+                requested_vb_id: vb_id,
+                num_vbuckets: self.entries.len(),
+            }
+            .into())
         }
     }
 }

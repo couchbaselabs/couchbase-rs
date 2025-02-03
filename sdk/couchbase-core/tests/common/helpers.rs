@@ -1,5 +1,7 @@
 use couchbase_core::agent::Agent;
 use couchbase_core::crudoptions::GetCollectionIdOptions;
+use couchbase_core::error::{Error, ErrorKind};
+use couchbase_core::memdx;
 use couchbase_core::memdx::error::ServerErrorKind;
 use couchbase_core::mgmtoptions::{CreateCollectionOptions, DeleteCollectionOptions};
 use rand::distr::Alphanumeric;
@@ -87,7 +89,7 @@ pub async fn delete_collection_and_wait_for_kv(
                 .get_collection_id(GetCollectionIdOptions::new(scope_name, collection_name))
                 .await;
             if let Some(e) = resp.err() {
-                if e.is_memdx_error()
+                if is_memdx_error(&e)
                     .unwrap()
                     .is_server_error_kind(ServerErrorKind::UnknownCollectionName)
                 {
@@ -100,4 +102,11 @@ pub async fn delete_collection_and_wait_for_kv(
     };
 
     timeout_at(deadline, fut()).await.unwrap();
+}
+
+pub fn is_memdx_error(e: &Error) -> Option<&memdx::error::Error> {
+    match e.kind() {
+        ErrorKind::Memdx(err, ..) => Some(err),
+        _ => None,
+    }
 }

@@ -136,10 +136,7 @@ impl OnDemandAgentManager {
     pub fn get_cluster_agent(&self) -> error::Result<&Agent> {
         let closed = self.closed.lock().unwrap();
         if *closed {
-            return Err(ErrorKind::Generic {
-                msg: "agent manager closed".into(),
-            }
-            .into());
+            return Err(ErrorKind::Shutdown {}.into());
         }
 
         Ok(&self.cluster_agent)
@@ -149,10 +146,7 @@ impl OnDemandAgentManager {
         {
             let closed = self.closed.lock().unwrap();
             if *closed {
-                return Err(ErrorKind::Generic {
-                    msg: "agent manager closed".into(),
-                }
-                .into());
+                return Err(ErrorKind::Shutdown {}.into());
             }
         }
 

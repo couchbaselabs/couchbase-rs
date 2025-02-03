@@ -41,7 +41,7 @@ impl StdVbucketRouter {
             return Ok(i);
         }
 
-        Err(ErrorKind::InvalidVbucketMap.into())
+        Err(ErrorKind::NoVbucketMap.into())
     }
 }
 
@@ -65,7 +65,10 @@ impl VbucketRouter for StdVbucketRouter {
             }
         }
 
-        Err(ErrorKind::InvalidVbucketMap.into())
+        Err(ErrorKind::NoServerAssigned {
+            requested_vb_id: vb_id,
+        }
+        .into())
     }
 
     fn dispatch_to_vbucket(&self, vb_id: u16) -> Result<String> {
@@ -81,7 +84,10 @@ impl VbucketRouter for StdVbucketRouter {
             }
         }
 
-        Err(ErrorKind::InvalidVbucketMap.into())
+        Err(ErrorKind::NoServerAssigned {
+            requested_vb_id: vb_id,
+        }
+        .into())
     }
 }
 

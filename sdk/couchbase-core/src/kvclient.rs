@@ -11,8 +11,8 @@ use tokio::time::Instant;
 use uuid::Uuid;
 
 use crate::authenticator::Authenticator;
-use crate::error::Result;
-use crate::error::{Error, ErrorKind};
+use crate::error::Error;
+use crate::error::{MemdxError, Result};
 use crate::memdx::auth_mechanism::AuthMechanism;
 use crate::memdx::connection::{ConnectOptions, ConnectionType, TcpConnection, TlsConnection};
 use crate::memdx::dispatcher::{Dispatcher, DispatcherOptions, OrphanResponseHandler};
@@ -173,9 +173,9 @@ where
             || bootstrap_get_error_map.is_some();
 
         if should_bootstrap && config.disable_bootstrap {
-            // TODO: error model needs thought.
-            return Err(Error::new_invalid_arguments_error(
-                "Bootstrap was disabled but options requiring bootstrap were specified",
+            return Err(Error::new_invalid_argument_error(
+                "bootstrap was disabled but options requiring bootstrap were specified",
+                None,
             ));
         }
 
@@ -201,36 +201,40 @@ where
         };
 
         let conn = if let Some(tls) = config.tls.clone() {
-            ConnectionType::Tls(
-                TlsConnection::connect(
-                    &config.address,
-                    tls,
-                    ConnectOptions {
-                        deadline: Instant::now().add(Duration::new(7, 0)),
-                    },
-                )
-                .await
-                .map_err(|e| ErrorKind::Memdx {
-                    source: e,
-                    dispatched_to: Some(config.address.clone()),
-                    dispatched_from: None,
-                })?,
+            let conn = match TlsConnection::connect(
+                &config.address,
+                tls,
+                ConnectOptions {
+                    deadline: Instant::now().add(Duration::new(7, 0)),
+                },
             )
+            .await
+            {
+                Ok(conn) => conn,
+                Err(e) => {
+                    return Err(Error::new_contextual_memdx_error(
+                        MemdxError::new(e).with_dispatched_to(config.address),
+                    ))
+                }
+            };
+            ConnectionType::Tls(conn)
         } else {
-            ConnectionType::Tcp(
-                TcpConnection::connect(
-                    &config.address,
-                    ConnectOptions {
-                        deadline: Instant::now().add(Duration::new(7, 0)),
-                    },
-                )
-                .await
-                .map_err(|e| ErrorKind::Memdx {
-                    source: e,
-                    dispatched_to: Some(config.address.clone()),
-                    dispatched_from: None,
-                })?,
+            let conn = match TcpConnection::connect(
+                &config.address,
+                ConnectOptions {
+                    deadline: Instant::now().add(Duration::new(7, 0)),
+                },
             )
+            .await
+            {
+                Ok(conn) => conn,
+                Err(e) => {
+                    return Err(Error::new_contextual_memdx_error(
+                        MemdxError::new(e).with_dispatched_to(config.address),
+                    ))
+                }
+            };
+            ConnectionType::Tcp(conn)
         };
 
         let remote_addr = *conn.peer_addr();
@@ -293,15 +297,17 @@ where
             && current_config.disable_error_map == config.disable_error_map
             && current_config.disable_bootstrap == config.disable_bootstrap)
         {
-            return Err(Error::new_invalid_arguments_error(
-                "Cannot reconfigure due to conflicting options",
+            return Err(Error::new_invalid_argument_error(
+                "cannot reconfigure due to conflicting options",
+                None,
             ));
         }
 
         let selected_bucket_name = if current_config.selected_bucket != config.selected_bucket {
             if current_config.selected_bucket.is_some() {
-                return Err(Error::new_invalid_arguments_error(
-                    "Cannot reconfigure from one selected bucket to another",
+                return Err(Error::new_invalid_argument_error(
+                    "cannot reconfigure from one selected bucket to another",
+                    None,
                 ));
             }
 
@@ -314,8 +320,9 @@ where
         };
 
         if *current_config.deref() != config {
-            return Err(Error::new_invalid_arguments_error(
-                "Client config after reconfigure did not match new configuration",
+            return Err(Error::new_invalid_argument_error(
+                "client config after reconfigure did not match new configuration",
+                None,
             ));
         }
 
@@ -350,6 +357,10 @@ where
         0.0
     }
 
+    fn remote_hostname(&self) -> &str {
+        &self.remote_hostname
+    }
+
     fn remote_addr(&self) -> SocketAddr {
         self.remote_addr
     }
@@ -358,16 +369,11 @@ where
         self.local_addr
     }
 
-    fn remote_hostname(&self) -> &str {
-        &self.remote_hostname
-    }
-
     async fn close(&self) -> Result<()> {
-        Ok(self.cli.close().await.map_err(|e| ErrorKind::Memdx {
-            source: e,
-            dispatched_to: None,
-            dispatched_from: None,
-        })?)
+        self.cli
+            .close()
+            .await
+            .map_err(|e| Error::new_contextual_memdx_error(MemdxError::new(e)))
     }
 
     fn id(&self) -> &str {

@@ -171,21 +171,21 @@ where
 }
 
 pub(crate) fn error_to_retry_reason(err: &Error) -> Option<RetryReason> {
-    match err.kind.as_ref() {
-        ErrorKind::Memdx { source, .. } => {
-            if source.is_server_error_kind(ServerErrorKind::NotMyVbucket) {
+    match err.kind() {
+        ErrorKind::Memdx(err) => {
+            if err.is_server_error_kind(ServerErrorKind::NotMyVbucket) {
                 return Some(RetryReason::NotMyVbucket);
             }
-            if source.is_server_error_kind(ServerErrorKind::TmpFail) {
+            if err.is_server_error_kind(ServerErrorKind::TmpFail) {
                 return Some(RetryReason::TempFail);
             }
-            if source.is_server_error_kind(ServerErrorKind::UnknownCollectionID)
-                || source.is_server_error_kind(ServerErrorKind::UnknownCollectionName)
+            if err.is_server_error_kind(ServerErrorKind::UnknownCollectionID)
+                || err.is_server_error_kind(ServerErrorKind::UnknownCollectionName)
             {
                 return Some(RetryReason::KvCollectionOutdated);
             }
         }
-        ErrorKind::InvalidVbucketMap => {
+        ErrorKind::NoVbucketMap => {
             return Some(RetryReason::InvalidVbucketMap);
         }
         _ => {}

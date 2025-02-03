@@ -1,10 +1,11 @@
 use url::Url;
 
 use crate::error;
-use crate::error::ErrorKind;
+use crate::error::Error;
 
 pub(crate) fn get_host_port_from_uri(uri: &str) -> error::Result<String> {
-    let parsed = Url::parse(uri).map_err(|e| ErrorKind::Generic { msg: e.to_string() })?;
+    let parsed = Url::parse(uri)
+        .map_err(|e| Error::new_message_error(format!("failed to parse uri: {}", e)))?;
 
     let host = if let Some(host) = parsed.host() {
         if let Some(port) = parsed.port() {
@@ -13,10 +14,7 @@ pub(crate) fn get_host_port_from_uri(uri: &str) -> error::Result<String> {
             host.to_string()
         }
     } else {
-        return Err(ErrorKind::Generic {
-            msg: "invalid endpoint".to_string(),
-        }
-        .into());
+        return Err(Error::new_message_error(format!("no host in URI {}", uri)));
     };
 
     Ok(host)
@@ -45,24 +43,20 @@ fn split_host_port(hostport: &str) -> error::Result<(&str, &str)> {
     const TOO_MANY_COLONS: &str = "too many colons in address";
 
     let addr_err = |addr: &str, why: &str| -> error::Result<(&str, &str)> {
-        Err(ErrorKind::InvalidArgument {
-            msg: format!("invalid address '{}': {}", addr, why),
-        }
-        .into())
+        Err(Error::new_message_error(format!(
+            "invalid address '{}': {}",
+            addr, why
+        )))
     };
 
     let i = hostport
         .rfind(':')
-        .ok_or_else(|| ErrorKind::InvalidArgument {
-            msg: MISSING_PORT.to_string(),
-        })?;
+        .ok_or_else(|| Error::new_message_error(MISSING_PORT))?;
 
     if let Some(stripped) = hostport.strip_prefix('[') {
         let end = hostport
             .find(']')
-            .ok_or_else(|| ErrorKind::InvalidArgument {
-                msg: "missing ']' in address".to_string(),
-            })?;
+            .ok_or_else(|| Error::new_message_error("missing ']' in address"))?;
         if end + 1 == hostport.len() {
             return addr_err(hostport, MISSING_PORT);
         } else if end + 1 != i {

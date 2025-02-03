@@ -1,130 +1,255 @@
 use crate::analyticsx::error::Error as AnalyticsError;
 use crate::httpx::error::Error as HttpError;
-use crate::memdx::error::Error as MemdxError;
+use crate::memdx;
 use crate::mgmtx::error::Error as MgmtError;
 use crate::queryx::error::Error as QueryError;
 use crate::searchx::error::Error as SearchError;
 use crate::service_type::ServiceType;
-use std::fmt::Display;
-use std::net::SocketAddr;
+use serde::de::StdError;
+use std::fmt::{Display, Formatter};
+use std::ops::Deref;
 use std::sync::Arc;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(thiserror::Error, Debug, Clone)]
-#[error("{kind}")]
-#[non_exhaustive]
+#[derive(Debug, Clone)]
 pub struct Error {
-    pub kind: Arc<ErrorKind>,
-    // #[source]
-    // pub(crate) source: Option<Box<dyn StdError + 'static>>,
+    kind: Arc<ErrorKind>,
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.kind)
+    }
+}
+
+impl StdError for Error {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        match self.kind.as_ref() {
+            ErrorKind::Memdx(err) => err.source.source(),
+            ErrorKind::Query(err) => err.source(),
+            ErrorKind::Search(err) => err.source(),
+            ErrorKind::Analytics(err) => err.source(),
+            ErrorKind::Http(err) => err.source(),
+            ErrorKind::Mgmt(err) => err.source(),
+            _ => None,
+        }
+    }
 }
 
 impl Error {
     pub(crate) fn new(kind: ErrorKind) -> Self {
         Self {
             kind: Arc::new(kind),
-            // source: None,
         }
     }
 
-    // pub(crate) fn with_source(kind: ErrorKind, source: impl std::error::Error + 'static) -> Self {
-    //     Self {
-    //         kind: Box::new(kind),
-    //         source: Some(Box::new(source)),
-    //     }
-    // }
+    pub(crate) fn new_contextual_memdx_error(e: MemdxError) -> Self {
+        Self::new(ErrorKind::Memdx(e))
+    }
 
-    pub fn is_memdx_error(&self) -> Option<&MemdxError> {
+    pub(crate) fn new_message_error(msg: impl Into<String>) -> Self {
+        Self::new(ErrorKind::Message { msg: msg.into() })
+    }
+
+    pub(crate) fn new_invalid_argument_error(msg: impl Into<String>, arg: Option<String>) -> Self {
+        Self::new(ErrorKind::InvalidArgument {
+            msg: msg.into(),
+            arg,
+        })
+    }
+
+    pub fn kind(&self) -> &ErrorKind {
+        &self.kind
+    }
+
+    pub(crate) fn is_memdx_error(&self) -> Option<&memdx::error::Error> {
         match self.kind.as_ref() {
-            ErrorKind::Memdx { source, .. } => Some(source),
+            ErrorKind::Memdx(err) => Some(err),
             _ => None,
         }
     }
-
-    pub(crate) fn new_invalid_arguments_error(msg: &str) -> Self {
-        Self::new(ErrorKind::InvalidArgument {
-            msg: msg.to_string(),
-        })
-    }
-
-    pub(crate) fn new_internal_error(msg: &str) -> Self {
-        Self::new(ErrorKind::Internal {
-            msg: msg.to_string(),
-        })
-    }
-
-    pub(crate) fn new_memdx_error(
-        source: MemdxError,
-        dispatched_to: Option<SocketAddr>,
-        dispatched_from: Option<SocketAddr>,
-    ) -> Self {
-        Self::new(ErrorKind::Memdx {
-            source,
-            dispatched_to: dispatched_to.map(|x| x.to_string()),
-            dispatched_from: dispatched_from.map(|x| x.to_string()),
-        })
-    }
 }
 
-#[derive(thiserror::Error, Debug)]
+#[derive(Debug)]
 #[non_exhaustive]
 pub enum ErrorKind {
-    #[error("Vbucket map outdated")]
-    VbucketMapOutdated,
-    #[error("An error occurred during serialization/deserialization {msg}")]
-    #[non_exhaustive]
-    JSONError { msg: String },
-    #[error("Invalid argument {msg}")]
-    #[non_exhaustive]
-    InvalidArgument { msg: String },
-    #[error("{source} dispatched to: {dispatched_to:?}, dispatched from: {dispatched_from:?}")]
-    Memdx {
-        source: MemdxError,
-        dispatched_to: Option<String>,
-        dispatched_from: Option<String>,
-    },
-    #[error("{0}")]
+    Memdx(MemdxError),
     Query(QueryError),
-    #[error("{0}")]
     Search(SearchError),
-    #[error("{0}")]
     Analytics(AnalyticsError),
-    #[error("{0}")]
     Http(HttpError),
-    #[error("{0}")]
     Mgmt(MgmtError),
-    #[error("Endpoint not known {endpoint}")]
+    VbucketMapOutdated,
     #[non_exhaustive]
-    EndpointNotKnown { endpoint: String },
-    #[error("no endpoints available")]
+    InvalidArgument {
+        msg: String,
+        arg: Option<String>,
+    },
     #[non_exhaustive]
+    EndpointNotKnown {
+        endpoint: String,
+    },
+    InvalidVbucket {
+        requested_vb_id: u16,
+        num_vbuckets: usize,
+    },
+    InvalidReplica {
+        requested_replica: u32,
+        num_servers: usize,
+    },
     NoEndpointsAvailable,
-    #[error("Shutdown")]
     Shutdown,
-    #[error("No bucket selected")]
     NoBucket,
-    #[error("Illegal State {msg}")]
-    IllegalState { msg: String },
-    #[error("Invalid vbucket map")]
-    InvalidVbucketMap,
-    #[error("Collection manifest outdated: our manifest uid: {manifest_uid}, server manifest uid: {server_manifest_uid}")]
+    IllegalState {
+        msg: String,
+    },
+    NoVbucketMap,
+    #[non_exhaustive]
+    NoServerAssigned {
+        requested_vb_id: u16,
+    },
+    #[non_exhaustive]
     CollectionManifestOutdated {
         manifest_uid: u64,
         server_manifest_uid: u64,
     },
-    #[error("{msg}")]
     #[non_exhaustive]
-    Generic { msg: String },
-    #[error("Service not available {service}")]
+    Message {
+        msg: String,
+    },
     #[non_exhaustive]
-    ServiceNotAvailable { service: ServiceType },
-    #[error("feature not available {feature}, {msg}")]
+    ServiceNotAvailable {
+        service: ServiceType,
+    },
     #[non_exhaustive]
-    FeatureNotAvailable { feature: String, msg: String },
-    #[error("Internal error {msg}")]
+    FeatureNotAvailable {
+        feature: String,
+        msg: String,
+    },
     #[non_exhaustive]
-    Internal { msg: String },
+    Compression {
+        msg: String,
+    },
+    #[non_exhaustive]
+    Internal {
+        msg: String,
+    },
+}
+
+impl Display for ErrorKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ErrorKind::VbucketMapOutdated => write!(f, "vbucket map outdated"),
+            ErrorKind::InvalidArgument { msg, arg } => {
+                if let Some(arg) = arg {
+                    write!(f, "invalid argument {}: {}", arg, msg)
+                } else {
+                    write!(f, "invalid argument: {}", msg)
+                }
+            }
+            ErrorKind::Memdx(err) => write!(f, "{}", err),
+            ErrorKind::Query(err) => write!(f, "{}", err),
+            ErrorKind::Search(err) => write!(f, "{}", err),
+            ErrorKind::Analytics(err) => write!(f, "{}", err),
+            ErrorKind::Http(err) => write!(f, "{}", err),
+            ErrorKind::Mgmt(err) => write!(f, "{}", err),
+            ErrorKind::EndpointNotKnown { endpoint } => {
+                write!(f, "endpoint not known: {}", endpoint)
+            }
+            ErrorKind::NoEndpointsAvailable => write!(f, "no endpoints available"),
+            ErrorKind::Shutdown => write!(f, "shutdown"),
+            ErrorKind::NoBucket => write!(f, "no bucket selected"),
+            ErrorKind::IllegalState { msg } => write!(f, "illegal state: {}", msg),
+            ErrorKind::NoVbucketMap => write!(f, "invalid vbucket map"),
+            ErrorKind::CollectionManifestOutdated {
+                manifest_uid,
+                server_manifest_uid,
+            } => {
+                write!(
+                    f,
+                    "collection manifest outdated: our manifest uid: {}, server manifest uid: {}",
+                    manifest_uid, server_manifest_uid
+                )
+            }
+            ErrorKind::Message { msg } => write!(f, "{}", msg),
+            ErrorKind::ServiceNotAvailable { service } => {
+                write!(f, "service not available: {}", service)
+            }
+            ErrorKind::FeatureNotAvailable { feature, msg } => {
+                write!(f, "feature not available: {}, {}", feature, msg)
+            }
+            ErrorKind::Internal { msg } => write!(f, "internal error: {}", msg),
+            ErrorKind::NoServerAssigned { requested_vb_id } => {
+                write!(f, "no server assigned for vbucket id: {}", requested_vb_id)
+            }
+            ErrorKind::InvalidVbucket {
+                requested_vb_id,
+                num_vbuckets,
+            } => write!(
+                f,
+                "invalid vbucket id: {}, num vbuckets: {}",
+                requested_vb_id, num_vbuckets
+            ),
+            ErrorKind::InvalidReplica {
+                requested_replica,
+                num_servers,
+            } => write!(
+                f,
+                "invalid replica: {}, num servers: {}",
+                requested_replica, num_servers
+            ),
+            ErrorKind::Compression { msg } => write!(f, "compression error: {}", msg),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct MemdxError {
+    source: memdx::error::Error,
+    dispatched_to: Option<String>,
+    dispatched_from: Option<String>,
+}
+
+impl MemdxError {
+    pub(crate) fn new(source: memdx::error::Error) -> Self {
+        Self {
+            source,
+            dispatched_to: None,
+            dispatched_from: None,
+        }
+    }
+
+    pub(crate) fn with_dispatched_to(mut self, dispatched_to: impl Into<String>) -> Self {
+        self.dispatched_to = Some(dispatched_to.into());
+        self
+    }
+
+    pub(crate) fn with_dispatched_from(mut self, dispatched_from: impl Into<String>) -> Self {
+        self.dispatched_from = Some(dispatched_from.into());
+        self
+    }
+}
+
+impl Deref for MemdxError {
+    type Target = memdx::error::Error;
+
+    fn deref(&self) -> &Self::Target {
+        &self.source
+    }
+}
+
+impl Display for MemdxError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.source)?;
+        if let Some(ref dispatched_to) = self.dispatched_to {
+            write!(f, ", dispatched to: {}", dispatched_to)?;
+        }
+        if let Some(ref dispatched_from) = self.dispatched_from {
+            write!(f, ", dispatched from: {}", dispatched_from)?;
+        }
+        Ok(())
+    }
 }
 
 impl<E> From<E> for Error
@@ -165,13 +290,5 @@ impl From<AnalyticsError> for Error {
 impl From<MgmtError> for Error {
     fn from(value: MgmtError) -> Self {
         Self::new(ErrorKind::Mgmt(value))
-    }
-}
-
-impl From<serde_json::Error> for Error {
-    fn from(value: serde_json::Error) -> Self {
-        Self::new(ErrorKind::JSONError {
-            msg: value.to_string(),
-        })
     }
 }

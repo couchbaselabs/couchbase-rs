@@ -271,7 +271,7 @@ impl Error {
 type Source = Arc<dyn StdError + Send + Sync>;
 
 #[derive(Debug, Clone)]
-pub struct ErrorImpl {
+struct ErrorImpl {
     kind: Box<ErrorKind>,
     source: Option<Source>,
 }
