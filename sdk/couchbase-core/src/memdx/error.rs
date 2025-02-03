@@ -10,42 +10,43 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub struct Error {
-    inner: Box<ErrorImpl>,
+    inner: ErrorImpl,
 }
 
 impl Error {
     pub(crate) fn new_protocol_error(msg: impl Into<String>) -> Self {
         Self {
-            inner: Box::new(ErrorImpl {
-                kind: ErrorKind::Protocol { msg: msg.into() },
+            inner: ErrorImpl {
+                kind: Box::new(ErrorKind::Protocol { msg: msg.into() }),
                 source: None,
-            }),
+            },
         }
     }
+
     pub(crate) fn new_decompression_error() -> Self {
         Self {
-            inner: Box::new(ErrorImpl {
-                kind: ErrorKind::Decompression {},
+            inner: ErrorImpl {
+                kind: Box::new(ErrorKind::Decompression {}),
                 source: None,
-            }),
+            },
         }
     }
 
     pub(crate) fn new_message_error(msg: impl Into<String>) -> Self {
         Self {
-            inner: Box::new(ErrorImpl {
-                kind: ErrorKind::Message(msg.into()),
+            inner: ErrorImpl {
+                kind: Box::new(ErrorKind::Message(msg.into())),
                 source: None,
-            }),
+            },
         }
     }
 
     pub(crate) fn new_cancelled_error(cancellation_kind: CancellationErrorKind) -> Self {
         Self {
-            inner: Box::new(ErrorImpl {
-                kind: ErrorKind::Cancelled(cancellation_kind),
+            inner: ErrorImpl {
+                kind: Box::new(ErrorKind::Cancelled(cancellation_kind)),
                 source: None,
-            }),
+            },
         }
     }
 
@@ -54,13 +55,13 @@ impl Error {
         arg: impl Into<Option<String>>,
     ) -> Self {
         Self {
-            inner: Box::new(ErrorImpl {
-                kind: ErrorKind::InvalidArgument {
+            inner: ErrorImpl {
+                kind: Box::new(ErrorKind::InvalidArgument {
                     msg: msg.into(),
                     arg: arg.into(),
-                },
+                }),
                 source: None,
-            }),
+            },
         }
     }
 
@@ -69,33 +70,33 @@ impl Error {
         source: Box<io::Error>,
     ) -> Self {
         Self {
-            inner: Box::new(ErrorImpl {
-                kind: ErrorKind::ConnectionFailed { msg: reason.into() },
+            inner: ErrorImpl {
+                kind: Box::new(ErrorKind::ConnectionFailed { msg: reason.into() }),
                 source: Some(source),
-            }),
+            },
         }
     }
 
     pub(crate) fn new_dispatch_error(opaque: u32, op_code: OpCode, source: Box<io::Error>) -> Self {
         Self {
-            inner: Box::new(ErrorImpl {
-                kind: ErrorKind::Dispatch { opaque, op_code },
+            inner: ErrorImpl {
+                kind: Box::new(ErrorKind::Dispatch { opaque, op_code }),
                 source: Some(source),
-            }),
+            },
         }
     }
 
     pub(crate) fn new_close_error(msg: String, source: Box<io::Error>) -> Self {
         Self {
-            inner: Box::new(ErrorImpl {
-                kind: ErrorKind::Close { msg },
+            inner: ErrorImpl {
+                kind: Box::new(ErrorKind::Close { msg }),
                 source: Some(source),
-            }),
+            },
         }
     }
 
     pub fn has_server_config(&self) -> Option<&Vec<u8>> {
-        if let ErrorKind::Server(ServerError { config, .. }) = &self.inner.kind {
+        if let ErrorKind::Server(ServerError { config, .. }) = self.inner.kind.as_ref() {
             config.as_ref()
         } else {
             None
@@ -103,9 +104,9 @@ impl Error {
     }
 
     pub fn has_server_error_context(&self) -> Option<&Vec<u8>> {
-        if let ErrorKind::Server(ServerError { context, .. }) = &self.inner.kind {
+        if let ErrorKind::Server(ServerError { context, .. }) = self.inner.kind.as_ref() {
             context.as_ref()
-        } else if let ErrorKind::Resource(ResourceError { cause, .. }) = &self.inner.kind {
+        } else if let ErrorKind::Resource(ResourceError { cause, .. }) = self.inner.kind.as_ref() {
             cause.context.as_ref()
         } else {
             None
@@ -113,15 +114,15 @@ impl Error {
     }
 
     pub fn is_cancellation_error(&self) -> bool {
-        matches!(self.inner.kind, ErrorKind::Cancelled { .. })
+        matches!(self.inner.kind.as_ref(), ErrorKind::Cancelled { .. })
     }
 
     pub fn is_dispatch_error(&self) -> bool {
-        matches!(self.inner.kind, ErrorKind::Dispatch { .. })
+        matches!(self.inner.kind.as_ref(), ErrorKind::Dispatch { .. })
     }
 
     pub fn is_server_error_kind(&self, kind: ServerErrorKind) -> bool {
-        match &self.inner.kind {
+        match self.inner.kind.as_ref() {
             ErrorKind::Server(e) => e.kind == kind,
             ErrorKind::Resource(e) => e.cause.kind == kind,
             _ => false,
@@ -142,7 +143,7 @@ type Source = Box<dyn StdError + Send + Sync>;
 
 #[derive(Debug)]
 struct ErrorImpl {
-    kind: ErrorKind,
+    kind: Box<ErrorKind>,
     source: Option<Source>,
 }
 
@@ -577,10 +578,10 @@ where
 {
     fn from(err: E) -> Self {
         Self {
-            inner: Box::new(ErrorImpl {
-                kind: ErrorKind::from(err),
+            inner: ErrorImpl {
+                kind: Box::new(ErrorKind::from(err)),
                 source: None,
-            }),
+            },
         }
     }
 }
@@ -588,10 +589,10 @@ where
 impl From<ServerError> for Error {
     fn from(value: ServerError) -> Self {
         Self {
-            inner: Box::new(ErrorImpl {
-                kind: ErrorKind::Server(value),
+            inner: ErrorImpl {
+                kind: Box::new(ErrorKind::Server(value)),
                 source: None,
-            }),
+            },
         }
     }
 }
@@ -599,10 +600,10 @@ impl From<ServerError> for Error {
 impl From<ResourceError> for Error {
     fn from(value: ResourceError) -> Self {
         Self {
-            inner: Box::new(ErrorImpl {
-                kind: ErrorKind::Resource(value),
+            inner: ErrorImpl {
+                kind: Box::new(ErrorKind::Resource(value)),
                 source: None,
-            }),
+            },
         }
     }
 }
@@ -610,10 +611,10 @@ impl From<ResourceError> for Error {
 impl From<io::Error> for Error {
     fn from(value: io::Error) -> Self {
         Self {
-            inner: Box::new(ErrorImpl {
-                kind: ErrorKind::Io,
+            inner: ErrorImpl {
+                kind: Box::new(ErrorKind::Io),
                 source: Some(Box::new(value)),
-            }),
+            },
         }
     }
 }

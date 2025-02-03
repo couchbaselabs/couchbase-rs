@@ -3,7 +3,7 @@ extern crate core;
 use crate::common::default_agent_options::{create_default_options, create_options_without_bucket};
 use crate::common::helpers::{
     create_collection_and_wait_for_kv, delete_collection_and_wait_for_kv, generate_bytes_value,
-    generate_key,
+    generate_key, is_memdx_error,
 };
 use crate::common::test_config::{setup_tests, test_bucket, test_is_ssl, test_scope};
 use crate::common::try_until;
@@ -90,10 +90,7 @@ async fn test_add_and_delete() {
 
     let add_result = agent.add(add_opts.clone()).await;
 
-    assert!(add_result
-        .err()
-        .unwrap()
-        .is_memdx_error()
+    assert!(is_memdx_error(&add_result.err().unwrap())
         .unwrap()
         .is_server_error_kind(ServerErrorKind::KeyExists));
 
@@ -198,7 +195,7 @@ async fn test_lock_unlock() {
         .err()
         .unwrap();
 
-    let memdx_err = unlock_result.is_memdx_error().unwrap();
+    let memdx_err = is_memdx_error(&unlock_result).unwrap();
     assert!(
         memdx_err.is_server_error_kind(ServerErrorKind::NotLocked)
             || memdx_err.is_server_error_kind(ServerErrorKind::TmpFail)
@@ -364,7 +361,7 @@ async fn test_append_and_prepend_cas_mismatch() {
 
     assert!(prepend_result.is_err());
     let e = prepend_result.err().unwrap();
-    let e = e.is_memdx_error().unwrap();
+    let e = is_memdx_error(&e).unwrap();
     assert!(e.is_server_error_kind(ServerErrorKind::CasMismatch));
 
     let value = " 42".as_bytes();
@@ -379,7 +376,7 @@ async fn test_append_and_prepend_cas_mismatch() {
 
     assert!(append_result.is_err());
     let e = append_result.err().unwrap();
-    let e = e.is_memdx_error().unwrap();
+    let e = is_memdx_error(&e).unwrap();
     assert!(e.is_server_error_kind(ServerErrorKind::CasMismatch));
 
     agent.close().await;
@@ -597,7 +594,7 @@ async fn test_kv_without_a_bucket() {
 
     assert!(upsert_result.is_err());
     let err = upsert_result.err().unwrap();
-    let memdx_err = err.is_memdx_error();
+    let memdx_err = is_memdx_error(&err);
     assert!(memdx_err.is_some());
     assert!(memdx_err
         .unwrap()

@@ -1,7 +1,7 @@
 use std::future::Future;
 
-use crate::error::Error;
 use crate::error::Result;
+use crate::error::{Error, MemdxError};
 use crate::kvclient::{KvClient, StdKvClient};
 use crate::memdx;
 use crate::memdx::dispatcher::Dispatcher;
@@ -236,13 +236,16 @@ where
         match result {
             Ok(v) => Ok(v),
             Err(e) => {
-                let (dispatched_to, dispatched_from) = if e.is_dispatch_error() {
-                    (Some(self.remote_addr()), Some(self.local_addr()))
+                let e = if e.is_dispatch_error() {
+                    let mut e = MemdxError::new(e)
+                        .with_dispatched_to(self.remote_addr().to_string())
+                        .with_dispatched_from(self.local_addr().to_string());
+                    Error::new_contextual_memdx_error(e)
                 } else {
-                    (None, None)
+                    Error::new_contextual_memdx_error(MemdxError::new(e))
                 };
 
-                Err(Error::new_memdx_error(e, dispatched_to, dispatched_from))
+                Err(e)
             }
         }
     }
@@ -250,10 +253,10 @@ where
     fn handle_response_side_result<T>(&self, result: memdx::error::Result<T>) -> Result<T> {
         match result {
             Ok(v) => Ok(v),
-            Err(e) => Err(Error::new_memdx_error(
-                e,
-                Some(self.remote_addr()),
-                Some(self.local_addr()),
+            Err(e) => Err(Error::new_contextual_memdx_error(
+                MemdxError::new(e)
+                    .with_dispatched_to(self.remote_addr().to_string())
+                    .with_dispatched_from(self.local_addr().to_string()),
             )),
         }
     }
@@ -262,7 +265,11 @@ where
         OpBootstrap::bootstrap(OpsCore {}, self.client(), opts)
             .await
             .map_err(|e| {
-                Error::new_memdx_error(e, Some(self.remote_addr()), Some(self.local_addr()))
+                Error::new_contextual_memdx_error(
+                    MemdxError::new(e)
+                        .with_dispatched_to(self.remote_addr().to_string())
+                        .with_dispatched_from(self.local_addr().to_string()),
+                )
             })
     }
 
