@@ -135,6 +135,10 @@ pub struct TerseConfig {
     pub cluster_capabilities_ver: Vec<i64>,
     #[serde(alias = "clusterCapabilities")]
     pub cluster_capabilities: HashMap<String, Vec<String>>,
+    #[serde(alias = "clusterUUID")]
+    pub cluster_uuid: Option<String>,
+    #[serde(alias = "clusterName")]
+    pub cluster_name: Option<String>,
 }
 
 #[derive(Deserialize, Debug, Clone)]

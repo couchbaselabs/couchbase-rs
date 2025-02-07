@@ -6,6 +6,7 @@ use crate::parsedconfig::{
     BucketType, ParsedConfig, ParsedConfigBucket, ParsedConfigBucketFeature, ParsedConfigFeature,
     ParsedConfigNode, ParsedConfigNodeAddresses, ParsedConfigNodePorts,
 };
+use crate::tracingcomponent::ClusterLabels;
 use crate::vbucketmap::VbucketMap;
 
 pub(crate) struct ConfigParser {}
@@ -14,6 +15,15 @@ impl ConfigParser {
     pub fn parse_terse_config(config: TerseConfig, source_hostname: &str) -> Result<ParsedConfig> {
         let rev_id = config.rev;
         let rev_epoch = config.rev_epoch.unwrap_or_default();
+
+        let cluster_labels = if config.cluster_name.is_some() || config.cluster_uuid.is_some() {
+            Some(ClusterLabels {
+                cluster_name: config.cluster_name,
+                cluster_uuid: config.cluster_uuid,
+            })
+        } else {
+            None
+        };
 
         let len_nodes = if let Some(nodes) = config.nodes {
             nodes.len()
@@ -93,6 +103,7 @@ impl ConfigParser {
             nodes,
             features,
             source_hostname: source_hostname.to_string(),
+            cluster_labels,
         })
     }
 

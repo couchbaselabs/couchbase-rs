@@ -21,6 +21,7 @@ use tokio::sync::{mpsc, oneshot, Mutex, MutexGuard, RwLock, Semaphore};
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use tokio_util::codec::{FramedRead, FramedWrite};
+use tracing::{Instrument, Span};
 use uuid::Uuid;
 
 use crate::memdx::client_response::ClientResponse;
@@ -36,6 +37,7 @@ use crate::memdx::hello_feature::HelloFeature::DataType;
 use crate::memdx::packet::{RequestPacket, ResponsePacket};
 use crate::memdx::pendingop::ClientPendingOp;
 use crate::memdx::subdoc::SubdocRequestInfo;
+use crate::tracingcomponent::{BeginDispatchFields, TracingComponent};
 
 pub(crate) type ResponseSender = Sender<error::Result<ClientResponse>>;
 pub(crate) type OpaqueMap = HashMap<u32, Arc<SenderContext>>;
@@ -47,6 +49,7 @@ pub struct ResponseContext {
     pub is_persistent: bool,
     pub scope_name: Option<String>,
     pub collection_name: Option<String>,
+    pub dispatch_span: Span,
 }
 
 #[derive(Debug, Clone)]
@@ -303,7 +306,10 @@ impl Dispatcher for Client {
             is_persistent: false,
             scope_name: None,
             collection_name: None,
+            dispatch_span: Span::none(),
         });
+        let dispatch_span = context.dispatch_span.clone();
+
         let is_persistent = context.is_persistent;
         let opaque = self.register_handler(SenderContext {
             sender: response_tx,
@@ -320,7 +326,7 @@ impl Dispatcher for Client {
         );
 
         let mut writer = self.writer.lock().await;
-        match writer.send(packet).await {
+        match writer.send(packet).instrument(dispatch_span).await {
             Ok(_) => Ok(ClientPendingOp::new(
                 opaque,
                 self.opaque_map.clone(),

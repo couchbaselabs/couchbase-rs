@@ -7,6 +7,7 @@ use crate::clients::bucket_client::{
 };
 use crate::clients::query_client::{CouchbaseQueryClient, QueryClient, QueryClientBackend};
 use crate::clients::search_client::{CouchbaseSearchClient, SearchClient, SearchClientBackend};
+use crate::clients::tracing_client::{CouchbaseTracingClient, TracingClient, TracingClientBackend};
 use crate::error;
 use crate::options::cluster_options::ClusterOptions;
 use crate::retry::DEFAULT_RETRY_STRATEGY;
@@ -14,6 +15,7 @@ use couchbase_connstr::{parse, resolve, Address, SrvRecord};
 use couchbase_core::agentoptions::{CompressionConfig, SeedConfig};
 use couchbase_core::ondemand_agentmanager::{OnDemandAgentManager, OnDemandAgentManagerOptions};
 use couchbase_core::retry::RetryStrategy;
+use couchbase_core::tracingcomponent::ClusterLabels;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
@@ -115,6 +117,21 @@ impl ClusterClient {
             }
         }
     }
+
+    pub fn tracing_client(&self) -> error::Result<TracingClient> {
+        match &self.backend {
+            ClusterClientBackend::CouchbaseClusterBackend(backend) => {
+                let tracing_client = backend.tracing_client()?;
+
+                Ok(TracingClient::new(
+                    TracingClientBackend::CouchbaseTracingClientBackend(tracing_client),
+                ))
+            }
+            ClusterClientBackend::Couchbase2ClusterBackend(_) => {
+                unimplemented!()
+            }
+        }
+    }
 }
 
 struct CouchbaseClusterBackend {
@@ -208,6 +225,14 @@ impl CouchbaseClusterBackend {
         let agent = self.agent_manager.get_cluster_agent()?;
 
         Ok(CouchbaseAnalyticsClient::new(
+            CouchbaseAgentProvider::with_agent(agent.clone()),
+        ))
+    }
+
+    fn tracing_client(&self) -> error::Result<CouchbaseTracingClient> {
+        let agent = self.agent_manager.get_cluster_agent()?;
+
+        Ok(CouchbaseTracingClient::new(
             CouchbaseAgentProvider::with_agent(agent.clone()),
         ))
     }

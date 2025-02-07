@@ -6,10 +6,15 @@ use crate::searchx::error::ServerError;
 use crate::searchx::index::Index;
 use crate::searchx::query_options::QueryOptions;
 use crate::searchx::search_respreader::SearchRespReader;
+use crate::tracingcomponent::{
+    end_dispatch_span, BeginDispatchFields, EndDispatchFields, TracingComponent,
+};
+use crate::util::get_host_port_tuple_from_uri;
 use bytes::Bytes;
 use http::{Method, StatusCode};
 use std::collections::HashMap;
 use std::sync::Arc;
+use tracing::Instrument;
 
 #[derive(Debug)]
 pub struct Search<C: Client> {
@@ -20,6 +25,8 @@ pub struct Search<C: Client> {
     pub password: String,
 
     pub vector_search_enabled: bool,
+
+    pub(crate) tracing: Arc<TracingComponent>,
 }
 
 impl<C: Client> Search<C> {
@@ -102,6 +109,14 @@ impl<C: Client> Search<C> {
             error::Error::new_encoding_error(format!("could not serialize query options: {}", e))
         })?;
 
+        let dispatch_span = self
+            .tracing
+            .create_dispatch_span(&BeginDispatchFields::from_strings(
+                None,
+                get_host_port_tuple_from_uri(&self.endpoint).unwrap_or_default(),
+                None,
+            ));
+
         let res = self
             .execute(
                 Method::POST,
@@ -111,8 +126,11 @@ impl<C: Client> Search<C> {
                 None,
                 Some(Bytes::from(body)),
             )
+            .instrument(dispatch_span.clone())
             .await
             .map_err(|e| error::Error::new_http_error(&self.endpoint).with(Arc::new(e)))?;
+
+        end_dispatch_span(dispatch_span, EndDispatchFields::new(None, None));
 
         SearchRespReader::new(res, &opts.index_name, &self.endpoint).await
     }

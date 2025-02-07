@@ -21,17 +21,22 @@ use crate::memdx::response::{
 };
 use crate::memdx::status::Status;
 use crate::memdx::subdoc::SubdocRequestInfo;
+use crate::tracingcomponent::{BeginDispatchFields, TracingComponent};
 use bitflags::Flags;
 use byteorder::{BigEndian, ByteOrder};
 use bytes::BufMut;
+use std::sync::Arc;
 use std::time::Duration;
 
 #[derive(Debug)]
 pub struct OpsCrud {
-    pub collections_enabled: bool,
-    pub durability_enabled: bool,
-    pub preserve_expiry_enabled: bool,
-    pub ext_frames_enabled: bool,
+    pub(crate) collections_enabled: bool,
+    pub(crate) durability_enabled: bool,
+    pub(crate) preserve_expiry_enabled: bool,
+    pub(crate) ext_frames_enabled: bool,
+
+    pub(crate) tracing: Arc<TracingComponent>,
+    pub(crate) dispatch_fields: BeginDispatchFields,
 }
 
 impl OpsCrud {
@@ -78,7 +83,16 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, None).await?;
+        let response_context = ResponseContext {
+            cas: packet.cas,
+            subdoc_info: None,
+            is_persistent: false,
+            scope_name: None,
+            collection_name: None,
+            dispatch_span: self.tracing.create_dispatch_span(&self.dispatch_fields),
+        };
+
+        let pending_op = dispatcher.dispatch(packet, Some(response_context)).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -117,7 +131,16 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, None).await?;
+        let response_context = ResponseContext {
+            cas: packet.cas,
+            subdoc_info: None,
+            is_persistent: false,
+            scope_name: None,
+            collection_name: None,
+            dispatch_span: self.tracing.create_dispatch_span(&self.dispatch_fields),
+        };
+
+        let pending_op = dispatcher.dispatch(packet, Some(response_context)).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -160,7 +183,16 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, None).await?;
+        let response_context = ResponseContext {
+            cas: packet.cas,
+            subdoc_info: None,
+            is_persistent: false,
+            scope_name: None,
+            collection_name: None,
+            dispatch_span: self.tracing.create_dispatch_span(&self.dispatch_fields),
+        };
+
+        let pending_op = dispatcher.dispatch(packet, Some(response_context)).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -204,7 +236,16 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, None).await?;
+        let response_context = ResponseContext {
+            cas: packet.cas,
+            subdoc_info: None,
+            is_persistent: false,
+            scope_name: None,
+            collection_name: None,
+            dispatch_span: self.tracing.create_dispatch_span(&self.dispatch_fields),
+        };
+
+        let pending_op = dispatcher.dispatch(packet, Some(response_context)).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -246,7 +287,16 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, None).await?;
+        let response_context = ResponseContext {
+            cas: packet.cas,
+            subdoc_info: None,
+            is_persistent: false,
+            scope_name: None,
+            collection_name: None,
+            dispatch_span: self.tracing.create_dispatch_span(&self.dispatch_fields),
+        };
+
+        let pending_op = dispatcher.dispatch(packet, Some(response_context)).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -288,7 +338,16 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, None).await?;
+        let response_context = ResponseContext {
+            cas: packet.cas,
+            subdoc_info: None,
+            is_persistent: false,
+            scope_name: None,
+            collection_name: None,
+            dispatch_span: self.tracing.create_dispatch_span(&self.dispatch_fields),
+        };
+
+        let pending_op = dispatcher.dispatch(packet, Some(response_context)).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -327,7 +386,16 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, None).await?;
+        let response_context = ResponseContext {
+            cas: packet.cas,
+            subdoc_info: None,
+            is_persistent: false,
+            scope_name: None,
+            collection_name: None,
+            dispatch_span: self.tracing.create_dispatch_span(&self.dispatch_fields),
+        };
+
+        let pending_op = dispatcher.dispatch(packet, Some(response_context)).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -369,7 +437,16 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, None).await?;
+        let response_context = ResponseContext {
+            cas: packet.cas,
+            subdoc_info: None,
+            is_persistent: false,
+            scope_name: None,
+            collection_name: None,
+            dispatch_span: self.tracing.create_dispatch_span(&self.dispatch_fields),
+        };
+
+        let pending_op = dispatcher.dispatch(packet, Some(response_context)).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -417,7 +494,16 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, None).await?;
+        let response_context = ResponseContext {
+            cas: packet.cas,
+            subdoc_info: None,
+            is_persistent: false,
+            scope_name: None,
+            collection_name: None,
+            dispatch_span: self.tracing.create_dispatch_span(&self.dispatch_fields),
+        };
+
+        let pending_op = dispatcher.dispatch(packet, Some(response_context)).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -472,7 +558,16 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, None).await?;
+        let response_context = ResponseContext {
+            cas: packet.cas,
+            subdoc_info: None,
+            is_persistent: false,
+            scope_name: None,
+            collection_name: None,
+            dispatch_span: self.tracing.create_dispatch_span(&self.dispatch_fields),
+        };
+
+        let pending_op = dispatcher.dispatch(packet, Some(response_context)).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -516,7 +611,16 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, None).await?;
+        let response_context = ResponseContext {
+            cas: packet.cas,
+            subdoc_info: None,
+            is_persistent: false,
+            scope_name: None,
+            collection_name: None,
+            dispatch_span: self.tracing.create_dispatch_span(&self.dispatch_fields),
+        };
+
+        let pending_op = dispatcher.dispatch(packet, Some(response_context)).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -560,7 +664,16 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, None).await?;
+        let response_context = ResponseContext {
+            cas: packet.cas,
+            subdoc_info: None,
+            is_persistent: false,
+            scope_name: None,
+            collection_name: None,
+            dispatch_span: self.tracing.create_dispatch_span(&self.dispatch_fields),
+        };
+
+        let pending_op = dispatcher.dispatch(packet, Some(response_context)).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -629,7 +742,16 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, None).await?;
+        let response_context = ResponseContext {
+            cas: packet.cas,
+            subdoc_info: None,
+            is_persistent: false,
+            scope_name: None,
+            collection_name: None,
+            dispatch_span: self.tracing.create_dispatch_span(&self.dispatch_fields),
+        };
+
+        let pending_op = dispatcher.dispatch(packet, Some(response_context)).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -681,7 +803,16 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, None).await?;
+        let response_context = ResponseContext {
+            cas: packet.cas,
+            subdoc_info: None,
+            is_persistent: false,
+            scope_name: None,
+            collection_name: None,
+            dispatch_span: self.tracing.create_dispatch_span(&self.dispatch_fields),
+        };
+
+        let pending_op = dispatcher.dispatch(packet, Some(response_context)).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -761,6 +892,7 @@ impl OpsCrud {
             is_persistent: false,
             scope_name: None,
             collection_name: None,
+            dispatch_span: self.tracing.create_dispatch_span(&self.dispatch_fields),
         };
 
         let pending_op = dispatcher.dispatch(packet, Some(response_context)).await?;
@@ -871,6 +1003,7 @@ impl OpsCrud {
             is_persistent: false,
             scope_name: None,
             collection_name: None,
+            dispatch_span: self.tracing.create_dispatch_span(&self.dispatch_fields),
         };
 
         let pending_op = dispatcher.dispatch(packet, Some(response_context)).await?;

@@ -1,0 +1,40 @@
+pub(crate) const SPAN_NAME_DISPATCH_TO_SERVER: &str = "dispatch_to_server";
+pub(crate) const SPAN_NAME_REQUEST_ENCODING: &str = "request_encoding";
+
+pub(crate) const SPAN_ATTRIB_DB_SYSTEM_KEY: &str = "db.system";
+pub(crate) const SPAN_ATTRIB_DB_SYSTEM_VALUE: &str = "couchbase";
+pub(crate) const SPAN_ATTRIB_OPERATION_ID_KEY: &str = "db.couchbase.operation_id";
+pub(crate) const SPAN_ATTRIB_OPERATION_KEY: &str = "db.operation";
+pub(crate) const SPAN_ATTRIB_RETRIES: &str = "db.couchbase.retries";
+pub(crate) const SPAN_ATTRIB_LOCAL_ID_KEY: &str = "db.couchbase.local_id";
+pub(crate) const SPAN_ATTRIB_NET_TRANSPORT: &str = "net.transport";
+pub(crate) const SPAN_ATTRIB_NET_HOST_NAME_KEY: &str = "net.host.name";
+pub(crate) const SPAN_ATTRIB_NET_HOST_PORT_KEY: &str = "net.host.port";
+pub(crate) const SPAN_ATTRIB_NET_PEER_NAME_KEY: &str = "net.peer.name";
+pub(crate) const SPAN_ATTRIB_NET_PEER_PORT_KEY: &str = "net.peer.port";
+pub(crate) const SPAN_ATTRIB_SERVER_DURATION_KEY: &str = "db.couchbase.server_duration";
+pub(crate) const SPAN_ATTRIB_SERVICE_KEY: &str = "db.couchbase.service";
+pub(crate) const SPAN_ATTRIB_DB_NAME_KEY: &str = "db.name";
+pub(crate) const SPAN_ATTRIB_DB_COLLECTION_NAME_KEY: &str = "db.couchbase.collection";
+pub(crate) const SPAN_ATTRIB_DB_SCOPE_NAME_KEY: &str = "db.couchbase.scope";
+pub(crate) const SPAN_ATTRIB_DB_DURABILITY: &str = "db.couchbase.durability";
+pub(crate) const SPAN_ATTRIB_NUM_RETRIES: &str = "db.couchbase.retries";
+pub(crate) const SPAN_ATTRIB_CLUSTER_UUID_KEY: &str = "db.couchbase.cluster_uuid";
+pub(crate) const SPAN_ATTRIB_CLUSTER_NAME_KEY: &str = "db.couchbase.cluster_name";
+
+pub(crate) const METER_NAME_CB_OPERATIONS: &str = "db.couchbase.operations";
+pub(crate) const METER_ATTRIB_SERVICE_KEY: &str = "db.couchbase.service";
+pub(crate) const METER_ATTRIB_OPERATION_KEY: &str = "db.operation";
+pub(crate) const METER_ATTRIB_BUCKET_NAME_KEY: &str = "db.name";
+pub(crate) const METER_ATTRIB_SCOPE_NAME_KEY: &str = "db.couchbase.scope";
+pub(crate) const METER_ATTRIB_COLLECTION_NAME_KEY: &str = "db.couchbase.collection";
+pub(crate) const METER_ATTRIB_OUTCOME_KEY: &str = "outcome";
+pub(crate) const METER_ATTRIB_CLUSTER_UUID_KEY: &str = "db.couchbase.cluster_uuid";
+pub(crate) const METER_ATTRIB_CLUSTER_NAME_KEY: &str = "db.couchbase.cluster_name";
+
+pub(crate) const SERVICE_VALUE_KV: &str = "kv";
+pub(crate) const SERVICE_VALUE_QUERY: &str = "query";
+pub(crate) const SERVICE_VALUE_ANALYTICS: &str = "analytics";
+pub(crate) const SERVICE_VALUE_SEARCH: &str = "search";
+pub(crate) const SERVICE_VALUE_MANAGEMENT: &str = "management";
+pub(crate) const SERVICE_VALUE_EVENTING: &str = "eventing";

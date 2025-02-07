@@ -44,6 +44,7 @@ impl<'a> EnsureManifestHelper<'a> {
             endpoint: target.endpoint.to_string(),
             username: target.username.to_string(),
             password: target.password.to_string(),
+            tracing: None,
         }
         .get_collection_manifest(&GetCollectionManifestOptions {
             on_behalf_of_info: self.on_behalf_of_info,

@@ -17,6 +17,7 @@ use crate::mgmtx::responses::{
 use crate::retry::{orchestrate_retries, RetryInfo, RetryManager};
 use crate::retrybesteffort::ExponentialBackoffCalculator;
 use crate::service_type::ServiceType;
+use crate::tracingcomponent::TracingComponent;
 use crate::{error, mgmtx};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -24,6 +25,7 @@ use std::time::Duration;
 
 pub(crate) struct MgmtComponent<C: Client> {
     http_component: HttpComponent<C>,
+    tracing: Arc<TracingComponent>,
 
     retry_manager: Arc<RetryManager>,
 }
@@ -42,6 +44,7 @@ impl<C: Client> MgmtComponent<C> {
     pub fn new(
         retry_manager: Arc<RetryManager>,
         http_client: Arc<C>,
+        tracing: Arc<TracingComponent>,
         config: MgmtComponentConfig,
         opts: MgmtComponentOptions,
     ) -> Self {
@@ -52,6 +55,7 @@ impl<C: Client> MgmtComponent<C> {
                 http_client,
                 HttpComponentState::new(config.endpoints, config.authenticator),
             ),
+            tracing,
             retry_manager,
         }
     }
@@ -86,6 +90,7 @@ impl<C: Client> MgmtComponent<C> {
                             endpoint: endpoint.clone(),
                             username,
                             password,
+                            tracing: Some(self.tracing.clone()),
                         }
                         .get_collection_manifest(&copts)
                         .await)
@@ -125,6 +130,7 @@ impl<C: Client> MgmtComponent<C> {
                             endpoint: endpoint.clone(),
                             username,
                             password,
+                            tracing: Some(self.tracing.clone()),
                         }
                         .create_scope(&copts)
                         .await)
@@ -164,6 +170,7 @@ impl<C: Client> MgmtComponent<C> {
                             endpoint: endpoint.clone(),
                             username,
                             password,
+                            tracing: Some(self.tracing.clone()),
                         }
                         .delete_scope(&copts)
                         .await)
@@ -203,6 +210,7 @@ impl<C: Client> MgmtComponent<C> {
                             endpoint: endpoint.clone(),
                             username,
                             password,
+                            tracing: Some(self.tracing.clone()),
                         }
                         .create_collection(&copts)
                         .await)
@@ -242,6 +250,7 @@ impl<C: Client> MgmtComponent<C> {
                             endpoint: endpoint.clone(),
                             username,
                             password,
+                            tracing: Some(self.tracing.clone()),
                         }
                         .delete_collection(&copts)
                         .await)
@@ -281,6 +290,7 @@ impl<C: Client> MgmtComponent<C> {
                             endpoint: endpoint.clone(),
                             username,
                             password,
+                            tracing: Some(self.tracing.clone()),
                         }
                         .update_collection(&copts)
                         .await)

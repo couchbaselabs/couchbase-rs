@@ -24,6 +24,7 @@ use crate::memdx::response::{
     PrependResponse, ReplaceResponse, SelectBucketResponse, SetResponse, TouchResponse,
     UnlockResponse,
 };
+use crate::tracingcomponent::BeginDispatchFields;
 
 pub(crate) trait KvClientOps: Sized + Send + Sync {
     fn set(&self, req: SetRequest) -> impl Future<Output = Result<SetResponse>> + Send;
@@ -280,6 +281,12 @@ where
             durability_enabled: self.has_feature(HelloFeature::SyncReplication),
             preserve_expiry_enabled: self.has_feature(HelloFeature::PreserveExpiry),
             ext_frames_enabled: self.has_feature(HelloFeature::AltRequests),
+            tracing: self.tracing.clone(),
+            dispatch_fields: BeginDispatchFields::from_addrs(
+                self.local_addr(),
+                self.remote_addr(),
+                self.id().to_string(),
+            ),
         }
     }
 }

@@ -22,6 +22,14 @@ pub(crate) fn get_host_port_from_uri(uri: &str) -> error::Result<String> {
     Ok(host)
 }
 
+pub(crate) fn get_host_port_tuple_from_uri(uri: &str) -> error::Result<(String, String)> {
+    let parsed = Url::parse(uri).map_err(|e| ErrorKind::Generic { msg: e.to_string() })?;
+    let host = parsed.host().map_or_else(String::new, |h| h.to_string());
+    let port = parsed.port().map_or_else(String::new, |p| p.to_string());
+
+    Ok((host, port))
+}
+
 pub(crate) fn hostname_from_addr_str(addr: &str) -> String {
     let (host, _) = match split_host_port(addr) {
         Ok(hp) => hp,

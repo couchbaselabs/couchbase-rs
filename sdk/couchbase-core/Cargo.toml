@@ -41,6 +41,7 @@ tokio-stream = "0.1.15"
 tokio-util = { version = "0.7", features = ["codec"] }
 
 tokio-rustls = { version = "0.26.0", optional = true }
+tracing = "0.1.40"
 
 [dev-dependencies]
 chrono = "0.4.38"

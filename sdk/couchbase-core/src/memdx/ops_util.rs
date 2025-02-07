@@ -7,6 +7,7 @@ use crate::memdx::packet::RequestPacket;
 use crate::memdx::pendingop::StandardPendingOp;
 use crate::memdx::request::GetCollectionIdRequest;
 use crate::memdx::response::GetCollectionIdResponse;
+use tracing::Span;
 
 pub struct OpsUtil {}
 
@@ -41,6 +42,7 @@ impl OpsUtil {
                     is_persistent: false,
                     scope_name: Some(request.scope_name.to_string()),
                     collection_name: Some(request.collection_name.to_string()),
+                    dispatch_span: Span::none(),
                 }),
             )
             .await?;

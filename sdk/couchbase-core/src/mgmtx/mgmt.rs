@@ -12,12 +12,17 @@ use crate::mgmtx::responses::{
     CreateCollectionResponse, CreateScopeResponse, DeleteCollectionResponse, DeleteScopeResponse,
     UpdateCollectionResponse,
 };
+use crate::tracingcomponent::{
+    end_dispatch_span, BeginDispatchFields, EndDispatchFields, TracingComponent,
+};
+use crate::util::get_host_port_tuple_from_uri;
 use bytes::Bytes;
 use http::Method;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::Arc;
+use tracing::Instrument;
 
 lazy_static! {
     static ref FIELD_NAME_MAP: HashMap<String, String> = {
@@ -41,6 +46,8 @@ pub struct Management<C: Client> {
     pub endpoint: String,
     pub username: String,
     pub password: String,
+
+    pub(crate) tracing: Option<Arc<TracingComponent>>,
 }
 
 impl<C: Client> Management<C> {
@@ -91,10 +98,29 @@ impl<C: Client> Management<C> {
     ) -> error::Result<Response> {
         let req = self.new_request(method, path, content_type, on_behalf_of, headers, body);
 
-        self.http_client
-            .execute(req)
-            .await
-            .map_err(|e| error::Error::new_message_error("could not execute request").with(e))
+        if let Some(tracing) = &self.tracing {
+            let dispatch_span = tracing.create_dispatch_span(&BeginDispatchFields::from_strings(
+                None,
+                get_host_port_tuple_from_uri(&self.endpoint).unwrap_or_default(),
+                None,
+            ));
+
+            let res = self
+                .http_client
+                .execute(req)
+                .instrument(dispatch_span.clone())
+                .await
+                .map_err(|e| error::Error::new_message_error("could not execute request").with(e));
+
+            end_dispatch_span(dispatch_span, EndDispatchFields::new(None, None));
+
+            res
+        } else {
+            self.http_client
+                .execute(req)
+                .await
+                .map_err(|e| error::Error::new_message_error("could not execute request").with(e))
+        }
     }
 
     async fn decode_common_error(response: Response) -> error::Error {

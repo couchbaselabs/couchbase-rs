@@ -18,12 +18,14 @@ use crate::queryx::query_respreader::QueryRespReader;
 use crate::queryx::query_result::{EarlyMetaData, MetaData};
 use crate::retry::{orchestrate_retries, RetryInfo, RetryManager, DEFAULT_RETRY_STRATEGY};
 use crate::service_type::ServiceType;
+use crate::tracingcomponent::TracingComponent;
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
 
 pub(crate) struct QueryComponent<C: Client> {
     http_component: HttpComponent<C>,
 
+    tracing: Arc<TracingComponent>,
     retry_manager: Arc<RetryManager>,
     prepared_cache: Arc<Mutex<PreparedStatementCache>>,
 }
@@ -72,6 +74,7 @@ impl<C: Client> QueryComponent<C> {
     pub fn new(
         retry_manager: Arc<RetryManager>,
         http_client: Arc<C>,
+        tracing: Arc<TracingComponent>,
         config: QueryComponentConfig,
         opts: QueryComponentOptions,
     ) -> Self {
@@ -82,6 +85,7 @@ impl<C: Client> QueryComponent<C> {
                 http_client,
                 HttpComponentState::new(config.endpoints, config.authenticator),
             ),
+            tracing,
             retry_manager,
             prepared_cache: Arc::new(Mutex::new(PreparedStatementCache::default())),
         }
@@ -121,6 +125,7 @@ impl<C: Client> QueryComponent<C> {
                             endpoint: endpoint.clone(),
                             username,
                             password,
+                            tracing: self.tracing.clone(),
                         }
                         .query(&copts)
                         .await)
@@ -167,6 +172,7 @@ impl<C: Client> QueryComponent<C> {
                                 endpoint: endpoint.clone(),
                                 username,
                                 password,
+                                tracing: self.tracing.clone(),
                             },
                             cache: self.prepared_cache.clone(),
                         }
@@ -218,6 +224,7 @@ impl<C: Client> QueryComponent<C> {
                             endpoint: endpoint.clone(),
                             username,
                             password,
+                            tracing: self.tracing.clone(),
                         }
                         .get_all_indexes(&copts)
                         .await)
@@ -418,6 +425,7 @@ impl<C: Client> QueryComponent<C> {
                             endpoint: endpoint.clone(),
                             username,
                             password,
+                            tracing: self.tracing.clone(),
                         })
                         .await
                     },

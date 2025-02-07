@@ -12,6 +12,7 @@ use crate::clients::query_client::{
 use crate::clients::search_client::{
     CouchbaseSearchClient, SearchClient, SearchClientBackend, SearchKeyspace,
 };
+use crate::clients::tracing_client::{CouchbaseTracingClient, TracingClient, TracingClientBackend};
 use couchbase_core::retry::RetryStrategy;
 use std::sync::Arc;
 
@@ -31,6 +32,13 @@ impl ScopeClient {
         match &self.backend {
             ScopeClientBackend::CouchbaseScopeBackend(client) => client.name(),
             ScopeClientBackend::Couchbase2ScopeBackend(client) => client.name(),
+        }
+    }
+
+    pub fn bucket_name(&self) -> &str {
+        match &self.backend {
+            ScopeClientBackend::CouchbaseScopeBackend(client) => client.bucket_name(),
+            ScopeClientBackend::Couchbase2ScopeBackend(client) => client.bucket_name(),
         }
     }
 
@@ -83,6 +91,17 @@ impl ScopeClient {
         match &self.backend {
             ScopeClientBackend::CouchbaseScopeBackend(client) => client.collection(name),
             ScopeClientBackend::Couchbase2ScopeBackend(client) => client.collection(name),
+        }
+    }
+
+    pub fn tracing_client(&self) -> TracingClient {
+        match &self.backend {
+            ScopeClientBackend::CouchbaseScopeBackend(client) => TracingClient::new(
+                TracingClientBackend::CouchbaseTracingClientBackend(client.tracing_client()),
+            ),
+            ScopeClientBackend::Couchbase2ScopeBackend(_) => {
+                unimplemented!()
+            }
         }
     }
 }
@@ -165,6 +184,10 @@ impl CouchbaseScopeClient {
             },
         )
     }
+
+    pub fn tracing_client(&self) -> CouchbaseTracingClient {
+        CouchbaseTracingClient::new(self.agent_provider.clone())
+    }
 }
 
 #[derive(Clone)]
@@ -180,6 +203,10 @@ impl Couchbase2ScopeClient {
 
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    pub fn bucket_name(&self) -> &str {
+        &self.bucket_name
     }
 
     pub fn collection(&self, _name: String) -> CollectionClient {

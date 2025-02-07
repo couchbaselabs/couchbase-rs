@@ -54,6 +54,8 @@ use crate::retry::RetryManager;
 use crate::searchcomponent::{SearchComponent, SearchComponentConfig, SearchComponentOptions};
 use crate::service_type::ServiceType;
 use crate::tls_config::TlsConfig;
+use crate::tracingcomponent::ClusterLabels;
+use crate::tracingcomponent::{TracingComponent, TracingComponentConfig};
 use crate::util::{get_host_port_from_uri, get_hostname_from_host_port};
 use crate::vbucketrouter::{
     StdVbucketRouter, VbucketRouter, VbucketRouterOptions, VbucketRoutingInfo,
@@ -87,6 +89,8 @@ pub(crate) struct AgentInner {
     retry_manager: Arc<RetryManager>,
     http_client: Arc<ReqwestClient>,
 
+    pub(crate) tracing: Arc<TracingComponent>,
+
     pub(crate) crud: CrudComponent<
         AgentClientManager,
         StdVbucketRouter,
@@ -118,6 +122,7 @@ struct AgentComponentConfigs {
     pub analytics_config: AnalyticsComponentConfig,
     pub mgmt_config: MgmtComponentConfig,
     pub http_client_config: ClientConfig,
+    pub tracing_config: TracingComponentConfig,
 }
 
 impl AgentInner {
@@ -209,6 +214,8 @@ impl AgentInner {
         self.analytics
             .reconfigure(agent_component_configs.analytics_config);
         self.mgmt.reconfigure(agent_component_configs.mgmt_config);
+        self.tracing
+            .reconfigure(agent_component_configs.tracing_config);
     }
 
     fn can_update_config(new_config: &ParsedConfig, old_config: &ParsedConfig) -> bool {
@@ -323,6 +330,15 @@ impl AgentInner {
             }
         };
 
+        let cluster_labels = state
+            .latest_config
+            .cluster_labels
+            .as_ref()
+            .map(|cluster_labels| ClusterLabels {
+                cluster_uuid: cluster_labels.cluster_uuid.clone(),
+                cluster_name: cluster_labels.cluster_name.clone(),
+            });
+
         AgentComponentConfigs {
             config_watcher_memd_config: ConfigWatcherMemdConfig {
                 endpoints: kv_data_node_ids,
@@ -352,7 +368,14 @@ impl AgentInner {
                 endpoints: mgmt_endpoints,
                 authenticator: state.authenticator.clone(),
             },
+            tracing_config: TracingComponentConfig { cluster_labels },
         }
+    }
+
+    pub async fn cluster_labels(&self) -> Option<ClusterLabels> {
+        let guard = self.state.lock().await;
+
+        guard.latest_config.cluster_labels.clone()
     }
 
     // TODO: This really shouldn't be async
@@ -449,6 +472,10 @@ impl Agent {
 
         let agent_component_configs = AgentInner::gen_agent_component_configs(&mut state);
 
+        let tracing = Arc::new(TracingComponent::new(
+            agent_component_configs.tracing_config,
+        ));
+
         let conn_mgr = Arc::new(
             StdKvClientManager::new(
                 KvClientManagerConfig {
@@ -462,6 +489,7 @@ impl Agent {
                         info!("Orphan : {:?}", packet);
                     }),
                     disable_decompression: opts.compression_config.disable_decompression,
+                    tracing: tracing.clone(),
                 },
             )
             .await?,
@@ -506,6 +534,7 @@ impl Agent {
         let mgmt = MgmtComponent::new(
             retry_manager.clone(),
             http_client.clone(),
+            tracing.clone(),
             agent_component_configs.mgmt_config,
             MgmtComponentOptions {
                 user_agent: client_name.clone(),
@@ -515,6 +544,7 @@ impl Agent {
         let query = QueryComponent::new(
             retry_manager.clone(),
             http_client.clone(),
+            tracing.clone(),
             agent_component_configs.query_config,
             QueryComponentOptions {
                 user_agent: client_name.clone(),
@@ -524,6 +554,7 @@ impl Agent {
         let search = SearchComponent::new(
             retry_manager.clone(),
             http_client.clone(),
+            tracing.clone(),
             agent_component_configs.search_config,
             SearchComponentOptions {
                 user_agent: client_name.clone(),
@@ -533,6 +564,7 @@ impl Agent {
         let analytics = AnalyticsComponent::new(
             retry_manager.clone(),
             http_client.clone(),
+            tracing.clone(),
             agent_component_configs.analytics_config,
             AnalyticsComponentOptions {
                 user_agent: client_name,
@@ -552,6 +584,7 @@ impl Agent {
             query,
             search,
             analytics,
+            tracing,
         });
 
         nmvb_handler.set_watcher(inner.clone()).await;
@@ -610,6 +643,7 @@ impl Agent {
                                     debug!("Bootstrap client {} closed", id);
                                 })
                             }),
+                            tracing: Arc::default(),
                             disable_decompression: false,
                         },
                     ),
@@ -698,6 +732,7 @@ impl Agent {
                 endpoint,
                 username,
                 password,
+                tracing: None,
             }
             .get_terse_bucket_config(GetTerseBucketConfigOptions {
                 bucket_name,
@@ -714,6 +749,7 @@ impl Agent {
                 endpoint,
                 username,
                 password,
+                tracing: None,
             }
             .get_terse_cluster_config(GetTerseClusterConfigOptions {
                 on_behalf_of_info: None,

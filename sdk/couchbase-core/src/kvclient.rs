@@ -22,6 +22,7 @@ use crate::memdx::op_bootstrap::BootstrapOptions;
 use crate::memdx::request::{GetErrorMapRequest, HelloRequest, SelectBucketRequest};
 use crate::service_type::ServiceType;
 use crate::tls_config::TlsConfig;
+use crate::tracingcomponent::TracingComponent;
 use crate::util::hostname_from_addr_str;
 
 #[derive(Clone)]
@@ -58,6 +59,7 @@ pub(crate) struct KvClientOptions {
     pub orphan_handler: OrphanResponseHandler,
     pub on_close: OnKvClientCloseHandler,
     pub disable_decompression: bool,
+    pub tracing: Arc<TracingComponent>,
 }
 
 pub(crate) trait KvClient: Sized + PartialEq + Send + Sync {
@@ -94,6 +96,8 @@ pub(crate) struct StdKvClient<D: Dispatcher> {
     selected_bucket: Mutex<Option<String>>,
 
     id: String,
+
+    pub(crate) tracing: Arc<TracingComponent>,
 }
 
 impl<D> StdKvClient<D>
@@ -249,6 +253,7 @@ where
             supported_features: vec![],
             selected_bucket: Mutex::new(None),
             id: id.clone(),
+            tracing: opts.tracing.clone(),
         };
 
         if should_bootstrap {

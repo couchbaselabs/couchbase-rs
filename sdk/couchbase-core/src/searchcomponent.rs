@@ -11,6 +11,7 @@ use crate::searchx::search::Search;
 use crate::searchx::search_respreader::SearchRespReader;
 use crate::searchx::search_result::{FacetResult, MetaData, ResultHit};
 use crate::service_type::ServiceType;
+use crate::tracingcomponent::TracingComponent;
 use crate::{error, searchx};
 use arc_swap::ArcSwap;
 use futures::StreamExt;
@@ -21,6 +22,7 @@ use std::sync::Arc;
 
 pub(crate) struct SearchComponent<C: Client> {
     http_component: HttpComponent<C>,
+    tracing: Arc<TracingComponent>,
 
     retry_manager: Arc<RetryManager>,
 
@@ -78,6 +80,7 @@ impl<C: Client> SearchComponent<C> {
     pub fn new(
         retry_manager: Arc<RetryManager>,
         http_client: Arc<C>,
+        tracing: Arc<TracingComponent>,
         config: SearchComponentConfig,
         opts: SearchComponentOptions,
     ) -> Self {
@@ -88,6 +91,7 @@ impl<C: Client> SearchComponent<C> {
                 http_client,
                 HttpComponentState::new(config.endpoints, config.authenticator),
             ),
+            tracing,
             retry_manager,
             state: ArcSwap::new(Arc::new(SearchComponentState {
                 vector_search_enabled: config.vector_search_enabled,
@@ -145,6 +149,7 @@ impl<C: Client> SearchComponent<C> {
                             password,
 
                             vector_search_enabled: self.state.load().vector_search_enabled,
+                            tracing: self.tracing.clone(),
                         }
                         .query(&copts)
                         .await)
@@ -239,6 +244,7 @@ impl<C: Client> SearchComponent<C> {
                             password,
 
                             vector_search_enabled: self.state.load().vector_search_enabled,
+                            tracing: self.tracing.clone(),
                         })
                         .await
                     },

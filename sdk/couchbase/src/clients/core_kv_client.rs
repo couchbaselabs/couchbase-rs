@@ -18,6 +18,33 @@ impl CoreKvClient {
         Self { backend }
     }
 
+    pub fn collection_name(&self) -> &str {
+        match &self.backend {
+            CoreKvClientBackend::CouchbaseCoreKvClientBackend(client) => client.collection_name(),
+            CoreKvClientBackend::Couchbase2CoreKvClientBackend(client) => {
+                unimplemented!()
+            }
+        }
+    }
+
+    pub fn scope_name(&self) -> &str {
+        match &self.backend {
+            CoreKvClientBackend::CouchbaseCoreKvClientBackend(client) => client.scope_name(),
+            CoreKvClientBackend::Couchbase2CoreKvClientBackend(client) => {
+                unimplemented!()
+            }
+        }
+    }
+
+    pub fn bucket_name(&self) -> &str {
+        match &self.backend {
+            CoreKvClientBackend::CouchbaseCoreKvClientBackend(client) => client.bucket_name(),
+            CoreKvClientBackend::Couchbase2CoreKvClientBackend(client) => {
+                unimplemented!()
+            }
+        }
+    }
+
     pub async fn upsert(
         &self,
         id: &str,

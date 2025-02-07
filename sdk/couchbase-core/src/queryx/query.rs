@@ -10,6 +10,10 @@ use crate::queryx::query_options::{
 };
 use crate::queryx::query_respreader::QueryRespReader;
 use crate::retry::RetryStrategy;
+use crate::tracingcomponent::{
+    end_dispatch_span, BeginDispatchFields, EndDispatchFields, OperationId, TracingComponent,
+};
+use crate::util::{get_host_port_from_uri, get_host_port_tuple_from_uri};
 use bytes::Bytes;
 use futures::StreamExt;
 use http::{Method, StatusCode};
@@ -21,6 +25,7 @@ use std::fmt::format;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
+use tracing::{instrument, Instrument, Level, Span};
 use uuid::Uuid;
 
 #[derive(Debug)]
@@ -30,6 +35,8 @@ pub struct Query<C: Client> {
     pub endpoint: String,
     pub username: String,
     pub password: String,
+
+    pub(crate) tracing: Arc<TracingComponent>,
 }
 
 impl<C: Client> Query<C> {
@@ -123,6 +130,14 @@ impl<C: Client> Query<C> {
                 Error::new_encoding_error(format!("failed to encode options: {}", e))
             })?);
 
+        let dispatch_span = self
+            .tracing
+            .create_dispatch_span(&BeginDispatchFields::from_strings(
+                None,
+                get_host_port_tuple_from_uri(&self.endpoint).unwrap_or_default(),
+                None,
+            ));
+
         let res = match self
             .execute(
                 Method::POST,
@@ -131,6 +146,7 @@ impl<C: Client> Query<C> {
                 on_behalf_of,
                 Some(body),
             )
+            .instrument(dispatch_span.clone())
             .await
         {
             Ok(r) => r,
@@ -142,7 +158,29 @@ impl<C: Client> Query<C> {
             }
         };
 
+        end_dispatch_span(
+            dispatch_span,
+            EndDispatchFields::new(None, Some(OperationId::String(client_context_id.clone()))),
+        );
+
         QueryRespReader::new(res, &self.endpoint, statement, client_context_id).await
+    }
+
+    #[instrument(
+        skip_all,
+        level = Level::TRACE,
+        name = "query",
+        fields(
+        otel.kind = "client",
+        db.system = "couchbase",
+        db.couchbase.service = "query",
+        db.statement = opts.statement.as_deref().unwrap_or(""),
+        db.couchbase.cluster_name,
+        db.couchbase.cluster_uuid,
+        ))]
+    async fn query_with_span(&self, opts: &QueryOptions) -> error::Result<QueryRespReader> {
+        self.tracing.record_cluster_labels(&Span::current());
+        self.query(opts).await
     }
 
     pub async fn get_all_indexes(
@@ -211,7 +249,7 @@ impl<C: Client> Query<C> {
         let opts = QueryOptions::new()
             .statement(qs)
             .on_behalf_of(opts.on_behalf_of.cloned());
-        let mut res = self.query(&opts).await?;
+        let mut res = self.query_with_span(&opts).await?;
 
         let mut indexes = vec![];
 
@@ -266,7 +304,7 @@ impl<C: Client> Query<C> {
             .statement(qs)
             .on_behalf_of(opts.on_behalf_of.cloned());
 
-        let mut res = self.query(&query_opts).await;
+        let mut res = self.query_with_span(&query_opts).await;
 
         match res {
             Err(e) => {
@@ -319,7 +357,7 @@ impl<C: Client> Query<C> {
             .statement(qs)
             .on_behalf_of(opts.on_behalf_of.cloned());
 
-        let mut res = self.query(&query_opts).await;
+        let mut res = self.query_with_span(&query_opts).await;
 
         match res {
             Err(e) => {
@@ -364,7 +402,7 @@ impl<C: Client> Query<C> {
             .statement(qs)
             .on_behalf_of(opts.on_behalf_of.cloned());
 
-        let mut res = self.query(&query_opts).await;
+        let mut res = self.query_with_span(&query_opts).await;
 
         match res {
             Err(e) => {
@@ -398,7 +436,7 @@ impl<C: Client> Query<C> {
             .statement(qs)
             .on_behalf_of(opts.on_behalf_of.cloned());
 
-        let res = self.query(&query_opts).await;
+        let mut res = self.query_with_span(&query_opts).await;
 
         match res {
             Err(e) => {
@@ -474,7 +512,7 @@ impl<C: Client> Query<C> {
                 .statement(qs)
                 .on_behalf_of(opts.on_behalf_of.cloned());
 
-            let res = self.query(&query_opts).await;
+            let res = self.query_with_span(&query_opts).await;
 
             match res {
                 Err(e) => {

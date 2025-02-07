@@ -49,6 +49,7 @@ pub mod searchoptions;
 pub mod searchx;
 pub mod service_type;
 mod tls_config;
+pub mod tracingcomponent;
 mod util;
 mod vbucketmap;
 mod vbucketrouter;

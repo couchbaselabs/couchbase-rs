@@ -9,6 +9,7 @@ use crate::httpcomponent::{HttpComponent, HttpComponentState};
 use crate::httpx::client::Client;
 use crate::retry::{orchestrate_retries, RetryInfo, RetryManager, DEFAULT_RETRY_STRATEGY};
 use crate::service_type::ServiceType;
+use crate::tracingcomponent::TracingComponent;
 use bytes::Bytes;
 use futures::StreamExt;
 use futures_core::Stream;
@@ -17,6 +18,7 @@ use std::sync::Arc;
 
 pub(crate) struct AnalyticsComponent<C: Client> {
     http_component: HttpComponent<C>,
+    tracing: Arc<TracingComponent>,
 
     retry_manager: Arc<RetryManager>,
 }
@@ -61,6 +63,7 @@ impl<C: Client> AnalyticsComponent<C> {
     pub fn new(
         retry_manager: Arc<RetryManager>,
         http_client: Arc<C>,
+        tracing: Arc<TracingComponent>,
         config: AnalyticsComponentConfig,
         opts: AnalyticsComponentOptions,
     ) -> Self {
@@ -71,6 +74,7 @@ impl<C: Client> AnalyticsComponent<C> {
                 http_client,
                 HttpComponentState::new(config.endpoints, config.authenticator),
             ),
+            tracing,
             retry_manager,
         }
     }
@@ -110,6 +114,7 @@ impl<C: Client> AnalyticsComponent<C> {
                             endpoint: endpoint.clone(),
                             username,
                             password,
+                            tracing: self.tracing.clone(),
                         }
                         .query(&copts)
                         .await)

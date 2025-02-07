@@ -118,6 +118,7 @@ impl RetryInfo {
 
     pub(crate) fn add_retry_attempt(&mut self, reason: RetryReason) {
         self.retry_attempts += 1;
+        tracing::Span::current().record("db.couchbase.retries", self.retry_attempts);
         self.retry_reasons.insert(reason);
     }
 

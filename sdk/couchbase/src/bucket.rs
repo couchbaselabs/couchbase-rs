@@ -37,8 +37,6 @@ impl Bucket {
     }
 
     pub fn collections(&self) -> CollectionManager {
-        CollectionManager {
-            client: self.collections_mgmt_client.clone(),
-        }
+        CollectionManager::new(self.collections_mgmt_client.clone())
     }
 }

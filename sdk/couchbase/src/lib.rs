@@ -18,6 +18,8 @@ pub mod results;
 pub mod scope;
 pub mod search;
 pub mod subdoc;
+pub mod threshold_log_tracer;
+mod tracing;
 pub mod transcoding;
 
 pub mod authenticator {

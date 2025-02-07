@@ -11,6 +11,7 @@ use crate::memdx::ops_core::OpsCore;
 use crate::memdx::ops_crud::{decode_res_ext_frames, OpsCrud};
 use crate::memdx::status::Status;
 use crate::memdx::subdoc::{SubDocResult, SubdocDocFlag};
+use crate::tracingcomponent::{end_dispatch_span, EndDispatchFields, OperationId};
 use byteorder::{BigEndian, ReadBytesExt};
 use tokio_io::Buf;
 
@@ -248,7 +249,21 @@ pub struct SetResponse {
 
 impl TryFromClientResponse for SetResponse {
     fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+        let span = resp.response_context().dispatch_span.clone();
+
         let packet = resp.packet();
+
+        let server_duration = if let Some(f) = &packet.framing_extras {
+            decode_res_ext_frames(f)?
+        } else {
+            None
+        };
+
+        end_dispatch_span(
+            span,
+            EndDispatchFields::new(server_duration, Some(OperationId::from_u32(packet.opaque))),
+        );
+
         let status = packet.status;
 
         if status == Status::TooBig {
@@ -285,12 +300,6 @@ impl TryFromClientResponse for SetResponse {
             None
         };
 
-        let server_duration = if let Some(f) = &packet.framing_extras {
-            decode_res_ext_frames(f)?
-        } else {
-            None
-        };
-
         Ok(SetResponse {
             cas: packet.cas.unwrap_or_default(),
             mutation_token,
@@ -322,7 +331,21 @@ pub struct GetResponse {
 
 impl TryFromClientResponse for GetResponse {
     fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+        let span = resp.response_context().dispatch_span.clone();
+
         let packet = resp.packet();
+
+        let server_duration = if let Some(f) = &packet.framing_extras {
+            decode_res_ext_frames(f)?
+        } else {
+            None
+        };
+
+        end_dispatch_span(
+            span,
+            EndDispatchFields::new(server_duration, Some(OperationId::from_u32(packet.opaque))),
+        );
+
         let status = packet.status;
 
         if status == Status::KeyNotFound {
@@ -338,12 +361,6 @@ impl TryFromClientResponse for GetResponse {
         }
 
         let flags = parse_flags(&packet.extras)?;
-
-        let server_duration = if let Some(f) = &packet.framing_extras {
-            decode_res_ext_frames(f)?
-        } else {
-            None
-        };
 
         let value = packet.value.unwrap_or_default();
 
@@ -371,7 +388,21 @@ pub struct GetMetaResponse {
 
 impl TryFromClientResponse for GetMetaResponse {
     fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+        let span = resp.response_context().dispatch_span.clone();
+
         let packet = resp.packet();
+
+        let server_duration = if let Some(f) = &packet.framing_extras {
+            decode_res_ext_frames(f)?
+        } else {
+            None
+        };
+
+        end_dispatch_span(
+            span,
+            EndDispatchFields::new(server_duration, Some(OperationId::from_u32(packet.opaque))),
+        );
+
         let status = packet.status;
 
         if status == Status::KeyNotFound {
@@ -385,12 +416,6 @@ impl TryFromClientResponse for GetMetaResponse {
         } else if status != Status::Success {
             return Err(OpsCrud::decode_common_error(&packet));
         }
-
-        let server_duration = if let Some(f) = &packet.framing_extras {
-            decode_res_ext_frames(f)?
-        } else {
-            None
-        };
 
         let value = packet.value.unwrap_or_default();
 
@@ -431,7 +456,20 @@ pub struct DeleteResponse {
 
 impl TryFromClientResponse for DeleteResponse {
     fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+        let span = resp.response_context().dispatch_span.clone();
         let packet = resp.packet();
+
+        let server_duration = if let Some(f) = &packet.framing_extras {
+            decode_res_ext_frames(f)?
+        } else {
+            None
+        };
+
+        end_dispatch_span(
+            span,
+            EndDispatchFields::new(server_duration, Some(OperationId::from_u32(packet.opaque))),
+        );
+
         let status = packet.status;
 
         if status == Status::KeyNotFound {
@@ -468,12 +506,6 @@ impl TryFromClientResponse for DeleteResponse {
             None
         };
 
-        let server_duration = if let Some(f) = &packet.framing_extras {
-            decode_res_ext_frames(f)?
-        } else {
-            None
-        };
-
         Ok(DeleteResponse {
             cas: packet.cas.unwrap_or_default(),
             mutation_token,
@@ -493,7 +525,20 @@ pub struct GetAndLockResponse {
 
 impl TryFromClientResponse for GetAndLockResponse {
     fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+        let span = resp.response_context().dispatch_span.clone();
         let packet = resp.packet();
+
+        let server_duration = if let Some(f) = &packet.framing_extras {
+            decode_res_ext_frames(f)?
+        } else {
+            None
+        };
+
+        end_dispatch_span(
+            span,
+            EndDispatchFields::new(server_duration, Some(OperationId::from_u32(packet.opaque))),
+        );
+
         let status = packet.status;
 
         if status == Status::KeyNotFound {
@@ -517,12 +562,6 @@ impl TryFromClientResponse for GetAndLockResponse {
         }
 
         let flags = parse_flags(&packet.extras)?;
-
-        let server_duration = if let Some(f) = &packet.framing_extras {
-            decode_res_ext_frames(f)?
-        } else {
-            None
-        };
 
         let value = packet.value.unwrap_or_default();
 
@@ -547,7 +586,20 @@ pub struct GetAndTouchResponse {
 
 impl TryFromClientResponse for GetAndTouchResponse {
     fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+        let span = resp.response_context().dispatch_span.clone();
         let packet = resp.packet();
+
+        let server_duration = if let Some(f) = &packet.framing_extras {
+            decode_res_ext_frames(f)?
+        } else {
+            None
+        };
+
+        end_dispatch_span(
+            span,
+            EndDispatchFields::new(server_duration, Some(OperationId::from_u32(packet.opaque))),
+        );
+
         let status = packet.status;
 
         if status == Status::KeyNotFound {
@@ -572,12 +624,6 @@ impl TryFromClientResponse for GetAndTouchResponse {
 
         let flags = parse_flags(&packet.extras)?;
 
-        let server_duration = if let Some(f) = &packet.framing_extras {
-            decode_res_ext_frames(f)?
-        } else {
-            None
-        };
-
         let value = packet.value.unwrap_or_default();
 
         Ok(GetAndTouchResponse {
@@ -597,7 +643,20 @@ pub struct UnlockResponse {
 
 impl TryFromClientResponse for UnlockResponse {
     fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+        let span = resp.response_context().dispatch_span.clone();
         let packet = resp.packet();
+
+        let server_duration = if let Some(f) = &packet.framing_extras {
+            decode_res_ext_frames(f)?
+        } else {
+            None
+        };
+
+        end_dispatch_span(
+            span,
+            EndDispatchFields::new(server_duration, Some(OperationId::from_u32(packet.opaque))),
+        );
+
         let status = packet.status;
 
         if status == Status::KeyNotFound {
@@ -628,12 +687,6 @@ impl TryFromClientResponse for UnlockResponse {
             return Err(OpsCrud::decode_common_error(&packet));
         }
 
-        let server_duration = if let Some(f) = &packet.framing_extras {
-            decode_res_ext_frames(f)?
-        } else {
-            None
-        };
-
         Ok(UnlockResponse { server_duration })
     }
 }
@@ -646,7 +699,20 @@ pub struct TouchResponse {
 
 impl TryFromClientResponse for TouchResponse {
     fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+        let span = resp.response_context().dispatch_span.clone();
         let packet = resp.packet();
+
+        let server_duration = if let Some(f) = &packet.framing_extras {
+            decode_res_ext_frames(f)?
+        } else {
+            None
+        };
+
+        end_dispatch_span(
+            span,
+            EndDispatchFields::new(server_duration, Some(OperationId::from_u32(packet.opaque))),
+        );
+
         let status = packet.status;
 
         if status == Status::KeyNotFound {
@@ -675,12 +741,6 @@ impl TryFromClientResponse for TouchResponse {
             }
         }
 
-        let server_duration = if let Some(f) = &packet.framing_extras {
-            decode_res_ext_frames(f)?
-        } else {
-            None
-        };
-
         Ok(TouchResponse {
             cas: packet.cas.unwrap_or_default(),
             server_duration,
@@ -697,7 +757,20 @@ pub struct AddResponse {
 
 impl TryFromClientResponse for AddResponse {
     fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+        let span = resp.response_context().dispatch_span.clone();
         let packet = resp.packet();
+
+        let server_duration = if let Some(f) = &packet.framing_extras {
+            decode_res_ext_frames(f)?
+        } else {
+            None
+        };
+
+        end_dispatch_span(
+            span,
+            EndDispatchFields::new(server_duration, Some(OperationId::from_u32(packet.opaque))),
+        );
+
         let status = packet.status;
 
         if status == Status::TooBig {
@@ -726,12 +799,6 @@ impl TryFromClientResponse for AddResponse {
             None
         };
 
-        let server_duration = if let Some(f) = &packet.framing_extras {
-            decode_res_ext_frames(f)?
-        } else {
-            None
-        };
-
         Ok(AddResponse {
             cas: packet.cas.unwrap_or_default(),
             mutation_token,
@@ -749,7 +816,20 @@ pub struct ReplaceResponse {
 
 impl TryFromClientResponse for ReplaceResponse {
     fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+        let span = resp.response_context().dispatch_span.clone();
         let packet = resp.packet();
+
+        let server_duration = if let Some(f) = &packet.framing_extras {
+            decode_res_ext_frames(f)?
+        } else {
+            None
+        };
+
+        end_dispatch_span(
+            span,
+            EndDispatchFields::new(server_duration, Some(OperationId::from_u32(packet.opaque))),
+        );
+
         let status = packet.status;
 
         if status == Status::TooBig {
@@ -794,12 +874,6 @@ impl TryFromClientResponse for ReplaceResponse {
             None
         };
 
-        let server_duration = if let Some(f) = &packet.framing_extras {
-            decode_res_ext_frames(f)?
-        } else {
-            None
-        };
-
         Ok(ReplaceResponse {
             cas: packet.cas.unwrap_or_default(),
             mutation_token,
@@ -817,8 +891,21 @@ pub struct AppendResponse {
 
 impl TryFromClientResponse for AppendResponse {
     fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+        let span = resp.response_context().dispatch_span.clone();
         let cas = resp.response_context().cas;
         let packet = resp.packet();
+
+        let server_duration = if let Some(f) = &packet.framing_extras {
+            decode_res_ext_frames(f)?
+        } else {
+            None
+        };
+
+        end_dispatch_span(
+            span,
+            EndDispatchFields::new(server_duration, Some(OperationId::from_u32(packet.opaque))),
+        );
+
         let status = packet.status;
 
         // KeyExists without a request cas would be an odd error to receive so we don't
@@ -861,12 +948,6 @@ impl TryFromClientResponse for AppendResponse {
 
         let mutation_token = if let Some(extras) = &packet.extras {
             Some(MutationToken::try_from(extras)?)
-        } else {
-            None
-        };
-
-        let server_duration = if let Some(f) = &packet.framing_extras {
-            decode_res_ext_frames(f)?
         } else {
             None
         };
@@ -888,8 +969,21 @@ pub struct PrependResponse {
 
 impl TryFromClientResponse for PrependResponse {
     fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+        let span = resp.response_context().dispatch_span.clone();
         let cas = resp.response_context().cas;
         let packet = resp.packet();
+
+        let server_duration = if let Some(f) = &packet.framing_extras {
+            decode_res_ext_frames(f)?
+        } else {
+            None
+        };
+
+        end_dispatch_span(
+            span,
+            EndDispatchFields::new(server_duration, Some(OperationId::from_u32(packet.opaque))),
+        );
+
         let status = packet.status;
 
         // KeyExists without a request cas would be an odd error to receive so we don't
@@ -932,12 +1026,6 @@ impl TryFromClientResponse for PrependResponse {
 
         let mutation_token = if let Some(extras) = &packet.extras {
             Some(MutationToken::try_from(extras)?)
-        } else {
-            None
-        };
-
-        let server_duration = if let Some(f) = &packet.framing_extras {
-            decode_res_ext_frames(f)?
         } else {
             None
         };
@@ -960,7 +1048,20 @@ pub struct IncrementResponse {
 
 impl TryFromClientResponse for IncrementResponse {
     fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+        let span = resp.response_context().dispatch_span.clone();
         let packet = resp.packet();
+
+        let server_duration = if let Some(f) = &packet.framing_extras {
+            decode_res_ext_frames(f)?
+        } else {
+            None
+        };
+
+        end_dispatch_span(
+            span,
+            EndDispatchFields::new(server_duration, Some(OperationId::from_u32(packet.opaque))),
+        );
+
         let status = packet.status;
 
         if status == Status::KeyNotFound {
@@ -997,12 +1098,6 @@ impl TryFromClientResponse for IncrementResponse {
 
         let mutation_token = if let Some(extras) = &packet.extras {
             Some(MutationToken::try_from(extras)?)
-        } else {
-            None
-        };
-
-        let server_duration = if let Some(f) = &packet.framing_extras {
-            decode_res_ext_frames(f)?
         } else {
             None
         };
@@ -1026,7 +1121,20 @@ pub struct DecrementResponse {
 
 impl TryFromClientResponse for DecrementResponse {
     fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+        let span = resp.response_context().dispatch_span.clone();
         let packet = resp.packet();
+
+        let server_duration = if let Some(f) = &packet.framing_extras {
+            decode_res_ext_frames(f)?
+        } else {
+            None
+        };
+
+        end_dispatch_span(
+            span,
+            EndDispatchFields::new(server_duration, Some(OperationId::from_u32(packet.opaque))),
+        );
+
         let status = packet.status;
 
         if status == Status::KeyNotFound {
@@ -1067,12 +1175,6 @@ impl TryFromClientResponse for DecrementResponse {
             None
         };
 
-        let server_duration = if let Some(f) = &packet.framing_extras {
-            decode_res_ext_frames(f)?
-        } else {
-            None
-        };
-
         Ok(DecrementResponse {
             cas: packet.cas.unwrap_or_default(),
             value,
@@ -1091,11 +1193,24 @@ pub struct LookupInResponse {
 
 impl TryFromClientResponse for LookupInResponse {
     fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+        let span = resp.response_context().dispatch_span.clone();
         let subdoc_info = resp
             .response_context()
             .subdoc_info
             .expect("missing subdoc info in response context");
+
         let packet = resp.packet();
+        let server_duration = if let Some(f) = &packet.framing_extras {
+            decode_res_ext_frames(f)?
+        } else {
+            None
+        };
+
+        end_dispatch_span(
+            span,
+            EndDispatchFields::new(server_duration, Some(OperationId::from_u32(packet.opaque))),
+        );
+
         let cas = packet.cas;
         let status = packet.status;
 
@@ -1240,12 +1355,24 @@ pub struct MutateInResponse {
 
 impl TryFromClientResponse for MutateInResponse {
     fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+        let span = resp.response_context().dispatch_span.clone();
         let subdoc_info = resp
             .response_context()
             .subdoc_info
             .expect("missing subdoc info in response context");
 
         let packet = resp.packet();
+        let server_duration = if let Some(f) = &packet.framing_extras {
+            decode_res_ext_frames(f)?
+        } else {
+            None
+        };
+
+        end_dispatch_span(
+            span,
+            EndDispatchFields::new(server_duration, Some(OperationId::from_u32(packet.opaque))),
+        );
+
         let cas = packet.cas;
         let status = packet.status;
 
@@ -1496,12 +1623,6 @@ impl TryFromClientResponse for MutateInResponse {
             let seqno = u64::from_be_bytes(seqno_bytes.try_into().unwrap());
 
             Some(MutationToken { vbuuid, seqno })
-        } else {
-            None
-        };
-
-        let server_duration = if let Some(f) = &packet.framing_extras {
-            decode_res_ext_frames(f)?
         } else {
             None
         };

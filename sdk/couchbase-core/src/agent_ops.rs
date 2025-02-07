@@ -31,10 +31,15 @@ use crate::queryoptions::{
 use crate::queryx::index::Index;
 use crate::searchcomponent::SearchResultStream;
 use crate::searchoptions::SearchOptions;
+use crate::tracingcomponent::ClusterLabels;
 
 impl Agent {
     pub async fn bucket_features(&self) -> Result<Vec<BucketFeature>> {
         self.inner.bucket_features().await
+    }
+
+    pub fn cluster_labels(&self) -> Option<ClusterLabels> {
+        self.inner.tracing.get_cluster_labels()
     }
 
     pub async fn upsert(&self, opts: UpsertOptions<'_>) -> Result<UpsertResult> {

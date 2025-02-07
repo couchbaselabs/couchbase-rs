@@ -44,6 +44,18 @@ impl CouchbaseCoreKvClient {
         }
     }
 
+    pub fn bucket_name(&self) -> &str {
+        &self.bucket_name
+    }
+
+    pub fn scope_name(&self) -> &str {
+        &self.scope_name
+    }
+
+    pub fn collection_name(&self) -> &str {
+        &self.collection_name
+    }
+
     pub async fn upsert(
         &self,
         id: &str,
