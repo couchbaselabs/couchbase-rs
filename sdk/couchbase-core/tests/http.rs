@@ -1,14 +1,15 @@
+use crate::common::test_config::{setup_tests, test_mem_addrs, test_password, test_username};
 use bytes::Bytes;
+use couchbase_core::analyticsx::query_respreader::Status;
 use couchbase_core::httpx::client::{Client, ClientConfig, ReqwestClient};
-use couchbase_core::httpx::json_row_stream::JsonRowStream;
-use couchbase_core::httpx::raw_json_row_streamer::RawJsonRowStreamer;
+use couchbase_core::httpx::decoder::Decoder;
+use couchbase_core::httpx::raw_json_row_streamer::{RawJsonRowItem, RawJsonRowStreamer};
 use couchbase_core::httpx::request::{Auth, BasicAuth, Request};
 use http::Method;
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::json;
+use serde_json::value::RawValue;
 use tokio_stream::StreamExt;
-
-use crate::common::test_config::{setup_tests, test_mem_addrs, test_password, test_username};
 
 mod common;
 
@@ -23,6 +24,23 @@ struct TerseClusterInfo {
     #[serde(alias = "isBalanced")]
     is_balanced: bool,
     orchestrator: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct QueryMetaData {
+    #[serde(rename = "requestID")]
+    pub request_id: Option<String>,
+    #[serde(rename = "clientContextID")]
+    pub client_context_id: Option<String>,
+    pub status: Option<Status>,
+    pub metrics: Option<QueryMetrics>,
+    pub signature: Option<Box<RawValue>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct QueryMetrics {
+    #[serde(rename = "elapsedTime")]
+    pub elapsed_time: Option<String>,
 }
 
 #[tokio::test]
@@ -48,7 +66,7 @@ async fn test_row_streamer() {
 
     let resp = client.execute(request).await.unwrap();
 
-    let mut streamer = RawJsonRowStreamer::new(JsonRowStream::new(resp.bytes_stream()), "results");
+    let mut streamer = RawJsonRowStreamer::new(Decoder::new(resp.bytes_stream()), "results");
 
     let prelude = String::from_utf8(
         streamer
@@ -61,34 +79,34 @@ async fn test_row_streamer() {
     assert!(prelude.contains("signature"));
     assert!(prelude.contains("requestID"));
 
+    let mut stream = Box::pin(streamer.into_stream());
     let mut rows = vec![];
 
-    while let Some(row) = streamer.next().await {
-        rows.push(row.expect("Failed reading row"));
+    let mut epilog = None;
+    while let Some(row) = stream.next().await {
+        match row {
+            Ok(RawJsonRowItem::Row(row)) => {
+                rows.push(row);
+            }
+            Ok(RawJsonRowItem::Metadata(meta)) => {
+                epilog = Some(meta);
+            }
+            Err(e) => {
+                panic!("Failed reading from stream: {}", e);
+            }
+        }
     }
+
+    let epilog = epilog.unwrap();
 
     assert_eq!(rows.len(), 1000);
 
-    let epilog = streamer.epilog().expect("Failed reading epilog");
-    let epilog: Value = serde_json::from_slice(&epilog).expect("failed parsing epilog as json");
+    let epilog: QueryMetaData =
+        serde_json::from_slice(&epilog).expect("failed parsing epilog as json");
 
-    let request_id = epilog
-        .get("requestID")
-        .and_then(Value::as_str)
-        .unwrap_or_default();
-    let status = epilog
-        .get("status")
-        .and_then(Value::as_str)
-        .unwrap_or_default();
-    let elapsed_time = epilog
-        .get("metrics")
-        .unwrap()
-        .get("elapsedTime")
-        .and_then(Value::as_str)
-        .unwrap_or_default();
-    assert_eq!(status, "success");
-    assert!(!request_id.is_empty());
-    assert!(!elapsed_time.is_empty());
+    assert_eq!(epilog.status.unwrap(), Status::Success);
+    assert!(!epilog.request_id.unwrap().is_empty());
+    assert!(!epilog.metrics.unwrap().elapsed_time.unwrap().is_empty());
 }
 
 #[tokio::test]

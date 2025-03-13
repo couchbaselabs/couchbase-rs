@@ -15,8 +15,9 @@ use regex::Regex;
 use tokio::sync::Mutex;
 
 use crate::helpers::durations::parse_duration_from_golang_string;
-use crate::httpx::json_row_stream::JsonRowStream;
-use crate::httpx::raw_json_row_streamer::RawJsonRowStreamer;
+use crate::httpx;
+use crate::httpx::decoder::Decoder;
+use crate::httpx::raw_json_row_streamer::{RawJsonRowItem, RawJsonRowStreamer};
 use crate::httpx::response::Response;
 use crate::memdx::magic::Magic::Res;
 use crate::queryx::error;
@@ -34,7 +35,7 @@ pub struct QueryRespReader {
     client_context_id: String,
     status_code: StatusCode,
 
-    streamer: Option<RawJsonRowStreamer>,
+    streamer: Pin<Box<dyn Stream<Item = httpx::error::Result<RawJsonRowItem>> + Send>>,
     early_meta_data: EarlyMetaData,
     meta_data: Option<MetaData>,
     meta_data_error: Option<Error>,
@@ -45,24 +46,28 @@ impl Stream for QueryRespReader {
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.get_mut();
-        let mut streamer: &mut RawJsonRowStreamer = if let Some(streamer) = this.streamer.as_mut() {
-            streamer
-        } else {
-            return Poll::Ready(None);
-        };
 
-        match streamer.poll_next_unpin(cx) {
-            Poll::Ready(Some(Ok(row_data))) => Poll::Ready(Some(Ok(Bytes::from(row_data)))),
+        match this.streamer.poll_next_unpin(cx) {
+            Poll::Ready(Some(Ok(RawJsonRowItem::Row(row_data)))) => {
+                Poll::Ready(Some(Ok(Bytes::from(row_data))))
+            }
+            Poll::Ready(Some(Ok(RawJsonRowItem::Metadata(metadata)))) => {
+                match this.read_final_metadata(metadata) {
+                    Ok(meta) => this.meta_data = Some(meta),
+                    Err(e) => {
+                        this.meta_data_error = Some(e.clone());
+                        return Poll::Ready(Some(Err(e)));
+                    }
+                };
+                Poll::Ready(None)
+            }
             Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(Error::new_http_error(
                 &this.endpoint,
-                this.statement.clone(),
+                Some(this.statement.clone()),
                 this.client_context_id.clone(),
             )
             .with(Arc::new(e))))),
-            Poll::Ready(None) => {
-                this.read_final_metadata();
-                Poll::Ready(None)
-            }
+            Poll::Ready(None) => Poll::Ready(None),
             Poll::Pending => Poll::Pending,
         }
     }
@@ -128,30 +133,41 @@ impl QueryRespReader {
         }
 
         let stream = resp.bytes_stream();
-        let mut streamer = RawJsonRowStreamer::new(JsonRowStream::new(stream), "results");
+        let mut streamer = RawJsonRowStreamer::new(Decoder::new(stream), "results");
 
         let early_meta_data =
             Self::read_early_metadata(&mut streamer, &endpoint, &statement, &client_context_id)
                 .await?;
 
-        let has_more_rows = streamer.has_more_rows();
+        let has_more_rows = streamer.has_more_rows().await;
+        let mut epilog = None;
+        if !has_more_rows {
+            epilog = match streamer.epilog() {
+                Ok(epilog) => Some(epilog),
+                Err(e) => {
+                    return Err(
+                        Error::new_http_error(endpoint, statement, client_context_id)
+                            .with(Arc::new(e)),
+                    );
+                }
+            };
+        }
 
         let mut reader = Self {
             endpoint,
             statement,
             client_context_id,
             status_code,
-            streamer: Some(streamer),
+            streamer: Box::pin(streamer.into_stream()),
             early_meta_data,
             meta_data: None,
             meta_data_error: None,
         };
 
-        if !has_more_rows {
-            reader.read_final_metadata();
-            if let Some(e) = reader.meta_data_error {
-                return Err(e);
-            }
+        if let Some(epilog) = epilog {
+            let meta = reader.read_final_metadata(epilog)?;
+
+            reader.meta_data = Some(meta);
         }
 
         Ok(reader)
@@ -207,49 +223,20 @@ impl QueryRespReader {
         })
     }
 
-    fn read_final_metadata(&mut self) {
-        // We take the streamer here so that it gets dropped and closes the stream.
-        let streamer = std::mem::take(&mut self.streamer);
+    fn read_final_metadata(&mut self, epilog: Vec<u8>) -> error::Result<MetaData> {
+        let metadata: QueryMetaData = match serde_json::from_slice(&epilog) {
+            Ok(m) => m,
+            Err(e) => {
+                return Err(Error::new_message_error(
+                    format!("failed to parse query metadata from epilog: {}", e),
+                    self.endpoint.clone(),
+                    self.statement.clone(),
+                    self.client_context_id.clone(),
+                ));
+            }
+        };
 
-        if let Some(mut streamer) = streamer {
-            let epilog = match streamer.epilog() {
-                Ok(e) => e,
-                Err(e) => {
-                    self.meta_data_error = Some(
-                        Error::new_http_error(
-                            &self.endpoint,
-                            self.statement.clone(),
-                            self.client_context_id.clone(),
-                        )
-                        .with(Arc::new(e)),
-                    );
-                    return;
-                }
-            };
-
-            let metadata: QueryMetaData = match serde_json::from_slice(&epilog) {
-                Ok(m) => m,
-                Err(e) => {
-                    self.meta_data_error = Some(Error::new_message_error(
-                        format!("failed to parse metadata from response: {}", e),
-                        self.endpoint.clone(),
-                        self.statement.clone(),
-                        self.client_context_id.clone(),
-                    ));
-                    return;
-                }
-            };
-
-            let metadata = match self.parse_metadata(metadata) {
-                Ok(m) => m,
-                Err(e) => {
-                    self.meta_data_error = Some(e);
-                    return;
-                }
-            };
-
-            self.meta_data = Some(metadata);
-        }
+        self.parse_metadata(metadata)
     }
 
     fn parse_metadata(&self, metadata: QueryMetaData) -> error::Result<MetaData> {

@@ -223,7 +223,9 @@ impl<C: Client> QueryComponent<C> {
                         .await)
                         {
                             Ok(r) => r,
-                            Err(e) => return Err(ErrorKind::Query(e).into()),
+                            Err(e) => {
+                                return Err(ErrorKind::Query(e).into());
+                            }
                         };
 
                         Ok(res)
