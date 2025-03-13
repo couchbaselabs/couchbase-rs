@@ -1,13 +1,10 @@
+use crate::httpx::decoder::{Decoder, Token};
 use crate::httpx::error::Error;
 use crate::httpx::error::Result as HttpxResult;
-use crate::httpx::json_row_stream::JsonRowStream;
-use futures::{Stream, StreamExt, TryStreamExt};
-use futures_core::FusedStream;
+use futures::{stream, FutureExt, Stream, TryStreamExt};
 use serde_json::Value;
 use std::cmp::{PartialEq, PartialOrd};
 use std::collections::HashMap;
-use std::pin::Pin;
-use std::task::{Context, Poll};
 
 #[derive(PartialEq, Eq, PartialOrd, Debug)]
 enum RowStreamState {
@@ -18,19 +15,22 @@ enum RowStreamState {
 }
 
 pub struct RawJsonRowStreamer {
-    stream: JsonRowStream,
+    stream: Decoder,
     rows_attrib: String,
-    buffered_row: Vec<u8>,
     attribs: HashMap<String, Value>,
     state: RowStreamState,
 }
 
+pub enum RawJsonRowItem {
+    Row(Vec<u8>),
+    Metadata(Vec<u8>),
+}
+
 impl RawJsonRowStreamer {
-    pub fn new(stream: JsonRowStream, rows_attrib: impl Into<String>) -> Self {
+    pub fn new(stream: Decoder, rows_attrib: impl Into<String>) -> Self {
         Self {
             stream,
             rows_attrib: rows_attrib.into(),
-            buffered_row: Vec::new(),
             attribs: HashMap::new(),
             state: RowStreamState::Start,
         }
@@ -43,77 +43,92 @@ impl RawJsonRowStreamer {
             ));
         }
 
-        let first = match self.stream.next().await {
-            Some(result) => result?,
-            None => {
-                return Err(Error::new_message_error(
-                    "expected first line to be non-empty",
-                ))
-            }
-        };
+        let first = self.stream.token().await?;
 
-        if &first[..] != b"{" {
+        if first != Token::Delim('{') {
             return Err(Error::new_message_error(
                 "expected an opening brace for the result",
             ));
         }
+
         loop {
-            match self.stream.next().await {
-                Some(mut item) => {
-                    let mut item = String::from_utf8(item?)
-                        .map_err(|e| Error::new_message_error("failed to parse utf8 string"))?;
-                    if item.is_empty() || item == "}" {
-                        self.state = RowStreamState::End;
-                        break;
-                    }
-                    if self.state < RowStreamState::PostRows && item.contains(&self.rows_attrib) {
-                        if let Some(mut maybe_row) = self.stream.next().await {
-                            let maybe_row = maybe_row?;
-                            let str_row = std::str::from_utf8(&maybe_row).map_err(|e| {
-                                Error::new_message_error("failed to parse utf8 string")
-                            })?;
-                            // if there are no more rows, immediately move to post-rows
-                            if str_row == "]" {
-                                self.state = RowStreamState::PostRows;
-                                // Read the rest of the metadata.
-                                continue;
-                            } else {
-                                // We can't peek, so buffer the first row
-                                self.buffered_row = maybe_row;
-                            }
-                        }
+            if !self.stream.more().await {
+                self.state = RowStreamState::End;
+                break;
+            }
+
+            let token = self.stream.token().await?;
+            let key = match token {
+                Token::String(s) => s,
+                _ => {
+                    return Err(Error::new_message_error(
+                        "expected a string key for the result",
+                    ));
+                }
+            };
+
+            if key == self.rows_attrib.as_str() {
+                let token = self.stream.token().await?;
+                match token {
+                    Token::Delim('[') => {
                         self.state = RowStreamState::Rows;
-                        break;
                     }
+                    Token::Value(v) => {
+                        if &v == b"null" {
+                            continue;
+                        }
 
-                    // Wrap the line in a JSON object to deserialize
-                    item = format!("{{{}}}", item);
-                    let json_value: HashMap<String, Value> =
-                        serde_json::from_str(&item).map_err(|e| {
-                            Error::new_message_error(format!("failed to parse response: {}", e))
-                        })?;
-
-                    // Save the attribute for the metadata
-                    for (k, v) in json_value {
-                        self.attribs.insert(k, v);
+                        return Err(Error::new_message_error(
+                            "expected an opening bracket for the rows",
+                        ));
+                    }
+                    _ => {
+                        return Err(Error::new_message_error(
+                            "expected an opening bracket for the rows",
+                        ));
                     }
                 }
-                None => {
-                    self.state = RowStreamState::End;
+
+                if self.stream.more().await {
+                    self.state = RowStreamState::Rows;
                     break;
                 }
+
+                // There are no rows so we can just read the remaining metadata now.
+                let token = match self.stream.token().await {
+                    Ok(t) => t,
+                    Err(e) => return Err(e),
+                };
+
+                match token {
+                    Token::Delim(']') => {}
+                    _ => {
+                        return Err(Error::new_message_error(
+                            "expected closing ] for the result",
+                        ));
+                    }
+                }
+
+                self.state = RowStreamState::PostRows;
+                continue;
             }
+
+            let value = self.stream.decode().await?;
+            let value = serde_json::from_slice(&value)
+                .map_err(|e| Error::new_message_error(format!("failed to parse value: {}", e)))?;
+
+            self.attribs.insert(key, value);
         }
 
         Ok(())
     }
 
-    pub fn has_more_rows(&self) -> bool {
-        if self.state == RowStreamState::Rows {
-            return true;
+    pub async fn has_more_rows(&mut self) -> bool {
+        if self.state != RowStreamState::Rows {
+            return false;
         }
 
-        !self.buffered_row.is_empty()
+        self.stream.more().await
     }
 
     pub async fn read_prelude(&mut self) -> HttpxResult<Vec<u8>> {
@@ -126,72 +141,89 @@ impl RawJsonRowStreamer {
         serde_json::to_vec(&self.attribs)
             .map_err(|e| Error::new_message_error(format!("failed to read epilogue: {}", e)))
     }
-}
 
-impl FusedStream for RawJsonRowStreamer {
-    fn is_terminated(&self) -> bool {
-        matches!(self.state, RowStreamState::End) || matches!(self.state, RowStreamState::PostRows)
+    pub async fn next(&mut self) -> Option<HttpxResult<RawJsonRowItem>> {
+        if self.state == RowStreamState::End {
+            return None;
+        }
+
+        loop {
+            if self.state == RowStreamState::PostRows {
+                let token = match self.stream.token().await {
+                    Ok(t) => t,
+                    Err(e) => return Some(Err(e)),
+                };
+
+                let key = match token {
+                    Token::String(s) => s,
+                    Token::Delim('}') => {
+                        self.state = RowStreamState::End;
+
+                        let metadata = match serde_json::to_vec(&self.attribs).map_err(|e| {
+                            Error::new_message_error(format!("failed to encode metadata: {}", e))
+                        }) {
+                            Ok(m) => m,
+                            Err(e) => return Some(Err(e)),
+                        };
+
+                        return Some(Ok(RawJsonRowItem::Metadata(metadata)));
+                    }
+                    _ => {
+                        return Some(Err(Error::new_message_error(
+                            "expected a string key for the result",
+                        )));
+                    }
+                };
+
+                let value = match self.stream.decode().await {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+
+                let value = match serde_json::from_slice::<Value>(&value) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return Some(Err(Error::new_message_error(format!(
+                            "failed to parse value: {}",
+                            e
+                        ))))
+                    }
+                };
+
+                self.attribs.insert(key, value);
+                continue;
+            }
+
+            let row = match self.stream.decode().await {
+                Ok(v) => v,
+                Err(e) => return Some(Err(e)),
+            };
+
+            if !self.stream.more().await {
+                let token = match self.stream.token().await {
+                    Ok(t) => t,
+                    Err(e) => return Some(Err(e)),
+                };
+
+                match token {
+                    Token::Delim(']') => {}
+                    _ => {
+                        return Some(Err(Error::new_message_error(
+                            "expected closing ] for the result",
+                        )));
+                    }
+                }
+
+                self.state = RowStreamState::PostRows;
+            }
+
+            return Some(Ok(RawJsonRowItem::Row(row)));
+        }
     }
-}
 
-impl Stream for RawJsonRowStreamer {
-    type Item = HttpxResult<Vec<u8>>;
-
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        if self.state < RowStreamState::Rows {
-            return Poll::Ready(Some(Err(Error::new_message_error(
-                "unexpected parsing state during read rows",
-            ))));
-        }
-
-        let row = self.buffered_row.clone();
-
-        let this = self.get_mut();
-
-        match this.stream.poll_next_unpin(cx) {
-            Poll::Ready(Some(Ok(stream_row))) => {
-                if this.state == RowStreamState::PostRows {
-                    let mut item = String::from_utf8(stream_row).map_err(|e| {
-                        Error::new_message_error("failed to parse stream epilogue to string")
-                    })?;
-
-                    if item == "}" || item.is_empty() {
-                        this.state = RowStreamState::End;
-                        return Poll::Ready(None);
-                    }
-
-                    item = format!("{{{}}}", item);
-                    let json_value: HashMap<String, Value> =
-                        serde_json::from_str(&item).map_err(|e| {
-                            Error::new_message_error(format!(
-                                "failed to parse stream epilogue to value: {}",
-                                e
-                            ))
-                        })?;
-                    for (k, v) in json_value {
-                        this.attribs.insert(k, v);
-                    }
-
-                    // TODO: I'm very suspicious of this.
-                    cx.waker().wake_by_ref();
-                    return Poll::Pending;
-                }
-
-                let str_row = std::str::from_utf8(&stream_row)
-                    .map_err(|e| Error::new_message_error("failed to parse stream row"))?;
-                if str_row == "]" {
-                    this.state = RowStreamState::PostRows;
-                } else {
-                    this.buffered_row = stream_row;
-                }
-                Poll::Ready(Some(Ok(row)))
-            }
-            Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(e))),
-            Poll::Ready(None) => {
-                this.state = RowStreamState::End;
-                Poll::Ready(None)
-            }
-            Poll::Pending => Poll::Pending,
-        }
+    pub fn into_stream(self) -> impl Stream<Item = HttpxResult<RawJsonRowItem>> {
+        stream::unfold(self, |mut stream| async move {
+            stream.next().await.map(|row| (row, stream))
+        })
     }
 }

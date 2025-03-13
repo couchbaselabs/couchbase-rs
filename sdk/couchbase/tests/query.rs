@@ -41,6 +41,40 @@ fn test_query_basic() {
 }
 
 #[test]
+fn test_query_empty_result() {
+    run_test(async |cluster| {
+        let opts = QueryOptions::new().metrics(true);
+        let mut res = cluster
+            .query("SELECT * FROM ARRAY_RANGE(0, 0) AS x", opts)
+            .await
+            .unwrap();
+
+        let mut rows: Vec<Value> = vec![];
+        while let Some(row) = res.rows().next().await {
+            rows.push(row.unwrap());
+        }
+
+        assert_eq!(0, rows.len());
+    })
+}
+
+#[test]
+fn test_query_error() {
+    run_test(async |cluster| {
+        let opts = QueryOptions::new().metrics(true);
+        let mut res = cluster.query("SELEC 1=1", opts).await;
+
+        // TODO: once error handling is improved, this should be a proper error.
+        assert!(res.is_err());
+        assert!(res
+            .err()
+            .unwrap()
+            .msg
+            .contains("parsing failure code: 3000"));
+    })
+}
+
+#[test]
 fn test_query_raw_result() {
     run_test(async |cluster| {
         let opts = QueryOptions::new().metrics(true);
