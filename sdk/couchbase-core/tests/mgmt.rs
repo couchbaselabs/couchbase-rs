@@ -1,19 +1,24 @@
 use crate::common::default_agent_options::create_default_options;
-use crate::common::feature_supported;
 use crate::common::helpers::generate_string_value;
 use crate::common::test_config::{setup_tests, test_bucket};
+use crate::common::{feature_supported, try_until};
 use couchbase_core::agent::Agent;
 use couchbase_core::cbconfig::CollectionManifest;
 use couchbase_core::features::BucketFeature;
 use couchbase_core::mgmtoptions::{
-    CreateCollectionOptions, CreateScopeOptions, DeleteCollectionOptions, DeleteScopeOptions,
-    EnsureManifestOptions, GetCollectionManifestOptions,
+    CreateBucketOptions, CreateCollectionOptions, CreateScopeOptions, DeleteBucketOptions,
+    DeleteCollectionOptions, DeleteScopeOptions, EnsureBucketOptions, EnsureManifestOptions,
+    GetBucketOptions, GetCollectionManifestOptions, UpdateBucketOptions,
 };
+use couchbase_core::mgmtx::bucket_settings::{BucketSettings, BucketType, MutableBucketSettings};
 use couchbase_core::mgmtx::responses::{
     CreateScopeResponse, DeleteCollectionResponse, DeleteScopeResponse,
 };
 use couchbase_core::{cbconfig, error};
-use std::ops::Deref;
+use std::future::Future;
+use std::ops::{Add, Deref};
+use std::time::Duration;
+use tokio::time::Instant;
 
 mod common;
 
@@ -121,6 +126,215 @@ async fn test_collections() {
         .await
         .unwrap();
     assert!(!resp.manifest_uid.is_empty());
+
+    agent.close().await;
+}
+
+#[tokio::test]
+async fn test_buckets() {
+    setup_tests().await;
+
+    let agent_opts = create_default_options().await;
+
+    let mut agent = Agent::new(agent_opts).await.unwrap();
+
+    let bucket_name = generate_string_value(10);
+
+    let settings = BucketSettings::default()
+        .bucket_type(BucketType::EPHEMERAL)
+        .ram_quota_mb(100);
+
+    let opts = &CreateBucketOptions::new(&bucket_name, &settings);
+
+    agent.create_bucket(opts).await.unwrap();
+
+    agent.close().await;
+}
+
+#[tokio::test]
+async fn test_create_couchbase_bucket() {
+    setup_tests().await;
+
+    let agent_opts = create_default_options().await;
+    let mut agent = Agent::new(agent_opts).await.unwrap();
+
+    let bucket_name = generate_string_value(10);
+
+    let settings = BucketSettings::default()
+        .bucket_type(BucketType::COUCHBASE)
+        .ram_quota_mb(100);
+
+    let opts = &CreateBucketOptions::new(&bucket_name, &settings);
+
+    agent.create_bucket(opts).await.unwrap();
+
+    agent
+        .ensure_bucket(&EnsureBucketOptions::new(&bucket_name, false))
+        .await
+        .unwrap();
+
+    let get_opts = &GetBucketOptions::new(&bucket_name);
+    let bucket = agent.get_bucket(get_opts).await.unwrap();
+
+    agent
+        .delete_bucket(&DeleteBucketOptions::new(&bucket_name))
+        .await
+        .unwrap();
+
+    assert_eq!(bucket.name, bucket_name);
+    assert_eq!(
+        bucket.bucket_settings.mutable_bucket_settings.ram_quota_mb,
+        Some(100)
+    );
+    assert_eq!(
+        bucket.bucket_settings.bucket_type,
+        Some(BucketType::COUCHBASE)
+    );
+
+    agent.close().await;
+}
+
+#[tokio::test]
+async fn test_create_ephemeral_bucket() {
+    setup_tests().await;
+
+    let agent_opts = create_default_options().await;
+    let mut agent = Agent::new(agent_opts).await.unwrap();
+
+    let bucket_name = generate_string_value(10);
+
+    let settings = BucketSettings::default()
+        .bucket_type(BucketType::EPHEMERAL)
+        .ram_quota_mb(100);
+
+    let opts = &CreateBucketOptions::new(&bucket_name, &settings);
+
+    agent.create_bucket(opts).await.unwrap();
+
+    agent
+        .ensure_bucket(&EnsureBucketOptions::new(&bucket_name, false))
+        .await
+        .unwrap();
+
+    let get_opts = &GetBucketOptions::new(&bucket_name);
+    let bucket = agent.get_bucket(get_opts).await.unwrap();
+
+    agent
+        .delete_bucket(&DeleteBucketOptions::new(&bucket_name))
+        .await
+        .unwrap();
+
+    assert_eq!(bucket.name, bucket_name);
+    assert_eq!(
+        bucket.bucket_settings.mutable_bucket_settings.ram_quota_mb,
+        Some(100)
+    );
+    assert_eq!(
+        bucket.bucket_settings.bucket_type,
+        Some(BucketType::EPHEMERAL)
+    );
+
+    agent.close().await;
+}
+
+#[tokio::test]
+async fn test_update_bucket() {
+    setup_tests().await;
+
+    let agent_opts = create_default_options().await;
+    let mut agent = Agent::new(agent_opts).await.unwrap();
+
+    let bucket_name = generate_string_value(10);
+
+    let settings = BucketSettings::default()
+        .bucket_type(BucketType::COUCHBASE)
+        .ram_quota_mb(100);
+
+    let create_opts = &CreateBucketOptions::new(&bucket_name, &settings);
+    agent.create_bucket(create_opts).await.unwrap();
+
+    agent
+        .ensure_bucket(&EnsureBucketOptions::new(&bucket_name, false))
+        .await
+        .unwrap();
+
+    let update_settings = MutableBucketSettings::default()
+        .ram_quota_mb(200)
+        .max_ttl(Duration::from_secs(3600));
+
+    let update_opts = &UpdateBucketOptions::new(&bucket_name, &update_settings);
+    agent.update_bucket(update_opts).await.unwrap();
+
+    let get_opts = &GetBucketOptions::new(&bucket_name);
+    let bucket = try_until(
+        Instant::now().add(Duration::from_secs(30)),
+        Duration::from_millis(100),
+        "bucket update not applied within time",
+        || async {
+            let bucket = match agent.get_bucket(get_opts).await {
+                Ok(b) => b,
+                Err(_e) => return Ok(None),
+            };
+
+            if bucket.bucket_settings.mutable_bucket_settings.ram_quota_mb == Some(200) {
+                return Ok(Some(bucket));
+            }
+
+            Ok(None)
+        },
+    )
+    .await;
+
+    agent
+        .delete_bucket(&DeleteBucketOptions::new(&bucket_name))
+        .await
+        .unwrap();
+
+    assert_eq!(
+        bucket.bucket_settings.mutable_bucket_settings.ram_quota_mb,
+        Some(200)
+    );
+    assert_eq!(
+        bucket.bucket_settings.mutable_bucket_settings.max_ttl,
+        Some(Duration::from_secs(3600))
+    );
+
+    agent.close().await;
+}
+
+#[tokio::test]
+async fn test_delete_bucket() {
+    setup_tests().await;
+
+    let agent_opts = create_default_options().await;
+    let mut agent = Agent::new(agent_opts).await.unwrap();
+
+    let bucket_name = generate_string_value(10);
+
+    let settings = BucketSettings::default()
+        .bucket_type(BucketType::EPHEMERAL)
+        .ram_quota_mb(100);
+
+    let create_opts = &CreateBucketOptions::new(&bucket_name, &settings);
+    agent.create_bucket(create_opts).await.unwrap();
+
+    agent
+        .ensure_bucket(&EnsureBucketOptions::new(&bucket_name, false))
+        .await
+        .unwrap();
+
+    let delete_opts = &DeleteBucketOptions::new(&bucket_name);
+    agent.delete_bucket(delete_opts).await.unwrap();
+
+    agent
+        .ensure_bucket(&EnsureBucketOptions::new(&bucket_name, true))
+        .await
+        .unwrap();
+
+    let get_opts = &GetBucketOptions::new(&bucket_name);
+    let result = agent.get_bucket(get_opts).await;
+
+    assert!(result.is_err());
 
     agent.close().await;
 }

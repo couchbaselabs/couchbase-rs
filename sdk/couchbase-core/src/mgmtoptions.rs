@@ -1,5 +1,6 @@
 use crate::httpx::request::OnBehalfOfInfo;
 use crate::mgmtx;
+use crate::mgmtx::bucket_settings::{BucketSettings, MutableBucketSettings};
 use crate::retry::{RetryStrategy, DEFAULT_RETRY_STRATEGY};
 use std::sync::Arc;
 
@@ -304,6 +305,235 @@ impl<'a> EnsureManifestOptions<'a> {
             bucket_name,
             manifest_uid,
         }
+    }
+
+    pub fn on_behalf_of_info(mut self, on_behalf_of_info: &'a OnBehalfOfInfo) -> Self {
+        self.on_behalf_of_info = Some(on_behalf_of_info);
+        self
+    }
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct GetAllBucketsOptions<'a> {
+    pub(crate) on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+
+    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
+}
+
+impl<'a> GetAllBucketsOptions<'a> {
+    pub fn new() -> Self {
+        Self {
+            on_behalf_of_info: None,
+            retry_strategy: DEFAULT_RETRY_STRATEGY.clone(),
+        }
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = retry_strategy;
+        self
+    }
+
+    pub fn on_behalf_of_info(mut self, on_behalf_of_info: &'a OnBehalfOfInfo) -> Self {
+        self.on_behalf_of_info = Some(on_behalf_of_info);
+        self
+    }
+}
+
+impl Default for GetAllBucketsOptions<'_> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<'a> From<&GetAllBucketsOptions<'a>> for mgmtx::options::GetAllBucketsOptions<'a> {
+    fn from(opts: &GetAllBucketsOptions<'a>) -> Self {
+        Self {
+            on_behalf_of_info: opts.on_behalf_of_info,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct GetBucketOptions<'a> {
+    pub(crate) on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+    pub(crate) bucket_name: &'a str,
+
+    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
+}
+
+impl<'a> GetBucketOptions<'a> {
+    pub fn new(bucket_name: &'a str) -> Self {
+        Self {
+            on_behalf_of_info: None,
+            bucket_name,
+            retry_strategy: DEFAULT_RETRY_STRATEGY.clone(),
+        }
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = retry_strategy;
+        self
+    }
+
+    pub fn on_behalf_of_info(mut self, on_behalf_of_info: &'a OnBehalfOfInfo) -> Self {
+        self.on_behalf_of_info = Some(on_behalf_of_info);
+        self
+    }
+}
+
+impl<'a> From<&GetBucketOptions<'a>> for mgmtx::options::GetBucketOptions<'a> {
+    fn from(opts: &GetBucketOptions<'a>) -> Self {
+        Self {
+            on_behalf_of_info: opts.on_behalf_of_info,
+            bucket_name: opts.bucket_name,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct CreateBucketOptions<'a> {
+    pub(crate) on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+    pub(crate) bucket_name: &'a str,
+    pub(crate) bucket_settings: &'a BucketSettings,
+
+    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
+}
+
+impl<'a> CreateBucketOptions<'a> {
+    pub fn new(bucket_name: &'a str, bucket_settings: &'a BucketSettings) -> Self {
+        Self {
+            on_behalf_of_info: None,
+            bucket_name,
+            bucket_settings,
+            retry_strategy: DEFAULT_RETRY_STRATEGY.clone(),
+        }
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = retry_strategy;
+        self
+    }
+
+    pub fn on_behalf_of_info(mut self, on_behalf_of_info: &'a OnBehalfOfInfo) -> Self {
+        self.on_behalf_of_info = Some(on_behalf_of_info);
+        self
+    }
+}
+
+impl<'a> From<&CreateBucketOptions<'a>> for mgmtx::options::CreateBucketOptions<'a> {
+    fn from(opts: &CreateBucketOptions<'a>) -> Self {
+        Self {
+            on_behalf_of_info: opts.on_behalf_of_info,
+            bucket_name: opts.bucket_name,
+            bucket_settings: opts.bucket_settings,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct UpdateBucketOptions<'a> {
+    pub(crate) on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+    pub(crate) bucket_name: &'a str,
+    pub(crate) bucket_settings: &'a MutableBucketSettings,
+
+    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
+}
+
+impl<'a> UpdateBucketOptions<'a> {
+    pub fn new(bucket_name: &'a str, bucket_settings: &'a MutableBucketSettings) -> Self {
+        Self {
+            on_behalf_of_info: None,
+            bucket_name,
+            bucket_settings,
+            retry_strategy: DEFAULT_RETRY_STRATEGY.clone(),
+        }
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = retry_strategy;
+        self
+    }
+
+    pub fn on_behalf_of_info(mut self, on_behalf_of_info: &'a OnBehalfOfInfo) -> Self {
+        self.on_behalf_of_info = Some(on_behalf_of_info);
+        self
+    }
+}
+
+impl<'a> From<&UpdateBucketOptions<'a>> for mgmtx::options::UpdateBucketOptions<'a> {
+    fn from(opts: &UpdateBucketOptions<'a>) -> Self {
+        Self {
+            on_behalf_of_info: opts.on_behalf_of_info,
+            bucket_name: opts.bucket_name,
+            bucket_settings: opts.bucket_settings,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct DeleteBucketOptions<'a> {
+    pub(crate) on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+    pub(crate) bucket_name: &'a str,
+
+    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
+}
+
+impl<'a> DeleteBucketOptions<'a> {
+    pub fn new(bucket_name: &'a str) -> Self {
+        Self {
+            on_behalf_of_info: None,
+            bucket_name,
+            retry_strategy: DEFAULT_RETRY_STRATEGY.clone(),
+        }
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = retry_strategy;
+        self
+    }
+
+    pub fn on_behalf_of_info(mut self, on_behalf_of_info: &'a OnBehalfOfInfo) -> Self {
+        self.on_behalf_of_info = Some(on_behalf_of_info);
+        self
+    }
+}
+
+impl<'a> From<&DeleteBucketOptions<'a>> for mgmtx::options::DeleteBucketOptions<'a> {
+    fn from(opts: &DeleteBucketOptions<'a>) -> Self {
+        Self {
+            on_behalf_of_info: opts.on_behalf_of_info,
+            bucket_name: opts.bucket_name,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct EnsureBucketOptions<'a> {
+    pub(crate) on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+    pub(crate) bucket_name: &'a str,
+    pub(crate) bucket_uuid: Option<&'a str>,
+    pub(crate) want_missing: bool,
+}
+
+impl<'a> EnsureBucketOptions<'a> {
+    pub fn new(bucket_name: &'a str, want_missing: bool) -> Self {
+        Self {
+            on_behalf_of_info: None,
+            bucket_name,
+            bucket_uuid: None,
+            want_missing,
+        }
+    }
+
+    pub fn bucket_uuid(mut self, bucket_uuid: &'a str) -> Self {
+        self.bucket_uuid = Some(bucket_uuid);
+        self
     }
 
     pub fn on_behalf_of_info(mut self, on_behalf_of_info: &'a OnBehalfOfInfo) -> Self {

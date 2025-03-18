@@ -16,9 +16,12 @@ use crate::crudresults::{
 use crate::error::Result;
 use crate::features::BucketFeature;
 use crate::mgmtoptions::{
-    CreateCollectionOptions, CreateScopeOptions, DeleteCollectionOptions, DeleteScopeOptions,
-    EnsureManifestOptions, GetCollectionManifestOptions, UpdateCollectionOptions,
+    CreateBucketOptions, CreateCollectionOptions, CreateScopeOptions, DeleteBucketOptions,
+    DeleteCollectionOptions, DeleteScopeOptions, EnsureBucketOptions, EnsureManifestOptions,
+    GetAllBucketsOptions, GetBucketOptions, GetCollectionManifestOptions, UpdateBucketOptions,
+    UpdateCollectionOptions,
 };
+use crate::mgmtx::bucket_settings::BucketDef;
 use crate::mgmtx::responses::{
     CreateCollectionResponse, CreateScopeResponse, DeleteCollectionResponse, DeleteScopeResponse,
     UpdateCollectionResponse,
@@ -193,5 +196,29 @@ impl Agent {
 
     pub async fn ensure_manifest(&self, opts: &EnsureManifestOptions<'_>) -> Result<()> {
         self.inner.mgmt.ensure_manifest(opts).await
+    }
+
+    pub async fn get_all_buckets(&self, opts: &GetAllBucketsOptions<'_>) -> Result<Vec<BucketDef>> {
+        self.inner.mgmt.get_all_buckets(opts).await
+    }
+
+    pub async fn get_bucket(&self, opts: &GetBucketOptions<'_>) -> Result<BucketDef> {
+        self.inner.mgmt.get_bucket(opts).await
+    }
+
+    pub async fn create_bucket(&self, opts: &CreateBucketOptions<'_>) -> Result<()> {
+        self.inner.mgmt.create_bucket(opts).await
+    }
+
+    pub async fn update_bucket(&self, opts: &UpdateBucketOptions<'_>) -> Result<()> {
+        self.inner.mgmt.update_bucket(opts).await
+    }
+
+    pub async fn delete_bucket(&self, opts: &DeleteBucketOptions<'_>) -> Result<()> {
+        self.inner.mgmt.delete_bucket(opts).await
+    }
+
+    pub async fn ensure_bucket(&self, opts: &EnsureBucketOptions<'_>) -> Result<()> {
+        self.inner.mgmt.ensure_bucket(opts).await
     }
 }
