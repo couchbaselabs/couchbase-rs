@@ -248,7 +248,9 @@ impl<C: Client> Management<C> {
         &self,
         opts: &CreateScopeOptions<'_>,
     ) -> error::Result<CreateScopeResponse> {
-        let body = Self::url_encode(&[("name", opts.scope_name)])?;
+        let body = url::form_urlencoded::Serializer::new(String::new())
+            .append_pair("name", opts.scope_name)
+            .finish();
 
         let resp = self
             .execute(
@@ -257,7 +259,7 @@ impl<C: Client> Management<C> {
                 "application/x-www-form-urlencoded",
                 opts.on_behalf_of_info.cloned(),
                 None,
-                Some(body),
+                Some(Bytes::from(body)),
             )
             .await?;
 
@@ -305,19 +307,24 @@ impl<C: Client> Management<C> {
         &self,
         opts: &CreateCollectionOptions<'_>,
     ) -> error::Result<CreateCollectionResponse> {
-        let mut form = vec![("name", opts.collection_name)];
-        let max_ttl = opts.max_ttl.map(|m| m.to_string());
-        let max_ttl = max_ttl.as_deref();
-        let history = opts.history_enabled.map(|h| h.to_string());
-        let history = history.as_deref();
-        if let Some(max_ttl) = max_ttl {
-            form.push(("maxTTL", max_ttl));
-        }
-        if let Some(history) = history {
-            form.push(("history", history));
-        }
+        let body = {
+            // Serializer is not Send so we need to drop it before making the request.
+            let mut form = url::form_urlencoded::Serializer::new(String::new());
+            form.append_pair("name", opts.collection_name);
 
-        let body = Self::url_encode(form.as_slice())?;
+            let max_ttl = opts.max_ttl.map(|m| m.to_string());
+            let max_ttl = max_ttl.as_deref();
+            let history = opts.history_enabled.map(|h| h.to_string());
+            let history = history.as_deref();
+            if let Some(max_ttl) = max_ttl {
+                form.append_pair("maxTTL", max_ttl);
+            }
+            if let Some(history) = history {
+                form.append_pair("history", history);
+            }
+
+            Bytes::from(form.finish())
+        };
 
         let resp = self
             .execute(
@@ -348,19 +355,23 @@ impl<C: Client> Management<C> {
         &self,
         opts: &UpdateCollectionOptions<'_>,
     ) -> error::Result<UpdateCollectionResponse> {
-        let mut form = vec![];
-        let max_ttl = opts.max_ttl.map(|m| m.to_string());
-        let max_ttl = max_ttl.as_deref();
-        let history = opts.history_enabled.map(|h| h.to_string());
-        let history = history.as_deref();
-        if let Some(max_ttl) = max_ttl {
-            form.push(("maxTTL", max_ttl));
-        }
-        if let Some(history) = history {
-            form.push(("history", history));
-        }
+        let body = {
+            // Serializer is not Send so we need to drop it before making the request.
+            let mut form = url::form_urlencoded::Serializer::new(String::new());
 
-        let body = Self::url_encode(form.as_slice())?;
+            let max_ttl = opts.max_ttl.map(|m| m.to_string());
+            let max_ttl = max_ttl.as_deref();
+            let history = opts.history_enabled.map(|h| h.to_string());
+            let history = history.as_deref();
+            if let Some(max_ttl) = max_ttl {
+                form.append_pair("maxTTL", max_ttl);
+            }
+            if let Some(history) = history {
+                form.append_pair("history", history);
+            }
+
+            Bytes::from(form.finish())
+        };
 
         let resp = self
             .execute(
@@ -414,13 +425,6 @@ impl<C: Client> Management<C> {
         Ok(DeleteCollectionResponse {
             manifest_uid: manifest_uid.manifest_uid,
         })
-    }
-
-    fn url_encode(value: &[(&str, &str)]) -> error::Result<Bytes> {
-        let body = serde_urlencoded::to_string(value)
-            .map_err(|e| error::Error::new_message_error(format!("encoding failed: {}", e)))?;
-
-        Ok(Bytes::from(body))
     }
 
     async fn parse_response<T: DeserializeOwned>(resp: Response) -> error::Result<T> {

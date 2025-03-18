@@ -32,7 +32,6 @@ futures-core = "0.3.30"
 
 serde = { version = "1.0.203", features = ["derive"] }
 serde_json = { version = "1.0.120", features = ["raw_value"] }
-serde_urlencoded = "0.7"
 
 tokio = { version = "1.38", features = ["full"] }
 tokio-io = { version = "0.2.0-alpha.6", features = ["util"] }
