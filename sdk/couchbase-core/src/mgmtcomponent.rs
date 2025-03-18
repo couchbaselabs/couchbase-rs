@@ -4,12 +4,16 @@ use crate::error::ErrorKind;
 use crate::httpcomponent::{HttpComponent, HttpComponentState};
 use crate::httpx::client::Client;
 use crate::mgmtoptions::{
-    CreateCollectionOptions, CreateScopeOptions, DeleteCollectionOptions, DeleteScopeOptions,
-    EnsureManifestOptions, GetCollectionManifestOptions, UpdateCollectionOptions,
+    CreateBucketOptions, CreateCollectionOptions, CreateScopeOptions, DeleteBucketOptions,
+    DeleteCollectionOptions, DeleteScopeOptions, EnsureBucketOptions, EnsureManifestOptions,
+    GetAllBucketsOptions, GetBucketOptions, GetCollectionManifestOptions, UpdateBucketOptions,
+    UpdateCollectionOptions,
 };
+use crate::mgmtx::bucket_helper::EnsureBucketHelper;
+use crate::mgmtx::bucket_settings::BucketDef;
 use crate::mgmtx::manifest_helper::EnsureManifestHelper;
 use crate::mgmtx::node_target::NodeTarget;
-use crate::mgmtx::options::EnsureManifestPollOptions;
+use crate::mgmtx::options::{EnsureBucketPollOptions, EnsureManifestPollOptions};
 use crate::mgmtx::responses::{
     CreateCollectionResponse, CreateScopeResponse, DeleteCollectionResponse, DeleteScopeResponse,
     UpdateCollectionResponse,
@@ -297,6 +301,164 @@ impl<C: Client> MgmtComponent<C> {
         .await
     }
 
+    pub async fn get_all_buckets(
+        &self,
+        opts: &GetAllBucketsOptions<'_>,
+    ) -> error::Result<Vec<BucketDef>> {
+        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+
+        let copts = opts.into();
+
+        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
+            self.http_component
+                .orchestrate_endpoint(
+                    None,
+                    async |client: Arc<C>,
+                           endpoint_id: String,
+                           endpoint: String,
+                           username: String,
+                           password: String| {
+                        mgmtx::mgmt::Management::<C> {
+                            http_client: client,
+                            user_agent: self.http_component.user_agent().to_string(),
+                            endpoint: endpoint.clone(),
+                            username,
+                            password,
+                        }
+                        .get_all_buckets(&copts)
+                        .await
+                        .map_err(|e| ErrorKind::Mgmt(e).into())
+                    },
+                )
+                .await
+        })
+        .await
+    }
+
+    pub async fn get_bucket(&self, opts: &GetBucketOptions<'_>) -> error::Result<BucketDef> {
+        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+
+        let copts = opts.into();
+
+        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
+            self.http_component
+                .orchestrate_endpoint(
+                    None,
+                    async |client: Arc<C>,
+                           endpoint_id: String,
+                           endpoint: String,
+                           username: String,
+                           password: String| {
+                        mgmtx::mgmt::Management::<C> {
+                            http_client: client,
+                            user_agent: self.http_component.user_agent().to_string(),
+                            endpoint: endpoint.clone(),
+                            username,
+                            password,
+                        }
+                        .get_bucket(&copts)
+                        .await
+                        .map_err(|e| ErrorKind::Mgmt(e).into())
+                    },
+                )
+                .await
+        })
+        .await
+    }
+
+    pub async fn create_bucket(&self, opts: &CreateBucketOptions<'_>) -> error::Result<()> {
+        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+
+        let copts = opts.into();
+
+        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
+            self.http_component
+                .orchestrate_endpoint(
+                    None,
+                    async |client: Arc<C>,
+                           endpoint_id: String,
+                           endpoint: String,
+                           username: String,
+                           password: String| {
+                        mgmtx::mgmt::Management::<C> {
+                            http_client: client,
+                            user_agent: self.http_component.user_agent().to_string(),
+                            endpoint: endpoint.clone(),
+                            username,
+                            password,
+                        }
+                        .create_bucket(&copts)
+                        .await
+                        .map_err(|e| ErrorKind::Mgmt(e).into())
+                    },
+                )
+                .await
+        })
+        .await
+    }
+
+    pub async fn update_bucket(&self, opts: &UpdateBucketOptions<'_>) -> error::Result<()> {
+        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+
+        let copts = opts.into();
+
+        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
+            self.http_component
+                .orchestrate_endpoint(
+                    None,
+                    async |client: Arc<C>,
+                           endpoint_id: String,
+                           endpoint: String,
+                           username: String,
+                           password: String| {
+                        mgmtx::mgmt::Management::<C> {
+                            http_client: client,
+                            user_agent: self.http_component.user_agent().to_string(),
+                            endpoint: endpoint.clone(),
+                            username,
+                            password,
+                        }
+                        .update_bucket(&copts)
+                        .await
+                        .map_err(|e| ErrorKind::Mgmt(e).into())
+                    },
+                )
+                .await
+        })
+        .await
+    }
+
+    pub async fn delete_bucket(&self, opts: &DeleteBucketOptions<'_>) -> error::Result<()> {
+        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+
+        let copts = opts.into();
+
+        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
+            self.http_component
+                .orchestrate_endpoint(
+                    None,
+                    async |client: Arc<C>,
+                           endpoint_id: String,
+                           endpoint: String,
+                           username: String,
+                           password: String| {
+                        mgmtx::mgmt::Management::<C> {
+                            http_client: client,
+                            user_agent: self.http_component.user_agent().to_string(),
+                            endpoint: endpoint.clone(),
+                            username,
+                            password,
+                        }
+                        .delete_bucket(&copts)
+                        .await
+                        .map_err(|e| ErrorKind::Mgmt(e).into())
+                    },
+                )
+                .await
+        })
+        .await
+    }
+
     pub async fn ensure_manifest(&self, opts: &EnsureManifestOptions<'_>) -> error::Result<()> {
         let mut helper = EnsureManifestHelper::new(
             self.http_component.user_agent(),
@@ -316,6 +478,32 @@ impl<C: Client> MgmtComponent<C> {
                 helper
                     .clone()
                     .poll(&EnsureManifestPollOptions { client, targets })
+                    .await
+                    .map_err(error::Error::from)
+            })
+            .await
+    }
+
+    pub async fn ensure_bucket(&self, opts: &EnsureBucketOptions<'_>) -> error::Result<()> {
+        let mut helper = EnsureBucketHelper::new(
+            self.http_component.user_agent(),
+            opts.bucket_name,
+            opts.bucket_uuid,
+            opts.want_missing,
+            opts.on_behalf_of_info,
+        );
+
+        let backoff = ExponentialBackoffCalculator::new(
+            Duration::from_millis(100),
+            Duration::from_millis(1000),
+            1.5,
+        );
+
+        self.http_component
+            .ensure_resource(backoff, async |client: Arc<C>, targets: Vec<NodeTarget>| {
+                helper
+                    .clone()
+                    .poll(&EnsureBucketPollOptions { client, targets })
                     .await
                     .map_err(error::Error::from)
             })

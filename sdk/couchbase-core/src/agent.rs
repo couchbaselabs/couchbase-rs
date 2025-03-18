@@ -701,8 +701,8 @@ impl Agent {
                 username,
                 password,
             }
-            .get_terse_bucket_config(GetTerseBucketConfigOptions {
-                bucket_name,
+            .get_terse_bucket_config(&GetTerseBucketConfigOptions {
+                bucket_name: &bucket_name,
                 on_behalf_of_info: None,
             })
             .await
@@ -717,7 +717,7 @@ impl Agent {
                 username,
                 password,
             }
-            .get_terse_cluster_config(GetTerseClusterConfigOptions {
+            .get_terse_cluster_config(&GetTerseClusterConfigOptions {
                 on_behalf_of_info: None,
             })
             .await
