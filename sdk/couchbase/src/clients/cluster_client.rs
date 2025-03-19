@@ -71,13 +71,13 @@ impl ClusterClient {
         }
     }
 
-    pub fn query_client(&self) -> error::Result<QueryClient> {
+    pub fn query_client(&self) -> QueryClient {
         match &self.backend {
             ClusterClientBackend::CouchbaseClusterBackend(backend) => {
-                let query_client = backend.query_client()?;
+                let query_client = backend.query_client();
 
-                Ok(QueryClient::new(
-                    QueryClientBackend::CouchbaseQueryClientBackend(query_client),
+                QueryClient::new(QueryClientBackend::CouchbaseQueryClientBackend(
+                    query_client,
                 ))
             }
             ClusterClientBackend::Couchbase2ClusterBackend(_) => {
@@ -86,13 +86,13 @@ impl ClusterClient {
         }
     }
 
-    pub fn search_client(&self) -> error::Result<SearchClient> {
+    pub fn search_client(&self) -> SearchClient {
         match &self.backend {
             ClusterClientBackend::CouchbaseClusterBackend(backend) => {
-                let search_client = backend.search_client()?;
+                let search_client = backend.search_client();
 
-                Ok(SearchClient::new(
-                    SearchClientBackend::CouchbaseSearchClientBackend(search_client),
+                SearchClient::new(SearchClientBackend::CouchbaseSearchClientBackend(
+                    search_client,
                 ))
             }
             ClusterClientBackend::Couchbase2ClusterBackend(_) => {
@@ -101,13 +101,13 @@ impl ClusterClient {
         }
     }
 
-    pub fn analytics_client(&self) -> error::Result<AnalyticsClient> {
+    pub fn analytics_client(&self) -> AnalyticsClient {
         match &self.backend {
             ClusterClientBackend::CouchbaseClusterBackend(backend) => {
-                let analytics_client = backend.analytics_client()?;
+                let analytics_client = backend.analytics_client();
 
-                Ok(AnalyticsClient::new(
-                    AnalyticsClientBackend::CouchbaseAnalyticsClientBackend(analytics_client),
+                AnalyticsClient::new(AnalyticsClientBackend::CouchbaseAnalyticsClientBackend(
+                    analytics_client,
                 ))
             }
             ClusterClientBackend::Couchbase2ClusterBackend(_) => {
@@ -188,28 +188,22 @@ impl CouchbaseClusterBackend {
         )
     }
 
-    fn query_client(&self) -> error::Result<CouchbaseQueryClient> {
-        let agent = self.agent_manager.get_cluster_agent()?;
+    fn query_client(&self) -> CouchbaseQueryClient {
+        let agent = self.agent_manager.get_cluster_agent();
 
-        Ok(CouchbaseQueryClient::new(
-            CouchbaseAgentProvider::with_agent(agent.clone()),
-        ))
+        CouchbaseQueryClient::new(CouchbaseAgentProvider::with_agent(agent.clone()))
     }
 
-    fn search_client(&self) -> error::Result<CouchbaseSearchClient> {
-        let agent = self.agent_manager.get_cluster_agent()?;
+    fn search_client(&self) -> CouchbaseSearchClient {
+        let agent = self.agent_manager.get_cluster_agent();
 
-        Ok(CouchbaseSearchClient::new(
-            CouchbaseAgentProvider::with_agent(agent.clone()),
-        ))
+        CouchbaseSearchClient::new(CouchbaseAgentProvider::with_agent(agent.clone()))
     }
 
-    fn analytics_client(&self) -> error::Result<CouchbaseAnalyticsClient> {
-        let agent = self.agent_manager.get_cluster_agent()?;
+    fn analytics_client(&self) -> CouchbaseAnalyticsClient {
+        let agent = self.agent_manager.get_cluster_agent();
 
-        Ok(CouchbaseAnalyticsClient::new(
-            CouchbaseAgentProvider::with_agent(agent.clone()),
-        ))
+        CouchbaseAnalyticsClient::new(CouchbaseAgentProvider::with_agent(agent.clone()))
     }
 
     fn merge_options(

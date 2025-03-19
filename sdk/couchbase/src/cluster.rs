@@ -29,9 +29,9 @@ impl Cluster {
     ) -> error::Result<Cluster> {
         let client = Arc::new(ClusterClient::connect(conn_str, opts).await?);
 
-        let query_client = Arc::new(client.query_client()?);
-        let search_client = Arc::new(client.search_client()?);
-        let analytics_client = Arc::new(client.analytics_client()?);
+        let query_client = Arc::new(client.query_client());
+        let search_client = Arc::new(client.search_client());
+        let analytics_client = Arc::new(client.analytics_client());
 
         Ok(Cluster {
             client,
