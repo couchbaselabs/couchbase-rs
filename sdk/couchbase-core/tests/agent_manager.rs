@@ -16,7 +16,7 @@ async fn test_get_cluster_agent() {
 
     let mgr = OnDemandAgentManager::new(agent_opts).await.unwrap();
 
-    let agent = mgr.get_cluster_agent().unwrap();
+    let agent = mgr.get_cluster_agent();
 
     agent
         .query(QueryOptions::default().statement("SELECT 1=1".to_string()))

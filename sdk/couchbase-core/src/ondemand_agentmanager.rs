@@ -115,8 +115,6 @@ pub struct OnDemandAgentManager {
     fast_map: ArcSwap<HashMap<String, Agent>>,
     slow_map: Mutex<HashMap<String, Agent>>,
     notif_map: Mutex<HashMap<String, Arc<Notify>>>,
-
-    closed: std::sync::Mutex<bool>,
 }
 
 impl OnDemandAgentManager {
@@ -129,27 +127,14 @@ impl OnDemandAgentManager {
             fast_map: Default::default(),
             slow_map: Default::default(),
             notif_map: Default::default(),
-            closed: Default::default(),
         })
     }
 
-    pub fn get_cluster_agent(&self) -> error::Result<&Agent> {
-        let closed = self.closed.lock().unwrap();
-        if *closed {
-            return Err(ErrorKind::Shutdown {}.into());
-        }
-
-        Ok(&self.cluster_agent)
+    pub fn get_cluster_agent(&self) -> &Agent {
+        &self.cluster_agent
     }
 
     pub async fn get_bucket_agent(&self, bucket_name: impl Into<String>) -> error::Result<Agent> {
-        {
-            let closed = self.closed.lock().unwrap();
-            if *closed {
-                return Err(ErrorKind::Shutdown {}.into());
-            }
-        }
-
         let bucket_name = bucket_name.into();
         let fast_map = self.fast_map.load();
         if let Some(agent) = fast_map.get(&bucket_name) {
