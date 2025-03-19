@@ -1,12 +1,11 @@
 use crate::mgmtx::bucket_settings_json::BucketSettingsJson;
-use crate::mgmtx::error;
 use std::fmt::Display;
 use std::string::ToString;
 use std::time::Duration;
 use url::form_urlencoded::Serializer;
 
 #[derive(Default, Debug, Clone, PartialOrd, PartialEq, Eq)]
-pub struct MutableBucketSettings {
+pub struct BucketSettings {
     pub flush_enabled: Option<bool>,
     pub ram_quota_mb: Option<u64>,
     pub replica_number: Option<u32>,
@@ -17,9 +16,13 @@ pub struct MutableBucketSettings {
     pub history_retention_collection_default: Option<bool>,
     pub history_retention_bytes: Option<u64>,
     pub history_retention_seconds: Option<u32>,
+    pub conflict_resolution_type: Option<ConflictResolutionType>,
+    pub replica_index: Option<bool>,
+    pub bucket_type: Option<BucketType>,
+    pub storage_backend: Option<StorageBackend>,
 }
 
-impl MutableBucketSettings {
+impl BucketSettings {
     pub fn flush_enabled(mut self, flush_enabled: bool) -> Self {
         self.flush_enabled = Some(flush_enabled);
         self
@@ -75,74 +78,6 @@ impl MutableBucketSettings {
         self.history_retention_seconds = Some(history_retention_seconds);
         self
     }
-}
-
-#[derive(Default, Debug, Clone, PartialOrd, PartialEq, Eq)]
-pub struct BucketSettings {
-    pub mutable_bucket_settings: MutableBucketSettings,
-    pub conflict_resolution_type: Option<ConflictResolutionType>,
-    pub replica_index: Option<bool>,
-    pub bucket_type: Option<BucketType>,
-    pub storage_backend: Option<StorageBackend>,
-}
-
-impl BucketSettings {
-    pub fn flush_enabled(mut self, flush_enabled: bool) -> Self {
-        self.mutable_bucket_settings.flush_enabled = Some(flush_enabled);
-        self
-    }
-
-    pub fn ram_quota_mb(mut self, ram_quota_mb: u64) -> Self {
-        self.mutable_bucket_settings.ram_quota_mb = Some(ram_quota_mb);
-        self
-    }
-
-    pub fn replica_number(mut self, replica_number: u32) -> Self {
-        self.mutable_bucket_settings.replica_number = Some(replica_number);
-        self
-    }
-
-    pub fn eviction_policy(mut self, eviction_policy: impl Into<EvictionPolicyType>) -> Self {
-        self.mutable_bucket_settings.eviction_policy = Some(eviction_policy.into());
-        self
-    }
-
-    pub fn max_ttl(mut self, max_ttl: Duration) -> Self {
-        self.mutable_bucket_settings.max_ttl = Some(max_ttl);
-        self
-    }
-
-    pub fn compression_mode(mut self, compression_mode: impl Into<CompressionMode>) -> Self {
-        self.mutable_bucket_settings.compression_mode = Some(compression_mode.into());
-        self
-    }
-
-    pub fn durability_min_level(
-        mut self,
-        durability_min_level: impl Into<DurabilityLevel>,
-    ) -> Self {
-        self.mutable_bucket_settings.durability_min_level = Some(durability_min_level.into());
-        self
-    }
-
-    pub fn history_retention_collection_default(
-        mut self,
-        history_retention_collection_default: bool,
-    ) -> Self {
-        self.mutable_bucket_settings
-            .history_retention_collection_default = Some(history_retention_collection_default);
-        self
-    }
-
-    pub fn history_retention_bytes(mut self, history_retention_bytes: u64) -> Self {
-        self.mutable_bucket_settings.history_retention_bytes = Some(history_retention_bytes);
-        self
-    }
-
-    pub fn history_retention_seconds(mut self, history_retention_seconds: u32) -> Self {
-        self.mutable_bucket_settings.history_retention_seconds = Some(history_retention_seconds);
-        self
-    }
 
     pub fn conflict_resolution_type(
         mut self,
@@ -188,25 +123,22 @@ impl From<BucketSettingsJson> for BucketDef {
         Self {
             name: settings.name,
             bucket_settings: BucketSettings {
-                mutable_bucket_settings: MutableBucketSettings {
-                    flush_enabled: settings.controllers.as_ref().map(|c| {
-                        if let Some(f) = &c.flush {
-                            f == "enabled"
-                        } else {
-                            false
-                        }
-                    }),
-                    ram_quota_mb: Some(settings.quota.raw_ram / 1024 / 1024),
-                    replica_number: settings.replica_number,
-                    eviction_policy: settings.eviction_policy,
-                    max_ttl: settings.max_ttl.map(|d| Duration::from_secs(d as u64)),
-                    compression_mode: settings.compression_mode,
-                    durability_min_level: settings.durability_min_level,
-                    history_retention_collection_default: settings
-                        .history_retention_collection_default,
-                    history_retention_bytes: settings.history_retention_bytes,
-                    history_retention_seconds: settings.history_retention_seconds,
-                },
+                flush_enabled: settings.controllers.as_ref().map(|c| {
+                    if let Some(f) = &c.flush {
+                        !f.is_empty()
+                    } else {
+                        false
+                    }
+                }),
+                ram_quota_mb: Some(settings.quota.raw_ram / 1024 / 1024),
+                replica_number: settings.replica_number,
+                eviction_policy: settings.eviction_policy,
+                max_ttl: settings.max_ttl.map(|d| Duration::from_secs(d as u64)),
+                compression_mode: settings.compression_mode,
+                durability_min_level: settings.durability_min_level,
+                history_retention_collection_default: settings.history_retention_collection_default,
+                history_retention_bytes: settings.history_retention_bytes,
+                history_retention_seconds: settings.history_retention_seconds,
                 conflict_resolution_type: settings.conflict_resolution_type,
                 replica_index: settings.replica_index,
                 bucket_type: settings.bucket_type,
@@ -253,8 +185,7 @@ impl EvictionPolicyType {
     pub const VALUE_ONLY: EvictionPolicyType =
         EvictionPolicyType(InnerEvictionPolicyType::ValueOnly);
 
-    pub const FULL_EVICTION: EvictionPolicyType =
-        EvictionPolicyType(InnerEvictionPolicyType::FullEviction);
+    pub const FULL: EvictionPolicyType = EvictionPolicyType(InnerEvictionPolicyType::Full);
 
     pub const NOT_RECENTLY_USED: EvictionPolicyType =
         EvictionPolicyType(InnerEvictionPolicyType::NotRecentlyUsed);
@@ -271,7 +202,7 @@ impl Display for EvictionPolicyType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.0 {
             InnerEvictionPolicyType::ValueOnly => write!(f, "valueOnly"),
-            InnerEvictionPolicyType::FullEviction => write!(f, "fullEviction"),
+            InnerEvictionPolicyType::Full => write!(f, "fullEviction"),
             InnerEvictionPolicyType::NotRecentlyUsed => write!(f, "nruEviction"),
             InnerEvictionPolicyType::NoEviction => write!(f, "noEviction"),
             InnerEvictionPolicyType::Other(val) => write!(f, "unknown({})", val),
@@ -282,7 +213,7 @@ impl Display for EvictionPolicyType {
 #[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub(crate) enum InnerEvictionPolicyType {
     ValueOnly,
-    FullEviction,
+    Full,
     NotRecentlyUsed,
     NoEviction,
     Other(String),
@@ -429,10 +360,7 @@ pub(crate) enum InnerStorageBackend {
     Other(String),
 }
 
-pub(crate) fn encode_mutable_bucket_settings(
-    serializer: &mut Serializer<String>,
-    opts: &MutableBucketSettings,
-) {
+pub(crate) fn encode_bucket_settings(serializer: &mut Serializer<String>, opts: &BucketSettings) {
     if let Some(flush) = opts.flush_enabled {
         serializer.append_pair("flushEnabled", if flush { "1" } else { "0" });
     }
@@ -469,14 +397,6 @@ pub(crate) fn encode_mutable_bucket_settings(
             history_retention_collection_default.to_string().as_str(),
         );
     }
-}
-
-pub(crate) fn encode_bucket_settings(
-    serializer: &mut Serializer<String>,
-    opts: &BucketSettings,
-) -> error::Result<()> {
-    encode_mutable_bucket_settings(serializer, &opts.mutable_bucket_settings);
-
     if let Some(conflict_resolution_type) = &opts.conflict_resolution_type {
         serializer.append_pair(
             "conflictResolutionType",
@@ -492,6 +412,4 @@ pub(crate) fn encode_bucket_settings(
     if let Some(storage_backend) = &opts.storage_backend {
         serializer.append_pair("storageBackend", storage_backend.to_string().as_str());
     }
-
-    Ok(())
 }

@@ -18,8 +18,8 @@ use crate::features::BucketFeature;
 use crate::mgmtoptions::{
     CreateBucketOptions, CreateCollectionOptions, CreateScopeOptions, DeleteBucketOptions,
     DeleteCollectionOptions, DeleteScopeOptions, EnsureBucketOptions, EnsureManifestOptions,
-    GetAllBucketsOptions, GetBucketOptions, GetCollectionManifestOptions, UpdateBucketOptions,
-    UpdateCollectionOptions,
+    FlushBucketOptions, GetAllBucketsOptions, GetBucketOptions, GetCollectionManifestOptions,
+    UpdateBucketOptions, UpdateCollectionOptions,
 };
 use crate::mgmtx::bucket_settings::BucketDef;
 use crate::mgmtx::responses::{
@@ -216,6 +216,10 @@ impl Agent {
 
     pub async fn delete_bucket(&self, opts: &DeleteBucketOptions<'_>) -> Result<()> {
         self.inner.mgmt.delete_bucket(opts).await
+    }
+
+    pub async fn flush_bucket(&self, opts: &FlushBucketOptions<'_>) -> Result<()> {
+        self.inner.mgmt.flush_bucket(opts).await
     }
 
     pub async fn ensure_bucket(&self, opts: &EnsureBucketOptions<'_>) -> Result<()> {

@@ -1,7 +1,41 @@
 use crate::common::try_until;
-use couchbase::collections_manager::CollectionManager;
+use couchbase::bucket_manager::BucketManager;
+use couchbase::collection_manager::CollectionManager;
 use couchbase::results::collections_mgmt_results::CollectionSpec;
 use std::time::Duration;
+
+pub async fn verify_bucket_created(manager: &BucketManager, bucket_name: &str) {
+    try_until(
+        tokio::time::Instant::now() + Duration::from_secs(30),
+        Duration::from_millis(100),
+        "Bucket was not created in time",
+        || async {
+            // TODO: Update to look only for bucket not found when error model allows.
+            match manager.get_bucket(bucket_name, None).await {
+                Ok(_) => Ok(Some(())),
+                Err(_) => Ok(None),
+            }
+        },
+    )
+    .await;
+}
+
+pub async fn verify_bucket_deleted(manager: &BucketManager, bucket_name: &str) {
+    try_until(
+        tokio::time::Instant::now() + Duration::from_secs(30),
+        Duration::from_millis(100),
+        "Bucket was not deleted in time",
+        || async {
+            let buckets = manager.get_all_buckets(None).await?;
+            if buckets.iter().any(|s| s.name == bucket_name) {
+                return Ok(None);
+            };
+
+            Ok(Some(()))
+        },
+    )
+    .await;
+}
 
 pub async fn verify_scope_created(manager: &CollectionManager, scope_name: &str) {
     try_until(

@@ -10,11 +10,12 @@ use couchbase_core::mgmtoptions::{
     DeleteCollectionOptions, DeleteScopeOptions, EnsureBucketOptions, EnsureManifestOptions,
     GetBucketOptions, GetCollectionManifestOptions, UpdateBucketOptions,
 };
-use couchbase_core::mgmtx::bucket_settings::{BucketSettings, BucketType, MutableBucketSettings};
+use couchbase_core::mgmtx::bucket_settings::{BucketSettings, BucketType};
 use couchbase_core::mgmtx::responses::{
     CreateScopeResponse, DeleteCollectionResponse, DeleteScopeResponse,
 };
 use couchbase_core::{cbconfig, error};
+use serial_test::serial;
 use std::future::Future;
 use std::ops::{Add, Deref};
 use std::time::Duration;
@@ -130,6 +131,7 @@ async fn test_collections() {
     agent.close().await;
 }
 
+#[serial]
 #[tokio::test]
 async fn test_buckets() {
     setup_tests().await;
@@ -151,6 +153,7 @@ async fn test_buckets() {
     agent.close().await;
 }
 
+#[serial]
 #[tokio::test]
 async fn test_create_couchbase_bucket() {
     setup_tests().await;
@@ -182,10 +185,7 @@ async fn test_create_couchbase_bucket() {
         .unwrap();
 
     assert_eq!(bucket.name, bucket_name);
-    assert_eq!(
-        bucket.bucket_settings.mutable_bucket_settings.ram_quota_mb,
-        Some(100)
-    );
+    assert_eq!(bucket.bucket_settings.ram_quota_mb, Some(100));
     assert_eq!(
         bucket.bucket_settings.bucket_type,
         Some(BucketType::COUCHBASE)
@@ -194,6 +194,7 @@ async fn test_create_couchbase_bucket() {
     agent.close().await;
 }
 
+#[serial]
 #[tokio::test]
 async fn test_create_ephemeral_bucket() {
     setup_tests().await;
@@ -225,10 +226,7 @@ async fn test_create_ephemeral_bucket() {
         .unwrap();
 
     assert_eq!(bucket.name, bucket_name);
-    assert_eq!(
-        bucket.bucket_settings.mutable_bucket_settings.ram_quota_mb,
-        Some(100)
-    );
+    assert_eq!(bucket.bucket_settings.ram_quota_mb, Some(100));
     assert_eq!(
         bucket.bucket_settings.bucket_type,
         Some(BucketType::EPHEMERAL)
@@ -237,6 +235,7 @@ async fn test_create_ephemeral_bucket() {
     agent.close().await;
 }
 
+#[serial]
 #[tokio::test]
 async fn test_update_bucket() {
     setup_tests().await;
@@ -258,7 +257,7 @@ async fn test_update_bucket() {
         .await
         .unwrap();
 
-    let update_settings = MutableBucketSettings::default()
+    let update_settings = BucketSettings::default()
         .ram_quota_mb(200)
         .max_ttl(Duration::from_secs(3600));
 
@@ -276,7 +275,7 @@ async fn test_update_bucket() {
                 Err(_e) => return Ok(None),
             };
 
-            if bucket.bucket_settings.mutable_bucket_settings.ram_quota_mb == Some(200) {
+            if bucket.bucket_settings.ram_quota_mb == Some(200) {
                 return Ok(Some(bucket));
             }
 
@@ -290,18 +289,16 @@ async fn test_update_bucket() {
         .await
         .unwrap();
 
+    assert_eq!(bucket.bucket_settings.ram_quota_mb, Some(200));
     assert_eq!(
-        bucket.bucket_settings.mutable_bucket_settings.ram_quota_mb,
-        Some(200)
-    );
-    assert_eq!(
-        bucket.bucket_settings.mutable_bucket_settings.max_ttl,
+        bucket.bucket_settings.max_ttl,
         Some(Duration::from_secs(3600))
     );
 
     agent.close().await;
 }
 
+#[serial]
 #[tokio::test]
 async fn test_delete_bucket() {
     setup_tests().await;

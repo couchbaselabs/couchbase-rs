@@ -6,8 +6,8 @@ use crate::httpx::client::Client;
 use crate::mgmtoptions::{
     CreateBucketOptions, CreateCollectionOptions, CreateScopeOptions, DeleteBucketOptions,
     DeleteCollectionOptions, DeleteScopeOptions, EnsureBucketOptions, EnsureManifestOptions,
-    GetAllBucketsOptions, GetBucketOptions, GetCollectionManifestOptions, UpdateBucketOptions,
-    UpdateCollectionOptions,
+    FlushBucketOptions, GetAllBucketsOptions, GetBucketOptions, GetCollectionManifestOptions,
+    UpdateBucketOptions, UpdateCollectionOptions,
 };
 use crate::mgmtx::bucket_helper::EnsureBucketHelper;
 use crate::mgmtx::bucket_settings::BucketDef;
@@ -450,6 +450,37 @@ impl<C: Client> MgmtComponent<C> {
                             password,
                         }
                         .delete_bucket(&copts)
+                        .await
+                        .map_err(|e| ErrorKind::Mgmt(e).into())
+                    },
+                )
+                .await
+        })
+        .await
+    }
+
+    pub async fn flush_bucket(&self, opts: &FlushBucketOptions<'_>) -> error::Result<()> {
+        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+
+        let copts = opts.into();
+
+        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
+            self.http_component
+                .orchestrate_endpoint(
+                    None,
+                    async |client: Arc<C>,
+                           endpoint_id: String,
+                           endpoint: String,
+                           username: String,
+                           password: String| {
+                        mgmtx::mgmt::Management::<C> {
+                            http_client: client,
+                            user_agent: self.http_component.user_agent().to_string(),
+                            endpoint: endpoint.clone(),
+                            username,
+                            password,
+                        }
+                        .flush_bucket(&copts)
                         .await
                         .map_err(|e| ErrorKind::Mgmt(e).into())
                     },

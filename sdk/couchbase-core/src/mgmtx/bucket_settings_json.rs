@@ -9,10 +9,10 @@ pub struct BucketSettingsJson {
     pub name: String,
     #[serde(default)]
     pub controllers: Option<Controllers>,
-    #[serde(default)]
+    #[serde(default, rename = "replicaIndex")]
     pub replica_index: Option<bool>,
     pub quota: Quota,
-    #[serde(default)]
+    #[serde(default, rename = "replicaNumber")]
     pub replica_number: Option<u32>,
     #[serde(
         deserialize_with = "deserialize_bucket_type",
@@ -52,11 +52,11 @@ pub struct BucketSettingsJson {
         default
     )]
     pub storage_backend: Option<StorageBackend>,
-    #[serde(default)]
+    #[serde(default, rename = "historyRetentionCollectionDefault")]
     pub history_retention_collection_default: Option<bool>,
-    #[serde(default)]
+    #[serde(default, rename = "historyRetentionBytes")]
     pub history_retention_bytes: Option<u64>,
-    #[serde(default)]
+    #[serde(default, rename = "historyRetentionSeconds")]
     pub history_retention_seconds: Option<u32>,
 }
 
@@ -110,7 +110,7 @@ where
     let s: Option<String> = Option::deserialize(deserializer)?;
     match s.as_deref() {
         Some("valueOnly") => Ok(Some(EvictionPolicyType::VALUE_ONLY)),
-        Some("fullEviction") => Ok(Some(EvictionPolicyType::FULL_EVICTION)),
+        Some("fullEviction") => Ok(Some(EvictionPolicyType::FULL)),
         Some("nruEviction") => Ok(Some(EvictionPolicyType::NOT_RECENTLY_USED)),
         Some("noEviction") => Ok(Some(EvictionPolicyType::NO_EVICTION)),
         Some(other) => Ok(Some(EvictionPolicyType::other(other.to_string()))),

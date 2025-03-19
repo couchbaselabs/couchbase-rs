@@ -56,3 +56,33 @@ pub(crate) fn parse_optional_durability_level_to_memdx(
         _ => None,
     }
 }
+
+impl From<DurabilityLevel> for couchbase_core::mgmtx::bucket_settings::DurabilityLevel {
+    fn from(value: DurabilityLevel) -> Self {
+        match value {
+            DurabilityLevel::NONE => couchbase_core::mgmtx::bucket_settings::DurabilityLevel::NONE,
+            DurabilityLevel::MAJORITY => {
+                couchbase_core::mgmtx::bucket_settings::DurabilityLevel::MAJORITY
+            }
+            DurabilityLevel::MAJORITY_AND_PERSIST_ACTIVE => {
+                couchbase_core::mgmtx::bucket_settings::DurabilityLevel::MAJORITY_AND_PERSIST_ACTIVE
+            }
+            DurabilityLevel::PERSIST_TO_MAJORITY => {
+                couchbase_core::mgmtx::bucket_settings::DurabilityLevel::PERSIST_TO_MAJORITY
+            }
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl From<couchbase_core::mgmtx::bucket_settings::DurabilityLevel> for DurabilityLevel {
+    fn from(value: couchbase_core::mgmtx::bucket_settings::DurabilityLevel) -> Self {
+        match value {
+            couchbase_core::mgmtx::bucket_settings::DurabilityLevel::NONE => DurabilityLevel::NONE,
+            couchbase_core::mgmtx::bucket_settings::DurabilityLevel::MAJORITY => DurabilityLevel::MAJORITY,
+            couchbase_core::mgmtx::bucket_settings::DurabilityLevel::MAJORITY_AND_PERSIST_ACTIVE => DurabilityLevel::MAJORITY_AND_PERSIST_ACTIVE,
+            couchbase_core::mgmtx::bucket_settings::DurabilityLevel::PERSIST_TO_MAJORITY => DurabilityLevel::PERSIST_TO_MAJORITY,
+            _ => DurabilityLevel::other(value.to_string()),
+        }
+    }
+}

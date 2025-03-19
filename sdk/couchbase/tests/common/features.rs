@@ -1,6 +1,15 @@
 use crate::common::node_version::NodeVersion;
 use crate::common::test_config::TestCluster;
 
+const SERVER_VERSION_720: NodeVersion = NodeVersion {
+    major: 7,
+    minor: 2,
+    patch: 0,
+    build: 0,
+    edition: None,
+    modifier: None,
+};
+
 const SERVER_VERSION_722: NodeVersion = NodeVersion {
     major: 7,
     minor: 2,
@@ -30,6 +39,7 @@ pub enum TestFeatureCode {
     BucketManagement,
     CollectionNoExpiry,
     CollectionUpdates,
+    HistoryRetention,
 }
 
 impl TestCluster {
@@ -49,6 +59,7 @@ impl TestCluster {
                 !self.cluster_version.lower(&SERVER_VERSION_722)
                     && !self.cluster_version.equal(&SERVER_VERSION_722)
             }
+            TestFeatureCode::HistoryRetention => !self.cluster_version.lower(&SERVER_VERSION_720),
         }
     }
 }
