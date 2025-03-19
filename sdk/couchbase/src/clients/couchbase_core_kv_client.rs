@@ -1,4 +1,5 @@
 use crate::clients::agent_provider::CouchbaseAgentProvider;
+use crate::durability_level::parse_optional_durability_level_to_memdx;
 use crate::error;
 use crate::mutation_state::MutationToken;
 use crate::options::kv_binary_options::{
@@ -62,7 +63,9 @@ impl CouchbaseCoreKvClient {
                 )
                 .flags(flags)
                 .expiry(options.expiry.map(|e| e.as_millis() as u32))
-                .durability_level(options.durability_level.map(|l| l.into()))
+                .durability_level(parse_optional_durability_level_to_memdx(
+                    options.durability_level,
+                ))
                 .retry_strategy(
                     options
                         .retry_strategy
@@ -98,7 +101,9 @@ impl CouchbaseCoreKvClient {
                 )
                 .flags(flags)
                 .expiry(options.expiry.map(|e| e.as_millis() as u32))
-                .durability_level(options.durability_level.map(|l| l.into()))
+                .durability_level(parse_optional_durability_level_to_memdx(
+                    options.durability_level,
+                ))
                 .retry_strategy(
                     options
                         .retry_strategy
@@ -133,7 +138,9 @@ impl CouchbaseCoreKvClient {
                 )
                 .flags(flags)
                 .expiry(options.expiry.map(|e| e.as_millis() as u32))
-                .durability_level(options.durability_level.map(|l| l.into()))
+                .durability_level(parse_optional_durability_level_to_memdx(
+                    options.durability_level,
+                ))
                 .retry_strategy(
                     options
                         .retry_strategy
@@ -161,7 +168,9 @@ impl CouchbaseCoreKvClient {
                     &self.scope_name,
                     &self.collection_name,
                 )
-                .durability_level(options.durability_level.map(|l| l.into()))
+                .durability_level(parse_optional_durability_level_to_memdx(
+                    options.durability_level,
+                ))
                 .retry_strategy(
                     options
                         .retry_strategy
@@ -333,7 +342,9 @@ impl CouchbaseCoreKvClient {
                     &self.collection_name,
                     value,
                 )
-                .durability_level(options.durability_level.map(|l| l.into()))
+                .durability_level(parse_optional_durability_level_to_memdx(
+                    options.durability_level,
+                ))
                 .retry_strategy(
                     options
                         .retry_strategy
@@ -365,7 +376,9 @@ impl CouchbaseCoreKvClient {
                     &self.collection_name,
                     value,
                 )
-                .durability_level(options.durability_level.map(|l| l.into()))
+                .durability_level(parse_optional_durability_level_to_memdx(
+                    options.durability_level,
+                ))
                 .retry_strategy(
                     options
                         .retry_strategy
@@ -395,7 +408,9 @@ impl CouchbaseCoreKvClient {
                     &self.scope_name,
                     &self.collection_name,
                 )
-                .durability_level(options.durability_level.map(|l| l.into()))
+                .durability_level(parse_optional_durability_level_to_memdx(
+                    options.durability_level,
+                ))
                 .retry_strategy(
                     options
                         .retry_strategy
@@ -429,7 +444,9 @@ impl CouchbaseCoreKvClient {
                     &self.scope_name,
                     &self.collection_name,
                 )
-                .durability_level(options.durability_level.map(|l| l.into()))
+                .durability_level(parse_optional_durability_level_to_memdx(
+                    options.durability_level,
+                ))
                 .retry_strategy(
                     options
                         .retry_strategy

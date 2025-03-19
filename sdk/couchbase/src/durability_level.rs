@@ -1,49 +1,58 @@
-use serde::Serialize;
+use std::fmt::Display;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase")]
-#[non_exhaustive]
-pub enum DurabilityLevel {
+#[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
+pub struct DurabilityLevel(InnerDurabilityLevel);
+
+impl DurabilityLevel {
+    pub const NONE: DurabilityLevel = DurabilityLevel(InnerDurabilityLevel::None);
+
+    pub const MAJORITY: DurabilityLevel = DurabilityLevel(InnerDurabilityLevel::Majority);
+
+    pub const MAJORITY_AND_PERSIST_ACTIVE: DurabilityLevel =
+        DurabilityLevel(InnerDurabilityLevel::MajorityAndPersistActive);
+
+    pub const PERSIST_TO_MAJORITY: DurabilityLevel =
+        DurabilityLevel(InnerDurabilityLevel::PersistToMajority);
+
+    pub(crate) fn other(val: String) -> DurabilityLevel {
+        DurabilityLevel(InnerDurabilityLevel::Other(val))
+    }
+}
+
+impl Display for DurabilityLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.0 {
+            InnerDurabilityLevel::None => write!(f, "none"),
+            InnerDurabilityLevel::Majority => write!(f, "majority"),
+            InnerDurabilityLevel::MajorityAndPersistActive => write!(f, "majorityAndPersistActive"),
+            InnerDurabilityLevel::PersistToMajority => write!(f, "persistToMajority"),
+            InnerDurabilityLevel::Other(val) => write!(f, "unknown({})", val),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
+pub(crate) enum InnerDurabilityLevel {
+    None,
     Majority,
-    MajorityAndPersistToActive,
+    MajorityAndPersistActive,
     PersistToMajority,
+    Other(String),
 }
 
-impl From<DurabilityLevel> for couchbase_core::memdx::durability_level::DurabilityLevel {
-    fn from(value: DurabilityLevel) -> Self {
-        match value {
-            DurabilityLevel::Majority => {
-                couchbase_core::memdx::durability_level::DurabilityLevel::Majority
-            }
-            DurabilityLevel::MajorityAndPersistToActive => {
-                couchbase_core::memdx::durability_level::DurabilityLevel::MajorityAndPersistToActive
-            }
-            DurabilityLevel::PersistToMajority => {
-                couchbase_core::memdx::durability_level::DurabilityLevel::PersistToMajority
-            }
+pub(crate) fn parse_optional_durability_level_to_memdx(
+    durability_level: Option<DurabilityLevel>,
+) -> Option<couchbase_core::memdx::durability_level::DurabilityLevel> {
+    match durability_level {
+        Some(DurabilityLevel(InnerDurabilityLevel::Majority)) => {
+            Some(couchbase_core::memdx::durability_level::DurabilityLevel::MAJORITY)
         }
-    }
-}
-
-impl TryFrom<&str> for DurabilityLevel {
-    type Error = crate::error::Error;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        match value {
-            "majority" => Ok(DurabilityLevel::Majority),
-            "majorityAndPersistToActive" => Ok(DurabilityLevel::MajorityAndPersistToActive),
-            "persistToMajority" => Ok(DurabilityLevel::PersistToMajority),
-            _ => Err(Self::Error {
-                msg: "unknown durability level".to_string(),
-            }),
+        Some(DurabilityLevel(InnerDurabilityLevel::MajorityAndPersistActive)) => Some(
+            couchbase_core::memdx::durability_level::DurabilityLevel::MAJORITY_AND_PERSIST_ACTIVE,
+        ),
+        Some(DurabilityLevel(InnerDurabilityLevel::PersistToMajority)) => {
+            Some(couchbase_core::memdx::durability_level::DurabilityLevel::PERSIST_TO_MAJORITY)
         }
-    }
-}
-
-impl TryFrom<String> for DurabilityLevel {
-    type Error = crate::error::Error;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        Self::try_from(value.as_str())
+        _ => None,
     }
 }
