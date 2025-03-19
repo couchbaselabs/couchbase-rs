@@ -2,9 +2,7 @@ use crate::cbconfig::{CollectionManifest, TerseConfig};
 use crate::httpx::client::Client;
 use crate::httpx::request::{Auth, BasicAuth, OnBehalfOfInfo, Request};
 use crate::httpx::response::Response;
-use crate::mgmtx::bucket_settings::{
-    encode_bucket_settings, encode_mutable_bucket_settings, BucketDef,
-};
+use crate::mgmtx::bucket_settings::{encode_bucket_settings, BucketDef};
 use crate::mgmtx::bucket_settings_json::BucketSettingsJson;
 use crate::mgmtx::error;
 use crate::mgmtx::options::{
@@ -486,7 +484,7 @@ impl<C: Client> Management<C> {
             // Serializer is not Send so we need to drop it before making the request.
             let mut form = url::form_urlencoded::Serializer::new(String::new());
             form.append_pair("name", opts.bucket_name);
-            encode_bucket_settings(&mut form, opts.bucket_settings)?;
+            encode_bucket_settings(&mut form, opts.bucket_settings);
 
             Bytes::from(form.finish())
         };
@@ -513,7 +511,7 @@ impl<C: Client> Management<C> {
         let body = {
             // Serializer is not Send so we need to drop it before making the request.
             let mut form = url::form_urlencoded::Serializer::new(String::new());
-            encode_mutable_bucket_settings(&mut form, opts.bucket_settings);
+            encode_bucket_settings(&mut form, opts.bucket_settings);
 
             Bytes::from(form.finish())
         };

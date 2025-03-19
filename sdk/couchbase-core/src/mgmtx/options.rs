@@ -1,6 +1,6 @@
 use crate::httpx::client::Client;
 use crate::httpx::request::OnBehalfOfInfo;
-use crate::mgmtx::bucket_settings::{BucketSettings, MutableBucketSettings};
+use crate::mgmtx::bucket_settings::BucketSettings;
 use crate::mgmtx::node_target::NodeTarget;
 use std::sync::Arc;
 
@@ -103,7 +103,7 @@ pub struct CreateBucketOptions<'a> {
 pub struct UpdateBucketOptions<'a> {
     pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
     pub bucket_name: &'a str,
-    pub bucket_settings: &'a MutableBucketSettings,
+    pub bucket_settings: &'a BucketSettings,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]

@@ -5,7 +5,7 @@ use crate::common::consistency_utils::{
 use crate::common::features::TestFeatureCode;
 use crate::common::test_config::run_test;
 use crate::common::{generate_string_value, try_until};
-use couchbase::collections_manager::{
+use couchbase::collection_manager::{
     CreateCollectionSettings, MaxExpiryValue, UpdateCollectionSettings,
 };
 use std::time::Duration;

@@ -1,6 +1,6 @@
 use crate::clients::collections_mgmt_client::CollectionsMgmtClient;
 use crate::error;
-use crate::options::collections_mgmt_options::*;
+use crate::options::collection_mgmt_options::*;
 use crate::results::collections_mgmt_results::ScopeSpec;
 use std::sync::Arc;
 use std::time::Duration;

@@ -5,6 +5,9 @@ use crate::clients::analytics_client::{
 use crate::clients::bucket_client::{
     BucketClient, BucketClientBackend, Couchbase2BucketClient, CouchbaseBucketClient,
 };
+use crate::clients::bucket_mgmt_client::{
+    BucketMgmtClient, BucketMgmtClientBackend, CouchbaseBucketMgmtClient,
+};
 use crate::clients::query_client::{CouchbaseQueryClient, QueryClient, QueryClientBackend};
 use crate::clients::search_client::{CouchbaseSearchClient, SearchClient, SearchClientBackend};
 use crate::error;
@@ -67,6 +70,21 @@ impl ClusterClient {
                 let bucket_client = backend.bucket(name);
 
                 BucketClient::new(BucketClientBackend::Couchbase2BucketBackend(bucket_client))
+            }
+        }
+    }
+
+    pub fn buckets_client(&self) -> BucketMgmtClient {
+        match &self.backend {
+            ClusterClientBackend::CouchbaseClusterBackend(backend) => {
+                let bucket_client = backend.buckets();
+
+                BucketMgmtClient::new(BucketMgmtClientBackend::CouchbaseBucketMgmtClientBackend(
+                    bucket_client,
+                ))
+            }
+            ClusterClientBackend::Couchbase2ClusterBackend(_backend) => {
+                unimplemented!()
             }
         }
     }
@@ -184,6 +202,15 @@ impl CouchbaseClusterBackend {
         CouchbaseBucketClient::new(
             CouchbaseAgentProvider::with_bucket(self.agent_manager.clone(), name.clone()),
             name,
+            self.default_retry_strategy.clone(),
+        )
+    }
+
+    fn buckets(&self) -> CouchbaseBucketMgmtClient {
+        let agent = self.agent_manager.get_cluster_agent();
+
+        CouchbaseBucketMgmtClient::new(
+            CouchbaseAgentProvider::with_agent(agent.clone()),
             self.default_retry_strategy.clone(),
         )
     }

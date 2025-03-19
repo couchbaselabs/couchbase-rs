@@ -166,7 +166,7 @@ impl AgentInner {
         {
             error!(
                 "Failed to reconfigure connection manager (old clients); {}",
-                e.to_string()
+                e
             );
         };
 
@@ -177,10 +177,7 @@ impl AgentInner {
             .cfg_watcher
             .reconfigure(agent_component_configs.config_watcher_memd_config)
         {
-            error!(
-                "Failed to reconfigure memd config watcher component; {}",
-                e.to_string()
-            );
+            error!("Failed to reconfigure memd config watcher component; {}", e);
         }
 
         if let Err(e) = self
@@ -193,7 +190,7 @@ impl AgentInner {
         {
             error!(
                 "Failed to reconfigure connection manager (updated clients); {}",
-                e.to_string()
+                e,
             );
         }
 
@@ -201,7 +198,7 @@ impl AgentInner {
             .http_client
             .reconfigure(agent_component_configs.http_client_config)
         {
-            error!("Failed to reconfigure http client: {}", e.to_string());
+            error!("Failed to reconfigure http client: {}", e);
         }
 
         self.query.reconfigure(agent_component_configs.query_config);

@@ -41,7 +41,7 @@ jobs:
                 version: ${{ matrix.server }}
                 services: [kv, n1ql, index, fts, cbas]
             docker:
-              kv-memory: 512
+              kv-memory: 2048
         run: |
           CBDC_ID=$(cbdinocluster -v alloc --def="${CLUSTERCONFIG}")
           cbdinocluster -v buckets add ${CBDC_ID} default --ram-quota-mb=100 --flush-enabled=true --num-replicas=2

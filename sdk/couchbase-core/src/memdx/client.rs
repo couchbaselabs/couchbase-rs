@@ -217,7 +217,7 @@ impl Client {
                                     drop(requests);
                                 }
                                 Err(e) => {
-                                    warn!("{} failed to read frame {}", opts.client_id, e.to_string());
+                                    warn!("{} failed to read frame {}", opts.client_id, e);
                                 }
                             }
                         }

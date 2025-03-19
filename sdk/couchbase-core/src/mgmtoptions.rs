@@ -1,6 +1,6 @@
 use crate::httpx::request::OnBehalfOfInfo;
 use crate::mgmtx;
-use crate::mgmtx::bucket_settings::{BucketSettings, MutableBucketSettings};
+use crate::mgmtx::bucket_settings::BucketSettings;
 use crate::retry::{RetryStrategy, DEFAULT_RETRY_STRATEGY};
 use std::sync::Arc;
 
@@ -438,13 +438,13 @@ impl<'a> From<&CreateBucketOptions<'a>> for mgmtx::options::CreateBucketOptions<
 pub struct UpdateBucketOptions<'a> {
     pub(crate) on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
     pub(crate) bucket_name: &'a str,
-    pub(crate) bucket_settings: &'a MutableBucketSettings,
+    pub(crate) bucket_settings: &'a BucketSettings,
 
     pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> UpdateBucketOptions<'a> {
-    pub fn new(bucket_name: &'a str, bucket_settings: &'a MutableBucketSettings) -> Self {
+    pub fn new(bucket_name: &'a str, bucket_settings: &'a BucketSettings) -> Self {
         Self {
             on_behalf_of_info: None,
             bucket_name,
@@ -505,6 +505,44 @@ impl<'a> DeleteBucketOptions<'a> {
 
 impl<'a> From<&DeleteBucketOptions<'a>> for mgmtx::options::DeleteBucketOptions<'a> {
     fn from(opts: &DeleteBucketOptions<'a>) -> Self {
+        Self {
+            on_behalf_of_info: opts.on_behalf_of_info,
+            bucket_name: opts.bucket_name,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct FlushBucketOptions<'a> {
+    pub(crate) on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+    pub(crate) bucket_name: &'a str,
+
+    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
+}
+
+impl<'a> FlushBucketOptions<'a> {
+    pub fn new(bucket_name: &'a str) -> Self {
+        Self {
+            on_behalf_of_info: None,
+            bucket_name,
+            retry_strategy: DEFAULT_RETRY_STRATEGY.clone(),
+        }
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = retry_strategy;
+        self
+    }
+
+    pub fn on_behalf_of_info(mut self, on_behalf_of_info: &'a OnBehalfOfInfo) -> Self {
+        self.on_behalf_of_info = Some(on_behalf_of_info);
+        self
+    }
+}
+
+impl<'a> From<&FlushBucketOptions<'a>> for mgmtx::options::FlushBucketOptions<'a> {
+    fn from(opts: &FlushBucketOptions<'a>) -> Self {
         Self {
             on_behalf_of_info: opts.on_behalf_of_info,
             bucket_name: opts.bucket_name,

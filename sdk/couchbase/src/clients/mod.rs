@@ -1,6 +1,7 @@
-mod agent_provider;
+pub mod agent_provider;
 pub mod analytics_client;
 pub mod bucket_client;
+pub mod bucket_mgmt_client;
 pub mod cluster_client;
 pub mod collection_client;
 pub mod collections_mgmt_client;

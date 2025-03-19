@@ -188,7 +188,7 @@ impl TlsConnection {
         .map_err(|e| {
             Error::new_connection_failed_error(
                 "failed to upgrade tcp stream to tls",
-                Box::new(io::Error::new(io::ErrorKind::Other, e)),
+                Box::new(io::Error::other(e)),
             )
         })?;
 
