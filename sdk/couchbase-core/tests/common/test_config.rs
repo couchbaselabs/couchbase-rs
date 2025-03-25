@@ -1,15 +1,23 @@
+use std::env;
+use std::future::Future;
 use std::io::Write;
-use std::sync::Arc;
+use std::ops::{Deref, DerefMut};
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering::SeqCst;
+use std::sync::LazyLock;
 
+use crate::common::default_agent_options;
+use couchbase_connstr::ResolvedConnSpec;
+use couchbase_core::agent::Agent;
 use envconfig::Envconfig;
-use futures::executor::block_on;
 use lazy_static::lazy_static;
-use log::{trace, LevelFilter};
-use tokio::runtime::{Handle, Runtime};
-use tokio::sync::Mutex;
+use log::LevelFilter;
+use tokio::runtime::Runtime;
+use tokio::sync::RwLock;
 
 lazy_static! {
-    pub static ref TEST_CONFIG: Mutex<Option<Arc<TestConfig>>> = Mutex::new(None);
+    pub static ref TEST_AGENT: RwLock<Option<TestAgent>> = RwLock::new(None);
+    pub static ref LOGGER_INITIATED: AtomicBool = AtomicBool::new(false);
 }
 
 #[derive(Debug, Clone, Envconfig)]
@@ -31,101 +39,171 @@ pub struct EnvTestConfig {
 }
 
 #[derive(Debug, Clone)]
-pub struct TestConfig {
+pub struct TestSetupConfig {
     pub username: String,
     pub password: String,
     pub memd_addrs: Vec<String>,
-    pub default_bucket: String,
-    pub default_scope: String,
-    pub default_collection: String,
     pub data_timeout: String,
     pub use_ssl: bool,
+    pub bucket: String,
+    pub scope: String,
+    pub collection: String,
+    pub resolved_conn_spec: ResolvedConnSpec,
 }
 
-pub async fn setup_tests() {
-    let mut config = TEST_CONFIG.lock().await;
-
-    if config.is_none() {
-        env_logger::Builder::new()
-            .format(|buf, record| {
-                writeln!(
-                    buf,
-                    "{}:{} {} [{}] - {}",
-                    record.file().unwrap_or("unknown"),
-                    record.line().unwrap_or(0),
-                    chrono::Local::now().format("%Y-%m-%dT%H:%M:%S%.3f"),
-                    record.level(),
-                    record.args()
-                )
-            })
-            .filter(Some("rustls"), LevelFilter::Warn)
-            .filter_level(LevelFilter::Trace)
-            .init();
-        let test_config = EnvTestConfig::init_from_env().unwrap();
-
-        // TODO: Once we have connection string parsing in place this should go away.
-        let conn_spec = couchbase_connstr::parse(test_config.conn_string).unwrap();
-        let resolved = couchbase_connstr::resolve(conn_spec).await.unwrap();
-
-        *config = Some(Arc::new(TestConfig {
-            username: test_config.username,
-            password: test_config.password,
-            memd_addrs: resolved.memd_hosts.iter().map(|h| h.to_string()).collect(),
-            default_bucket: test_config.default_bucket,
-            default_scope: test_config.default_scope,
-            default_collection: test_config.default_collection,
-            data_timeout: test_config.data_timeout,
-            use_ssl: resolved.use_ssl,
-        }));
-
-        trace!("{:?}", &config);
+impl TestSetupConfig {
+    pub async fn setup_agent(&self) -> Agent {
+        Agent::new(default_agent_options::create_default_options(self.clone()).await)
+            .await
+            .unwrap()
     }
 }
 
-pub async fn test_username() -> String {
-    let guard = TEST_CONFIG.lock().await;
-    let config = guard.clone().unwrap();
-    config.username.clone()
+#[derive(Clone)]
+pub struct TestAgent {
+    pub test_setup_config: TestSetupConfig,
+    agent: Agent,
 }
 
-pub async fn test_password() -> String {
-    let guard = TEST_CONFIG.lock().await;
-    let config = guard.clone().unwrap();
-    config.password.clone()
+impl Deref for TestAgent {
+    type Target = Agent;
+
+    fn deref(&self) -> &Self::Target {
+        &self.agent
+    }
 }
 
-pub async fn test_mem_addrs() -> Vec<String> {
-    let guard = TEST_CONFIG.lock().await;
-    let config = guard.clone().unwrap();
-    config.memd_addrs.clone()
+impl DerefMut for TestAgent {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.agent
+    }
 }
 
-pub async fn test_bucket() -> String {
-    let guard = TEST_CONFIG.lock().await;
-    let config = guard.clone().unwrap();
-    config.default_bucket.clone()
+static RUNTIME: LazyLock<Runtime> = LazyLock::new(|| {
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+});
+
+pub fn run_test<T, Fut>(test: T)
+where
+    T: FnOnce(TestAgent) -> Fut,
+    Fut: Future<Output = ()>,
+{
+    RUNTIME.block_on(async {
+        let mut config = TEST_AGENT.write().await;
+
+        if let Some(agent) = config.deref() {
+            let agent = agent.clone();
+            drop(config);
+            test(agent).await;
+            return;
+        }
+
+        if LOGGER_INITIATED
+            .compare_exchange(false, true, SeqCst, SeqCst)
+            .unwrap_or(false)
+        {
+            env_logger::Builder::new()
+                .format(|buf, record| {
+                    writeln!(
+                        buf,
+                        "{}:{} {} [{}] - {}",
+                        record.file().unwrap_or("unknown"),
+                        record.line().unwrap_or(0),
+                        chrono::Local::now().format("%Y-%m-%dT%H:%M:%S"),
+                        record.level(),
+                        record.args()
+                    )
+                })
+                .filter(Some("rustls"), LevelFilter::Warn)
+                .filter_level(
+                    env::var("RUST_LOG")
+                        .unwrap_or("TRACE".to_string())
+                        .parse()
+                        .unwrap(),
+                )
+                .init();
+        }
+
+        let test_agent = create_test_agent().await;
+
+        *config = Some(test_agent.clone());
+        drop(config);
+
+        test(test_agent).await;
+    });
 }
 
-pub async fn test_scope() -> String {
-    let guard = TEST_CONFIG.lock().await;
-    let config = guard.clone().unwrap();
-    config.default_scope.clone()
+pub fn setup_test<T, Fut>(test: T)
+where
+    T: FnOnce(TestSetupConfig) -> Fut,
+    Fut: Future<Output = ()>,
+{
+    RUNTIME.block_on(async {
+        if LOGGER_INITIATED
+            .compare_exchange(false, true, SeqCst, SeqCst)
+            .unwrap_or(false)
+        {
+            env_logger::Builder::new()
+                .format(|buf, record| {
+                    writeln!(
+                        buf,
+                        "{}:{} {} [{}] - {}",
+                        record.file().unwrap_or("unknown"),
+                        record.line().unwrap_or(0),
+                        chrono::Local::now().format("%Y-%m-%dT%H:%M:%S"),
+                        record.level(),
+                        record.args()
+                    )
+                })
+                .filter(Some("rustls"), LevelFilter::Warn)
+                .filter_level(
+                    env::var("RUST_LOG")
+                        .unwrap_or("TRACE".to_string())
+                        .parse()
+                        .unwrap(),
+                )
+                .init();
+        }
+
+        let test_config = EnvTestConfig::init_from_env().unwrap();
+        test(create_test_config(&test_config).await).await;
+    });
 }
 
-pub async fn test_collection() -> String {
-    let guard = TEST_CONFIG.lock().await;
-    let config = guard.clone().unwrap();
-    config.default_collection.clone()
+pub async fn create_test_config(test_config: &EnvTestConfig) -> TestSetupConfig {
+    let conn_spec = couchbase_connstr::parse(&test_config.conn_string).unwrap();
+
+    let resolved_conn_spec = couchbase_connstr::resolve(conn_spec).await.unwrap();
+
+    TestSetupConfig {
+        username: test_config.username.clone(),
+        password: test_config.password.clone(),
+        memd_addrs: resolved_conn_spec
+            .memd_hosts
+            .iter()
+            .map(|h| h.to_string())
+            .collect(),
+        data_timeout: test_config.data_timeout.clone(),
+        use_ssl: resolved_conn_spec.use_ssl,
+        bucket: test_config.default_bucket.clone(),
+        scope: test_config.default_scope.clone(),
+        collection: test_config.default_collection.clone(),
+        resolved_conn_spec,
+    }
 }
 
-pub async fn test_data_timeout() -> String {
-    let guard = TEST_CONFIG.lock().await;
-    let config = guard.clone().unwrap();
-    config.data_timeout.clone()
-}
+pub async fn create_test_agent() -> TestAgent {
+    let test_config = EnvTestConfig::init_from_env().unwrap();
 
-pub async fn test_is_ssl() -> bool {
-    let guard = TEST_CONFIG.lock().await;
-    let config = guard.clone().unwrap();
-    config.use_ssl
+    let test_setup_config = create_test_config(&test_config).await;
+
+    let agent = test_setup_config.setup_agent().await;
+
+    TestAgent {
+        test_setup_config,
+        agent,
+    }
 }

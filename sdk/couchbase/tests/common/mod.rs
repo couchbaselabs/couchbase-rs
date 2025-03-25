@@ -33,8 +33,7 @@ where
     Fut: std::future::Future<Output = Result<Option<T>, couchbase::error::Error>>,
 {
     while Instant::now() < deadline {
-        let res = f().await.unwrap();
-        if let Some(r) = res {
+        if let Ok(Some(r)) = f().await {
             return r;
         }
         tokio::time::sleep(sleep).await;
