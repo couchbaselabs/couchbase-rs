@@ -1,4 +1,4 @@
-use crate::common::test_config::TEST_CONFIG;
+use crate::common::test_config::TestSetupConfig;
 use couchbase_core::agentoptions::{AgentOptions, SeedConfig};
 use couchbase_core::authenticator::{Authenticator, PasswordAuthenticator};
 #[cfg(feature = "rustls-tls")]
@@ -8,11 +8,7 @@ use {
     tokio_rustls::rustls::crypto::CryptoProvider,
 };
 
-pub async fn create_default_options() -> AgentOptions {
-    let guard = TEST_CONFIG.lock().await;
-    let config = guard.clone().unwrap();
-    drop(guard);
-
+pub async fn create_default_options(config: TestSetupConfig) -> AgentOptions {
     let tls_config = if config.use_ssl {
         #[cfg(feature = "native-tls")]
         {
@@ -34,14 +30,10 @@ pub async fn create_default_options() -> AgentOptions {
         }),
     )
     .tls_config(tls_config)
-    .bucket_name(config.default_bucket.clone())
+    .bucket_name(config.bucket.clone())
 }
 
-pub async fn create_options_without_bucket() -> AgentOptions {
-    let guard = TEST_CONFIG.lock().await;
-    let config = guard.clone().unwrap();
-    drop(guard);
-
+pub async fn create_options_without_bucket(config: TestSetupConfig) -> AgentOptions {
     let tls_config = if config.use_ssl {
         #[cfg(feature = "native-tls")]
         {

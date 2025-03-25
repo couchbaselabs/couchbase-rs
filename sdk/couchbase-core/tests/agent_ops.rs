@@ -5,7 +5,7 @@ use crate::common::helpers::{
     create_collection_and_wait_for_kv, delete_collection_and_wait_for_kv, generate_bytes_value,
     generate_key, is_memdx_error,
 };
-use crate::common::test_config::{setup_tests, test_bucket, test_is_ssl, test_scope};
+use crate::common::test_config::{run_test, setup_test};
 use crate::common::try_until;
 use couchbase_core::agent::Agent;
 use couchbase_core::crudoptions::{
@@ -31,398 +31,353 @@ mod common;
 #[global_allocator]
 static ALLOC: dhat::Alloc = dhat::Alloc;
 
-#[tokio::test]
-async fn test_upsert_and_get() {
-    setup_tests().await;
+#[test]
+fn test_upsert_and_get() {
+    run_test(async |mut agent| {
+        let strat = Arc::new(BestEffortRetryStrategy::new(
+            ExponentialBackoffCalculator::default(),
+        ));
 
-    let agent_opts = create_default_options().await;
+        let key = generate_key();
+        let value = generate_bytes_value(32);
 
-    let mut agent = Agent::new(agent_opts).await.unwrap();
+        let upsert_opts = UpsertOptions::new(key.as_slice(), "", "", value.as_slice())
+            .retry_strategy(strat.clone());
 
-    let strat = Arc::new(BestEffortRetryStrategy::new(
-        ExponentialBackoffCalculator::default(),
-    ));
+        let upsert_result = agent.upsert(upsert_opts).await.unwrap();
 
-    let key = generate_key();
-    let value = generate_bytes_value(32);
+        assert_ne!(0, upsert_result.cas);
+        assert!(upsert_result.mutation_token.is_some());
 
-    let upsert_opts =
-        UpsertOptions::new(key.as_slice(), "", "", value.as_slice()).retry_strategy(strat.clone());
+        let get_result = agent
+            .get(GetOptions::new(&key, "", "").retry_strategy(strat))
+            .await
+            .unwrap();
 
-    let upsert_result = agent.upsert(upsert_opts).await.unwrap();
-
-    assert_ne!(0, upsert_result.cas);
-    assert!(upsert_result.mutation_token.is_some());
-
-    let get_result = agent
-        .get(GetOptions::new(&key, "", "").retry_strategy(strat))
-        .await
-        .unwrap();
-
-    assert_eq!(value, get_result.value);
-    assert_eq!(upsert_result.cas, get_result.cas);
-
-    agent.close().await;
+        assert_eq!(value, get_result.value);
+        assert_eq!(upsert_result.cas, get_result.cas);
+    });
 }
 
-#[tokio::test]
-async fn test_add_and_delete() {
-    setup_tests().await;
+#[test]
+fn test_add_and_delete() {
+    run_test(async |mut agent| {
+        let strat = Arc::new(BestEffortRetryStrategy::new(
+            ExponentialBackoffCalculator::default(),
+        ));
 
-    let agent_opts = create_default_options().await;
+        let key = generate_key();
+        let value = generate_bytes_value(32);
 
-    let mut agent = Agent::new(agent_opts).await.unwrap();
+        let add_opts =
+            AddOptions::new(key.as_slice(), "", "", value.as_slice()).retry_strategy(strat.clone());
 
-    let strat = Arc::new(BestEffortRetryStrategy::new(
-        ExponentialBackoffCalculator::default(),
-    ));
+        let add_result = agent.add(add_opts.clone()).await.unwrap();
 
-    let key = generate_key();
-    let value = generate_bytes_value(32);
+        assert_ne!(0, add_result.cas);
+        assert!(add_result.mutation_token.is_some());
 
-    let add_opts =
-        AddOptions::new(key.as_slice(), "", "", value.as_slice()).retry_strategy(strat.clone());
+        let add_result = agent.add(add_opts.clone()).await;
 
-    let add_result = agent.add(add_opts.clone()).await.unwrap();
+        assert!(is_memdx_error(&add_result.err().unwrap())
+            .unwrap()
+            .is_server_error_kind(ServerErrorKind::KeyExists));
 
-    assert_ne!(0, add_result.cas);
-    assert!(add_result.mutation_token.is_some());
+        let delete_result = agent
+            .delete(DeleteOptions::new(&key, "", "").retry_strategy(strat))
+            .await
+            .unwrap();
 
-    let add_result = agent.add(add_opts.clone()).await;
+        assert_ne!(0, delete_result.cas);
+        assert!(delete_result.mutation_token.is_some());
 
-    assert!(is_memdx_error(&add_result.err().unwrap())
-        .unwrap()
-        .is_server_error_kind(ServerErrorKind::KeyExists));
+        let add_result = agent.add(add_opts).await.unwrap();
 
-    let delete_result = agent
-        .delete(DeleteOptions::new(&key, "", "").retry_strategy(strat))
-        .await
-        .unwrap();
-
-    assert_ne!(0, delete_result.cas);
-    assert!(delete_result.mutation_token.is_some());
-
-    let add_result = agent.add(add_opts).await.unwrap();
-
-    assert_ne!(0, add_result.cas);
-    assert!(add_result.mutation_token.is_some());
-
-    agent.close().await;
+        assert_ne!(0, add_result.cas);
+        assert!(add_result.mutation_token.is_some());
+    });
 }
 
-#[tokio::test]
-async fn test_replace() {
-    setup_tests().await;
+#[test]
+fn test_replace() {
+    run_test(async |mut agent| {
+        let strat = Arc::new(BestEffortRetryStrategy::new(
+            ExponentialBackoffCalculator::default(),
+        ));
 
-    let agent_opts = create_default_options().await;
+        let key = generate_key();
+        let value = generate_bytes_value(32);
 
-    let mut agent = Agent::new(agent_opts).await.unwrap();
+        let upsert_opts = UpsertOptions::new(key.as_slice(), "", "", value.as_slice())
+            .retry_strategy(strat.clone());
 
-    let strat = Arc::new(BestEffortRetryStrategy::new(
-        ExponentialBackoffCalculator::default(),
-    ));
+        let upsert_result = agent.upsert(upsert_opts).await.unwrap();
 
-    let key = generate_key();
-    let value = generate_bytes_value(32);
+        assert_ne!(0, upsert_result.cas);
+        assert!(upsert_result.mutation_token.is_some());
 
-    let upsert_opts =
-        UpsertOptions::new(key.as_slice(), "", "", value.as_slice()).retry_strategy(strat.clone());
+        let new_value = generate_bytes_value(32);
 
-    let upsert_result = agent.upsert(upsert_opts).await.unwrap();
+        let replace_result = agent
+            .replace(
+                ReplaceOptions::new(&key, "", "", new_value.as_slice())
+                    .retry_strategy(strat.clone()),
+            )
+            .await
+            .unwrap();
 
-    assert_ne!(0, upsert_result.cas);
-    assert!(upsert_result.mutation_token.is_some());
+        assert_ne!(0, replace_result.cas);
+        assert!(replace_result.mutation_token.is_some());
 
-    let new_value = generate_bytes_value(32);
+        let get_result = agent
+            .get(GetOptions::new(&key, "", "").retry_strategy(strat.clone()))
+            .await
+            .unwrap();
 
-    let replace_result = agent
-        .replace(
-            ReplaceOptions::new(&key, "", "", new_value.as_slice()).retry_strategy(strat.clone()),
-        )
-        .await
-        .unwrap();
-
-    assert_ne!(0, replace_result.cas);
-    assert!(replace_result.mutation_token.is_some());
-
-    let get_result = agent
-        .get(GetOptions::new(&key, "", "").retry_strategy(strat.clone()))
-        .await
-        .unwrap();
-
-    assert_eq!(new_value, get_result.value);
-    assert_eq!(replace_result.cas, get_result.cas);
-
-    agent.close().await;
+        assert_eq!(new_value, get_result.value);
+        assert_eq!(replace_result.cas, get_result.cas);
+    });
 }
 
-#[tokio::test]
-async fn test_lock_unlock() {
-    setup_tests().await;
+#[test]
+fn test_lock_unlock() {
+    run_test(async |mut agent| {
+        let strat = Arc::new(BestEffortRetryStrategy::new(
+            ExponentialBackoffCalculator::default(),
+        ));
 
-    let agent_opts = create_default_options().await;
+        let key = generate_key();
+        let value = generate_bytes_value(32);
 
-    let mut agent = Agent::new(agent_opts).await.unwrap();
+        let upsert_opts = UpsertOptions::new(key.as_slice(), "", "", value.as_slice())
+            .retry_strategy(strat.clone());
 
-    let strat = Arc::new(BestEffortRetryStrategy::new(
-        ExponentialBackoffCalculator::default(),
-    ));
+        let upsert_result = agent.upsert(upsert_opts).await.unwrap();
 
-    let key = generate_key();
-    let value = generate_bytes_value(32);
+        assert_ne!(0, upsert_result.cas);
+        assert!(upsert_result.mutation_token.is_some());
 
-    let upsert_opts =
-        UpsertOptions::new(key.as_slice(), "", "", value.as_slice()).retry_strategy(strat.clone());
+        let get_result = agent
+            .get(GetOptions::new(&key, "", "").retry_strategy(strat.clone()))
+            .await
+            .unwrap();
 
-    let upsert_result = agent.upsert(upsert_opts).await.unwrap();
+        let cas = get_result.cas;
 
-    assert_ne!(0, upsert_result.cas);
-    assert!(upsert_result.mutation_token.is_some());
+        let unlock_result = agent
+            .unlock(
+                UnlockOptions::new(key.as_slice(), "", "", cas)
+                    .retry_strategy(Arc::new(FailFastRetryStrategy::default())),
+            )
+            .await
+            .err()
+            .unwrap();
 
-    let get_result = agent
-        .get(GetOptions::new(&key, "", "").retry_strategy(strat.clone()))
-        .await
-        .unwrap();
+        let memdx_err = is_memdx_error(&unlock_result).unwrap();
+        assert!(
+            memdx_err.is_server_error_kind(ServerErrorKind::NotLocked)
+                || memdx_err.is_server_error_kind(ServerErrorKind::TmpFail)
+        );
 
-    let cas = get_result.cas;
+        let get_and_lock_result = agent
+            .get_and_lock(
+                GetAndLockOptions::new(key.as_slice(), "", "", 10).retry_strategy(strat.clone()),
+            )
+            .await
+            .unwrap();
 
-    let unlock_result = agent
-        .unlock(
-            UnlockOptions::new(key.as_slice(), "", "", cas)
-                .retry_strategy(Arc::new(FailFastRetryStrategy::default())),
-        )
-        .await
-        .err()
-        .unwrap();
+        let cas = get_and_lock_result.cas;
+        assert_eq!(value, get_and_lock_result.value);
 
-    let memdx_err = is_memdx_error(&unlock_result).unwrap();
-    assert!(
-        memdx_err.is_server_error_kind(ServerErrorKind::NotLocked)
-            || memdx_err.is_server_error_kind(ServerErrorKind::TmpFail)
-    );
+        let unlock_result = agent
+            .unlock(UnlockOptions::new(key.as_slice(), "", "", cas).retry_strategy(strat.clone()))
+            .await;
 
-    let get_and_lock_result = agent
-        .get_and_lock(
-            GetAndLockOptions::new(key.as_slice(), "", "", 10).retry_strategy(strat.clone()),
-        )
-        .await
-        .unwrap();
-
-    let cas = get_and_lock_result.cas;
-    assert_eq!(value, get_and_lock_result.value);
-
-    let unlock_result = agent
-        .unlock(UnlockOptions::new(key.as_slice(), "", "", cas).retry_strategy(strat.clone()))
-        .await;
-
-    assert!(unlock_result.is_ok());
-
-    agent.close().await;
+        assert!(unlock_result.is_ok());
+    });
 }
 
-#[tokio::test]
-async fn test_touch_operations() {
+#[test]
+fn test_touch_operations() {
     // TODO RSCBC-27 we can't fetch & check the expiry without subdoc
+    run_test(async |mut agent| {
+        let strat = Arc::new(BestEffortRetryStrategy::new(
+            ExponentialBackoffCalculator::default(),
+        ));
 
-    setup_tests().await;
+        let key = generate_key();
+        let value = generate_bytes_value(32);
 
-    let agent_opts = create_default_options().await;
+        let upsert_opts = UpsertOptions::new(key.as_slice(), "", "", value.as_slice())
+            .retry_strategy(strat.clone())
+            .expiry(10);
 
-    let mut agent = Agent::new(agent_opts).await.unwrap();
+        let upsert_result = agent.upsert(upsert_opts).await.unwrap();
 
-    let strat = Arc::new(BestEffortRetryStrategy::new(
-        ExponentialBackoffCalculator::default(),
-    ));
+        assert_ne!(0, upsert_result.cas);
+        assert!(upsert_result.mutation_token.is_some());
 
-    let key = generate_key();
-    let value = generate_bytes_value(32);
+        let touch_result = agent
+            .touch(TouchOptions::new(key.as_slice(), "", "", 12).retry_strategy(strat.clone()))
+            .await
+            .unwrap();
 
-    let upsert_opts = UpsertOptions::new(key.as_slice(), "", "", value.as_slice())
-        .retry_strategy(strat.clone())
-        .expiry(10);
+        assert_ne!(0, touch_result.cas);
 
-    let upsert_result = agent.upsert(upsert_opts).await.unwrap();
+        let get_and_touch_result = agent
+            .get_and_touch(
+                GetAndTouchOptions::new(key.as_slice(), "", "", 15).retry_strategy(strat.clone()),
+            )
+            .await
+            .unwrap();
 
-    assert_ne!(0, upsert_result.cas);
-    assert!(upsert_result.mutation_token.is_some());
-
-    let touch_result = agent
-        .touch(TouchOptions::new(key.as_slice(), "", "", 12).retry_strategy(strat.clone()))
-        .await
-        .unwrap();
-
-    assert_ne!(0, touch_result.cas);
-
-    let get_and_touch_result = agent
-        .get_and_touch(
-            GetAndTouchOptions::new(key.as_slice(), "", "", 15).retry_strategy(strat.clone()),
-        )
-        .await
-        .unwrap();
-
-    assert_eq!(value, get_and_touch_result.value);
-    assert_ne!(0, get_and_touch_result.cas);
-
-    agent.close().await;
+        assert_eq!(value, get_and_touch_result.value);
+        assert_ne!(0, get_and_touch_result.cas);
+    });
 }
 
-#[tokio::test]
-async fn test_append_and_prepend() {
-    setup_tests().await;
+#[test]
+fn test_append_and_prepend() {
+    run_test(async |mut agent| {
+        let strat = Arc::new(BestEffortRetryStrategy::new(
+            ExponentialBackoffCalculator::default(),
+        ));
 
-    let agent_opts = create_default_options().await;
+        let key = generate_key();
+        let value = "answer is".as_bytes().to_vec();
 
-    let mut agent = Agent::new(agent_opts).await.unwrap();
+        let upsert_result = agent
+            .upsert(
+                UpsertOptions::new(key.as_slice(), "", "", value.as_slice())
+                    .retry_strategy(strat.clone()),
+            )
+            .await
+            .unwrap();
 
-    let strat = Arc::new(BestEffortRetryStrategy::new(
-        ExponentialBackoffCalculator::default(),
-    ));
+        assert_ne!(0, upsert_result.cas);
+        assert!(upsert_result.mutation_token.is_some());
 
-    let key = generate_key();
-    let value = "answer is".as_bytes().to_vec();
+        let value = "the ".as_bytes();
 
-    let upsert_result = agent
-        .upsert(
-            UpsertOptions::new(key.as_slice(), "", "", value.as_slice())
-                .retry_strategy(strat.clone()),
-        )
-        .await
-        .unwrap();
+        let prepend_result = agent
+            .prepend(PrependOptions::new(&key, "", "", value).retry_strategy(strat.clone()))
+            .await
+            .unwrap();
 
-    assert_ne!(0, upsert_result.cas);
-    assert!(upsert_result.mutation_token.is_some());
+        assert_ne!(0, prepend_result.cas);
+        assert!(prepend_result.mutation_token.is_some());
 
-    let value = "the ".as_bytes();
+        let value = " 42".as_bytes();
 
-    let prepend_result = agent
-        .prepend(PrependOptions::new(&key, "", "", value).retry_strategy(strat.clone()))
-        .await
-        .unwrap();
+        let append_result = agent
+            .append(AppendOptions::new(&key, "", "", value).retry_strategy(strat.clone()))
+            .await
+            .unwrap();
 
-    assert_ne!(0, prepend_result.cas);
-    assert!(prepend_result.mutation_token.is_some());
+        assert_ne!(0, append_result.cas);
+        assert!(append_result.mutation_token.is_some());
 
-    let value = " 42".as_bytes();
+        let get_result = agent
+            .get(GetOptions::new(&key, "", "").retry_strategy(strat.clone()))
+            .await
+            .unwrap();
 
-    let append_result = agent
-        .append(AppendOptions::new(&key, "", "", value).retry_strategy(strat.clone()))
-        .await
-        .unwrap();
-
-    assert_ne!(0, append_result.cas);
-    assert!(append_result.mutation_token.is_some());
-
-    let get_result = agent
-        .get(GetOptions::new(&key, "", "").retry_strategy(strat.clone()))
-        .await
-        .unwrap();
-
-    assert_eq!("the answer is 42".as_bytes(), get_result.value.as_slice());
-    assert_eq!(append_result.cas, get_result.cas);
-
-    agent.close().await;
+        assert_eq!("the answer is 42".as_bytes(), get_result.value.as_slice());
+        assert_eq!(append_result.cas, get_result.cas);
+    })
 }
 
-#[tokio::test]
-async fn test_append_and_prepend_cas_mismatch() {
-    setup_tests().await;
+#[test]
+fn test_append_and_prepend_cas_mismatch() {
+    run_test(async |mut agent| {
+        let strat = Arc::new(BestEffortRetryStrategy::new(
+            ExponentialBackoffCalculator::default(),
+        ));
 
-    let agent_opts = create_default_options().await;
+        let key = generate_key();
+        let value = "answer is".as_bytes().to_vec();
 
-    let mut agent = Agent::new(agent_opts).await.unwrap();
+        let upsert_result = agent
+            .upsert(
+                UpsertOptions::new(key.as_slice(), "", "", value.as_slice())
+                    .retry_strategy(strat.clone()),
+            )
+            .await
+            .unwrap();
 
-    let strat = Arc::new(BestEffortRetryStrategy::new(
-        ExponentialBackoffCalculator::default(),
-    ));
+        assert_ne!(0, upsert_result.cas);
+        assert!(upsert_result.mutation_token.is_some());
 
-    let key = generate_key();
-    let value = "answer is".as_bytes().to_vec();
+        let value = "the ".as_bytes();
 
-    let upsert_result = agent
-        .upsert(
-            UpsertOptions::new(key.as_slice(), "", "", value.as_slice())
-                .retry_strategy(strat.clone()),
-        )
-        .await
-        .unwrap();
+        let prepend_result = agent
+            .prepend(
+                PrependOptions::new(&key, "", "", value)
+                    .retry_strategy(strat.clone())
+                    .cas(1234),
+            )
+            .await;
 
-    assert_ne!(0, upsert_result.cas);
-    assert!(upsert_result.mutation_token.is_some());
+        assert!(prepend_result.is_err());
+        let e = prepend_result.err().unwrap();
+        let e = is_memdx_error(&e).unwrap();
+        assert!(e.is_server_error_kind(ServerErrorKind::CasMismatch));
 
-    let value = "the ".as_bytes();
+        let value = " 42".as_bytes();
 
-    let prepend_result = agent
-        .prepend(
-            PrependOptions::new(&key, "", "", value)
-                .retry_strategy(strat.clone())
-                .cas(1234),
-        )
-        .await;
+        let append_result = agent
+            .append(
+                AppendOptions::new(&key, "", "", value)
+                    .retry_strategy(strat.clone())
+                    .cas(1234),
+            )
+            .await;
 
-    assert!(prepend_result.is_err());
-    let e = prepend_result.err().unwrap();
-    let e = is_memdx_error(&e).unwrap();
-    assert!(e.is_server_error_kind(ServerErrorKind::CasMismatch));
-
-    let value = " 42".as_bytes();
-
-    let append_result = agent
-        .append(
-            AppendOptions::new(&key, "", "", value)
-                .retry_strategy(strat.clone())
-                .cas(1234),
-        )
-        .await;
-
-    assert!(append_result.is_err());
-    let e = append_result.err().unwrap();
-    let e = is_memdx_error(&e).unwrap();
-    assert!(e.is_server_error_kind(ServerErrorKind::CasMismatch));
-
-    agent.close().await;
+        assert!(append_result.is_err());
+        let e = append_result.err().unwrap();
+        let e = is_memdx_error(&e).unwrap();
+        assert!(e.is_server_error_kind(ServerErrorKind::CasMismatch));
+    });
 }
 
-#[tokio::test]
-async fn test_increment_and_decrement() {
-    setup_tests().await;
+#[test]
+fn test_increment_and_decrement() {
+    run_test(async |mut agent| {
+        let strat = Arc::new(BestEffortRetryStrategy::new(
+            ExponentialBackoffCalculator::default(),
+        ));
 
-    let agent_opts = create_default_options().await;
+        let key = generate_key();
 
-    let agent = Agent::new(agent_opts).await.unwrap();
+        let increment_result = agent
+            .increment(
+                IncrementOptions::new(key.as_slice(), "", "")
+                    .retry_strategy(strat.clone())
+                    .delta(1)
+                    .initial(42),
+            )
+            .await
+            .unwrap();
 
-    let strat = Arc::new(BestEffortRetryStrategy::new(
-        ExponentialBackoffCalculator::default(),
-    ));
+        assert_ne!(0, increment_result.cas);
+        assert_eq!(increment_result.value, 42);
+        assert!(increment_result.mutation_token.is_some());
 
-    let key = generate_key();
+        let decrement_result = agent
+            .decrement(
+                DecrementOptions::new(key.as_slice(), "", "")
+                    .retry_strategy(strat.clone())
+                    .delta(2),
+            )
+            .await
+            .unwrap();
 
-    let increment_result = agent
-        .increment(
-            IncrementOptions::new(key.as_slice(), "", "")
-                .retry_strategy(strat.clone())
-                .delta(1)
-                .initial(42),
-        )
-        .await
-        .unwrap();
-
-    assert_ne!(0, increment_result.cas);
-    assert_eq!(increment_result.value, 42);
-    assert!(increment_result.mutation_token.is_some());
-
-    let decrement_result = agent
-        .decrement(
-            DecrementOptions::new(key.as_slice(), "", "")
-                .retry_strategy(strat.clone())
-                .delta(2),
-        )
-        .await
-        .unwrap();
-
-    assert_ne!(0, decrement_result.cas);
-    assert_eq!(decrement_result.value, 40);
-    assert!(decrement_result.mutation_token.is_some());
+        assert_ne!(0, decrement_result.cas);
+        assert_eq!(decrement_result.value, 40);
+        assert!(decrement_result.mutation_token.is_some());
+    });
 }
+
 #[derive(Serialize)]
 struct SubdocObject {
     foo: u32,
@@ -431,378 +386,371 @@ struct SubdocObject {
     arr: Vec<u32>,
 }
 
-#[tokio::test]
-async fn test_lookup_in() {
-    setup_tests().await;
+#[test]
+fn test_lookup_in() {
+    run_test(async |mut agent| {
+        let strat = Arc::new(BestEffortRetryStrategy::new(
+            ExponentialBackoffCalculator::default(),
+        ));
 
-    let agent_opts = create_default_options().await;
+        let key = generate_key();
 
-    let agent = Agent::new(agent_opts).await.unwrap();
+        let obj = SubdocObject {
+            foo: 14,
+            bar: 2,
+            baz: "hello".to_string(),
+            arr: vec![1, 2, 3],
+        };
 
-    let strat = Arc::new(BestEffortRetryStrategy::new(
-        ExponentialBackoffCalculator::default(),
-    ));
+        let value = serde_json::to_vec(&obj).unwrap();
 
-    let key = generate_key();
+        let upsert_opts = UpsertOptions::new(key.as_slice(), "", "", value.as_slice())
+            .retry_strategy(strat.clone());
 
-    let obj = SubdocObject {
-        foo: 14,
-        bar: 2,
-        baz: "hello".to_string(),
-        arr: vec![1, 2, 3],
-    };
+        let upsert_result = agent.upsert(upsert_opts).await.unwrap();
 
-    let value = serde_json::to_vec(&obj).unwrap();
+        assert_ne!(0, upsert_result.cas);
+        assert!(upsert_result.mutation_token.is_some());
 
-    let upsert_opts =
-        UpsertOptions::new(key.as_slice(), "", "", value.as_slice()).retry_strategy(strat.clone());
+        let ops = [
+            LookupInOp::new(LookupInOpType::Get, "baz".as_bytes()),
+            LookupInOp::new(LookupInOpType::Exists, "not-exists".as_bytes()),
+            LookupInOp::new(LookupInOpType::GetCount, "arr".as_bytes()),
+            LookupInOp::new(LookupInOpType::GetDoc, "".as_bytes()),
+        ];
 
-    let upsert_result = agent.upsert(upsert_opts).await.unwrap();
+        let lookup_in_opts =
+            LookupInOptions::new(key.as_slice(), "", "", &ops).retry_strategy(strat.clone());
 
-    assert_ne!(0, upsert_result.cas);
-    assert!(upsert_result.mutation_token.is_some());
+        let lookup_in_result = agent.lookup_in(lookup_in_opts).await.unwrap();
 
-    let ops = [
-        LookupInOp::new(LookupInOpType::Get, "baz".as_bytes()),
-        LookupInOp::new(LookupInOpType::Exists, "not-exists".as_bytes()),
-        LookupInOp::new(LookupInOpType::GetCount, "arr".as_bytes()),
-        LookupInOp::new(LookupInOpType::GetDoc, "".as_bytes()),
-    ];
-
-    let lookup_in_opts =
-        LookupInOptions::new(key.as_slice(), "", "", &ops).retry_strategy(strat.clone());
-
-    let lookup_in_result = agent.lookup_in(lookup_in_opts).await.unwrap();
-
-    assert_eq!(4, lookup_in_result.value.len());
-    assert_ne!(0, lookup_in_result.cas);
-    assert!(!lookup_in_result.doc_is_deleted);
-    assert!(lookup_in_result.value[0].err.is_none());
-    assert_eq!(
-        std::str::from_utf8(lookup_in_result.value[0].value.as_ref().unwrap())
-            .unwrap()
-            .trim_matches('"'),
-        "hello"
-    );
-    assert!(lookup_in_result.value[0].err.is_none());
-    assert!(lookup_in_result.value[1]
-        .err
-        .as_ref()
-        .is_some_and(|err| err.is_error_kind(SubdocErrorKind::PathNotFound)));
-    assert_eq!(
-        lookup_in_result.value[1].err.as_ref().unwrap().op_index(),
-        Some(1)
-    );
-    assert!(lookup_in_result.value[2].err.is_none());
-    assert_eq!(
-        std::str::from_utf8(lookup_in_result.value[2].value.as_ref().unwrap())
-            .unwrap()
-            .trim_matches('"'),
-        "3"
-    );
-    assert!(lookup_in_result.value[3].err.is_none());
-    assert_eq!(
-        lookup_in_result.value[3].value.as_ref().unwrap(),
-        &serde_json::to_vec(&obj).unwrap()
-    );
+        assert_eq!(4, lookup_in_result.value.len());
+        assert_ne!(0, lookup_in_result.cas);
+        assert!(!lookup_in_result.doc_is_deleted);
+        assert!(lookup_in_result.value[0].err.is_none());
+        assert_eq!(
+            std::str::from_utf8(lookup_in_result.value[0].value.as_ref().unwrap())
+                .unwrap()
+                .trim_matches('"'),
+            "hello"
+        );
+        assert!(lookup_in_result.value[0].err.is_none());
+        assert!(lookup_in_result.value[1]
+            .err
+            .as_ref()
+            .is_some_and(|err| err.is_error_kind(SubdocErrorKind::PathNotFound)));
+        assert_eq!(
+            lookup_in_result.value[1].err.as_ref().unwrap().op_index(),
+            Some(1)
+        );
+        assert!(lookup_in_result.value[2].err.is_none());
+        assert_eq!(
+            std::str::from_utf8(lookup_in_result.value[2].value.as_ref().unwrap())
+                .unwrap()
+                .trim_matches('"'),
+            "3"
+        );
+        assert!(lookup_in_result.value[3].err.is_none());
+        assert_eq!(
+            lookup_in_result.value[3].value.as_ref().unwrap(),
+            &serde_json::to_vec(&obj).unwrap()
+        );
+    });
 }
 
-#[tokio::test]
-async fn test_mutate_in() {
-    setup_tests().await;
+#[test]
+fn test_mutate_in() {
+    run_test(async |mut agent| {
+        let strat = Arc::new(BestEffortRetryStrategy::new(
+            ExponentialBackoffCalculator::default(),
+        ));
 
-    let agent_opts = create_default_options().await;
+        let key = generate_key();
 
-    let agent = Agent::new(agent_opts).await.unwrap();
+        let obj = SubdocObject {
+            foo: 14,
+            bar: 2,
+            baz: "hello".to_string(),
+            arr: vec![1, 2, 3],
+        };
 
-    let strat = Arc::new(BestEffortRetryStrategy::new(
-        ExponentialBackoffCalculator::default(),
-    ));
+        let value = serde_json::to_vec(&obj).unwrap();
 
-    let key = generate_key();
+        let upsert_opts = UpsertOptions::new(key.as_slice(), "", "", value.as_slice())
+            .retry_strategy(strat.clone());
 
-    let obj = SubdocObject {
-        foo: 14,
-        bar: 2,
-        baz: "hello".to_string(),
-        arr: vec![1, 2, 3],
-    };
+        let upsert_result = agent.upsert(upsert_opts).await.unwrap();
 
-    let value = serde_json::to_vec(&obj).unwrap();
+        assert_ne!(0, upsert_result.cas);
+        assert!(upsert_result.mutation_token.is_some());
 
-    let upsert_opts =
-        UpsertOptions::new(key.as_slice(), "", "", value.as_slice()).retry_strategy(strat.clone());
+        let ops = [
+            MutateInOp::new(MutateInOpType::Counter, "bar".as_bytes(), "3".as_bytes()),
+            MutateInOp::new(
+                MutateInOpType::DictSet,
+                "baz".as_bytes(),
+                "\"world\"".as_bytes(),
+            ),
+            MutateInOp::new(
+                MutateInOpType::ArrayPushLast,
+                "arr".as_bytes(),
+                "4".as_bytes(),
+            ),
+        ];
 
-    let upsert_result = agent.upsert(upsert_opts).await.unwrap();
+        let mutate_in_options = MutateInOptions::new(key.as_slice(), "", "", &ops)
+            .retry_strategy(strat.clone())
+            .expiry(10);
 
-    assert_ne!(0, upsert_result.cas);
-    assert!(upsert_result.mutation_token.is_some());
+        let mutate_in_result = agent.mutate_in(mutate_in_options).await.unwrap();
 
-    let ops = [
-        MutateInOp::new(MutateInOpType::Counter, "bar".as_bytes(), "3".as_bytes()),
-        MutateInOp::new(
-            MutateInOpType::DictSet,
-            "baz".as_bytes(),
-            "\"world\"".as_bytes(),
-        ),
-        MutateInOp::new(
-            MutateInOpType::ArrayPushLast,
-            "arr".as_bytes(),
-            "4".as_bytes(),
-        ),
-    ];
-
-    let mutate_in_options = MutateInOptions::new(key.as_slice(), "", "", &ops)
-        .retry_strategy(strat.clone())
-        .expiry(10);
-
-    let mutate_in_result = agent.mutate_in(mutate_in_options).await.unwrap();
-
-    assert_eq!(mutate_in_result.value.len(), 3);
-    assert!(mutate_in_result.value[0].err.is_none());
-    assert!(mutate_in_result.value[0]
-        .clone()
-        .value
-        .is_some_and(|val| String::from_utf8(val).unwrap() == "5"));
-    assert!(mutate_in_result.value[1].err.is_none());
-    assert!(mutate_in_result.value[1].value.is_none());
-    assert!(mutate_in_result.value[2].err.is_none());
-    assert!(mutate_in_result.value[2].value.is_none());
+        assert_eq!(mutate_in_result.value.len(), 3);
+        assert!(mutate_in_result.value[0].err.is_none());
+        assert!(mutate_in_result.value[0]
+            .clone()
+            .value
+            .is_some_and(|val| String::from_utf8(val).unwrap() == "5"));
+        assert!(mutate_in_result.value[1].err.is_none());
+        assert!(mutate_in_result.value[1].value.is_none());
+        assert!(mutate_in_result.value[2].err.is_none());
+        assert!(mutate_in_result.value[2].value.is_none());
+    });
 }
 
-#[tokio::test]
-async fn test_kv_without_a_bucket() {
-    setup_tests().await;
+#[test]
+fn test_kv_without_a_bucket() {
+    setup_test(async |config| {
+        let agent_opts = create_options_without_bucket(config).await;
 
-    let agent_opts = create_options_without_bucket().await;
+        let agent = Agent::new(agent_opts).await.unwrap();
 
-    let agent = Agent::new(agent_opts).await.unwrap();
+        let strat = Arc::new(BestEffortRetryStrategy::new(
+            ExponentialBackoffCalculator::default(),
+        ));
 
-    let strat = Arc::new(BestEffortRetryStrategy::new(
-        ExponentialBackoffCalculator::default(),
-    ));
+        let key = generate_key();
+        let value = generate_bytes_value(32);
 
-    let key = generate_key();
-    let value = generate_bytes_value(32);
-
-    let upsert_result = agent
-        .upsert(
-            UpsertOptions::new(key.as_slice(), "", "", value.as_slice())
-                .retry_strategy(strat.clone()),
-        )
-        .await;
-
-    assert!(upsert_result.is_err());
-    let err = upsert_result.err().unwrap();
-    let memdx_err = is_memdx_error(&err);
-    assert!(memdx_err.is_some());
-    assert!(memdx_err
-        .unwrap()
-        .is_server_error_kind(ServerErrorKind::NoBucket));
-}
-
-#[tokio::test]
-async fn test_unknown_collection_id() {
-    setup_tests().await;
-
-    let agent_opts = create_default_options().await;
-    let bucket = test_bucket().await;
-    let scope_name = test_scope().await;
-    let collection_name = rng()
-        .sample_iter(&Alphanumeric)
-        .take(10)
-        .map(char::from)
-        .collect::<String>();
-
-    let mut agent = Agent::new(agent_opts).await.unwrap();
-
-    let strat = Arc::new(FailFastRetryStrategy::default());
-
-    let key = generate_key();
-    let value = generate_bytes_value(32);
-
-    create_collection_and_wait_for_kv(
-        agent.clone(),
-        &bucket,
-        &scope_name,
-        &collection_name,
-        Instant::now().add(Duration::from_secs(5)),
-    )
-    .await;
-
-    // Do an upsert to prep the cid cache.
-    let upsert_opts = UpsertOptions::new(
-        key.as_slice(),
-        &scope_name,
-        &collection_name,
-        value.as_slice(),
-    )
-    .retry_strategy(strat.clone());
-
-    let upsert_result = agent.upsert(upsert_opts).await.unwrap();
-
-    assert_ne!(0, upsert_result.cas);
-    assert!(upsert_result.mutation_token.is_some());
-
-    delete_collection_and_wait_for_kv(
-        agent.clone(),
-        &bucket,
-        &scope_name,
-        &collection_name,
-        Instant::now().add(Duration::from_secs(5)),
-    )
-    .await;
-
-    let upsert_opts = UpsertOptions::new(
-        key.as_slice(),
-        &scope_name,
-        &collection_name,
-        value.as_slice(),
-    )
-    .retry_strategy(Arc::new(BestEffortRetryStrategy::new(
-        ExponentialBackoffCalculator::default(),
-    )));
-
-    // Even though we wait for the delete collection to be acknowledged, it still may persist in kv
-    // on some nodes.
-    try_until(
-        Instant::now().add(Duration::from_secs(30)),
-        Duration::from_millis(100),
-        "upsert didn't fail with timeout in allowed time",
-        || async {
-            let upsert_result = timeout_at(
-                Instant::now().add(Duration::from_millis(2500)),
-                agent.upsert(upsert_opts.clone()),
+        let upsert_result = agent
+            .upsert(
+                UpsertOptions::new(key.as_slice(), "", "", value.as_slice())
+                    .retry_strategy(strat.clone()),
             )
             .await;
 
-            match upsert_result {
-                Ok(_) => Ok(None),
-                Err(_e) => Ok(Some(())),
-            }
-        },
-    )
-    .await;
-
-    agent.close().await;
+        assert!(upsert_result.is_err());
+        let err = upsert_result.err().unwrap();
+        let memdx_err = is_memdx_error(&err);
+        assert!(memdx_err.is_some());
+        assert!(memdx_err
+            .unwrap()
+            .is_server_error_kind(ServerErrorKind::NoBucket));
+    });
 }
 
-#[tokio::test]
-async fn test_changed_collection_id() {
-    setup_tests().await;
+#[test]
+fn test_unknown_collection_id() {
+    setup_test(async |config| {
+        let agent_opts = create_default_options(config.clone()).await;
+        let bucket = config.bucket;
+        let scope_name = config.scope;
+        let collection_name = rng()
+            .sample_iter(&Alphanumeric)
+            .take(10)
+            .map(char::from)
+            .collect::<String>();
 
-    let agent_opts = create_default_options().await;
-    let bucket = test_bucket().await;
-    let scope_name = test_scope().await;
-    let collection_name = rng()
-        .sample_iter(&Alphanumeric)
-        .take(10)
-        .map(char::from)
-        .collect::<String>();
+        let mut agent = Agent::new(agent_opts).await.unwrap();
 
-    let mut agent = Agent::new(agent_opts).await.unwrap();
+        let strat = Arc::new(FailFastRetryStrategy::default());
 
-    let strat = Arc::new(FailFastRetryStrategy::default());
+        let key = generate_key();
+        let value = generate_bytes_value(32);
 
-    let key = generate_key();
-    let value = generate_bytes_value(32);
+        create_collection_and_wait_for_kv(
+            agent.clone(),
+            &bucket,
+            &scope_name,
+            &collection_name,
+            Instant::now().add(Duration::from_secs(5)),
+        )
+        .await;
 
-    create_collection_and_wait_for_kv(
-        agent.clone(),
-        &bucket,
-        &scope_name,
-        &collection_name,
-        Instant::now().add(Duration::from_secs(5)),
-    )
-    .await;
+        // Do an upsert to prep the cid cache.
+        let upsert_opts = UpsertOptions::new(
+            key.as_slice(),
+            &scope_name,
+            &collection_name,
+            value.as_slice(),
+        )
+        .retry_strategy(strat.clone());
 
-    // Do an upsert to prep the cid cache.
-    let upsert_opts = UpsertOptions::new(
-        key.as_slice(),
-        &scope_name,
-        &collection_name,
-        value.as_slice(),
-    )
-    .retry_strategy(strat.clone());
+        let upsert_result = agent.upsert(upsert_opts).await.unwrap();
 
-    let upsert_result = agent.upsert(upsert_opts).await.unwrap();
+        assert_ne!(0, upsert_result.cas);
+        assert!(upsert_result.mutation_token.is_some());
 
-    assert_ne!(0, upsert_result.cas);
-    assert!(upsert_result.mutation_token.is_some());
+        delete_collection_and_wait_for_kv(
+            agent.clone(),
+            &bucket,
+            &scope_name,
+            &collection_name,
+            Instant::now().add(Duration::from_secs(5)),
+        )
+        .await;
 
-    delete_collection_and_wait_for_kv(
-        agent.clone(),
-        &bucket,
-        &scope_name,
-        &collection_name,
-        Instant::now().add(Duration::from_secs(5)),
-    )
-    .await;
+        let upsert_opts = UpsertOptions::new(
+            key.as_slice(),
+            &scope_name,
+            &collection_name,
+            value.as_slice(),
+        )
+        .retry_strategy(Arc::new(BestEffortRetryStrategy::new(
+            ExponentialBackoffCalculator::default(),
+        )));
 
-    create_collection_and_wait_for_kv(
-        agent.clone(),
-        &bucket,
-        &scope_name,
-        &collection_name,
-        Instant::now().add(Duration::from_secs(5)),
-    )
-    .await;
+        // Even though we wait for the delete collection to be acknowledged, it still may persist in kv
+        // on some nodes.
+        try_until(
+            Instant::now().add(Duration::from_secs(30)),
+            Duration::from_millis(100),
+            "upsert didn't fail with timeout in allowed time",
+            || async {
+                let upsert_result = timeout_at(
+                    Instant::now().add(Duration::from_millis(2500)),
+                    agent.upsert(upsert_opts.clone()),
+                )
+                .await;
 
-    let upsert_opts = UpsertOptions::new(
-        key.as_slice(),
-        &scope_name,
-        &collection_name,
-        value.as_slice(),
-    )
-    .retry_strategy(Arc::new(BestEffortRetryStrategy::new(
-        ExponentialBackoffCalculator::default(),
-    )));
+                match upsert_result {
+                    Ok(_) => Ok(None),
+                    Err(_e) => Ok(Some(())),
+                }
+            },
+        )
+        .await;
 
-    // This call should now get a cid unknown error and fetch the new one.
-    let upsert_result = agent.upsert(upsert_opts).await.unwrap();
-
-    assert_ne!(0, upsert_result.cas);
-    assert!(upsert_result.mutation_token.is_some());
-
-    agent.close().await;
+        agent.close().await;
+    });
 }
+
+#[test]
+fn test_changed_collection_id() {
+    setup_test(async |config| {
+        let agent_opts = create_default_options(config.clone()).await;
+        let bucket = config.bucket;
+        let scope_name = config.scope;
+        let collection_name = rng()
+            .sample_iter(&Alphanumeric)
+            .take(10)
+            .map(char::from)
+            .collect::<String>();
+
+        let mut agent = Agent::new(agent_opts).await.unwrap();
+
+        let strat = Arc::new(FailFastRetryStrategy::default());
+
+        let key = generate_key();
+        let value = generate_bytes_value(32);
+
+        create_collection_and_wait_for_kv(
+            agent.clone(),
+            &bucket,
+            &scope_name,
+            &collection_name,
+            Instant::now().add(Duration::from_secs(5)),
+        )
+        .await;
+
+        // Do an upsert to prep the cid cache.
+        let upsert_opts = UpsertOptions::new(
+            key.as_slice(),
+            &scope_name,
+            &collection_name,
+            value.as_slice(),
+        )
+        .retry_strategy(strat.clone());
+
+        let upsert_result = agent.upsert(upsert_opts).await.unwrap();
+
+        assert_ne!(0, upsert_result.cas);
+        assert!(upsert_result.mutation_token.is_some());
+
+        delete_collection_and_wait_for_kv(
+            agent.clone(),
+            &bucket,
+            &scope_name,
+            &collection_name,
+            Instant::now().add(Duration::from_secs(5)),
+        )
+        .await;
+
+        create_collection_and_wait_for_kv(
+            agent.clone(),
+            &bucket,
+            &scope_name,
+            &collection_name,
+            Instant::now().add(Duration::from_secs(5)),
+        )
+        .await;
+
+        let upsert_opts = UpsertOptions::new(
+            key.as_slice(),
+            &scope_name,
+            &collection_name,
+            value.as_slice(),
+        )
+        .retry_strategy(Arc::new(BestEffortRetryStrategy::new(
+            ExponentialBackoffCalculator::default(),
+        )));
+
+        // This call should now get a cid unknown error and fetch the new one.
+        let upsert_result = agent.upsert(upsert_opts).await.unwrap();
+
+        assert_ne!(0, upsert_result.cas);
+        assert!(upsert_result.mutation_token.is_some());
+
+        agent.close().await;
+    });
+}
+
 #[cfg(feature = "dhat-heap")]
-#[tokio::test]
-async fn upsert_allocations() {
-    setup_tests().await;
+#[test]
+fn upsert_allocations() {
+    run_test(async |mut agent| {
+        let key = generate_key();
+        let value = generate_bytes_value(32);
 
-    let agent_opts = create_default_options().await;
+        let strat = Arc::new(FailFastRetryStrategy::default());
 
-    let agent = Agent::new(agent_opts).await.unwrap();
+        let upsert_opts = UpsertOptions::new(key.as_slice(), "", "", value.as_slice())
+            .retry_strategy(strat.clone());
 
-    let key = generate_key();
-    let value = generate_bytes_value(32);
+        // make sure that all the underlying resources are setup.
+        agent.upsert(upsert_opts.clone()).await.unwrap();
 
-    let strat = Arc::new(FailFastRetryStrategy::default());
+        let profiler = dhat::Profiler::builder().testing().build();
 
-    let upsert_opts =
-        UpsertOptions::new(key.as_slice(), "", "", value.as_slice()).retry_strategy(strat.clone());
+        let stats1 = dhat::HeapStats::get();
 
-    // make sure that all the underlying resources are setup.
-    agent.upsert(upsert_opts.clone()).await.unwrap();
+        let _ = agent.upsert(upsert_opts).await.unwrap();
 
-    let profiler = dhat::Profiler::builder().testing().build();
+        let stats2 = dhat::HeapStats::get();
 
-    let stats1 = dhat::HeapStats::get();
+        let total_allocs = stats2.total_blocks - stats1.total_blocks;
 
-    let upsert_result = agent.upsert(upsert_opts).await.unwrap();
+        let expected_allocs = if agent.test_setup_config.use_ssl {
+            19
+        } else {
+            21
+        };
+        dhat::assert!(
+            total_allocs <= expected_allocs,
+            "Expected max {} allocations, was {}",
+            expected_allocs,
+            total_allocs
+        );
 
-    let stats2 = dhat::HeapStats::get();
-
-    let total_allocs = stats2.total_blocks - stats1.total_blocks;
-
-    let expected_allocs = if test_is_ssl().await { 19 } else { 21 };
-    dhat::assert!(
-        total_allocs <= expected_allocs,
-        "Expected max {} allocations, was {}",
-        expected_allocs,
-        total_allocs
-    );
-
-    drop(profiler);
+        drop(profiler);
+    });
 }
