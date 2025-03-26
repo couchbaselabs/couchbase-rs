@@ -33,7 +33,14 @@ use crate::queryoptions::{
 };
 use crate::queryx::index::Index;
 use crate::searchcomponent::SearchResultStream;
+use crate::searchmgmt_options::{
+    AllowQueryingOptions, AnalyzeDocumentOptions, DeleteIndexOptions, DisallowQueryingOptions,
+    FreezePlanOptions, GetIndexOptions, GetIndexedDocumentsCountOptions, PauseIngestOptions,
+    ResumeIngestOptions, UnfreezePlanOptions, UpsertIndexOptions,
+};
 use crate::searchoptions::SearchOptions;
+use crate::searchx::document_analysis::DocumentAnalysis;
+use crate::{searchmgmt_options, searchx};
 
 impl Agent {
     pub async fn bucket_features(&self) -> Result<Vec<BucketFeature>> {
@@ -154,6 +161,69 @@ impl Agent {
         self.inner.search.query(opts).await
     }
 
+    pub async fn get_search_index(
+        &self,
+        opts: &GetIndexOptions<'_>,
+    ) -> Result<searchx::index::Index> {
+        self.inner.search.get_index(opts).await
+    }
+
+    pub async fn upsert_search_index(&self, opts: &UpsertIndexOptions<'_>) -> Result<()> {
+        self.inner.search.upsert_index(opts).await
+    }
+
+    pub async fn delete_search_index(&self, opts: &DeleteIndexOptions<'_>) -> Result<()> {
+        self.inner.search.delete_index(opts).await
+    }
+
+    pub async fn get_all_search_indexes(
+        &self,
+        opts: &searchmgmt_options::GetAllIndexesOptions<'_>,
+    ) -> Result<Vec<searchx::index::Index>> {
+        self.inner.search.get_all_indexes(opts).await
+    }
+
+    pub async fn analyze_search_document(
+        &self,
+        opts: &AnalyzeDocumentOptions<'_>,
+    ) -> Result<DocumentAnalysis> {
+        self.inner.search.analyze_document(opts).await
+    }
+
+    pub async fn get_search_indexed_documents_count(
+        &self,
+        opts: &GetIndexedDocumentsCountOptions<'_>,
+    ) -> Result<u64> {
+        self.inner.search.get_indexed_documents_count(opts).await
+    }
+
+    pub async fn pause_search_index_ingest(&self, opts: &PauseIngestOptions<'_>) -> Result<()> {
+        self.inner.search.pause_ingest(opts).await
+    }
+
+    pub async fn resume_search_index_ingest(&self, opts: &ResumeIngestOptions<'_>) -> Result<()> {
+        self.inner.search.resume_ingest(opts).await
+    }
+
+    pub async fn allow_search_index_querying(&self, opts: &AllowQueryingOptions<'_>) -> Result<()> {
+        self.inner.search.allow_querying(opts).await
+    }
+
+    pub async fn disallow_search_index_querying(
+        &self,
+        opts: &DisallowQueryingOptions<'_>,
+    ) -> Result<()> {
+        self.inner.search.disallow_querying(opts).await
+    }
+
+    pub async fn freeze_search_index_plan(&self, opts: &FreezePlanOptions<'_>) -> Result<()> {
+        self.inner.search.freeze_plan(opts).await
+    }
+
+    pub async fn unfreeze_search_index_plan(&self, opts: &UnfreezePlanOptions<'_>) -> Result<()> {
+        self.inner.search.unfreeze_plan(opts).await
+    }
+
     pub async fn analytics(&self, opts: AnalyticsOptions<'_>) -> Result<AnalyticsResultStream> {
         self.inner.analytics.query(opts).await
     }
@@ -224,5 +294,12 @@ impl Agent {
 
     pub async fn ensure_bucket(&self, opts: &EnsureBucketOptions<'_>) -> Result<()> {
         self.inner.mgmt.ensure_bucket(opts).await
+    }
+
+    pub async fn ensure_search_index(
+        &self,
+        opts: &searchmgmt_options::EnsureIndexOptions<'_>,
+    ) -> Result<()> {
+        self.inner.search.ensure_index(opts).await
     }
 }

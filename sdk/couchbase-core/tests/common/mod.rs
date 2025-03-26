@@ -1,9 +1,12 @@
 use couchbase_core::agent::Agent;
 use couchbase_core::features::BucketFeature;
+use log::error;
 use tokio::time::Instant;
 
 pub mod default_agent_options;
+pub mod features;
 pub mod helpers;
+pub mod node_version;
 pub mod test_config;
 
 pub async fn feature_supported(agent: &Agent, feature: BucketFeature) -> bool {
@@ -20,10 +23,15 @@ where
     Fut: std::future::Future<Output = Result<Option<T>, couchbase_core::error::Error>>,
 {
     while Instant::now() < deadline {
-        let res = f().await.unwrap();
-        if let Some(r) = res {
+        let res = f().await;
+        if let Ok(Some(r)) = res {
             return r;
         }
+
+        if let Err(e) = res {
+            error!("{}", e);
+        }
+
         tokio::time::sleep(sleep).await;
     }
     panic!("{}", fail_msg.as_ref());

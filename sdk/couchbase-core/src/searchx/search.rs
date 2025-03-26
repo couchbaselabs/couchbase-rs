@@ -1,10 +1,20 @@
 use crate::httpx::client::Client;
 use crate::httpx::request::{Auth, BasicAuth, OnBehalfOfInfo, Request};
 use crate::httpx::response::Response;
+use crate::mgmtx::mgmt::parse_response_json;
+use crate::searchx::document_analysis::DocumentAnalysis;
 use crate::searchx::error;
 use crate::searchx::error::ServerError;
 use crate::searchx::index::Index;
+use crate::searchx::index_json::{SearchIndexResponseJson, SearchIndexesResponseJson};
+use crate::searchx::mgmt_options::{
+    AllowQueryingOptions, AnalyzeDocumentOptions, DeleteIndexOptions, DisallowQueryingOptions,
+    FreezePlanOptions, GetAllIndexesOptions, GetIndexOptions, GetIndexedDocumentsCountOptions,
+    PauseIngestOptions, RefreshConfigOptions, ResumeIngestOptions, UnfreezePlanOptions,
+    UpsertIndexOptions,
+};
 use crate::searchx::query_options::QueryOptions;
+use crate::searchx::search_json::{DocumentAnalysisJson, IndexedDocumentsJson};
 use crate::searchx::search_respreader::SearchRespReader;
 use bytes::Bytes;
 use http::{Method, StatusCode};
@@ -118,21 +128,7 @@ impl<C: Client> Search<C> {
     }
 
     pub async fn upsert_index(&self, opts: &UpsertIndexOptions<'_>) -> error::Result<()> {
-        let req_uri = if let Some(bucket) = &opts.bucket_name {
-            if let Some(scope) = &opts.scope_name {
-                format!(
-                    "api/bucket/{}/scope/{}/index/{}",
-                    bucket, scope, &opts.index.name
-                )
-            } else {
-                return Err(error::Error::new_invalid_argument_error(
-                    "must specify both or neither scope and bucket names",
-                    None,
-                ));
-            }
-        } else {
-            format!("api/index/{}", &opts.index.name)
-        };
+        let req_uri = Self::get_uri(&opts.index.name, opts.bucket_name, opts.scope_name)?;
 
         let body = serde_json::to_vec(&opts.index).map_err(|e| {
             error::Error::new_encoding_error(format!("could not serialize index: {}", e))
@@ -164,21 +160,7 @@ impl<C: Client> Search<C> {
     }
 
     pub async fn delete_index(&self, opts: &DeleteIndexOptions<'_>) -> error::Result<()> {
-        let req_uri = if let Some(bucket) = &opts.bucket_name {
-            if let Some(scope) = &opts.scope_name {
-                format!(
-                    "api/bucket/{}/scope/{}/index/{}",
-                    bucket, scope, &opts.index_name
-                )
-            } else {
-                return Err(error::Error::new_invalid_argument_error(
-                    "must specify both or neither scope and bucket names",
-                    None,
-                ));
-            }
-        } else {
-            format!("api/index/{}", &opts.index_name)
-        };
+        let req_uri = Self::get_uri(opts.index_name, opts.bucket_name, opts.scope_name)?;
 
         let mut headers = HashMap::new();
         headers.insert("cache-control", "no-cache");
@@ -206,6 +188,337 @@ impl<C: Client> Search<C> {
         }
 
         Ok(())
+    }
+
+    pub async fn get_index(&self, opts: &GetIndexOptions<'_>) -> error::Result<Index> {
+        let req_uri = Self::get_uri(opts.index_name, opts.bucket_name, opts.scope_name)?;
+
+        let res = self
+            .execute(
+                Method::GET,
+                req_uri,
+                "",
+                // TODO: change when we change ownership on execute
+                opts.on_behalf_of.cloned(),
+                None,
+                None,
+            )
+            .await
+            .map_err(|e| error::Error::new_http_error(&self.endpoint).with(Arc::new(e)))?;
+
+        if res.status() != 200 {
+            return Err(decode_response_error(
+                res,
+                opts.index_name.to_string(),
+                self.endpoint.clone(),
+            )
+            .await);
+        }
+
+        let index: SearchIndexResponseJson = parse_response_json(res).await.map_err(|e| {
+            error::Error::new_message_error(
+                "failed to parse index json",
+                Some(self.endpoint.clone()),
+            )
+            .with(Arc::new(e))
+        })?;
+
+        Ok(index.index_def.into())
+    }
+
+    pub async fn get_all_indexes(
+        &self,
+        opts: &GetAllIndexesOptions<'_>,
+    ) -> error::Result<Vec<Index>> {
+        let req_uri = Self::get_uri("", opts.bucket_name, opts.scope_name)?;
+
+        let res = self
+            .execute(
+                Method::GET,
+                req_uri,
+                "",
+                // TODO: change when we change ownership on execute
+                opts.on_behalf_of.cloned(),
+                None,
+                None,
+            )
+            .await
+            .map_err(|e| error::Error::new_http_error(&self.endpoint).with(Arc::new(e)))?;
+
+        if res.status() != 200 {
+            return Err(decode_response_error(res, "".to_string(), self.endpoint.clone()).await);
+        }
+
+        let index: SearchIndexesResponseJson = parse_response_json(res).await.map_err(|e| {
+            error::Error::new_message_error(
+                "failed to parse index json",
+                Some(self.endpoint.clone()),
+            )
+            .with(Arc::new(e))
+        })?;
+
+        Ok(index
+            .indexes
+            .index_defs
+            .into_values()
+            .map(Index::from)
+            .collect())
+    }
+
+    pub async fn analyze_document(
+        &self,
+        opts: &AnalyzeDocumentOptions<'_>,
+    ) -> error::Result<DocumentAnalysis> {
+        let req_uri = Self::get_uri(opts.index_name, opts.bucket_name, opts.scope_name)?;
+        let body = Bytes::from(opts.doc_content.to_vec());
+
+        let res = self
+            .execute(
+                Method::POST,
+                req_uri,
+                "application/json",
+                // TODO: change when we change ownership on execute
+                opts.on_behalf_of.cloned(),
+                None,
+                Some(body),
+            )
+            .await
+            .map_err(|e| error::Error::new_http_error(&self.endpoint).with(Arc::new(e)))?;
+
+        if res.status() != 200 {
+            return Err(decode_response_error(
+                res,
+                opts.index_name.to_string(),
+                self.endpoint.clone(),
+            )
+            .await);
+        }
+
+        let analysis: DocumentAnalysisJson = parse_response_json(res).await.map_err(|e| {
+            error::Error::new_message_error(
+                "failed to parse document analysis",
+                Some(self.endpoint.clone()),
+            )
+            .with(Arc::new(e))
+        })?;
+
+        Ok(analysis.into())
+    }
+
+    pub async fn get_indexed_documents_count(
+        &self,
+        opts: &GetIndexedDocumentsCountOptions<'_>,
+    ) -> error::Result<u64> {
+        let req_uri = if opts.scope_name.is_none() && opts.bucket_name.is_none() {
+            format!("/api/index/{}/count", opts.index_name)
+        } else if opts.scope_name.is_some() && opts.bucket_name.is_some() {
+            format!(
+                "/api/bucket/{}/scope/{}/index/{}/count",
+                opts.bucket_name.unwrap(),
+                opts.scope_name.unwrap(),
+                opts.index_name
+            )
+        } else {
+            return Err(error::Error::new_invalid_argument_error(
+                "must specify both or neither of scope and bucket names",
+                None,
+            ));
+        };
+
+        let res = self
+            .execute(
+                Method::GET,
+                req_uri,
+                "",
+                opts.on_behalf_of.cloned(),
+                None,
+                None,
+            )
+            .await
+            .map_err(|e| error::Error::new_http_error(&self.endpoint).with(Arc::new(e)))?;
+
+        if res.status() != 200 {
+            return Err(decode_response_error(
+                res,
+                opts.index_name.to_string(),
+                self.endpoint.clone(),
+            )
+            .await);
+        }
+
+        let count: IndexedDocumentsJson = parse_response_json(res).await.map_err(|e| {
+            error::Error::new_message_error(
+                "failed to parse indexed count",
+                Some(self.endpoint.clone()),
+            )
+            .with(Arc::new(e))
+        })?;
+
+        Ok(count.count)
+    }
+
+    pub async fn pause_ingest(&self, opts: &PauseIngestOptions<'_>) -> error::Result<()> {
+        self.control_request(
+            opts.index_name,
+            opts.bucket_name,
+            opts.scope_name,
+            "ingestControl/pause",
+            opts.on_behalf_of,
+        )
+        .await
+    }
+
+    pub async fn resume_ingest(&self, opts: &ResumeIngestOptions<'_>) -> error::Result<()> {
+        self.control_request(
+            opts.index_name,
+            opts.bucket_name,
+            opts.scope_name,
+            "ingestControl/resume",
+            opts.on_behalf_of,
+        )
+        .await
+    }
+
+    pub async fn allow_querying(&self, opts: &AllowQueryingOptions<'_>) -> error::Result<()> {
+        self.control_request(
+            opts.index_name,
+            opts.bucket_name,
+            opts.scope_name,
+            "queryControl/allow",
+            opts.on_behalf_of,
+        )
+        .await
+    }
+
+    pub async fn disallow_querying(&self, opts: &DisallowQueryingOptions<'_>) -> error::Result<()> {
+        self.control_request(
+            opts.index_name,
+            opts.bucket_name,
+            opts.scope_name,
+            "queryControl/disallow",
+            opts.on_behalf_of,
+        )
+        .await
+    }
+
+    pub async fn freeze_plan(&self, opts: &FreezePlanOptions<'_>) -> error::Result<()> {
+        self.control_request(
+            opts.index_name,
+            opts.bucket_name,
+            opts.scope_name,
+            "planFreezeControl/freeze",
+            opts.on_behalf_of,
+        )
+        .await
+    }
+
+    pub async fn unfreeze_plan(&self, opts: &UnfreezePlanOptions<'_>) -> error::Result<()> {
+        self.control_request(
+            opts.index_name,
+            opts.bucket_name,
+            opts.scope_name,
+            "planFreezeControl/unfreeze",
+            opts.on_behalf_of,
+        )
+        .await
+    }
+
+    async fn control_request(
+        &self,
+        index_name: &str,
+        bucket_name: Option<&str>,
+        scope_name: Option<&str>,
+        control: &str,
+        on_behalf_of: Option<&OnBehalfOfInfo>,
+    ) -> error::Result<()> {
+        if index_name.is_empty() {
+            return Err(error::Error::new_invalid_argument_error(
+                "must specify index name",
+                None,
+            ));
+        }
+
+        let req_uri = if scope_name.is_none() && bucket_name.is_none() {
+            format!("/api/index/{}/{}", index_name, control)
+        } else if scope_name.is_some() && bucket_name.is_some() {
+            format!(
+                "/api/bucket/{}/scope/{}/index/{}/{}",
+                bucket_name.unwrap(),
+                scope_name.unwrap(),
+                index_name,
+                control
+            )
+        } else {
+            return Err(error::Error::new_invalid_argument_error(
+                "must specify both or neither of scope and bucket names",
+                None,
+            ));
+        };
+
+        let res = self
+            .execute(
+                Method::POST,
+                req_uri,
+                "application/json",
+                on_behalf_of.cloned(),
+                None,
+                None,
+            )
+            .await
+            .map_err(|e| error::Error::new_http_error(&self.endpoint).with(Arc::new(e)))?;
+
+        if res.status() != 200 {
+            return Err(
+                decode_response_error(res, index_name.to_string(), self.endpoint.clone()).await,
+            );
+        }
+
+        Ok(())
+    }
+
+    pub(crate) async fn refresh_config(
+        &self,
+        opts: &RefreshConfigOptions<'_>,
+    ) -> error::Result<()> {
+        let res = self
+            .execute(
+                Method::POST,
+                "/api/cfgRefresh",
+                "application/json",
+                opts.on_behalf_of.cloned(),
+                None,
+                None,
+            )
+            .await
+            .map_err(|e| error::Error::new_http_error(&self.endpoint).with(Arc::new(e)))?;
+
+        if res.status() != 200 {
+            return Err(decode_response_error(res, "".to_string(), self.endpoint.clone()).await);
+        }
+
+        Ok(())
+    }
+
+    fn get_uri(
+        index_name: &str,
+        bucket_name: Option<&str>,
+        scope_name: Option<&str>,
+    ) -> error::Result<String> {
+        if let Some(bucket) = &bucket_name {
+            if let Some(scope) = &scope_name {
+                Ok(format!(
+                    "api/bucket/{}/scope/{}/index/{}",
+                    bucket, scope, &index_name
+                ))
+            } else {
+                Err(error::Error::new_invalid_argument_error(
+                    "must specify both or neither scope and bucket names",
+                    None,
+                ))
+            }
+        } else {
+            Ok(format!("api/index/{}", &index_name))
+        }
     }
 }
 
@@ -287,74 +600,4 @@ pub(crate) fn decode_common_error(
     error::Error::new_server_error(ServerError::new(
         error_kind, index_name, body_str, endpoint, status,
     ))
-}
-
-#[derive(Debug)]
-#[non_exhaustive]
-pub struct UpsertIndexOptions<'a> {
-    pub index: &'a Index,
-    pub bucket_name: Option<&'a str>,
-    pub scope_name: Option<&'a str>,
-    pub on_behalf_of: Option<&'a OnBehalfOfInfo>,
-}
-
-impl<'a> UpsertIndexOptions<'a> {
-    pub fn new(index: &'a Index) -> Self {
-        Self {
-            index,
-            bucket_name: None,
-            scope_name: None,
-            on_behalf_of: None,
-        }
-    }
-
-    pub fn bucket_name(mut self, bucket_name: impl Into<Option<&'a str>>) -> Self {
-        self.bucket_name = bucket_name.into();
-        self
-    }
-
-    pub fn scope_name(mut self, scope_name: impl Into<Option<&'a str>>) -> Self {
-        self.scope_name = scope_name.into();
-        self
-    }
-
-    pub fn on_behalf_of(mut self, on_behalf_of: impl Into<Option<&'a OnBehalfOfInfo>>) -> Self {
-        self.on_behalf_of = on_behalf_of.into();
-        self
-    }
-}
-
-#[derive(Debug)]
-#[non_exhaustive]
-pub struct DeleteIndexOptions<'a> {
-    pub index_name: &'a str,
-    pub bucket_name: Option<&'a str>,
-    pub scope_name: Option<&'a str>,
-    pub on_behalf_of: Option<&'a OnBehalfOfInfo>,
-}
-
-impl<'a> DeleteIndexOptions<'a> {
-    pub fn new(index_name: &'a str) -> Self {
-        Self {
-            index_name,
-            bucket_name: None,
-            scope_name: None,
-            on_behalf_of: None,
-        }
-    }
-
-    pub fn bucket_name(mut self, bucket_name: impl Into<Option<&'a str>>) -> Self {
-        self.bucket_name = bucket_name.into();
-        self
-    }
-
-    pub fn scope_name(mut self, scope_name: impl Into<Option<&'a str>>) -> Self {
-        self.scope_name = scope_name.into();
-        self
-    }
-
-    pub fn on_behalf_of(mut self, on_behalf_of: impl Into<Option<&'a OnBehalfOfInfo>>) -> Self {
-        self.on_behalf_of = on_behalf_of.into();
-        self
-    }
 }

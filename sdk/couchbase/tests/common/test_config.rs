@@ -92,7 +92,9 @@ where
         let mut config = TEST_CONFIG.write().await;
 
         if let Some(cluster) = config.deref() {
-            test(cluster.clone()).await;
+            let cluster = cluster.clone();
+            drop(config);
+            test(cluster).await;
             return;
         }
 
@@ -120,6 +122,7 @@ where
         let test_cluster = create_test_cluster().await;
 
         *config = Some(test_cluster.clone());
+        drop(config);
 
         test(test_cluster).await;
     });

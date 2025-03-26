@@ -45,6 +45,7 @@ pub mod retrybesteffort;
 pub mod retryfailfast;
 mod scram;
 pub mod searchcomponent;
+pub mod searchmgmt_options;
 pub mod searchoptions;
 pub mod searchx;
 pub mod service_type;
