@@ -1,4 +1,4 @@
-use crate::collection_manager::MaxExpiryValue;
+use crate::management::collections::collection_settings::MaxExpiryValue;
 
 #[derive(Default, Debug, Clone)]
 pub struct ScopeSpec {

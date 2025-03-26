@@ -2,10 +2,10 @@ use crate::common::consistency_utils::{verify_bucket_created, verify_bucket_dele
 use crate::common::features::TestFeatureCode;
 use crate::common::test_config::run_test;
 use crate::common::{generate_string_value, try_until};
-use couchbase::bucket_settings::{
+use couchbase::durability_level::DurabilityLevel;
+use couchbase::management::buckets::bucket_settings::{
     BucketSettings, CompressionMode, ConflictResolutionType, EvictionPolicyType, StorageBackend,
 };
-use couchbase::durability_level::DurabilityLevel;
 use serial_test::serial;
 use std::time::Duration;
 

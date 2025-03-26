@@ -1,6 +1,6 @@
-use crate::bucket_settings::BucketSettings;
 use crate::clients::agent_provider::CouchbaseAgentProvider;
 use crate::error;
+use crate::management::buckets::bucket_settings::BucketSettings;
 use crate::options::bucket_mgmt_options::{
     CreateBucketOptions, DeleteBucketOptions, FlushBucketOptions, GetAllBucketsOptions,
     GetBucketOptions, UpdateBucketOptions,

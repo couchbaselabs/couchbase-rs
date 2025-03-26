@@ -1,8 +1,8 @@
 use crate::clients::agent_provider::CouchbaseAgentProvider;
-use crate::collection_manager::{
+use crate::error;
+use crate::management::collections::collection_settings::{
     CreateCollectionSettings, MaxExpiryValue, UpdateCollectionSettings,
 };
-use crate::error;
 use crate::options::collection_mgmt_options::*;
 use crate::results::collections_mgmt_results::{CollectionSpec, ScopeSpec};
 use couchbase_core::retry::RetryStrategy;

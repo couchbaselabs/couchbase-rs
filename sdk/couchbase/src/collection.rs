@@ -1,7 +1,7 @@
 use crate::clients::collection_client::CollectionClient;
 use crate::clients::core_kv_client::CoreKvClient;
 use crate::clients::query_index_mgmt_client::QueryIndexMgmtClient;
-use crate::query_index_manager::CollectionQueryIndexManager;
+use crate::management::query::query_index_manager::CollectionQueryIndexManager;
 use std::sync::Arc;
 
 #[derive(Clone)]

@@ -1,11 +1,11 @@
 use crate::bucket::Bucket;
-use crate::bucket_manager::BucketManager;
 use crate::clients::analytics_client::AnalyticsClient;
 use crate::clients::bucket_mgmt_client::BucketMgmtClient;
 use crate::clients::cluster_client::ClusterClient;
 use crate::clients::query_client::QueryClient;
 use crate::clients::search_client::SearchClient;
 use crate::error;
+use crate::management::buckets::bucket_manager::BucketManager;
 use crate::options::analytics_options::AnalyticsOptions;
 use crate::options::cluster_options::ClusterOptions;
 use crate::options::query_options::QueryOptions;
