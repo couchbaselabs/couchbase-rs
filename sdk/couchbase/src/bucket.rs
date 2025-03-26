@@ -1,7 +1,7 @@
 use crate::clients::bucket_client::BucketClient;
 use crate::clients::collections_mgmt_client::CollectionsMgmtClient;
 use crate::collection::Collection;
-use crate::collection_manager::CollectionManager;
+use crate::management::collections::collection_manager::CollectionManager;
 use crate::scope::Scope;
 use std::sync::Arc;
 

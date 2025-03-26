@@ -1,8 +1,6 @@
 extern crate core;
 
 pub mod bucket;
-pub mod bucket_manager;
-pub mod bucket_settings;
 mod capella_ca;
 mod clients;
 pub mod cluster;
@@ -10,12 +8,11 @@ pub mod collection;
 pub mod collection_binary_crud;
 pub mod collection_crud;
 pub mod collection_ds;
-pub mod collection_manager;
 pub mod durability_level;
 pub mod error;
+pub mod management;
 pub mod mutation_state;
 pub mod options;
-pub mod query_index_manager;
 pub mod results;
 pub mod scope;
 pub mod search;

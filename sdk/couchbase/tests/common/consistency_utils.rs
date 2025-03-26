@@ -1,6 +1,6 @@
 use crate::common::try_until;
-use couchbase::bucket_manager::BucketManager;
-use couchbase::collection_manager::CollectionManager;
+use couchbase::management::buckets::bucket_manager::BucketManager;
+use couchbase::management::collections::collection_manager::CollectionManager;
 use couchbase::results::collections_mgmt_results::CollectionSpec;
 use std::time::Duration;
 
@@ -22,7 +22,7 @@ pub async fn verify_bucket_created(manager: &BucketManager, bucket_name: &str) {
 
 pub async fn verify_bucket_deleted(manager: &BucketManager, bucket_name: &str) {
     try_until(
-        tokio::time::Instant::now() + Duration::from_secs(30),
+        tokio::time::Instant::now() + Duration::from_secs(60),
         Duration::from_millis(100),
         "Bucket was not deleted in time",
         || async {

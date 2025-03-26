@@ -1,6 +1,6 @@
-use crate::bucket_settings::BucketSettings;
 use crate::clients::bucket_mgmt_client::BucketMgmtClient;
 use crate::error;
+use crate::management::buckets::bucket_settings::BucketSettings;
 use crate::options::bucket_mgmt_options::*;
 use std::sync::Arc;
 

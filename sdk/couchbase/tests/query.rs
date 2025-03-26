@@ -3,7 +3,7 @@ use crate::common::consistency_utils::{
 };
 use crate::common::test_config::run_test;
 use crate::common::try_until;
-use couchbase::collection_manager::CollectionManager;
+use couchbase::management::collections::collection_manager::CollectionManager;
 use couchbase::options::query_index_mgmt_options::{
     CreatePrimaryQueryIndexOptions, CreateQueryIndexOptions,
 };
@@ -233,7 +233,8 @@ async fn create_collection(manager: &CollectionManager) -> (String, String) {
     manager.create_scope(&scope_name, None).await.unwrap();
     verify_scope_created(manager, &scope_name).await;
 
-    let settings = couchbase::collection_manager::CreateCollectionSettings::new();
+    let settings =
+        couchbase::management::collections::collection_manager::CreateCollectionSettings::new();
     manager
         .create_collection(&scope_name, &collection_name, settings, None)
         .await
