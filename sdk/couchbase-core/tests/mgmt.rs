@@ -1,18 +1,16 @@
-use crate::common::helpers::generate_string_value;
+use crate::common::helpers::{
+    create_scope, delete_collection, delete_scope, generate_string_value,
+};
 use crate::common::test_config::run_test;
 use crate::common::{feature_supported, try_until};
 use couchbase_core::agent::Agent;
 use couchbase_core::cbconfig::CollectionManifest;
 use couchbase_core::features::BucketFeature;
 use couchbase_core::mgmtoptions::{
-    CreateBucketOptions, CreateCollectionOptions, CreateScopeOptions, DeleteBucketOptions,
-    DeleteCollectionOptions, DeleteScopeOptions, EnsureBucketOptions, EnsureManifestOptions,
-    GetBucketOptions, GetCollectionManifestOptions, UpdateBucketOptions,
+    CreateBucketOptions, CreateCollectionOptions, DeleteBucketOptions, EnsureBucketOptions,
+    EnsureManifestOptions, GetBucketOptions, GetCollectionManifestOptions, UpdateBucketOptions,
 };
 use couchbase_core::mgmtx::bucket_settings::{BucketSettings, BucketType};
-use couchbase_core::mgmtx::responses::{
-    CreateScopeResponse, DeleteCollectionResponse, DeleteScopeResponse,
-};
 use couchbase_core::{cbconfig, error};
 use serial_test::serial;
 use std::future::Future;
@@ -336,35 +334,7 @@ async fn ensure_manifest(agent: &Agent, bucket_name: &str, manifest_uid: String)
     agent.ensure_manifest(ensure_opts).await.unwrap();
 }
 
-async fn delete_scope(
-    agent: &Agent,
-    bucket_name: &str,
-    scope_name: &str,
-) -> error::Result<DeleteScopeResponse> {
-    let opts = &DeleteScopeOptions::new(bucket_name, scope_name);
-    agent.delete_scope(opts).await
-}
-
-async fn create_scope(
-    agent: &Agent,
-    bucket_name: &str,
-    scope_name: &str,
-) -> error::Result<CreateScopeResponse> {
-    let opts = &CreateScopeOptions::new(bucket_name, scope_name);
-    agent.create_scope(opts).await
-}
-
 async fn get_manifest(agent: &Agent, bucket_name: &str) -> error::Result<CollectionManifest> {
     let opts = &GetCollectionManifestOptions::new(bucket_name);
     agent.get_collection_manifest(opts).await
-}
-
-async fn delete_collection(
-    agent: &Agent,
-    bucket_name: &str,
-    scope_name: &str,
-    collection_name: &str,
-) -> error::Result<DeleteCollectionResponse> {
-    let opts = &DeleteCollectionOptions::new(bucket_name, scope_name, collection_name);
-    agent.delete_collection(opts).await
 }

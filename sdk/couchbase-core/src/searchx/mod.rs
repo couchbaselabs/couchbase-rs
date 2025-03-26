@@ -1,7 +1,10 @@
+pub mod document_analysis;
+pub mod ensure_index_helper;
 pub mod error;
 pub mod facets;
-pub(crate) mod index;
+pub mod index;
 mod index_json;
+pub mod mgmt_options;
 pub mod queries;
 pub mod query_options;
 pub mod search;

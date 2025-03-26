@@ -197,7 +197,7 @@ impl<C: Client> Management<C> {
             return Err(Self::decode_common_error(resp).await);
         }
 
-        Self::parse_response_json(resp).await
+        parse_response_json(resp).await
     }
 
     pub async fn get_terse_bucket_config(
@@ -219,7 +219,7 @@ impl<C: Client> Management<C> {
             return Err(Self::decode_common_error(resp).await);
         }
 
-        Self::parse_response_json(resp).await
+        parse_response_json(resp).await
     }
 
     pub async fn get_collection_manifest(
@@ -244,7 +244,7 @@ impl<C: Client> Management<C> {
             return Err(Self::decode_common_error(resp).await);
         }
 
-        Self::parse_response_json(resp).await
+        parse_response_json(resp).await
     }
 
     pub async fn create_scope(
@@ -270,7 +270,7 @@ impl<C: Client> Management<C> {
             return Err(Self::decode_common_error(resp).await);
         }
 
-        let manifest_uid: ManifestUidJson = Self::parse_response_json(resp).await?;
+        let manifest_uid: ManifestUidJson = parse_response_json(resp).await?;
 
         Ok(CreateScopeResponse {
             manifest_uid: manifest_uid.manifest_uid,
@@ -299,7 +299,7 @@ impl<C: Client> Management<C> {
             return Err(Self::decode_common_error(resp).await);
         }
 
-        let manifest_uid: ManifestUidJson = Self::parse_response_json(resp).await?;
+        let manifest_uid: ManifestUidJson = parse_response_json(resp).await?;
 
         Ok(DeleteScopeResponse {
             manifest_uid: manifest_uid.manifest_uid,
@@ -347,7 +347,7 @@ impl<C: Client> Management<C> {
             return Err(Self::decode_common_error(resp).await);
         }
 
-        let manifest_uid: ManifestUidJson = Self::parse_response_json(resp).await?;
+        let manifest_uid: ManifestUidJson = parse_response_json(resp).await?;
 
         Ok(CreateCollectionResponse {
             manifest_uid: manifest_uid.manifest_uid,
@@ -394,7 +394,7 @@ impl<C: Client> Management<C> {
             return Err(Self::decode_common_error(resp).await);
         }
 
-        let manifest_uid: ManifestUidJson = Self::parse_response_json(resp).await?;
+        let manifest_uid: ManifestUidJson = parse_response_json(resp).await?;
 
         Ok(UpdateCollectionResponse {
             manifest_uid: manifest_uid.manifest_uid,
@@ -423,7 +423,7 @@ impl<C: Client> Management<C> {
             return Err(Self::decode_common_error(resp).await);
         }
 
-        let manifest_uid: ManifestUidJson = Self::parse_response_json(resp).await?;
+        let manifest_uid: ManifestUidJson = parse_response_json(resp).await?;
 
         Ok(DeleteCollectionResponse {
             manifest_uid: manifest_uid.manifest_uid,
@@ -449,7 +449,7 @@ impl<C: Client> Management<C> {
             return Err(Self::decode_common_error(resp).await);
         }
 
-        let json_buckets: Vec<BucketSettingsJson> = Self::parse_response_json(resp).await?;
+        let json_buckets: Vec<BucketSettingsJson> = parse_response_json(resp).await?;
         let mut buckets = Vec::with_capacity(json_buckets.len());
         for bucket in json_buckets {
             buckets.push(bucket.into());
@@ -474,7 +474,7 @@ impl<C: Client> Management<C> {
             return Err(Self::decode_common_error(resp).await);
         }
 
-        let bucket: BucketSettingsJson = Self::parse_response_json(resp).await?;
+        let bucket: BucketSettingsJson = parse_response_json(resp).await?;
 
         Ok(bucket.into())
     }
@@ -584,16 +584,16 @@ impl<C: Client> Management<C> {
 
         Ok(())
     }
+}
 
-    async fn parse_response_json<T: DeserializeOwned>(resp: Response) -> error::Result<T> {
-        let body = resp
-            .bytes()
-            .await
-            .map_err(|e| error::Error::new_message_error("could not read response").with(e))?;
+pub(crate) async fn parse_response_json<T: DeserializeOwned>(resp: Response) -> error::Result<T> {
+    let body = resp
+        .bytes()
+        .await
+        .map_err(|e| error::Error::new_message_error("could not read response").with(e))?;
 
-        serde_json::from_slice(&body)
-            .map_err(|e| error::Error::new_message_error("could not parse response").with(e))
-    }
+    serde_json::from_slice(&body)
+        .map_err(|e| error::Error::new_message_error("could not parse response").with(e))
 }
 
 #[derive(Deserialize)]

@@ -199,3 +199,14 @@ impl From<Row> for ResultHit {
 pub(crate) struct ErrorResponse {
     pub(crate) error: String,
 }
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct DocumentAnalysisJson {
+    pub status: String,
+    pub analyzed: Vec<u8>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct IndexedDocumentsJson {
+    pub count: u64,
+}

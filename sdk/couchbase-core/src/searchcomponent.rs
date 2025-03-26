@@ -1,23 +1,33 @@
 use crate::authenticator::Authenticator;
+use crate::error;
 use crate::error::ErrorKind;
 use crate::httpcomponent::{HttpComponent, HttpComponentState};
 use crate::httpx::client::Client;
-use crate::httpx::request::OnBehalfOfInfo;
-use crate::retry::{
-    orchestrate_retries, RetryInfo, RetryManager, RetryStrategy, DEFAULT_RETRY_STRATEGY,
+use crate::mgmtx::node_target::NodeTarget;
+use crate::retry::{orchestrate_retries, RetryInfo, RetryManager, DEFAULT_RETRY_STRATEGY};
+use crate::retrybesteffort::ExponentialBackoffCalculator;
+use crate::searchmgmt_options::{
+    AllowQueryingOptions, AnalyzeDocumentOptions, DeleteIndexOptions, DisallowQueryingOptions,
+    EnsureIndexOptions, FreezePlanOptions, GetAllIndexesOptions, GetIndexOptions,
+    GetIndexedDocumentsCountOptions, PauseIngestOptions, ResumeIngestOptions, UnfreezePlanOptions,
+    UpsertIndexOptions,
 };
 use crate::searchoptions::SearchOptions;
+use crate::searchx::document_analysis::DocumentAnalysis;
+use crate::searchx::ensure_index_helper::EnsureIndexHelper;
+use crate::searchx::index::Index;
+use crate::searchx::mgmt_options::EnsureIndexPollOptions;
 use crate::searchx::search::Search;
 use crate::searchx::search_respreader::SearchRespReader;
 use crate::searchx::search_result::{FacetResult, MetaData, ResultHit};
 use crate::service_type::ServiceType;
-use crate::{error, searchx};
 use arc_swap::ArcSwap;
 use futures::StreamExt;
 use futures_core::Stream;
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::Arc;
+use std::time::Duration;
 
 pub(crate) struct SearchComponent<C: Client> {
     http_component: HttpComponent<C>,
@@ -164,6 +174,57 @@ impl<C: Client> SearchComponent<C> {
         .await
     }
 
+    pub async fn get_index(&self, opts: &GetIndexOptions<'_>) -> error::Result<Index> {
+        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
+            retry_strategy
+        } else {
+            DEFAULT_RETRY_STRATEGY.clone()
+        };
+
+        let retry_info = RetryInfo::new(true, retry);
+        let endpoint = opts.endpoint;
+        let copts = opts.into();
+
+        self.orchestrate_mgmt_call(
+            retry_info,
+            endpoint.map(|e| e.to_string()),
+            async |search| {
+                search
+                    .get_index(&copts)
+                    .await
+                    .map_err(|e| ErrorKind::Search(e).into())
+            },
+        )
+        .await
+    }
+
+    pub async fn get_all_indexes(
+        &self,
+        opts: &GetAllIndexesOptions<'_>,
+    ) -> error::Result<Vec<Index>> {
+        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
+            retry_strategy
+        } else {
+            DEFAULT_RETRY_STRATEGY.clone()
+        };
+
+        let retry_info = RetryInfo::new(true, retry);
+        let endpoint = opts.endpoint;
+        let copts = opts.into();
+
+        self.orchestrate_mgmt_call(
+            retry_info,
+            endpoint.map(|e| e.to_string()),
+            async |search| {
+                search
+                    .get_all_indexes(&copts)
+                    .await
+                    .map_err(|e| ErrorKind::Search(e).into())
+            },
+        )
+        .await
+    }
+
     pub async fn upsert_index(&self, opts: &UpsertIndexOptions<'_>) -> error::Result<()> {
         let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
             retry_strategy
@@ -212,6 +273,271 @@ impl<C: Client> SearchComponent<C> {
         .await
     }
 
+    pub async fn analyze_document(
+        &self,
+        opts: &AnalyzeDocumentOptions<'_>,
+    ) -> error::Result<DocumentAnalysis> {
+        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
+            retry_strategy
+        } else {
+            DEFAULT_RETRY_STRATEGY.clone()
+        };
+
+        let retry_info = RetryInfo::new(true, retry);
+        let endpoint = opts.endpoint;
+        let copts = opts.into();
+
+        self.orchestrate_mgmt_call(
+            retry_info,
+            endpoint.map(|e| e.to_string()),
+            async |search| {
+                search
+                    .analyze_document(&copts)
+                    .await
+                    .map_err(|e| ErrorKind::Search(e).into())
+            },
+        )
+        .await
+    }
+
+    pub async fn get_indexed_documents_count(
+        &self,
+        opts: &GetIndexedDocumentsCountOptions<'_>,
+    ) -> error::Result<u64> {
+        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
+            retry_strategy
+        } else {
+            DEFAULT_RETRY_STRATEGY.clone()
+        };
+
+        let retry_info = RetryInfo::new(true, retry);
+        let endpoint = opts.endpoint;
+        let copts = opts.into();
+
+        self.orchestrate_mgmt_call(
+            retry_info,
+            endpoint.map(|e| e.to_string()),
+            async |search| {
+                search
+                    .get_indexed_documents_count(&copts)
+                    .await
+                    .map_err(|e| ErrorKind::Search(e).into())
+            },
+        )
+        .await
+    }
+
+    pub async fn pause_ingest(&self, opts: &PauseIngestOptions<'_>) -> error::Result<()> {
+        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
+            retry_strategy
+        } else {
+            DEFAULT_RETRY_STRATEGY.clone()
+        };
+
+        let retry_info = RetryInfo::new(true, retry);
+        let endpoint = opts.endpoint;
+        let copts = opts.into();
+
+        self.orchestrate_no_res_mgmt_call(
+            retry_info,
+            endpoint.map(|e| e.to_string()),
+            async |search| {
+                search
+                    .pause_ingest(&copts)
+                    .await
+                    .map_err(|e| ErrorKind::Search(e).into())
+            },
+        )
+        .await
+    }
+
+    pub async fn resume_ingest(&self, opts: &ResumeIngestOptions<'_>) -> error::Result<()> {
+        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
+            retry_strategy
+        } else {
+            DEFAULT_RETRY_STRATEGY.clone()
+        };
+
+        let retry_info = RetryInfo::new(true, retry);
+        let endpoint = opts.endpoint;
+        let copts = opts.into();
+
+        self.orchestrate_no_res_mgmt_call(
+            retry_info,
+            endpoint.map(|e| e.to_string()),
+            async |search| {
+                search
+                    .resume_ingest(&copts)
+                    .await
+                    .map_err(|e| ErrorKind::Search(e).into())
+            },
+        )
+        .await
+    }
+
+    pub async fn allow_querying(&self, opts: &AllowQueryingOptions<'_>) -> error::Result<()> {
+        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
+            retry_strategy
+        } else {
+            DEFAULT_RETRY_STRATEGY.clone()
+        };
+
+        let retry_info = RetryInfo::new(true, retry);
+        let endpoint = opts.endpoint;
+        let copts = opts.into();
+
+        self.orchestrate_no_res_mgmt_call(
+            retry_info,
+            endpoint.map(|e| e.to_string()),
+            async |search| {
+                search
+                    .allow_querying(&copts)
+                    .await
+                    .map_err(|e| ErrorKind::Search(e).into())
+            },
+        )
+        .await
+    }
+
+    pub async fn disallow_querying(&self, opts: &DisallowQueryingOptions<'_>) -> error::Result<()> {
+        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
+            retry_strategy
+        } else {
+            DEFAULT_RETRY_STRATEGY.clone()
+        };
+
+        let retry_info = RetryInfo::new(true, retry);
+        let endpoint = opts.endpoint;
+        let copts = opts.into();
+
+        self.orchestrate_no_res_mgmt_call(
+            retry_info,
+            endpoint.map(|e| e.to_string()),
+            async |search| {
+                search
+                    .disallow_querying(&copts)
+                    .await
+                    .map_err(|e| ErrorKind::Search(e).into())
+            },
+        )
+        .await
+    }
+
+    pub async fn freeze_plan(&self, opts: &FreezePlanOptions<'_>) -> error::Result<()> {
+        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
+            retry_strategy
+        } else {
+            DEFAULT_RETRY_STRATEGY.clone()
+        };
+
+        let retry_info = RetryInfo::new(true, retry);
+        let endpoint = opts.endpoint;
+        let copts = opts.into();
+
+        self.orchestrate_no_res_mgmt_call(
+            retry_info,
+            endpoint.map(|e| e.to_string()),
+            async |search| {
+                search
+                    .freeze_plan(&copts)
+                    .await
+                    .map_err(|e| ErrorKind::Search(e).into())
+            },
+        )
+        .await
+    }
+
+    pub async fn unfreeze_plan(&self, opts: &UnfreezePlanOptions<'_>) -> error::Result<()> {
+        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
+            retry_strategy
+        } else {
+            DEFAULT_RETRY_STRATEGY.clone()
+        };
+
+        let retry_info = RetryInfo::new(true, retry);
+        let endpoint = opts.endpoint;
+        let copts = opts.into();
+
+        self.orchestrate_no_res_mgmt_call(
+            retry_info,
+            endpoint.map(|e| e.to_string()),
+            async |search| {
+                search
+                    .unfreeze_plan(&copts)
+                    .await
+                    .map_err(|e| ErrorKind::Search(e).into())
+            },
+        )
+        .await
+    }
+
+    pub async fn ensure_index(&self, opts: &EnsureIndexOptions<'_>) -> error::Result<()> {
+        let mut helper = EnsureIndexHelper::new(
+            self.http_component.user_agent(),
+            opts.index_name,
+            opts.bucket_name,
+            opts.scope_name,
+            opts.on_behalf_of_info,
+        );
+
+        let backoff = ExponentialBackoffCalculator::new(
+            Duration::from_millis(100),
+            Duration::from_millis(1000),
+            1.5,
+        );
+
+        self.http_component
+            .ensure_resource(backoff, async |client: Arc<C>, targets: Vec<NodeTarget>| {
+                helper
+                    .clone()
+                    .poll(&EnsureIndexPollOptions {
+                        client,
+                        targets,
+                        desired_state: opts.desired_state,
+                    })
+                    .await
+                    .map_err(error::Error::from)
+            })
+            .await
+    }
+
+    async fn orchestrate_mgmt_call<Fut, Resp>(
+        &self,
+        retry_info: RetryInfo,
+        endpoint: Option<String>,
+        operation: impl Fn(Search<C>) -> Fut + Send + Sync,
+    ) -> error::Result<Resp>
+    where
+        Resp: Send + Sync,
+        Fut: Future<Output = error::Result<Resp>> + Send,
+        C: Client,
+    {
+        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
+            self.http_component
+                .orchestrate_endpoint(
+                    endpoint.clone(),
+                    async |client: Arc<C>,
+                           endpoint_id: String,
+                           endpoint: String,
+                           username: String,
+                           password: String| {
+                        operation(Search::<C> {
+                            http_client: client,
+                            user_agent: self.http_component.user_agent().to_string(),
+                            endpoint: endpoint.clone(),
+                            username,
+                            password,
+
+                            vector_search_enabled: self.state.load().vector_search_enabled,
+                        })
+                        .await
+                    },
+                )
+                .await
+        })
+        .await
+    }
+
     async fn orchestrate_no_res_mgmt_call<Fut>(
         &self,
         retry_info: RetryInfo,
@@ -246,129 +572,5 @@ impl<C: Client> SearchComponent<C> {
                 .await
         })
         .await
-    }
-}
-
-#[derive(Debug)]
-#[non_exhaustive]
-pub struct UpsertIndexOptions<'a> {
-    pub index: &'a searchx::index::Index,
-    pub bucket_name: Option<&'a str>,
-    pub scope_name: Option<&'a str>,
-
-    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
-    pub endpoint: Option<&'a str>,
-
-    pub on_behalf_of: Option<&'a OnBehalfOfInfo>,
-}
-
-impl<'a> UpsertIndexOptions<'a> {
-    pub fn new(index: &'a searchx::index::Index) -> Self {
-        Self {
-            index,
-            bucket_name: None,
-            scope_name: None,
-            retry_strategy: None,
-            endpoint: None,
-            on_behalf_of: None,
-        }
-    }
-
-    pub fn bucket_name(mut self, bucket_name: &'a str) -> Self {
-        self.bucket_name = Some(bucket_name);
-        self
-    }
-
-    pub fn scope_name(mut self, scope_name: &'a str) -> Self {
-        self.scope_name = Some(scope_name);
-        self
-    }
-
-    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
-        self.retry_strategy = Some(retry_strategy);
-        self
-    }
-
-    pub fn endpoint(mut self, endpoint: &'a str) -> Self {
-        self.endpoint = Some(endpoint);
-        self
-    }
-
-    pub fn on_behalf_of(mut self, on_behalf_of: &'a OnBehalfOfInfo) -> Self {
-        self.on_behalf_of = Some(on_behalf_of);
-        self
-    }
-}
-
-#[derive(Debug)]
-#[non_exhaustive]
-pub struct DeleteIndexOptions<'a> {
-    pub index_name: &'a str,
-    pub bucket_name: Option<&'a str>,
-    pub scope_name: Option<&'a str>,
-
-    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
-    pub endpoint: Option<&'a str>,
-
-    pub on_behalf_of: Option<&'a OnBehalfOfInfo>,
-}
-
-impl<'a> DeleteIndexOptions<'a> {
-    pub fn new(index_name: &'a str) -> Self {
-        Self {
-            index_name,
-            bucket_name: None,
-            scope_name: None,
-            retry_strategy: None,
-            endpoint: None,
-            on_behalf_of: None,
-        }
-    }
-
-    pub fn bucket_name(mut self, bucket_name: &'a str) -> Self {
-        self.bucket_name = Some(bucket_name);
-        self
-    }
-
-    pub fn scope_name(mut self, scope_name: &'a str) -> Self {
-        self.scope_name = Some(scope_name);
-        self
-    }
-
-    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
-        self.retry_strategy = Some(retry_strategy);
-        self
-    }
-
-    pub fn endpoint(mut self, endpoint: &'a str) -> Self {
-        self.endpoint = Some(endpoint);
-        self
-    }
-
-    pub fn on_behalf_of(mut self, on_behalf_of: &'a OnBehalfOfInfo) -> Self {
-        self.on_behalf_of = Some(on_behalf_of);
-        self
-    }
-}
-
-impl<'a> From<&UpsertIndexOptions<'a>> for searchx::search::UpsertIndexOptions<'a> {
-    fn from(opts: &UpsertIndexOptions<'a>) -> searchx::search::UpsertIndexOptions<'a> {
-        searchx::search::UpsertIndexOptions {
-            index: opts.index,
-            bucket_name: opts.bucket_name,
-            scope_name: opts.scope_name,
-            on_behalf_of: opts.on_behalf_of,
-        }
-    }
-}
-
-impl<'a> From<&DeleteIndexOptions<'a>> for searchx::search::DeleteIndexOptions<'a> {
-    fn from(opts: &DeleteIndexOptions<'a>) -> searchx::search::DeleteIndexOptions<'a> {
-        searchx::search::DeleteIndexOptions {
-            index_name: opts.index_name,
-            bucket_name: opts.bucket_name,
-            scope_name: opts.scope_name,
-            on_behalf_of: opts.on_behalf_of,
-        }
     }
 }

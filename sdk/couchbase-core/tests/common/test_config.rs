@@ -1,19 +1,21 @@
-use std::env;
-use std::future::Future;
-use std::io::Write;
-use std::ops::{Deref, DerefMut};
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering::SeqCst;
-use std::sync::LazyLock;
-
 use crate::common::default_agent_options;
+use crate::common::node_version::NodeVersion;
 use couchbase_connstr::ResolvedConnSpec;
 use couchbase_core::agent::Agent;
 use envconfig::Envconfig;
 use lazy_static::lazy_static;
 use log::LevelFilter;
+use std::env;
+use std::future::Future;
+use std::io::Write;
+use std::ops::{Add, Deref, DerefMut};
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering::SeqCst;
+use std::sync::LazyLock;
+use std::time::Duration;
 use tokio::runtime::Runtime;
 use tokio::sync::RwLock;
+use tokio::time::{timeout_at, Instant};
 
 lazy_static! {
     pub static ref TEST_AGENT: RwLock<Option<TestAgent>> = RwLock::new(None);
@@ -36,6 +38,8 @@ pub struct EnvTestConfig {
     pub default_collection: String,
     #[envconfig(from = "RCBDATA_TIMEOUT", default = "2500")]
     pub data_timeout: String,
+    #[envconfig(from = "RCBSERVER_VERSION", default = "7.6.2")]
+    pub server_version: String,
 }
 
 #[derive(Debug, Clone)]
@@ -62,6 +66,7 @@ impl TestSetupConfig {
 #[derive(Clone)]
 pub struct TestAgent {
     pub test_setup_config: TestSetupConfig,
+    pub cluster_version: NodeVersion,
     agent: Agent,
 }
 
@@ -101,10 +106,7 @@ where
             return;
         }
 
-        if LOGGER_INITIATED
-            .compare_exchange(false, true, SeqCst, SeqCst)
-            .unwrap_or(false)
-        {
+        if LOGGER_INITIATED.compare_exchange(false, true, SeqCst, SeqCst) == Ok(false) {
             env_logger::Builder::new()
                 .format(|buf, record| {
                     writeln!(
@@ -127,7 +129,12 @@ where
                 .init();
         }
 
-        let test_agent = create_test_agent().await;
+        let test_agent = timeout_at(
+            Instant::now().add(Duration::from_secs(7)),
+            create_test_agent(),
+        )
+        .await
+        .unwrap();
 
         *config = Some(test_agent.clone());
         drop(config);
@@ -142,10 +149,7 @@ where
     Fut: Future<Output = ()>,
 {
     RUNTIME.block_on(async {
-        if LOGGER_INITIATED
-            .compare_exchange(false, true, SeqCst, SeqCst)
-            .unwrap_or(false)
-        {
+        if LOGGER_INITIATED.compare_exchange(false, true, SeqCst, SeqCst) == Ok(false) {
             env_logger::Builder::new()
                 .format(|buf, record| {
                     writeln!(
@@ -204,6 +208,7 @@ pub async fn create_test_agent() -> TestAgent {
 
     TestAgent {
         test_setup_config,
+        cluster_version: NodeVersion::from(test_config.server_version.clone()),
         agent,
     }
 }
