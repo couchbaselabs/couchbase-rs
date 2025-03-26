@@ -1,7 +1,4 @@
 use crate::clients::agent_provider::CouchbaseAgentProvider;
-use crate::clients::analytics_client::{
-    AnalyticsClient, AnalyticsClientBackend, CouchbaseAnalyticsClient,
-};
 use crate::clients::bucket_client::{
     BucketClient, BucketClientBackend, Couchbase2BucketClient, CouchbaseBucketClient,
 };
@@ -118,21 +115,6 @@ impl ClusterClient {
             }
         }
     }
-
-    pub fn analytics_client(&self) -> AnalyticsClient {
-        match &self.backend {
-            ClusterClientBackend::CouchbaseClusterBackend(backend) => {
-                let analytics_client = backend.analytics_client();
-
-                AnalyticsClient::new(AnalyticsClientBackend::CouchbaseAnalyticsClientBackend(
-                    analytics_client,
-                ))
-            }
-            ClusterClientBackend::Couchbase2ClusterBackend(_) => {
-                unimplemented!()
-            }
-        }
-    }
 }
 
 struct CouchbaseClusterBackend {
@@ -225,12 +207,6 @@ impl CouchbaseClusterBackend {
         let agent = self.agent_manager.get_cluster_agent();
 
         CouchbaseSearchClient::new(CouchbaseAgentProvider::with_agent(agent.clone()))
-    }
-
-    fn analytics_client(&self) -> CouchbaseAnalyticsClient {
-        let agent = self.agent_manager.get_cluster_agent();
-
-        CouchbaseAnalyticsClient::new(CouchbaseAgentProvider::with_agent(agent.clone()))
     }
 
     fn merge_options(
