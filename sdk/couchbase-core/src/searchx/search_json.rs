@@ -24,7 +24,7 @@ pub(crate) struct SearchMetaData {
     pub(crate) max_score: f64,
     pub(crate) took: u64,
     #[serde(default)]
-    pub(crate) facets: HashMap<String, Facet>,
+    pub(crate) facets: Option<HashMap<String, Facet>>,
 }
 
 #[derive(Debug, Deserialize)]

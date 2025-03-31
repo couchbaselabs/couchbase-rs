@@ -1,8 +1,14 @@
+use crate::common::consistency_utils::{verify_collection_created, verify_scope_created};
 use crate::common::doc_generation::import_sample_beer_dataset;
+use crate::common::features::TestFeatureCode;
 use crate::common::test_config::run_test;
+use crate::common::{new_key, try_until};
 use chrono::DateTime;
+use couchbase::management::collections::collection_settings::CreateCollectionSettings;
+use couchbase::management::search::index::SearchIndex;
 use couchbase::options::search_options::SearchOptions;
 use couchbase::results::search_results::{SearchFacetResultType, SearchResult, SearchRow};
+use couchbase::scope::Scope;
 use couchbase::search::facets::{
     DateRange, DateRangeFacet, Facet, NumericRange, NumericRangeFacet, TermFacet,
 };
@@ -10,24 +16,57 @@ use couchbase::search::queries::{Query, TermQuery};
 use couchbase::search::request::SearchRequest;
 use couchbase::search::sort::{Sort, SortId};
 use futures::StreamExt;
+use log::{error, warn};
 use std::collections::HashMap;
+use std::ops::Add;
 use std::time::Duration;
 use tokio::time;
 use tokio::time::{timeout_at, Instant};
 
 mod common;
 
-const BASIC_INDEX_NAME: &str = "basic_search_index";
-
 #[test]
 fn test_search_basic() {
     run_test(async |cluster| {
-        let scope = cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope);
+        if !cluster.supports_feature(&TestFeatureCode::SearchManagementCollections) {
+            return;
+        }
 
-        let collection = scope.collection(&cluster.default_collection);
+        let scope_name = new_key();
+        let collection_name = new_key();
 
+        let bucket = cluster.bucket(&cluster.default_bucket);
+        let collection_mgr = bucket.collections();
+        collection_mgr
+            .create_scope(&scope_name, None)
+            .await
+            .unwrap();
+        verify_scope_created(&collection_mgr, &scope_name).await;
+
+        collection_mgr
+            .create_collection(
+                &scope_name,
+                &collection_name,
+                CreateCollectionSettings::new(),
+                None,
+            )
+            .await
+            .unwrap();
+        verify_collection_created(&collection_mgr, &scope_name, &collection_name).await;
+
+        let scope = bucket.scope(&scope_name);
+        let collection = scope.collection(&collection_name);
+
+        let index_name = index_name();
+
+        import_search_index(
+            &scope,
+            &index_name,
+            &cluster.default_bucket,
+            &scope_name,
+            &collection_name,
+        )
+        .await;
         let import_results = import_sample_beer_dataset("search", &collection).await;
 
         let query = TermQuery::new("search").field("service".to_string());
@@ -58,14 +97,14 @@ fn test_search_basic() {
 
         let sort = Sort::Id(SortId::new().descending(true));
 
-        let deadline = Instant::now() + std::time::Duration::from_secs(60);
+        let deadline = Instant::now() + Duration::from_secs(60);
 
         let res: SearchResult;
         let rows: Vec<SearchRow>;
         loop {
-            let mut this_res = cluster
+            let mut this_res = match scope
                 .search(
-                    BASIC_INDEX_NAME,
+                    &index_name,
                     SearchRequest::with_search_query(Query::Term(query.clone())),
                     SearchOptions::new()
                         .include_locations(true)
@@ -75,7 +114,16 @@ fn test_search_basic() {
                         .fields(vec!["city".to_string()]),
                 )
                 .await
-                .unwrap();
+            {
+                Ok(res) => res,
+                Err(e) => {
+                    error!("search failed: {}", e.msg);
+                    let sleep = time::sleep(Duration::from_secs(1));
+                    timeout_at(deadline, sleep).await.unwrap();
+
+                    continue;
+                }
+            };
 
             let mut this_rows = vec![];
             while let Some(row) = this_res.rows().next().await {
@@ -88,9 +136,21 @@ fn test_search_basic() {
                 break;
             }
 
+            error!(
+                "search returned {} rows, expected {}",
+                this_rows.len(),
+                import_results.len()
+            );
+
             let sleep = time::sleep(Duration::from_secs(1));
             timeout_at(deadline, sleep).await.unwrap();
         }
+
+        scope
+            .search_indexes()
+            .drop_index(&index_name, None)
+            .await
+            .unwrap();
 
         for row in rows {
             let locations = row.locations.as_ref().unwrap();
@@ -201,4 +261,51 @@ fn test_search_basic() {
             }
         }
     })
+}
+
+async fn import_search_index(
+    scope: &Scope,
+    index_name: &str,
+    bucket_name: &str,
+    scope_name: &str,
+    collection_name: &str,
+) {
+    let mut data = include_str!("./testdata/basic_scoped_search_index.json");
+    let mut data = data.replace("$indexName", index_name);
+    let mut data = data.replace("$bucketName", bucket_name);
+    let mut data = data.replace("$scopeName", scope_name);
+    let data = data.replace("$collectionName", collection_name);
+
+    let mut index: SearchIndex = serde_json::from_str(&data).unwrap();
+
+    let mgr = scope.search_indexes();
+
+    try_until(
+        Instant::now().add(Duration::from_secs(30)),
+        Duration::from_millis(500),
+        "failed to upsert index",
+        || async {
+            match mgr.upsert_index(index.clone(), None).await {
+                Ok(_) => Ok(Some(())),
+                Err(e) => {
+                    warn!("failed to upsert index: {}", e.msg);
+                    Ok(None)
+                }
+            }
+        },
+    )
+    .await;
+}
+
+fn index_name() -> String {
+    let mut name = new_key();
+    loop {
+        if name.as_bytes()[0].is_ascii_digit() {
+            name = name[1..].to_string();
+        } else {
+            break;
+        }
+    }
+
+    name
 }
