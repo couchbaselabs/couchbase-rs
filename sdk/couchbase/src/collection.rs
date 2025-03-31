@@ -1,7 +1,7 @@
 use crate::clients::collection_client::CollectionClient;
 use crate::clients::core_kv_client::CoreKvClient;
 use crate::clients::query_index_mgmt_client::QueryIndexMgmtClient;
-use crate::management::query::query_index_manager::CollectionQueryIndexManager;
+use crate::management::query::query_index_manager::QueryIndexManager;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -30,8 +30,8 @@ impl Collection {
         BinaryCollection::new(self.core_kv_client.clone())
     }
 
-    pub fn query_indexes(&self) -> CollectionQueryIndexManager {
-        CollectionQueryIndexManager {
+    pub fn query_indexes(&self) -> QueryIndexManager {
+        QueryIndexManager {
             client: self.query_index_management_client.clone(),
         }
     }

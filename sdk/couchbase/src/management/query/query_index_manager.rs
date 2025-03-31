@@ -8,11 +8,11 @@ use crate::options::query_index_mgmt_options::{
 use crate::results::query_index_mgmt_results::QueryIndex;
 use std::sync::Arc;
 
-pub struct CollectionQueryIndexManager {
+pub struct QueryIndexManager {
     pub(crate) client: Arc<QueryIndexMgmtClient>,
 }
 
-impl CollectionQueryIndexManager {
+impl QueryIndexManager {
     pub async fn get_all_indexes(
         &self,
         opts: impl Into<Option<GetAllIndexesOptions>>,

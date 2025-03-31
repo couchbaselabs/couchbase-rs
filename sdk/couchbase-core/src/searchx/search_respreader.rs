@@ -209,8 +209,10 @@ impl SearchRespReader {
         };
 
         let mut facets: HashMap<String, FacetResult> = HashMap::new();
-        for (facet_name, facet_data) in metadata_json.facets {
-            facets.insert(facet_name, facet_data.try_into()?);
+        if let Some(resp_facets) = metadata_json.facets {
+            for (facet_name, facet_data) in resp_facets {
+                facets.insert(facet_name, facet_data.try_into()?);
+            }
         }
 
         Ok((metadata, facets))

@@ -9,6 +9,10 @@ use crate::clients::query_client::{
 use crate::clients::search_client::{
     CouchbaseSearchClient, SearchClient, SearchClientBackend, SearchKeyspace,
 };
+use crate::clients::search_index_mgmt_client::{
+    CouchbaseSearchIndexMgmtClient, SearchIndexKeyspace, SearchIndexMgmtClient,
+    SearchIndexMgmtClientBackend,
+};
 use couchbase_core::retry::RetryStrategy;
 use std::sync::Arc;
 
@@ -54,6 +58,21 @@ impl ScopeClient {
                 SearchClient::new(SearchClientBackend::CouchbaseSearchClientBackend(
                     search_client,
                 ))
+            }
+            ScopeClientBackend::Couchbase2ScopeBackend(_) => {
+                unimplemented!()
+            }
+        }
+    }
+
+    pub fn search_index_management_client(&self) -> SearchIndexMgmtClient {
+        match &self.backend {
+            ScopeClientBackend::CouchbaseScopeBackend(backend) => {
+                let client = backend.search_index_management_client();
+
+                SearchIndexMgmtClient::new(
+                    SearchIndexMgmtClientBackend::CouchbaseSearchIndexMgmtClientBackend(client),
+                )
             }
             ScopeClientBackend::Couchbase2ScopeBackend(_) => {
                 unimplemented!()
@@ -132,6 +151,16 @@ impl CouchbaseScopeClient {
         CouchbaseSearchClient::with_keyspace(
             self.agent_provider.clone(),
             SearchKeyspace {
+                bucket_name: self.bucket_name().to_string(),
+                scope_name: self.name().to_string(),
+            },
+        )
+    }
+
+    pub fn search_index_management_client(&self) -> CouchbaseSearchIndexMgmtClient {
+        CouchbaseSearchIndexMgmtClient::new(
+            self.agent_provider.clone(),
+            SearchIndexKeyspace {
                 bucket_name: self.bucket_name().to_string(),
                 scope_name: self.name().to_string(),
             },
