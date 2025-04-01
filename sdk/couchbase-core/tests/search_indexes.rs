@@ -1,7 +1,7 @@
 use crate::common::features::TestFeatureCode;
 use crate::common::helpers::{
     create_collection_and_ensure_exists, create_scope_and_ensure_exists, delete_scope,
-    generate_string_key,
+    generate_key_with_letter_prefix, generate_string_key,
 };
 use crate::common::test_config::run_test;
 use crate::common::try_until;
@@ -24,7 +24,7 @@ fn test_basic_search_index_management() {
             return;
         }
 
-        let index_name = index_name();
+        let index_name = generate_key_with_letter_prefix();
 
         let index = load_search_index(&index_name, &agent.test_setup_config.bucket).await;
 
@@ -85,7 +85,7 @@ fn test_basic_search_index_management_collections() {
             return;
         }
 
-        let index_name = index_name();
+        let index_name = generate_key_with_letter_prefix();
         let scope_name = generate_string_key();
         let collection_name = generate_string_key();
 
@@ -178,19 +178,6 @@ fn test_basic_search_index_management_collections() {
             .await
             .unwrap();
     });
-}
-
-fn index_name() -> String {
-    let mut name = generate_string_key();
-    loop {
-        if name.as_bytes()[0].is_ascii_digit() {
-            name = name[1..].to_string();
-        } else {
-            break;
-        }
-    }
-
-    name
 }
 
 async fn load_scoped_search_index(

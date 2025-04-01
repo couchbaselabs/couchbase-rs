@@ -19,6 +19,19 @@ pub fn generate_key() -> Vec<u8> {
     generate_string_key().into_bytes()
 }
 
+pub fn generate_key_with_letter_prefix() -> String {
+    let mut name = generate_string_key();
+    loop {
+        if name.as_bytes()[0].is_ascii_digit() {
+            name = name[1..].to_string();
+        } else {
+            break;
+        }
+    }
+
+    name
+}
+
 pub fn generate_string_key() -> String {
     rng()
         .sample_iter(&Alphanumeric)

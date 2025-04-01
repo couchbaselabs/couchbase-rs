@@ -16,16 +16,20 @@ use crate::crudresults::{
 use crate::error::Result;
 use crate::features::BucketFeature;
 use crate::mgmtoptions::{
-    CreateBucketOptions, CreateCollectionOptions, CreateScopeOptions, DeleteBucketOptions,
-    DeleteCollectionOptions, DeleteScopeOptions, EnsureBucketOptions, EnsureManifestOptions,
-    FlushBucketOptions, GetAllBucketsOptions, GetBucketOptions, GetCollectionManifestOptions,
-    UpdateBucketOptions, UpdateCollectionOptions,
+    ChangePasswordOptions, CreateBucketOptions, CreateCollectionOptions, CreateScopeOptions,
+    DeleteBucketOptions, DeleteCollectionOptions, DeleteGroupOptions, DeleteScopeOptions,
+    DeleteUserOptions, EnsureBucketOptions, EnsureGroupOptions, EnsureManifestOptions,
+    EnsureUserOptions, FlushBucketOptions, GetAllBucketsOptions, GetAllGroupsOptions,
+    GetAllUsersOptions, GetBucketOptions, GetCollectionManifestOptions, GetGroupOptions,
+    GetRolesOptions, GetUserOptions, UpdateBucketOptions, UpdateCollectionOptions,
+    UpsertGroupOptions, UpsertUserOptions,
 };
 use crate::mgmtx::bucket_settings::BucketDef;
 use crate::mgmtx::responses::{
     CreateCollectionResponse, CreateScopeResponse, DeleteCollectionResponse, DeleteScopeResponse,
     UpdateCollectionResponse,
 };
+use crate::mgmtx::user::{Group, RoleAndDescription, UserAndMetadata};
 use crate::querycomponent::QueryResultStream;
 use crate::queryoptions::{
     BuildDeferredIndexesOptions, CreateIndexOptions, CreatePrimaryIndexOptions, DropIndexOptions,
@@ -290,6 +294,57 @@ impl Agent {
 
     pub async fn flush_bucket(&self, opts: &FlushBucketOptions<'_>) -> Result<()> {
         self.inner.mgmt.flush_bucket(opts).await
+    }
+
+    pub async fn get_user(&self, opts: &GetUserOptions<'_>) -> Result<UserAndMetadata> {
+        self.inner.mgmt.get_user(opts).await
+    }
+
+    pub async fn get_all_users(
+        &self,
+        opts: &GetAllUsersOptions<'_>,
+    ) -> Result<Vec<UserAndMetadata>> {
+        self.inner.mgmt.get_all_users(opts).await
+    }
+
+    pub async fn upsert_user(&self, opts: &UpsertUserOptions<'_>) -> Result<()> {
+        self.inner.mgmt.upsert_user(opts).await
+    }
+
+    pub async fn delete_user(&self, opts: &DeleteUserOptions<'_>) -> Result<()> {
+        self.inner.mgmt.delete_user(opts).await
+    }
+
+    pub async fn get_roles(&self, opts: &GetRolesOptions<'_>) -> Result<Vec<RoleAndDescription>> {
+        self.inner.mgmt.get_roles(opts).await
+    }
+
+    pub async fn get_group(&self, opts: &GetGroupOptions<'_>) -> Result<Group> {
+        self.inner.mgmt.get_group(opts).await
+    }
+
+    pub async fn get_all_groups(&self, opts: &GetAllGroupsOptions<'_>) -> Result<Vec<Group>> {
+        self.inner.mgmt.get_all_groups(opts).await
+    }
+
+    pub async fn upsert_group(&self, opts: &UpsertGroupOptions<'_>) -> Result<()> {
+        self.inner.mgmt.upsert_group(opts).await
+    }
+
+    pub async fn delete_group(&self, opts: &DeleteGroupOptions<'_>) -> Result<()> {
+        self.inner.mgmt.delete_group(opts).await
+    }
+
+    pub async fn change_password(&self, opts: &ChangePasswordOptions<'_>) -> Result<()> {
+        self.inner.mgmt.change_password(opts).await
+    }
+
+    pub async fn ensure_user(&self, opts: &EnsureUserOptions<'_>) -> Result<()> {
+        self.inner.mgmt.ensure_user(opts).await
+    }
+
+    pub async fn ensure_group(&self, opts: &EnsureGroupOptions<'_>) -> Result<()> {
+        self.inner.mgmt.ensure_group(opts).await
     }
 
     pub async fn ensure_bucket(&self, opts: &EnsureBucketOptions<'_>) -> Result<()> {

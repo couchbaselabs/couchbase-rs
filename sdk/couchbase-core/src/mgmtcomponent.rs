@@ -4,20 +4,29 @@ use crate::error::ErrorKind;
 use crate::httpcomponent::{HttpComponent, HttpComponentState};
 use crate::httpx::client::Client;
 use crate::mgmtoptions::{
-    CreateBucketOptions, CreateCollectionOptions, CreateScopeOptions, DeleteBucketOptions,
-    DeleteCollectionOptions, DeleteScopeOptions, EnsureBucketOptions, EnsureManifestOptions,
-    FlushBucketOptions, GetAllBucketsOptions, GetBucketOptions, GetCollectionManifestOptions,
-    UpdateBucketOptions, UpdateCollectionOptions,
+    ChangePasswordOptions, CreateBucketOptions, CreateCollectionOptions, CreateScopeOptions,
+    DeleteBucketOptions, DeleteCollectionOptions, DeleteGroupOptions, DeleteScopeOptions,
+    DeleteUserOptions, EnsureBucketOptions, EnsureGroupOptions, EnsureManifestOptions,
+    EnsureUserOptions, FlushBucketOptions, GetAllBucketsOptions, GetAllGroupsOptions,
+    GetAllUsersOptions, GetBucketOptions, GetCollectionManifestOptions, GetGroupOptions,
+    GetRolesOptions, GetUserOptions, UpdateBucketOptions, UpdateCollectionOptions,
+    UpsertGroupOptions, UpsertUserOptions,
 };
 use crate::mgmtx::bucket_helper::EnsureBucketHelper;
 use crate::mgmtx::bucket_settings::BucketDef;
+use crate::mgmtx::group_helper::EnsureGroupHelper;
 use crate::mgmtx::manifest_helper::EnsureManifestHelper;
 use crate::mgmtx::node_target::NodeTarget;
-use crate::mgmtx::options::{EnsureBucketPollOptions, EnsureManifestPollOptions};
+use crate::mgmtx::options::{
+    EnsureBucketPollOptions, EnsureGroupPollOptions, EnsureManifestPollOptions,
+    EnsureUserPollOptions,
+};
 use crate::mgmtx::responses::{
     CreateCollectionResponse, CreateScopeResponse, DeleteCollectionResponse, DeleteScopeResponse,
     UpdateCollectionResponse,
 };
+use crate::mgmtx::user::{Group, RoleAndDescription, UserAndMetadata};
+use crate::mgmtx::user_helper::EnsureUserHelper;
 use crate::retry::{orchestrate_retries, RetryInfo, RetryManager};
 use crate::retrybesteffort::ExponentialBackoffCalculator;
 use crate::service_type::ServiceType;
@@ -535,6 +544,366 @@ impl<C: Client> MgmtComponent<C> {
                 helper
                     .clone()
                     .poll(&EnsureBucketPollOptions { client, targets })
+                    .await
+                    .map_err(error::Error::from)
+            })
+            .await
+    }
+
+    pub async fn get_user(&self, opts: &GetUserOptions<'_>) -> error::Result<UserAndMetadata> {
+        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+        let copts = opts.into();
+
+        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
+            self.http_component
+                .orchestrate_endpoint(
+                    None,
+                    async |client: Arc<C>,
+                           endpoint_id: String,
+                           endpoint: String,
+                           username: String,
+                           password: String| {
+                        mgmtx::mgmt::Management::<C> {
+                            http_client: client,
+                            user_agent: self.http_component.user_agent().to_string(),
+                            endpoint: endpoint.clone(),
+                            username,
+                            password,
+                        }
+                        .get_user(&copts)
+                        .await
+                        .map_err(|e| ErrorKind::Mgmt(e).into())
+                    },
+                )
+                .await
+        })
+        .await
+    }
+
+    pub async fn get_all_users(
+        &self,
+        opts: &GetAllUsersOptions<'_>,
+    ) -> error::Result<Vec<UserAndMetadata>> {
+        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+        let copts = opts.into();
+
+        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
+            self.http_component
+                .orchestrate_endpoint(
+                    None,
+                    async |client: Arc<C>,
+                           endpoint_id: String,
+                           endpoint: String,
+                           username: String,
+                           password: String| {
+                        mgmtx::mgmt::Management::<C> {
+                            http_client: client,
+                            user_agent: self.http_component.user_agent().to_string(),
+                            endpoint: endpoint.clone(),
+                            username,
+                            password,
+                        }
+                        .get_all_users(&copts)
+                        .await
+                        .map_err(|e| ErrorKind::Mgmt(e).into())
+                    },
+                )
+                .await
+        })
+        .await
+    }
+
+    pub async fn upsert_user(&self, opts: &UpsertUserOptions<'_>) -> error::Result<()> {
+        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+        let copts = opts.into();
+
+        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
+            self.http_component
+                .orchestrate_endpoint(
+                    None,
+                    async |client: Arc<C>,
+                           endpoint_id: String,
+                           endpoint: String,
+                           username: String,
+                           password: String| {
+                        mgmtx::mgmt::Management::<C> {
+                            http_client: client,
+                            user_agent: self.http_component.user_agent().to_string(),
+                            endpoint: endpoint.clone(),
+                            username,
+                            password,
+                        }
+                        .upsert_user(&copts)
+                        .await
+                        .map_err(|e| ErrorKind::Mgmt(e).into())
+                    },
+                )
+                .await
+        })
+        .await
+    }
+
+    pub async fn delete_user(&self, opts: &DeleteUserOptions<'_>) -> error::Result<()> {
+        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+        let copts = opts.into();
+
+        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
+            self.http_component
+                .orchestrate_endpoint(
+                    None,
+                    async |client: Arc<C>,
+                           endpoint_id: String,
+                           endpoint: String,
+                           username: String,
+                           password: String| {
+                        mgmtx::mgmt::Management::<C> {
+                            http_client: client,
+                            user_agent: self.http_component.user_agent().to_string(),
+                            endpoint: endpoint.clone(),
+                            username,
+                            password,
+                        }
+                        .delete_user(&copts)
+                        .await
+                        .map_err(|e| ErrorKind::Mgmt(e).into())
+                    },
+                )
+                .await
+        })
+        .await
+    }
+
+    pub async fn get_roles(
+        &self,
+        opts: &GetRolesOptions<'_>,
+    ) -> error::Result<Vec<RoleAndDescription>> {
+        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+        let copts = opts.into();
+
+        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
+            self.http_component
+                .orchestrate_endpoint(
+                    None,
+                    async |client: Arc<C>,
+                           endpoint_id: String,
+                           endpoint: String,
+                           username: String,
+                           password: String| {
+                        mgmtx::mgmt::Management::<C> {
+                            http_client: client,
+                            user_agent: self.http_component.user_agent().to_string(),
+                            endpoint: endpoint.clone(),
+                            username,
+                            password,
+                        }
+                        .get_roles(&copts)
+                        .await
+                        .map_err(|e| ErrorKind::Mgmt(e).into())
+                    },
+                )
+                .await
+        })
+        .await
+    }
+
+    pub async fn get_group(&self, opts: &GetGroupOptions<'_>) -> error::Result<Group> {
+        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+        let copts = opts.into();
+
+        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
+            self.http_component
+                .orchestrate_endpoint(
+                    None,
+                    async |client: Arc<C>,
+                           endpoint_id: String,
+                           endpoint: String,
+                           username: String,
+                           password: String| {
+                        mgmtx::mgmt::Management::<C> {
+                            http_client: client,
+                            user_agent: self.http_component.user_agent().to_string(),
+                            endpoint: endpoint.clone(),
+                            username,
+                            password,
+                        }
+                        .get_group(&copts)
+                        .await
+                        .map_err(|e| ErrorKind::Mgmt(e).into())
+                    },
+                )
+                .await
+        })
+        .await
+    }
+
+    pub async fn get_all_groups(
+        &self,
+        opts: &GetAllGroupsOptions<'_>,
+    ) -> error::Result<Vec<Group>> {
+        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+        let copts = opts.into();
+
+        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
+            self.http_component
+                .orchestrate_endpoint(
+                    None,
+                    async |client: Arc<C>,
+                           endpoint_id: String,
+                           endpoint: String,
+                           username: String,
+                           password: String| {
+                        mgmtx::mgmt::Management::<C> {
+                            http_client: client,
+                            user_agent: self.http_component.user_agent().to_string(),
+                            endpoint: endpoint.clone(),
+                            username,
+                            password,
+                        }
+                        .get_all_groups(&copts)
+                        .await
+                        .map_err(|e| ErrorKind::Mgmt(e).into())
+                    },
+                )
+                .await
+        })
+        .await
+    }
+
+    pub async fn upsert_group(&self, opts: &UpsertGroupOptions<'_>) -> error::Result<()> {
+        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+        let copts = opts.into();
+
+        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
+            self.http_component
+                .orchestrate_endpoint(
+                    None,
+                    async |client: Arc<C>,
+                           endpoint_id: String,
+                           endpoint: String,
+                           username: String,
+                           password: String| {
+                        mgmtx::mgmt::Management::<C> {
+                            http_client: client,
+                            user_agent: self.http_component.user_agent().to_string(),
+                            endpoint: endpoint.clone(),
+                            username,
+                            password,
+                        }
+                        .upsert_group(&copts)
+                        .await
+                        .map_err(|e| ErrorKind::Mgmt(e).into())
+                    },
+                )
+                .await
+        })
+        .await
+    }
+
+    pub async fn delete_group(&self, opts: &DeleteGroupOptions<'_>) -> error::Result<()> {
+        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+        let copts = opts.into();
+
+        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
+            self.http_component
+                .orchestrate_endpoint(
+                    None,
+                    async |client: Arc<C>,
+                           endpoint_id: String,
+                           endpoint: String,
+                           username: String,
+                           password: String| {
+                        mgmtx::mgmt::Management::<C> {
+                            http_client: client,
+                            user_agent: self.http_component.user_agent().to_string(),
+                            endpoint: endpoint.clone(),
+                            username,
+                            password,
+                        }
+                        .delete_group(&copts)
+                        .await
+                        .map_err(|e| ErrorKind::Mgmt(e).into())
+                    },
+                )
+                .await
+        })
+        .await
+    }
+
+    pub async fn change_password(&self, opts: &ChangePasswordOptions<'_>) -> error::Result<()> {
+        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+        let copts = opts.into();
+
+        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
+            self.http_component
+                .orchestrate_endpoint(
+                    None,
+                    async |client: Arc<C>,
+                           endpoint_id: String,
+                           endpoint: String,
+                           username: String,
+                           password: String| {
+                        mgmtx::mgmt::Management::<C> {
+                            http_client: client,
+                            user_agent: self.http_component.user_agent().to_string(),
+                            endpoint: endpoint.clone(),
+                            username,
+                            password,
+                        }
+                        .change_password(&copts)
+                        .await
+                        .map_err(|e| ErrorKind::Mgmt(e).into())
+                    },
+                )
+                .await
+        })
+        .await
+    }
+
+    pub async fn ensure_user(&self, opts: &EnsureUserOptions<'_>) -> error::Result<()> {
+        let mut helper = EnsureUserHelper::new(
+            self.http_component.user_agent(),
+            opts.username,
+            opts.auth_domain,
+            opts.want_missing,
+            opts.on_behalf_of_info,
+        );
+
+        let backoff = ExponentialBackoffCalculator::new(
+            Duration::from_millis(100),
+            Duration::from_millis(1000),
+            1.5,
+        );
+
+        self.http_component
+            .ensure_resource(backoff, async |client: Arc<C>, targets: Vec<NodeTarget>| {
+                helper
+                    .clone()
+                    .poll(&EnsureUserPollOptions { client, targets })
+                    .await
+                    .map_err(error::Error::from)
+            })
+            .await
+    }
+
+    pub async fn ensure_group(&self, opts: &EnsureGroupOptions<'_>) -> error::Result<()> {
+        let mut helper = EnsureGroupHelper::new(
+            self.http_component.user_agent(),
+            opts.group_name,
+            opts.want_missing,
+            opts.on_behalf_of_info,
+        );
+
+        let backoff = ExponentialBackoffCalculator::new(
+            Duration::from_millis(100),
+            Duration::from_millis(1000),
+            1.5,
+        );
+
+        self.http_component
+            .ensure_resource(backoff, async |client: Arc<C>, targets: Vec<NodeTarget>| {
+                helper
+                    .clone()
+                    .poll(&EnsureGroupPollOptions { client, targets })
                     .await
                     .map_err(error::Error::from)
             })

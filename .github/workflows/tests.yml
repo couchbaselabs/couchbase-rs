@@ -20,7 +20,7 @@ jobs:
           - 7.1.1
           - 7.0.3
 
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
       - name: Install cbdinocluster
         run: |

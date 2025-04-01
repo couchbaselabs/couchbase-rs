@@ -70,13 +70,13 @@ pub struct ErrorImpl {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ErrorKind {
-    #[non_exhaustive]
     Server(ServerError),
-    #[non_exhaustive]
     Resource(ResourceError),
     #[non_exhaustive]
-    InvalidArgument { msg: String, arg: Option<String> },
-    #[non_exhaustive]
+    InvalidArgument {
+        msg: String,
+        arg: Option<String>,
+    },
     Message(String),
 }
 
@@ -152,6 +152,7 @@ pub enum ServerErrorKind {
     ServerInvalidArg,
     BucketUuidMismatch,
     UserNotFound,
+    GroupNotFound,
     OperationDelayed,
     Unknown,
 }
@@ -171,6 +172,7 @@ impl Display for ServerErrorKind {
             ServerErrorKind::ServerInvalidArg => write!(f, "server invalid argument"),
             ServerErrorKind::BucketUuidMismatch => write!(f, "bucket uuid mismatch"),
             ServerErrorKind::UserNotFound => write!(f, "user not found"),
+            ServerErrorKind::GroupNotFound => write!(f, "group not found"),
             ServerErrorKind::OperationDelayed => {
                 write!(f, "operation was delayed, but will continue")
             }
