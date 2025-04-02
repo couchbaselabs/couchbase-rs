@@ -3,8 +3,10 @@ use crate::clients::bucket_mgmt_client::BucketMgmtClient;
 use crate::clients::cluster_client::ClusterClient;
 use crate::clients::query_client::QueryClient;
 use crate::clients::search_client::SearchClient;
+use crate::clients::user_mgmt_client::UserMgmtClient;
 use crate::error;
 use crate::management::buckets::bucket_manager::BucketManager;
+use crate::management::users::user_manager::UserManager;
 use crate::options::cluster_options::ClusterOptions;
 use crate::options::query_options::QueryOptions;
 use crate::options::search_options::SearchOptions;
@@ -19,6 +21,7 @@ pub struct Cluster {
     bucket_mgmt_client: Arc<BucketMgmtClient>,
     query_client: Arc<QueryClient>,
     search_client: Arc<SearchClient>,
+    user_mgmt_client: Arc<UserMgmtClient>,
 }
 
 impl Cluster {
@@ -31,12 +34,14 @@ impl Cluster {
         let bucket_mgmt_client = Arc::new(client.buckets_client());
         let query_client = Arc::new(client.query_client());
         let search_client = Arc::new(client.search_client());
+        let user_mgmt_client = Arc::new(client.users_client());
 
         Ok(Cluster {
             client,
             bucket_mgmt_client,
             query_client,
             search_client,
+            user_mgmt_client,
         })
     }
 
@@ -48,6 +53,10 @@ impl Cluster {
 
     pub fn buckets(&self) -> BucketManager {
         BucketManager::new(self.bucket_mgmt_client.clone())
+    }
+
+    pub fn users(&self) -> UserManager {
+        UserManager::new(self.user_mgmt_client.clone())
     }
 
     pub async fn query(

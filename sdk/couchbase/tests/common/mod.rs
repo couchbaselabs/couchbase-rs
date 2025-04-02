@@ -1,3 +1,4 @@
+use log::error;
 use uuid::Uuid;
 
 pub mod consistency_utils;
@@ -33,9 +34,14 @@ where
     Fut: std::future::Future<Output = Result<Option<T>, couchbase::error::Error>>,
 {
     while Instant::now() < deadline {
-        if let Ok(Some(r)) = f().await {
-            return r;
-        }
+        match f().await {
+            Ok(Some(r)) => return r,
+            Ok(None) => {}
+            Err(e) => {
+                error!("{:?}", e);
+            }
+        };
+
         tokio::time::sleep(sleep).await;
     }
     panic!("{}", fail_msg.as_ref());

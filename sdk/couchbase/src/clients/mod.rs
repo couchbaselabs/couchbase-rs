@@ -11,3 +11,4 @@ pub mod query_index_mgmt_client;
 pub mod scope_client;
 pub mod search_client;
 pub mod search_index_mgmt_client;
+pub mod user_mgmt_client;

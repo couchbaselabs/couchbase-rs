@@ -8,3 +8,4 @@ pub mod query_index_mgmt_options;
 pub mod query_options;
 pub mod search_index_mgmt_options;
 pub mod search_options;
+pub mod user_mgmt_options;
