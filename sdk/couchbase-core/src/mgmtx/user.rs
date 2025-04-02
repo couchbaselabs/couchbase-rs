@@ -85,7 +85,7 @@ pub struct User {
     pub groups: Vec<String>,
     pub roles: Vec<Role>,
 
-    pub(crate) password: Option<String>,
+    pub password: Option<String>,
 }
 
 impl User {
