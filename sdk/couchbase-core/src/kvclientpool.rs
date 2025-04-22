@@ -220,6 +220,7 @@ where
         }
 
         drop(clients);
+
         self.check_connections().await;
     }
 
@@ -347,7 +348,10 @@ where
             });
         }
 
-        clients.check_connections().await;
+        let clients_clone = clients.clone();
+        tokio::spawn(async move {
+            clients_clone.check_connections().await;
+        });
 
         NaiveKvClientPool { clients }
     }
