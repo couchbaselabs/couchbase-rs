@@ -509,7 +509,7 @@ impl CouchbaseCoreKvClient {
             let original_idx = op_indexes[i];
             entries[original_idx] = Some(LookupInResultEntry {
                 value: x.value.as_ref().map(|v| bytes::Bytes::from(v.clone())),
-                error: x.err.as_ref().map(|e| e.clone().into()),
+                error: x.err.as_ref().map(|e| e.into()),
                 op: ordered_specs[i].op.clone(),
             });
         }

@@ -309,7 +309,7 @@ impl CouchbaseSearchIndexMgmtClient {
         let agent = self.agent_provider.get_agent().await;
 
         let value =
-            serde_json::to_vec(&document).map_err(|e| error::Error { msg: e.to_string() })?;
+            serde_json::to_vec(&document).map_err(error::Error::encoding_failure_from_serde)?;
 
         let mut analyze_opts = searchmgmt_options::AnalyzeDocumentOptions::new(&index_name, &value)
             .bucket_name(&self.keyspace.bucket_name)
@@ -321,7 +321,7 @@ impl CouchbaseSearchIndexMgmtClient {
         let analysis = agent.analyze_search_document(&analyze_opts).await?;
 
         let analysed = serde_json::from_slice(&analysis.analyzed)
-            .map_err(|e| error::Error { msg: e.to_string() })?;
+            .map_err(error::Error::decoding_failure_from_serde)?;
 
         Ok(analysed)
     }

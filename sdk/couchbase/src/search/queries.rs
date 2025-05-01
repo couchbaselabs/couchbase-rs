@@ -17,9 +17,10 @@ impl TryFrom<&str> for MatchOperator {
             "and" => Ok(MatchOperator::And),
             "OR" => Ok(MatchOperator::Or),
             "AND" => Ok(MatchOperator::And),
-            _ => Err(crate::error::Error {
-                msg: "Invalid match operator".to_string(),
-            }),
+            _ => Err(crate::error::Error::invalid_argument(
+                "operator",
+                "invalid match operator",
+            )),
         }
     }
 }

@@ -91,7 +91,7 @@ pub(crate) struct StdKvClient<D: Dispatcher> {
     // so that we can use it in our errors.  Note that it is set before
     // we send the operation to select the bucket, since things happen
     // asynchronously and we do not support changing selected buckets.
-    selected_bucket: Mutex<Option<String>>,
+    pub(crate) selected_bucket: std::sync::Mutex<Option<String>>,
 
     id: String,
 }
@@ -150,7 +150,7 @@ where
         let creds = match config.authenticator.as_ref() {
             // PasswordAuthenticator(auth) => get_credentials(ServiceType::Memd, config.address.to_string())
             Authenticator::PasswordAuthenticator(a) => {
-                a.get_credentials(ServiceType::Memd, config.address.to_string())?
+                a.get_credentials(&ServiceType::MEMD, config.address.to_string())?
             }
         };
 
@@ -251,13 +251,13 @@ where
             cli,
             current_config: Mutex::new(config),
             supported_features: vec![],
-            selected_bucket: Mutex::new(None),
+            selected_bucket: std::sync::Mutex::new(None),
             id: id.clone(),
         };
 
         if should_bootstrap {
             if let Some(b) = &bootstrap_select_bucket {
-                let mut guard = kv_cli.selected_bucket.lock().await;
+                let mut guard = kv_cli.selected_bucket.lock().unwrap();
                 *guard = Some(b.bucket_name.clone());
             };
 
@@ -275,7 +275,7 @@ where
                 Ok(res) => res,
                 Err(e) => {
                     kv_cli.close().await.unwrap_or_default();
-                    return Err(e);
+                    return Err(Error::new_contextual_memdx_error(e));
                 }
             };
 
@@ -327,9 +327,10 @@ where
         }
 
         if let Some(bucket_name) = selected_bucket_name {
-            let mut current_bucket = self.selected_bucket.lock().await;
-            *current_bucket = Some(bucket_name.clone());
-            drop(current_bucket);
+            {
+                let mut current_bucket = self.selected_bucket.lock().unwrap();
+                *current_bucket = Some(bucket_name.clone());
+            }
 
             match self
                 .select_bucket(SelectBucketRequest { bucket_name })
@@ -337,9 +338,10 @@ where
             {
                 Ok(_) => {}
                 Err(_e) => {
-                    let mut current_bucket = self.selected_bucket.lock().await;
-                    *current_bucket = None;
-                    drop(current_bucket);
+                    {
+                        let mut current_bucket = self.selected_bucket.lock().unwrap();
+                        *current_bucket = None;
+                    }
 
                     current_config.selected_bucket = None;
                 }

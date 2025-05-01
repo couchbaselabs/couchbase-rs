@@ -13,7 +13,7 @@ use couchbase_core::crudoptions::{
     GetAndTouchOptions, GetOptions, IncrementOptions, LookupInOptions, MutateInOptions,
     PrependOptions, ReplaceOptions, TouchOptions, UnlockOptions, UpsertOptions,
 };
-use couchbase_core::memdx::error::{ServerErrorKind, SubdocErrorKind};
+use couchbase_core::memdx::error::{ErrorKind, ServerErrorKind, SubdocErrorKind};
 use couchbase_core::memdx::subdoc::{LookupInOp, LookupInOpType, MutateInOp, MutateInOpType};
 use couchbase_core::retrybesteffort::{BestEffortRetryStrategy, ExponentialBackoffCalculator};
 use couchbase_core::retryfailfast::FailFastRetryStrategy;
@@ -435,14 +435,19 @@ fn test_lookup_in() {
             "hello"
         );
         assert!(lookup_in_result.value[0].err.is_none());
-        assert!(lookup_in_result.value[1]
-            .err
-            .as_ref()
-            .is_some_and(|err| err.is_error_kind(SubdocErrorKind::PathNotFound)));
-        assert_eq!(
-            lookup_in_result.value[1].err.as_ref().unwrap().op_index(),
-            Some(1)
-        );
+
+        let kind = lookup_in_result.value[1].err.as_ref().unwrap().kind();
+        match kind {
+            ErrorKind::Server(e) => match e.kind() {
+                ServerErrorKind::Subdoc { error, .. } => {
+                    assert!(error.is_error_kind(SubdocErrorKind::PathNotFound));
+                    assert_eq!(1, error.op_index().unwrap());
+                }
+                _ => panic!("Expected subdoc error, got {:?}", e.kind()),
+            },
+            _ => panic!("Expected server error, got {:?}", kind),
+        }
+
         assert!(lookup_in_result.value[2].err.is_none());
         assert_eq!(
             std::str::from_utf8(lookup_in_result.value[2].value.as_ref().unwrap())
@@ -507,9 +512,9 @@ fn test_mutate_in() {
         assert_eq!(mutate_in_result.value.len(), 3);
         assert!(mutate_in_result.value[0].err.is_none());
         assert!(mutate_in_result.value[0]
-            .clone()
             .value
-            .is_some_and(|val| String::from_utf8(val).unwrap() == "5"));
+            .as_ref()
+            .is_some_and(|val| String::from_utf8(val.clone()).unwrap() == "5"));
         assert!(mutate_in_result.value[1].err.is_none());
         assert!(mutate_in_result.value[1].value.is_none());
         assert!(mutate_in_result.value[2].err.is_none());

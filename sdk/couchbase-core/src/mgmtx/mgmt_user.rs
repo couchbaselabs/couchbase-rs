@@ -13,14 +13,18 @@ use http::Method;
 
 impl<C: Client> Management<C> {
     pub async fn get_user(&self, opts: &GetUserOptions<'_>) -> error::Result<UserAndMetadata> {
+        let method = Method::GET;
+        let path = format!(
+            "/settings/rbac/users/{}/{}",
+            urlencoding::encode(opts.auth_domain),
+            urlencoding::encode(opts.username)
+        )
+        .to_string();
+
         let resp = self
             .execute(
-                Method::GET,
-                format!(
-                    "/settings/rbac/users/{}/{}",
-                    urlencoding::encode(opts.auth_domain),
-                    urlencoding::encode(opts.username)
-                ),
+                method.clone(),
+                &path,
                 "",
                 opts.on_behalf_of_info.cloned(),
                 None,
@@ -29,7 +33,7 @@ impl<C: Client> Management<C> {
             .await?;
 
         if resp.status() != 200 {
-            return Err(Self::decode_common_error(resp).await);
+            return Err(Self::decode_common_error(method, path, "get_user", resp).await);
         }
 
         let user_json: UserAndMetadataJson = parse_response_json(resp).await?;
@@ -41,13 +45,17 @@ impl<C: Client> Management<C> {
         &self,
         opts: &GetAllUsersOptions<'_>,
     ) -> error::Result<Vec<UserAndMetadata>> {
+        let method = Method::GET;
+        let path = format!(
+            "/settings/rbac/users/{}",
+            urlencoding::encode(opts.auth_domain),
+        )
+        .to_string();
+
         let resp = self
             .execute(
-                Method::GET,
-                format!(
-                    "/settings/rbac/users/{}",
-                    urlencoding::encode(opts.auth_domain),
-                ),
+                method.clone(),
+                &path,
                 "",
                 opts.on_behalf_of_info.cloned(),
                 None,
@@ -56,7 +64,7 @@ impl<C: Client> Management<C> {
             .await?;
 
         if resp.status() != 200 {
-            return Err(Self::decode_common_error(resp).await);
+            return Err(Self::decode_common_error(method, path, "get_all_users", resp).await);
         }
 
         let users_json: Vec<UserAndMetadataJson> = parse_response_json(resp).await?;
@@ -93,14 +101,17 @@ impl<C: Client> Management<C> {
             Bytes::from(form.finish())
         };
 
+        let method = Method::PUT;
+        let path = format!(
+            "/settings/rbac/users/{}/{}",
+            urlencoding::encode(opts.auth_domain),
+            urlencoding::encode(&opts.user.username),
+        );
+
         let resp = self
             .execute(
-                Method::PUT,
-                format!(
-                    "/settings/rbac/users/{}/{}",
-                    urlencoding::encode(opts.auth_domain),
-                    urlencoding::encode(&opts.user.username),
-                ),
+                method.clone(),
+                &path,
                 "application/x-www-form-urlencoded",
                 opts.on_behalf_of_info.cloned(),
                 None,
@@ -109,21 +120,25 @@ impl<C: Client> Management<C> {
             .await?;
 
         if resp.status().as_u16() < 200 || resp.status().as_u16() >= 300 {
-            return Err(Self::decode_common_error(resp).await);
+            return Err(Self::decode_common_error(method, path, "upsert_user", resp).await);
         }
 
         Ok(())
     }
 
     pub async fn delete_user(&self, opts: &DeleteUserOptions<'_>) -> error::Result<()> {
+        let method = Method::DELETE;
+        let path = format!(
+            "/settings/rbac/users/{}/{}",
+            urlencoding::encode(opts.auth_domain),
+            urlencoding::encode(opts.username),
+        )
+        .to_string();
+
         let resp = self
             .execute(
-                Method::DELETE,
-                format!(
-                    "/settings/rbac/users/{}/{}",
-                    urlencoding::encode(opts.auth_domain),
-                    urlencoding::encode(opts.username),
-                ),
+                method.clone(),
+                &path,
                 "",
                 opts.on_behalf_of_info.cloned(),
                 None,
@@ -132,7 +147,7 @@ impl<C: Client> Management<C> {
             .await?;
 
         if resp.status() != 200 {
-            return Err(Self::decode_common_error(resp).await);
+            return Err(Self::decode_common_error(method, path, "delete_user", resp).await);
         }
 
         Ok(())
@@ -142,10 +157,13 @@ impl<C: Client> Management<C> {
         &self,
         opts: &GetRolesOptions<'_>,
     ) -> error::Result<Vec<RoleAndDescription>> {
+        let method = Method::GET;
+        let path = "/settings/rbac/roles".to_string();
+
         let resp = self
             .execute(
-                Method::GET,
-                "/settings/rbac/roles",
+                method.clone(),
+                &path,
                 "",
                 opts.on_behalf_of_info.cloned(),
                 None,
@@ -154,7 +172,7 @@ impl<C: Client> Management<C> {
             .await?;
 
         if resp.status() != 200 {
-            return Err(Self::decode_common_error(resp).await);
+            return Err(Self::decode_common_error(method, path, "get_roles", resp).await);
         }
 
         let roles_json: Vec<RoleAndDescriptionJson> = parse_response_json(resp).await?;
@@ -166,10 +184,13 @@ impl<C: Client> Management<C> {
     }
 
     pub async fn get_group(&self, opts: &GetGroupOptions<'_>) -> error::Result<Group> {
+        let method = Method::GET;
+        let path = format!("/settings/rbac/groups/{}", opts.group_name).to_string();
+
         let resp = self
             .execute(
-                Method::GET,
-                format!("/settings/rbac/groups/{}", opts.group_name),
+                method.clone(),
+                &path,
                 "",
                 opts.on_behalf_of_info.cloned(),
                 None,
@@ -178,7 +199,7 @@ impl<C: Client> Management<C> {
             .await?;
 
         if resp.status() != 200 {
-            return Err(Self::decode_common_error(resp).await);
+            return Err(Self::decode_common_error(method, path, "get_group", resp).await);
         }
 
         let group_json: GroupJson = parse_response_json(resp).await?;
@@ -190,10 +211,13 @@ impl<C: Client> Management<C> {
         &self,
         opts: &GetAllGroupsOptions<'_>,
     ) -> error::Result<Vec<Group>> {
+        let method = Method::GET;
+        let path = "/settings/rbac/groups".to_string();
+
         let resp = self
             .execute(
-                Method::GET,
-                "/settings/rbac/groups",
+                method.clone(),
+                &path,
                 "",
                 opts.on_behalf_of_info.cloned(),
                 None,
@@ -202,7 +226,7 @@ impl<C: Client> Management<C> {
             .await?;
 
         if resp.status() != 200 {
-            return Err(Self::decode_common_error(resp).await);
+            return Err(Self::decode_common_error(method, path, "get_all_groups", resp).await);
         }
 
         let groups_json: Vec<GroupJson> = parse_response_json(resp).await?;
@@ -211,6 +235,13 @@ impl<C: Client> Management<C> {
     }
 
     pub async fn upsert_group(&self, opts: &UpsertGroupOptions<'_>) -> error::Result<()> {
+        let method = Method::PUT;
+        let path = format!(
+            "/settings/rbac/groups/{}",
+            urlencoding::encode(&opts.group.name),
+        )
+        .to_string();
+
         let body = {
             let mut form = url::form_urlencoded::Serializer::new(String::new());
             form.append_pair(
@@ -237,11 +268,8 @@ impl<C: Client> Management<C> {
 
         let resp = self
             .execute(
-                Method::PUT,
-                format!(
-                    "/settings/rbac/groups/{}",
-                    urlencoding::encode(&opts.group.name),
-                ),
+                method.clone(),
+                &path,
                 "application/x-www-form-urlencoded",
                 opts.on_behalf_of_info.cloned(),
                 None,
@@ -250,20 +278,24 @@ impl<C: Client> Management<C> {
             .await?;
 
         if resp.status().as_u16() < 200 || resp.status().as_u16() >= 300 {
-            return Err(Self::decode_common_error(resp).await);
+            return Err(Self::decode_common_error(method, path, "upsert_group", resp).await);
         }
 
         Ok(())
     }
 
     pub async fn delete_group(&self, opts: &DeleteGroupOptions<'_>) -> error::Result<()> {
+        let method = Method::DELETE;
+        let path = format!(
+            "/settings/rbac/groups/{}",
+            urlencoding::encode(opts.group_name),
+        )
+        .to_string();
+
         let resp = self
             .execute(
-                Method::DELETE,
-                format!(
-                    "/settings/rbac/groups/{}",
-                    urlencoding::encode(opts.group_name),
-                ),
+                method.clone(),
+                &path,
                 "",
                 opts.on_behalf_of_info.cloned(),
                 None,
@@ -272,13 +304,16 @@ impl<C: Client> Management<C> {
             .await?;
 
         if resp.status() != 200 {
-            return Err(Self::decode_common_error(resp).await);
+            return Err(Self::decode_common_error(method, path, "delete_group", resp).await);
         }
 
         Ok(())
     }
 
     pub async fn change_password(&self, opts: &ChangePasswordOptions<'_>) -> error::Result<()> {
+        let method = Method::POST;
+        let path = "/controller/changePassword".to_string();
+
         let body = {
             let mut form = url::form_urlencoded::Serializer::new(String::new());
             form.append_pair("password", opts.new_password);
@@ -288,8 +323,8 @@ impl<C: Client> Management<C> {
 
         let resp = self
             .execute(
-                Method::POST,
-                "/controller/changePassword",
+                method.clone(),
+                &path,
                 "application/x-www-form-urlencoded",
                 opts.on_behalf_of_info.cloned(),
                 None,
@@ -298,7 +333,7 @@ impl<C: Client> Management<C> {
             .await?;
 
         if resp.status() != 200 {
-            return Err(Self::decode_common_error(resp).await);
+            return Err(Self::decode_common_error(method, path, "change_password", resp).await);
         }
 
         Ok(())

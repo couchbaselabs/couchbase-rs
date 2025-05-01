@@ -185,7 +185,6 @@ pub enum ErrorKind {
     ConnectionFailed {
         msg: String,
     },
-    #[non_exhaustive]
     Io,
     #[non_exhaustive]
     InvalidArgument {
@@ -397,24 +396,45 @@ pub struct ServerErrorContext {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum ServerErrorKind {
-    NotMyVbucket,
-    KeyExists,
-    NotStored,
     KeyNotFound,
-    TmpFail,
-    CasMismatch,
+    KeyExists,
+    TooBig,
+    NotStored,
+    BadDelta,
+    NotMyVbucket,
+    NoBucket,
     Locked,
     NotLocked,
-    TooBig,
-    UnknownCollectionID,
-    NoBucket,
-    UnknownBucketName,
-    Access,
     Auth { msg: String },
-    ConfigNotSet,
+    RangeError,
+    Access,
+    RateLimitedNetworkIngress,
+    RateLimitedNetworkEgress,
+    RateLimitedMaxConnections,
+    RateLimitedMaxCommands,
+    RateLimitedScopeSizeLimitExceeded,
+    UnknownCommand,
+    NotSupported,
+    InternalError,
+    Busy,
+    TmpFail,
+    UnknownCollectionID,
     UnknownScopeName,
     UnknownCollectionName,
+    DurabilityInvalid,
+    DurabilityImpossible,
+    SyncWriteInProgress,
+    SyncWriteAmbiguous,
+    SyncWriteRecommitInProgress,
+    RangeScanCancelled,
+    RangeScanVBUUIDNotEqual,
+
+    ConfigNotSet,
+    UnknownBucketName,
+    CasMismatch,
+
     Subdoc { error: SubdocError },
+
     UnknownStatus { status: Status },
 }
 
@@ -442,6 +462,32 @@ impl Display for ServerErrorKind {
             ServerErrorKind::UnknownStatus { status } => {
                 write!(f, "server status unexpected for operation: {}", status)
             }
+            ServerErrorKind::BadDelta => write!(f, "bad delta"),
+            ServerErrorKind::UnknownCommand => write!(f, "unknown command"),
+            ServerErrorKind::RangeError => write!(f, "range error"),
+            ServerErrorKind::RateLimitedNetworkIngress => {
+                write!(f, "rate limited: network ingress")
+            }
+            ServerErrorKind::RateLimitedNetworkEgress => write!(f, "rate limited: network egress"),
+            ServerErrorKind::RateLimitedMaxConnections => {
+                write!(f, "rate limited: max connections")
+            }
+            ServerErrorKind::RateLimitedMaxCommands => write!(f, "rate limited: max commands"),
+            ServerErrorKind::RateLimitedScopeSizeLimitExceeded => {
+                write!(f, "rate limited: scope size limit exceeded")
+            }
+            ServerErrorKind::NotSupported => write!(f, "not supported"),
+            ServerErrorKind::InternalError => write!(f, "internal error"),
+            ServerErrorKind::Busy => write!(f, "busy"),
+            ServerErrorKind::DurabilityInvalid => write!(f, "durability invalid"),
+            ServerErrorKind::DurabilityImpossible => write!(f, "durability impossible"),
+            ServerErrorKind::SyncWriteInProgress => write!(f, "sync write in progress"),
+            ServerErrorKind::SyncWriteAmbiguous => write!(f, "sync write ambiguous"),
+            ServerErrorKind::SyncWriteRecommitInProgress => {
+                write!(f, "sync write recommit in progress")
+            }
+            ServerErrorKind::RangeScanCancelled => write!(f, "range scan cancelled"),
+            ServerErrorKind::RangeScanVBUUIDNotEqual => write!(f, "range scan vbUUID not equal"),
         }
     }
 }
@@ -465,6 +511,10 @@ impl SubdocError {
 
     pub fn is_error_kind(&self, kind: SubdocErrorKind) -> bool {
         self.kind == kind
+    }
+
+    pub fn kind(&self) -> &SubdocErrorKind {
+        &self.kind
     }
 
     pub fn op_index(&self) -> Option<u8> {

@@ -7,9 +7,7 @@ pub fn encode(value: &[u8]) -> crate::error::Result<(&[u8], u32)> {
 pub fn decode(value: &[u8], flags: u32) -> crate::error::Result<&[u8]> {
     let datatype = decode_common_flags(flags);
     if datatype != DataType::Binary {
-        return Err(crate::error::Error {
-            msg: "datatype not supported".to_string(),
-        });
+        return Err(crate::error::Error::other_failure("datatype not supported"));
     }
 
     Ok(value)

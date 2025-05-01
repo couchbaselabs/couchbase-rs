@@ -130,24 +130,26 @@ pub struct LookupInResult {
 impl LookupInResult {
     pub fn content_as<V: DeserializeOwned>(&self, lookup_index: usize) -> error::Result<V> {
         let content = self.content_as_raw(lookup_index)?;
-        serde_json::from_slice(&content).map_err(|e| error::Error { msg: e.to_string() })
+        serde_json::from_slice(&content).map_err(error::Error::decoding_failure_from_serde)
     }
 
     pub fn content_as_raw(&self, lookup_index: usize) -> error::Result<Bytes> {
         if lookup_index >= self.entries.len() {
-            return Err(error::Error {
-                msg: "Index cannot be >= number of lookups".into(),
-            });
+            return Err(error::Error::invalid_argument(
+                "index",
+                "index cannot be >= number of lookups",
+            ));
         }
 
-        let entry = self.entries.get(lookup_index).ok_or_else(|| error::Error {
-            msg: "Index out of bounds".into(),
-        })?;
+        let entry = self
+            .entries
+            .get(lookup_index)
+            .ok_or_else(|| error::Error::invalid_argument("index", "index out of bounds"))?;
 
         if entry.op == LookupInOpType::Exists {
             let res = self.exists(lookup_index)?;
             let val = Bytes::from(
-                serde_json::to_vec(&res).map_err(|e| error::Error { msg: e.to_string() })?,
+                serde_json::to_vec(&res).map_err(error::Error::decoding_failure_from_serde)?,
             );
             return Ok(val);
         }
@@ -161,20 +163,21 @@ impl LookupInResult {
 
     pub fn exists(&self, lookup_index: usize) -> error::Result<bool> {
         if lookup_index >= self.entries.len() {
-            return Err(error::Error {
-                msg: "Index cannot be >= number of lookups".into(),
-            });
+            return Err(error::Error::invalid_argument(
+                "index",
+                "index cannot be >= number of lookups",
+            ));
         }
 
-        let entry = self.entries.get(lookup_index).ok_or_else(|| error::Error {
-            msg: "Index out of bounds".into(),
-        })?;
+        let entry = self
+            .entries
+            .get(lookup_index)
+            .ok_or_else(|| error::Error::invalid_argument("index", "index out of bounds"))?;
 
         if let Some(err) = &entry.error {
-            return if err.msg.contains("subdoc path not found") {
-                Ok(false)
-            } else {
-                Err(err.clone())
+            return match err.kind() {
+                error::ErrorKind::PathNotFound => Ok(false),
+                _ => Err(err.clone()),
             };
         };
 
@@ -210,19 +213,21 @@ impl MutateInResult {
     pub fn content_as<V: DeserializeOwned>(&self, mutate_index: usize) -> error::Result<V> {
         let content = self.content_as_raw(mutate_index)?;
 
-        serde_json::from_slice(&content).map_err(|e| error::Error { msg: e.to_string() })
+        serde_json::from_slice(&content).map_err(error::Error::decoding_failure_from_serde)
     }
 
     pub fn content_as_raw(&self, mutate_index: usize) -> error::Result<Bytes> {
         if mutate_index >= self.entries.len() {
-            return Err(error::Error {
-                msg: "Index cannot be >= number of operations".into(),
-            });
+            return Err(error::Error::invalid_argument(
+                "index",
+                "index cannot be >= number of operations",
+            ));
         }
 
-        let entry = self.entries.get(mutate_index).ok_or_else(|| error::Error {
-            msg: "Index  out of bounds".into(),
-        })?;
+        let entry = self
+            .entries
+            .get(mutate_index)
+            .ok_or_else(|| error::Error::invalid_argument("index", "index out of bounds"))?;
 
         Ok(entry.value.clone().unwrap_or_default())
     }

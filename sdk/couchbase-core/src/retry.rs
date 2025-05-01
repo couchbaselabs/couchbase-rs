@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
@@ -49,6 +49,18 @@ impl RetryReason {
             RetryReason::KvCollectionOutdated => true,
             RetryReason::Unknown => false,
             _ => false,
+        }
+    }
+}
+
+impl Display for RetryReason {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RetryReason::NotMyVbucket => write!(f, "NotMyVbucket"),
+            RetryReason::InvalidVbucketMap => write!(f, "InvalidVbucketMap"),
+            RetryReason::TempFail => write!(f, "TempFail"),
+            RetryReason::KvCollectionOutdated => write!(f, "KvCollectionOutdated"),
+            RetryReason::Unknown => write!(f, "Unknown"),
         }
     }
 }

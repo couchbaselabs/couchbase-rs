@@ -42,3 +42,17 @@ impl Display for ServiceType {
         write!(f, "{}", txt)
     }
 }
+
+impl From<&couchbase_core::service_type::ServiceType> for ServiceType {
+    fn from(service_type: &couchbase_core::service_type::ServiceType) -> Self {
+        match *service_type {
+            couchbase_core::service_type::ServiceType::MEMD => ServiceType::MEMD,
+            couchbase_core::service_type::ServiceType::MGMT => ServiceType::MGMT,
+            couchbase_core::service_type::ServiceType::QUERY => ServiceType::QUERY,
+            couchbase_core::service_type::ServiceType::SEARCH => ServiceType::SEARCH,
+            couchbase_core::service_type::ServiceType::ANALYTICS => ServiceType::ANALYTICS,
+            couchbase_core::service_type::ServiceType::EVENTING => ServiceType::EVENTING,
+            _ => ServiceType(InnerServiceType::Other(service_type.to_string())),
+        }
+    }
+}

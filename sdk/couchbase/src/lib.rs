@@ -10,12 +10,14 @@ pub mod collection_crud;
 pub mod collection_ds;
 pub mod durability_level;
 pub mod error;
+pub mod error_context;
 pub mod management;
 pub mod mutation_state;
 pub mod options;
 pub mod results;
 pub mod scope;
 pub mod search;
+pub mod service_type;
 pub mod subdoc;
 pub mod transcoding;
 

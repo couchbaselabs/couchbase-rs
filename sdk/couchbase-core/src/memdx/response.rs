@@ -104,7 +104,7 @@ impl TryFromClientResponse for SASLAuthResponse {
     fn try_from(resp: ClientResponse) -> Result<Self, Error> {
         let packet = resp.packet();
         let status = packet.status;
-        if status == Status::SASLAuthContinue {
+        if status == Status::AuthContinue {
             return Ok(SASLAuthResponse {
                 needs_more_steps: true,
                 payload: packet.value.unwrap_or_default(),
@@ -251,32 +251,20 @@ impl TryFromClientResponse for SetResponse {
         let packet = resp.packet();
         let status = packet.status;
 
-        if status == Status::TooBig {
-            return Err(ServerError::new(
-                ServerErrorKind::TooBig,
-                packet.op_code,
-                status,
-                packet.opaque,
-            )
-            .into());
+        let kind = if status == Status::TooBig {
+            Some(ServerErrorKind::TooBig)
         } else if status == Status::Locked {
-            return Err(ServerError::new(
-                ServerErrorKind::Locked,
-                packet.op_code,
-                status,
-                packet.opaque,
-            )
-            .into());
+            Some(ServerErrorKind::Locked)
         } else if status == Status::KeyExists {
-            return Err(ServerError::new(
-                ServerErrorKind::KeyExists,
-                packet.op_code,
-                status,
-                packet.opaque,
-            )
-            .into());
-        } else if status != Status::Success {
-            return Err(OpsCrud::decode_common_error(&packet));
+            Some(ServerErrorKind::CasMismatch)
+        } else if status == Status::Success {
+            None
+        } else {
+            return Err(OpsCrud::decode_common_mutation_error(&packet));
+        };
+
+        if let Some(kind) = kind {
+            return Err(ServerError::new(kind, packet.op_code, status, packet.opaque).into());
         }
 
         let mutation_token = if let Some(extras) = &packet.extras {
@@ -400,11 +388,11 @@ impl TryFromClientResponse for GetMetaResponse {
             }
 
             let mut extras = Cursor::new(extras);
-            let deleted = extras.read_u32::<BigEndian>().unwrap();
-            let flags = extras.read_u32::<BigEndian>().unwrap();
-            let expiry = extras.read_u32::<BigEndian>().unwrap();
-            let seq_no = extras.read_u64::<BigEndian>().unwrap();
-            let datatype = extras.read_u8().unwrap();
+            let deleted = extras.read_u32::<BigEndian>()?;
+            let flags = extras.read_u32::<BigEndian>()?;
+            let expiry = extras.read_u32::<BigEndian>()?;
+            let seq_no = extras.read_u64::<BigEndian>()?;
+            let datatype = extras.read_u8()?;
 
             Ok(GetMetaResponse {
                 cas: packet.cas.unwrap_or_default(),
@@ -434,32 +422,20 @@ impl TryFromClientResponse for DeleteResponse {
         let packet = resp.packet();
         let status = packet.status;
 
-        if status == Status::KeyNotFound {
-            return Err(ServerError::new(
-                ServerErrorKind::KeyNotFound,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
-            )
-            .into());
-        } else if status == Status::KeyExists {
-            return Err(ServerError::new(
-                ServerErrorKind::KeyExists,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
-            )
-            .into());
+        let kind = if status == Status::KeyNotFound {
+            Some(ServerErrorKind::KeyNotFound)
         } else if status == Status::Locked {
-            return Err(ServerError::new(
-                ServerErrorKind::Locked,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
-            )
-            .into());
-        } else if status != Status::Success {
-            return Err(OpsCrud::decode_common_error(&packet));
+            Some(ServerErrorKind::Locked)
+        } else if status == Status::KeyExists {
+            Some(ServerErrorKind::CasMismatch)
+        } else if status == Status::Success {
+            None
+        } else {
+            return Err(OpsCrud::decode_common_mutation_error(&packet));
+        };
+
+        if let Some(kind) = kind {
+            return Err(ServerError::new(kind, packet.op_code, status, packet.opaque).into());
         }
 
         let mutation_token = if let Some(extras) = &packet.extras {
@@ -700,24 +676,20 @@ impl TryFromClientResponse for AddResponse {
         let packet = resp.packet();
         let status = packet.status;
 
-        if status == Status::TooBig {
-            return Err(ServerError::new(
-                ServerErrorKind::TooBig,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
-            )
-            .into());
+        let kind = if status == Status::TooBig {
+            Some(ServerErrorKind::TooBig)
+        } else if status == Status::Locked {
+            Some(ServerErrorKind::Locked)
         } else if status == Status::KeyExists {
-            return Err(ServerError::new(
-                ServerErrorKind::KeyExists,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
-            )
-            .into());
-        } else if status != Status::Success {
-            return Err(OpsCrud::decode_common_error(&packet));
+            Some(ServerErrorKind::KeyExists)
+        } else if status == Status::Success {
+            None
+        } else {
+            return Err(OpsCrud::decode_common_mutation_error(&packet));
+        };
+
+        if let Some(kind) = kind {
+            return Err(ServerError::new(kind, packet.op_code, status, packet.opaque).into());
         }
 
         let mutation_token = if let Some(extras) = &packet.extras {
@@ -752,40 +724,22 @@ impl TryFromClientResponse for ReplaceResponse {
         let packet = resp.packet();
         let status = packet.status;
 
-        if status == Status::TooBig {
-            return Err(ServerError::new(
-                ServerErrorKind::TooBig,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
-            )
-            .into());
-        } else if status == Status::KeyExists {
-            return Err(ServerError::new(
-                ServerErrorKind::CasMismatch,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
-            )
-            .into());
+        let kind = if status == Status::TooBig {
+            Some(ServerErrorKind::TooBig)
         } else if status == Status::KeyNotFound {
-            return Err(ServerError::new(
-                ServerErrorKind::KeyNotFound,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
-            )
-            .into());
+            Some(ServerErrorKind::KeyNotFound)
         } else if status == Status::Locked {
-            return Err(ServerError::new(
-                ServerErrorKind::Locked,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
-            )
-            .into());
-        } else if status != Status::Success {
-            return Err(OpsCrud::decode_common_error(&packet));
+            Some(ServerErrorKind::Locked)
+        } else if status == Status::KeyExists {
+            Some(ServerErrorKind::CasMismatch)
+        } else if status == Status::Success {
+            None
+        } else {
+            return Err(OpsCrud::decode_common_mutation_error(&packet));
+        };
+
+        if let Some(kind) = kind {
+            return Err(ServerError::new(kind, packet.op_code, status, packet.opaque).into());
         }
 
         let mutation_token = if let Some(extras) = &packet.extras {
@@ -821,42 +775,24 @@ impl TryFromClientResponse for AppendResponse {
         let packet = resp.packet();
         let status = packet.status;
 
-        // KeyExists without a request cas would be an odd error to receive so we don't
-        // handle that case.
-        if status == Status::KeyExists && cas.is_some() {
-            return Err(ServerError::new(
-                ServerErrorKind::CasMismatch,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
-            )
-            .into());
-        } else if status == Status::TooBig {
-            return Err(ServerError::new(
-                ServerErrorKind::TooBig,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
-            )
-            .into());
+        let kind = if status == Status::TooBig {
+            Some(ServerErrorKind::TooBig)
         } else if status == Status::NotStored {
-            return Err(ServerError::new(
-                ServerErrorKind::KeyNotFound,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
-            )
-            .into());
+            Some(ServerErrorKind::NotStored)
         } else if status == Status::Locked {
-            return Err(ServerError::new(
-                ServerErrorKind::Locked,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
-            )
-            .into());
-        } else if status != Status::Success {
-            return Err(OpsCrud::decode_common_error(&packet));
+            Some(ServerErrorKind::Locked)
+        } else if status == Status::KeyExists && cas.is_some() {
+            // KeyExists without a request cas would be an odd error to receive so we don't
+            // handle that case.
+            Some(ServerErrorKind::CasMismatch)
+        } else if status == Status::Success {
+            None
+        } else {
+            return Err(OpsCrud::decode_common_mutation_error(&packet));
+        };
+
+        if let Some(kind) = kind {
+            return Err(ServerError::new(kind, packet.op_code, status, packet.opaque).into());
         }
 
         let mutation_token = if let Some(extras) = &packet.extras {
@@ -892,42 +828,24 @@ impl TryFromClientResponse for PrependResponse {
         let packet = resp.packet();
         let status = packet.status;
 
-        // KeyExists without a request cas would be an odd error to receive so we don't
-        // handle that case.
-        if status == Status::KeyExists && cas.is_some() {
-            return Err(ServerError::new(
-                ServerErrorKind::CasMismatch,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
-            )
-            .into());
-        } else if status == Status::TooBig {
-            return Err(ServerError::new(
-                ServerErrorKind::TooBig,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
-            )
-            .into());
+        let kind = if status == Status::TooBig {
+            Some(ServerErrorKind::TooBig)
         } else if status == Status::NotStored {
-            return Err(ServerError::new(
-                ServerErrorKind::KeyNotFound,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
-            )
-            .into());
+            Some(ServerErrorKind::NotStored)
         } else if status == Status::Locked {
-            return Err(ServerError::new(
-                ServerErrorKind::Locked,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
-            )
-            .into());
-        } else if status != Status::Success {
-            return Err(OpsCrud::decode_common_error(&packet));
+            Some(ServerErrorKind::Locked)
+        } else if status == Status::KeyExists && cas.is_some() {
+            // KeyExists without a request cas would be an odd error to receive so we don't
+            // handle that case.
+            Some(ServerErrorKind::CasMismatch)
+        } else if status == Status::Success {
+            None
+        } else {
+            return Err(OpsCrud::decode_common_mutation_error(&packet));
+        };
+
+        if let Some(kind) = kind {
+            return Err(ServerError::new(kind, packet.op_code, status, packet.opaque).into());
         }
 
         let mutation_token = if let Some(extras) = &packet.extras {
@@ -963,24 +881,20 @@ impl TryFromClientResponse for IncrementResponse {
         let packet = resp.packet();
         let status = packet.status;
 
-        if status == Status::KeyNotFound {
-            return Err(ServerError::new(
-                ServerErrorKind::KeyNotFound,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
-            )
-            .into());
+        let kind = if status == Status::KeyNotFound {
+            Some(ServerErrorKind::KeyNotFound)
         } else if status == Status::Locked {
-            return Err(ServerError::new(
-                ServerErrorKind::Locked,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
-            )
-            .into());
-        } else if status != Status::Success {
-            return Err(OpsCrud::decode_common_error(&packet));
+            Some(ServerErrorKind::Locked)
+        } else if status == Status::BadDelta {
+            Some(ServerErrorKind::BadDelta)
+        } else if status == Status::Success {
+            None
+        } else {
+            return Err(OpsCrud::decode_common_mutation_error(&packet));
+        };
+
+        if let Some(kind) = kind {
+            return Err(ServerError::new(kind, packet.op_code, status, packet.opaque).into());
         }
 
         let value = if let Some(val) = &packet.value {
@@ -1029,24 +943,20 @@ impl TryFromClientResponse for DecrementResponse {
         let packet = resp.packet();
         let status = packet.status;
 
-        if status == Status::KeyNotFound {
-            return Err(ServerError::new(
-                ServerErrorKind::KeyNotFound,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
-            )
-            .into());
+        let kind = if status == Status::KeyNotFound {
+            Some(ServerErrorKind::KeyNotFound)
         } else if status == Status::Locked {
-            return Err(ServerError::new(
-                ServerErrorKind::Locked,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
-            )
-            .into());
-        } else if status != Status::Success {
-            return Err(OpsCrud::decode_common_error(&packet));
+            Some(ServerErrorKind::Locked)
+        } else if status == Status::BadDelta {
+            Some(ServerErrorKind::BadDelta)
+        } else if status == Status::Success {
+            None
+        } else {
+            return Err(OpsCrud::decode_common_mutation_error(&packet));
+        };
+
+        if let Some(kind) = kind {
+            return Err(ServerError::new(kind, packet.op_code, status, packet.opaque).into());
         }
 
         let value = if let Some(val) = &packet.value {
@@ -1181,9 +1091,9 @@ impl TryFromClientResponse for LookupInResponse {
                 return Err(Error::new_protocol_error("bad value length"));
             }
 
-            let res_status = cursor.read_u16::<BigEndian>().unwrap();
+            let res_status = cursor.read_u16::<BigEndian>()?;
             let res_status = Status::from(res_status);
-            let res_value_len = cursor.read_u32::<BigEndian>().unwrap();
+            let res_value_len = cursor.read_u32::<BigEndian>()?;
 
             if cursor.remaining() < res_value_len as usize {
                 return Err(Error::new_protocol_error("bad value length"));
@@ -1191,7 +1101,7 @@ impl TryFromClientResponse for LookupInResponse {
 
             let value = if res_value_len > 0 {
                 let mut tmp_val = vec![0; res_value_len as usize];
-                cursor.read_exact(&mut tmp_val).unwrap();
+                cursor.read_exact(&mut tmp_val)?;
                 Some(tmp_val)
             } else {
                 None
@@ -1209,7 +1119,17 @@ impl TryFromClientResponse for LookupInResponse {
                 _ => Some(SubdocErrorKind::UnknownStatus { status: res_status }),
             };
 
-            let err = err_kind.map(|kind| SubdocError::new(kind, op_index));
+            let err = err_kind.map(|kind| {
+                ServerError::new(
+                    ServerErrorKind::Subdoc {
+                        error: SubdocError::new(kind, op_index),
+                    },
+                    packet.op_code,
+                    packet.status,
+                    packet.opaque,
+                )
+                .into()
+            });
 
             results.push(SubDocResult { value, err });
             op_index += 1;
@@ -1249,145 +1169,58 @@ impl TryFromClientResponse for MutateInResponse {
         let cas = packet.cas;
         let status = packet.status;
 
-        if status == Status::KeyNotFound {
-            return Err(ServerError::new(
-                ServerErrorKind::KeyNotFound,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
-            )
-            .into());
+        let kind = if status == Status::KeyNotFound {
+            Some(ServerErrorKind::KeyNotFound)
         } else if status == Status::KeyExists && cas.is_some() {
-            return Err(ServerError::new(
-                ServerErrorKind::CasMismatch,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
-            )
-            .into());
+            Some(ServerErrorKind::CasMismatch)
+        } else if status == Status::KeyExists {
+            Some(ServerErrorKind::KeyExists)
         } else if status == Status::Locked {
-            return Err(ServerError::new(
-                ServerErrorKind::Locked,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
-            )
-            .into());
+            Some(ServerErrorKind::Locked)
         } else if status == Status::TooBig {
-            return Err(ServerError::new(
-                ServerErrorKind::TooBig,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
-            )
-            .into());
+            Some(ServerErrorKind::TooBig)
         } else if status == Status::SubDocInvalidCombo {
-            return Err(ServerError::new(
-                ServerErrorKind::Subdoc {
-                    error: SubdocError::new(SubdocErrorKind::InvalidCombo, None),
-                },
-                packet.op_code,
-                packet.status,
-                packet.opaque,
-            )
-            .into());
+            Some(ServerErrorKind::Subdoc {
+                error: SubdocError::new(SubdocErrorKind::InvalidCombo, None),
+            })
         } else if status == Status::SubDocInvalidXattrOrder {
-            return Err(ServerError::new(
-                ServerErrorKind::Subdoc {
-                    error: SubdocError::new(SubdocErrorKind::InvalidXattrOrder, None),
-                },
-                packet.op_code,
-                packet.status,
-                packet.opaque,
-            )
-            .into());
+            Some(ServerErrorKind::Subdoc {
+                error: SubdocError::new(SubdocErrorKind::InvalidXattrOrder, None),
+            })
         } else if status == Status::SubDocXattrInvalidKeyCombo {
-            return Err(ServerError::new(
-                ServerErrorKind::Subdoc {
-                    error: SubdocError::new(SubdocErrorKind::XattrInvalidKeyCombo, None),
-                },
-                packet.op_code,
-                packet.status,
-                packet.opaque,
-            )
-            .into());
+            Some(ServerErrorKind::Subdoc {
+                error: SubdocError::new(SubdocErrorKind::XattrInvalidKeyCombo, None),
+            })
         } else if status == Status::SubDocXattrInvalidFlagCombo {
-            return Err(ServerError::new(
-                ServerErrorKind::Subdoc {
-                    error: SubdocError::new(SubdocErrorKind::XattrInvalidFlagCombo, None),
-                },
-                packet.op_code,
-                packet.status,
-                packet.opaque,
-            )
-            .into());
+            Some(ServerErrorKind::Subdoc {
+                error: SubdocError::new(SubdocErrorKind::XattrInvalidFlagCombo, None),
+            })
         } else if status == Status::SubDocXattrUnknownMacro {
-            return Err(ServerError::new(
-                ServerErrorKind::Subdoc {
-                    error: SubdocError::new(SubdocErrorKind::XattrUnknownMacro, None),
-                },
-                packet.op_code,
-                packet.status,
-                packet.opaque,
-            )
-            .into());
+            Some(ServerErrorKind::Subdoc {
+                error: SubdocError::new(SubdocErrorKind::XattrUnknownMacro, None),
+            })
         } else if status == Status::SubDocXattrUnknownVattrMacro {
-            return Err(ServerError::new(
-                ServerErrorKind::Subdoc {
-                    error: SubdocError::new(SubdocErrorKind::XattrUnknownVattrMacro, None),
-                },
-                packet.op_code,
-                packet.status,
-                packet.opaque,
-            )
-            .into());
+            Some(ServerErrorKind::Subdoc {
+                error: SubdocError::new(SubdocErrorKind::XattrUnknownVattrMacro, None),
+            })
         } else if status == Status::SubDocXattrCannotModifyVAttr {
-            return Err(ServerError::new(
-                ServerErrorKind::Subdoc {
-                    error: SubdocError::new(SubdocErrorKind::XattrCannotModifyVAttr, None),
-                },
-                packet.op_code,
-                packet.status,
-                packet.opaque,
-            )
-            .into());
+            Some(ServerErrorKind::Subdoc {
+                error: SubdocError::new(SubdocErrorKind::XattrCannotModifyVAttr, None),
+            })
         } else if status == Status::SubDocCanOnlyReviveDeletedDocuments {
-            return Err(ServerError::new(
-                ServerErrorKind::Subdoc {
-                    error: SubdocError::new(SubdocErrorKind::CanOnlyReviveDeletedDocuments, None),
-                },
-                packet.op_code,
-                packet.status,
-                packet.opaque,
-            )
-            .into());
+            Some(ServerErrorKind::Subdoc {
+                error: SubdocError::new(SubdocErrorKind::CanOnlyReviveDeletedDocuments, None),
+            })
         } else if status == Status::SubDocDeletedDocumentCantHaveValue {
-            return Err(ServerError::new(
-                ServerErrorKind::Subdoc {
-                    error: SubdocError::new(SubdocErrorKind::DeletedDocumentCantHaveValue, None),
-                },
-                packet.op_code,
-                packet.status,
-                packet.opaque,
-            )
-            .into());
+            Some(ServerErrorKind::Subdoc {
+                error: SubdocError::new(SubdocErrorKind::DeletedDocumentCantHaveValue, None),
+            })
         } else if status == Status::NotStored {
             if subdoc_info.flags.contains(SubdocDocFlag::AddDoc) {
-                return Err(ServerError::new(
-                    ServerErrorKind::KeyExists,
-                    packet.op_code,
-                    packet.status,
-                    packet.opaque,
-                )
-                .into());
+                Some(ServerErrorKind::KeyExists)
+            } else {
+                Some(ServerErrorKind::NotStored)
             }
-            return Err(ServerError::new(
-                ServerErrorKind::NotStored,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
-            )
-            .into());
         } else if status == Status::SubDocMultiPathFailure {
             if let Some(value) = &packet.value {
                 if value.len() != 3 {
@@ -1395,8 +1228,8 @@ impl TryFromClientResponse for MutateInResponse {
                 }
 
                 let mut cursor = Cursor::new(value);
-                let op_index = cursor.read_u8().unwrap();
-                let res_status = cursor.read_u16::<BigEndian>().unwrap();
+                let op_index = cursor.read_u8()?;
+                let res_status = cursor.read_u16::<BigEndian>()?;
 
                 let res_status = Status::from(res_status);
 
@@ -1415,16 +1248,18 @@ impl TryFromClientResponse for MutateInResponse {
                     _ => SubdocErrorKind::UnknownStatus { status: res_status },
                 };
 
-                return Err(ServerError::new(
-                    ServerErrorKind::Subdoc {
-                        error: SubdocError::new(err_kind, Some(op_index)),
-                    },
-                    packet.op_code,
-                    packet.status,
-                    packet.opaque,
-                )
-                .into());
+                Some(ServerErrorKind::Subdoc {
+                    error: SubdocError::new(err_kind, Some(op_index)),
+                })
+            } else {
+                return Err(Error::new_protocol_error("bad value length"));
             }
+        } else {
+            None
+        };
+
+        if let Some(kind) = kind {
+            return Err(ServerError::new(kind, packet.op_code, status, packet.opaque).into());
         }
 
         let mut doc_is_deleted = false;
@@ -1432,7 +1267,7 @@ impl TryFromClientResponse for MutateInResponse {
             doc_is_deleted = true;
             // still considered a success
         } else if status != Status::Success && status != Status::SubDocMultiPathFailure {
-            return Err(OpsCrud::decode_common_error(&packet));
+            return Err(OpsCrud::decode_common_mutation_error(&packet));
         }
 
         let mut results: Vec<SubDocResult> = Vec::with_capacity(subdoc_info.op_count as usize);
@@ -1445,7 +1280,7 @@ impl TryFromClientResponse for MutateInResponse {
                     return Err(Error::new_protocol_error("bad value length"));
                 }
 
-                let op_index = cursor.read_u8().unwrap();
+                let op_index = cursor.read_u8()?;
 
                 if op_index > results.len() as u8 {
                     for _ in results.len() as u8..op_index {
@@ -1456,14 +1291,14 @@ impl TryFromClientResponse for MutateInResponse {
                     }
                 }
 
-                let op_status = cursor.read_u16::<BigEndian>().unwrap();
+                let op_status = cursor.read_u16::<BigEndian>()?;
                 let op_status = Status::from(op_status);
 
                 if op_status == Status::Success {
-                    let val_length = cursor.read_u32::<BigEndian>().unwrap();
+                    let val_length = cursor.read_u32::<BigEndian>()?;
 
                     let mut value = vec![0; val_length as usize];
-                    cursor.read_exact(&mut value).unwrap();
+                    cursor.read_exact(&mut value)?;
 
                     results.push(SubDocResult {
                         err: None,
@@ -1571,8 +1406,8 @@ impl TryFromClientResponse for GetCollectionIdResponse {
         };
 
         let mut extras = Cursor::new(extras);
-        let manifest_rev = extras.read_u64::<BigEndian>().unwrap();
-        let collection_id = extras.read_u32::<BigEndian>().unwrap();
+        let manifest_rev = extras.read_u64::<BigEndian>()?;
+        let collection_id = extras.read_u32::<BigEndian>()?;
 
         Ok(GetCollectionIdResponse {
             manifest_rev,

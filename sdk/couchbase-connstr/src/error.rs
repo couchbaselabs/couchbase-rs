@@ -1,10 +1,9 @@
 use std::fmt::{Display, Formatter};
 use std::{fmt, io};
-use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Debug, Clone, Error)]
+#[derive(Debug, Clone)]
 pub struct Error {
     pub(crate) kind: ErrorKind,
 }
@@ -15,26 +14,25 @@ impl Error {
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug)]
 #[non_exhaustive]
 pub enum ErrorKind {
-    #[error("failed to parse: {0}")]
     Parse(String),
-    #[error("invalid argument: {0}")]
-    InvalidArgument(&'static str),
-    #[error("io error: {0}")]
-    Io(#[from] io::Error),
-    #[error("resolve error: {0}")]
-    Resolve(#[from] hickory_resolver::error::ResolveError),
+    InvalidArgument { msg: String, arg: String },
+    Io(io::Error),
+    Resolve(hickory_resolver::error::ResolveError),
 }
 
 impl Clone for ErrorKind {
     fn clone(&self) -> Self {
         match self {
             ErrorKind::Parse(s) => ErrorKind::Parse(s.clone()),
-            ErrorKind::InvalidArgument(s) => ErrorKind::InvalidArgument(s),
-            ErrorKind::Io(e) => Self::from(io::Error::from(e.kind())),
-            ErrorKind::Resolve(e) => Self::from(e.clone()),
+            ErrorKind::InvalidArgument { msg, arg } => ErrorKind::InvalidArgument {
+                msg: msg.clone(),
+                arg: arg.clone(),
+            },
+            ErrorKind::Io(e) => Self::Io(io::Error::from(e.kind())),
+            ErrorKind::Resolve(e) => Self::Resolve(e.clone()),
         }
     }
 }
@@ -42,6 +40,19 @@ impl Clone for ErrorKind {
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(&self.kind, f)
+    }
+}
+
+impl Display for ErrorKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            ErrorKind::Parse(s) => write!(f, "Parse error: {}", s),
+            ErrorKind::InvalidArgument { msg, arg } => {
+                write!(f, "Invalid argument: {} ({})", msg, arg)
+            }
+            ErrorKind::Io(e) => write!(f, "IO error: {}", e),
+            ErrorKind::Resolve(e) => write!(f, "Resolve error: {}", e),
+        }
     }
 }
 

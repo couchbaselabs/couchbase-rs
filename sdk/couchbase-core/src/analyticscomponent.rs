@@ -66,7 +66,7 @@ impl<C: Client> AnalyticsComponent<C> {
     ) -> Self {
         Self {
             http_component: HttpComponent::new(
-                ServiceType::Analytics,
+                ServiceType::ANALYTICS,
                 opts.user_agent,
                 http_client,
                 HttpComponentState::new(config.endpoints, config.authenticator),

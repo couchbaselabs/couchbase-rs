@@ -193,7 +193,11 @@ pub async fn resolve(conn_spec: ConnSpec) -> error::Result<ResolvedConnSpec> {
             }
             "" => (DEFAULT_MEMD_PORT, false, false),
             _ => {
-                return Err(ErrorKind::InvalidArgument("bad port").into());
+                return Err(ErrorKind::InvalidArgument {
+                    msg: "unrecognized scheme".to_string(),
+                    arg: "scheme".to_string(),
+                }
+                .into());
             }
         }
     } else {
@@ -250,11 +254,15 @@ pub async fn resolve(conn_spec: ConnSpec) -> error::Result<ResolvedConnSpec> {
     for address in conn_spec.hosts {
         if let Some(port) = &address.port {
             if *port == DEFAULT_LEGACY_HTTP_PORT {
-                return Err(ErrorKind::InvalidArgument("couchbase://host:8091 not supported for couchbase:// scheme. Use couchbase://host").into());
+                return Err(ErrorKind::InvalidArgument{msg: "couchbase://host:8091 not supported for couchbase:// scheme. Use couchbase://host".to_string(), arg: "port".to_string()}.into());
             }
 
             if !has_explicit_scheme && address.port != Some(default_port) {
-                return Err(ErrorKind::InvalidArgument("ambiguous port without scheme").into());
+                return Err(ErrorKind::InvalidArgument {
+                    msg: "ambiguous port without scheme".to_string(),
+                    arg: "port".to_string(),
+                }
+                .into());
             }
 
             memd_hosts.push(Address {
@@ -292,9 +300,10 @@ pub async fn resolve(conn_spec: ConnSpec) -> error::Result<ResolvedConnSpec> {
 
 fn handle_couchbase2_scheme(conn_spec: ConnSpec) -> error::Result<ResolvedConnSpec> {
     if conn_spec.hosts.len() > 1 {
-        return Err(ErrorKind::InvalidArgument(
-            "couchbase2 scheme can only be used with a single host",
-        )
+        return Err(ErrorKind::InvalidArgument {
+            msg: "couchbase2 scheme can only be used with a single host".to_string(),
+            arg: "scheme".to_string(),
+        }
         .into());
     }
 

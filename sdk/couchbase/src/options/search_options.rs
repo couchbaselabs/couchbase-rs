@@ -1,3 +1,4 @@
+use crate::error::Error;
 use crate::mutation_state::MutationState;
 use crate::search::facets::Facet;
 use crate::search::sort::Sort;
@@ -171,7 +172,7 @@ impl SearchOptions {
         key: impl Into<String>,
         value: T,
     ) -> crate::error::Result<Self> {
-        let value = serde_json::to_value(&value)?;
+        let value = serde_json::to_value(&value).map_err(Error::encoding_failure_from_serde)?;
 
         match self.raw {
             Some(mut params) => {

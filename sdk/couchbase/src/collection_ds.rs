@@ -268,11 +268,9 @@ impl CouchbaseSet<'_> {
             .await;
 
         if let Err(e) = res {
-            // TODO Check for errors properly once we have proper error types
-            return if e.msg.contains("subdoc path exists") {
-                Ok(false)
-            } else {
-                Err(e)
+            return match e.kind() {
+                crate::error::ErrorKind::PathExists => Ok(false),
+                _ => Err(e),
             };
         }
 
@@ -305,20 +303,19 @@ impl CouchbaseSet<'_> {
                     )
                     .await;
                 if let Err(e) = res {
-                    // TODO Check for errors properly once we have proper error types
-                    if e.msg.contains("CAS mismatch") || e.msg.contains("Key exists") {
-                        continue;
-                    } else {
-                        return Err(e);
-                    }
+                    match e.kind() {
+                        crate::error::ErrorKind::DocumentExists => continue,
+                        crate::error::ErrorKind::CasMismatch => continue,
+                        _ => return Err(e),
+                    };
                 }
             }
             return Ok(());
         }
 
-        Err(crate::error::Error {
-            msg: "failed to perform operation after 16 retries".into(),
-        })
+        Err(crate::error::Error::other_failure(
+            "failed to perform operation after 16 retries",
+        ))
     }
 
     pub async fn values<T: DeserializeOwned>(&self) -> crate::error::Result<Vec<T>> {
@@ -406,19 +403,18 @@ impl CouchbaseQueue<'_> {
                 )
                 .await;
             if let Err(e) = res {
-                // TODO Check for errors properly once we have proper error types
-                if e.msg.contains("CAS mismatch") || e.msg.contains("Key exists") {
-                    continue;
-                } else {
-                    return Err(e);
-                }
+                match e.kind() {
+                    crate::error::ErrorKind::DocumentExists => continue,
+                    crate::error::ErrorKind::CasMismatch => continue,
+                    _ => return Err(e),
+                };
             }
             return Ok(value);
         }
 
-        Err(crate::error::Error {
-            msg: "failed to perform operation after 16 retries".into(),
-        })
+        Err(crate::error::Error::other_failure(
+            "failed to perform operation after 16 retries",
+        ))
     }
 
     pub async fn len(&self) -> crate::error::Result<usize> {

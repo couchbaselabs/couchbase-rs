@@ -1,4 +1,5 @@
 use crate::error;
+use crate::error::Error;
 use crate::subdoc::macros::MUTATE_IN_MACROS;
 use couchbase_core::memdx::subdoc::MutateInOpType::{
     ArrayAddUnique, ArrayInsert, ArrayPushFirst, ArrayPushLast, Counter, Delete, DictAdd, DictSet,
@@ -263,7 +264,11 @@ impl MutateInSpec {
         value: V,
         opts: impl Into<Option<InsertSpecOptions>>,
     ) -> error::Result<Self> {
-        Ok(Self::insert_raw(path, serde_json::to_vec(&value)?, opts))
+        Ok(Self::insert_raw(
+            path,
+            serde_json::to_vec(&value).map_err(Error::encoding_failure_from_serde)?,
+            opts,
+        ))
     }
 
     pub fn insert_raw(
@@ -289,7 +294,11 @@ impl MutateInSpec {
         value: V,
         opts: impl Into<Option<UpsertSpecOptions>>,
     ) -> error::Result<Self> {
-        Ok(Self::upsert_raw(path, serde_json::to_vec(&value)?, opts))
+        Ok(Self::upsert_raw(
+            path,
+            serde_json::to_vec(&value).map_err(Error::encoding_failure_from_serde)?,
+            opts,
+        ))
     }
 
     pub fn upsert_raw(
@@ -315,7 +324,11 @@ impl MutateInSpec {
         value: V,
         opts: impl Into<Option<ReplaceSpecOptions>>,
     ) -> error::Result<Self> {
-        Ok(Self::replace_raw(path, serde_json::to_vec(&value)?, opts))
+        Ok(Self::replace_raw(
+            path,
+            serde_json::to_vec(&value).map_err(Error::encoding_failure_from_serde)?,
+            opts,
+        ))
     }
 
     pub fn replace_raw(
@@ -354,7 +367,7 @@ impl MutateInSpec {
         value: &[V],
         opts: impl Into<Option<ArrayAppendSpecOptions>>,
     ) -> error::Result<Self> {
-        let mut value = serde_json::to_vec(&value)?;
+        let mut value = serde_json::to_vec(&value).map_err(Error::encoding_failure_from_serde)?;
         if !value.is_empty() {
             value.remove(0);
             if !value.is_empty() {
@@ -387,7 +400,7 @@ impl MutateInSpec {
         value: &[V],
         opts: impl Into<Option<ArrayPrependSpecOptions>>,
     ) -> error::Result<Self> {
-        let mut value = serde_json::to_vec(&value)?;
+        let mut value = serde_json::to_vec(&value).map_err(Error::encoding_failure_from_serde)?;
         if !value.is_empty() {
             value.remove(0);
             if !value.is_empty() {
@@ -420,7 +433,7 @@ impl MutateInSpec {
         value: &[V],
         opts: impl Into<Option<ArrayInsertSpecOptions>>,
     ) -> error::Result<Self> {
-        let mut value = serde_json::to_vec(&value)?;
+        let mut value = serde_json::to_vec(&value).map_err(Error::encoding_failure_from_serde)?;
         if !value.is_empty() {
             value.remove(0);
             if !value.is_empty() {
@@ -455,7 +468,7 @@ impl MutateInSpec {
     ) -> error::Result<Self> {
         Ok(Self::array_add_unique_raw(
             path,
-            serde_json::to_vec(&value)?,
+            serde_json::to_vec(&value).map_err(Error::encoding_failure_from_serde)?,
             opts,
         ))
     }
@@ -484,12 +497,13 @@ impl MutateInSpec {
         opts: impl Into<Option<IncrementSpecOptions>>,
     ) -> error::Result<Self> {
         if delta < 0 {
-            return Err(error::Error {
-                msg: "only positive delta allowed in subdoc increment".to_string(),
-            });
+            return Err(Error::invalid_argument(
+                "delta",
+                "only positive delta allowed in subdoc increment",
+            ));
         }
 
-        let value = serde_json::to_vec(&delta)?;
+        let value = serde_json::to_vec(&delta).map_err(Error::encoding_failure_from_serde)?;
         let opts = opts.into().unwrap_or_default();
 
         Ok(Self {
@@ -508,13 +522,14 @@ impl MutateInSpec {
         opts: impl Into<Option<DecrementSpecOptions>>,
     ) -> error::Result<Self> {
         if delta < 0 {
-            return Err(error::Error {
-                msg: "only positive delta allowed in subdoc decrement".to_string(),
-            });
+            return Err(Error::invalid_argument(
+                "delta",
+                "only positive delta allowed in subdoc increment",
+            ));
         }
 
         let delta = -delta;
-        let value = serde_json::to_vec(&delta)?;
+        let value = serde_json::to_vec(&delta).map_err(Error::encoding_failure_from_serde)?;
         let opts = opts.into().unwrap_or_default();
 
         Ok(Self {

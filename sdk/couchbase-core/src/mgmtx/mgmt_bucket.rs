@@ -15,10 +15,13 @@ impl<C: Client> Management<C> {
         &self,
         opts: &GetAllBucketsOptions<'_>,
     ) -> error::Result<Vec<BucketDef>> {
+        let method = Method::GET;
+        let path = "/pools/default/buckets".to_string();
+
         let resp = self
             .execute(
-                Method::GET,
-                "/pools/default/buckets",
+                method.clone(),
+                &path,
                 "",
                 opts.on_behalf_of_info.cloned(),
                 None,
@@ -27,7 +30,7 @@ impl<C: Client> Management<C> {
             .await?;
 
         if resp.status() != 200 {
-            return Err(Self::decode_common_error(resp).await);
+            return Err(Self::decode_common_error(method, path, "get_all_buckets", resp).await);
         }
 
         let json_buckets: Vec<BucketSettingsJson> = parse_response_json(resp).await?;
@@ -40,10 +43,13 @@ impl<C: Client> Management<C> {
     }
 
     pub async fn get_bucket(&self, opts: &GetBucketOptions<'_>) -> error::Result<BucketDef> {
+        let method = Method::GET;
+        let path = format!("/pools/default/buckets/{}", opts.bucket_name).to_string();
+
         let resp = self
             .execute(
-                Method::GET,
-                format!("/pools/default/buckets/{}", opts.bucket_name),
+                method.clone(),
+                &path,
                 "",
                 opts.on_behalf_of_info.cloned(),
                 None,
@@ -52,7 +58,7 @@ impl<C: Client> Management<C> {
             .await?;
 
         if resp.status() != 200 {
-            return Err(Self::decode_common_error(resp).await);
+            return Err(Self::decode_common_error(method, path, "get_bucket", resp).await);
         }
 
         let bucket: BucketSettingsJson = parse_response_json(resp).await?;
@@ -61,6 +67,9 @@ impl<C: Client> Management<C> {
     }
 
     pub async fn create_bucket(&self, opts: &CreateBucketOptions<'_>) -> error::Result<()> {
+        let method = Method::POST;
+        let path = "/pools/default/buckets".to_string();
+
         let body = {
             // Serializer is not Send so we need to drop it before making the request.
             let mut form = url::form_urlencoded::Serializer::new(String::new());
@@ -72,8 +81,8 @@ impl<C: Client> Management<C> {
 
         let resp = self
             .execute(
-                Method::POST,
-                "/pools/default/buckets",
+                method.clone(),
+                &path,
                 "application/x-www-form-urlencoded",
                 opts.on_behalf_of_info.cloned(),
                 None,
@@ -82,13 +91,16 @@ impl<C: Client> Management<C> {
             .await?;
 
         if resp.status() != 202 {
-            return Err(Self::decode_common_error(resp).await);
+            return Err(Self::decode_common_error(method, path, "create_bucket", resp).await);
         }
 
         Ok(())
     }
 
     pub async fn update_bucket(&self, opts: &UpdateBucketOptions<'_>) -> error::Result<()> {
+        let method = Method::POST;
+        let path = format!("/pools/default/buckets/{}", opts.bucket_name).to_string();
+
         let body = {
             // Serializer is not Send so we need to drop it before making the request.
             let mut form = url::form_urlencoded::Serializer::new(String::new());
@@ -99,8 +111,8 @@ impl<C: Client> Management<C> {
 
         let resp = self
             .execute(
-                Method::POST,
-                format!("/pools/default/buckets/{}", opts.bucket_name),
+                method.clone(),
+                &path,
                 "application/x-www-form-urlencoded",
                 opts.on_behalf_of_info.cloned(),
                 None,
@@ -109,17 +121,20 @@ impl<C: Client> Management<C> {
             .await?;
 
         if resp.status() != 200 {
-            return Err(Self::decode_common_error(resp).await);
+            return Err(Self::decode_common_error(method, path, "update_bucket", resp).await);
         }
 
         Ok(())
     }
 
     pub async fn delete_bucket(&self, opts: &DeleteBucketOptions<'_>) -> error::Result<()> {
+        let method = Method::DELETE;
+        let path = format!("/pools/default/buckets/{}", opts.bucket_name).to_string();
+
         let resp = self
             .execute(
-                Method::DELETE,
-                format!("/pools/default/buckets/{}", opts.bucket_name),
+                method.clone(),
+                &path,
                 "",
                 opts.on_behalf_of_info.cloned(),
                 None,
@@ -128,7 +143,7 @@ impl<C: Client> Management<C> {
             .await?;
 
         if resp.status() != 200 {
-            let e = Self::decode_common_error(resp).await;
+            let e = Self::decode_common_error(method, path.clone(), "delete_bucket", resp).await;
             match e.kind() {
                 error::ErrorKind::Server(e) => {
                     // A delayed operation is considered a success for deletion, since
@@ -145,13 +160,17 @@ impl<C: Client> Management<C> {
     }
 
     pub async fn flush_bucket(&self, opts: &FlushBucketOptions<'_>) -> error::Result<()> {
+        let method = Method::POST;
+        let path = format!(
+            "/pools/default/buckets/{}/controller/doFlush",
+            opts.bucket_name
+        )
+        .to_string();
+
         let resp = self
             .execute(
-                Method::POST,
-                format!(
-                    "/pools/default/buckets/{}/controller/doFlush",
-                    opts.bucket_name
-                ),
+                method.clone(),
+                &path,
                 "",
                 opts.on_behalf_of_info.cloned(),
                 None,
@@ -160,7 +179,7 @@ impl<C: Client> Management<C> {
             .await?;
 
         if resp.status() != 200 {
-            return Err(Self::decode_common_error(resp).await);
+            return Err(Self::decode_common_error(method, path, "flush_bucket", resp).await);
         }
 
         Ok(())

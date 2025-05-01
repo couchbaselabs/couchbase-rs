@@ -139,7 +139,7 @@ impl<V: DeserializeOwned> Stream for QueryRows<'_, V> {
             Poll::Pending => return Poll::Pending,
         };
 
-        let row = serde_json::from_slice(&row).map_err(error::Error::from);
+        let row = serde_json::from_slice(&row).map_err(error::Error::decoding_failure_from_serde);
         Poll::Ready(Some(row))
     }
 }
