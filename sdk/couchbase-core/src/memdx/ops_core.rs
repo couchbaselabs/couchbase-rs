@@ -31,7 +31,6 @@ impl OpsCore {
 
         if let Some(value) = &resp.value {
             if resp.status == Status::NotMyVbucket {
-                // TODO: unsure what this actually does.
                 base_cause = base_cause.with_config(value.to_vec());
             } else {
                 base_cause = base_cause.with_context(value.to_vec());

@@ -39,4 +39,8 @@ impl Response {
             Error::new_decoding_error(format!("failed to decode body into json: {}", e))
         })
     }
+
+    pub fn url(&self) -> &str {
+        self.inner.url().as_str()
+    }
 }

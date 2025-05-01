@@ -1,4 +1,4 @@
-use http::StatusCode;
+use http::{Method, StatusCode};
 use std::error::Error as StdError;
 use std::fmt::{Display, Formatter};
 
@@ -100,7 +100,10 @@ impl Display for ErrorKind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ServerError {
     status_code: StatusCode,
+    url: String,
     body: String,
+    method: Method,
+    path: String,
     kind: ServerErrorKind,
 }
 
@@ -110,16 +113,26 @@ impl Display for ServerError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "server error: status code: {}, body: {}, kind: {}",
-            self.status_code, self.body, self.kind
+            "server error: method: {}, path: {} status code: {}, body: {}, kind: {}",
+            self.method, self.path, self.status_code, self.body, self.kind
         )
     }
 }
 
 impl ServerError {
-    pub(crate) fn new(status_code: StatusCode, body: String, kind: ServerErrorKind) -> Self {
+    pub(crate) fn new(
+        status_code: StatusCode,
+        url: String,
+        method: Method,
+        path: String,
+        body: String,
+        kind: ServerErrorKind,
+    ) -> Self {
         Self {
             status_code,
+            url,
+            method,
+            path,
             body,
             kind,
         }
@@ -136,12 +149,25 @@ impl ServerError {
     pub fn body(&self) -> &str {
         &self.body
     }
+
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+
+    pub fn method(&self) -> &Method {
+        &self.method
+    }
+
+    pub fn url(&self) -> &str {
+        &self.url
+    }
 }
 
-#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum ServerErrorKind {
     AccessDenied,
-    UnsupportedFeature,
+    UnsupportedFeature { feature: String },
     ScopeExists,
     ScopeNotFound,
     CollectionExists,
@@ -149,7 +175,7 @@ pub enum ServerErrorKind {
     BucketExists,
     BucketNotFound,
     FlushDisabled,
-    ServerInvalidArg,
+    ServerInvalidArg { arg: String, reason: String },
     BucketUuidMismatch,
     UserNotFound,
     GroupNotFound,
@@ -161,7 +187,9 @@ impl Display for ServerErrorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ServerErrorKind::AccessDenied => write!(f, "access denied"),
-            ServerErrorKind::UnsupportedFeature => write!(f, "unsupported feature"),
+            ServerErrorKind::UnsupportedFeature { feature } => {
+                write!(f, "unsupported feature {}", feature)
+            }
             ServerErrorKind::ScopeExists => write!(f, "scope exists"),
             ServerErrorKind::ScopeNotFound => write!(f, "scope not found"),
             ServerErrorKind::CollectionExists => write!(f, "collection exists"),
@@ -169,7 +197,9 @@ impl Display for ServerErrorKind {
             ServerErrorKind::BucketExists => write!(f, "bucket exists"),
             ServerErrorKind::BucketNotFound => write!(f, "bucket not found"),
             ServerErrorKind::FlushDisabled => write!(f, "flush disabled"),
-            ServerErrorKind::ServerInvalidArg => write!(f, "server invalid argument"),
+            ServerErrorKind::ServerInvalidArg { arg, reason } => {
+                write!(f, "server invalid argument: {} - {}", arg, reason)
+            }
             ServerErrorKind::BucketUuidMismatch => write!(f, "bucket uuid mismatch"),
             ServerErrorKind::UserNotFound => write!(f, "user not found"),
             ServerErrorKind::GroupNotFound => write!(f, "group not found"),

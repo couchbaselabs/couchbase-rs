@@ -60,7 +60,7 @@ impl<C: Client> MgmtComponent<C> {
     ) -> Self {
         Self {
             http_component: HttpComponent::new(
-                ServiceType::Mgmt,
+                ServiceType::MGMT,
                 opts.user_agent,
                 http_client,
                 HttpComponentState::new(config.endpoints, config.authenticator),

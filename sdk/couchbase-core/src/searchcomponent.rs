@@ -93,7 +93,7 @@ impl<C: Client> SearchComponent<C> {
     ) -> Self {
         Self {
             http_component: HttpComponent::new(
-                ServiceType::Search,
+                ServiceType::SEARCH,
                 opts.user_agent,
                 http_client,
                 HttpComponentState::new(config.endpoints, config.authenticator),

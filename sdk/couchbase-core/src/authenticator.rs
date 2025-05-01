@@ -25,7 +25,7 @@ pub struct PasswordAuthenticator {
 impl PasswordAuthenticator {
     pub fn get_credentials(
         &self,
-        _service_type: ServiceType,
+        _service_type: &ServiceType,
         _host_port: String,
     ) -> Result<UserPassPair> {
         Ok(UserPassPair {

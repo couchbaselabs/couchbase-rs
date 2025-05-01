@@ -5,7 +5,7 @@ use crate::mgmtx::error::Error as MgmtError;
 use crate::queryx::error::Error as QueryError;
 use crate::searchx::error::Error as SearchError;
 use crate::service_type::ServiceType;
-use serde::de::StdError;
+use std::error::Error as StdError;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 use std::sync::Arc;
@@ -26,7 +26,7 @@ impl Display for Error {
 impl StdError for Error {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
         match self.kind.as_ref() {
-            ErrorKind::Memdx(err) => err.source.source(),
+            ErrorKind::Memdx(err) => err.inner.source.source(),
             ErrorKind::Query(err) => err.source(),
             ErrorKind::Search(err) => err.source(),
             ErrorKind::Analytics(err) => err.source(),
@@ -206,46 +206,105 @@ impl Display for ErrorKind {
 
 #[derive(Debug)]
 pub struct MemdxError {
+    inner: Box<InnerMemdxError>,
+}
+
+#[derive(Debug)]
+pub struct InnerMemdxError {
     source: memdx::error::Error,
     dispatched_to: Option<String>,
     dispatched_from: Option<String>,
-}
-
-impl MemdxError {
-    pub(crate) fn new(source: memdx::error::Error) -> Self {
-        Self {
-            source,
-            dispatched_to: None,
-            dispatched_from: None,
-        }
-    }
-
-    pub(crate) fn with_dispatched_to(mut self, dispatched_to: impl Into<String>) -> Self {
-        self.dispatched_to = Some(dispatched_to.into());
-        self
-    }
-
-    pub(crate) fn with_dispatched_from(mut self, dispatched_from: impl Into<String>) -> Self {
-        self.dispatched_from = Some(dispatched_from.into());
-        self
-    }
+    doc_id: Option<Vec<u8>>,
+    bucket_name: Option<String>,
+    scope_name: Option<String>,
+    collection_name: Option<String>,
 }
 
 impl Deref for MemdxError {
     type Target = memdx::error::Error;
 
     fn deref(&self) -> &Self::Target {
-        &self.source
+        &self.inner.source
+    }
+}
+
+impl MemdxError {
+    pub(crate) fn new(source: memdx::error::Error) -> Self {
+        Self {
+            inner: Box::new(InnerMemdxError {
+                source,
+                dispatched_to: None,
+                dispatched_from: None,
+                doc_id: None,
+                bucket_name: None,
+                scope_name: None,
+                collection_name: None,
+            }),
+        }
+    }
+
+    pub(crate) fn with_dispatched_to(mut self, dispatched_to: impl Into<String>) -> Self {
+        self.inner.dispatched_to = Some(dispatched_to.into());
+        self
+    }
+
+    pub(crate) fn with_dispatched_from(mut self, dispatched_from: impl Into<String>) -> Self {
+        self.inner.dispatched_from = Some(dispatched_from.into());
+        self
+    }
+
+    pub fn dispatched_to(&self) -> Option<&String> {
+        self.inner.dispatched_to.as_ref()
+    }
+
+    pub fn dispatched_from(&self) -> Option<&String> {
+        self.inner.dispatched_from.as_ref()
+    }
+
+    pub fn doc_id(&self) -> Option<&[u8]> {
+        self.inner.doc_id.as_deref()
+    }
+
+    pub fn bucket_name(&self) -> Option<&String> {
+        self.inner.bucket_name.as_ref()
+    }
+
+    pub fn scope_name(&self) -> Option<&String> {
+        self.inner.scope_name.as_ref()
+    }
+
+    pub fn collection_name(&self) -> Option<&String> {
+        self.inner.collection_name.as_ref()
+    }
+
+    pub(crate) fn set_doc_id(mut self, doc_id: Vec<u8>) -> Self {
+        self.inner.doc_id = Some(doc_id);
+        self
+    }
+
+    pub(crate) fn set_bucket_name(mut self, bucket_name: String) -> Self {
+        self.inner.bucket_name = Some(bucket_name);
+        self
+    }
+
+    pub(crate) fn set_scope_name(mut self, scope_name: String) -> Self {
+        self.inner.scope_name = Some(scope_name);
+        self
+    }
+
+    pub(crate) fn set_collection_name(mut self, collection_name: String) -> Self {
+        self.inner.collection_name = Some(collection_name);
+        self
     }
 }
 
 impl Display for MemdxError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.source)?;
-        if let Some(ref dispatched_to) = self.dispatched_to {
+        write!(f, "{}", self.inner.source)?;
+        if let Some(ref dispatched_to) = self.inner.dispatched_to {
             write!(f, ", dispatched to: {}", dispatched_to)?;
         }
-        if let Some(ref dispatched_from) = self.dispatched_from {
+        if let Some(ref dispatched_from) = self.inner.dispatched_from {
             write!(f, ", dispatched from: {}", dispatched_from)?;
         }
         Ok(())

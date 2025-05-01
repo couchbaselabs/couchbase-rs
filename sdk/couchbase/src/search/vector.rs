@@ -106,15 +106,15 @@ impl TryFrom<VectorQuery> for KnnQuery {
 
     fn try_from(value: VectorQuery) -> error::Result<KnnQuery> {
         if value.query.is_none() && value.base64_query.is_none() {
-            return Err(error::Error {
-                msg: "vector search query or base64_query must be set".to_string(),
-            });
+            return Err(error::Error::other_failure(
+                "vector search query or base64_query must be set",
+            ));
         }
 
         if value.query.is_some() && value.base64_query.is_some() {
-            return Err(error::Error {
-                msg: "only one of vector search query or base64_query must be set".to_string(),
-            });
+            return Err(error::Error::other_failure(
+                "only one of vector search query or base64_query may be set",
+            ));
         }
 
         Ok(KnnQuery::new(value.field_name)

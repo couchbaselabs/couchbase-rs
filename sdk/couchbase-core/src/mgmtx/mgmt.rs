@@ -89,8 +89,14 @@ impl<C: Client> Management<C> {
             .map_err(|e| error::Error::new_message_error("could not execute request").with(e))
     }
 
-    pub(crate) async fn decode_common_error(response: Response) -> error::Error {
+    pub(crate) async fn decode_common_error(
+        method: Method,
+        path: String,
+        feature: impl Into<String>,
+        response: Response,
+    ) -> error::Error {
         let status = response.status();
+        let url = response.url().to_string();
         let body = match response.bytes().await {
             Ok(b) => b,
             Err(e) => {
@@ -138,24 +144,32 @@ impl<C: Client> Management<C> {
             if let Some(ia) = s_err {
                 let key = ia.0;
                 if FIELD_NAME_MAP.contains_key(&key) {
-                    error::ServerErrorKind::ServerInvalidArg
+                    error::ServerErrorKind::ServerInvalidArg {
+                        arg: key,
+                        reason: ia.1,
+                    }
                 } else {
                     error::ServerErrorKind::Unknown
                 }
             } else if body_str.contains("not allowed on this type of bucket") {
-                error::ServerErrorKind::ServerInvalidArg
+                error::ServerErrorKind::ServerInvalidArg {
+                    arg: "history_enabled".to_string(),
+                    reason: body_str.to_string(),
+                }
             } else {
                 error::ServerErrorKind::Unknown
             }
         } else if status == 404 {
-            error::ServerErrorKind::UnsupportedFeature
+            error::ServerErrorKind::UnsupportedFeature {
+                feature: feature.into(),
+            }
         } else if status == 401 {
             error::ServerErrorKind::AccessDenied
         } else {
             error::ServerErrorKind::Unknown
         };
 
-        error::ServerError::new(status, body_str, kind).into()
+        error::ServerError::new(status, url, method, path, body_str, kind).into()
     }
 
     fn parse_for_invalid_arg(body: &str) -> Option<(String, String)> {
@@ -177,10 +191,13 @@ impl<C: Client> Management<C> {
         &self,
         opts: &GetTerseClusterConfigOptions<'_>,
     ) -> error::Result<TerseConfig> {
+        let method = Method::GET;
+        let path = "/pools/default/nodeServicesStreaming".to_string();
+
         let resp = self
             .execute(
-                Method::GET,
-                "/pools/default/nodeServicesStreaming",
+                method.clone(),
+                &path,
                 "",
                 opts.on_behalf_of_info.cloned(),
                 None,
@@ -189,7 +206,9 @@ impl<C: Client> Management<C> {
             .await?;
 
         if resp.status() != 200 {
-            return Err(Self::decode_common_error(resp).await);
+            return Err(
+                Self::decode_common_error(method, path, "get_terse_cluster_config", resp).await,
+            );
         }
 
         parse_response_json(resp).await
@@ -199,10 +218,13 @@ impl<C: Client> Management<C> {
         &self,
         opts: &GetTerseBucketConfigOptions<'_>,
     ) -> error::Result<TerseConfig> {
+        let method = Method::GET;
+        let path = format!("/pools/default/b/{}", opts.bucket_name);
+
         let resp = self
             .execute(
-                Method::GET,
-                format!("/pools/default/b/{}", opts.bucket_name),
+                method.clone(),
+                &path,
                 "",
                 opts.on_behalf_of_info.cloned(),
                 None,
@@ -211,7 +233,9 @@ impl<C: Client> Management<C> {
             .await?;
 
         if resp.status() != 200 {
-            return Err(Self::decode_common_error(resp).await);
+            return Err(
+                Self::decode_common_error(method, path, "get_terse_bucket_config", resp).await,
+            );
         }
 
         parse_response_json(resp).await

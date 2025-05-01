@@ -3,6 +3,7 @@ use crate::common::consistency_utils::{
 };
 use crate::common::test_config::run_test;
 use crate::common::try_until;
+use couchbase::error::ErrorKind;
 use couchbase::management::collections::collection_manager::CollectionManager;
 use couchbase::options::query_index_mgmt_options::{
     CreatePrimaryQueryIndexOptions, CreateQueryIndexOptions,
@@ -64,13 +65,11 @@ fn test_query_error() {
         let opts = QueryOptions::new().metrics(true);
         let mut res = cluster.query("SELEC 1=1", opts).await;
 
-        // TODO: once error handling is improved, this should be a proper error.
-        assert!(res.is_err());
-        assert!(res
-            .err()
-            .unwrap()
-            .msg
-            .contains("parsing failure code: 3000"));
+        let e = res.err().unwrap();
+        assert_eq!(&ErrorKind::ParsingFailure, e.kind());
+
+        assert!(e.to_string().contains("3000"));
+        assert!(e.to_string().contains("syntax error"));
     })
 }
 

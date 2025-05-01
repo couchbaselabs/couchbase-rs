@@ -13,9 +13,11 @@ use crate::crudoptions::{
 use crate::crudresults::{
     AddResult, AppendResult, DecrementResult, DeleteResult, GetAndLockResult, GetAndTouchResult,
     GetCollectionIdResult, GetMetaResult, GetResult, IncrementResult, LookupInResult,
-    MutateInResult, PrependResult, ReplaceResult, TouchResult, UnlockResult, UpsertResult,
+    MutateInResult, PrependResult, ReplaceResult, SubDocResult, TouchResult, UnlockResult,
+    UpsertResult,
 };
-use crate::error::Result;
+use crate::error;
+use crate::error::{Error, MemdxError, Result};
 use crate::kvclient::KvClient;
 use crate::kvclient_ops::KvClientOps;
 use crate::kvclientmanager::{
@@ -31,6 +33,7 @@ use crate::memdx::request::{
     LookupInRequest, MutateInRequest, PrependRequest, ReplaceRequest, SetRequest, TouchRequest,
     UnlockRequest,
 };
+use crate::memdx::response::{LookupInResponse, MutateInResponse};
 use crate::mutationtoken::MutationToken;
 use crate::nmvbhandler::NotMyVbucketConfigHandler;
 use crate::retry::{error_to_retry_reason, orchestrate_retries, RetryInfo, RetryManager};
@@ -115,6 +118,17 @@ impl<
                         durability_level: opts.durability_level,
                         durability_level_timeout: None,
                     })
+                    .map_err(|e| {
+                        let e = Self::update_memdx_err(
+                            client.clone(),
+                            e,
+                            opts.key.to_vec(),
+                            opts.scope_name,
+                            opts.collection_name,
+                        );
+
+                        Error::new_contextual_memdx_error(e)
+                    })
                     .map_ok(|resp| {
                         let mutation_token = resp.mutation_token.map(|t| MutationToken {
                             vbid: vbucket_id,
@@ -147,6 +161,17 @@ impl<
                         vbucket_id,
                         on_behalf_of: None,
                     })
+                    .map_err(|e| {
+                        let e = Self::update_memdx_err(
+                            client.clone(),
+                            e,
+                            opts.key.to_vec(),
+                            opts.scope_name,
+                            opts.collection_name,
+                        );
+
+                        Error::new_contextual_memdx_error(e)
+                    })
                     .map_ok(|resp| GetResult {
                         value: resp.value,
                         datatype: resp.datatype,
@@ -172,6 +197,17 @@ impl<
                         key: opts.key,
                         vbucket_id,
                         on_behalf_of: None,
+                    })
+                    .map_err(|e| {
+                        let e = Self::update_memdx_err(
+                            client.clone(),
+                            e,
+                            opts.key.to_vec(),
+                            opts.scope_name,
+                            opts.collection_name,
+                        );
+
+                        Error::new_contextual_memdx_error(e)
                     })
                     .map_ok(|resp| GetMetaResult {
                         value: resp.value,
@@ -206,6 +242,17 @@ impl<
                         durability_level: opts.durability_level,
                         durability_level_timeout: None,
                     })
+                    .map_err(|e| {
+                        let e = Self::update_memdx_err(
+                            client.clone(),
+                            e,
+                            opts.key.to_vec(),
+                            opts.scope_name,
+                            opts.collection_name,
+                        );
+
+                        Error::new_contextual_memdx_error(e)
+                    })
                     .map_ok(|resp| {
                         let mutation_token = resp.mutation_token.map(|t| MutationToken {
                             vbid: vbucket_id,
@@ -239,6 +286,17 @@ impl<
                         lock_time: opts.lock_time,
                         on_behalf_of: None,
                     })
+                    .map_err(|e| {
+                        let e = Self::update_memdx_err(
+                            client.clone(),
+                            e,
+                            opts.key.to_vec(),
+                            opts.scope_name,
+                            opts.collection_name,
+                        );
+
+                        Error::new_contextual_memdx_error(e)
+                    })
                     .map_ok(|resp| GetAndLockResult {
                         value: resp.value,
                         datatype: resp.datatype,
@@ -265,6 +323,17 @@ impl<
                         vbucket_id,
                         expiry: opts.expiry,
                         on_behalf_of: None,
+                    })
+                    .map_err(|e| {
+                        let e = Self::update_memdx_err(
+                            client.clone(),
+                            e,
+                            opts.key.to_vec(),
+                            opts.scope_name,
+                            opts.collection_name,
+                        );
+
+                        Error::new_contextual_memdx_error(e)
                     })
                     .map_ok(|resp| GetAndTouchResult {
                         value: resp.value,
@@ -293,6 +362,17 @@ impl<
                         cas: opts.cas,
                         on_behalf_of: None,
                     })
+                    .map_err(|e| {
+                        let e = Self::update_memdx_err(
+                            client.clone(),
+                            e,
+                            opts.key.to_vec(),
+                            opts.scope_name,
+                            opts.collection_name,
+                        );
+
+                        Error::new_contextual_memdx_error(e)
+                    })
                     .map_ok(|resp| UnlockResult {
                         // mutation token?
                     })
@@ -316,6 +396,17 @@ impl<
                         vbucket_id,
                         expiry: opts.expiry,
                         on_behalf_of: None,
+                    })
+                    .map_err(|e| {
+                        let e = Self::update_memdx_err(
+                            client.clone(),
+                            e,
+                            opts.key.to_vec(),
+                            opts.scope_name,
+                            opts.collection_name,
+                        );
+
+                        Error::new_contextual_memdx_error(e)
                     })
                     .map_ok(|resp| TouchResult { cas: resp.cas })
                     .await
@@ -355,6 +446,17 @@ impl<
                         on_behalf_of: None,
                         durability_level: opts.durability_level,
                         durability_level_timeout: None,
+                    })
+                    .map_err(|e| {
+                        let e = Self::update_memdx_err(
+                            client.clone(),
+                            e,
+                            opts.key.to_vec(),
+                            opts.scope_name,
+                            opts.collection_name,
+                        );
+
+                        Error::new_contextual_memdx_error(e)
                     })
                     .map_ok(|resp| {
                         let mutation_token = resp.mutation_token.map(|t| MutationToken {
@@ -408,6 +510,17 @@ impl<
                         durability_level: opts.durability_level,
                         durability_level_timeout: None,
                     })
+                    .map_err(|e| {
+                        let e = Self::update_memdx_err(
+                            client.clone(),
+                            e,
+                            opts.key.to_vec(),
+                            opts.scope_name,
+                            opts.collection_name,
+                        );
+
+                        Error::new_contextual_memdx_error(e)
+                    })
                     .map_ok(|resp| {
                         let mutation_token = resp.mutation_token.map(|t| MutationToken {
                             vbid: vbucket_id,
@@ -456,6 +569,17 @@ impl<
                         on_behalf_of: None,
                         durability_level: opts.durability_level,
                         durability_level_timeout: None,
+                    })
+                    .map_err(|e| {
+                        let e = Self::update_memdx_err(
+                            client.clone(),
+                            e,
+                            opts.key.to_vec(),
+                            opts.scope_name,
+                            opts.collection_name,
+                        );
+
+                        Error::new_contextual_memdx_error(e)
                     })
                     .map_ok(|resp| {
                         let mutation_token = resp.mutation_token.map(|t| MutationToken {
@@ -506,6 +630,17 @@ impl<
                         durability_level: opts.durability_level,
                         durability_level_timeout: None,
                     })
+                    .map_err(|e| {
+                        let e = Self::update_memdx_err(
+                            client.clone(),
+                            e,
+                            opts.key.to_vec(),
+                            opts.scope_name,
+                            opts.collection_name,
+                        );
+
+                        Error::new_contextual_memdx_error(e)
+                    })
                     .map_ok(|resp| {
                         let mutation_token = resp.mutation_token.map(|t| MutationToken {
                             vbid: vbucket_id,
@@ -542,6 +677,17 @@ impl<
                         on_behalf_of: None,
                         durability_level: opts.durability_level,
                         durability_level_timeout: None,
+                    })
+                    .map_err(|e| {
+                        let e = Self::update_memdx_err(
+                            client.clone(),
+                            e,
+                            opts.key.to_vec(),
+                            opts.scope_name,
+                            opts.collection_name,
+                        );
+
+                        Error::new_contextual_memdx_error(e)
                     })
                     .map_ok(|resp| {
                         let mutation_token = resp.mutation_token.map(|t| MutationToken {
@@ -581,6 +727,17 @@ impl<
                         durability_level: opts.durability_level,
                         durability_level_timeout: None,
                     })
+                    .map_err(|e| {
+                        let e = Self::update_memdx_err(
+                            client.clone(),
+                            e,
+                            opts.key.to_vec(),
+                            opts.scope_name,
+                            opts.collection_name,
+                        );
+
+                        Error::new_contextual_memdx_error(e)
+                    })
                     .map_ok(|resp| {
                         let mutation_token = resp.mutation_token.map(|t| MutationToken {
                             vbid: vbucket_id,
@@ -616,8 +773,36 @@ impl<
                         ops: opts.ops,
                         on_behalf_of: None,
                     })
-                    .map_ok(|resp| LookupInResult {
-                        value: resp.ops,
+                    .map_err(|e| {
+                        let e = Self::update_memdx_err(
+                            client.clone(),
+                            e,
+                            opts.key.to_vec(),
+                            opts.scope_name,
+                            opts.collection_name,
+                        );
+
+                        Error::new_contextual_memdx_error(e)
+                    })
+                    .map_ok(|resp: LookupInResponse| LookupInResult {
+                        value: resp
+                            .ops
+                            .into_iter()
+                            .map(|o| {
+                                let err = o.err.map(|e| {
+                                    error::MemdxError::new(e)
+                                        .set_doc_id(opts.key.to_vec())
+                                        .set_bucket_name(client.bucket_name().unwrap_or_default())
+                                        .set_collection_name(opts.collection_name.to_string())
+                                        .set_scope_name(opts.scope_name.to_string())
+                                });
+
+                                SubDocResult {
+                                    err,
+                                    value: o.value,
+                                }
+                            })
+                            .collect(),
                         cas: resp.cas,
                         doc_is_deleted: resp.doc_is_deleted,
                     })
@@ -648,7 +833,18 @@ impl<
                         durability_level: opts.durability_level,
                         durability_level_timeout: None,
                     })
-                    .map_ok(|resp| {
+                    .map_err(|e| {
+                        let e = Self::update_memdx_err(
+                            client.clone(),
+                            e,
+                            opts.key.to_vec(),
+                            opts.scope_name,
+                            opts.collection_name,
+                        );
+
+                        Error::new_contextual_memdx_error(e)
+                    })
+                    .map_ok(|resp: MutateInResponse| {
                         let mutation_token = resp.mutation_token.map(|t| MutationToken {
                             vbid: vbucket_id,
                             vbuuid: t.vbuuid,
@@ -656,7 +852,26 @@ impl<
                         });
 
                         MutateInResult {
-                            value: resp.ops,
+                            value: resp
+                                .ops
+                                .into_iter()
+                                .map(|o| {
+                                    let err = o.err.map(|e| {
+                                        MemdxError::new(e)
+                                            .set_doc_id(opts.key.to_vec())
+                                            .set_bucket_name(
+                                                client.bucket_name().unwrap_or_default(),
+                                            )
+                                            .set_collection_name(opts.collection_name.to_string())
+                                            .set_scope_name(opts.scope_name.to_string())
+                                    });
+
+                                    SubDocResult {
+                                        err,
+                                        value: o.value,
+                                    }
+                                })
+                                .collect(),
                             cas: resp.cas,
                             mutation_token,
                         }
@@ -680,6 +895,14 @@ impl<
                         .get_collection_id(GetCollectionIdRequest {
                             scope_name: opts.scope_name,
                             collection_name: opts.collection_name,
+                        })
+                        .map_err(|e| {
+                            let e = e
+                                .set_bucket_name(client.bucket_name().unwrap_or_default())
+                                .set_collection_name(opts.collection_name.to_string())
+                                .set_scope_name(opts.scope_name.to_string());
+
+                            Error::new_contextual_memdx_error(e)
                         })
                         .map_ok(|resp| GetCollectionIdResult {
                             collection_id: resp.collection_id,
@@ -760,5 +983,18 @@ impl<
             .await
         })
         .await
+    }
+
+    fn update_memdx_err(
+        client: Arc<KvClientManagerClientType<M>>,
+        e: MemdxError,
+        key: Vec<u8>,
+        scope_name: impl Into<String>,
+        collection_name: impl Into<String>,
+    ) -> MemdxError {
+        e.set_doc_id(key)
+            .set_bucket_name(client.bucket_name().unwrap_or_default())
+            .set_collection_name(collection_name.into())
+            .set_scope_name(scope_name.into())
     }
 }

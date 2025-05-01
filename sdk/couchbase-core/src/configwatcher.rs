@@ -1,7 +1,7 @@
 use crate::cbconfig;
 use crate::cbconfig::TerseConfig;
 use crate::configparser::ConfigParser;
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::kvclient::KvClient;
 use crate::kvclient_ops::KvClientOps;
 use crate::kvclientmanager::KvClientManager;
@@ -152,7 +152,8 @@ where
 
         let resp = client
             .get_cluster_config(GetClusterConfigRequest {})
-            .await?;
+            .await
+            .map_err(Error::new_contextual_memdx_error)?;
 
         let config = cbconfig::parse::parse_terse_config(&resp.config, hostname)?;
 

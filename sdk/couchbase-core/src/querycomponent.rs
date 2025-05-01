@@ -77,7 +77,7 @@ impl<C: Client> QueryComponent<C> {
     ) -> Self {
         Self {
             http_component: HttpComponent::new(
-                ServiceType::Query,
+                ServiceType::QUERY,
                 opts.user_agent,
                 http_client,
                 HttpComponentState::new(config.endpoints, config.authenticator),

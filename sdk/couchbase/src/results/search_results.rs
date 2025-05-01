@@ -191,11 +191,9 @@ pub struct SearchRow {
 impl SearchRow {
     pub fn fields<V: DeserializeOwned>(&self) -> error::Result<V> {
         if let Some(fields) = &self.fields {
-            serde_json::from_str(fields.get()).map_err(|e| error::Error { msg: e.to_string() })
+            serde_json::from_str(fields.get()).map_err(error::Error::decoding_failure_from_serde)
         } else {
-            Err(error::Error {
-                msg: "no fields in response".to_string(),
-            })
+            Err(error::Error::other_failure("no fields in response"))
         }
     }
 }

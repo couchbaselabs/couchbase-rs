@@ -120,7 +120,7 @@ impl TryFrom<TlsOptions> for Arc<tokio_rustls::rustls::ClientConfig> {
             let mut store = RootCertStore::empty();
             let mut cursor = Cursor::new(ca_cert);
             let certs = rustls_pemfile::certs(&mut cursor)
-                .map(|item| item.map_err(|e| error::Error { msg: e.to_string() }))
+                .map(|item| item.map_err(|e| error::Error::other_failure(e.to_string())))
                 .collect::<error::Result<Vec<CertificateDer>>>()?;
 
             store.add_parsable_certificates(certs);
@@ -133,7 +133,7 @@ impl TryFrom<TlsOptions> for Arc<tokio_rustls::rustls::ClientConfig> {
             debug!("Adding Capella root CA to trust store");
             let mut cursor = Cursor::new(CAPELLA_CERT);
             let certs = rustls_pemfile::certs(&mut cursor)
-                .map(|item| item.map_err(|e| error::Error { msg: e.to_string() }))
+                .map(|item| item.map_err(|e| error::Error::other_failure(e.to_string())))
                 .collect::<error::Result<Vec<CertificateDer>>>()?;
 
             store.add_parsable_certificates(certs);
@@ -143,7 +143,7 @@ impl TryFrom<TlsOptions> for Arc<tokio_rustls::rustls::ClientConfig> {
         let mut config =
             tokio_rustls::rustls::ClientConfig::builder_with_provider(Arc::new(default_provider()))
                 .with_safe_default_protocol_versions()
-                .map_err(|e| error::Error { msg: e.to_string() })?;
+                .map_err(|e| error::Error::other_failure(e.to_string()))?;
 
         let config = if let Some(true) = opts.danger_accept_invalid_certs {
             config
@@ -172,18 +172,18 @@ impl TryFrom<TlsOptions> for tokio_native_tls::native_tls::TlsConnector {
         }
         if let Some(cert) = opts.ca_certificate {
             let pem = tokio_native_tls::native_tls::Certificate::from_pem(&cert)
-                .map_err(|e| error::Error { msg: e.to_string() })?;
+                .map_err(|e| error::Error::other_failure(e.to_string()))?;
             builder.add_root_certificate(pem);
         } else {
             debug!("Adding Capella root CA to trust store");
             let capella_ca =
                 tokio_native_tls::native_tls::Certificate::from_pem(CAPELLA_CERT.as_ref())
-                    .map_err(|e| error::Error { msg: e.to_string() })?;
+                    .map_err(|e| error::Error::other_failure(e.to_string()))?;
             builder.add_root_certificate(capella_ca);
         }
         builder
             .build()
-            .map_err(|e| error::Error { msg: e.to_string() })
+            .map_err(|e| error::Error::other_failure(e.to_string()))
     }
 }
 

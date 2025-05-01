@@ -959,11 +959,40 @@ impl OpsCrud {
         Ok(magic)
     }
 
+    pub(crate) fn decode_common_mutation_status(
+        resp: &ResponsePacket,
+    ) -> std::result::Result<(), Error> {
+        let kind = match resp.status {
+            Status::DurabilityInvalidLevel => ServerErrorKind::DurabilityInvalid,
+            Status::SyncWriteAmbiguous => ServerErrorKind::SyncWriteAmbiguous,
+            Status::SyncWriteInProgress => ServerErrorKind::SyncWriteInProgress,
+            Status::SyncWriteRecommitInProgress => ServerErrorKind::SyncWriteRecommitInProgress,
+            Status::DurabilityImpossible => ServerErrorKind::DurabilityImpossible,
+            _ => {
+                return Self::decode_common_status(resp);
+            }
+        };
+
+        let mut err = ServerError::new(kind, resp.op_code, resp.status, resp.opaque);
+        if let Some(value) = &resp.value {
+            err = err.with_context(value.clone());
+        }
+
+        Err(err.into())
+    }
+
     pub(crate) fn decode_common_status(resp: &ResponsePacket) -> std::result::Result<(), Error> {
         let kind = match resp.status {
             Status::CollectionUnknown => ServerErrorKind::UnknownCollectionID,
             Status::AccessError => ServerErrorKind::Access,
             Status::NoBucket => ServerErrorKind::NoBucket,
+            Status::RateLimitedMaxCommands => ServerErrorKind::RateLimitedMaxCommands,
+            Status::RateLimitedMaxConnections => ServerErrorKind::RateLimitedMaxConnections,
+            Status::RateLimitedNetworkEgress => ServerErrorKind::RateLimitedNetworkEgress,
+            Status::RateLimitedNetworkIngress => ServerErrorKind::RateLimitedNetworkIngress,
+            Status::RateLimitedScopeSizeLimitExceeded => {
+                ServerErrorKind::RateLimitedScopeSizeLimitExceeded
+            }
             _ => {
                 return Ok(());
             }
@@ -975,6 +1004,14 @@ impl OpsCrud {
         }
 
         Err(err.into())
+    }
+
+    pub(crate) fn decode_common_mutation_error(resp: &ResponsePacket) -> Error {
+        if let Err(e) = Self::decode_common_mutation_status(resp) {
+            return e;
+        };
+
+        OpsCore::decode_error(resp).into()
     }
 
     pub(crate) fn decode_common_error(resp: &ResponsePacket) -> Error {

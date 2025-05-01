@@ -1,4 +1,5 @@
 use crate::error;
+use crate::error::Error;
 use crate::mutation_state::MutationState;
 use couchbase_core::{queryoptions, queryx};
 use serde::Serialize;
@@ -124,7 +125,7 @@ impl QueryOptions {
         key: impl Into<String>,
         value: T,
     ) -> error::Result<Self> {
-        let value = serde_json::to_value(&value)?;
+        let value = serde_json::to_value(&value).map_err(Error::encoding_failure_from_serde)?;
 
         match self.named_parameters {
             Some(mut params) => {
@@ -151,7 +152,8 @@ impl QueryOptions {
     }
 
     pub fn add_positional_parameter<T: Serialize>(mut self, parameters: T) -> error::Result<Self> {
-        let parameters = serde_json::to_value(&parameters)?;
+        let parameters =
+            serde_json::to_value(&parameters).map_err(Error::encoding_failure_from_serde)?;
 
         match self.positional_parameters {
             Some(mut params) => {
@@ -180,7 +182,7 @@ impl QueryOptions {
         key: impl Into<String>,
         value: T,
     ) -> error::Result<Self> {
-        let value = serde_json::to_value(&value)?;
+        let value = serde_json::to_value(&value).map_err(Error::encoding_failure_from_serde)?;
 
         match self.raw {
             Some(mut params) => {

@@ -1,13 +1,13 @@
-use std::sync::Arc;
-
 use crate::collectionresolver::CollectionResolver;
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::kvclient_ops::KvClientOps;
 use crate::kvclientmanager::{
     orchestrate_random_memd_client, KvClientManager, KvClientManagerClientType,
 };
 use crate::memdx::request::GetCollectionIdRequest;
 use crate::memdx::response::GetCollectionIdResponse;
+use futures::TryFutureExt;
+use std::sync::Arc;
 
 pub(crate) struct CollectionResolverMemd<K> {
     conn_mgr: Arc<K>,
@@ -45,6 +45,7 @@ where
                         scope_name,
                         collection_name,
                     })
+                    .map_err(Error::new_contextual_memdx_error)
                     .await
             },
         )

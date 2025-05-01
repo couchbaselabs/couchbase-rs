@@ -117,7 +117,7 @@ fn test_search_basic() {
             {
                 Ok(res) => res,
                 Err(e) => {
-                    error!("search failed: {}", e.msg);
+                    error!("search failed: {}", e);
                     let sleep = time::sleep(Duration::from_secs(1));
                     timeout_at(deadline, sleep).await.unwrap();
 
@@ -288,7 +288,7 @@ async fn import_search_index(
             match mgr.upsert_index(index.clone(), None).await {
                 Ok(_) => Ok(Some(())),
                 Err(e) => {
-                    warn!("failed to upsert index: {}", e.msg);
+                    warn!("failed to upsert index: {}", e);
                     Ok(None)
                 }
             }

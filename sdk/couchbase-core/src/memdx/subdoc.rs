@@ -34,9 +34,9 @@ pub struct SubdocRequestInfo {
     pub(crate) op_count: u8,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct SubDocResult {
-    pub err: Option<error::SubdocError>,
+    pub err: Option<error::Error>,
     pub value: Option<Vec<u8>>,
 }
 

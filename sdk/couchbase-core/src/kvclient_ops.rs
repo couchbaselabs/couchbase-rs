@@ -1,7 +1,6 @@
 use std::future::Future;
 
-use crate::error::Result;
-use crate::error::{Error, MemdxError};
+use crate::error::MemdxError;
 use crate::kvclient::{KvClient, StdKvClient};
 use crate::memdx;
 use crate::memdx::dispatcher::Dispatcher;
@@ -25,59 +24,75 @@ use crate::memdx::response::{
     UnlockResponse,
 };
 
+pub(crate) type KvResult<T> = Result<T, MemdxError>;
+
 pub(crate) trait KvClientOps: Sized + Send + Sync {
-    fn set(&self, req: SetRequest) -> impl Future<Output = Result<SetResponse>> + Send;
-    fn get(&self, req: GetRequest) -> impl Future<Output = Result<GetResponse>> + Send;
-    fn get_meta(&self, req: GetMetaRequest)
-        -> impl Future<Output = Result<GetMetaResponse>> + Send;
-    fn delete(&self, req: DeleteRequest) -> impl Future<Output = Result<DeleteResponse>> + Send;
+    fn bucket_name(&self) -> Option<String>;
+    fn set(&self, req: SetRequest) -> impl Future<Output = KvResult<SetResponse>> + Send;
+    fn get(&self, req: GetRequest) -> impl Future<Output = KvResult<GetResponse>> + Send;
+    fn get_meta(
+        &self,
+        req: GetMetaRequest,
+    ) -> impl Future<Output = KvResult<GetMetaResponse>> + Send;
+    fn delete(&self, req: DeleteRequest) -> impl Future<Output = KvResult<DeleteResponse>> + Send;
     fn get_and_lock(
         &self,
         req: GetAndLockRequest,
-    ) -> impl Future<Output = Result<GetAndLockResponse>> + Send;
+    ) -> impl Future<Output = KvResult<GetAndLockResponse>> + Send;
     fn get_and_touch(
         &self,
         req: GetAndTouchRequest,
-    ) -> impl Future<Output = Result<GetAndTouchResponse>> + Send;
-    fn unlock(&self, req: UnlockRequest) -> impl Future<Output = Result<UnlockResponse>> + Send;
-    fn touch(&self, req: TouchRequest) -> impl Future<Output = Result<TouchResponse>> + Send;
-    fn add(&self, req: AddRequest) -> impl Future<Output = Result<AddResponse>> + Send;
-    fn replace(&self, req: ReplaceRequest) -> impl Future<Output = Result<ReplaceResponse>> + Send;
-    fn append(&self, req: AppendRequest) -> impl Future<Output = Result<AppendResponse>> + Send;
-    fn prepend(&self, req: PrependRequest) -> impl Future<Output = Result<PrependResponse>> + Send;
+    ) -> impl Future<Output = KvResult<GetAndTouchResponse>> + Send;
+    fn unlock(&self, req: UnlockRequest) -> impl Future<Output = KvResult<UnlockResponse>> + Send;
+    fn touch(&self, req: TouchRequest) -> impl Future<Output = KvResult<TouchResponse>> + Send;
+    fn add(&self, req: AddRequest) -> impl Future<Output = KvResult<AddResponse>> + Send;
+    fn replace(
+        &self,
+        req: ReplaceRequest,
+    ) -> impl Future<Output = KvResult<ReplaceResponse>> + Send;
+    fn append(&self, req: AppendRequest) -> impl Future<Output = KvResult<AppendResponse>> + Send;
+    fn prepend(
+        &self,
+        req: PrependRequest,
+    ) -> impl Future<Output = KvResult<PrependResponse>> + Send;
     fn increment(
         &self,
         req: IncrementRequest,
-    ) -> impl Future<Output = Result<IncrementResponse>> + Send;
+    ) -> impl Future<Output = KvResult<IncrementResponse>> + Send;
     fn decrement(
         &self,
         req: DecrementRequest,
-    ) -> impl Future<Output = Result<DecrementResponse>> + Send;
+    ) -> impl Future<Output = KvResult<DecrementResponse>> + Send;
 
     fn lookup_in(
         &self,
         req: LookupInRequest,
-    ) -> impl Future<Output = Result<LookupInResponse>> + Send;
+    ) -> impl Future<Output = KvResult<LookupInResponse>> + Send;
 
     fn mutate_in(
         &self,
         req: MutateInRequest,
-    ) -> impl Future<Output = Result<MutateInResponse>> + Send;
+    ) -> impl Future<Output = KvResult<MutateInResponse>> + Send;
     fn get_cluster_config(
         &self,
         req: GetClusterConfigRequest,
-    ) -> impl Future<Output = Result<GetClusterConfigResponse>> + Send;
+    ) -> impl Future<Output = KvResult<GetClusterConfigResponse>> + Send;
     fn get_collection_id(
         &self,
         req: GetCollectionIdRequest,
-    ) -> impl Future<Output = Result<GetCollectionIdResponse>> + Send;
+    ) -> impl Future<Output = KvResult<GetCollectionIdResponse>> + Send;
 }
 
 impl<D> KvClientOps for StdKvClient<D>
 where
     D: Dispatcher,
 {
-    async fn set(&self, req: SetRequest<'_>) -> Result<SetResponse> {
+    fn bucket_name(&self) -> Option<String> {
+        let guard = self.selected_bucket.lock().unwrap();
+        guard.clone()
+    }
+
+    async fn set(&self, req: SetRequest<'_>) -> KvResult<SetResponse> {
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().set(self.client(), req).await)?;
 
@@ -85,7 +100,7 @@ where
         Ok(res)
     }
 
-    async fn get(&self, req: GetRequest<'_>) -> Result<GetResponse> {
+    async fn get(&self, req: GetRequest<'_>) -> KvResult<GetResponse> {
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().get(self.client(), req).await)?;
 
@@ -93,7 +108,7 @@ where
         Ok(res)
     }
 
-    async fn get_meta(&self, req: GetMetaRequest<'_>) -> Result<GetMetaResponse> {
+    async fn get_meta(&self, req: GetMetaRequest<'_>) -> KvResult<GetMetaResponse> {
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().get_meta(self.client(), req).await)?;
 
@@ -101,7 +116,7 @@ where
         Ok(res)
     }
 
-    async fn delete(&self, req: DeleteRequest<'_>) -> Result<DeleteResponse> {
+    async fn delete(&self, req: DeleteRequest<'_>) -> KvResult<DeleteResponse> {
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().delete(self.client(), req).await)?;
 
@@ -109,7 +124,7 @@ where
         Ok(res)
     }
 
-    async fn get_and_lock(&self, req: GetAndLockRequest<'_>) -> Result<GetAndLockResponse> {
+    async fn get_and_lock(&self, req: GetAndLockRequest<'_>) -> KvResult<GetAndLockResponse> {
         let mut op = self
             .handle_dispatch_side_result(self.ops_crud().get_and_lock(self.client(), req).await)?;
 
@@ -117,7 +132,7 @@ where
         Ok(res)
     }
 
-    async fn get_and_touch(&self, req: GetAndTouchRequest<'_>) -> Result<GetAndTouchResponse> {
+    async fn get_and_touch(&self, req: GetAndTouchRequest<'_>) -> KvResult<GetAndTouchResponse> {
         let mut op = self
             .handle_dispatch_side_result(self.ops_crud().get_and_touch(self.client(), req).await)?;
 
@@ -125,7 +140,7 @@ where
         Ok(res)
     }
 
-    async fn unlock(&self, req: UnlockRequest<'_>) -> Result<UnlockResponse> {
+    async fn unlock(&self, req: UnlockRequest<'_>) -> KvResult<UnlockResponse> {
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().unlock(self.client(), req).await)?;
 
@@ -133,7 +148,7 @@ where
         Ok(res)
     }
 
-    async fn touch(&self, req: TouchRequest<'_>) -> Result<TouchResponse> {
+    async fn touch(&self, req: TouchRequest<'_>) -> KvResult<TouchResponse> {
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().touch(self.client(), req).await)?;
 
@@ -141,7 +156,7 @@ where
         Ok(res)
     }
 
-    async fn add(&self, req: AddRequest<'_>) -> Result<AddResponse> {
+    async fn add(&self, req: AddRequest<'_>) -> KvResult<AddResponse> {
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().add(self.client(), req).await)?;
 
@@ -149,7 +164,7 @@ where
         Ok(res)
     }
 
-    async fn replace(&self, req: ReplaceRequest<'_>) -> Result<ReplaceResponse> {
+    async fn replace(&self, req: ReplaceRequest<'_>) -> KvResult<ReplaceResponse> {
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().replace(self.client(), req).await)?;
 
@@ -157,7 +172,7 @@ where
         Ok(res)
     }
 
-    async fn append(&self, req: AppendRequest<'_>) -> Result<AppendResponse> {
+    async fn append(&self, req: AppendRequest<'_>) -> KvResult<AppendResponse> {
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().append(self.client(), req).await)?;
 
@@ -165,7 +180,7 @@ where
         Ok(res)
     }
 
-    async fn prepend(&self, req: PrependRequest<'_>) -> Result<PrependResponse> {
+    async fn prepend(&self, req: PrependRequest<'_>) -> KvResult<PrependResponse> {
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().prepend(self.client(), req).await)?;
 
@@ -173,7 +188,7 @@ where
         Ok(res)
     }
 
-    async fn increment(&self, req: IncrementRequest<'_>) -> Result<IncrementResponse> {
+    async fn increment(&self, req: IncrementRequest<'_>) -> KvResult<IncrementResponse> {
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().increment(self.client(), req).await)?;
 
@@ -181,7 +196,7 @@ where
         Ok(res)
     }
 
-    async fn decrement(&self, req: DecrementRequest<'_>) -> Result<DecrementResponse> {
+    async fn decrement(&self, req: DecrementRequest<'_>) -> KvResult<DecrementResponse> {
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().decrement(self.client(), req).await)?;
 
@@ -189,7 +204,7 @@ where
         Ok(res)
     }
 
-    async fn lookup_in(&self, req: LookupInRequest<'_>) -> Result<LookupInResponse> {
+    async fn lookup_in(&self, req: LookupInRequest<'_>) -> KvResult<LookupInResponse> {
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().lookup_in(self.client(), req).await)?;
 
@@ -197,7 +212,7 @@ where
         Ok(res)
     }
 
-    async fn mutate_in(&self, req: MutateInRequest<'_>) -> Result<MutateInResponse> {
+    async fn mutate_in(&self, req: MutateInRequest<'_>) -> KvResult<MutateInResponse> {
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().mutate_in(self.client(), req).await)?;
 
@@ -208,7 +223,7 @@ where
     async fn get_cluster_config(
         &self,
         req: GetClusterConfigRequest,
-    ) -> Result<GetClusterConfigResponse> {
+    ) -> KvResult<GetClusterConfigResponse> {
         let mut op = self
             .handle_dispatch_side_result(OpsCore {}.get_cluster_config(self.client(), req).await)?;
 
@@ -219,7 +234,7 @@ where
     async fn get_collection_id(
         &self,
         req: GetCollectionIdRequest<'_>,
-    ) -> Result<GetCollectionIdResponse> {
+    ) -> KvResult<GetCollectionIdResponse> {
         let mut op = self
             .handle_dispatch_side_result(OpsUtil {}.get_collection_id(self.client(), req).await)?;
 
@@ -232,48 +247,35 @@ impl<D> StdKvClient<D>
 where
     D: Dispatcher,
 {
-    fn handle_dispatch_side_result<T>(&self, result: memdx::error::Result<T>) -> Result<T> {
+    fn handle_dispatch_side_result<T>(&self, result: memdx::error::Result<T>) -> KvResult<T> {
         match result {
             Ok(v) => Ok(v),
-            Err(e) => {
-                let e = if e.is_dispatch_error() {
-                    let mut e = MemdxError::new(e)
-                        .with_dispatched_to(self.remote_addr().to_string())
-                        .with_dispatched_from(self.local_addr().to_string());
-                    Error::new_contextual_memdx_error(e)
-                } else {
-                    Error::new_contextual_memdx_error(MemdxError::new(e))
-                };
-
-                Err(e)
-            }
+            Err(e) => Err(MemdxError::new(e)
+                .with_dispatched_to(self.remote_addr().to_string())
+                .with_dispatched_from(self.local_addr().to_string())),
         }
     }
 
-    fn handle_response_side_result<T>(&self, result: memdx::error::Result<T>) -> Result<T> {
+    fn handle_response_side_result<T>(&self, result: memdx::error::Result<T>) -> KvResult<T> {
         match result {
             Ok(v) => Ok(v),
-            Err(e) => Err(Error::new_contextual_memdx_error(
-                MemdxError::new(e)
-                    .with_dispatched_to(self.remote_addr().to_string())
-                    .with_dispatched_from(self.local_addr().to_string()),
-            )),
+            Err(e) => Err(MemdxError::new(e)
+                .with_dispatched_to(self.remote_addr().to_string())
+                .with_dispatched_from(self.local_addr().to_string())),
         }
     }
 
-    pub async fn bootstrap(&self, opts: BootstrapOptions) -> Result<BootstrapResult> {
+    pub async fn bootstrap(&self, opts: BootstrapOptions) -> KvResult<BootstrapResult> {
         OpBootstrap::bootstrap(OpsCore {}, self.client(), opts)
             .await
             .map_err(|e| {
-                Error::new_contextual_memdx_error(
-                    MemdxError::new(e)
-                        .with_dispatched_to(self.remote_addr().to_string())
-                        .with_dispatched_from(self.local_addr().to_string()),
-                )
+                MemdxError::new(e)
+                    .with_dispatched_to(self.remote_addr().to_string())
+                    .with_dispatched_from(self.local_addr().to_string())
             })
     }
 
-    pub async fn select_bucket(&self, req: SelectBucketRequest) -> Result<SelectBucketResponse> {
+    pub async fn select_bucket(&self, req: SelectBucketRequest) -> KvResult<SelectBucketResponse> {
         let mut op =
             self.handle_dispatch_side_result(OpsCore {}.select_bucket(self.client(), req).await)?;
 

@@ -1,4 +1,4 @@
-use crate::memdx::subdoc::SubDocResult;
+use crate::error;
 use crate::mutationtoken::MutationToken;
 use std::time::Duration;
 
@@ -96,14 +96,20 @@ pub struct DecrementResult {
     pub mutation_token: Option<MutationToken>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
+pub struct SubDocResult {
+    pub err: Option<error::MemdxError>,
+    pub value: Option<Vec<u8>>,
+}
+
+#[derive(Debug)]
 pub struct LookupInResult {
     pub value: Vec<SubDocResult>,
     pub cas: u64,
     pub doc_is_deleted: bool,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct MutateInResult {
     pub value: Vec<SubDocResult>,
     pub cas: u64,

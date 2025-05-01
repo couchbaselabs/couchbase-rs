@@ -115,7 +115,6 @@ struct ErrorImpl {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ErrorKind {
-    #[non_exhaustive]
     Server(ServerError),
     #[non_exhaustive]
     Http {

@@ -84,9 +84,10 @@ impl CouchbaseSearchClient {
         };
 
         if opts.consistent_with.is_some() && opts.scan_consistency.is_some() {
-            return Err(error::Error {
-                msg: "consistent_with and scan_consistency cannot be used together".to_string(),
-            });
+            return Err(error::Error::invalid_argument(
+                "consistent_with",
+                "cannot be used with scan_consistency",
+            ));
         }
 
         let control = {

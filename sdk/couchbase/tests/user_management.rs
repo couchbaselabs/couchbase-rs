@@ -1,5 +1,6 @@
 use crate::common::test_config::run_test;
 use crate::common::{new_key, try_until};
+use couchbase::error::ErrorKind;
 use couchbase::management::users::user::{Group, Role, User, UserAndMetadata};
 use couchbase::management::users::user_manager::UserManager;
 use couchbase::options::user_mgmt_options::{
@@ -52,7 +53,7 @@ fn test_delete_group() {
                     Err(e) => e,
                 };
 
-                if err.msg.to_ascii_lowercase().contains("not found") {
+                if &ErrorKind::GroupNotFound == err.kind() {
                     return Ok(Some(()));
                 }
 
@@ -159,7 +160,7 @@ fn test_delete_user() {
                     Err(e) => e,
                 };
 
-                if err.msg.to_ascii_lowercase().contains("not found") {
+                if &ErrorKind::UserNotFound == err.kind() {
                     return Ok(Some(()));
                 }
 

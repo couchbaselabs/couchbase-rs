@@ -54,8 +54,6 @@ impl Error {
     }
 }
 
-type Source = Box<dyn StdError + Send + Sync>;
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ErrorImpl {
     kind: ErrorKind,
@@ -65,10 +63,10 @@ pub struct ErrorImpl {
 #[non_exhaustive]
 pub enum ErrorKind {
     #[non_exhaustive]
-    Connection { msg: String },
-    #[non_exhaustive]
+    Connection {
+        msg: String,
+    },
     Decoding(String),
-    #[non_exhaustive]
     Message(String),
 }
 

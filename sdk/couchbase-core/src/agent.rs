@@ -649,7 +649,7 @@ impl Agent {
                 let host = get_host_port_from_uri(&endpoint)?;
                 let user_pass = match endpoint_config.authenticator.as_ref() {
                     Authenticator::PasswordAuthenticator(authenticator) => {
-                        authenticator.get_credentials(ServiceType::Mgmt, host)?
+                        authenticator.get_credentials(&ServiceType::MGMT, host)?
                     }
                 };
 

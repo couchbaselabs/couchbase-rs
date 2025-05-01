@@ -19,10 +19,13 @@ impl<C: Client> Management<C> {
         &self,
         opts: &GetCollectionManifestOptions<'_>,
     ) -> error::Result<CollectionManifest> {
+        let method = Method::GET;
+        let path = format!("/pools/default/buckets/{}/scopes", opts.bucket_name).to_string();
+
         let resp = self
             .execute(
-                Method::GET,
-                format!("/pools/default/buckets/{}/scopes", opts.bucket_name),
+                method.clone(),
+                &path,
                 "",
                 opts.on_behalf_of_info.cloned(),
                 None,
@@ -34,7 +37,9 @@ impl<C: Client> Management<C> {
             })?;
 
         if resp.status() != 200 {
-            return Err(Self::decode_common_error(resp).await);
+            return Err(
+                Self::decode_common_error(method, path, "get_collection_manifest", resp).await,
+            );
         }
 
         parse_response_json(resp).await
@@ -44,14 +49,17 @@ impl<C: Client> Management<C> {
         &self,
         opts: &CreateScopeOptions<'_>,
     ) -> error::Result<CreateScopeResponse> {
+        let method = Method::POST;
+        let path = format!("/pools/default/buckets/{}/scopes", opts.bucket_name).to_string();
+
         let body = url::form_urlencoded::Serializer::new(String::new())
             .append_pair("name", opts.scope_name)
             .finish();
 
         let resp = self
             .execute(
-                Method::POST,
-                format!("/pools/default/buckets/{}/scopes", opts.bucket_name),
+                method.clone(),
+                &path,
                 "application/x-www-form-urlencoded",
                 opts.on_behalf_of_info.cloned(),
                 None,
@@ -60,7 +68,7 @@ impl<C: Client> Management<C> {
             .await?;
 
         if resp.status() != 200 {
-            return Err(Self::decode_common_error(resp).await);
+            return Err(Self::decode_common_error(method, path, "create_scope", resp).await);
         }
 
         let manifest_uid: ManifestUidJson = parse_response_json(resp).await?;
@@ -74,13 +82,17 @@ impl<C: Client> Management<C> {
         &self,
         opts: &DeleteScopeOptions<'_>,
     ) -> error::Result<DeleteScopeResponse> {
+        let method = Method::DELETE;
+        let path = format!(
+            "/pools/default/buckets/{}/scopes/{}",
+            opts.bucket_name, opts.scope_name
+        )
+        .to_string();
+
         let resp = self
             .execute(
-                Method::DELETE,
-                format!(
-                    "/pools/default/buckets/{}/scopes/{}",
-                    opts.bucket_name, opts.scope_name
-                ),
+                method.clone(),
+                &path,
                 "",
                 opts.on_behalf_of_info.cloned(),
                 None,
@@ -89,7 +101,7 @@ impl<C: Client> Management<C> {
             .await?;
 
         if resp.status() != 200 {
-            return Err(Self::decode_common_error(resp).await);
+            return Err(Self::decode_common_error(method, path, "delete_scope", resp).await);
         }
 
         let manifest_uid: ManifestUidJson = parse_response_json(resp).await?;
@@ -103,6 +115,13 @@ impl<C: Client> Management<C> {
         &self,
         opts: &CreateCollectionOptions<'_>,
     ) -> error::Result<CreateCollectionResponse> {
+        let method = Method::POST;
+        let path = format!(
+            "/pools/default/buckets/{}/scopes/{}/collections",
+            opts.bucket_name, opts.scope_name
+        )
+        .to_string();
+
         let body = {
             // Serializer is not Send so we need to drop it before making the request.
             let mut form = url::form_urlencoded::Serializer::new(String::new());
@@ -124,11 +143,8 @@ impl<C: Client> Management<C> {
 
         let resp = self
             .execute(
-                Method::POST,
-                format!(
-                    "/pools/default/buckets/{}/scopes/{}/collections",
-                    opts.bucket_name, opts.scope_name
-                ),
+                method.clone(),
+                &path,
                 "application/x-www-form-urlencoded",
                 opts.on_behalf_of_info.cloned(),
                 None,
@@ -137,7 +153,7 @@ impl<C: Client> Management<C> {
             .await?;
 
         if resp.status() != 200 {
-            return Err(Self::decode_common_error(resp).await);
+            return Err(Self::decode_common_error(method, path, "create_collection", resp).await);
         }
 
         let manifest_uid: ManifestUidJson = parse_response_json(resp).await?;
@@ -151,6 +167,13 @@ impl<C: Client> Management<C> {
         &self,
         opts: &UpdateCollectionOptions<'_>,
     ) -> error::Result<UpdateCollectionResponse> {
+        let method = Method::PATCH;
+        let path = format!(
+            "/pools/default/buckets/{}/scopes/{}/collections/{}",
+            opts.bucket_name, opts.scope_name, opts.collection_name
+        )
+        .to_string();
+
         let body = {
             // Serializer is not Send so we need to drop it before making the request.
             let mut form = url::form_urlencoded::Serializer::new(String::new());
@@ -171,11 +194,8 @@ impl<C: Client> Management<C> {
 
         let resp = self
             .execute(
-                Method::PATCH,
-                format!(
-                    "/pools/default/buckets/{}/scopes/{}/collections/{}",
-                    opts.bucket_name, opts.scope_name, opts.collection_name
-                ),
+                method.clone(),
+                &path,
                 "application/x-www-form-urlencoded",
                 opts.on_behalf_of_info.cloned(),
                 None,
@@ -184,7 +204,7 @@ impl<C: Client> Management<C> {
             .await?;
 
         if resp.status() != 200 {
-            return Err(Self::decode_common_error(resp).await);
+            return Err(Self::decode_common_error(method, path, "update_collection", resp).await);
         }
 
         let manifest_uid: ManifestUidJson = parse_response_json(resp).await?;
@@ -198,13 +218,17 @@ impl<C: Client> Management<C> {
         &self,
         opts: &DeleteCollectionOptions<'_>,
     ) -> error::Result<DeleteCollectionResponse> {
+        let method = Method::DELETE;
+        let path = format!(
+            "/pools/default/buckets/{}/scopes/{}/collections/{}",
+            opts.bucket_name, opts.scope_name, opts.collection_name
+        )
+        .to_string();
+
         let resp = self
             .execute(
-                Method::DELETE,
-                format!(
-                    "/pools/default/buckets/{}/scopes/{}/collections/{}",
-                    opts.bucket_name, opts.scope_name, opts.collection_name
-                ),
+                method.clone(),
+                &path,
                 "",
                 opts.on_behalf_of_info.cloned(),
                 None,
@@ -213,7 +237,7 @@ impl<C: Client> Management<C> {
             .await?;
 
         if resp.status() != 200 {
-            return Err(Self::decode_common_error(resp).await);
+            return Err(Self::decode_common_error(method, path, "delete_collection", resp).await);
         }
 
         let manifest_uid: ManifestUidJson = parse_response_json(resp).await?;

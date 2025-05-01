@@ -155,9 +155,11 @@ impl CouchbaseClusterBackend {
         };
 
         let tls_config = if let Some(tls_config) = opts.tls_options {
-            Some(tls_config.try_into().map_err(|e| error::Error {
-                msg: format!("{:?}", e),
-            })?)
+            Some(
+                tls_config
+                    .try_into()
+                    .map_err(|e| error::Error::other_failure(format!("{:?}", e)))?,
+            )
         } else {
             None
         };
@@ -179,13 +181,15 @@ impl CouchbaseClusterBackend {
         }
 
         if core_opts.tls_config.is_some() && !use_ssl {
-            return Err(error::Error {
-                msg: "TLS config provided but couchbase scheme used".into(),
-            });
+            return Err(error::Error::invalid_argument(
+                "tls_config",
+                "tls config provided but couchbase scheme used",
+            ));
         } else if core_opts.tls_config.is_none() && use_ssl {
-            return Err(error::Error {
-                msg: "No TLS config provided but couchbases scheme used".into(),
-            });
+            return Err(error::Error::invalid_argument(
+                "tls_config",
+                "no TLS config provided but couchbases scheme used",
+            ));
         }
 
         Self::merge_options(&mut core_opts, extra_opts)?;
@@ -242,12 +246,11 @@ impl CouchbaseClusterBackend {
     ) -> error::Result<()> {
         for (k, v) in extra_opts {
             match k.as_str() {
+                // TODO: This doesn't look complete...
                 "kv_connect_timeout" => {
                     opts.connect_timeout =
                         Some(Duration::from_millis(v[0].parse().map_err(|e| {
-                            error::Error {
-                                msg: format!("{}", e),
-                            }
+                            error::Error::other_failure(format!("{:?}", e))
                         })?))
                 }
                 "placeholder" => {}
