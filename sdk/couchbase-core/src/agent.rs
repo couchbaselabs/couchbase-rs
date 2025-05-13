@@ -31,6 +31,7 @@ use crate::configwatcher::{
     ConfigWatcher, ConfigWatcherMemd, ConfigWatcherMemdConfig, ConfigWatcherMemdOptions,
 };
 use crate::crudcomponent::CrudComponent;
+use crate::errmapcomponent::ErrMapComponent;
 use crate::error::{Error, ErrorKind, Result};
 use crate::features::BucketFeature;
 use crate::httpcomponent::HttpComponent;
@@ -87,6 +88,7 @@ pub(crate) struct AgentInner {
     collections: Arc<AgentCollectionResolver>,
     retry_manager: Arc<RetryManager>,
     http_client: Arc<ReqwestClient>,
+    err_map_component: Arc<ErrMapComponent>,
 
     pub(crate) crud: CrudComponent<
         AgentClientManager,
@@ -426,6 +428,8 @@ impl Agent {
             tls_config: state.tls_config.clone(),
         })?);
 
+        let err_map_component = Arc::new(ErrMapComponent::new());
+
         let first_kv_client_configs =
             Self::gen_first_kv_client_configs(&opts.seed_config.memd_addrs, &state);
         let first_http_client_configs =
@@ -434,6 +438,7 @@ impl Agent {
             first_kv_client_configs,
             first_http_client_configs,
             http_client.clone(),
+            err_map_component.clone(),
             connect_timeout,
         )
         .await?;
@@ -444,6 +449,8 @@ impl Agent {
         state.network_type = network_type;
 
         let agent_component_configs = AgentInner::gen_agent_component_configs(&mut state);
+
+        let err_map_component_conn_mgr = err_map_component.clone();
 
         let conn_mgr = Arc::new(
             StdKvClientManager::new(
@@ -457,6 +464,9 @@ impl Agent {
                     orphan_handler: Arc::new(|packet| {
                         info!("Orphan : {:?}", packet);
                     }),
+                    on_err_map_fetched_handler: Some(Arc::new(move |err_map| {
+                        err_map_component_conn_mgr.on_err_map(err_map);
+                    })),
                     disable_decompression: opts.compression_config.disable_decompression,
                 },
             )
@@ -487,7 +497,7 @@ impl Agent {
             },
         ));
 
-        let retry_manager = Arc::new(RetryManager::default());
+        let retry_manager = Arc::new(RetryManager::new(err_map_component.clone()));
         let compression_manager = Arc::new(CompressionManager::new(opts.compression_config));
 
         let crud = CrudComponent::new(
@@ -544,6 +554,8 @@ impl Agent {
             collections,
             retry_manager,
             http_client,
+            err_map_component,
+
             mgmt,
             query,
             search,
@@ -590,11 +602,13 @@ impl Agent {
         kv_client_manager_client_configs: HashMap<String, KvClientConfig>,
         http_configs: HashMap<String, FirstHttpConfig>,
         http_client: Arc<C>,
+        err_map_component: Arc<ErrMapComponent>,
         connect_timeout: Duration,
     ) -> Result<ParsedConfig> {
         loop {
             for endpoint_config in kv_client_manager_client_configs.values() {
                 let host = &endpoint_config.address;
+                let err_map_component_clone = err_map_component.clone();
                 let timeout_result = timeout(
                     connect_timeout,
                     StdKvClient::new(
@@ -606,6 +620,9 @@ impl Agent {
                                     debug!("Bootstrap client {} closed", id);
                                 })
                             }),
+                            on_err_map_fetched: Some(Arc::new(move |err_map| {
+                                err_map_component_clone.on_err_map(err_map);
+                            })),
                             disable_decompression: false,
                         },
                     ),

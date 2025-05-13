@@ -11,7 +11,9 @@ use tokio::time::{sleep, Instant};
 
 use crate::error::Result;
 use crate::error::{Error, ErrorKind};
-use crate::kvclient::{KvClient, KvClientConfig, KvClientOptions, OnKvClientCloseHandler};
+use crate::kvclient::{
+    KvClient, KvClientConfig, KvClientOptions, OnErrMapFetchedHandler, OnKvClientCloseHandler,
+};
 use crate::kvclient_ops::KvClientOps;
 use crate::memdx::dispatcher::{Dispatcher, OrphanResponseHandler};
 
@@ -41,6 +43,7 @@ pub(crate) struct KvClientPoolOptions {
     pub connect_timeout: Duration,
     pub connect_throttle_period: Duration,
     pub orphan_handler: OrphanResponseHandler,
+    pub on_err_map_fetched: Option<OnErrMapFetchedHandler>,
     pub disable_decompression: bool,
 }
 
@@ -60,6 +63,7 @@ struct KvClientPoolClientSpawner {
 
     orphan_handler: OrphanResponseHandler,
     on_client_close: OnKvClientCloseHandler,
+    on_err_map_fetched: Option<OnErrMapFetchedHandler>,
 
     disable_decompression: bool,
 }
@@ -289,6 +293,7 @@ impl KvClientPoolClientSpawner {
                 orphan_handler: self.orphan_handler.clone(),
                 on_close: self.on_client_close.clone(),
                 disable_decompression: self.disable_decompression,
+                on_err_map_fetched: self.on_err_map_fetched.clone(),
             },
         )
         .await
@@ -331,6 +336,7 @@ where
                 connection_error: Mutex::new(None),
                 on_client_close: Arc::new(|id| Box::pin(async {})),
                 config: Arc::new(Mutex::new(config.client_config)),
+                on_err_map_fetched: opts.on_err_map_fetched,
 
                 disable_decompression: opts.disable_decompression,
             }),

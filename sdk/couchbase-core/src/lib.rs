@@ -54,5 +54,7 @@ mod util;
 mod vbucketmap;
 mod vbucketrouter;
 
+mod errmap;
+mod errmapcomponent;
 #[cfg(feature = "rustls-tls")]
 pub mod insecure_certverfier;

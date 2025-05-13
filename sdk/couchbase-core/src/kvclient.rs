@@ -54,9 +54,12 @@ impl PartialEq for KvClientConfig {
 pub(crate) type OnKvClientCloseHandler =
     Arc<dyn Fn(String) -> BoxFuture<'static, ()> + Send + Sync>;
 
+pub(crate) type OnErrMapFetchedHandler = Arc<dyn Fn(&[u8]) + Send + Sync>;
+
 pub(crate) struct KvClientOptions {
     pub orphan_handler: OrphanResponseHandler,
     pub on_close: OnKvClientCloseHandler,
+    pub on_err_map_fetched: Option<OnErrMapFetchedHandler>,
     pub disable_decompression: bool,
 }
 
@@ -281,6 +284,12 @@ where
 
             if let Some(hello) = res.hello {
                 kv_cli.supported_features = hello.enabled_features;
+            }
+
+            if let Some(handler) = opts.on_err_map_fetched {
+                if let Some(err_map) = res.error_map {
+                    handler(&err_map.error_map);
+                }
             }
         }
 
