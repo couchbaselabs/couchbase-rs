@@ -175,6 +175,12 @@ pub enum Status {
 
 impl From<Status> for u16 {
     fn from(value: Status) -> Self {
+        Self::from(&value)
+    }
+}
+
+impl From<&Status> for u16 {
+    fn from(value: &Status) -> Self {
         match value {
             Status::Success => 0x00,
             Status::KeyNotFound => 0x01,
@@ -243,7 +249,7 @@ impl From<Status> for u16 {
             Status::SubDocCanOnlyReviveDeletedDocuments => 0xd6,
             Status::SubDocDeletedDocumentCantHaveValue => 0xd7,
 
-            Status::Unknown(value) => value,
+            Status::Unknown(value) => *value,
         }
     }
 }

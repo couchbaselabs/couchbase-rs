@@ -790,7 +790,7 @@ impl<
                             .into_iter()
                             .map(|o| {
                                 let err = o.err.map(|e| {
-                                    error::MemdxError::new(e)
+                                    MemdxError::new(e)
                                         .set_doc_id(opts.key.to_vec())
                                         .set_bucket_name(client.bucket_name().unwrap_or_default())
                                         .set_collection_name(opts.collection_name.to_string())
@@ -924,7 +924,7 @@ impl<
                 }
             }
 
-            if let Some(reason) = error_to_retry_reason(&err) {
+            if let Some(reason) = error_to_retry_reason(&self.retry_manager, &err) {
                 if let Some(duration) = self
                     .retry_manager
                     .maybe_retry(&mut retry_info, reason)

@@ -4,15 +4,16 @@ use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::errmapcomponent::ErrMapComponent;
+use crate::error;
+use crate::error::{Error, ErrorKind};
+use crate::memdx::error::ErrorKind::{Resource, Server};
+use crate::memdx::error::{ServerError, ServerErrorKind};
+use crate::retrybesteffort::controlled_backoff;
+use crate::retryfailfast::FailFastRetryStrategy;
 use async_trait::async_trait;
 use log::debug;
 use tokio::time::sleep;
-
-use crate::error;
-use crate::error::{Error, ErrorKind};
-use crate::memdx::error::ServerErrorKind;
-use crate::retrybesteffort::controlled_backoff;
-use crate::retryfailfast::FailFastRetryStrategy;
 
 lazy_static! {
     pub(crate) static ref DEFAULT_RETRY_STRATEGY: Arc<dyn RetryStrategy> =
@@ -26,19 +27,19 @@ pub enum RetryReason {
     InvalidVbucketMap,
     TempFail,
     KvCollectionOutdated,
-    Unknown,
+    KvErrorMapRetryIndicated,
 }
 
 impl RetryReason {
     pub fn allows_non_idempotent_retry(&self) -> bool {
-        match self {
-            RetryReason::InvalidVbucketMap => true,
-            RetryReason::NotMyVbucket => true,
-            RetryReason::TempFail => true,
-            RetryReason::KvCollectionOutdated => true,
-            RetryReason::Unknown => false,
-            _ => false,
-        }
+        matches!(
+            self,
+            RetryReason::InvalidVbucketMap
+                | RetryReason::NotMyVbucket
+                | RetryReason::TempFail
+                | RetryReason::KvCollectionOutdated
+                | RetryReason::KvErrorMapRetryIndicated
+        )
     }
 
     pub fn always_retry(&self) -> bool {
@@ -47,7 +48,7 @@ impl RetryReason {
             RetryReason::NotMyVbucket => true,
             RetryReason::TempFail => false,
             RetryReason::KvCollectionOutdated => true,
-            RetryReason::Unknown => false,
+            RetryReason::KvErrorMapRetryIndicated => false,
             _ => false,
         }
     }
@@ -56,19 +57,24 @@ impl RetryReason {
 impl Display for RetryReason {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            RetryReason::NotMyVbucket => write!(f, "NotMyVbucket"),
-            RetryReason::InvalidVbucketMap => write!(f, "InvalidVbucketMap"),
-            RetryReason::TempFail => write!(f, "TempFail"),
-            RetryReason::KvCollectionOutdated => write!(f, "KvCollectionOutdated"),
-            RetryReason::Unknown => write!(f, "Unknown"),
+            RetryReason::NotMyVbucket => write!(f, "KV_NOT_MY_VBUCKET"),
+            RetryReason::InvalidVbucketMap => write!(f, "KV_INVALID_VBUCKET_MAP"),
+            RetryReason::TempFail => write!(f, "KV_TEMPORARY_FAILURE"),
+            RetryReason::KvCollectionOutdated => write!(f, "KV_NOT_MY_VBUCKET"),
+            RetryReason::KvErrorMapRetryIndicated => write!(f, "KV_ERROR_MAP_RETRY_INDICATED"),
         }
     }
 }
 
-#[derive(Default)]
-pub struct RetryManager {}
+pub struct RetryManager {
+    err_map_component: Arc<ErrMapComponent>,
+}
 
 impl RetryManager {
+    pub fn new(err_map_component: Arc<ErrMapComponent>) -> Self {
+        Self { err_map_component }
+    }
+
     pub async fn maybe_retry(
         &self,
         request: &mut RetryInfo,
@@ -167,7 +173,7 @@ where
             Err(e) => e,
         };
 
-        if let Some(reason) = error_to_retry_reason(&err) {
+        if let Some(reason) = error_to_retry_reason(&rs, &err) {
             if let Some(duration) = rs.maybe_retry(&mut retry_info, reason).await {
                 debug!(
                     "Retrying operation after {:?} due to {:?}",
@@ -182,23 +188,40 @@ where
     }
 }
 
-pub(crate) fn error_to_retry_reason(err: &Error) -> Option<RetryReason> {
+pub(crate) fn error_to_retry_reason(rs: &Arc<RetryManager>, err: &Error) -> Option<RetryReason> {
     match err.kind() {
-        ErrorKind::Memdx(err) => {
-            if err.is_server_error_kind(ServerErrorKind::NotMyVbucket) {
-                return Some(RetryReason::NotMyVbucket);
-            }
-            if err.is_server_error_kind(ServerErrorKind::TmpFail) {
-                return Some(RetryReason::TempFail);
-            }
-            if err.is_server_error_kind(ServerErrorKind::UnknownCollectionID)
-                || err.is_server_error_kind(ServerErrorKind::UnknownCollectionName)
-            {
-                return Some(RetryReason::KvCollectionOutdated);
-            }
-        }
+        ErrorKind::Memdx(err) => match err.kind() {
+            Server(e) => return server_error_to_retry_reason(rs, e),
+            Resource(e) => return server_error_to_retry_reason(rs, e.cause()),
+            _ => {}
+        },
         ErrorKind::NoVbucketMap => {
             return Some(RetryReason::InvalidVbucketMap);
+        }
+        _ => {}
+    }
+
+    None
+}
+
+fn server_error_to_retry_reason(rs: &Arc<RetryManager>, e: &ServerError) -> Option<RetryReason> {
+    match e.kind() {
+        ServerErrorKind::NotMyVbucket => {
+            return Some(RetryReason::NotMyVbucket);
+        }
+        ServerErrorKind::TmpFail => {
+            return Some(RetryReason::TempFail);
+        }
+        ServerErrorKind::UnknownCollectionID => {
+            return Some(RetryReason::KvCollectionOutdated);
+        }
+        ServerErrorKind::UnknownCollectionName => {
+            return Some(RetryReason::KvCollectionOutdated);
+        }
+        ServerErrorKind::UnknownStatus { status } => {
+            if rs.err_map_component.should_retry(status) {
+                return Some(RetryReason::KvErrorMapRetryIndicated);
+            }
         }
         _ => {}
     }

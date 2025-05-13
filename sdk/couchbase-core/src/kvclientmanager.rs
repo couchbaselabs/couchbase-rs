@@ -8,7 +8,7 @@ use tokio::sync::Mutex;
 
 use crate::error::ErrorKind;
 use crate::error::Result;
-use crate::kvclient::{KvClient, KvClientConfig};
+use crate::kvclient::{KvClient, KvClientConfig, OnErrMapFetchedHandler};
 use crate::kvclient_ops::KvClientOps;
 use crate::kvclientpool::{KvClientPool, KvClientPoolConfig, KvClientPoolOptions};
 use crate::memdx::dispatcher::OrphanResponseHandler;
@@ -50,6 +50,7 @@ pub(crate) struct KvClientManagerOptions {
     pub connect_timeout: Duration,
     pub connect_throttle_period: Duration,
     pub orphan_handler: OrphanResponseHandler,
+    pub on_err_map_fetched_handler: Option<OnErrMapFetchedHandler>,
     pub disable_decompression: bool,
 }
 
@@ -109,6 +110,7 @@ where
                 connect_throttle_period: self.opts.connect_throttle_period,
                 orphan_handler: self.opts.orphan_handler.clone(),
                 disable_decompression: self.opts.disable_decompression,
+                on_err_map_fetched: self.opts.on_err_map_fetched_handler.clone(),
             },
         )
         .await;
