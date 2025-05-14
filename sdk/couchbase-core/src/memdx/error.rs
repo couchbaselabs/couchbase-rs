@@ -113,6 +113,14 @@ impl Error {
         }
     }
 
+    pub fn has_opaque(&self) -> Option<u32> {
+        if let ErrorKind::Server(ServerError { opaque, .. }) = self.inner.kind.as_ref() {
+            Some(*opaque)
+        } else {
+            None
+        }
+    }
+
     pub fn is_cancellation_error(&self) -> bool {
         matches!(self.inner.kind.as_ref(), ErrorKind::Cancelled { .. })
     }

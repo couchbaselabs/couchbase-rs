@@ -89,7 +89,8 @@ impl<C: Client> AnalyticsComponent<C> {
             DEFAULT_RETRY_STRATEGY.clone()
         };
 
-        let retry_info = RetryInfo::new(opts.read_only.unwrap_or_default(), retry);
+        let retry_info =
+            RetryInfo::new("analytics_query", opts.read_only.unwrap_or_default(), retry);
 
         let endpoint = opts.endpoint.clone();
 

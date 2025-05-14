@@ -80,7 +80,11 @@ impl<C: Client> MgmtComponent<C> {
         &self,
         opts: &GetCollectionManifestOptions<'_>,
     ) -> error::Result<CollectionManifest> {
-        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+        let retry_info = RetryInfo::new(
+            "get_collection_manifest",
+            false,
+            opts.retry_strategy.clone(),
+        );
 
         let copts = opts.into();
 
@@ -119,7 +123,7 @@ impl<C: Client> MgmtComponent<C> {
         &self,
         opts: &CreateScopeOptions<'_>,
     ) -> error::Result<CreateScopeResponse> {
-        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+        let retry_info = RetryInfo::new("create_scope", false, opts.retry_strategy.clone());
 
         let copts = opts.into();
 
@@ -158,7 +162,7 @@ impl<C: Client> MgmtComponent<C> {
         &self,
         opts: &DeleteScopeOptions<'_>,
     ) -> error::Result<DeleteScopeResponse> {
-        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+        let retry_info = RetryInfo::new("delete_scope", false, opts.retry_strategy.clone());
 
         let copts = opts.into();
 
@@ -197,7 +201,7 @@ impl<C: Client> MgmtComponent<C> {
         &self,
         opts: &CreateCollectionOptions<'_>,
     ) -> error::Result<CreateCollectionResponse> {
-        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+        let retry_info = RetryInfo::new("create_collection", false, opts.retry_strategy.clone());
 
         let copts = opts.into();
 
@@ -236,7 +240,7 @@ impl<C: Client> MgmtComponent<C> {
         &self,
         opts: &DeleteCollectionOptions<'_>,
     ) -> error::Result<DeleteCollectionResponse> {
-        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+        let retry_info = RetryInfo::new("delete_collection", false, opts.retry_strategy.clone());
 
         let copts = opts.into();
 
@@ -275,7 +279,7 @@ impl<C: Client> MgmtComponent<C> {
         &self,
         opts: &UpdateCollectionOptions<'_>,
     ) -> error::Result<UpdateCollectionResponse> {
-        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+        let retry_info = RetryInfo::new("update_collection", false, opts.retry_strategy.clone());
 
         let copts = opts.into();
 
@@ -314,7 +318,7 @@ impl<C: Client> MgmtComponent<C> {
         &self,
         opts: &GetAllBucketsOptions<'_>,
     ) -> error::Result<Vec<BucketDef>> {
-        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+        let retry_info = RetryInfo::new("get_all_buckets", false, opts.retry_strategy.clone());
 
         let copts = opts.into();
 
@@ -345,7 +349,7 @@ impl<C: Client> MgmtComponent<C> {
     }
 
     pub async fn get_bucket(&self, opts: &GetBucketOptions<'_>) -> error::Result<BucketDef> {
-        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+        let retry_info = RetryInfo::new("get_bucket", false, opts.retry_strategy.clone());
 
         let copts = opts.into();
 
@@ -376,7 +380,7 @@ impl<C: Client> MgmtComponent<C> {
     }
 
     pub async fn create_bucket(&self, opts: &CreateBucketOptions<'_>) -> error::Result<()> {
-        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+        let retry_info = RetryInfo::new("create_bucket", false, opts.retry_strategy.clone());
 
         let copts = opts.into();
 
@@ -407,7 +411,7 @@ impl<C: Client> MgmtComponent<C> {
     }
 
     pub async fn update_bucket(&self, opts: &UpdateBucketOptions<'_>) -> error::Result<()> {
-        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+        let retry_info = RetryInfo::new("update_bucket", false, opts.retry_strategy.clone());
 
         let copts = opts.into();
 
@@ -438,7 +442,7 @@ impl<C: Client> MgmtComponent<C> {
     }
 
     pub async fn delete_bucket(&self, opts: &DeleteBucketOptions<'_>) -> error::Result<()> {
-        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+        let retry_info = RetryInfo::new("delete_bucket", false, opts.retry_strategy.clone());
 
         let copts = opts.into();
 
@@ -469,7 +473,7 @@ impl<C: Client> MgmtComponent<C> {
     }
 
     pub async fn flush_bucket(&self, opts: &FlushBucketOptions<'_>) -> error::Result<()> {
-        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+        let retry_info = RetryInfo::new("flush_bucket", false, opts.retry_strategy.clone());
 
         let copts = opts.into();
 
@@ -551,7 +555,7 @@ impl<C: Client> MgmtComponent<C> {
     }
 
     pub async fn get_user(&self, opts: &GetUserOptions<'_>) -> error::Result<UserAndMetadata> {
-        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+        let retry_info = RetryInfo::new("get_user", false, opts.retry_strategy.clone());
         let copts = opts.into();
 
         orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
@@ -584,7 +588,7 @@ impl<C: Client> MgmtComponent<C> {
         &self,
         opts: &GetAllUsersOptions<'_>,
     ) -> error::Result<Vec<UserAndMetadata>> {
-        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+        let retry_info = RetryInfo::new("get_all_users", false, opts.retry_strategy.clone());
         let copts = opts.into();
 
         orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
@@ -614,7 +618,7 @@ impl<C: Client> MgmtComponent<C> {
     }
 
     pub async fn upsert_user(&self, opts: &UpsertUserOptions<'_>) -> error::Result<()> {
-        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+        let retry_info = RetryInfo::new("upsert_user", false, opts.retry_strategy.clone());
         let copts = opts.into();
 
         orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
@@ -644,7 +648,7 @@ impl<C: Client> MgmtComponent<C> {
     }
 
     pub async fn delete_user(&self, opts: &DeleteUserOptions<'_>) -> error::Result<()> {
-        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+        let retry_info = RetryInfo::new("delete_user", false, opts.retry_strategy.clone());
         let copts = opts.into();
 
         orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
@@ -677,7 +681,7 @@ impl<C: Client> MgmtComponent<C> {
         &self,
         opts: &GetRolesOptions<'_>,
     ) -> error::Result<Vec<RoleAndDescription>> {
-        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+        let retry_info = RetryInfo::new("get_roles", false, opts.retry_strategy.clone());
         let copts = opts.into();
 
         orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
@@ -707,7 +711,7 @@ impl<C: Client> MgmtComponent<C> {
     }
 
     pub async fn get_group(&self, opts: &GetGroupOptions<'_>) -> error::Result<Group> {
-        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+        let retry_info = RetryInfo::new("get_group", false, opts.retry_strategy.clone());
         let copts = opts.into();
 
         orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
@@ -740,7 +744,7 @@ impl<C: Client> MgmtComponent<C> {
         &self,
         opts: &GetAllGroupsOptions<'_>,
     ) -> error::Result<Vec<Group>> {
-        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+        let retry_info = RetryInfo::new("get_all_groups", false, opts.retry_strategy.clone());
         let copts = opts.into();
 
         orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
@@ -770,7 +774,7 @@ impl<C: Client> MgmtComponent<C> {
     }
 
     pub async fn upsert_group(&self, opts: &UpsertGroupOptions<'_>) -> error::Result<()> {
-        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+        let retry_info = RetryInfo::new("upsert_group", false, opts.retry_strategy.clone());
         let copts = opts.into();
 
         orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
@@ -800,7 +804,7 @@ impl<C: Client> MgmtComponent<C> {
     }
 
     pub async fn delete_group(&self, opts: &DeleteGroupOptions<'_>) -> error::Result<()> {
-        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+        let retry_info = RetryInfo::new("delete_group", false, opts.retry_strategy.clone());
         let copts = opts.into();
 
         orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
@@ -830,7 +834,7 @@ impl<C: Client> MgmtComponent<C> {
     }
 
     pub async fn change_password(&self, opts: &ChangePasswordOptions<'_>) -> error::Result<()> {
-        let retry_info = RetryInfo::new(false, opts.retry_strategy.clone());
+        let retry_info = RetryInfo::new("change_password", false, opts.retry_strategy.clone());
         let copts = opts.into();
 
         orchestrate_retries(self.retry_manager.clone(), retry_info, async || {

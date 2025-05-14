@@ -12,7 +12,7 @@ use crate::memdx::error::{ServerError, ServerErrorKind};
 use crate::retrybesteffort::controlled_backoff;
 use crate::retryfailfast::FailFastRetryStrategy;
 use async_trait::async_trait;
-use log::debug;
+use log::{debug, info};
 use tokio::time::sleep;
 
 lazy_static! {
@@ -28,6 +28,7 @@ pub enum RetryReason {
     TempFail,
     KvCollectionOutdated,
     KvErrorMapRetryIndicated,
+    Locked,
 }
 
 impl RetryReason {
@@ -39,6 +40,7 @@ impl RetryReason {
                 | RetryReason::TempFail
                 | RetryReason::KvCollectionOutdated
                 | RetryReason::KvErrorMapRetryIndicated
+                | RetryReason::Locked
         )
     }
 
@@ -49,6 +51,7 @@ impl RetryReason {
             RetryReason::TempFail => false,
             RetryReason::KvCollectionOutdated => true,
             RetryReason::KvErrorMapRetryIndicated => false,
+            RetryReason::Locked => false,
             _ => false,
         }
     }
@@ -62,6 +65,7 @@ impl Display for RetryReason {
             RetryReason::TempFail => write!(f, "KV_TEMPORARY_FAILURE"),
             RetryReason::KvCollectionOutdated => write!(f, "KV_NOT_MY_VBUCKET"),
             RetryReason::KvErrorMapRetryIndicated => write!(f, "KV_ERROR_MAP_RETRY_INDICATED"),
+            RetryReason::Locked => write!(f, "KV_LOCKED"),
         }
     }
 }
@@ -118,19 +122,27 @@ pub trait RetryStrategy: Debug + Send + Sync {
 
 #[derive(Clone, Debug)]
 pub struct RetryInfo {
+    pub(crate) operation: &'static str,
     pub(crate) is_idempotent: bool,
     pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
     pub(crate) retry_attempts: u32,
     pub(crate) retry_reasons: HashSet<RetryReason>,
+    pub(crate) unique_id: Option<String>,
 }
 
 impl RetryInfo {
-    pub(crate) fn new(is_idempotent: bool, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+    pub(crate) fn new(
+        operation: &'static str,
+        is_idempotent: bool,
+        retry_strategy: Arc<dyn RetryStrategy>,
+    ) -> Self {
         Self {
+            operation,
             is_idempotent,
             retry_strategy,
             retry_attempts: 0,
             retry_reasons: Default::default(),
+            unique_id: None,
         }
     }
 
@@ -156,6 +168,21 @@ impl RetryInfo {
     }
 }
 
+impl Display for RetryInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{{ operation: {},  id: {}, is_idempotent: {}, retry_attempts: {}, retry_reasons: {} }}",
+            self.operation, self.unique_id.as_ref().unwrap_or(&"".to_string()), self.is_idempotent, self.retry_attempts,
+            self.retry_reasons
+                .iter()
+                .map(|r| r.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    }
+}
+
 pub(crate) async fn orchestrate_retries<Fut, Resp>(
     rs: Arc<RetryManager>,
     mut retry_info: RetryInfo,
@@ -166,35 +193,48 @@ where
     Resp: Send,
 {
     loop {
-        let err = match operation().await {
+        let mut err = match operation().await {
             Ok(r) => {
                 return Ok(r);
             }
             Err(e) => e,
         };
 
-        if let Some(reason) = error_to_retry_reason(&rs, &err) {
+        if let Some(reason) = error_to_retry_reason(&rs, &mut retry_info, &err) {
             if let Some(duration) = rs.maybe_retry(&mut retry_info, reason).await {
                 debug!(
-                    "Retrying operation after {:?} due to {:?}",
-                    duration, reason
+                    "Retrying {} after {:?} due to {}",
+                    &retry_info, duration, reason
                 );
                 sleep(duration).await;
                 continue;
             }
         }
 
+        if retry_info.retry_attempts > 0 {
+            // If we aren't retrying then attach any retry info that we have.
+            err.set_retry_info(retry_info);
+        }
+
         return Err(err);
     }
 }
 
-pub(crate) fn error_to_retry_reason(rs: &Arc<RetryManager>, err: &Error) -> Option<RetryReason> {
+pub(crate) fn error_to_retry_reason(
+    rs: &Arc<RetryManager>,
+    retry_info: &mut RetryInfo,
+    err: &Error,
+) -> Option<RetryReason> {
     match err.kind() {
-        ErrorKind::Memdx(err) => match err.kind() {
-            Server(e) => return server_error_to_retry_reason(rs, e),
-            Resource(e) => return server_error_to_retry_reason(rs, e.cause()),
-            _ => {}
-        },
+        ErrorKind::Memdx(err) => {
+            retry_info.unique_id = err.has_opaque().map(|o| o.to_string());
+
+            match err.kind() {
+                Server(e) => return server_error_to_retry_reason(rs, e),
+                Resource(e) => return server_error_to_retry_reason(rs, e.cause()),
+                _ => {}
+            }
+        }
         ErrorKind::NoVbucketMap => {
             return Some(RetryReason::InvalidVbucketMap);
         }
@@ -217,6 +257,9 @@ fn server_error_to_retry_reason(rs: &Arc<RetryManager>, e: &ServerError) -> Opti
         }
         ServerErrorKind::UnknownCollectionName => {
             return Some(RetryReason::KvCollectionOutdated);
+        }
+        ServerErrorKind::Locked => {
+            return Some(RetryReason::Locked);
         }
         ServerErrorKind::UnknownStatus { status } => {
             if rs.err_map_component.should_retry(status) {

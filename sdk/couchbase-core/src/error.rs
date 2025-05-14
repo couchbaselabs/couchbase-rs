@@ -3,6 +3,7 @@ use crate::httpx::error::Error as HttpError;
 use crate::memdx;
 use crate::mgmtx::error::Error as MgmtError;
 use crate::queryx::error::Error as QueryError;
+use crate::retry::RetryInfo;
 use crate::searchx::error::Error as SearchError;
 use crate::service_type::ServiceType;
 use std::error::Error as StdError;
@@ -15,10 +16,14 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, Clone)]
 pub struct Error {
     kind: Arc<ErrorKind>,
+    retry_info: Option<RetryInfo>,
 }
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        if let Some(retry_info) = &self.retry_info {
+            return write!(f, "{}, {}", self.kind, retry_info);
+        }
         write!(f, "{}", self.kind)
     }
 }
@@ -41,6 +46,7 @@ impl Error {
     pub(crate) fn new(kind: ErrorKind) -> Self {
         Self {
             kind: Arc::new(kind),
+            retry_info: None,
         }
     }
 
@@ -68,6 +74,14 @@ impl Error {
             ErrorKind::Memdx(err) => Some(err),
             _ => None,
         }
+    }
+
+    pub(crate) fn set_retry_info(&mut self, retry_info: RetryInfo) {
+        self.retry_info = Some(retry_info);
+    }
+
+    pub fn retry_info(&self) -> Option<&RetryInfo> {
+        self.retry_info.as_ref()
     }
 }
 
@@ -318,6 +332,7 @@ where
     fn from(err: E) -> Self {
         Self {
             kind: Arc::new(err.into()),
+            retry_info: None,
         }
     }
 }
