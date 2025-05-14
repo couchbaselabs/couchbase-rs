@@ -60,6 +60,41 @@ fn test_upsert_and_get() {
 }
 
 #[test]
+fn test_upsert_retry_locked_until_deadline() {
+    run_test(async |mut agent| {
+        let strat = Arc::new(BestEffortRetryStrategy::new(
+            ExponentialBackoffCalculator::default(),
+        ));
+
+        let key = generate_key();
+        let value = generate_bytes_value(32);
+
+        let upsert_opts = UpsertOptions::new(key.as_slice(), "", "", value.as_slice())
+            .retry_strategy(strat.clone());
+
+        let upsert_result = agent.upsert(upsert_opts.clone()).await.unwrap();
+
+        assert_ne!(0, upsert_result.cas);
+        assert!(upsert_result.mutation_token.is_some());
+
+        let _ = agent
+            .get_and_lock(
+                GetAndLockOptions::new(key.as_slice(), "", "", 10).retry_strategy(strat.clone()),
+            )
+            .await
+            .unwrap();
+
+        let res = timeout_at(
+            Instant::now().add(Duration::from_secs(1)),
+            agent.upsert(upsert_opts.clone()),
+        )
+        .await;
+
+        assert!(res.is_err(), "Expected timeout error, got {:?}", res);
+    });
+}
+
+#[test]
 fn test_add_and_delete() {
     run_test(async |mut agent| {
         let strat = Arc::new(BestEffortRetryStrategy::new(
@@ -600,7 +635,7 @@ fn test_unknown_collection_id() {
             &bucket,
             &scope_name,
             &collection_name,
-            Instant::now().add(Duration::from_secs(5)),
+            Instant::now().add(Duration::from_secs(10)),
         )
         .await;
 
@@ -663,7 +698,7 @@ fn test_changed_collection_id() {
             &bucket,
             &scope_name,
             &collection_name,
-            Instant::now().add(Duration::from_secs(5)),
+            Instant::now().add(Duration::from_secs(10)),
         )
         .await;
 

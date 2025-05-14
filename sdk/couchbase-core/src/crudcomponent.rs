@@ -87,7 +87,7 @@ impl<
     pub(crate) async fn upsert(&self, opts: UpsertOptions<'_>) -> Result<UpsertResult> {
         self.orchestrate_simple_crud(
             opts.key,
-            RetryInfo::new(false, opts.retry_strategy),
+            RetryInfo::new("upsert", false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
             async |collection_id, _manifest_id, vbucket_id, client| {
@@ -150,7 +150,7 @@ impl<
     pub(crate) async fn get(&self, opts: GetOptions<'_>) -> Result<GetResult> {
         self.orchestrate_simple_crud(
             opts.key,
-            RetryInfo::new(true, opts.retry_strategy),
+            RetryInfo::new("get", true, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
             async |collection_id, _manifest_id, vbucket_id, client| {
@@ -187,7 +187,7 @@ impl<
     pub(crate) async fn get_meta(&self, opts: GetMetaOptions<'_>) -> Result<GetMetaResult> {
         self.orchestrate_simple_crud(
             opts.key,
-            RetryInfo::new(true, opts.retry_strategy),
+            RetryInfo::new("get_meta", true, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
             async |collection_id, _manifest_id, vbucket_id, client| {
@@ -228,7 +228,7 @@ impl<
     pub async fn delete(&self, opts: DeleteOptions<'_>) -> Result<DeleteResult> {
         self.orchestrate_simple_crud(
             opts.key,
-            RetryInfo::new(false, opts.retry_strategy),
+            RetryInfo::new("delete", false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
             async |collection_id, manifest_id, vbucket_id, client| {
@@ -274,7 +274,7 @@ impl<
     pub async fn get_and_lock(&self, opts: GetAndLockOptions<'_>) -> Result<GetAndLockResult> {
         self.orchestrate_simple_crud(
             opts.key,
-            RetryInfo::new(false, opts.retry_strategy),
+            RetryInfo::new("get_and_lock", false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
             async |collection_id, manifest_id, vbucket_id, client| {
@@ -312,7 +312,7 @@ impl<
     pub async fn get_and_touch(&self, opts: GetAndTouchOptions<'_>) -> Result<GetAndTouchResult> {
         self.orchestrate_simple_crud(
             opts.key,
-            RetryInfo::new(false, opts.retry_strategy),
+            RetryInfo::new("get_and_touch", false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
             async |collection_id, manifest_id, vbucket_id, client| {
@@ -350,7 +350,7 @@ impl<
     pub async fn unlock(&self, opts: UnlockOptions<'_>) -> Result<UnlockResult> {
         self.orchestrate_simple_crud(
             opts.key,
-            RetryInfo::new(false, opts.retry_strategy),
+            RetryInfo::new("unlock", false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
             async |collection_id, manifest_id, vbucket_id, client| {
@@ -385,7 +385,7 @@ impl<
     pub async fn touch(&self, opts: TouchOptions<'_>) -> Result<TouchResult> {
         self.orchestrate_simple_crud(
             opts.key,
-            RetryInfo::new(false, opts.retry_strategy),
+            RetryInfo::new("touch", false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
             async |collection_id, manifest_id, vbucket_id, client| {
@@ -418,7 +418,7 @@ impl<
     pub async fn add(&self, opts: AddOptions<'_>) -> Result<AddResult> {
         self.orchestrate_simple_crud(
             opts.key,
-            RetryInfo::new(false, opts.retry_strategy),
+            RetryInfo::new("add", false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
             async |collection_id, manifest_id, vbucket_id, client| {
@@ -479,7 +479,7 @@ impl<
     pub async fn replace(&self, opts: ReplaceOptions<'_>) -> Result<ReplaceResult> {
         self.orchestrate_simple_crud(
             opts.key,
-            RetryInfo::new(false, opts.retry_strategy),
+            RetryInfo::new("replace", false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
             async |collection_id, manifest_id, vbucket_id, client| {
@@ -542,7 +542,7 @@ impl<
     pub async fn append(&self, opts: AppendOptions<'_>) -> Result<AppendResult> {
         self.orchestrate_simple_crud(
             opts.key,
-            RetryInfo::new(false, opts.retry_strategy),
+            RetryInfo::new("append", false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
             async |collection_id, manifest_id, vbucket_id, client| {
@@ -602,7 +602,7 @@ impl<
     pub async fn prepend(&self, opts: PrependOptions<'_>) -> Result<PrependResult> {
         self.orchestrate_simple_crud(
             opts.key,
-            RetryInfo::new(false, opts.retry_strategy),
+            RetryInfo::new("prepend", false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
             async |collection_id, manifest_id, vbucket_id, client| {
@@ -662,7 +662,7 @@ impl<
     pub async fn increment(&self, opts: IncrementOptions<'_>) -> Result<IncrementResult> {
         self.orchestrate_simple_crud(
             opts.key,
-            RetryInfo::new(false, opts.retry_strategy),
+            RetryInfo::new("increment", false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
             async |collection_id, manifest_id, vbucket_id, client| {
@@ -711,7 +711,7 @@ impl<
     pub async fn decrement(&self, opts: DecrementOptions<'_>) -> Result<DecrementResult> {
         self.orchestrate_simple_crud(
             opts.key,
-            RetryInfo::new(false, opts.retry_strategy),
+            RetryInfo::new("decrement", false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
             async |collection_id, manifest_id, vbucket_id, client| {
@@ -760,7 +760,7 @@ impl<
     pub async fn lookup_in(&self, opts: LookupInOptions<'_>) -> Result<LookupInResult> {
         self.orchestrate_simple_crud(
             opts.key,
-            RetryInfo::new(true, opts.retry_strategy),
+            RetryInfo::new("lookup_in", true, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
             async |collection_id, manifest_id, vbucket_id, client| {
@@ -815,7 +815,7 @@ impl<
     pub async fn mutate_in(&self, opts: MutateInOptions<'_>) -> Result<MutateInResult> {
         self.orchestrate_simple_crud(
             opts.key,
-            RetryInfo::new(false, opts.retry_strategy),
+            RetryInfo::new("mutate_in", false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
             async |collection_id, manifest_id, vbucket_id, client| {
@@ -886,10 +886,10 @@ impl<
         &self,
         opts: GetCollectionIdOptions<'_>,
     ) -> Result<GetCollectionIdResult> {
-        let mut retry_info = RetryInfo::new(true, opts.retry_strategy);
+        let mut retry_info = RetryInfo::new("get_collection_id", true, opts.retry_strategy);
 
         loop {
-            let err =
+            let mut err =
                 match orchestrate_random_memd_client(self.conn_manager.clone(), async |client| {
                     client
                         .get_collection_id(GetCollectionIdRequest {
@@ -924,19 +924,25 @@ impl<
                 }
             }
 
-            if let Some(reason) = error_to_retry_reason(&self.retry_manager, &err) {
+            if let Some(reason) = error_to_retry_reason(&self.retry_manager, &mut retry_info, &err)
+            {
                 if let Some(duration) = self
                     .retry_manager
                     .maybe_retry(&mut retry_info, reason)
                     .await
                 {
                     debug!(
-                        "Retrying operation after {:?} due to {:?}",
-                        duration, reason
+                        "Retrying {} after {:?} due to {}",
+                        &retry_info, duration, reason
                     );
                     sleep(duration).await;
                     continue;
                 }
+            }
+
+            if retry_info.retry_attempts > 0 {
+                // If we aren't retrying then attach any retry info that we have.
+                err.set_retry_info(retry_info);
             }
 
             return Err(err);

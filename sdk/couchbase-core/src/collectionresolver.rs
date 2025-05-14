@@ -67,7 +67,12 @@ async fn maybe_invalidate_collection_id<Cr>(
 where
     Cr: CollectionResolver,
 {
-    let invalidating_manifest_rev = parse_manifest_rev_from_error(&err).unwrap_or_default();
+    let invalidating_manifest_rev = match parse_manifest_rev_from_error(&err) {
+        Some(rev) => rev,
+        None => {
+            return err;
+        }
+    };
 
     if invalidating_manifest_rev > 0 && invalidating_manifest_rev < our_manifest_rev {
         return err;

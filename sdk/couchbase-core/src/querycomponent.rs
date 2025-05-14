@@ -101,7 +101,7 @@ impl<C: Client> QueryComponent<C> {
             DEFAULT_RETRY_STRATEGY.clone()
         };
 
-        let retry_info = RetryInfo::new(opts.read_only.unwrap_or_default(), retry);
+        let retry_info = RetryInfo::new("query", opts.read_only.unwrap_or_default(), retry);
 
         let endpoint = opts.endpoint.clone();
         let copts = opts.into();
@@ -146,7 +146,8 @@ impl<C: Client> QueryComponent<C> {
         } else {
             DEFAULT_RETRY_STRATEGY.clone()
         };
-        let retry_info = RetryInfo::new(opts.read_only.unwrap_or_default(), retry);
+        let retry_info =
+            RetryInfo::new("prepared_query", opts.read_only.unwrap_or_default(), retry);
 
         let endpoint = opts.endpoint.clone();
         let copts = opts.into();
@@ -198,7 +199,7 @@ impl<C: Client> QueryComponent<C> {
             DEFAULT_RETRY_STRATEGY.clone()
         };
 
-        let retry_info = RetryInfo::new(true, retry);
+        let retry_info = RetryInfo::new("query_get_all_indexes", true, retry);
 
         let endpoint = opts.endpoint.clone();
         let copts = opts.into();
@@ -246,7 +247,7 @@ impl<C: Client> QueryComponent<C> {
             DEFAULT_RETRY_STRATEGY.clone()
         };
 
-        let retry_info = RetryInfo::new(false, retry);
+        let retry_info = RetryInfo::new("query_create_primary_index", false, retry);
 
         let endpoint = opts.endpoint.clone();
         let copts = opts.into();
@@ -271,7 +272,7 @@ impl<C: Client> QueryComponent<C> {
             DEFAULT_RETRY_STRATEGY.clone()
         };
 
-        let retry_info = RetryInfo::new(false, retry);
+        let retry_info = RetryInfo::new("query_create_index", false, retry);
 
         let endpoint = opts.endpoint.clone();
         let copts = opts.into();
@@ -299,7 +300,7 @@ impl<C: Client> QueryComponent<C> {
             DEFAULT_RETRY_STRATEGY.clone()
         };
 
-        let retry_info = RetryInfo::new(false, retry);
+        let retry_info = RetryInfo::new("query_drop_primary_index", false, retry);
 
         let endpoint = opts.endpoint.clone();
         let copts = opts.into();
@@ -324,7 +325,7 @@ impl<C: Client> QueryComponent<C> {
             DEFAULT_RETRY_STRATEGY.clone()
         };
 
-        let retry_info = RetryInfo::new(false, retry);
+        let retry_info = RetryInfo::new("query_drop_index", false, retry);
 
         let endpoint = opts.endpoint.clone();
         let copts = opts.into();
@@ -352,7 +353,7 @@ impl<C: Client> QueryComponent<C> {
             DEFAULT_RETRY_STRATEGY.clone()
         };
 
-        let retry_info = RetryInfo::new(false, retry);
+        let retry_info = RetryInfo::new("query_build_deferred_indexes", false, retry);
 
         let endpoint = opts.endpoint.clone();
         let copts = opts.into();
@@ -377,7 +378,7 @@ impl<C: Client> QueryComponent<C> {
             DEFAULT_RETRY_STRATEGY.clone()
         };
 
-        let retry_info = RetryInfo::new(true, retry);
+        let retry_info = RetryInfo::new("query_watch_indexes", true, retry);
 
         let endpoint = opts.endpoint.clone();
         let copts = opts.into();

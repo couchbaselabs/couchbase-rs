@@ -133,7 +133,7 @@ impl<C: Client> SearchComponent<C> {
             DEFAULT_RETRY_STRATEGY.clone()
         };
 
-        let retry_info = RetryInfo::new(true, retry);
+        let retry_info = RetryInfo::new("search_query", true, retry);
 
         let endpoint = opts.endpoint.clone();
         let copts = opts.into();
@@ -181,7 +181,7 @@ impl<C: Client> SearchComponent<C> {
             DEFAULT_RETRY_STRATEGY.clone()
         };
 
-        let retry_info = RetryInfo::new(true, retry);
+        let retry_info = RetryInfo::new("search_get_index", true, retry);
         let endpoint = opts.endpoint;
         let copts = opts.into();
 
@@ -208,7 +208,7 @@ impl<C: Client> SearchComponent<C> {
             DEFAULT_RETRY_STRATEGY.clone()
         };
 
-        let retry_info = RetryInfo::new(true, retry);
+        let retry_info = RetryInfo::new("search_get_all_indexes", true, retry);
         let endpoint = opts.endpoint;
         let copts = opts.into();
 
@@ -232,7 +232,7 @@ impl<C: Client> SearchComponent<C> {
             DEFAULT_RETRY_STRATEGY.clone()
         };
 
-        let retry_info = RetryInfo::new(true, retry);
+        let retry_info = RetryInfo::new("search_upsert_index", true, retry);
         let endpoint = opts.endpoint;
         let copts = opts.into();
 
@@ -256,7 +256,7 @@ impl<C: Client> SearchComponent<C> {
             DEFAULT_RETRY_STRATEGY.clone()
         };
 
-        let retry_info = RetryInfo::new(true, retry);
+        let retry_info = RetryInfo::new("search_delete_index", true, retry);
         let endpoint = opts.endpoint;
         let copts = opts.into();
 
@@ -283,7 +283,7 @@ impl<C: Client> SearchComponent<C> {
             DEFAULT_RETRY_STRATEGY.clone()
         };
 
-        let retry_info = RetryInfo::new(true, retry);
+        let retry_info = RetryInfo::new("search_analyze_document", true, retry);
         let endpoint = opts.endpoint;
         let copts = opts.into();
 
@@ -310,7 +310,7 @@ impl<C: Client> SearchComponent<C> {
             DEFAULT_RETRY_STRATEGY.clone()
         };
 
-        let retry_info = RetryInfo::new(true, retry);
+        let retry_info = RetryInfo::new("search_get_indexed_documents_count", true, retry);
         let endpoint = opts.endpoint;
         let copts = opts.into();
 
@@ -334,7 +334,7 @@ impl<C: Client> SearchComponent<C> {
             DEFAULT_RETRY_STRATEGY.clone()
         };
 
-        let retry_info = RetryInfo::new(true, retry);
+        let retry_info = RetryInfo::new("search_pause_ingest", true, retry);
         let endpoint = opts.endpoint;
         let copts = opts.into();
 
@@ -358,7 +358,7 @@ impl<C: Client> SearchComponent<C> {
             DEFAULT_RETRY_STRATEGY.clone()
         };
 
-        let retry_info = RetryInfo::new(true, retry);
+        let retry_info = RetryInfo::new("search_resume_ingest", true, retry);
         let endpoint = opts.endpoint;
         let copts = opts.into();
 
@@ -382,7 +382,7 @@ impl<C: Client> SearchComponent<C> {
             DEFAULT_RETRY_STRATEGY.clone()
         };
 
-        let retry_info = RetryInfo::new(true, retry);
+        let retry_info = RetryInfo::new("search_allow_querying", true, retry);
         let endpoint = opts.endpoint;
         let copts = opts.into();
 
@@ -406,7 +406,7 @@ impl<C: Client> SearchComponent<C> {
             DEFAULT_RETRY_STRATEGY.clone()
         };
 
-        let retry_info = RetryInfo::new(true, retry);
+        let retry_info = RetryInfo::new("search_disallow_querying", true, retry);
         let endpoint = opts.endpoint;
         let copts = opts.into();
 
@@ -430,7 +430,7 @@ impl<C: Client> SearchComponent<C> {
             DEFAULT_RETRY_STRATEGY.clone()
         };
 
-        let retry_info = RetryInfo::new(true, retry);
+        let retry_info = RetryInfo::new("search_freeze_plan", true, retry);
         let endpoint = opts.endpoint;
         let copts = opts.into();
 
@@ -454,7 +454,7 @@ impl<C: Client> SearchComponent<C> {
             DEFAULT_RETRY_STRATEGY.clone()
         };
 
-        let retry_info = RetryInfo::new(true, retry);
+        let retry_info = RetryInfo::new("search_unfreeze_plan", true, retry);
         let endpoint = opts.endpoint;
         let copts = opts.into();
 
