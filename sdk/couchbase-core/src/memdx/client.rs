@@ -17,7 +17,7 @@ use tokio::io::{AsyncRead, AsyncWrite, Join, ReadHalf, WriteHalf};
 use tokio::select;
 use tokio::sync::mpsc::unbounded_channel;
 use tokio::sync::mpsc::{Receiver, Sender, UnboundedReceiver, UnboundedSender};
-use tokio::sync::{mpsc, oneshot, Mutex, MutexGuard, RwLock, Semaphore};
+use tokio::sync::{mpsc, oneshot, Mutex, MutexGuard, RwLock};
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use tokio_util::codec::{FramedRead, FramedWrite};
@@ -169,7 +169,6 @@ impl Client {
                                         t.map(Arc::clone)
                                     };
 
-
                                     if let Some(context) = context {
                                         let sender = &context.sender;
 
@@ -197,10 +196,19 @@ impl Client {
                                         }
 
                                         if !context.context.is_persistent {
-                                                    let mut map = requests.lock().unwrap();
-                                                    map.remove(&opaque);
-                                                    drop(map);
+                                            {
+                                                let mut map = requests.lock().unwrap();
+                                                map.remove(&opaque);
+                                            }
                                         }
+
+                                        trace!(
+                                            "Sending response on {}. Opcode={}. Opaque={}. Status={}",
+                                            opts.client_id,
+                                            packet.op_code,
+                                            packet.opaque,
+                                            packet.status,
+                                        );
 
                                         let resp = ClientResponse::new(packet, context.context.clone());
                                         match sender.send(Ok(resp)).await {

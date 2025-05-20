@@ -8,6 +8,7 @@ use tokio::sync::{Mutex, Notify};
 
 use crate::agent::Agent;
 use crate::agentoptions::{AgentOptions, CompressionConfig, ConfigPollerConfig, SeedConfig};
+use crate::auth_mechanism::AuthMechanism;
 use crate::authenticator::Authenticator;
 use crate::error;
 use crate::error::ErrorKind;
@@ -19,6 +20,7 @@ pub struct OnDemandAgentManagerOptions {
     pub seed_config: SeedConfig,
     pub authenticator: Authenticator,
 
+    pub auth_mechanisms: Vec<AuthMechanism>,
     pub tls_config: Option<TlsConfig>,
 
     pub connect_timeout: Option<Duration>,
@@ -38,6 +40,7 @@ impl OnDemandAgentManagerOptions {
             seed_config,
             compression_config: CompressionConfig::default(),
             config_poller_config: ConfigPollerConfig::default(),
+            auth_mechanisms: vec![],
         }
     }
 
@@ -78,6 +81,11 @@ impl OnDemandAgentManagerOptions {
         self.config_poller_config = config_poller_config;
         self
     }
+
+    pub fn auth_mechanisms(mut self, auth_mechanisms: impl Into<Vec<AuthMechanism>>) -> Self {
+        self.auth_mechanisms = auth_mechanisms.into();
+        self
+    }
 }
 
 impl From<OnDemandAgentManagerOptions> for AgentOptions {
@@ -91,6 +99,7 @@ impl From<OnDemandAgentManagerOptions> for AgentOptions {
             seed_config: opts.seed_config,
             compression_config: opts.compression_config,
             config_poller_config: opts.config_poller_config,
+            auth_mechanisms: opts.auth_mechanisms,
         }
     }
 }
@@ -105,6 +114,7 @@ impl From<AgentOptions> for OnDemandAgentManagerOptions {
             seed_config: opts.seed_config,
             compression_config: opts.compression_config,
             config_poller_config: opts.config_poller_config,
+            auth_mechanisms: opts.auth_mechanisms,
         }
     }
 }

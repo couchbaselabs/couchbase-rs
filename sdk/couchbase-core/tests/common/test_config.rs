@@ -1,5 +1,6 @@
 use crate::common::default_agent_options;
 use crate::common::node_version::NodeVersion;
+use crate::common::test_agent::TestAgent;
 use couchbase_connstr::ResolvedConnSpec;
 use couchbase_core::agent::Agent;
 use envconfig::Envconfig;
@@ -8,7 +9,7 @@ use log::LevelFilter;
 use std::env;
 use std::future::Future;
 use std::io::Write;
-use std::ops::{Add, Deref, DerefMut};
+use std::ops::{Add, Deref};
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::LazyLock;
@@ -28,7 +29,7 @@ pub struct EnvTestConfig {
     pub username: String,
     #[envconfig(from = "RCBPASSWORD", default = "password")]
     pub password: String,
-    #[envconfig(from = "RCBCONNSTR", default = "couchbase://192.168.107.128")]
+    #[envconfig(from = "RCBCONNSTR", default = "couchbases://192.168.107.128")]
     pub conn_string: String,
     #[envconfig(from = "RCBBUCKET", default = "default")]
     pub default_bucket: String,
@@ -63,27 +64,6 @@ impl TestSetupConfig {
     }
 }
 
-#[derive(Clone)]
-pub struct TestAgent {
-    pub test_setup_config: TestSetupConfig,
-    pub cluster_version: NodeVersion,
-    agent: Agent,
-}
-
-impl Deref for TestAgent {
-    type Target = Agent;
-
-    fn deref(&self) -> &Self::Target {
-        &self.agent
-    }
-}
-
-impl DerefMut for TestAgent {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.agent
-    }
-}
-
 static RUNTIME: LazyLock<Runtime> = LazyLock::new(|| {
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -114,7 +94,7 @@ where
                         "{}:{} {} [{}] - {}",
                         record.file().unwrap_or("unknown"),
                         record.line().unwrap_or(0),
-                        chrono::Local::now().format("%Y-%m-%dT%H:%M:%S"),
+                        chrono::Local::now().format("%Y-%m-%dT%H:%M:%S%.3f"),
                         record.level(),
                         record.args()
                     )
@@ -157,7 +137,7 @@ where
                         "{}:{} {} [{}] - {}",
                         record.file().unwrap_or("unknown"),
                         record.line().unwrap_or(0),
-                        chrono::Local::now().format("%Y-%m-%dT%H:%M:%S"),
+                        chrono::Local::now().format("%Y-%m-%dT%H:%M:%S%.3f"),
                         record.level(),
                         record.args()
                     )
@@ -206,9 +186,9 @@ pub async fn create_test_agent() -> TestAgent {
 
     let agent = test_setup_config.setup_agent().await;
 
-    TestAgent {
+    TestAgent::new(
         test_setup_config,
-        cluster_version: NodeVersion::from(test_config.server_version.clone()),
+        NodeVersion::from(test_config.server_version.clone()),
         agent,
-    }
+    )
 }

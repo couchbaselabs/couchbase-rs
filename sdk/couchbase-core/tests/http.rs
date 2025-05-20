@@ -9,6 +9,8 @@ use http::Method;
 use serde::Deserialize;
 use serde_json::json;
 use serde_json::value::RawValue;
+use std::time::Duration;
+use tokio::time::timeout;
 use tokio_stream::StreamExt;
 
 mod common;
@@ -63,7 +65,10 @@ fn test_row_streamer() {
 
         let client = ReqwestClient::new(ClientConfig::default()).unwrap();
 
-        let resp = client.execute(request).await.unwrap();
+        let resp = timeout(Duration::from_secs(10), client.execute(request))
+            .await
+            .unwrap()
+            .unwrap();
 
         let mut streamer = RawJsonRowStreamer::new(Decoder::new(resp.bytes_stream()), "results");
 
@@ -126,7 +131,10 @@ fn test_json_block_read() {
 
         let client = ReqwestClient::new(ClientConfig::default()).expect("could not create client");
 
-        let res = client.execute(request).await.expect("Failed http request");
+        let res = timeout(Duration::from_secs(10), client.execute(request))
+            .await
+            .unwrap()
+            .expect("Failed http request");
 
         let cluster_info: TerseClusterInfo = res.json().await.unwrap();
 

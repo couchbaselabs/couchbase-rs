@@ -19,6 +19,7 @@ use crate::agentoptions::AgentOptions;
 use crate::analyticscomponent::{
     AnalyticsComponent, AnalyticsComponentConfig, AnalyticsComponentOptions,
 };
+use crate::auth_mechanism::AuthMechanism;
 use crate::authenticator::Authenticator;
 use crate::cbconfig::TerseConfig;
 use crate::collection_resolver_cached::{
@@ -67,6 +68,7 @@ struct AgentState {
     bucket: Option<String>,
     tls_config: Option<TlsConfig>,
     authenticator: Arc<Authenticator>,
+    auth_mechanisms: Vec<AuthMechanism>,
     num_pool_connections: usize,
     // http_transport:
     last_clients: HashMap<String, KvClientConfig>,
@@ -304,6 +306,7 @@ impl AgentInner {
                 disable_default_features: false,
                 disable_error_map: false,
                 disable_bootstrap: false,
+                auth_mechanisms: state.auth_mechanisms.clone(),
             };
             clients.insert(node_id, config);
         }
@@ -410,6 +413,30 @@ impl Agent {
         let build_version = env!("CARGO_PKG_VERSION");
         let client_name = format!("couchbase-rs-core {}", build_version);
 
+        let auth_mechanisms = if opts.auth_mechanisms.is_empty() {
+            if opts.tls_config.is_some() {
+                vec![AuthMechanism::Plain]
+            } else {
+                vec![
+                    AuthMechanism::ScramSha512,
+                    AuthMechanism::ScramSha256,
+                    AuthMechanism::ScramSha1,
+                ]
+            }
+        } else {
+            if opts.tls_config.is_none() && opts.auth_mechanisms.contains(&AuthMechanism::Plain) {
+                warn!("PLAIN sends credentials in plaintext, this will cause credential leakage on the network");
+            } else if opts.tls_config.is_some()
+                && (opts.auth_mechanisms.contains(&AuthMechanism::ScramSha512)
+                    || opts.auth_mechanisms.contains(&AuthMechanism::ScramSha256)
+                    || opts.auth_mechanisms.contains(&AuthMechanism::ScramSha1))
+            {
+                warn!("Consider using PLAIN for TLS connections, as it is more efficient");
+            }
+
+            opts.auth_mechanisms
+        };
+
         let mut state = AgentState {
             bucket: opts.bucket_name,
             authenticator: Arc::new(opts.authenticator),
@@ -419,6 +446,7 @@ impl Agent {
             network_type: "".to_string(),
             client_name: client_name.clone(),
             tls_config: opts.tls_config,
+            auth_mechanisms,
         };
 
         let connect_timeout = opts.connect_timeout.unwrap_or(Duration::from_secs(7));
@@ -759,6 +787,7 @@ impl Agent {
                 disable_default_features: false,
                 disable_error_map: false,
                 disable_bootstrap: false,
+                auth_mechanisms: state.auth_mechanisms.clone(),
             };
             clients.insert(node_id, config);
         }

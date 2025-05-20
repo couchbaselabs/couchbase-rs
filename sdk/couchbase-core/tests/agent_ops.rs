@@ -1,12 +1,12 @@
 extern crate core;
 
 use crate::common::default_agent_options::{create_default_options, create_options_without_bucket};
+use crate::common::helpers::try_until;
 use crate::common::helpers::{
     create_collection_and_wait_for_kv, delete_collection_and_wait_for_kv, generate_bytes_value,
     generate_key, is_memdx_error,
 };
 use crate::common::test_config::{run_test, setup_test};
-use crate::common::try_until;
 use couchbase_core::agent::Agent;
 use couchbase_core::crudoptions::{
     AddOptions, AppendOptions, DecrementOptions, DeleteOptions, GetAndLockOptions,
@@ -20,7 +20,7 @@ use couchbase_core::retryfailfast::FailFastRetryStrategy;
 use rand::distr::Alphanumeric;
 use rand::{rng, Rng};
 use serde::Serialize;
-use std::ops::Add;
+use std::ops::{Add, Deref};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::{timeout_at, Instant};
@@ -86,7 +86,7 @@ fn test_upsert_retry_locked_until_deadline() {
 
         let res = timeout_at(
             Instant::now().add(Duration::from_secs(1)),
-            agent.upsert(upsert_opts.clone()),
+            agent.deref().upsert(upsert_opts.clone()),
         )
         .await;
 
@@ -612,7 +612,7 @@ fn test_unknown_collection_id() {
             &bucket,
             &scope_name,
             &collection_name,
-            Instant::now().add(Duration::from_secs(5)),
+            Instant::now().add(Duration::from_secs(10)),
         )
         .await;
 

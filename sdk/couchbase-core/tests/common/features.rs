@@ -1,5 +1,5 @@
 use crate::common::node_version::NodeVersion;
-use crate::common::test_config::TestAgent;
+use crate::common::test_agent::TestAgent;
 
 const SERVER_VERSION_720: NodeVersion = NodeVersion {
     major: 7,

@@ -1,10 +1,9 @@
 use crate::common::features::TestFeatureCode;
 use crate::common::helpers::{
     create_collection_and_ensure_exists, create_scope_and_ensure_exists, delete_scope,
-    generate_key_with_letter_prefix, generate_string_key,
+    generate_key_with_letter_prefix, generate_string_key, try_until,
 };
 use crate::common::test_config::run_test;
-use crate::common::try_until;
 use couchbase_core::searchmgmt_options::{
     DeleteIndexOptions, EnsureIndexOptions, GetIndexOptions, UpsertIndexOptions,
 };

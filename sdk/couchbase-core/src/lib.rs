@@ -8,6 +8,7 @@ pub mod agentoptions;
 pub mod analyticscomponent;
 pub mod analyticsoptions;
 pub mod analyticsx;
+pub mod auth_mechanism;
 pub mod authenticator;
 pub mod cbconfig;
 mod collection_resolver_cached;
@@ -19,6 +20,8 @@ mod configwatcher;
 mod crudcomponent;
 pub mod crudoptions;
 pub mod crudresults;
+mod errmap;
+mod errmapcomponent;
 pub mod error;
 pub mod features;
 mod helpers;
@@ -54,7 +57,5 @@ mod util;
 mod vbucketmap;
 mod vbucketrouter;
 
-mod errmap;
-mod errmapcomponent;
 #[cfg(feature = "rustls-tls")]
 pub mod insecure_certverfier;
