@@ -14,9 +14,9 @@ fn upsert(c: &mut Criterion) {
         let cluster = create_test_cluster().await;
 
         cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope)
-            .collection(&cluster.default_collection)
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection())
     });
 
     let key = new_key();
@@ -35,9 +35,9 @@ fn insert(c: &mut Criterion) {
         let cluster = create_test_cluster().await;
 
         cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope)
-            .collection(&cluster.default_collection)
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection())
     });
 
     let key = new_key();
@@ -56,9 +56,9 @@ fn replace(c: &mut Criterion) {
         let cluster = create_test_cluster().await;
 
         cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope)
-            .collection(&cluster.default_collection)
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection())
     });
 
     let key = new_key();
@@ -81,9 +81,9 @@ fn remove(c: &mut Criterion) {
         let cluster = create_test_cluster().await;
 
         cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope)
-            .collection(&cluster.default_collection)
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection())
     });
 
     let key = new_key();
@@ -103,9 +103,9 @@ fn exists(c: &mut Criterion) {
         let cluster = create_test_cluster().await;
 
         cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope)
-            .collection(&cluster.default_collection)
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection())
     });
 
     let key = new_key();
@@ -125,9 +125,9 @@ fn get(c: &mut Criterion) {
         let cluster = create_test_cluster().await;
 
         cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope)
-            .collection(&cluster.default_collection)
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection())
     });
 
     let key = new_key();
@@ -147,9 +147,9 @@ fn get_and_touch(c: &mut Criterion) {
         let cluster = create_test_cluster().await;
 
         cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope)
-            .collection(&cluster.default_collection)
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection())
     });
 
     let key = new_key();
@@ -172,9 +172,9 @@ fn get_and_lock(c: &mut Criterion) {
         let cluster = create_test_cluster().await;
 
         cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope)
-            .collection(&cluster.default_collection)
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection())
     });
 
     let key = new_key();
@@ -197,9 +197,9 @@ fn unlock(c: &mut Criterion) {
         let cluster = create_test_cluster().await;
 
         cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope)
-            .collection(&cluster.default_collection)
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection())
     });
 
     let key = new_key();
@@ -225,9 +225,9 @@ fn touch(c: &mut Criterion) {
         let cluster = create_test_cluster().await;
 
         cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope)
-            .collection(&cluster.default_collection)
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection())
     });
 
     let key = new_key();
@@ -250,9 +250,9 @@ fn append(c: &mut Criterion) {
         let cluster = create_test_cluster().await;
 
         cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope)
-            .collection(&cluster.default_collection)
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection())
     });
 
     let key = new_key();
@@ -282,9 +282,9 @@ fn prepend(c: &mut Criterion) {
         let cluster = create_test_cluster().await;
 
         cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope)
-            .collection(&cluster.default_collection)
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection())
     });
 
     let key = new_key();
@@ -314,9 +314,9 @@ fn increment(c: &mut Criterion) {
         let cluster = create_test_cluster().await;
 
         cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope)
-            .collection(&cluster.default_collection)
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection())
     });
 
     let key = new_key();
@@ -336,9 +336,9 @@ fn decrement(c: &mut Criterion) {
         let cluster = create_test_cluster().await;
 
         cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope)
-            .collection(&cluster.default_collection)
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection())
     });
 
     let key = new_key();

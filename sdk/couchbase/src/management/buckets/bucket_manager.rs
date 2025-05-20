@@ -4,6 +4,7 @@ use crate::management::buckets::bucket_settings::BucketSettings;
 use crate::options::bucket_mgmt_options::*;
 use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct BucketManager {
     client: Arc<BucketMgmtClient>,
 }

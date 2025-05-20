@@ -9,6 +9,7 @@ use crate::options::search_index_mgmt_options::{
 use serde_json::Value;
 use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct SearchIndexManager {
     pub(crate) client: Arc<SearchIndexMgmtClient>,
 }

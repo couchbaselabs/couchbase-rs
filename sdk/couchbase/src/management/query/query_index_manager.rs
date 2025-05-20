@@ -8,6 +8,7 @@ use crate::options::query_index_mgmt_options::{
 use crate::results::query_index_mgmt_results::QueryIndex;
 use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct QueryIndexManager {
     pub(crate) client: Arc<QueryIndexMgmtClient>,
 }

@@ -7,9 +7,9 @@ mod common;
 fn test_list() {
     run_test(async |cluster| {
         let collection = cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope)
-            .collection(&cluster.default_collection);
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection());
         let key = new_key();
 
         let list = collection.list(&key, None);
@@ -44,9 +44,9 @@ fn test_list() {
 fn test_map() {
     run_test(async |cluster| {
         let collection = cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope)
-            .collection(&cluster.default_collection);
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection());
         let key = new_key();
 
         let map = collection.map(&key, None);
@@ -99,9 +99,9 @@ fn test_map() {
 fn test_set() {
     run_test(async |cluster| {
         let collection = cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope)
-            .collection(&cluster.default_collection);
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection());
         let key = new_key();
 
         let set = collection.set(&key, None);
@@ -140,9 +140,9 @@ fn test_set() {
 fn test_queue() {
     run_test(async |cluster| {
         let collection = cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope)
-            .collection(&cluster.default_collection);
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection());
         let key = new_key();
 
         let queue = collection.queue(&key, None);

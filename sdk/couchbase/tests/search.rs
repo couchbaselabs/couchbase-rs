@@ -35,7 +35,7 @@ fn test_search_basic() {
         let scope_name = new_key();
         let collection_name = new_key();
 
-        let bucket = cluster.bucket(&cluster.default_bucket);
+        let bucket = cluster.bucket(cluster.default_bucket());
         let collection_mgr = bucket.collections();
         collection_mgr
             .create_scope(&scope_name, None)
@@ -62,7 +62,7 @@ fn test_search_basic() {
         import_search_index(
             &scope,
             &index_name,
-            &cluster.default_bucket,
+            cluster.default_bucket(),
             &scope_name,
             &collection_name,
         )
