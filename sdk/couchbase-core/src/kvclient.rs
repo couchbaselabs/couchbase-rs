@@ -5,15 +5,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use futures::future::BoxFuture;
-use tokio::sync::Mutex;
-use tokio::time::Instant;
-use uuid::Uuid;
-
+use crate::auth_mechanism::AuthMechanism;
 use crate::authenticator::Authenticator;
 use crate::error::Error;
 use crate::error::{MemdxError, Result};
-use crate::memdx::auth_mechanism::AuthMechanism;
+use crate::memdx;
 use crate::memdx::connection::{ConnectOptions, ConnectionType, TcpConnection, TlsConnection};
 use crate::memdx::dispatcher::{Dispatcher, DispatcherOptions, OrphanResponseHandler};
 use crate::memdx::hello_feature::HelloFeature;
@@ -23,6 +19,10 @@ use crate::memdx::request::{GetErrorMapRequest, HelloRequest, SelectBucketReques
 use crate::service_type::ServiceType;
 use crate::tls_config::TlsConfig;
 use crate::util::hostname_from_addr_str;
+use futures::future::BoxFuture;
+use tokio::sync::Mutex;
+use tokio::time::Instant;
+use uuid::Uuid;
 
 #[derive(Clone)]
 pub(crate) struct KvClientConfig {
@@ -33,6 +33,7 @@ pub(crate) struct KvClientConfig {
     pub selected_bucket: Option<String>,
     pub disable_default_features: bool,
     pub disable_error_map: bool,
+    pub auth_mechanisms: Vec<AuthMechanism>,
 
     // disable_bootstrap provides a simple way to validate that all bootstrapping
     // is disabled on the client, mainly used for testing.
@@ -160,7 +161,12 @@ where
         let bootstrap_auth = Some(SASLAuthAutoOptions {
             username: creds.username.clone(),
             password: creds.password.clone(),
-            enabled_mechs: vec![AuthMechanism::ScramSha512, AuthMechanism::ScramSha256],
+            enabled_mechs: config
+                .auth_mechanisms
+                .iter()
+                .cloned()
+                .map(memdx::auth_mechanism::AuthMechanism::from)
+                .collect(),
         });
 
         let bootstrap_select_bucket =

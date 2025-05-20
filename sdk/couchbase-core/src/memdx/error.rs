@@ -114,8 +114,11 @@ impl Error {
     }
 
     pub fn has_opaque(&self) -> Option<u32> {
-        if let ErrorKind::Server(ServerError { opaque, .. }) = self.inner.kind.as_ref() {
+        let inner_kind = self.inner.kind.as_ref();
+        if let ErrorKind::Server(ServerError { opaque, .. }) = inner_kind {
             Some(*opaque)
+        } else if let ErrorKind::Resource(e) = inner_kind {
+            Some(e.cause.opaque)
         } else {
             None
         }

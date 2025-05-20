@@ -1,6 +1,6 @@
-use crate::common::helpers::generate_key_with_letter_prefix;
+use crate::common::helpers::{generate_key_with_letter_prefix, try_until};
+use crate::common::test_agent::TestAgent;
 use crate::common::test_config::run_test;
-use crate::common::try_until;
 use couchbase_core::agent::Agent;
 use couchbase_core::mgmtoptions::{
     DeleteGroupOptions, DeleteUserOptions, EnsureGroupOptions, EnsureUserOptions,
@@ -209,7 +209,7 @@ fn assert_user(expected: &User, actual: &UserAndMetadata) {
     assert_eq!(actual.user.roles, expected.roles);
 }
 
-async fn create_and_ensure_user(agent: &Agent, user: &User) {
+async fn create_and_ensure_user(agent: &TestAgent, user: &User) {
     agent
         .upsert_user(&UpsertUserOptions::new(user, "local"))
         .await
@@ -219,12 +219,9 @@ async fn create_and_ensure_user(agent: &Agent, user: &User) {
         Instant::now().add(Duration::from_secs(30)),
         Duration::from_millis(500),
         "failed to ensure group in time",
-        async || match timeout_at(
-            Instant::now().add(Duration::from_secs(5)),
-            agent.ensure_user(&EnsureUserOptions::new(&user.username, "local", false)),
-        )
-        .await
-        .unwrap()
+        async || match agent
+            .ensure_user(&EnsureUserOptions::new(&user.username, "local", false))
+            .await
         {
             Ok(_) => Ok(Some(())),
             Err(e) => {
@@ -236,7 +233,7 @@ async fn create_and_ensure_user(agent: &Agent, user: &User) {
     .await;
 }
 
-async fn create_and_ensure_group(agent: &Agent, group: &Group) {
+async fn create_and_ensure_group(agent: &TestAgent, group: &Group) {
     agent
         .upsert_group(&UpsertGroupOptions::new(group))
         .await
@@ -246,12 +243,9 @@ async fn create_and_ensure_group(agent: &Agent, group: &Group) {
         Instant::now().add(Duration::from_secs(30)),
         Duration::from_millis(500),
         "failed to ensure group in time",
-        async || match timeout_at(
-            Instant::now().add(Duration::from_secs(5)),
-            agent.ensure_group(&EnsureGroupOptions::new(&group.name, false)),
-        )
-        .await
-        .unwrap()
+        async || match agent
+            .ensure_group(&EnsureGroupOptions::new(&group.name, false))
+            .await
         {
             Ok(_) => Ok(Some(())),
             Err(e) => {
@@ -263,7 +257,7 @@ async fn create_and_ensure_group(agent: &Agent, group: &Group) {
     .await;
 }
 
-async fn delete_and_ensure_user(agent: &Agent, username: &str) {
+async fn delete_and_ensure_user(agent: &TestAgent, username: &str) {
     agent
         .delete_user(&DeleteUserOptions::new(username, "local"))
         .await
@@ -273,12 +267,9 @@ async fn delete_and_ensure_user(agent: &Agent, username: &str) {
         Instant::now().add(Duration::from_secs(30)),
         Duration::from_millis(500),
         "failed to ensure group in time",
-        async || match timeout_at(
-            Instant::now().add(Duration::from_secs(5)),
-            agent.ensure_user(&EnsureUserOptions::new(username, "local", true)),
-        )
-        .await
-        .unwrap()
+        async || match agent
+            .ensure_user(&EnsureUserOptions::new(username, "local", true))
+            .await
         {
             Ok(_) => Ok(Some(())),
             Err(e) => {
@@ -290,7 +281,7 @@ async fn delete_and_ensure_user(agent: &Agent, username: &str) {
     .await;
 }
 
-async fn delete_and_ensure_group(agent: &Agent, group_name: &str) {
+async fn delete_and_ensure_group(agent: &TestAgent, group_name: &str) {
     agent
         .delete_group(&DeleteGroupOptions::new(group_name))
         .await
@@ -300,12 +291,9 @@ async fn delete_and_ensure_group(agent: &Agent, group_name: &str) {
         Instant::now().add(Duration::from_secs(30)),
         Duration::from_millis(500),
         "failed to ensure group in time",
-        async || match timeout_at(
-            Instant::now().add(Duration::from_secs(5)),
-            agent.ensure_group(&EnsureGroupOptions::new(group_name, true)),
-        )
-        .await
-        .unwrap()
+        async || match agent
+            .ensure_group(&EnsureGroupOptions::new(group_name, true))
+            .await
         {
             Ok(_) => Ok(Some(())),
             Err(e) => {

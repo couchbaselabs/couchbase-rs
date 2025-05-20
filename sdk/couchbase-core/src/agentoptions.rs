@@ -1,7 +1,7 @@
-use std::time::Duration;
-
+use crate::auth_mechanism::AuthMechanism;
 use crate::authenticator::Authenticator;
 use crate::tls_config::TlsConfig;
+use std::time::Duration;
 
 #[derive(Clone, Debug)]
 #[non_exhaustive]
@@ -9,6 +9,7 @@ pub struct AgentOptions {
     pub(crate) seed_config: SeedConfig,
     pub(crate) authenticator: Authenticator,
 
+    pub(crate) auth_mechanisms: Vec<AuthMechanism>,
     pub(crate) tls_config: Option<TlsConfig>,
     pub(crate) bucket_name: Option<String>,
 
@@ -30,6 +31,7 @@ impl AgentOptions {
             seed_config,
             compression_config: CompressionConfig::default(),
             config_poller_config: ConfigPollerConfig::default(),
+            auth_mechanisms: vec![],
         }
     }
 
@@ -73,6 +75,11 @@ impl AgentOptions {
 
     pub fn config_poller_config(mut self, config_poller_config: ConfigPollerConfig) -> Self {
         self.config_poller_config = config_poller_config;
+        self
+    }
+
+    pub fn auth_mechanisms(mut self, auth_mechanisms: Vec<AuthMechanism>) -> Self {
+        self.auth_mechanisms = auth_mechanisms;
         self
     }
 }

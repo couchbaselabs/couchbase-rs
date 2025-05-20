@@ -63,7 +63,7 @@ impl Display for RetryReason {
             RetryReason::NotMyVbucket => write!(f, "KV_NOT_MY_VBUCKET"),
             RetryReason::InvalidVbucketMap => write!(f, "KV_INVALID_VBUCKET_MAP"),
             RetryReason::TempFail => write!(f, "KV_TEMPORARY_FAILURE"),
-            RetryReason::KvCollectionOutdated => write!(f, "KV_NOT_MY_VBUCKET"),
+            RetryReason::KvCollectionOutdated => write!(f, "KV_COLLECTION_OUTDATED"),
             RetryReason::KvErrorMapRetryIndicated => write!(f, "KV_ERROR_MAP_RETRY_INDICATED"),
             RetryReason::Locked => write!(f, "KV_LOCKED"),
         }

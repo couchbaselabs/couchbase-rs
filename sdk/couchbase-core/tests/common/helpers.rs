@@ -1,6 +1,8 @@
+use crate::common::test_agent::TestAgent;
 use couchbase_core::agent::Agent;
 use couchbase_core::crudoptions::GetCollectionIdOptions;
 use couchbase_core::error::{Error, ErrorKind};
+use couchbase_core::features::BucketFeature;
 use couchbase_core::memdx::error::ServerErrorKind;
 use couchbase_core::mgmtoptions::{
     CreateCollectionOptions, CreateScopeOptions, DeleteCollectionOptions, DeleteScopeOptions,
@@ -12,6 +14,7 @@ use couchbase_core::mgmtx::responses::{
 use couchbase_core::{error, memdx};
 use rand::distr::Alphanumeric;
 use rand::{rng, Rng};
+use std::ops::Add;
 use std::time::Duration;
 use tokio::time::{timeout_at, Instant};
 
@@ -134,7 +137,7 @@ pub fn is_memdx_error(e: &Error) -> Option<&memdx::error::Error> {
 }
 
 pub async fn delete_scope(
-    agent: &Agent,
+    agent: &TestAgent,
     bucket_name: &str,
     scope_name: &str,
 ) -> error::Result<DeleteScopeResponse> {
@@ -143,7 +146,7 @@ pub async fn delete_scope(
 }
 
 pub async fn delete_collection(
-    agent: &Agent,
+    agent: &TestAgent,
     bucket_name: &str,
     scope_name: &str,
     collection_name: &str,
@@ -153,7 +156,7 @@ pub async fn delete_collection(
 }
 
 pub async fn create_scope(
-    agent: &Agent,
+    agent: &TestAgent,
     bucket_name: &str,
     scope_name: &str,
 ) -> error::Result<CreateScopeResponse> {
@@ -161,7 +164,11 @@ pub async fn create_scope(
     agent.create_scope(opts).await
 }
 
-pub async fn create_scope_and_ensure_exists(agent: &Agent, bucket_name: &str, scope_name: &str) {
+pub async fn create_scope_and_ensure_exists(
+    agent: &TestAgent,
+    bucket_name: &str,
+    scope_name: &str,
+) {
     let res = create_scope(agent, bucket_name, scope_name).await.unwrap();
 
     agent
@@ -174,7 +181,7 @@ pub async fn create_scope_and_ensure_exists(agent: &Agent, bucket_name: &str, sc
 }
 
 pub async fn create_collection(
-    agent: &Agent,
+    agent: &TestAgent,
     bucket_name: &str,
     scope_name: &str,
     collection_name: &str,
@@ -184,7 +191,7 @@ pub async fn create_collection(
 }
 
 pub async fn create_collection_and_ensure_exists(
-    agent: &Agent,
+    agent: &TestAgent,
     bucket_name: &str,
     scope_name: &str,
     collection_name: &str,
@@ -200,4 +207,93 @@ pub async fn create_collection_and_ensure_exists(
         ))
         .await
         .unwrap();
+}
+
+pub async fn feature_supported(agent: &TestAgent, feature: BucketFeature) -> bool {
+    agent.bucket_features().await.unwrap().contains(&feature)
+}
+
+pub async fn try_until<Fut, T>(
+    deadline: Instant,
+    sleep: Duration,
+    fail_msg: impl AsRef<str>,
+    mut f: impl FnMut() -> Fut,
+) -> T
+where
+    Fut: std::future::Future<Output = Result<Option<T>, Error>>,
+{
+    while Instant::now() < deadline {
+        let res = f().await;
+        if let Ok(Some(r)) = res {
+            return r;
+        }
+
+        if let Err(e) = res {
+            log::error!("{}", e);
+        }
+
+        tokio::time::sleep(sleep).await;
+    }
+    panic!("{}", fail_msg.as_ref());
+}
+
+pub async fn run_with_deadline<Resp, Fut>(deadline: Instant, f: Fut) -> Result<Resp, Error>
+where
+    Fut: std::future::Future<Output = Result<Resp, Error>>,
+{
+    timeout_at(deadline, f).await.unwrap()
+}
+
+pub async fn run_with_std_kv_deadline<Resp, Fut>(f: Fut) -> Result<Resp, Error>
+where
+    Fut: std::future::Future<Output = Result<Resp, Error>>,
+{
+    timeout_at(Instant::now().add(Duration::from_millis(2500)), f)
+        .await
+        .unwrap()
+}
+
+pub async fn run_with_std_mgmt_deadline<Resp, Fut>(f: Fut) -> Result<Resp, Error>
+where
+    Fut: std::future::Future<Output = Result<Resp, Error>>,
+{
+    timeout_at(Instant::now().add(Duration::from_millis(10000)), f)
+        .await
+        .unwrap()
+}
+
+pub async fn run_with_std_analytics_deadline<Resp, Fut>(f: Fut) -> Result<Resp, Error>
+where
+    Fut: std::future::Future<Output = Result<Resp, Error>>,
+{
+    timeout_at(Instant::now().add(Duration::from_millis(10000)), f)
+        .await
+        .unwrap()
+}
+
+pub async fn run_with_std_query_deadline<Resp, Fut>(f: Fut) -> Result<Resp, Error>
+where
+    Fut: std::future::Future<Output = Result<Resp, Error>>,
+{
+    timeout_at(Instant::now().add(Duration::from_millis(10000)), f)
+        .await
+        .unwrap()
+}
+
+pub async fn run_with_std_search_deadline<Resp, Fut>(f: Fut) -> Result<Resp, Error>
+where
+    Fut: std::future::Future<Output = Result<Resp, Error>>,
+{
+    timeout_at(Instant::now().add(Duration::from_millis(10000)), f)
+        .await
+        .unwrap()
+}
+
+pub async fn run_with_std_ensure_deadline<Resp, Fut>(f: Fut) -> Result<Resp, Error>
+where
+    Fut: std::future::Future<Output = Result<Resp, Error>>,
+{
+    timeout_at(Instant::now().add(Duration::from_millis(30000)), f)
+        .await
+        .unwrap()
 }

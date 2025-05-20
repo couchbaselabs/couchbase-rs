@@ -1,8 +1,8 @@
 use crate::common::helpers::{
-    create_scope, delete_collection, delete_scope, generate_string_value,
+    create_scope, delete_collection, delete_scope, feature_supported, generate_string_value,
+    try_until,
 };
 use crate::common::test_config::run_test;
-use crate::common::{feature_supported, try_until};
 use couchbase_core::agent::Agent;
 use couchbase_core::cbconfig::CollectionManifest;
 use couchbase_core::features::BucketFeature;
