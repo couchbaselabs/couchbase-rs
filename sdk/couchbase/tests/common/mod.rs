@@ -6,7 +6,15 @@ pub mod default_cluster_options;
 pub mod doc_generation;
 pub mod features;
 pub mod node_version;
+mod test_binary_collection;
+mod test_bucket;
+mod test_cluster;
+mod test_collection;
 pub mod test_config;
+mod test_manager;
+mod test_query_index_manager;
+mod test_scope;
+mod test_search_index_manager;
 
 use rand::distr::Alphanumeric;
 use rand::{rng, Rng};

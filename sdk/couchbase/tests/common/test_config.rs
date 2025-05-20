@@ -6,6 +6,7 @@ use std::sync::LazyLock;
 
 use crate::common::default_cluster_options;
 use crate::common::node_version::NodeVersion;
+use crate::common::test_cluster::TestCluster;
 use couchbase::cluster::Cluster;
 use couchbase_connstr::ResolvedConnSpec;
 use envconfig::Envconfig;
@@ -24,7 +25,7 @@ pub struct EnvTestConfig {
     pub username: String,
     #[envconfig(from = "RCBPASSWORD", default = "password")]
     pub password: String,
-    #[envconfig(from = "RCBCONNSTR", default = "couchbase://192.168.107.128")]
+    #[envconfig(from = "RCBCONNSTR", default = "couchbases://192.168.107.128")]
     pub conn_string: String,
     #[envconfig(from = "RCBBUCKET", default = "default")]
     pub default_bucket: String,
@@ -32,8 +33,6 @@ pub struct EnvTestConfig {
     pub default_scope: String,
     #[envconfig(from = "RCBCOLLECTION", default = "_default")]
     pub default_collection: String,
-    #[envconfig(from = "RCBDATA_TIMEOUT", default = "2500")]
-    pub data_timeout: String,
     #[envconfig(from = "RCBSERVER_VERSION", default = "7.6.2")]
     pub server_version: String,
 }
@@ -43,8 +42,10 @@ pub struct TestSetupConfig {
     pub username: String,
     pub password: String,
     pub conn_str: String,
-    pub data_timeout: String,
     pub resolved_conn_spec: ResolvedConnSpec,
+    pub default_bucket: String,
+    pub default_scope: String,
+    pub default_collection: String,
 }
 
 impl TestSetupConfig {
@@ -55,24 +56,6 @@ impl TestSetupConfig {
         )
         .await
         .unwrap()
-    }
-}
-
-#[derive(Clone)]
-pub struct TestCluster {
-    pub default_bucket: String,
-    pub default_scope: String,
-    pub default_collection: String,
-    pub cluster_version: NodeVersion,
-    test_setup_config: TestSetupConfig,
-    cluster: Cluster,
-}
-
-impl Deref for TestCluster {
-    type Target = Cluster;
-
-    fn deref(&self) -> &Self::Target {
-        &self.cluster
     }
 }
 
@@ -134,21 +117,20 @@ pub async fn create_test_cluster() -> TestCluster {
     let conn_spec = couchbase_connstr::parse(&test_config.conn_string).unwrap();
 
     let test_setup_config = TestSetupConfig {
-        username: test_config.username,
-        password: test_config.password,
-        conn_str: test_config.conn_string,
-        data_timeout: test_config.data_timeout,
-        resolved_conn_spec: couchbase_connstr::resolve(conn_spec).await.unwrap(),
-    };
-
-    let cluster = test_setup_config.setup_cluster().await;
-
-    TestCluster {
         default_bucket: test_config.default_bucket,
         default_scope: test_config.default_scope,
         default_collection: test_config.default_collection,
-        cluster_version: NodeVersion::from(test_config.server_version),
-        test_setup_config,
-        cluster,
-    }
+        username: test_config.username,
+        password: test_config.password,
+        conn_str: test_config.conn_string,
+        resolved_conn_spec: couchbase_connstr::resolve(conn_spec).await.unwrap(),
+    };
+
+    TestCluster::new(
+        NodeVersion::from(test_config.server_version.clone()),
+        test_setup_config.clone(),
+    )
+    .await
 }
+
+impl TestCluster {}

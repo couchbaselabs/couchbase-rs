@@ -8,6 +8,7 @@ use crate::options::user_mgmt_options::{
 };
 use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct UserManager {
     client: Arc<UserMgmtClient>,
 }

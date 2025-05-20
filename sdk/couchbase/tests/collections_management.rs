@@ -15,7 +15,7 @@ mod common;
 #[test]
 fn test_create_scope() {
     run_test(async |cluster| {
-        let manager = cluster.bucket(&cluster.default_bucket).collections();
+        let manager = cluster.bucket(cluster.default_bucket()).collections();
 
         let name = generate_string_value(10);
         manager.create_scope(&name, None).await.unwrap();
@@ -27,7 +27,7 @@ fn test_create_scope() {
 #[test]
 fn test_drop_scope() {
     run_test(async |cluster| {
-        let manager = cluster.bucket(&cluster.default_bucket).collections();
+        let manager = cluster.bucket(cluster.default_bucket()).collections();
 
         let name = generate_string_value(10);
         manager.create_scope(&name, None).await.unwrap();
@@ -43,7 +43,7 @@ fn test_drop_scope() {
 #[test]
 fn test_create_collection() {
     run_test(async |cluster| {
-        let manager = cluster.bucket(&cluster.default_bucket).collections();
+        let manager = cluster.bucket(cluster.default_bucket()).collections();
 
         let scope_name = generate_string_value(10);
         let collection_name = generate_string_value(10);
@@ -78,7 +78,7 @@ fn test_update_collection() {
             return;
         }
 
-        let manager = cluster.bucket(&cluster.default_bucket).collections();
+        let manager = cluster.bucket(cluster.default_bucket()).collections();
 
         let scope_name = generate_string_value(10);
         let collection_name = generate_string_value(10);
@@ -140,7 +140,7 @@ fn test_update_collection() {
 #[test]
 fn test_drop_collection() {
     run_test(async |cluster| {
-        let manager = cluster.bucket(&cluster.default_bucket).collections();
+        let manager = cluster.bucket(cluster.default_bucket()).collections();
 
         let scope_name = generate_string_value(10);
         let collection_name = generate_string_value(10);

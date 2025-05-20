@@ -126,8 +126,8 @@ fn test_prepared_query_basic() {
 fn test_scope_query_basic() {
     run_test(async |cluster| {
         let scope = cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope);
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope());
 
         let opts = QueryOptions::new().metrics(true);
         let mut res = scope.query("SELECT 1=1", opts).await.unwrap();
@@ -153,11 +153,11 @@ fn test_scope_query_basic() {
 #[test]
 fn test_query_indexes() {
     run_test(async |cluster| {
-        let coll_manager = cluster.bucket(&cluster.default_bucket).collections();
+        let coll_manager = cluster.bucket(cluster.default_bucket()).collections();
         let (scope, collection) = create_collection(&coll_manager).await;
 
         let manager = cluster
-            .bucket(&cluster.default_bucket)
+            .bucket(cluster.default_bucket())
             .scope(&scope)
             .collection(&collection)
             .query_indexes();

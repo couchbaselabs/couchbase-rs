@@ -11,7 +11,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
 use std::collections::BTreeMap;
-use std::ops::Add;
+use std::ops::{Add, Deref};
 use std::time::Duration;
 use tokio::time::{timeout_at, Instant};
 
@@ -21,9 +21,9 @@ mod common;
 fn test_upsert() {
     run_test(async |cluster| {
         let collection = cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope)
-            .collection(&cluster.default_collection);
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection());
 
         let key = new_key();
 
@@ -41,9 +41,9 @@ fn test_upsert() {
 fn test_upsert_operation_cancellation() {
     run_test(async |cluster| {
         let collection = cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope)
-            .collection(&cluster.default_collection);
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection());
 
         let key = new_key();
 
@@ -51,7 +51,7 @@ fn test_upsert_operation_cancellation() {
 
         let _res = timeout_at(
             Instant::now().add(Duration::from_micros(1)),
-            collection.get(&key, None),
+            collection.deref().get(&key, None),
         )
         .await;
 
@@ -67,9 +67,9 @@ fn test_upsert_operation_cancellation() {
 fn test_upsert_with_transcoder() {
     run_test(async |cluster| {
         let collection = cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope)
-            .collection(&cluster.default_collection);
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection());
 
         let value = RawValue::from_string(r#"{"test": "test"}"#.to_string()).unwrap();
 
@@ -93,9 +93,9 @@ fn test_upsert_with_transcoder() {
 fn test_upsert_with_custom_transcoder() {
     run_test(async |cluster| {
         let collection = cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope)
-            .collection(&cluster.default_collection);
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection());
 
         let mut value = BTreeMap::new();
         value.insert("x".to_string(), 1.0);
@@ -126,9 +126,9 @@ fn test_upsert_with_custom_transcoder() {
 fn test_insert() {
     run_test(async |cluster| {
         let collection = cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope)
-            .collection(&cluster.default_collection);
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection());
 
         let key = new_key();
 
@@ -146,9 +146,9 @@ fn test_insert() {
 fn test_replace() {
     run_test(async |cluster| {
         let collection = cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope)
-            .collection(&cluster.default_collection);
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection());
 
         let key = new_key();
 
@@ -170,9 +170,9 @@ fn test_replace() {
 fn test_remove() {
     run_test(async |cluster| {
         let collection = cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope)
-            .collection(&cluster.default_collection);
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection());
 
         let key = new_key();
 
@@ -189,9 +189,9 @@ fn test_remove() {
 fn test_exists() {
     run_test(async |cluster| {
         let collection = cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope)
-            .collection(&cluster.default_collection);
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection());
 
         let key = new_key();
 
@@ -212,9 +212,9 @@ fn test_exists() {
 fn test_get_and_touch() {
     run_test(async |cluster| {
         let collection = cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope)
-            .collection(&cluster.default_collection);
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection());
 
         let key = new_key();
 
@@ -235,9 +235,9 @@ fn test_get_and_touch() {
 fn test_get_and_lock() {
     run_test(async |cluster| {
         let collection = cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope)
-            .collection(&cluster.default_collection);
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection());
 
         let key = new_key();
 
@@ -258,9 +258,9 @@ fn test_get_and_lock() {
 fn test_unlock() {
     run_test(async |cluster| {
         let collection = cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope)
-            .collection(&cluster.default_collection);
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection());
 
         let key = new_key();
 
@@ -279,9 +279,9 @@ fn test_unlock() {
 fn test_touch() {
     run_test(async |cluster| {
         let collection = cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope)
-            .collection(&cluster.default_collection);
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection());
 
         let key = new_key();
 
@@ -298,9 +298,9 @@ fn test_touch() {
 fn test_append() {
     run_test(async |cluster| {
         let collection = cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope)
-            .collection(&cluster.default_collection);
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection());
 
         let key = new_key();
 
@@ -329,9 +329,9 @@ fn test_append() {
 fn test_prepend() {
     run_test(async |cluster| {
         let collection = cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope)
-            .collection(&cluster.default_collection);
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection());
         let key = new_key();
 
         let (content, flags) = transcoding::raw_binary::encode("test".as_bytes()).unwrap();
@@ -359,9 +359,9 @@ fn test_prepend() {
 fn test_increment() {
     run_test(async |cluster| {
         let collection = cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope)
-            .collection(&cluster.default_collection);
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection());
 
         let key = new_key();
 
@@ -381,9 +381,9 @@ fn test_increment() {
 fn test_decrement() {
     run_test(async |cluster| {
         let collection = cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope)
-            .collection(&cluster.default_collection);
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection());
 
         let key = new_key();
 
@@ -411,9 +411,9 @@ struct SubdocObject {
 fn test_lookup_in() {
     run_test(async |cluster| {
         let collection = cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope)
-            .collection(&cluster.default_collection);
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection());
 
         let key = new_key();
 
@@ -456,9 +456,9 @@ fn test_lookup_in() {
 fn test_mutate_in() {
     run_test(async |cluster| {
         let collection = cluster
-            .bucket(&cluster.default_bucket)
-            .scope(&cluster.default_scope)
-            .collection(&cluster.default_collection);
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection());
 
         let key = new_key();
 

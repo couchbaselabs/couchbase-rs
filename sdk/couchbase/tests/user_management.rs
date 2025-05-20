@@ -9,7 +9,7 @@ use couchbase::options::user_mgmt_options::{
 };
 use std::ops::Add;
 use std::time::Duration;
-use tokio::time::{timeout_at, Instant};
+use tokio::time::Instant;
 
 mod common;
 
@@ -33,7 +33,7 @@ fn test_delete_group() {
         let group_name = new_key();
         let desc = new_key();
         let roles = vec![
-            Role::new("replication_target").bucket(&cluster.default_bucket),
+            Role::new("replication_target").bucket(cluster.default_bucket()),
             Role::new("replication_admin"),
         ];
 
@@ -70,7 +70,7 @@ fn test_get_group() {
         let group_name = new_key();
         let desc = new_key();
         let roles = vec![
-            Role::new("replication_target").bucket(&cluster.default_bucket),
+            Role::new("replication_target").bucket(cluster.default_bucket()),
             Role::new("replication_admin"),
         ];
 
@@ -103,7 +103,7 @@ fn test_get_all_groups() {
         let group_name = new_key();
         let desc = new_key();
         let roles = vec![
-            Role::new("replication_target").bucket(&cluster.default_bucket),
+            Role::new("replication_target").bucket(cluster.default_bucket()),
             Role::new("replication_admin"),
         ];
 
@@ -140,7 +140,7 @@ fn test_delete_user() {
         let username = new_key();
         let display_name = new_key();
         let roles = vec![
-            Role::new("replication_target").bucket(&cluster.default_bucket),
+            Role::new("replication_target").bucket(cluster.default_bucket()),
             Role::new("replication_admin"),
         ];
 
@@ -177,7 +177,7 @@ fn test_get_user() {
         let username = new_key();
         let display_name = new_key();
         let roles = vec![
-            Role::new("replication_target").bucket(&cluster.default_bucket),
+            Role::new("replication_target").bucket(cluster.default_bucket()),
             Role::new("replication_admin"),
         ];
 
@@ -207,7 +207,7 @@ fn test_get_all_users() {
         let username = new_key();
         let display_name = new_key();
         let roles = vec![
-            Role::new("replication_target").bucket(&cluster.default_bucket),
+            Role::new("replication_target").bucket(cluster.default_bucket()),
             Role::new("replication_admin"),
         ];
 
@@ -246,41 +246,21 @@ fn assert_user(expected: &User, actual: &UserAndMetadata) {
 }
 
 async fn create_user(mgr: &UserManager, user: User) {
-    timeout_at(
-        Instant::now().add(Duration::from_secs(5)),
-        mgr.upsert_user(user, UpsertUserOptions::new().auth_domain("local")),
-    )
-    .await
-    .unwrap()
-    .unwrap();
+    mgr.upsert_user(user, UpsertUserOptions::new().auth_domain("local"))
+        .await
+        .unwrap();
 }
 
 async fn create_group(mgr: &UserManager, group: Group) {
-    timeout_at(
-        Instant::now().add(Duration::from_secs(5)),
-        mgr.upsert_group(group, None),
-    )
-    .await
-    .unwrap()
-    .unwrap();
+    mgr.upsert_group(group, None).await.unwrap();
 }
 
 async fn delete_user(mgr: &UserManager, name: &str) {
-    timeout_at(
-        Instant::now().add(Duration::from_secs(5)),
-        mgr.drop_user(name, DropUserOptions::new().auth_domain("local")),
-    )
-    .await
-    .unwrap()
-    .unwrap();
+    mgr.drop_user(name, DropUserOptions::new().auth_domain("local"))
+        .await
+        .unwrap();
 }
 
 async fn delete_group(mgr: &UserManager, name: &str) {
-    timeout_at(
-        Instant::now().add(Duration::from_secs(5)),
-        mgr.drop_group(name, None),
-    )
-    .await
-    .unwrap()
-    .unwrap();
+    mgr.drop_group(name, None).await.unwrap();
 }
