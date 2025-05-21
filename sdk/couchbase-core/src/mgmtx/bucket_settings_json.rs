@@ -58,6 +58,8 @@ pub struct BucketSettingsJson {
     pub history_retention_bytes: Option<u64>,
     #[serde(default, rename = "historyRetentionSeconds")]
     pub history_retention_seconds: Option<u32>,
+    #[serde(default, rename = "numVBuckets")]
+    pub num_vbuckets: Option<u16>,
 }
 
 #[derive(Debug, Deserialize)]
