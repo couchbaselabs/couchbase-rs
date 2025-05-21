@@ -5,12 +5,12 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::errmapcomponent::ErrMapComponent;
-use crate::error;
 use crate::error::{Error, ErrorKind};
-use crate::memdx::error::ErrorKind::{Resource, Server};
-use crate::memdx::error::{ServerError, ServerErrorKind};
+use crate::memdx::error::ErrorKind::{Cancelled, Dispatch, Resource, Server};
+use crate::memdx::error::{CancellationErrorKind, ServerError, ServerErrorKind};
 use crate::retrybesteffort::controlled_backoff;
 use crate::retryfailfast::FailFastRetryStrategy;
+use crate::{error, queryx, searchx};
 use async_trait::async_trait;
 use log::{debug, info};
 use tokio::time::sleep;
@@ -23,35 +23,50 @@ lazy_static! {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum RetryReason {
-    NotMyVbucket,
-    InvalidVbucketMap,
-    TempFail,
+    KvNotMyVbucket,
+    KvInvalidVbucketMap,
+    KvTemporaryFailure,
     KvCollectionOutdated,
     KvErrorMapRetryIndicated,
-    Locked,
+    KvLocked,
+    KvSyncWriteInProgress,
+    KvSyncWriteRecommitInProgress,
+    ServiceNotAvailable,
+    SocketClosedWhileInFlight,
+    SocketNotAvailable,
+    QueryPreparedStatementFailure,
+    QueryIndexNotFound,
+    SearchTooManyRequests,
 }
 
 impl RetryReason {
     pub fn allows_non_idempotent_retry(&self) -> bool {
         matches!(
             self,
-            RetryReason::InvalidVbucketMap
-                | RetryReason::NotMyVbucket
-                | RetryReason::TempFail
+            RetryReason::KvInvalidVbucketMap
+                | RetryReason::KvNotMyVbucket
+                | RetryReason::KvTemporaryFailure
                 | RetryReason::KvCollectionOutdated
                 | RetryReason::KvErrorMapRetryIndicated
-                | RetryReason::Locked
+                | RetryReason::KvLocked
+                | RetryReason::ServiceNotAvailable
+                | RetryReason::SocketNotAvailable
+                | RetryReason::KvSyncWriteInProgress
+                | RetryReason::KvSyncWriteRecommitInProgress
+                | RetryReason::QueryPreparedStatementFailure
+                | RetryReason::QueryIndexNotFound
+                | RetryReason::SearchTooManyRequests
         )
     }
 
     pub fn always_retry(&self) -> bool {
         match self {
-            RetryReason::InvalidVbucketMap => true,
-            RetryReason::NotMyVbucket => true,
-            RetryReason::TempFail => false,
+            RetryReason::KvInvalidVbucketMap => true,
+            RetryReason::KvNotMyVbucket => true,
+            RetryReason::KvTemporaryFailure => false,
             RetryReason::KvCollectionOutdated => true,
             RetryReason::KvErrorMapRetryIndicated => false,
-            RetryReason::Locked => false,
+            RetryReason::KvLocked => false,
             _ => false,
         }
     }
@@ -60,12 +75,24 @@ impl RetryReason {
 impl Display for RetryReason {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            RetryReason::NotMyVbucket => write!(f, "KV_NOT_MY_VBUCKET"),
-            RetryReason::InvalidVbucketMap => write!(f, "KV_INVALID_VBUCKET_MAP"),
-            RetryReason::TempFail => write!(f, "KV_TEMPORARY_FAILURE"),
+            RetryReason::KvNotMyVbucket => write!(f, "KV_NOT_MY_VBUCKET"),
+            RetryReason::KvInvalidVbucketMap => write!(f, "KV_INVALID_VBUCKET_MAP"),
+            RetryReason::KvTemporaryFailure => write!(f, "KV_TEMPORARY_FAILURE"),
             RetryReason::KvCollectionOutdated => write!(f, "KV_COLLECTION_OUTDATED"),
             RetryReason::KvErrorMapRetryIndicated => write!(f, "KV_ERROR_MAP_RETRY_INDICATED"),
-            RetryReason::Locked => write!(f, "KV_LOCKED"),
+            RetryReason::KvLocked => write!(f, "KV_LOCKED"),
+            RetryReason::ServiceNotAvailable => write!(f, "SERVICE_NOT_AVAILABLE"),
+            RetryReason::SocketClosedWhileInFlight => write!(f, "SOCKET_CLOSED_WHILE_IN_FLIGHT"),
+            RetryReason::SocketNotAvailable => write!(f, "SOCKET_NOT_AVAILABLE"),
+            RetryReason::KvSyncWriteInProgress => write!(f, "KV_SYNC_WRITE_IN_PROGRESS"),
+            RetryReason::KvSyncWriteRecommitInProgress => {
+                write!(f, "KV_SYNC_WRITE_RECOMMIT_IN_PROGRESS")
+            }
+            RetryReason::QueryPreparedStatementFailure => {
+                write!(f, "QUERY_PREPARED_STATEMENT_FAILURE")
+            }
+            RetryReason::QueryIndexNotFound => write!(f, "QUERY_INDEX_NOT_FOUND"),
+            RetryReason::SearchTooManyRequests => write!(f, "SEARCH_TOO_MANY_REQUESTS"),
         }
     }
 }
@@ -232,11 +259,40 @@ pub(crate) fn error_to_retry_reason(
             match err.kind() {
                 Server(e) => return server_error_to_retry_reason(rs, e),
                 Resource(e) => return server_error_to_retry_reason(rs, e.cause()),
+                Cancelled(e) => {
+                    if e == &CancellationErrorKind::ClosedInFlight {
+                        return Some(RetryReason::SocketClosedWhileInFlight);
+                    }
+                }
+                Dispatch { .. } => return Some(RetryReason::SocketNotAvailable),
                 _ => {}
             }
         }
         ErrorKind::NoVbucketMap => {
-            return Some(RetryReason::InvalidVbucketMap);
+            return Some(RetryReason::KvInvalidVbucketMap);
+        }
+        ErrorKind::ServiceNotAvailable { .. } => {
+            return Some(RetryReason::ServiceNotAvailable);
+        }
+        ErrorKind::Query(e) => {
+            if let queryx::error::ErrorKind::Server(e) = e.kind() {
+                match e.kind() {
+                    queryx::error::ServerErrorKind::PreparedStatementFailure => {
+                        return Some(RetryReason::QueryPreparedStatementFailure);
+                    }
+                    queryx::error::ServerErrorKind::IndexNotFound => {
+                        return Some(RetryReason::QueryIndexNotFound);
+                    }
+                    _ => {}
+                }
+            }
+        }
+        ErrorKind::Search(e) => {
+            if let searchx::error::ErrorKind::Server(e) = e.kind() {
+                if e.status_code() == 429 {
+                    return Some(RetryReason::SearchTooManyRequests);
+                }
+            }
         }
         _ => {}
     }
@@ -247,10 +303,10 @@ pub(crate) fn error_to_retry_reason(
 fn server_error_to_retry_reason(rs: &Arc<RetryManager>, e: &ServerError) -> Option<RetryReason> {
     match e.kind() {
         ServerErrorKind::NotMyVbucket => {
-            return Some(RetryReason::NotMyVbucket);
+            return Some(RetryReason::KvNotMyVbucket);
         }
         ServerErrorKind::TmpFail => {
-            return Some(RetryReason::TempFail);
+            return Some(RetryReason::KvTemporaryFailure);
         }
         ServerErrorKind::UnknownCollectionID => {
             return Some(RetryReason::KvCollectionOutdated);
@@ -259,7 +315,13 @@ fn server_error_to_retry_reason(rs: &Arc<RetryManager>, e: &ServerError) -> Opti
             return Some(RetryReason::KvCollectionOutdated);
         }
         ServerErrorKind::Locked => {
-            return Some(RetryReason::Locked);
+            return Some(RetryReason::KvLocked);
+        }
+        ServerErrorKind::SyncWriteInProgress => {
+            return Some(RetryReason::KvSyncWriteInProgress);
+        }
+        ServerErrorKind::SyncWriteRecommitInProgress => {
+            return Some(RetryReason::KvSyncWriteRecommitInProgress);
         }
         ServerErrorKind::UnknownStatus { status } => {
             if rs.err_map_component.should_retry(status) {

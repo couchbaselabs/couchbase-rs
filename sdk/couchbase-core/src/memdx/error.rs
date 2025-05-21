@@ -8,7 +8,7 @@ use crate::memdx::status::Status;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Error {
     inner: ErrorImpl,
 }
@@ -119,6 +119,8 @@ impl Error {
             Some(*opaque)
         } else if let ErrorKind::Resource(e) = inner_kind {
             Some(e.cause.opaque)
+        } else if let ErrorKind::Dispatch { opaque, .. } = inner_kind {
+            return Some(*opaque);
         } else {
             None
         }
@@ -158,6 +160,12 @@ struct ErrorImpl {
     source: Option<Source>,
 }
 
+impl PartialEq for ErrorImpl {
+    fn eq(&self, other: &Self) -> bool {
+        self.kind == other.kind
+    }
+}
+
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.inner.kind)
@@ -173,7 +181,7 @@ impl StdError for Error {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum ErrorKind {
     Server(ServerError),

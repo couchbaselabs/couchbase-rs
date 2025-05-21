@@ -580,11 +580,7 @@ fn test_kv_without_a_bucket() {
 
         assert!(upsert_result.is_err());
         let err = upsert_result.err().unwrap();
-        let memdx_err = is_memdx_error(&err);
-        assert!(memdx_err.is_some());
-        assert!(memdx_err
-            .unwrap()
-            .is_server_error_kind(ServerErrorKind::NoBucket));
+        assert_eq!(&couchbase_core::error::ErrorKind::NoBucket, err.kind());
     });
 }
 

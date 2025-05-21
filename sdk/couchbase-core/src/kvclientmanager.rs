@@ -267,29 +267,26 @@ where
     M: KvClientManager,
     Fut: Future<Output = Result<Resp>> + Send,
 {
-    loop {
-        let client = manager.get_client(endpoint).await?;
+    let client = manager.get_client(endpoint).await?;
 
-        let res = operation(client.clone()).await;
-        return match res {
-            Ok(r) => Ok(r),
-            Err(e) => {
-                if let Some(memdx_err) = e.is_memdx_error() {
-                    if memdx_err.is_dispatch_error() {
-                        // This was a dispatch error, so we can just try with
-                        // a different client instead...
-                        // TODO: Log something
-                        manager
-                            .shutdown_client(Some(endpoint), client)
-                            .await
-                            .unwrap_or_default();
-                        continue;
-                    }
+    let res = operation(client.clone()).await;
+    match res {
+        Ok(r) => Ok(r),
+        Err(e) => {
+            if let Some(memdx_err) = e.is_memdx_error() {
+                if memdx_err.is_dispatch_error() {
+                    // TODO: Log something
+                    manager
+                        .shutdown_client(Some(endpoint), client)
+                        .await
+                        .unwrap_or_default();
+
+                    return Err(e);
                 }
-
-                Err(e)
             }
-        };
+
+            Err(e)
+        }
     }
 }
 
