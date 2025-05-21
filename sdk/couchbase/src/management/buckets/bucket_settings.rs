@@ -20,6 +20,7 @@ pub struct BucketSettings {
     pub replica_indexes: Option<bool>,
     pub bucket_type: Option<BucketType>,
     pub storage_backend: Option<StorageBackend>,
+    pub num_vbuckets: Option<u16>,
 }
 
 impl BucketSettings {
@@ -40,6 +41,7 @@ impl BucketSettings {
             replica_indexes: None,
             bucket_type: None,
             storage_backend: None,
+            num_vbuckets: None,
         }
     }
 
@@ -119,6 +121,11 @@ impl BucketSettings {
 
     pub fn storage_backend(mut self, storage_backend: impl Into<StorageBackend>) -> Self {
         self.storage_backend = Some(storage_backend.into());
+        self
+    }
+
+    pub fn num_vbuckets(mut self, num_vbuckets: u16) -> Self {
+        self.num_vbuckets = Some(num_vbuckets);
         self
     }
 }
@@ -419,6 +426,7 @@ impl From<BucketDef> for BucketSettings {
             replica_indexes: value.bucket_settings.replica_index,
             bucket_type: value.bucket_settings.bucket_type.map(|v| v.into()),
             storage_backend: value.bucket_settings.storage_backend.map(|v| v.into()),
+            num_vbuckets: value.bucket_settings.num_vbuckets,
         }
     }
 }

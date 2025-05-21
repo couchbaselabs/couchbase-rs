@@ -20,6 +20,7 @@ pub struct BucketSettings {
     pub replica_index: Option<bool>,
     pub bucket_type: Option<BucketType>,
     pub storage_backend: Option<StorageBackend>,
+    pub num_vbuckets: Option<u16>,
 }
 
 impl BucketSettings {
@@ -101,6 +102,11 @@ impl BucketSettings {
         self.storage_backend = Some(storage_backend.into());
         self
     }
+
+    pub fn num_vbuckets(mut self, num_vbuckets: u16) -> Self {
+        self.num_vbuckets = Some(num_vbuckets);
+        self
+    }
 }
 
 #[derive(Debug, Clone, PartialOrd, PartialEq)]
@@ -143,6 +149,7 @@ impl From<BucketSettingsJson> for BucketDef {
                 replica_index: settings.replica_index,
                 bucket_type: settings.bucket_type,
                 storage_backend: settings.storage_backend,
+                num_vbuckets: settings.num_vbuckets,
             },
         }
     }
@@ -411,5 +418,8 @@ pub(crate) fn encode_bucket_settings(serializer: &mut Serializer<String>, opts: 
     }
     if let Some(storage_backend) = &opts.storage_backend {
         serializer.append_pair("storageBackend", storage_backend.to_string().as_str());
+    }
+    if let Some(num_vbuckets) = opts.num_vbuckets {
+        serializer.append_pair("numVBuckets", num_vbuckets.to_string().as_str());
     }
 }
