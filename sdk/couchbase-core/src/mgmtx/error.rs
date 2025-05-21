@@ -4,7 +4,7 @@ use std::fmt::{Display, Formatter};
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Error {
     inner: Box<ErrorImpl>,
 }
@@ -65,6 +65,12 @@ type Source = Box<dyn StdError + Send + Sync>;
 pub struct ErrorImpl {
     pub kind: ErrorKind,
     source: Option<Source>,
+}
+
+impl PartialEq for ErrorImpl {
+    fn eq(&self, other: &Self) -> bool {
+        self.kind == other.kind
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

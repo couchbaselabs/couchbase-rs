@@ -85,7 +85,7 @@ impl Error {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 #[non_exhaustive]
 pub enum ErrorKind {
     Memdx(MemdxError),
@@ -218,12 +218,12 @@ impl Display for ErrorKind {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct MemdxError {
     inner: Box<InnerMemdxError>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct InnerMemdxError {
     source: memdx::error::Error,
     dispatched_to: Option<String>,

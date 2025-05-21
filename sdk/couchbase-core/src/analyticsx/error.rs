@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Error {
     inner: ErrorImpl,
 }
@@ -274,6 +274,12 @@ type Source = Arc<dyn StdError + Send + Sync>;
 struct ErrorImpl {
     kind: Box<ErrorKind>,
     source: Option<Source>,
+}
+
+impl PartialEq for ErrorImpl {
+    fn eq(&self, other: &Self) -> bool {
+        self.kind == other.kind
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

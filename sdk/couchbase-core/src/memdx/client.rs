@@ -33,6 +33,7 @@ use crate::memdx::dispatcher::{
 use crate::memdx::error;
 use crate::memdx::error::{CancellationErrorKind, Error};
 use crate::memdx::hello_feature::HelloFeature::DataType;
+use crate::memdx::opcode::OpCode;
 use crate::memdx::packet::{RequestPacket, ResponsePacket};
 use crate::memdx::pendingop::ClientPendingOp;
 use crate::memdx::subdoc::SubdocRequestInfo;
@@ -258,14 +259,12 @@ impl Dispatcher for Client {
         let reader = FramedRead::new(r, codec);
         let writer = FramedWrite::new(w, codec);
 
-        let uuid = Uuid::new_v4().to_string();
-
         let (close_tx, close_rx) = mpsc::channel::<()>(1);
 
         let opaque_map = Arc::new(std::sync::Mutex::new(OpaqueMap::default()));
 
         let read_opaque_map = Arc::clone(&opaque_map);
-        let read_uuid = uuid.clone();
+        let read_uuid = opts.id.clone();
 
         let read_handle = tokio::spawn(async move {
             Client::read_loop(
@@ -285,7 +284,7 @@ impl Dispatcher for Client {
         Self {
             current_opaque: AtomicU32::new(1),
             opaque_map,
-            client_id: uuid,
+            client_id: opts.id,
 
             close_tx,
 

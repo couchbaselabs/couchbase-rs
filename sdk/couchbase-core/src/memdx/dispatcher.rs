@@ -16,6 +16,7 @@ pub struct DispatcherOptions {
     pub orphan_handler: OrphanResponseHandler,
     pub on_connection_close_handler: OnConnectionCloseHandler,
     pub disable_decompression: bool,
+    pub id: String,
 }
 
 #[async_trait]

@@ -90,7 +90,7 @@ impl<
             RetryInfo::new("upsert", false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
-            async |collection_id, _manifest_id, vbucket_id, client| {
+            async |collection_id, vbucket_id, client| {
                 let mut compressor = self.compression_manager.compressor();
                 let (value, datatype) = match compressor.compress(
                     client.has_feature(HelloFeature::Snappy),
@@ -153,7 +153,7 @@ impl<
             RetryInfo::new("get", true, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
-            async |collection_id, _manifest_id, vbucket_id, client| {
+            async |collection_id, vbucket_id, client| {
                 client
                     .get(GetRequest {
                         collection_id,
@@ -190,7 +190,7 @@ impl<
             RetryInfo::new("get_meta", true, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
-            async |collection_id, _manifest_id, vbucket_id, client| {
+            async |collection_id, vbucket_id, client| {
                 client
                     .get_meta(GetMetaRequest {
                         collection_id,
@@ -231,7 +231,7 @@ impl<
             RetryInfo::new("delete", false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
-            async |collection_id, manifest_id, vbucket_id, client| {
+            async |collection_id, vbucket_id, client| {
                 client
                     .delete(DeleteRequest {
                         collection_id,
@@ -277,7 +277,7 @@ impl<
             RetryInfo::new("get_and_lock", false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
-            async |collection_id, manifest_id, vbucket_id, client| {
+            async |collection_id, vbucket_id, client| {
                 client
                     .get_and_lock(GetAndLockRequest {
                         collection_id,
@@ -315,7 +315,7 @@ impl<
             RetryInfo::new("get_and_touch", false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
-            async |collection_id, manifest_id, vbucket_id, client| {
+            async |collection_id, vbucket_id, client| {
                 client
                     .get_and_touch(GetAndTouchRequest {
                         collection_id,
@@ -353,7 +353,7 @@ impl<
             RetryInfo::new("unlock", false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
-            async |collection_id, manifest_id, vbucket_id, client| {
+            async |collection_id, vbucket_id, client| {
                 client
                     .unlock(UnlockRequest {
                         collection_id,
@@ -388,7 +388,7 @@ impl<
             RetryInfo::new("touch", false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
-            async |collection_id, manifest_id, vbucket_id, client| {
+            async |collection_id, vbucket_id, client| {
                 client
                     .touch(TouchRequest {
                         collection_id,
@@ -421,7 +421,7 @@ impl<
             RetryInfo::new("add", false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
-            async |collection_id, manifest_id, vbucket_id, client| {
+            async |collection_id, vbucket_id, client| {
                 let mut compressor = self.compression_manager.compressor();
                 let (value, datatype) = match compressor.compress(
                     client.has_feature(HelloFeature::Snappy),
@@ -482,7 +482,7 @@ impl<
             RetryInfo::new("replace", false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
-            async |collection_id, manifest_id, vbucket_id, client| {
+            async |collection_id, vbucket_id, client| {
                 let mut compressor = self.compression_manager.compressor();
                 let (value, datatype) = match compressor.compress(
                     client.has_feature(HelloFeature::Snappy),
@@ -545,7 +545,7 @@ impl<
             RetryInfo::new("append", false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
-            async |collection_id, manifest_id, vbucket_id, client| {
+            async |collection_id, vbucket_id, client| {
                 let mut compressor = self.compression_manager.compressor();
                 let (value, datatype) = match compressor.compress(
                     client.has_feature(HelloFeature::Snappy),
@@ -605,7 +605,7 @@ impl<
             RetryInfo::new("prepend", false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
-            async |collection_id, manifest_id, vbucket_id, client| {
+            async |collection_id, vbucket_id, client| {
                 let mut compressor = self.compression_manager.compressor();
                 let (value, datatype) = match compressor.compress(
                     client.has_feature(HelloFeature::Snappy),
@@ -665,7 +665,7 @@ impl<
             RetryInfo::new("increment", false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
-            async |collection_id, manifest_id, vbucket_id, client| {
+            async |collection_id, vbucket_id, client| {
                 client
                     .increment(IncrementRequest {
                         collection_id,
@@ -714,7 +714,7 @@ impl<
             RetryInfo::new("decrement", false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
-            async |collection_id, manifest_id, vbucket_id, client| {
+            async |collection_id, vbucket_id, client| {
                 client
                     .decrement(DecrementRequest {
                         collection_id,
@@ -763,7 +763,7 @@ impl<
             RetryInfo::new("lookup_in", true, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
-            async |collection_id, manifest_id, vbucket_id, client| {
+            async |collection_id, vbucket_id, client| {
                 client
                     .lookup_in(LookupInRequest {
                         collection_id,
@@ -818,7 +818,7 @@ impl<
             RetryInfo::new("mutate_in", false, opts.retry_strategy),
             opts.scope_name,
             opts.collection_name,
-            async |collection_id, manifest_id, vbucket_id, client| {
+            async |collection_id, vbucket_id, client| {
                 client
                     .mutate_in(MutateInRequest {
                         collection_id,
@@ -955,7 +955,7 @@ impl<
         retry_info: RetryInfo,
         scope_name: &str,
         collection_name: &str,
-        operation: impl Fn(u32, u64, u16, Arc<KvClientManagerClientType<M>>) -> Fut + Send + Sync,
+        operation: impl Fn(u32, u16, Arc<KvClientManagerClientType<M>>) -> Fut + Send + Sync,
     ) -> Result<Resp>
     where
         Fut: Future<Output = Result<Resp>> + Send,
@@ -966,7 +966,7 @@ impl<
                 self.collections.clone(),
                 scope_name,
                 collection_name,
-                async |collection_id: u32, manifest_rev: u64| {
+                async |collection_id: u32| {
                     orchestrate_memd_routing(
                         self.router.clone(),
                         self.nmvb_handler.clone(),
@@ -977,7 +977,7 @@ impl<
                                 self.conn_manager.clone(),
                                 &endpoint,
                                 async |client: Arc<KvClientManagerClientType<M>>| {
-                                    operation(collection_id, manifest_rev, vb_id, client).await
+                                    operation(collection_id, vb_id, client).await
                                 },
                             )
                             .await

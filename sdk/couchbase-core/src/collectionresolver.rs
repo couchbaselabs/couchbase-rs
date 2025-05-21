@@ -23,13 +23,20 @@ pub(crate) async fn orchestrate_memd_collection_id<Cr, Resp, Fut>(
     resolver: Arc<Cr>,
     scope_name: &str,
     collection_name: &str,
-    mut operation: impl Fn(u32, u64) -> Fut,
+    mut operation: impl Fn(u32) -> Fut,
 ) -> Result<Resp>
 where
     Cr: CollectionResolver,
     Fut: Future<Output = Result<Resp>> + Send,
 {
-    let (collection_id, mut manifest_rev) = match resolver
+    if (scope_name == "_default" && collection_name == "_default")
+        || (scope_name.is_empty() && collection_name.is_empty())
+    {
+        // We never want to invalidate this id.
+        return operation(0).await;
+    }
+
+    let (collection_id, manifest_rev) = match resolver
         .resolve_collection_id(scope_name, collection_name)
         .await
     {
@@ -46,7 +53,7 @@ where
         }
     };
 
-    let err = match operation(collection_id, manifest_rev).await {
+    let err = match operation(collection_id).await {
         Ok(r) => return Ok(r),
         Err(e) => e,
     };

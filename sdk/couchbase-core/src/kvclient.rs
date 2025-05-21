@@ -20,6 +20,7 @@ use crate::service_type::ServiceType;
 use crate::tls_config::TlsConfig;
 use crate::util::hostname_from_addr_str;
 use futures::future::BoxFuture;
+use log::debug;
 use tokio::sync::Mutex;
 use tokio::time::Instant;
 use uuid::Uuid;
@@ -193,6 +194,13 @@ where
         let id = Uuid::new_v4().to_string();
         let read_id = id.clone();
 
+        let client_id = Uuid::new_v4().to_string();
+
+        debug!(
+            "Kvclient {} assigning client id {} for {}",
+            &id, &client_id, &config.address
+        );
+
         let on_close = opts.on_close.clone();
         let memdx_client_opts = DispatcherOptions {
             on_connection_close_handler: Arc::new(move || {
@@ -207,6 +215,7 @@ where
             }),
             orphan_handler: opts.orphan_handler,
             disable_decompression: opts.disable_decompression,
+            id: client_id,
         };
 
         let conn = if let Some(tls) = config.tls.clone() {
