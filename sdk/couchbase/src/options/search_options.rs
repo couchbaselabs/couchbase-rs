@@ -5,7 +5,6 @@ use crate::search::sort::Sort;
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::time::Duration;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -109,7 +108,6 @@ pub struct SearchOptions {
     pub(crate) include_locations: Option<bool>,
     pub(crate) disable_scoring: Option<bool>,
     pub(crate) server_timeout: Option<Duration>,
-    pub(crate) retry_strategy: Option<Arc<dyn crate::retry::RetryStrategy>>,
 }
 
 impl SearchOptions {
@@ -200,11 +198,6 @@ impl SearchOptions {
 
     pub fn server_timeout(mut self, server_timeout: Duration) -> Self {
         self.server_timeout = Some(server_timeout);
-        self
-    }
-
-    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn crate::retry::RetryStrategy>) -> Self {
-        self.retry_strategy = Some(retry_strategy);
         self
     }
 }

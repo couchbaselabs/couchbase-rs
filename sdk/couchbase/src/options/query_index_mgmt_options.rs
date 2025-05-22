@@ -1,19 +1,10 @@
-use std::sync::Arc;
-
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct GetAllIndexesOptions {
-    pub(crate) retry_strategy: Option<Arc<dyn crate::retry::RetryStrategy>>,
-}
+pub struct GetAllIndexesOptions {}
 
 impl GetAllIndexesOptions {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn crate::retry::RetryStrategy>) -> Self {
-        self.retry_strategy = Some(retry_strategy);
-        self
     }
 }
 
@@ -23,7 +14,6 @@ pub struct CreateQueryIndexOptions {
     pub(crate) ignore_if_exists: Option<bool>,
     pub(crate) num_replicas: Option<u32>,
     pub(crate) deferred: Option<bool>,
-    pub(crate) retry_strategy: Option<Arc<dyn crate::retry::RetryStrategy>>,
 }
 
 impl CreateQueryIndexOptions {
@@ -32,7 +22,6 @@ impl CreateQueryIndexOptions {
             ignore_if_exists: None,
             num_replicas: None,
             deferred: None,
-            retry_strategy: None,
         }
     }
 
@@ -48,11 +37,6 @@ impl CreateQueryIndexOptions {
 
     pub fn deferred(mut self, deferred: bool) -> Self {
         self.deferred = Some(deferred);
-        self
-    }
-
-    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn crate::retry::RetryStrategy>) -> Self {
-        self.retry_strategy = Some(retry_strategy);
         self
     }
 }
@@ -64,7 +48,6 @@ pub struct CreatePrimaryQueryIndexOptions {
     pub(crate) ignore_if_exists: Option<bool>,
     pub(crate) num_replicas: Option<u32>,
     pub(crate) deferred: Option<bool>,
-    pub(crate) retry_strategy: Option<Arc<dyn crate::retry::RetryStrategy>>,
 }
 
 impl CreatePrimaryQueryIndexOptions {
@@ -74,7 +57,6 @@ impl CreatePrimaryQueryIndexOptions {
             ignore_if_exists: None,
             num_replicas: None,
             deferred: None,
-            retry_strategy: None,
         }
     }
 
@@ -97,35 +79,23 @@ impl CreatePrimaryQueryIndexOptions {
         self.deferred = Some(deferred);
         self
     }
-
-    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn crate::retry::RetryStrategy>) -> Self {
-        self.retry_strategy = Some(retry_strategy);
-        self
-    }
 }
 
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct DropQueryIndexOptions {
     pub(crate) ignore_if_not_exists: Option<bool>,
-    pub(crate) retry_strategy: Option<Arc<dyn crate::retry::RetryStrategy>>,
 }
 
 impl DropQueryIndexOptions {
     pub fn new() -> Self {
         Self {
             ignore_if_not_exists: None,
-            retry_strategy: None,
         }
     }
 
     pub fn ignore_if_not_exists(mut self, ignore_if_not_exists: bool) -> Self {
         self.ignore_if_not_exists = Some(ignore_if_not_exists);
-        self
-    }
-
-    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn crate::retry::RetryStrategy>) -> Self {
-        self.retry_strategy = Some(retry_strategy);
         self
     }
 }
@@ -135,7 +105,6 @@ impl DropQueryIndexOptions {
 pub struct DropPrimaryQueryIndexOptions {
     pub(crate) index_name: Option<String>,
     pub(crate) ignore_if_not_exists: Option<bool>,
-    pub(crate) retry_strategy: Option<Arc<dyn crate::retry::RetryStrategy>>,
 }
 
 impl DropPrimaryQueryIndexOptions {
@@ -143,7 +112,6 @@ impl DropPrimaryQueryIndexOptions {
         Self {
             index_name: None,
             ignore_if_not_exists: None,
-            retry_strategy: None,
         }
     }
 
@@ -156,25 +124,18 @@ impl DropPrimaryQueryIndexOptions {
         self.ignore_if_not_exists = Some(ignore_if_not_exists);
         self
     }
-
-    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn crate::retry::RetryStrategy>) -> Self {
-        self.retry_strategy = Some(retry_strategy);
-        self
-    }
 }
 
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct WatchQueryIndexOptions {
     pub(crate) watch_primary: Option<bool>,
-    pub(crate) retry_strategy: Option<Arc<dyn crate::retry::RetryStrategy>>,
 }
 
 impl WatchQueryIndexOptions {
     pub fn new() -> Self {
         Self {
             watch_primary: None,
-            retry_strategy: None,
         }
     }
 
@@ -182,28 +143,14 @@ impl WatchQueryIndexOptions {
         self.watch_primary = Some(watch_primary);
         self
     }
-
-    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn crate::retry::RetryStrategy>) -> Self {
-        self.retry_strategy = Some(retry_strategy);
-        self
-    }
 }
 
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct BuildQueryIndexOptions {
-    pub(crate) retry_strategy: Option<Arc<dyn crate::retry::RetryStrategy>>,
-}
+pub struct BuildQueryIndexOptions {}
 
 impl BuildQueryIndexOptions {
     pub fn new() -> Self {
-        Self {
-            retry_strategy: None,
-        }
-    }
-
-    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn crate::retry::RetryStrategy>) -> Self {
-        self.retry_strategy = Some(retry_strategy);
-        self
+        Self {}
     }
 }

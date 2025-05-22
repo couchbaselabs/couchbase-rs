@@ -154,6 +154,7 @@ impl CouchbaseScopeClient {
                 bucket_name: self.bucket_name().to_string(),
                 scope_name: self.name().to_string(),
             },
+            self.default_retry_strategy.clone(),
         )
     }
 
@@ -164,6 +165,7 @@ impl CouchbaseScopeClient {
                 bucket_name: self.bucket_name().to_string(),
                 scope_name: self.name().to_string(),
             },
+            self.default_retry_strategy.clone(),
         )
     }
 }

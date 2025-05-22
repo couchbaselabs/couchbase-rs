@@ -5,7 +5,6 @@ use couchbase_core::{queryoptions, queryx};
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::time::Duration;
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
@@ -77,7 +76,6 @@ pub struct QueryOptions {
     pub(crate) profile: Option<ProfileMode>,
     pub(crate) raw: Option<HashMap<String, Value>>,
     pub(crate) read_only: Option<bool>,
-    pub(crate) retry_strategy: Option<Arc<dyn crate::retry::RetryStrategy>>,
     pub(crate) scan_cap: Option<u32>,
     pub(crate) scan_consistency: Option<ScanConsistency>,
     pub(crate) scan_wait: Option<Duration>,
@@ -203,11 +201,6 @@ impl QueryOptions {
         self
     }
 
-    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn crate::retry::RetryStrategy>) -> Self {
-        self.retry_strategy = Some(retry_strategy);
-        self
-    }
-
     pub fn scan_cap(mut self, scan_cap: u32) -> Self {
         self.scan_cap = Some(scan_cap);
         self
@@ -265,8 +258,7 @@ impl TryFrom<QueryOptions> for queryoptions::QueryOptions {
             .timeout(opts.server_timeout)
             .use_replica(opts.use_replica.map(|r| r.into()))
             .named_args(opts.named_parameters)
-            .raw(opts.raw)
-            .retry_strategy(opts.retry_strategy);
+            .raw(opts.raw);
 
         Ok(builder)
     }

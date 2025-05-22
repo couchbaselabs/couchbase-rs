@@ -12,11 +12,11 @@ use crate::clients::user_mgmt_client::{
 };
 use crate::error;
 use crate::options::cluster_options::ClusterOptions;
-use crate::retry::DEFAULT_RETRY_STRATEGY;
 use couchbase_connstr::{parse, resolve, Address, SrvRecord};
 use couchbase_core::agentoptions::{CompressionConfig, SeedConfig};
 use couchbase_core::ondemand_agentmanager::{OnDemandAgentManager, OnDemandAgentManagerOptions};
 use couchbase_core::retry::RetryStrategy;
+use couchbase_core::retrybesteffort::{BestEffortRetryStrategy, ExponentialBackoffCalculator};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
@@ -149,10 +149,9 @@ impl CouchbaseClusterBackend {
         opts: ClusterOptions,
         extra_opts: HashMap<String, Vec<String>>,
     ) -> error::Result<CouchbaseClusterBackend> {
-        let default_retry_strategy = match &opts.retry_strategy {
-            Some(r) => r.clone(),
-            None => DEFAULT_RETRY_STRATEGY.clone(),
-        };
+        let default_retry_strategy = Arc::new(BestEffortRetryStrategy::new(
+            ExponentialBackoffCalculator::default(),
+        ));
 
         let tls_config = if let Some(tls_config) = opts.tls_options {
             Some(
@@ -237,7 +236,10 @@ impl CouchbaseClusterBackend {
     fn search_client(&self) -> CouchbaseSearchClient {
         let agent = self.agent_manager.get_cluster_agent();
 
-        CouchbaseSearchClient::new(CouchbaseAgentProvider::with_agent(agent.clone()))
+        CouchbaseSearchClient::new(
+            CouchbaseAgentProvider::with_agent(agent.clone()),
+            self.default_retry_strategy.clone(),
+        )
     }
 
     fn merge_options(
