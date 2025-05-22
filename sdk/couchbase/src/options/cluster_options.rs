@@ -26,7 +26,6 @@ pub struct ClusterOptions {
     pub(crate) timeout_options: Option<TimeoutOptions>,
     // compression_mode specifies compression related configuration options.
     pub(crate) compression_mode: Option<CompressionMode>,
-    pub(crate) retry_strategy: Option<Arc<dyn crate::retry::RetryStrategy>>,
     pub(crate) tls_options: Option<TlsOptions>,
 }
 
@@ -36,7 +35,6 @@ impl ClusterOptions {
             authenticator,
             timeout_options: None,
             compression_mode: None,
-            retry_strategy: None,
             tls_options: None,
         }
     }
@@ -48,11 +46,6 @@ impl ClusterOptions {
 
     pub fn compression_mode(mut self, compression_mode: CompressionMode) -> Self {
         self.compression_mode = Some(compression_mode);
-        self
-    }
-
-    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn crate::retry::RetryStrategy>) -> Self {
-        self.retry_strategy = Some(retry_strategy);
         self
     }
 

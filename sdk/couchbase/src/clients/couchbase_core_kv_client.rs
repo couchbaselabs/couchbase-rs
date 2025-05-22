@@ -66,11 +66,7 @@ impl CouchbaseCoreKvClient {
                 .durability_level(parse_optional_durability_level_to_memdx(
                     options.durability_level,
                 ))
-                .retry_strategy(
-                    options
-                        .retry_strategy
-                        .unwrap_or(self.default_retry_strategy.clone()),
-                )
+                .retry_strategy(self.default_retry_strategy.clone())
                 .preserve_expiry(options.preserve_expiry),
             )
             .await?;
@@ -104,11 +100,7 @@ impl CouchbaseCoreKvClient {
                 .durability_level(parse_optional_durability_level_to_memdx(
                     options.durability_level,
                 ))
-                .retry_strategy(
-                    options
-                        .retry_strategy
-                        .unwrap_or(self.default_retry_strategy.clone()),
-                ),
+                .retry_strategy(self.default_retry_strategy.clone()),
             )
             .await?;
 
@@ -141,11 +133,7 @@ impl CouchbaseCoreKvClient {
                 .durability_level(parse_optional_durability_level_to_memdx(
                     options.durability_level,
                 ))
-                .retry_strategy(
-                    options
-                        .retry_strategy
-                        .unwrap_or(self.default_retry_strategy.clone()),
-                )
+                .retry_strategy(self.default_retry_strategy.clone())
                 .preserve_expiry(options.preserve_expiry)
                 .cas(options.cas),
             )
@@ -171,11 +159,7 @@ impl CouchbaseCoreKvClient {
                 .durability_level(parse_optional_durability_level_to_memdx(
                     options.durability_level,
                 ))
-                .retry_strategy(
-                    options
-                        .retry_strategy
-                        .unwrap_or(self.default_retry_strategy.clone()),
-                )
+                .retry_strategy(self.default_retry_strategy.clone())
                 .cas(options.cas),
             )
             .await?;
@@ -197,11 +181,7 @@ impl CouchbaseCoreKvClient {
                     &self.scope_name,
                     &self.collection_name,
                 )
-                .retry_strategy(
-                    options
-                        .retry_strategy
-                        .unwrap_or(self.default_retry_strategy.clone()),
-                ),
+                .retry_strategy(self.default_retry_strategy.clone()),
             )
             .await?;
 
@@ -217,11 +197,7 @@ impl CouchbaseCoreKvClient {
                     &self.scope_name,
                     &self.collection_name,
                 )
-                .retry_strategy(
-                    options
-                        .retry_strategy
-                        .unwrap_or(self.default_retry_strategy.clone()),
-                ),
+                .retry_strategy(self.default_retry_strategy.clone()),
             )
             .await?;
 
@@ -243,11 +219,7 @@ impl CouchbaseCoreKvClient {
                     &self.collection_name,
                     expiry.as_secs() as u32,
                 )
-                .retry_strategy(
-                    options
-                        .retry_strategy
-                        .unwrap_or(self.default_retry_strategy.clone()),
-                ),
+                .retry_strategy(self.default_retry_strategy.clone()),
             )
             .await?;
 
@@ -269,11 +241,7 @@ impl CouchbaseCoreKvClient {
                     &self.collection_name,
                     lock_time.as_secs() as u32,
                 )
-                .retry_strategy(
-                    options
-                        .retry_strategy
-                        .unwrap_or(self.default_retry_strategy.clone()),
-                ),
+                .retry_strategy(self.default_retry_strategy.clone()),
             )
             .await?;
 
@@ -290,11 +258,7 @@ impl CouchbaseCoreKvClient {
                     &self.collection_name,
                     cas,
                 )
-                .retry_strategy(
-                    options
-                        .retry_strategy
-                        .unwrap_or(self.default_retry_strategy.clone()),
-                ),
+                .retry_strategy(self.default_retry_strategy.clone()),
             )
             .await?;
 
@@ -316,11 +280,7 @@ impl CouchbaseCoreKvClient {
                     &self.collection_name,
                     expiry.as_secs() as u32,
                 )
-                .retry_strategy(
-                    options
-                        .retry_strategy
-                        .unwrap_or(self.default_retry_strategy.clone()),
-                ),
+                .retry_strategy(self.default_retry_strategy.clone()),
             )
             .await?;
 
@@ -345,11 +305,7 @@ impl CouchbaseCoreKvClient {
                 .durability_level(parse_optional_durability_level_to_memdx(
                     options.durability_level,
                 ))
-                .retry_strategy(
-                    options
-                        .retry_strategy
-                        .unwrap_or(self.default_retry_strategy.clone()),
-                ),
+                .retry_strategy(self.default_retry_strategy.clone()),
             )
             .await?;
 
@@ -379,11 +335,7 @@ impl CouchbaseCoreKvClient {
                 .durability_level(parse_optional_durability_level_to_memdx(
                     options.durability_level,
                 ))
-                .retry_strategy(
-                    options
-                        .retry_strategy
-                        .unwrap_or(self.default_retry_strategy.clone()),
-                ),
+                .retry_strategy(self.default_retry_strategy.clone()),
             )
             .await?;
 
@@ -411,11 +363,7 @@ impl CouchbaseCoreKvClient {
                 .durability_level(parse_optional_durability_level_to_memdx(
                     options.durability_level,
                 ))
-                .retry_strategy(
-                    options
-                        .retry_strategy
-                        .unwrap_or(self.default_retry_strategy.clone()),
-                )
+                .retry_strategy(self.default_retry_strategy.clone())
                 .expiry(options.expiry.map(|e| e.as_secs() as u32))
                 .initial(options.initial)
                 .delta(options.delta),
@@ -447,11 +395,7 @@ impl CouchbaseCoreKvClient {
                 .durability_level(parse_optional_durability_level_to_memdx(
                     options.durability_level,
                 ))
-                .retry_strategy(
-                    options
-                        .retry_strategy
-                        .unwrap_or(self.default_retry_strategy.clone()),
-                )
+                .retry_strategy(self.default_retry_strategy.clone())
                 .expiry(options.expiry.map(|e| e.as_secs() as u32))
                 .initial(options.initial)
                 .delta(options.delta),
@@ -495,11 +439,7 @@ impl CouchbaseCoreKvClient {
                     }
                     flags
                 })
-                .retry_strategy(
-                    options
-                        .retry_strategy
-                        .unwrap_or(self.default_retry_strategy.clone()),
-                ),
+                .retry_strategy(self.default_retry_strategy.clone()),
             )
             .await?;
 
@@ -557,11 +497,7 @@ impl CouchbaseCoreKvClient {
                 .preserve_expiry(options.preserve_expiry)
                 .expiry(options.expiry.map(|e| e.as_secs() as u32))
                 .cas(options.cas)
-                .retry_strategy(
-                    options
-                        .retry_strategy
-                        .unwrap_or(self.default_retry_strategy.clone()),
-                ),
+                .retry_strategy(self.default_retry_strategy.clone()),
             )
             .await?;
 

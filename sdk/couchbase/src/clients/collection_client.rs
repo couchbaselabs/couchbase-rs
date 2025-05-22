@@ -114,6 +114,7 @@ impl CouchbaseCollectionClient {
                 scope_name: self.scope_name().to_string(),
                 collection_name: self.name().to_string(),
             },
+            self.default_retry_strategy.clone(),
         )
     }
 }

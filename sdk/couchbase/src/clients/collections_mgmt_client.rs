@@ -158,11 +158,7 @@ impl CouchbaseCollectionsMgmtClient {
                     &self.bucket_name,
                     scope_name.into().as_str(),
                 )
-                .retry_strategy(
-                    opts.retry_strategy
-                        .clone()
-                        .unwrap_or(self.default_retry_strategy.clone()),
-                ),
+                .retry_strategy(self.default_retry_strategy.clone()),
             )
             .await?;
 
@@ -181,11 +177,7 @@ impl CouchbaseCollectionsMgmtClient {
                     &self.bucket_name,
                     scope_name.into().as_str(),
                 )
-                .retry_strategy(
-                    opts.retry_strategy
-                        .clone()
-                        .unwrap_or(self.default_retry_strategy.clone()),
-                ),
+                .retry_strategy(self.default_retry_strategy.clone()),
             )
             .await?;
 
@@ -207,11 +199,7 @@ impl CouchbaseCollectionsMgmtClient {
             scope_name.as_str(),
             collection_name.as_str(),
         )
-        .retry_strategy(
-            opts.retry_strategy
-                .clone()
-                .unwrap_or(self.default_retry_strategy.clone()),
-        );
+        .retry_strategy(self.default_retry_strategy.clone());
 
         if let Some(max_ttl) = settings.max_expiry {
             opts = opts.max_ttl(max_ttl.into());
@@ -241,11 +229,7 @@ impl CouchbaseCollectionsMgmtClient {
             scope_name.as_str(),
             collection_name.as_str(),
         )
-        .retry_strategy(
-            opts.retry_strategy
-                .clone()
-                .unwrap_or(self.default_retry_strategy.clone()),
-        );
+        .retry_strategy(self.default_retry_strategy.clone());
 
         if let Some(max_ttl) = settings.max_expiry {
             opts = opts.max_ttl(max_ttl.into());
@@ -274,11 +258,7 @@ impl CouchbaseCollectionsMgmtClient {
                     scope_name.into().as_str(),
                     collection_name.into().as_str(),
                 )
-                .retry_strategy(
-                    opts.retry_strategy
-                        .clone()
-                        .unwrap_or(self.default_retry_strategy.clone()),
-                ),
+                .retry_strategy(self.default_retry_strategy.clone()),
             )
             .await?;
 
@@ -290,11 +270,7 @@ impl CouchbaseCollectionsMgmtClient {
         let manifest = agent
             .get_collection_manifest(
                 &couchbase_core::mgmtoptions::GetCollectionManifestOptions::new(&self.bucket_name)
-                    .retry_strategy(
-                        opts.retry_strategy
-                            .clone()
-                            .unwrap_or(self.default_retry_strategy.clone()),
-                    ),
+                    .retry_strategy(self.default_retry_strategy.clone()),
             )
             .await?;
 

@@ -6,6 +6,8 @@ use crate::options::query_index_mgmt_options::{
     WatchQueryIndexOptions,
 };
 use crate::results::query_index_mgmt_results::QueryIndex;
+use couchbase_core::retry::RetryStrategy;
+use std::sync::Arc;
 
 pub(crate) struct QueryIndexMgmtClient {
     backend: QueryIndexMgmtClientBackend,
@@ -133,13 +135,19 @@ pub(crate) struct QueryIndexKeyspace {
 pub(crate) struct CouchbaseQueryIndexMgmtClient {
     agent_provider: CouchbaseAgentProvider,
     keyspace: QueryIndexKeyspace,
+    default_retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl CouchbaseQueryIndexMgmtClient {
-    pub fn new(agent_provider: CouchbaseAgentProvider, keyspace: QueryIndexKeyspace) -> Self {
+    pub fn new(
+        agent_provider: CouchbaseAgentProvider,
+        keyspace: QueryIndexKeyspace,
+        default_retry_strategy: Arc<dyn RetryStrategy>,
+    ) -> Self {
         Self {
             agent_provider,
             keyspace,
+            default_retry_strategy,
         }
     }
 
@@ -154,9 +162,7 @@ impl CouchbaseQueryIndexMgmtClient {
                 .scope_name(&self.keyspace.scope_name)
                 .collection_name(&self.keyspace.collection_name);
 
-        if let Some(retry_strategy) = opts.retry_strategy {
-            get_indexes_opts = get_indexes_opts.retry_strategy(retry_strategy);
-        }
+        get_indexes_opts = get_indexes_opts.retry_strategy(self.default_retry_strategy.clone());
 
         let agent = self.agent_provider.get_agent().await;
 
@@ -194,9 +200,7 @@ impl CouchbaseQueryIndexMgmtClient {
         if let Some(num_replicas) = opts.num_replicas {
             create_index_opts = create_index_opts.num_replicas(num_replicas);
         }
-        if let Some(retry_strategy) = opts.retry_strategy {
-            create_index_opts = create_index_opts.retry_strategy(retry_strategy);
-        }
+        create_index_opts = create_index_opts.retry_strategy(self.default_retry_strategy.clone());
 
         let agent = self.agent_provider.get_agent().await;
 
@@ -228,9 +232,7 @@ impl CouchbaseQueryIndexMgmtClient {
         if let Some(index_name) = opts.index_name.as_deref() {
             create_index_opts = create_index_opts.index_name(index_name);
         }
-        if let Some(retry_strategy) = opts.retry_strategy {
-            create_index_opts = create_index_opts.retry_strategy(retry_strategy);
-        }
+        create_index_opts = create_index_opts.retry_strategy(self.default_retry_strategy.clone());
 
         let agent = self.agent_provider.get_agent().await;
 
@@ -256,9 +258,7 @@ impl CouchbaseQueryIndexMgmtClient {
         if let Some(ignore) = opts.ignore_if_not_exists {
             drop_index_opts = drop_index_opts.ignore_if_not_exists(ignore);
         }
-        if let Some(retry_strategy) = opts.retry_strategy {
-            drop_index_opts = drop_index_opts.retry_strategy(retry_strategy);
-        }
+        drop_index_opts = drop_index_opts.retry_strategy(self.default_retry_strategy.clone());
 
         let agent = self.agent_provider.get_agent().await;
 
@@ -284,9 +284,7 @@ impl CouchbaseQueryIndexMgmtClient {
         if let Some(index_name) = opts.index_name.as_deref() {
             drop_index_opts = drop_index_opts.index_name(index_name);
         }
-        if let Some(retry_strategy) = opts.retry_strategy {
-            drop_index_opts = drop_index_opts.retry_strategy(retry_strategy);
-        }
+        drop_index_opts = drop_index_opts.retry_strategy(self.default_retry_strategy.clone());
 
         let agent = self.agent_provider.get_agent().await;
 
@@ -314,9 +312,7 @@ impl CouchbaseQueryIndexMgmtClient {
         if let Some(watch_primary) = opts.watch_primary {
             watch_indexes_opts = watch_indexes_opts.watch_primary(watch_primary);
         }
-        if let Some(retry_strategy) = opts.retry_strategy {
-            watch_indexes_opts = watch_indexes_opts.retry_strategy(retry_strategy);
-        }
+        watch_indexes_opts = watch_indexes_opts.retry_strategy(self.default_retry_strategy.clone());
 
         let agent = self.agent_provider.get_agent().await;
 
@@ -338,9 +334,7 @@ impl CouchbaseQueryIndexMgmtClient {
             .scope_name(&self.keyspace.scope_name)
             .collection_name(&self.keyspace.collection_name);
 
-        if let Some(retry_strategy) = opts.retry_strategy {
-            build_indexes_opts = build_indexes_opts.retry_strategy(retry_strategy);
-        }
+        build_indexes_opts = build_indexes_opts.retry_strategy(self.default_retry_strategy.clone());
 
         let agent = self.agent_provider.get_agent().await;
 

@@ -179,11 +179,7 @@ impl CouchbaseUserMgmtClient {
         let opts = couchbase_core::mgmtoptions::GetAllUsersOptions::new(
             opts.auth_domain.as_deref().unwrap_or(DEFAULT_AUTH_DOMAIN),
         )
-        .retry_strategy(
-            opts.retry_strategy
-                .clone()
-                .unwrap_or(self.default_retry_strategy.clone()),
-        );
+        .retry_strategy(self.default_retry_strategy.clone());
 
         let users = agent.get_all_users(&opts).await?;
 
@@ -200,11 +196,7 @@ impl CouchbaseUserMgmtClient {
             &username,
             opts.auth_domain.as_deref().unwrap_or(DEFAULT_AUTH_DOMAIN),
         )
-        .retry_strategy(
-            opts.retry_strategy
-                .clone()
-                .unwrap_or(self.default_retry_strategy.clone()),
-        );
+        .retry_strategy(self.default_retry_strategy.clone());
 
         let user = agent.get_user(&opts).await?;
 
@@ -219,11 +211,7 @@ impl CouchbaseUserMgmtClient {
             &cuser,
             opts.auth_domain.as_deref().unwrap_or(DEFAULT_AUTH_DOMAIN),
         )
-        .retry_strategy(
-            opts.retry_strategy
-                .clone()
-                .unwrap_or(self.default_retry_strategy.clone()),
-        );
+        .retry_strategy(self.default_retry_strategy.clone());
 
         agent.upsert_user(&opts).await?;
 
@@ -236,11 +224,7 @@ impl CouchbaseUserMgmtClient {
             &username,
             opts.auth_domain.as_deref().unwrap_or(DEFAULT_AUTH_DOMAIN),
         )
-        .retry_strategy(
-            opts.retry_strategy
-                .clone()
-                .unwrap_or(self.default_retry_strategy.clone()),
-        );
+        .retry_strategy(self.default_retry_strategy.clone());
 
         agent.delete_user(&opts).await?;
 
@@ -249,11 +233,8 @@ impl CouchbaseUserMgmtClient {
 
     pub async fn get_roles(&self, opts: GetRolesOptions) -> error::Result<Vec<RoleAndDescription>> {
         let agent = self.agent_provider.get_agent().await;
-        let opts = couchbase_core::mgmtoptions::GetRolesOptions::new().retry_strategy(
-            opts.retry_strategy
-                .clone()
-                .unwrap_or(self.default_retry_strategy.clone()),
-        );
+        let opts = couchbase_core::mgmtoptions::GetRolesOptions::new()
+            .retry_strategy(self.default_retry_strategy.clone());
 
         let roles = agent.get_roles(&opts).await?;
 
@@ -266,11 +247,8 @@ impl CouchbaseUserMgmtClient {
         opts: GetGroupOptions,
     ) -> error::Result<Group> {
         let agent = self.agent_provider.get_agent().await;
-        let opts = couchbase_core::mgmtoptions::GetGroupOptions::new(&group_name).retry_strategy(
-            opts.retry_strategy
-                .clone()
-                .unwrap_or(self.default_retry_strategy.clone()),
-        );
+        let opts = couchbase_core::mgmtoptions::GetGroupOptions::new(&group_name)
+            .retry_strategy(self.default_retry_strategy.clone());
 
         let group = agent.get_group(&opts).await?;
 
@@ -279,11 +257,8 @@ impl CouchbaseUserMgmtClient {
 
     pub async fn get_all_groups(&self, opts: GetAllGroupsOptions) -> error::Result<Vec<Group>> {
         let agent = self.agent_provider.get_agent().await;
-        let opts = couchbase_core::mgmtoptions::GetAllGroupsOptions::new().retry_strategy(
-            opts.retry_strategy
-                .clone()
-                .unwrap_or(self.default_retry_strategy.clone()),
-        );
+        let opts = couchbase_core::mgmtoptions::GetAllGroupsOptions::new()
+            .retry_strategy(self.default_retry_strategy.clone());
 
         let groups = agent.get_all_groups(&opts).await?;
 
@@ -294,11 +269,8 @@ impl CouchbaseUserMgmtClient {
         let agent = self.agent_provider.get_agent().await;
         let cgroup = group.into();
 
-        let opts = couchbase_core::mgmtoptions::UpsertGroupOptions::new(&cgroup).retry_strategy(
-            opts.retry_strategy
-                .clone()
-                .unwrap_or(self.default_retry_strategy.clone()),
-        );
+        let opts = couchbase_core::mgmtoptions::UpsertGroupOptions::new(&cgroup)
+            .retry_strategy(self.default_retry_strategy.clone());
 
         agent.upsert_group(&opts).await?;
 
@@ -312,11 +284,7 @@ impl CouchbaseUserMgmtClient {
     ) -> error::Result<()> {
         let agent = self.agent_provider.get_agent().await;
         let opts = couchbase_core::mgmtoptions::DeleteGroupOptions::new(&group_name)
-            .retry_strategy(
-                opts.retry_strategy
-                    .clone()
-                    .unwrap_or(self.default_retry_strategy.clone()),
-            );
+            .retry_strategy(self.default_retry_strategy.clone());
 
         agent.delete_group(&opts).await?;
 
@@ -330,11 +298,7 @@ impl CouchbaseUserMgmtClient {
     ) -> error::Result<()> {
         let agent = self.agent_provider.get_agent().await;
         let opts = couchbase_core::mgmtoptions::ChangePasswordOptions::new(&new_password)
-            .retry_strategy(
-                opts.retry_strategy
-                    .clone()
-                    .unwrap_or(self.default_retry_strategy.clone()),
-            );
+            .retry_strategy(self.default_retry_strategy.clone());
 
         agent.change_password(&opts).await?;
 

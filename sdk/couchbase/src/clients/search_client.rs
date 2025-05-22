@@ -3,11 +3,13 @@ use crate::error;
 use crate::options::search_options::SearchOptions;
 use crate::results::search_results::SearchResult;
 use crate::search::request::SearchRequest;
+use couchbase_core::retry::RetryStrategy;
 use couchbase_core::searchx;
 use couchbase_core::searchx::query_options::{
     Consistency, ConsistencyLevel, ConsistencyVectors, Control, KnnOperator, KnnQuery,
 };
 use std::collections::HashMap;
+use std::sync::Arc;
 
 pub(crate) struct SearchClient {
     backend: SearchClientBackend,
@@ -48,20 +50,30 @@ pub(crate) struct SearchKeyspace {
 pub(crate) struct CouchbaseSearchClient {
     agent_provider: CouchbaseAgentProvider,
     keyspace: Option<SearchKeyspace>,
+    default_retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl CouchbaseSearchClient {
-    pub fn new(agent_provider: CouchbaseAgentProvider) -> Self {
+    pub fn new(
+        agent_provider: CouchbaseAgentProvider,
+        default_retry_strategy: Arc<dyn RetryStrategy>,
+    ) -> Self {
         Self {
             agent_provider,
             keyspace: None,
+            default_retry_strategy,
         }
     }
 
-    pub fn with_keyspace(agent_provider: CouchbaseAgentProvider, keyspace: SearchKeyspace) -> Self {
+    pub fn with_keyspace(
+        agent_provider: CouchbaseAgentProvider,
+        keyspace: SearchKeyspace,
+        default_retry_strategy: Arc<dyn RetryStrategy>,
+    ) -> Self {
         Self {
             agent_provider,
             keyspace: Some(keyspace),
+            default_retry_strategy,
         }
     }
 
@@ -187,7 +199,7 @@ impl CouchbaseSearchClient {
             .bucket_name(bucket_name)
             .on_behalf_of(None)
             .endpoint(None)
-            .retry_strategy(opts.retry_strategy);
+            .retry_strategy(self.default_retry_strategy.clone());
 
         let agent = self.agent_provider.get_agent().await;
         Ok(SearchResult::from(agent.search(core_opts).await?))
