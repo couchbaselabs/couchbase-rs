@@ -322,7 +322,15 @@ impl Display for ServerError {
 
         if let Some(context) = &self.context {
             if let Some(parsed) = Self::parse_context(context) {
-                base_msg = format!("{}, (context: {})", base_msg, parsed.text);
+                base_msg.push_str(" (");
+                if let Some(text) = &parsed.text {
+                    base_msg.push_str(&format!("context: {}, ", text));
+                }
+
+                if let Some(error_ref) = &parsed.error_ref {
+                    base_msg.push_str(&format!("error_ref: {}", error_ref));
+                }
+                base_msg.push(')');
             }
         }
 
@@ -388,9 +396,9 @@ impl ServerError {
             }
         };
 
-        let text = context_json.error.context.unwrap_or_default();
+        let text = context_json.error.context;
 
-        let error_ref = context_json.error_ref;
+        let error_ref = context_json.error.error_ref;
 
         let manifest_rev = context_json
             .manifest_rev
@@ -407,7 +415,7 @@ impl ServerError {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ServerErrorContext {
-    pub text: String,
+    pub text: Option<String>,
     pub error_ref: Option<String>,
     pub manifest_rev: Option<u64>,
 }
@@ -692,14 +700,14 @@ impl From<io::Error> for Error {
 struct ServerErrorContextJsonContext {
     #[serde(alias = "context")]
     context: Option<String>,
+    #[serde(alias = "ref")]
+    pub error_ref: Option<String>,
 }
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
 struct ServerErrorContextJson {
     #[serde(alias = "error", default)]
     error: ServerErrorContextJsonContext,
-    #[serde(alias = "ref")]
-    pub error_ref: Option<String>,
     #[serde(alias = "manifest_uid")]
     pub manifest_rev: Option<String>,
 }

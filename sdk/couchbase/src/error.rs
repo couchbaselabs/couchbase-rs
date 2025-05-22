@@ -84,14 +84,15 @@ impl Error {
 
         if let Some(xerror) = e.context() {
             if let Some(parsed) = ServerError::parse_context(xerror) {
-                extended_context = extended_context.with_xcontent(parsed.text);
+                if let Some(text) = parsed.text {
+                    extended_context = extended_context.with_xcontent(text);
+                }
+
                 if let Some(error_ref) = parsed.error_ref {
                     extended_context = extended_context.with_xref(error_ref);
                 }
             }
         }
-
-        // TODO: error name and desc.
 
         (e.kind().into(), extended_context)
     }

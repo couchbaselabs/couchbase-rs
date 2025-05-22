@@ -50,8 +50,6 @@ fn test_query_basic() {
         assert_eq!(0, meta.metrics.error_count);
         assert_eq!(0, meta.metrics.warning_count);
 
-        dbg!(&meta.signature);
-
         assert_eq!(
             "{\"$1\":\"boolean\"}",
             meta.signature.as_ref().unwrap().get()
