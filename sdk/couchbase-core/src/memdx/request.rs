@@ -43,11 +43,21 @@ impl SelectBucketRequest {
 }
 
 #[derive(Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct GetClusterConfigRequest {}
+pub struct GetClusterConfigKnownVersion {
+    pub rev_epoch: i64,
+    pub rev_id: i64,
+}
+
+#[derive(Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct GetClusterConfigRequest {
+    pub known_version: Option<GetClusterConfigKnownVersion>,
+}
 
 impl GetClusterConfigRequest {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            known_version: None,
+        }
     }
 }
 

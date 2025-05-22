@@ -19,6 +19,7 @@ use crate::memdx::response::{
     SASLListMechsResponse, SASLStepResponse, SelectBucketResponse,
 };
 use crate::memdx::status::Status;
+use byteorder::ByteOrder;
 
 pub struct OpsCore {}
 
@@ -158,11 +159,21 @@ impl OpBootstrapEncoder for OpsCore {
     async fn get_cluster_config<D>(
         &self,
         dispatcher: &D,
-        _request: GetClusterConfigRequest,
+        request: GetClusterConfigRequest,
     ) -> Result<StandardPendingOp<GetClusterConfigResponse>>
     where
         D: Dispatcher,
     {
+        let mut extra_buf = [0; 16];
+        let extras = if let Some(known_version) = request.known_version {
+            byteorder::BigEndian::write_u64(&mut extra_buf[0..8], known_version.rev_epoch as u64);
+            byteorder::BigEndian::write_u64(&mut extra_buf[8..16], known_version.rev_id as u64);
+
+            Some(&extra_buf[..])
+        } else {
+            None
+        };
+
         let op = dispatcher
             .dispatch(
                 RequestPacket {
@@ -171,7 +182,7 @@ impl OpBootstrapEncoder for OpsCore {
                     datatype: 0,
                     vbucket_id: None,
                     cas: None,
-                    extras: None,
+                    extras,
                     key: None,
                     value: None,
                     framing_extras: None,

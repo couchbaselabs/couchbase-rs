@@ -134,6 +134,7 @@ where
                 HelloFeature::CreateAsDeleted,
                 HelloFeature::AltRequests,
                 HelloFeature::Collections,
+                HelloFeature::ClusterMapKnownVersion,
             ]
         };
 

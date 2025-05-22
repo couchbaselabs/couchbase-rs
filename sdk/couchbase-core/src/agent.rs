@@ -668,7 +668,12 @@ impl Agent {
                     Err(_e) => continue,
                 };
 
-                let raw_config = match client.get_cluster_config(GetClusterConfigRequest {}).await {
+                let raw_config = match client
+                    .get_cluster_config(GetClusterConfigRequest {
+                        known_version: None,
+                    })
+                    .await
+                {
                     Ok(resp) => resp.config,
                     Err(_e) => continue,
                 };
