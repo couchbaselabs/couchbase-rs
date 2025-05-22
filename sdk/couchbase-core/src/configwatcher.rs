@@ -5,7 +5,8 @@ use crate::error::{Error, Result};
 use crate::kvclient::KvClient;
 use crate::kvclient_ops::KvClientOps;
 use crate::kvclientmanager::KvClientManager;
-use crate::memdx::request::GetClusterConfigRequest;
+use crate::memdx::hello_feature::HelloFeature;
+use crate::memdx::request::{GetClusterConfigKnownVersion, GetClusterConfigRequest};
 use crate::parsedconfig::ParsedConfig;
 use futures::future::err;
 use log::{debug, error, trace};
@@ -106,7 +107,7 @@ where
 
             recent_endpoints.push(endpoint.clone());
 
-            let parsed_config = match self.poll_one(&endpoint).await {
+            let parsed_config = match self.poll_one(&endpoint, &last_sent_config).await {
                 Ok(c) => c,
                 Err(e) => {
                     // TODO: log
@@ -117,21 +118,23 @@ where
 
             all_endpoints_failed = false;
 
-            if let Some(config) = &last_sent_config {
-                if let Some(cmp) = parsed_config.partial_cmp(config) {
-                    if cmp == Ordering::Greater {
-                        // TODO: log.
-                        on_new_config_tx
-                            .send(parsed_config.clone())
-                            .unwrap_or_default();
-                        last_sent_config = Some(parsed_config);
+            if let Some(parsed_config) = parsed_config {
+                if let Some(config) = &last_sent_config {
+                    if let Some(cmp) = parsed_config.partial_cmp(config) {
+                        if cmp == Ordering::Greater {
+                            // TODO: log.
+                            on_new_config_tx
+                                .send(parsed_config.clone())
+                                .unwrap_or_default();
+                            last_sent_config = Some(parsed_config);
+                        }
                     }
+                } else {
+                    on_new_config_tx
+                        .send(parsed_config.clone())
+                        .unwrap_or_default();
+                    last_sent_config = Some(parsed_config);
                 }
-            } else {
-                on_new_config_tx
-                    .send(parsed_config.clone())
-                    .unwrap_or_default();
-                last_sent_config = Some(parsed_config);
             }
 
             select! {
@@ -143,23 +146,48 @@ where
         }
     }
 
-    async fn poll_one(&self, endpoint: &str) -> Result<ParsedConfig> {
+    async fn poll_one(
+        &self,
+        endpoint: &str,
+        latest_config: &Option<ParsedConfig>,
+    ) -> Result<Option<ParsedConfig>> {
         debug!("Polling config from {}", &endpoint);
 
         let client = self.kv_client_manager.get_client(endpoint).await?;
 
         let hostname = client.remote_hostname();
+        let known_version = {
+            if let Some(latest_config) = latest_config {
+                if latest_config.rev_id > 0
+                    && client.has_feature(HelloFeature::ClusterMapKnownVersion)
+                {
+                    Some(GetClusterConfigKnownVersion {
+                        rev_epoch: latest_config.rev_epoch,
+                        rev_id: latest_config.rev_id,
+                    })
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        };
 
         let resp = client
-            .get_cluster_config(GetClusterConfigRequest {})
+            .get_cluster_config(GetClusterConfigRequest { known_version })
             .await
             .map_err(Error::new_contextual_memdx_error)?;
+
+        if resp.config.is_empty() {
+            debug!("Poller received empty config");
+            return Ok(None);
+        }
 
         let config = cbconfig::parse::parse_terse_config(&resp.config, hostname)?;
 
         trace!("Poller fetched new config {:?}", &config);
 
-        ConfigParser::parse_terse_config(config, hostname)
+        Ok(Some(ConfigParser::parse_terse_config(config, hostname)?))
     }
 }
 

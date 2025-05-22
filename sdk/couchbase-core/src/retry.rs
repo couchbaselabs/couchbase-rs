@@ -199,8 +199,11 @@ impl Display for RetryInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{{ operation: {},  id: {}, is_idempotent: {}, retry_attempts: {}, retry_reasons: {} }}",
-            self.operation, self.unique_id.as_ref().unwrap_or(&"".to_string()), self.is_idempotent, self.retry_attempts,
+            "{{ operation: {}, id: {}, is_idempotent: {}, retry_attempts: {}, retry_reasons: {} }}",
+            self.operation,
+            self.unique_id.as_ref().unwrap_or(&"".to_string()),
+            self.is_idempotent,
+            self.retry_attempts,
             self.retry_reasons
                 .iter()
                 .map(|r| r.to_string())

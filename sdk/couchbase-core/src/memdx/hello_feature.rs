@@ -22,6 +22,7 @@ pub enum HelloFeature {
     PointInTimeRecovery,
     CreateAsDeleted,
     ReplaceBodyWithXattr,
+    ClusterMapKnownVersion,
     Unknown(u16),
 }
 
@@ -50,6 +51,7 @@ impl From<HelloFeature> for u16 {
             HelloFeature::PointInTimeRecovery => 0x16,
             HelloFeature::CreateAsDeleted => 0x17,
             HelloFeature::ReplaceBodyWithXattr => 0x19,
+            HelloFeature::ClusterMapKnownVersion => 0x1d,
             HelloFeature::Unknown(code) => code,
         }
     }
@@ -80,6 +82,7 @@ impl From<u16> for HelloFeature {
             0x16 => HelloFeature::PointInTimeRecovery,
             0x17 => HelloFeature::CreateAsDeleted,
             0x19 => HelloFeature::ReplaceBodyWithXattr,
+            0x1d => HelloFeature::ClusterMapKnownVersion,
             code => HelloFeature::Unknown(code),
         }
     }
