@@ -369,7 +369,10 @@ impl TestAgent {
         run_with_std_ensure_deadline(self.agent.ensure_bucket(opts)).await
     }
 
-    pub async fn ensure_search_index(&self, opts: &EnsureIndexOptions<'_>) -> Result<()> {
+    pub async fn ensure_search_index(
+        &self,
+        opts: &searchmgmt_options::EnsureIndexOptions<'_>,
+    ) -> Result<()> {
         run_with_std_ensure_deadline(self.agent.ensure_search_index(opts)).await
     }
 }

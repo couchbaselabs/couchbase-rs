@@ -1,25 +1,30 @@
-use std::collections::HashMap;
-use std::future::Future;
-use std::sync::{Arc, Mutex};
-
 use crate::authenticator::Authenticator;
 use crate::error;
 use crate::error::ErrorKind;
 use crate::httpcomponent::{HttpComponent, HttpComponentState};
 use crate::httpx::client::Client;
+use crate::mgmtx::node_target::NodeTarget;
 use crate::queryoptions::{
     BuildDeferredIndexesOptions, CreateIndexOptions, CreatePrimaryIndexOptions, DropIndexOptions,
-    DropPrimaryIndexOptions, GetAllIndexesOptions, QueryOptions, WatchIndexesOptions,
+    DropPrimaryIndexOptions, EnsureIndexOptions, GetAllIndexesOptions, QueryOptions,
+    WatchIndexesOptions,
 };
+use crate::queryx::ensure_index_helper::EnsureIndexHelper;
 use crate::queryx::index::Index;
 use crate::queryx::preparedquery::{PreparedQuery, PreparedStatementCache};
 use crate::queryx::query::Query;
+use crate::queryx::query_options::EnsureIndexPollOptions;
 use crate::queryx::query_respreader::QueryRespReader;
 use crate::queryx::query_result::{EarlyMetaData, MetaData};
 use crate::retry::{orchestrate_retries, RetryInfo, RetryManager, DEFAULT_RETRY_STRATEGY};
+use crate::retrybesteffort::ExponentialBackoffCalculator;
 use crate::service_type::ServiceType;
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
+use std::collections::HashMap;
+use std::future::Future;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 pub(crate) struct QueryComponent<C: Client> {
     http_component: HttpComponent<C>,
@@ -394,6 +399,37 @@ impl<C: Client> QueryComponent<C> {
             },
         )
         .await
+    }
+
+    pub async fn ensure_index(&self, opts: &EnsureIndexOptions<'_>) -> error::Result<()> {
+        let mut helper = EnsureIndexHelper::new(
+            self.http_component.user_agent(),
+            opts.index_name,
+            opts.bucket_name,
+            opts.scope_name,
+            opts.collection_name,
+            opts.on_behalf_of_info,
+        );
+
+        let backoff = ExponentialBackoffCalculator::new(
+            Duration::from_millis(100),
+            Duration::from_millis(1000),
+            1.5,
+        );
+
+        self.http_component
+            .ensure_resource(backoff, async |client: Arc<C>, targets: Vec<NodeTarget>| {
+                helper
+                    .clone()
+                    .poll(&EnsureIndexPollOptions {
+                        client,
+                        targets,
+                        desired_state: opts.desired_state,
+                    })
+                    .await
+                    .map_err(error::Error::from)
+            })
+            .await
     }
 
     async fn orchestrate_no_res_mgmt_call<Fut>(

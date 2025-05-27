@@ -5,6 +5,7 @@ use std::time::Duration;
 
 use crate::httpx::request::OnBehalfOfInfo;
 use crate::queryx;
+pub use crate::queryx::ensure_index_helper::DesiredState;
 use crate::queryx::query_options::{FullScanVectors, SparseScanVectors};
 use crate::retry::RetryStrategy;
 
@@ -920,6 +921,36 @@ impl<'a> From<&WatchIndexesOptions<'a>> for queryx::query_options::WatchIndexesO
             indexes: opts.indexes,
             watch_primary: opts.watch_primary,
             on_behalf_of: opts.on_behalf_of,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct EnsureIndexOptions<'a> {
+    pub index_name: &'a str,
+    pub bucket_name: &'a str,
+    pub scope_name: Option<&'a str>,
+    pub collection_name: Option<&'a str>,
+    pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+    pub desired_state: DesiredState,
+}
+
+impl<'a> EnsureIndexOptions<'a> {
+    pub fn new(
+        index_name: &'a str,
+        bucket_name: &'a str,
+        scope_name: Option<&'a str>,
+        collection_name: Option<&'a str>,
+        desired_state: DesiredState,
+    ) -> Self {
+        Self {
+            index_name,
+            bucket_name,
+            scope_name,
+            collection_name,
+            on_behalf_of_info: None,
+            desired_state,
         }
     }
 }

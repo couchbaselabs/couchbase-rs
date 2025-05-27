@@ -166,7 +166,7 @@ fn test_query_indexes() {
 
         // Allow time for server to sync with the new collection
         try_until(
-            tokio::time::Instant::now() + Duration::from_secs(5),
+            tokio::time::Instant::now() + Duration::from_secs(30),
             Duration::from_millis(100),
             "Primary index was not created in time",
             async || {
@@ -183,10 +183,29 @@ fn test_query_indexes() {
         let opts = CreateQueryIndexOptions::new()
             .ignore_if_exists(true)
             .deferred(true);
-        manager
-            .create_index("test_index".to_string(), vec!["name".to_string()], opts)
-            .await
-            .unwrap();
+
+        // Allow time for server to sync with the new collection, this request might go
+        // somewhere different to the one above.
+        try_until(
+            tokio::time::Instant::now() + Duration::from_secs(30),
+            Duration::from_millis(100),
+            "Primary index was not created in time",
+            async || {
+                let res = manager
+                    .create_index(
+                        "test_index".to_string(),
+                        vec!["name".to_string()],
+                        opts.clone(),
+                    )
+                    .await;
+                if res.is_ok() {
+                    Ok(Some(()))
+                } else {
+                    Ok(None)
+                }
+            },
+        )
+        .await;
 
         let indexes = manager.get_all_indexes(None).await.unwrap();
 

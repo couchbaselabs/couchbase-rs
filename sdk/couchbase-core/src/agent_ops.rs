@@ -33,7 +33,8 @@ use crate::mgmtx::user::{Group, RoleAndDescription, UserAndMetadata};
 use crate::querycomponent::QueryResultStream;
 use crate::queryoptions::{
     BuildDeferredIndexesOptions, CreateIndexOptions, CreatePrimaryIndexOptions, DropIndexOptions,
-    DropPrimaryIndexOptions, GetAllIndexesOptions, QueryOptions, WatchIndexesOptions,
+    DropPrimaryIndexOptions, EnsureIndexOptions, GetAllIndexesOptions, QueryOptions,
+    WatchIndexesOptions,
 };
 use crate::queryx::index::Index;
 use crate::searchcomponent::SearchResultStream;
@@ -159,6 +160,10 @@ impl Agent {
 
     pub async fn watch_indexes(&self, opts: &WatchIndexesOptions<'_>) -> Result<()> {
         self.inner.query.watch_indexes(opts).await
+    }
+
+    pub async fn ensure_index(&self, opts: &EnsureIndexOptions<'_>) -> Result<()> {
+        self.inner.query.ensure_index(opts).await
     }
 
     pub async fn search(&self, opts: SearchOptions) -> Result<SearchResultStream> {

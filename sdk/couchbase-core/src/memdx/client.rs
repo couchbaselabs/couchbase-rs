@@ -203,14 +203,6 @@ impl Client {
                                             }
                                         }
 
-                                        trace!(
-                                            "Sending response on {}. Opcode={}. Opaque={}. Status={}",
-                                            opts.client_id,
-                                            packet.op_code,
-                                            packet.opaque,
-                                            packet.status,
-                                        );
-
                                         let resp = ClientResponse::new(packet, context.context.clone());
                                         match sender.send(Ok(resp)).await {
                                             Ok(_) => {}
