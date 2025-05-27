@@ -1,8 +1,3 @@
-use std::collections::HashMap;
-use std::future::Future;
-use std::hash::Hash;
-use std::sync::{Arc, Mutex};
-
 use crate::authenticator::Authenticator;
 use crate::error;
 use crate::error::ErrorKind;
@@ -10,7 +5,12 @@ use crate::httpx::client::Client;
 use crate::retrybesteffort::BackoffCalculator;
 use crate::service_type::ServiceType;
 use crate::util::get_host_port_from_uri;
+use log::debug;
 use rand::Rng;
+use std::collections::HashMap;
+use std::future::Future;
+use std::hash::Hash;
+use std::sync::{Arc, Mutex};
 
 pub(crate) struct HttpComponent<C: Client> {
     service_type: ServiceType,
@@ -243,7 +243,13 @@ impl<C: Client> HttpComponent<C> {
                 return Ok(());
             }
 
-            tokio::time::sleep(backoff.backoff(attempt_idx)).await;
+            let sleep = backoff.backoff(attempt_idx);
+            debug!(
+                "Retrying ensure_resource, after {:?}, attempt number: {}",
+                sleep, attempt_idx
+            );
+
+            tokio::time::sleep(sleep).await;
             attempt_idx += 1;
         }
     }

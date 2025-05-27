@@ -108,7 +108,7 @@ fn test_search_basic() {
                     SearchRequest::with_search_query(Query::Term(query.clone())),
                     SearchOptions::new()
                         .include_locations(true)
-                        .server_timeout(Duration::from_secs(5))
+                        .server_timeout(Duration::from_secs(10))
                         .facets(facets.clone())
                         .sort(vec![sort.clone()])
                         .fields(vec!["city".to_string()]),

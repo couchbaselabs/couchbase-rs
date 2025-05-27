@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Duration;
 
 use serde::ser::{SerializeMap, SerializeSeq};
@@ -6,7 +7,10 @@ use serde::{Serialize, Serializer};
 use serde_json::Value;
 
 use crate::helpers;
+use crate::httpx::client::Client;
 use crate::httpx::request::OnBehalfOfInfo;
+use crate::mgmtx::node_target::NodeTarget;
+use crate::queryx::ensure_index_helper::DesiredState;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -857,4 +861,11 @@ impl<'a> WatchIndexesOptions<'a> {
         self.on_behalf_of = on_behalf_of.into();
         self
     }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct EnsureIndexPollOptions<C: Client> {
+    pub desired_state: DesiredState,
+    pub client: Arc<C>,
+    pub targets: Vec<NodeTarget>,
 }
