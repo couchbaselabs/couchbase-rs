@@ -135,6 +135,7 @@ where
                 HelloFeature::AltRequests,
                 HelloFeature::Collections,
                 HelloFeature::ClusterMapKnownVersion,
+                HelloFeature::DedupeNotMyVbucketClustermap,
             ]
         };
 
