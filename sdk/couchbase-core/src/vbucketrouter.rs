@@ -1,6 +1,3 @@
-use std::future::Future;
-use std::sync::{Arc, Mutex, MutexGuard};
-
 use crate::cbconfig::TerseConfig;
 use crate::error::ErrorKind;
 use crate::error::Result;
@@ -8,6 +5,9 @@ use crate::memdx::error::ServerErrorKind;
 use crate::memdx::response::TryFromClientResponse;
 use crate::nmvbhandler::NotMyVbucketConfigHandler;
 use crate::vbucketmap::VbucketMap;
+use log::debug;
+use std::future::Future;
+use std::sync::{Arc, Mutex, MutexGuard};
 
 pub(crate) trait VbucketRouter: Send + Sync {
     fn update_vbucket_info(&self, info: VbucketRoutingInfo);
@@ -102,59 +102,54 @@ where
     V: VbucketRouter,
     Fut: Future<Output = Result<Resp>> + Send,
 {
-    let (mut endpoint, mut vb_id) = vb.dispatch_by_key(key, vb_server_idx)?;
+    let (mut endpoint, vb_id) = vb.dispatch_by_key(key, vb_server_idx)?;
 
-    loop {
-        let err = match operation(endpoint.clone(), vb_id).await {
-            Ok(r) => return Ok(r),
-            Err(e) => e,
-        };
+    let err = match operation(endpoint.clone(), vb_id).await {
+        Ok(r) => return Ok(r),
+        Err(e) => e,
+    };
 
-        let config = if let Some(memdx_err) = err.is_memdx_error() {
-            if memdx_err.is_server_error_kind(ServerErrorKind::NotMyVbucket) {
-                if let Some(config) = memdx_err.has_server_config() {
-                    config
-                } else {
-                    return Err(err);
-                }
+    let config = if let Some(memdx_err) = err.is_memdx_error() {
+        if memdx_err.is_server_error_kind(ServerErrorKind::NotMyVbucket) {
+            if let Some(config) = memdx_err.has_server_config() {
+                config
             } else {
+                // This will automatically get retried by the retry manager.
+                debug!("Received empty NMVB response");
                 return Err(err);
             }
         } else {
             return Err(err);
-        };
-
-        if config.is_empty() {
-            return Err(err);
         }
+    } else {
+        return Err(err);
+    };
 
-        let value = match std::str::from_utf8(config.as_slice()) {
-            Ok(v) => v.to_string(),
-            Err(_e) => "".to_string(),
-        };
-
-        let config = value.replace("$HOST", endpoint.as_ref());
-
-        let config_json: TerseConfig = match serde_json::from_str(&config) {
-            Ok(c) => c,
-            Err(_) => {
-                return Err(err);
-            }
-        };
-
-        nmvb_handler
-            .clone()
-            .not_my_vbucket_config(config_json, &endpoint)
-            .await;
-
-        let (new_endpoint, new_vb_id) = vb.dispatch_by_key(key, vb_server_idx)?;
-        if new_endpoint == endpoint && new_vb_id == vb_id {
-            return Err(err);
-        }
-
-        endpoint = new_endpoint;
-        vb_id = new_vb_id;
+    if config.is_empty() {
+        // This shouldn't happen.
+        return Err(err);
     }
+
+    let value = match std::str::from_utf8(config.as_slice()) {
+        Ok(v) => v.to_string(),
+        Err(_e) => "".to_string(),
+    };
+
+    let config = value.replace("$HOST", endpoint.as_ref());
+
+    let config_json: TerseConfig = match serde_json::from_str(&config) {
+        Ok(c) => c,
+        Err(_) => {
+            return Err(err);
+        }
+    };
+
+    nmvb_handler
+        .clone()
+        .not_my_vbucket_config(config_json, &endpoint)
+        .await;
+
+    Err(err)
 }
 
 #[cfg(test)]

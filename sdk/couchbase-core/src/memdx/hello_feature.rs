@@ -23,6 +23,7 @@ pub enum HelloFeature {
     CreateAsDeleted,
     ReplaceBodyWithXattr,
     ClusterMapKnownVersion,
+    DedupeNotMyVbucketClustermap,
     Unknown(u16),
 }
 
@@ -52,6 +53,7 @@ impl From<HelloFeature> for u16 {
             HelloFeature::CreateAsDeleted => 0x17,
             HelloFeature::ReplaceBodyWithXattr => 0x19,
             HelloFeature::ClusterMapKnownVersion => 0x1d,
+            HelloFeature::DedupeNotMyVbucketClustermap => 0x1e,
             HelloFeature::Unknown(code) => code,
         }
     }
@@ -83,6 +85,7 @@ impl From<u16> for HelloFeature {
             0x17 => HelloFeature::CreateAsDeleted,
             0x19 => HelloFeature::ReplaceBodyWithXattr,
             0x1d => HelloFeature::ClusterMapKnownVersion,
+            0x1e => HelloFeature::DedupeNotMyVbucketClustermap,
             code => HelloFeature::Unknown(code),
         }
     }
