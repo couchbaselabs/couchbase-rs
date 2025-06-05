@@ -24,6 +24,7 @@ pub enum HelloFeature {
     ReplaceBodyWithXattr,
     ClusterMapKnownVersion,
     DedupeNotMyVbucketClustermap,
+    ClusterMapChangeNotificationBrief,
     Unknown(u16),
 }
 
@@ -54,6 +55,7 @@ impl From<HelloFeature> for u16 {
             HelloFeature::ReplaceBodyWithXattr => 0x19,
             HelloFeature::ClusterMapKnownVersion => 0x1d,
             HelloFeature::DedupeNotMyVbucketClustermap => 0x1e,
+            HelloFeature::ClusterMapChangeNotificationBrief => 0x1f,
             HelloFeature::Unknown(code) => code,
         }
     }
@@ -86,6 +88,7 @@ impl From<u16> for HelloFeature {
             0x19 => HelloFeature::ReplaceBodyWithXattr,
             0x1d => HelloFeature::ClusterMapKnownVersion,
             0x1e => HelloFeature::DedupeNotMyVbucketClustermap,
+            0x1f => HelloFeature::ClusterMapChangeNotificationBrief,
             code => HelloFeature::Unknown(code),
         }
     }

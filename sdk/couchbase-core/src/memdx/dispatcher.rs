@@ -9,10 +9,13 @@ use crate::memdx::error::Result;
 use crate::memdx::packet::{RequestPacket, ResponsePacket};
 use crate::memdx::pendingop::ClientPendingOp;
 
+pub type UnsolicitedPacketHandler =
+    Arc<dyn Fn(ResponsePacket) -> BoxFuture<'static, ()> + Send + Sync>;
 pub type OrphanResponseHandler = Arc<dyn Fn(ResponsePacket) + Send + Sync>;
 pub type OnConnectionCloseHandler = Arc<dyn Fn() -> BoxFuture<'static, ()> + Send + Sync>;
 
 pub struct DispatcherOptions {
+    pub unsolicited_packet_handler: UnsolicitedPacketHandler,
     pub orphan_handler: OrphanResponseHandler,
     pub on_connection_close_handler: OnConnectionCloseHandler,
     pub disable_decompression: bool,

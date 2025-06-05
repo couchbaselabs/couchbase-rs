@@ -8,6 +8,9 @@ pub enum Magic {
     Res,
     ReqExt,
     ResExt,
+
+    ServerReq,
+    ServerRes,
 }
 
 impl Magic {
@@ -31,6 +34,8 @@ impl From<Magic> for u8 {
             Magic::Res => 0x81,
             Magic::ReqExt => 0x08,
             Magic::ResExt => 0x18,
+            Magic::ServerReq => 0x82,
+            Magic::ServerRes => 0x83,
         }
     }
 }
@@ -44,6 +49,8 @@ impl TryFrom<u8> for Magic {
             0x81 => Magic::Res,
             0x08 => Magic::ReqExt,
             0x18 => Magic::ResExt,
+            0x82 => Magic::ServerReq,
+            0x83 => Magic::ServerRes,
             _ => {
                 return Err(Error::new_message_error(format!("unknown magic {}", value)));
             }
@@ -60,6 +67,8 @@ impl Display for Magic {
             Magic::Res => "Res",
             Magic::ReqExt => "ReqExt",
             Magic::ResExt => "ResExt",
+            Magic::ServerReq => "ServerReq",
+            Magic::ServerRes => "ServerRes",
         };
         write!(f, "{}", txt)
     }

@@ -4,18 +4,19 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use arc_swap::ArcSwap;
-use log::debug;
-use tokio::sync::{Mutex, Notify};
-use tokio::time::{sleep, Instant};
-
 use crate::error::Result;
 use crate::error::{Error, ErrorKind};
 use crate::kvclient::{
     KvClient, KvClientConfig, KvClientOptions, OnErrMapFetchedHandler, OnKvClientCloseHandler,
+    UnsolicitedPacketSender,
 };
 use crate::kvclient_ops::KvClientOps;
-use crate::memdx::dispatcher::{Dispatcher, OrphanResponseHandler};
+use crate::memdx::dispatcher::{Dispatcher, OrphanResponseHandler, UnsolicitedPacketHandler};
+use arc_swap::ArcSwap;
+use log::debug;
+use tokio::sync::{Mutex, Notify};
+use tokio::time::{sleep, Instant};
+use urlencoding::decode_binary;
 
 // TODO: This needs some work, some more thought should go into the locking strategy as it's possible
 // there are still races in this. Additionally it's extremely easy to write in deadlocks.
@@ -42,6 +43,7 @@ pub(crate) struct KvClientPoolConfig {
 pub(crate) struct KvClientPoolOptions {
     pub connect_timeout: Duration,
     pub connect_throttle_period: Duration,
+    pub unsolicited_packet_tx: Option<UnsolicitedPacketSender>,
     pub orphan_handler: OrphanResponseHandler,
     pub on_err_map_fetched: Option<OnErrMapFetchedHandler>,
     pub disable_decompression: bool,
@@ -61,6 +63,7 @@ struct KvClientPoolClientSpawner {
 
     connection_error: Mutex<Option<ConnectionError>>,
 
+    unsolicited_packet_tx: Option<UnsolicitedPacketSender>,
     orphan_handler: OrphanResponseHandler,
     on_client_close: OnKvClientCloseHandler,
     on_err_map_fetched: Option<OnErrMapFetchedHandler>,
@@ -148,39 +151,41 @@ where
     async fn check_connections(&self) {
         let num_wanted_clients = self.num_connections.load(Ordering::SeqCst);
 
-        let mut clients = self.clients.lock().await;
-        let num_active_clients = clients.len();
+        {
+            let mut clients = self.clients.lock().await;
+            let num_active_clients = clients.len();
 
-        if num_active_clients > num_wanted_clients {
-            let mut num_excess_clients = num_active_clients - num_wanted_clients;
-            let mut num_closed_clients = 0;
+            if num_active_clients > num_wanted_clients {
+                let mut num_excess_clients = num_active_clients - num_wanted_clients;
+                let mut num_closed_clients = 0;
 
-            while num_excess_clients > 0 {
-                let client_to_close = clients.remove(0);
-                self.shutdown_client(client_to_close).await;
+                while num_excess_clients > 0 {
+                    let client_to_close = clients.remove(0);
+                    self.shutdown_client(client_to_close).await;
 
-                num_excess_clients -= 1;
-                num_closed_clients += 1;
+                    num_excess_clients -= 1;
+                    num_closed_clients += 1;
+                }
             }
-        }
 
-        if num_wanted_clients > num_active_clients {
-            let mut num_needed_clients = num_wanted_clients - num_active_clients;
-            while num_needed_clients > 0 {
-                let mut guard = self.spawner.lock().await;
-                if let Some(client) = guard.start_new_client::<K>().await {
-                    if self.closed.load(Ordering::SeqCst) {
-                        client.close().await.unwrap_or_default();
-                        return;
+            if num_wanted_clients > num_active_clients {
+                let mut num_needed_clients = num_wanted_clients - num_active_clients;
+                while num_needed_clients > 0 {
+                    let mut guard = self.spawner.lock().await;
+                    debug!("Starting new client");
+                    if let Some(client) = guard.start_new_client::<K>().await {
+                        if self.closed.load(Ordering::SeqCst) {
+                            debug!("Pool closed, closing newly created client");
+                            client.close().await.unwrap_or_default();
+                            return;
+                        }
+
+                        clients.push(Arc::new(client));
+                        num_needed_clients -= 1;
                     }
-
-                    clients.push(Arc::new(client));
-                    num_needed_clients -= 1;
                 }
             }
         }
-
-        drop(clients);
 
         self.rebuild_fast_map().await;
     }
@@ -214,16 +219,17 @@ where
 
         // TODO: not sure the ordering of close leading to here is great.
         if self.closed.load(Ordering::SeqCst) {
+            debug!("Pool is closed, ignoring client close for {}", &client_id);
             return;
         }
 
-        let mut clients = self.clients.lock().await;
-        let idx = clients.iter().position(|x| x.id() == client_id);
-        if let Some(idx) = idx {
-            clients.remove(idx);
+        {
+            let mut clients = self.clients.lock().await;
+            let idx = clients.iter().position(|x| x.id() == client_id);
+            if let Some(idx) = idx {
+                clients.remove(idx);
+            }
         }
-
-        drop(clients);
 
         self.check_connections().await;
     }
@@ -278,6 +284,11 @@ impl KvClientPoolClientSpawner {
                 };
 
                 if !connect_wait_period.is_zero() {
+                    debug!(
+                        "Connection error detected: {}, waiting for {}ms before retrying",
+                        &error.connect_error,
+                        connect_wait_period.as_millis()
+                    );
                     drop(err);
                     sleep(connect_wait_period).await;
                     continue;
@@ -290,6 +301,7 @@ impl KvClientPoolClientSpawner {
         match K::new(
             config.clone(),
             KvClientOptions {
+                unsolicited_packet_tx: self.unsolicited_packet_tx.clone(),
                 orphan_handler: self.orphan_handler.clone(),
                 on_close: self.on_client_close.clone(),
                 disable_decompression: self.disable_decompression,
@@ -299,11 +311,14 @@ impl KvClientPoolClientSpawner {
         .await
         {
             Ok(r) => {
+                debug!("New client created successfully");
                 let mut e = self.connection_error.lock().await;
                 *e = None;
                 Some(r)
             }
             Err(e) => {
+                debug!("Error creating new client: {}", &e);
+
                 let mut err = self.connection_error.lock().await;
                 *err = Some(ConnectionError {
                     connect_error: e,
@@ -332,6 +347,7 @@ where
             spawner: Mutex::new(KvClientPoolClientSpawner {
                 connect_timeout: opts.connect_timeout,
                 connect_throttle_period: opts.connect_throttle_period,
+                unsolicited_packet_tx: opts.unsolicited_packet_tx,
                 orphan_handler: opts.orphan_handler.clone(),
                 connection_error: Mutex::new(None),
                 on_client_close: Arc::new(|id| Box::pin(async {})),

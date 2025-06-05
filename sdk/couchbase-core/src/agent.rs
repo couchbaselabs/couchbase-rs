@@ -1,13 +1,15 @@
+use byteorder::BigEndian;
+use futures::executor::block_on;
+use log::{debug, error, info, warn};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt::format;
+use std::io::Cursor;
 use std::net::ToSocketAddrs;
 use std::ops::Add;
 use std::sync::Arc;
 use std::time::Duration;
-
-use futures::executor::block_on;
-use log::{debug, error, info, warn};
+use tokio::io::AsyncReadExt;
 use tokio::net;
 use tokio::runtime::{Handle, Runtime};
 use tokio::sync::broadcast::{Receiver, Sender};
@@ -27,10 +29,10 @@ use crate::collection_resolver_cached::{
 };
 use crate::collection_resolver_memd::{CollectionResolverMemd, CollectionResolverMemdOptions};
 use crate::compressionmanager::{CompressionManager, StdCompressor};
-use crate::configparser::ConfigParser;
-use crate::configwatcher::{
-    ConfigWatcher, ConfigWatcherMemd, ConfigWatcherMemdConfig, ConfigWatcherMemdOptions,
+use crate::configmanager::{
+    ConfigManager, ConfigManagerMemd, ConfigManagerMemdConfig, ConfigManagerMemdOptions,
 };
+use crate::configparser::ConfigParser;
 use crate::crudcomponent::CrudComponent;
 use crate::errmapcomponent::ErrMapComponent;
 use crate::error::{Error, ErrorKind, Result};
@@ -46,6 +48,8 @@ use crate::kvclientpool::{
     KvClientPool, KvClientPoolConfig, KvClientPoolOptions, NaiveKvClientPool,
 };
 use crate::memdx::client::Client;
+use crate::memdx::opcode::OpCode;
+use crate::memdx::packet::ResponsePacket;
 use crate::memdx::request::GetClusterConfigRequest;
 use crate::mgmtcomponent::{MgmtComponent, MgmtComponentConfig, MgmtComponentOptions};
 use crate::mgmtx::options::{GetTerseBucketConfigOptions, GetTerseClusterConfigOptions};
@@ -84,7 +88,7 @@ type AgentCollectionResolver = CollectionResolverCached<CollectionResolverMemd<A
 pub(crate) struct AgentInner {
     state: Arc<Mutex<AgentState>>,
 
-    cfg_watcher: Arc<dyn ConfigWatcher>,
+    cfg_manager: Arc<ConfigManagerMemd<AgentClientManager>>,
     conn_mgr: Arc<AgentClientManager>,
     vb_router: Arc<StdVbucketRouter>,
     collections: Arc<AgentCollectionResolver>,
@@ -111,11 +115,11 @@ pub(crate) struct AgentInner {
 pub struct Agent {
     pub(crate) inner: Arc<AgentInner>,
 
-    config_watcher_shutdown_tx: Sender<()>,
+    config_manager_shutdown_tx: Sender<()>,
 }
 
 struct AgentComponentConfigs {
-    pub config_watcher_memd_config: ConfigWatcherMemdConfig,
+    pub config_manager_memd_config: ConfigManagerMemdConfig,
     pub kv_client_manager_client_configs: HashMap<String, KvClientConfig>,
     pub vbucket_routing_info: VbucketRoutingInfo,
     pub query_config: QueryComponentConfig,
@@ -126,14 +130,38 @@ struct AgentComponentConfigs {
 }
 
 impl AgentInner {
+    pub async fn unsolicited_packet_handler(&self, packet: ResponsePacket) {
+        if packet.op_code == OpCode::Set {
+            if let Some(ref extras) = packet.extras {
+                if extras.len() < 16 {
+                    warn!("Received Set packet with too short extras: {:?}", packet);
+                    return;
+                }
+
+                let mut cursor = Cursor::new(extras);
+                let server_rev_epoch = cursor.read_i64().await.unwrap();
+                let server_rev_id = cursor.read_i64().await.unwrap();
+
+                if let Some(config) = self
+                    .cfg_manager
+                    .out_of_band_version(server_rev_id, server_rev_epoch)
+                    .await
+                {
+                    self.apply_config(config).await;
+                }
+            } else {
+                warn!("Received Set packet with no extras: {:?}", packet);
+            }
+        }
+    }
+
     pub async fn apply_config(&self, config: ParsedConfig) {
         let mut state = self.state.lock().await;
 
-        if !Self::can_update_config(&config, &state.latest_config) {
-            return;
-        }
-
-        info!("Applying updated config");
+        info!(
+            "Agent applying updated config: rev_id={}, rev_epoch={}",
+            config.rev_id, config.rev_epoch
+        );
         state.latest_config = config;
 
         self.update_state(&mut state).await;
@@ -178,8 +206,8 @@ impl AgentInner {
             .update_vbucket_info(agent_component_configs.vbucket_routing_info);
 
         if let Err(e) = self
-            .cfg_watcher
-            .reconfigure(agent_component_configs.config_watcher_memd_config)
+            .cfg_manager
+            .reconfigure(agent_component_configs.config_manager_memd_config)
         {
             error!("Failed to reconfigure memd config watcher component; {}", e);
         }
@@ -211,23 +239,6 @@ impl AgentInner {
         self.analytics
             .reconfigure(agent_component_configs.analytics_config);
         self.mgmt.reconfigure(agent_component_configs.mgmt_config);
-    }
-
-    fn can_update_config(new_config: &ParsedConfig, old_config: &ParsedConfig) -> bool {
-        if new_config.bucket != old_config.bucket {
-            debug!("Switching config due to changed bucket type (bucket takeover)");
-            return true;
-        } else if let Some(cmp) = new_config.partial_cmp(old_config) {
-            if cmp == Ordering::Less {
-                debug!("Skipping config due to new config being an older revision")
-            } else if cmp == Ordering::Equal {
-                debug!("Skipping config due to matching revisions")
-            } else {
-                return true;
-            }
-        }
-
-        false
     }
 
     fn gen_agent_component_configs(state: &mut AgentState) -> AgentComponentConfigs {
@@ -327,7 +338,7 @@ impl AgentInner {
         };
 
         AgentComponentConfigs {
-            config_watcher_memd_config: ConfigWatcherMemdConfig {
+            config_manager_memd_config: ConfigManagerMemdConfig {
                 endpoints: kv_data_node_ids,
             },
             kv_client_manager_client_configs: clients,
@@ -404,7 +415,9 @@ impl ConfigUpdater for AgentInner {
             }
         };
 
-        self.apply_config(parsed_config).await;
+        if let Some(config) = self.cfg_manager.out_of_band_config(parsed_config) {
+            self.apply_config(config).await;
+        };
     }
 }
 
@@ -471,7 +484,7 @@ impl Agent {
         )
         .await?;
 
-        state.latest_config = first_config;
+        state.latest_config = first_config.clone();
 
         let network_type = NetworkTypeHeuristic::identify(&state.latest_config);
         state.network_type = network_type;
@@ -480,15 +493,21 @@ impl Agent {
 
         let err_map_component_conn_mgr = err_map_component.clone();
 
+        let num_pool_connections = state.num_pool_connections;
+        let state = Arc::new(Mutex::new(state));
+
+        let (unsolicited_packet_tx, mut unsolicited_packet_rx) = mpsc::unbounded_channel();
+
         let conn_mgr = Arc::new(
             StdKvClientManager::new(
                 KvClientManagerConfig {
-                    num_pool_connections: state.num_pool_connections,
+                    num_pool_connections,
                     clients: agent_component_configs.kv_client_manager_client_configs,
                 },
                 KvClientManagerOptions {
                     connect_timeout,
                     connect_throttle_period,
+                    unsolicited_packet_tx: Some(unsolicited_packet_tx),
                     orphan_handler: Arc::new(|packet| {
                         info!("Orphan : {:?}", packet);
                     }),
@@ -501,11 +520,15 @@ impl Agent {
             .await?,
         );
 
-        let cfg_watcher = Arc::new(ConfigWatcherMemd::new(
-            agent_component_configs.config_watcher_memd_config,
-            ConfigWatcherMemdOptions {
+        let (config_manager_shutdown_tx, config_manager_shutdown_rx) = broadcast::channel(1);
+
+        let cfg_manager = Arc::new(ConfigManagerMemd::new(
+            agent_component_configs.config_manager_memd_config,
+            ConfigManagerMemdOptions {
                 polling_period: opts.config_poller_config.poll_interval,
                 kv_client_manager: conn_mgr.clone(),
+                first_config,
+                on_shutdown_rx: config_manager_shutdown_rx,
             },
         ));
         let vb_router = Arc::new(StdVbucketRouter::new(
@@ -574,8 +597,8 @@ impl Agent {
         );
 
         let inner = Arc::new(AgentInner {
-            state: Arc::new(Mutex::new(state)),
-            cfg_watcher: cfg_watcher.clone(),
+            state,
+            cfg_manager: cfg_manager.clone(),
             conn_mgr,
             vb_router,
             crud,
@@ -590,26 +613,28 @@ impl Agent {
             analytics,
         });
 
-        nmvb_handler.set_watcher(inner.clone()).await;
+        let inner_clone = inner.clone();
+        tokio::spawn(async move {
+            while let Some(packet) = unsolicited_packet_rx.recv().await {
+                inner_clone.unsolicited_packet_handler(packet).await;
+            }
+            debug!("Unsolicited packet handler exited");
+        });
 
-        let (shutdown_tx, shutdown_rx) = broadcast::channel(1);
+        nmvb_handler.set_watcher(inner.clone()).await;
 
         let agent = Agent {
             inner,
-            config_watcher_shutdown_tx: shutdown_tx,
+            config_manager_shutdown_tx,
         };
 
-        agent.start_config_watcher(cfg_watcher, shutdown_rx);
+        agent.start_config_watcher(cfg_manager);
 
         Ok(agent)
     }
 
-    fn start_config_watcher(
-        &self,
-        config_watcher: Arc<impl ConfigWatcher>,
-        shutdown_rx: Receiver<()>,
-    ) {
-        let mut watch_rx = config_watcher.watch(shutdown_rx);
+    fn start_config_watcher(&self, config_watcher: Arc<impl ConfigManager>) {
+        let mut watch_rx = config_watcher.watch();
 
         let inner = self.inner.clone();
         tokio::spawn(async move {
@@ -642,6 +667,7 @@ impl Agent {
                     StdKvClient::new(
                         endpoint_config.clone(),
                         KvClientOptions {
+                            unsolicited_packet_tx: None,
                             orphan_handler: Arc::new(|packet| {}),
                             on_close: Arc::new(|id| {
                                 Box::pin(async move {
@@ -826,7 +852,7 @@ impl Agent {
     }
 
     pub async fn close(&mut self) {
-        self.config_watcher_shutdown_tx.send(()).unwrap_or_default();
+        self.config_manager_shutdown_tx.send(()).unwrap_or_default();
 
         self.inner.conn_mgr.close().await.unwrap_or_default();
     }

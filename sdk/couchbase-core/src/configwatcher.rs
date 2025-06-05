@@ -1,5 +1,7 @@
 use crate::cbconfig;
 use crate::cbconfig::TerseConfig;
+use crate::configfetcher::ConfigFetcherMemd;
+use crate::configmanager::ConfigVersion;
 use crate::configparser::ConfigParser;
 use crate::error::{Error, Result};
 use crate::kvclient::KvClient;
@@ -12,17 +14,14 @@ use futures::future::err;
 use log::{debug, error, trace};
 use std::cmp::Ordering;
 use std::future::Future;
+use std::ops::Deref;
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::select;
-use tokio::sync::broadcast;
 use tokio::sync::broadcast::{Receiver, Sender};
+use tokio::sync::{broadcast, watch, Notify};
 use tokio::time::sleep;
-
-pub(crate) trait ConfigWatcher: Send + Sync {
-    fn watch(&self, on_shutdown_rx: Receiver<()>) -> Receiver<ParsedConfig>;
-    fn reconfigure(&self, config: ConfigWatcherMemdConfig) -> Result<()>;
-}
 
 #[derive(Debug, Clone)]
 pub(crate) struct ConfigWatcherMemdConfig {
@@ -31,24 +30,33 @@ pub(crate) struct ConfigWatcherMemdConfig {
 
 pub(crate) struct ConfigWatcherMemdOptions<M: KvClientManager> {
     pub polling_period: Duration,
-    pub kv_client_manager: Arc<M>,
+    pub config_fetcher: Arc<ConfigFetcherMemd<M>>,
+    pub latest_version_rx: watch::Receiver<ConfigVersion>,
 }
 
 pub struct ConfigWatcherMemdInner<M: KvClientManager> {
-    pub polling_period: Duration,
-    pub kv_client_manager: Arc<M>,
+    config_fetcher: Arc<ConfigFetcherMemd<M>>,
+    polling_period: Duration,
     endpoints: Mutex<Vec<String>>,
+    latest_version_rx: watch::Receiver<ConfigVersion>,
 }
 
-impl<M> ConfigWatcherMemdInner<M>
-where
-    M: KvClientManager,
-{
+impl<M: KvClientManager> ConfigWatcherMemdInner<M> {
     pub fn reconfigure(&self, config: ConfigWatcherMemdConfig) -> Result<()> {
         let mut endpoints = self.endpoints.lock().unwrap();
         *endpoints = config.endpoints;
 
         Ok(())
+    }
+
+    pub fn endpoints(&self) -> Vec<String> {
+        let mut endpoints = vec![];
+        let endpoints_guard = self.endpoints.lock().unwrap();
+        for endpoint in endpoints_guard.iter() {
+            endpoints.push(endpoint.clone());
+        }
+
+        endpoints
     }
 
     pub async fn watch(
@@ -58,17 +66,9 @@ where
     ) {
         let mut recent_endpoints = vec![];
         let mut all_endpoints_failed = true;
-        let mut last_sent_config = None;
 
         loop {
-            let mut endpoints = vec![];
-            {
-                // Ensure the mutex isn't held across an await.
-                let endpoints_guard = self.endpoints.lock().unwrap();
-                for endpoint in endpoints_guard.iter() {
-                    endpoints.push(endpoint.clone());
-                }
-            }
+            let endpoints = self.endpoints();
 
             if endpoints.is_empty() {
                 select! {
@@ -107,11 +107,40 @@ where
 
             recent_endpoints.push(endpoint.clone());
 
-            let parsed_config = match self.poll_one(&endpoint, &last_sent_config).await {
+            let (rev_id, rev_epoch) = {
+                let version = self.latest_version_rx.borrow();
+
+                (version.rev_id, version.rev_epoch)
+            };
+
+            let parsed_config = match self
+                .config_fetcher
+                .poll_one(&endpoint, rev_id, rev_epoch, |client| {
+                    // If notif brief is supported then we don't actually need to poll.
+                    let supported =
+                        client.has_feature(HelloFeature::ClusterMapChangeNotificationBrief);
+                    if !supported {
+                        debug!(
+                            "Polling config from {} with rev_id: {}, rev_epoch: {}",
+                            endpoint, rev_id, rev_epoch
+                        );
+                    }
+
+                    supported
+                })
+                .await
+            {
                 Ok(c) => c,
                 Err(e) => {
-                    // TODO: log
                     dbg!(e);
+
+                    select! {
+                        _ = on_shutdown_rx.recv() => {
+                            return;
+                        },
+                        _ = sleep(self.polling_period) => {}
+                    }
+
                     continue;
                 }
             };
@@ -119,22 +148,9 @@ where
             all_endpoints_failed = false;
 
             if let Some(parsed_config) = parsed_config {
-                if let Some(config) = &last_sent_config {
-                    if let Some(cmp) = parsed_config.partial_cmp(config) {
-                        if cmp == Ordering::Greater {
-                            // TODO: log.
-                            on_new_config_tx
-                                .send(parsed_config.clone())
-                                .unwrap_or_default();
-                            last_sent_config = Some(parsed_config);
-                        }
-                    }
-                } else {
-                    on_new_config_tx
-                        .send(parsed_config.clone())
-                        .unwrap_or_default();
-                    last_sent_config = Some(parsed_config);
-                }
+                on_new_config_tx
+                    .send(parsed_config.clone())
+                    .unwrap_or_default();
             }
 
             select! {
@@ -145,52 +161,9 @@ where
             }
         }
     }
-
-    async fn poll_one(
-        &self,
-        endpoint: &str,
-        latest_config: &Option<ParsedConfig>,
-    ) -> Result<Option<ParsedConfig>> {
-        debug!("Polling config from {}", &endpoint);
-
-        let client = self.kv_client_manager.get_client(endpoint).await?;
-
-        let hostname = client.remote_hostname();
-        let known_version = {
-            if let Some(latest_config) = latest_config {
-                if latest_config.rev_id > 0
-                    && client.has_feature(HelloFeature::ClusterMapKnownVersion)
-                {
-                    Some(GetClusterConfigKnownVersion {
-                        rev_epoch: latest_config.rev_epoch,
-                        rev_id: latest_config.rev_id,
-                    })
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        };
-
-        let resp = client
-            .get_cluster_config(GetClusterConfigRequest { known_version })
-            .await
-            .map_err(Error::new_contextual_memdx_error)?;
-
-        if resp.config.is_empty() {
-            debug!("Poller received empty config");
-            return Ok(None);
-        }
-
-        let config = cbconfig::parse::parse_terse_config(&resp.config, hostname)?;
-
-        trace!("Poller fetched new config {:?}", &config);
-
-        Ok(Some(ConfigParser::parse_terse_config(config, hostname)?))
-    }
 }
 
+#[derive(Clone)]
 pub(crate) struct ConfigWatcherMemd<M: KvClientManager> {
     inner: Arc<ConfigWatcherMemdInner<M>>,
 }
@@ -202,19 +175,15 @@ where
     pub fn new(config: ConfigWatcherMemdConfig, opts: ConfigWatcherMemdOptions<M>) -> Self {
         Self {
             inner: Arc::new(ConfigWatcherMemdInner {
+                config_fetcher: opts.config_fetcher,
                 polling_period: opts.polling_period,
-                kv_client_manager: opts.kv_client_manager,
                 endpoints: Mutex::new(config.endpoints),
+                latest_version_rx: opts.latest_version_rx,
             }),
         }
     }
-}
 
-impl<M> ConfigWatcher for ConfigWatcherMemd<M>
-where
-    M: KvClientManager + 'static,
-{
-    fn watch(&self, on_shutdown_rx: Receiver<()>) -> Receiver<ParsedConfig> {
+    pub fn watch(&self, on_shutdown_rx: Receiver<()>) -> Receiver<ParsedConfig> {
         let (on_new_config_tx, on_new_config_rx) = broadcast::channel::<ParsedConfig>(1);
 
         let inner = self.inner.clone();
@@ -226,7 +195,11 @@ where
         on_new_config_rx
     }
 
-    fn reconfigure(&self, config: ConfigWatcherMemdConfig) -> Result<()> {
+    pub fn reconfigure(&self, config: ConfigWatcherMemdConfig) -> Result<()> {
         self.inner.reconfigure(config)
+    }
+
+    pub fn endpoints(&self) -> Vec<String> {
+        self.inner.endpoints()
     }
 }

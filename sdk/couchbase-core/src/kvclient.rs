@@ -1,6 +1,7 @@
 use std::future::Future;
 use std::net::SocketAddr;
 use std::ops::{Add, Deref};
+use std::sync::atomic::Ordering::SeqCst;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -11,17 +12,20 @@ use crate::error::Error;
 use crate::error::{MemdxError, Result};
 use crate::memdx;
 use crate::memdx::connection::{ConnectOptions, ConnectionType, TcpConnection, TlsConnection};
-use crate::memdx::dispatcher::{Dispatcher, DispatcherOptions, OrphanResponseHandler};
+use crate::memdx::dispatcher::{
+    Dispatcher, DispatcherOptions, OrphanResponseHandler, UnsolicitedPacketHandler,
+};
 use crate::memdx::hello_feature::HelloFeature;
 use crate::memdx::op_auth_saslauto::SASLAuthAutoOptions;
 use crate::memdx::op_bootstrap::BootstrapOptions;
+use crate::memdx::packet::ResponsePacket;
 use crate::memdx::request::{GetErrorMapRequest, HelloRequest, SelectBucketRequest};
 use crate::service_type::ServiceType;
 use crate::tls_config::TlsConfig;
 use crate::util::hostname_from_addr_str;
 use futures::future::BoxFuture;
-use log::debug;
-use tokio::sync::Mutex;
+use log::{debug, warn};
+use tokio::sync::{mpsc, Mutex};
 use tokio::time::Instant;
 use uuid::Uuid;
 
@@ -58,7 +62,10 @@ pub(crate) type OnKvClientCloseHandler =
 
 pub(crate) type OnErrMapFetchedHandler = Arc<dyn Fn(&[u8]) + Send + Sync>;
 
+pub(crate) type UnsolicitedPacketSender = mpsc::UnboundedSender<ResponsePacket>;
+
 pub(crate) struct KvClientOptions {
+    pub unsolicited_packet_tx: Option<UnsolicitedPacketSender>,
     pub orphan_handler: OrphanResponseHandler,
     pub on_close: OnKvClientCloseHandler,
     pub on_err_map_fetched: Option<OnErrMapFetchedHandler>,
@@ -136,6 +143,8 @@ where
                 HelloFeature::Collections,
                 HelloFeature::ClusterMapKnownVersion,
                 HelloFeature::DedupeNotMyVbucketClustermap,
+                HelloFeature::ClusterMapChangeNotificationBrief,
+                HelloFeature::Duplex,
             ]
         };
 
@@ -203,6 +212,7 @@ where
             &id, &client_id, &config.address
         );
 
+        let unsolicited_packet_tx = opts.unsolicited_packet_tx.clone();
         let on_close = opts.on_close.clone();
         let memdx_client_opts = DispatcherOptions {
             on_connection_close_handler: Arc::new(move || {
@@ -216,6 +226,16 @@ where
                 })
             }),
             orphan_handler: opts.orphan_handler,
+            unsolicited_packet_handler: Arc::new(move |p| {
+                let unsolicited_packet_tx = unsolicited_packet_tx.clone();
+                Box::pin(async move {
+                    if let Some(sender) = unsolicited_packet_tx {
+                        if let Err(e) = sender.send(p) {
+                            warn!("Failed to send unsolicited packet {:?}", e);
+                        };
+                    }
+                })
+            }),
             disable_decompression: opts.disable_decompression,
             id: client_id,
         };

@@ -29,10 +29,12 @@ use crate::memdx::connection::{ConnectionType, Stream};
 use crate::memdx::datatype::DataTypeFlag;
 use crate::memdx::dispatcher::{
     Dispatcher, DispatcherOptions, OnConnectionCloseHandler, OrphanResponseHandler,
+    UnsolicitedPacketHandler,
 };
 use crate::memdx::error;
 use crate::memdx::error::{CancellationErrorKind, Error};
 use crate::memdx::hello_feature::HelloFeature::DataType;
+use crate::memdx::magic::Magic;
 use crate::memdx::opcode::OpCode;
 use crate::memdx::packet::{RequestPacket, ResponsePacket};
 use crate::memdx::pendingop::ClientPendingOp;
@@ -58,6 +60,7 @@ pub(crate) struct SenderContext {
 
 struct ReadLoopOptions {
     pub client_id: String,
+    pub unsolicited_packet_handler: UnsolicitedPacketHandler,
     pub orphan_handler: OrphanResponseHandler,
     pub on_connection_close_tx: OnConnectionCloseHandler,
     pub on_client_close_rx: Receiver<()>,
@@ -151,6 +154,18 @@ impl Client {
                         Some(input) => {
                             match input {
                                 Ok(mut packet) => {
+                                    if packet.magic == Magic::ServerReq {
+
+                                        trace!(
+                                            "Handling server request on {}. Opcode={}",
+                                            opts.client_id,
+                                            packet.op_code,
+                                        );
+
+                                        (opts.unsolicited_packet_handler)(packet).await;
+                                        continue;
+                                    }
+
                                     trace!(
                                         "Resolving response on {}. Opcode={}. Opaque={}. Status={}",
                                         opts.client_id,
@@ -264,6 +279,7 @@ impl Dispatcher for Client {
                 read_opaque_map,
                 ReadLoopOptions {
                     client_id: read_uuid,
+                    unsolicited_packet_handler: opts.unsolicited_packet_handler,
                     orphan_handler: opts.orphan_handler,
                     on_connection_close_tx: opts.on_connection_close_handler,
                     on_client_close_rx: close_rx,
