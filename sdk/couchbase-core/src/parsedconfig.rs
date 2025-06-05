@@ -80,7 +80,7 @@ impl From<String> for ParsedConfigBucketFeature {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone)]
 pub(crate) struct ParsedConfigBucket {
     pub bucket_uuid: String,
     pub bucket_name: String,
@@ -89,7 +89,13 @@ pub(crate) struct ParsedConfigBucket {
     pub features: Vec<ParsedConfigBucketFeature>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+impl PartialEq for ParsedConfigBucket {
+    fn eq(&self, other: &Self) -> bool {
+        self.bucket_uuid == other.bucket_uuid
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct ParsedConfig {
     pub rev_id: i64,
     pub rev_epoch: i64,

@@ -23,7 +23,7 @@ use serde::Serialize;
 use std::ops::{Add, Deref};
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::time::{timeout_at, Instant};
+use tokio::time::{sleep, timeout_at, Instant};
 
 mod common;
 
@@ -56,6 +56,8 @@ fn test_upsert_and_get() {
 
         assert_eq!(value, get_result.value);
         assert_eq!(upsert_result.cas, get_result.cas);
+
+        sleep(Duration::from_secs(500)).await;
     });
 }
 
