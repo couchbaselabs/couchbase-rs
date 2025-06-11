@@ -15,8 +15,8 @@ serde_json = "1.0"
 uuid = { version = "1.10.0", features = ["v4"] }
 webpki-roots = "0.26"
 
-couchbase_connstr = { path = "../couchbase-connstr" }
-couchbase_core = { path = "../couchbase-core", default-features = false }
+couchbase-connstr = { path = "../couchbase-connstr" }
+couchbase-core = { path = "../couchbase-core", default-features = false }
 rustls-pemfile = { version = "2.2", optional = true }
 
 tokio = { version = "1.42" }
@@ -37,8 +37,8 @@ tokio = "1.40"
 [features]
 default = ["default-tls"]
 default-tls = ["rustls-tls"]
-rustls-tls = ["dep:tokio-rustls", "couchbase_core/rustls-tls", "dep:rustls-pemfile"]
-native-tls = ["dep:tokio-native-tls", "couchbase_core/native-tls"]
+rustls-tls = ["dep:tokio-rustls", "couchbase-core/rustls-tls", "dep:rustls-pemfile"]
+native-tls = ["dep:tokio-native-tls", "couchbase-core/native-tls"]
 
 [lints.rust]
 # This is temporary whilst we build out the root modules.

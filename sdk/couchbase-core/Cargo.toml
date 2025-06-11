@@ -1,5 +1,5 @@
 [package]
-name = "couchbase_core"
+name = "couchbase-core"
 version = "0.1.0"
 edition = "2021"
 
@@ -47,7 +47,7 @@ env_logger = "0.11"
 envconfig = "0.10"
 serial_test = "3.2.0"
 
-couchbase_connstr = { path = "../couchbase-connstr" }
+couchbase-connstr = { path = "../couchbase-connstr" }
 
 [features]
 dhat-heap = ["dhat"]
