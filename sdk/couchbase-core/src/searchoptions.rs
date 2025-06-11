@@ -1,0 +1,220 @@
+use crate::httpx::request::OnBehalfOfInfo;
+use crate::retry::RetryStrategy;
+use crate::searchx;
+use crate::searchx::facets::Facet;
+use crate::searchx::queries::Query;
+use crate::searchx::query_options::{Control, Highlight, KnnOperator, KnnQuery};
+use crate::searchx::sort::Sort;
+use std::collections::HashMap;
+use std::sync::Arc;
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct SearchOptions {
+    pub(crate) collections: Option<Vec<String>>,
+    pub(crate) control: Option<Control>,
+    pub(crate) explain: Option<bool>,
+    pub(crate) facets: Option<HashMap<String, Facet>>,
+    pub(crate) fields: Option<Vec<String>>,
+    pub(crate) from: Option<u32>,
+    pub(crate) highlight: Option<Highlight>,
+    pub(crate) include_locations: Option<bool>,
+    pub(crate) query: Option<Query>,
+    pub(crate) score: Option<String>,
+    pub(crate) search_after: Option<Vec<String>>,
+    pub(crate) search_before: Option<Vec<String>>,
+    pub(crate) show_request: Option<bool>,
+    pub(crate) size: Option<u32>,
+    pub(crate) sort: Option<Vec<Sort>>,
+    pub(crate) knn: Option<Vec<KnnQuery>>,
+    pub(crate) knn_operator: Option<KnnOperator>,
+
+    pub(crate) raw: Option<HashMap<String, serde_json::Value>>,
+
+    pub(crate) index_name: String,
+    pub(crate) scope_name: Option<String>,
+    pub(crate) bucket_name: Option<String>,
+
+    pub(crate) on_behalf_of: Option<OnBehalfOfInfo>,
+
+    pub(crate) endpoint: Option<String>,
+    pub(crate) retry_strategy: Option<Arc<dyn RetryStrategy>>,
+}
+
+impl SearchOptions {
+    pub fn new(index_name: impl Into<String>) -> Self {
+        Self {
+            collections: None,
+            control: None,
+            explain: None,
+            facets: None,
+            fields: None,
+            from: None,
+            highlight: None,
+            include_locations: None,
+            query: None,
+            score: None,
+            search_after: None,
+            search_before: None,
+            show_request: None,
+            size: None,
+            sort: None,
+            knn: None,
+            knn_operator: None,
+            raw: None,
+            index_name: index_name.into(),
+            scope_name: None,
+            bucket_name: None,
+            on_behalf_of: None,
+            endpoint: None,
+            retry_strategy: None,
+        }
+    }
+
+    pub fn collections(mut self, collections: impl Into<Option<Vec<String>>>) -> Self {
+        self.collections = collections.into();
+        self
+    }
+
+    pub fn control(mut self, control: impl Into<Option<Control>>) -> Self {
+        self.control = control.into();
+        self
+    }
+
+    pub fn explain(mut self, explain: impl Into<Option<bool>>) -> Self {
+        self.explain = explain.into();
+        self
+    }
+
+    pub fn facets(mut self, facets: impl Into<Option<HashMap<String, Facet>>>) -> Self {
+        self.facets = facets.into();
+        self
+    }
+
+    pub fn fields(mut self, fields: impl Into<Option<Vec<String>>>) -> Self {
+        self.fields = fields.into();
+        self
+    }
+
+    pub fn from(mut self, from: impl Into<Option<u32>>) -> Self {
+        self.from = from.into();
+        self
+    }
+
+    pub fn highlight(mut self, highlight: impl Into<Option<Highlight>>) -> Self {
+        self.highlight = highlight.into();
+        self
+    }
+
+    pub fn include_locations(mut self, include_locations: impl Into<Option<bool>>) -> Self {
+        self.include_locations = include_locations.into();
+        self
+    }
+
+    pub fn query(mut self, query: impl Into<Option<Query>>) -> Self {
+        self.query = query.into();
+        self
+    }
+
+    pub fn score(mut self, score: impl Into<Option<String>>) -> Self {
+        self.score = score.into();
+        self
+    }
+
+    pub fn search_after(mut self, search_after: impl Into<Option<Vec<String>>>) -> Self {
+        self.search_after = search_after.into();
+        self
+    }
+
+    pub fn search_before(mut self, search_before: impl Into<Option<Vec<String>>>) -> Self {
+        self.search_before = search_before.into();
+        self
+    }
+
+    pub fn show_request(mut self, show_request: impl Into<Option<bool>>) -> Self {
+        self.show_request = show_request.into();
+        self
+    }
+
+    pub fn size(mut self, size: impl Into<Option<u32>>) -> Self {
+        self.size = size.into();
+        self
+    }
+
+    pub fn sort(mut self, sort: impl Into<Option<Vec<Sort>>>) -> Self {
+        self.sort = sort.into();
+        self
+    }
+
+    pub fn knn(mut self, knn: impl Into<Option<Vec<KnnQuery>>>) -> Self {
+        self.knn = knn.into();
+        self
+    }
+
+    pub fn knn_operator(mut self, knn_operator: impl Into<Option<KnnOperator>>) -> Self {
+        self.knn_operator = knn_operator.into();
+        self
+    }
+
+    pub fn raw(mut self, raw: impl Into<Option<HashMap<String, serde_json::Value>>>) -> Self {
+        self.raw = raw.into();
+        self
+    }
+
+    pub fn scope_name(mut self, scope_name: impl Into<Option<String>>) -> Self {
+        self.scope_name = scope_name.into();
+        self
+    }
+
+    pub fn bucket_name(mut self, bucket_name: impl Into<Option<String>>) -> Self {
+        self.bucket_name = bucket_name.into();
+        self
+    }
+
+    pub fn on_behalf_of(mut self, on_behalf_of: impl Into<Option<OnBehalfOfInfo>>) -> Self {
+        self.on_behalf_of = on_behalf_of.into();
+        self
+    }
+
+    pub fn retry_strategy(
+        mut self,
+        retry_strategy: impl Into<Option<Arc<dyn RetryStrategy>>>,
+    ) -> Self {
+        self.retry_strategy = retry_strategy.into();
+        self
+    }
+
+    pub fn endpoint(mut self, endpoint: impl Into<Option<String>>) -> Self {
+        self.endpoint = endpoint.into();
+        self
+    }
+}
+
+impl From<SearchOptions> for searchx::query_options::QueryOptions {
+    fn from(opts: SearchOptions) -> Self {
+        searchx::query_options::QueryOptions {
+            collections: opts.collections,
+            control: opts.control,
+            explain: opts.explain,
+            facets: opts.facets,
+            fields: opts.fields,
+            from: opts.from,
+            highlight: opts.highlight,
+            include_locations: opts.include_locations,
+            query: opts.query,
+            score: opts.score,
+            search_after: opts.search_after,
+            search_before: opts.search_before,
+            show_request: opts.show_request,
+            size: opts.size,
+            sort: opts.sort,
+            knn: opts.knn,
+            knn_operator: opts.knn_operator,
+            raw: opts.raw,
+            index_name: opts.index_name,
+            scope_name: opts.scope_name,
+            bucket_name: opts.bucket_name,
+            on_behalf_of: opts.on_behalf_of,
+        }
+    }
+}

@@ -1,0 +1,56 @@
+[package]
+name = "couchbase"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bytes = "1.5.0"
+chrono = "0.4.38"
+futures = "0.3.30"
+http = "1.3.1"
+lazy_static = "1.5.0"
+log = "0.4.22"
+serde = "1.0"
+serde_json = "1.0"
+uuid = { version = "1.10.0", features = ["v4"] }
+webpki-roots = "0.26"
+
+couchbase_connstr = { path = "../couchbase-connstr" }
+couchbase_core = { path = "../couchbase-core", default-features = false }
+rustls-pemfile = { version = "2.2", optional = true }
+
+tokio = { version = "1.42" }
+tokio-native-tls = { version = "0.3", optional = true }
+tokio-rustls = { version = "0.26.0", optional = true }
+
+[dev-dependencies]
+chrono = "0.4"
+criterion = { version = "0.5.1", features = ["html_reports", "async_tokio", "async"] }
+env_logger = "0.11"
+envconfig = "0.11.0"
+rand = "0.9.0-beta.0"
+serde_json = { version = "1.0", features = ["raw_value"] }
+serde_yaml = "0.9.33"
+serial_test = "3.2.0"
+tokio = "1.40"
+
+[features]
+default = ["default-tls"]
+default-tls = ["rustls-tls"]
+rustls-tls = ["dep:tokio-rustls", "couchbase_core/rustls-tls", "dep:rustls-pemfile"]
+native-tls = ["dep:tokio-native-tls", "couchbase_core/native-tls"]
+
+[lints.rust]
+# This is temporary whilst we build out the root modules.
+unused = "allow"
+
+[lib]
+bench = false
+
+[[bench]]
+name = "collection_crud"
+harness = false
+
+[[bench]]
+name = "query"
+harness = false

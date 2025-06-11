@@ -1,10 +1,4 @@
 target/
-Cargo.lock
 .idea/
-*.iml
-.vscode/
-CouchbaseMock.jar
-gocaves-macos
-couchbase/tests/config
-tags
-couchbase/integration/config.toml
+Cargo.lock
+dhat-heap.json

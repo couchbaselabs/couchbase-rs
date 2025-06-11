@@ -1,0 +1,3 @@
+[submodule "sdk/protostellar/contrib/protostellar"]
+	path = sdk/protostellar/contrib/protostellar
+	url = https://github.com/couchbase/protostellar

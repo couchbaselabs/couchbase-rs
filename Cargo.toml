@@ -1,2 +1,3 @@
 [workspace]
-members = ["couchbase", "couchbase-sys"]
+members = ["sdk/couchbase", "sdk/couchbase-connstr", "sdk/couchbase-core", "sdk/protostellar"]
+resolver = "2"
