@@ -70,6 +70,7 @@ pub(crate) struct KvClientOptions {
     pub on_close: OnKvClientCloseHandler,
     pub on_err_map_fetched: Option<OnErrMapFetchedHandler>,
     pub disable_decompression: bool,
+    pub id: String,
 }
 
 pub(crate) trait KvClient: Sized + PartialEq + Send + Sync {
@@ -202,7 +203,7 @@ where
 
         let closed = Arc::new(AtomicBool::new(false));
         let closed_clone = closed.clone();
-        let id = Uuid::new_v4().to_string();
+        let id = opts.id;
         let read_id = id.clone();
 
         let client_id = Uuid::new_v4().to_string();

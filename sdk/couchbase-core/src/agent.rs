@@ -1,22 +1,3 @@
-use byteorder::BigEndian;
-use futures::executor::block_on;
-use log::{debug, error, info, warn};
-use std::cmp::Ordering;
-use std::collections::HashMap;
-use std::fmt::format;
-use std::io::Cursor;
-use std::net::ToSocketAddrs;
-use std::ops::Add;
-use std::sync::Arc;
-use std::time::Duration;
-use tokio::io::AsyncReadExt;
-use tokio::net;
-use tokio::runtime::{Handle, Runtime};
-use tokio::sync::broadcast::{Receiver, Sender};
-use tokio::sync::{broadcast, mpsc, Mutex};
-use tokio::task::JoinHandle;
-use tokio::time::{sleep, timeout, timeout_at, Instant};
-
 use crate::agentoptions::AgentOptions;
 use crate::analyticscomponent::{
     AnalyticsComponent, AnalyticsComponentConfig, AnalyticsComponentOptions,
@@ -66,6 +47,25 @@ use crate::vbucketrouter::{
     StdVbucketRouter, VbucketRouter, VbucketRouterOptions, VbucketRoutingInfo,
 };
 use crate::{httpx, mgmtx};
+use byteorder::BigEndian;
+use futures::executor::block_on;
+use log::{debug, error, info, warn};
+use std::cmp::Ordering;
+use std::collections::HashMap;
+use std::fmt::format;
+use std::io::Cursor;
+use std::net::ToSocketAddrs;
+use std::ops::Add;
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::io::AsyncReadExt;
+use tokio::net;
+use tokio::runtime::{Handle, Runtime};
+use tokio::sync::broadcast::{Receiver, Sender};
+use tokio::sync::{broadcast, mpsc, Mutex};
+use tokio::task::JoinHandle;
+use tokio::time::{sleep, timeout, timeout_at, Instant};
+use uuid::Uuid;
 
 #[derive(Clone)]
 struct AgentState {
@@ -678,6 +678,7 @@ impl Agent {
                                 err_map_component_clone.on_err_map(err_map);
                             })),
                             disable_decompression: false,
+                            id: Uuid::new_v4().to_string(),
                         },
                     ),
                 )
