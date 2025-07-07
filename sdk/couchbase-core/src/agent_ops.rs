@@ -1,6 +1,4 @@
 use crate::agent::Agent;
-use crate::analyticscomponent::AnalyticsResultStream;
-use crate::analyticsoptions::AnalyticsOptions;
 use crate::cbconfig::CollectionManifest;
 use crate::crudoptions::{
     AddOptions, AppendOptions, DecrementOptions, DeleteOptions, GetAndLockOptions,
@@ -231,10 +229,6 @@ impl Agent {
 
     pub async fn unfreeze_search_index_plan(&self, opts: &UnfreezePlanOptions<'_>) -> Result<()> {
         self.inner.search.unfreeze_plan(opts).await
-    }
-
-    pub async fn analytics(&self, opts: AnalyticsOptions<'_>) -> Result<AnalyticsResultStream> {
-        self.inner.analytics.query(opts).await
     }
 
     pub async fn get_collection_manifest(

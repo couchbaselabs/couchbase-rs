@@ -1,13 +1,10 @@
 use crate::common::helpers::{
-    run_with_std_analytics_deadline, run_with_std_ensure_deadline, run_with_std_mgmt_deadline,
-    run_with_std_search_deadline,
+    run_with_std_ensure_deadline, run_with_std_mgmt_deadline, run_with_std_search_deadline,
 };
 use crate::common::helpers::{run_with_std_kv_deadline, run_with_std_query_deadline};
 use crate::common::node_version::NodeVersion;
 use crate::common::test_config::TestSetupConfig;
 use couchbase_core::agent::Agent;
-use couchbase_core::analyticscomponent::AnalyticsResultStream;
-use couchbase_core::analyticsoptions::AnalyticsOptions;
 use couchbase_core::cbconfig::CollectionManifest;
 use couchbase_core::crudoptions::*;
 use couchbase_core::crudresults::*;
@@ -244,10 +241,6 @@ impl TestAgent {
 
     pub async fn unfreeze_search_index_plan(&self, opts: &UnfreezePlanOptions<'_>) -> Result<()> {
         run_with_std_mgmt_deadline(self.agent.unfreeze_search_index_plan(opts)).await
-    }
-
-    pub async fn analytics(&self, opts: AnalyticsOptions<'_>) -> Result<AnalyticsResultStream> {
-        run_with_std_analytics_deadline(self.agent.analytics(opts)).await
     }
 
     pub async fn get_collection_manifest(

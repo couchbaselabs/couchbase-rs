@@ -16,8 +16,6 @@ pub(crate) struct ParsedConfigNodePorts {
     pub mgmt: i64,
     pub query: Option<i64>,
     pub search: Option<i64>,
-    pub analytics: Option<i64>,
-    // TODO: Do we need views?
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Default)]

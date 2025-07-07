@@ -1,4 +1,3 @@
-use crate::analyticsx::error::Error as AnalyticsError;
 use crate::httpx::error::Error as HttpError;
 use crate::memdx;
 use crate::mgmtx::error::Error as MgmtError;
@@ -34,7 +33,6 @@ impl StdError for Error {
             ErrorKind::Memdx(err) => err.inner.source.source(),
             ErrorKind::Query(err) => err.source(),
             ErrorKind::Search(err) => err.source(),
-            ErrorKind::Analytics(err) => err.source(),
             ErrorKind::Http(err) => err.source(),
             ErrorKind::Mgmt(err) => err.source(),
             _ => None,
@@ -91,7 +89,6 @@ pub enum ErrorKind {
     Memdx(MemdxError),
     Query(QueryError),
     Search(SearchError),
-    Analytics(AnalyticsError),
     Http(HttpError),
     Mgmt(MgmtError),
     VbucketMapOutdated,
@@ -165,7 +162,6 @@ impl Display for ErrorKind {
             ErrorKind::Memdx(err) => write!(f, "{}", err),
             ErrorKind::Query(err) => write!(f, "{}", err),
             ErrorKind::Search(err) => write!(f, "{}", err),
-            ErrorKind::Analytics(err) => write!(f, "{}", err),
             ErrorKind::Http(err) => write!(f, "{}", err),
             ErrorKind::Mgmt(err) => write!(f, "{}", err),
             ErrorKind::EndpointNotKnown { endpoint } => {
@@ -352,12 +348,6 @@ impl From<HttpError> for Error {
 impl From<SearchError> for Error {
     fn from(value: SearchError) -> Self {
         Self::new(ErrorKind::Search(value))
-    }
-}
-
-impl From<AnalyticsError> for Error {
-    fn from(value: AnalyticsError) -> Self {
-        Self::new(ErrorKind::Analytics(value))
     }
 }
 

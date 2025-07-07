@@ -262,15 +262,6 @@ where
         .unwrap()
 }
 
-pub async fn run_with_std_analytics_deadline<Resp, Fut>(f: Fut) -> Result<Resp, Error>
-where
-    Fut: std::future::Future<Output = Result<Resp, Error>>,
-{
-    timeout_at(Instant::now().add(Duration::from_millis(10000)), f)
-        .await
-        .unwrap()
-}
-
 pub async fn run_with_std_query_deadline<Resp, Fut>(f: Fut) -> Result<Resp, Error>
 where
     Fut: std::future::Future<Output = Result<Resp, Error>>,
