@@ -119,14 +119,12 @@ impl ConfigParser {
                 mgmt: ports.mgmt,
                 query: ports.n1ql,
                 search: ports.fts,
-                analytics: ports.cbas,
             },
             ssl_ports: ParsedConfigNodePorts {
                 kv: ports.kv_ssl,
                 mgmt: ports.mgmt_ssl,
                 query: ports.n1ql_ssl,
                 search: ports.fts_ssl,
-                analytics: ports.cbas_ssl,
             },
         }
     }

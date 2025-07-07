@@ -2,11 +2,6 @@
 
 pub mod couchbase {
     pub mod admin {
-        pub mod analytics {
-            pub mod v1 {
-                include!("../genproto/couchbase.admin.analytics.v1.rs");
-            }
-        }
         pub mod bucket {
             pub mod v1 {
                 include!("../genproto/couchbase.admin.bucket.v1.rs");
@@ -26,11 +21,6 @@ pub mod couchbase {
             pub mod v1 {
                 include!("../genproto/couchbase.admin.search.v1.rs");
             }
-        }
-    }
-    pub mod analytics {
-        pub mod v1 {
-            include!("../genproto/couchbase.analytics.v1.rs");
         }
     }
     pub mod internal {
@@ -63,11 +53,6 @@ pub mod couchbase {
     pub mod transactions {
         pub mod v1 {
             include!("../genproto/couchbase.transactions.v1.rs");
-        }
-    }
-    pub mod view {
-        pub mod v1 {
-            include!("../genproto/couchbase.view.v1.rs");
         }
     }
 }

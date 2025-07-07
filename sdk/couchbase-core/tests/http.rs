@@ -1,6 +1,5 @@
 use crate::common::test_config::setup_test;
 use bytes::Bytes;
-use couchbase_core::analyticsx::query_respreader::Status;
 use couchbase_core::httpx::client::{Client, ClientConfig, ReqwestClient};
 use couchbase_core::httpx::decoder::Decoder;
 use couchbase_core::httpx::raw_json_row_streamer::{RawJsonRowItem, RawJsonRowStreamer};
@@ -34,7 +33,7 @@ pub struct QueryMetaData {
     pub request_id: Option<String>,
     #[serde(rename = "clientContextID")]
     pub client_context_id: Option<String>,
-    pub status: Option<Status>,
+    pub status: Option<String>,
     pub metrics: Option<QueryMetrics>,
     pub signature: Option<Box<RawValue>>,
 }
@@ -108,7 +107,7 @@ fn test_row_streamer() {
         let epilog: QueryMetaData =
             serde_json::from_slice(&epilog).expect("failed parsing epilog as json");
 
-        assert_eq!(epilog.status.unwrap(), Status::Success);
+        assert_eq!(epilog.status.unwrap(), "success");
         assert!(!epilog.request_id.unwrap().is_empty());
         assert!(!epilog.metrics.unwrap().elapsed_time.unwrap().is_empty());
     });

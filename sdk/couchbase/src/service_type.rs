@@ -9,7 +9,6 @@ pub(crate) enum InnerServiceType {
     Mgmt,
     Query,
     Search,
-    Analytics,
     Eventing,
     Other(String),
 }
@@ -19,7 +18,6 @@ impl ServiceType {
     pub const MGMT: ServiceType = ServiceType(InnerServiceType::Mgmt);
     pub const QUERY: ServiceType = ServiceType(InnerServiceType::Query);
     pub const SEARCH: ServiceType = ServiceType(InnerServiceType::Search);
-    pub const ANALYTICS: ServiceType = ServiceType(InnerServiceType::Analytics);
     pub const EVENTING: ServiceType = ServiceType(InnerServiceType::Eventing);
 
     pub(crate) fn other(val: String) -> ServiceType {
@@ -34,7 +32,6 @@ impl Display for ServiceType {
             InnerServiceType::Mgmt => "mgmt",
             InnerServiceType::Query => "query",
             InnerServiceType::Search => "search",
-            InnerServiceType::Analytics => "analytics",
             InnerServiceType::Eventing => "eventing",
             InnerServiceType::Other(val) => return write!(f, "unknown({})", val),
         };
@@ -50,7 +47,6 @@ impl From<&couchbase_core::service_type::ServiceType> for ServiceType {
             couchbase_core::service_type::ServiceType::MGMT => ServiceType::MGMT,
             couchbase_core::service_type::ServiceType::QUERY => ServiceType::QUERY,
             couchbase_core::service_type::ServiceType::SEARCH => ServiceType::SEARCH,
-            couchbase_core::service_type::ServiceType::ANALYTICS => ServiceType::ANALYTICS,
             couchbase_core::service_type::ServiceType::EVENTING => ServiceType::EVENTING,
             _ => ServiceType(InnerServiceType::Other(service_type.to_string())),
         }
