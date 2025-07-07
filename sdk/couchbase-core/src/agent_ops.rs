@@ -28,6 +28,8 @@ use crate::mgmtx::responses::{
     UpdateCollectionResponse,
 };
 use crate::mgmtx::user::{Group, RoleAndDescription, UserAndMetadata};
+use crate::pingoptions::PingOptions;
+use crate::pingreport::PingReport;
 use crate::querycomponent::QueryResultStream;
 use crate::queryoptions::{
     BuildDeferredIndexesOptions, CreateIndexOptions, CreatePrimaryIndexOptions, DropIndexOptions,
@@ -336,6 +338,10 @@ impl Agent {
 
     pub async fn change_password(&self, opts: &ChangePasswordOptions<'_>) -> Result<()> {
         self.inner.mgmt.change_password(opts).await
+    }
+
+    pub async fn ping(&self, opts: &PingOptions) -> Result<PingReport> {
+        self.inner.diagnostics.ping(opts).await
     }
 
     pub async fn ensure_user(&self, opts: &EnsureUserOptions<'_>) -> Result<()> {

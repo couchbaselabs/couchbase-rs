@@ -1415,3 +1415,19 @@ impl TryFromClientResponse for GetCollectionIdResponse {
         })
     }
 }
+
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct PingResponse {}
+
+impl TryFromClientResponse for PingResponse {
+    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
+        let packet = resp.packet();
+        let status = packet.status;
+
+        if status != Status::Success {
+            return Err(OpsCore::decode_error(&packet).into());
+        }
+
+        Ok(PingResponse {})
+    }
+}

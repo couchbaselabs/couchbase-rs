@@ -12,6 +12,7 @@ use crate::configmanager::{
 };
 use crate::configparser::ConfigParser;
 use crate::crudcomponent::CrudComponent;
+use crate::diagnosticscomponent::{DiagnosticsComponent, DiagnosticsComponentConfig};
 use crate::errmapcomponent::ErrMapComponent;
 use crate::error::{Error, ErrorKind, Result};
 use crate::features::BucketFeature;
@@ -101,9 +102,14 @@ pub(crate) struct AgentInner {
         StdCompressor,
     >,
 
-    pub(crate) query: QueryComponent<ReqwestClient>,
-    pub(crate) search: SearchComponent<ReqwestClient>,
+    pub(crate) query: Arc<QueryComponent<ReqwestClient>>,
+    pub(crate) search: Arc<SearchComponent<ReqwestClient>>,
     pub(crate) mgmt: MgmtComponent<ReqwestClient>,
+    pub(crate) diagnostics: DiagnosticsComponent<
+        ReqwestClient,
+        AgentClientManager,
+        ConfigManagerMemd<AgentClientManager>,
+    >,
 }
 
 #[derive(Clone)]
@@ -121,6 +127,7 @@ struct AgentComponentConfigs {
     pub query_config: QueryComponentConfig,
     pub search_config: SearchComponentConfig,
     pub mgmt_config: MgmtComponentConfig,
+    pub diagnostics_config: DiagnosticsComponentConfig,
     pub http_client_config: ClientConfig,
 }
 
@@ -232,6 +239,8 @@ impl AgentInner {
         self.search
             .reconfigure(agent_component_configs.search_config);
         self.mgmt.reconfigure(agent_component_configs.mgmt_config);
+        self.diagnostics
+            .reconfigure(agent_component_configs.diagnostics_config);
     }
 
     fn gen_agent_component_configs(state: &mut AgentState) -> AgentComponentConfigs {
@@ -345,6 +354,9 @@ impl AgentInner {
                 endpoints: mgmt_endpoints,
                 authenticator: state.authenticator.clone(),
             },
+            diagnostics_config: DiagnosticsComponentConfig {
+                bucket: state.bucket.clone(),
+            },
         }
     }
 
@@ -430,7 +442,7 @@ impl Agent {
         };
 
         let mut state = AgentState {
-            bucket: opts.bucket_name,
+            bucket: opts.bucket_name.clone(),
             authenticator: Arc::new(opts.authenticator),
             num_pool_connections: 1,
             last_clients: Default::default(),
@@ -548,22 +560,31 @@ impl Agent {
             },
         );
 
-        let query = QueryComponent::new(
+        let query = Arc::new(QueryComponent::new(
             retry_manager.clone(),
             http_client.clone(),
             agent_component_configs.query_config,
             QueryComponentOptions {
                 user_agent: client_name.clone(),
             },
-        );
+        ));
 
-        let search = SearchComponent::new(
+        let search = Arc::new(SearchComponent::new(
             retry_manager.clone(),
             http_client.clone(),
             agent_component_configs.search_config,
             SearchComponentOptions {
                 user_agent: client_name.clone(),
             },
+        ));
+
+        let diagnostics = DiagnosticsComponent::new(
+            conn_mgr.clone(),
+            query.clone(),
+            search.clone(),
+            cfg_manager.clone(),
+            retry_manager.clone(),
+            agent_component_configs.diagnostics_config,
         );
 
         let inner = Arc::new(AgentInner {
@@ -580,6 +601,7 @@ impl Agent {
             mgmt,
             query,
             search,
+            diagnostics,
         });
 
         let inner_clone = inner.clone();

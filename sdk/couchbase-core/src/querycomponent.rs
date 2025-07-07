@@ -1,9 +1,11 @@
 use crate::authenticator::Authenticator;
+use crate::diagnosticscomponent::PingQueryOptions;
 use crate::error;
 use crate::error::ErrorKind;
 use crate::httpcomponent::{HttpComponent, HttpComponentState};
 use crate::httpx::client::Client;
 use crate::mgmtx::node_target::NodeTarget;
+use crate::pingreport::{EndpointPingReport, PingState};
 use crate::queryoptions::{
     BuildDeferredIndexesOptions, CreateIndexOptions, CreatePrimaryIndexOptions, DropIndexOptions,
     DropPrimaryIndexOptions, EnsureIndexOptions, GetAllIndexesOptions, QueryOptions,
@@ -13,18 +15,21 @@ use crate::queryx::ensure_index_helper::EnsureIndexHelper;
 use crate::queryx::index::Index;
 use crate::queryx::preparedquery::{PreparedQuery, PreparedStatementCache};
 use crate::queryx::query::Query;
-use crate::queryx::query_options::EnsureIndexPollOptions;
+use crate::queryx::query_options::{EnsureIndexPollOptions, PingOptions};
 use crate::queryx::query_respreader::QueryRespReader;
 use crate::queryx::query_result::{EarlyMetaData, MetaData};
 use crate::retry::{orchestrate_retries, RetryInfo, RetryManager, DEFAULT_RETRY_STRATEGY};
 use crate::retrybesteffort::ExponentialBackoffCalculator;
 use crate::service_type::ServiceType;
 use bytes::Bytes;
+use futures::future::join_all;
 use futures::{Stream, StreamExt};
 use std::collections::HashMap;
 use std::future::Future;
+use std::ops::Sub;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use tokio::select;
 
 pub(crate) struct QueryComponent<C: Client> {
     http_component: HttpComponent<C>,
@@ -73,7 +78,7 @@ impl Stream for QueryResultStream {
     }
 }
 
-impl<C: Client> QueryComponent<C> {
+impl<C: Client + 'static> QueryComponent<C> {
     pub fn new(
         retry_manager: Arc<RetryManager>,
         http_client: Arc<C>,
@@ -430,6 +435,76 @@ impl<C: Client> QueryComponent<C> {
                     .map_err(error::Error::from)
             })
             .await
+    }
+
+    pub async fn ping_all_endpoints(
+        &self,
+        opts: PingQueryOptions<'_>,
+    ) -> error::Result<Vec<EndpointPingReport>> {
+        let (client, targets) = self.http_component.get_all_targets::<NodeTarget>(&[])?;
+
+        let copts = PingOptions {
+            on_behalf_of: opts.on_behalf_of,
+        };
+        let timeout = opts.timeout;
+
+        let mut handles = Vec::with_capacity(targets.len());
+        let user_agent = self.http_component.user_agent().to_string();
+        for target in targets {
+            let user_agent = user_agent.clone();
+            let client = Query::<C> {
+                http_client: client.clone(),
+                user_agent,
+                endpoint: target.endpoint.clone(),
+                username: target.username,
+                password: target.password,
+            };
+
+            let handle = self.ping_one(client, timeout, copts.clone());
+
+            handles.push(handle);
+        }
+
+        let reports = join_all(handles).await;
+
+        Ok(reports)
+    }
+
+    async fn ping_one(
+        &self,
+        client: Query<C>,
+        timeout: Duration,
+        opts: PingOptions<'_>,
+    ) -> EndpointPingReport {
+        let start = std::time::Instant::now();
+        let res = select! {
+            e = tokio::time::sleep(timeout) => {
+                return EndpointPingReport {
+                    remote: client.endpoint,
+                    error: None,
+                    latency: std::time::Instant::now().sub(start),
+                    id: None,
+                    namespace: None,
+                    state: PingState::Timeout,
+                }
+            }
+            r = client.ping(&opts) => r.map_err(error::Error::from),
+        };
+        let end = std::time::Instant::now();
+
+        let (error, state) = match res {
+            Ok(_) => (None, PingState::Ok),
+            Err(e) => (Some(e), PingState::Error),
+        };
+
+        EndpointPingReport {
+            remote: client.endpoint,
+            error,
+            latency: end.sub(start),
+            id: None,
+            namespace: None,
+            state,
+        }
     }
 
     async fn orchestrate_no_res_mgmt_call<Fut>(

@@ -1,9 +1,11 @@
 use crate::authenticator::Authenticator;
+use crate::diagnosticscomponent::PingSearchOptions;
 use crate::error;
 use crate::error::ErrorKind;
 use crate::httpcomponent::{HttpComponent, HttpComponentState};
 use crate::httpx::client::Client;
 use crate::mgmtx::node_target::NodeTarget;
+use crate::pingreport::{EndpointPingReport, PingState};
 use crate::retry::{orchestrate_retries, RetryInfo, RetryManager, DEFAULT_RETRY_STRATEGY};
 use crate::retrybesteffort::ExponentialBackoffCalculator;
 use crate::searchmgmt_options::{
@@ -16,18 +18,21 @@ use crate::searchoptions::SearchOptions;
 use crate::searchx::document_analysis::DocumentAnalysis;
 use crate::searchx::ensure_index_helper::EnsureIndexHelper;
 use crate::searchx::index::Index;
-use crate::searchx::mgmt_options::EnsureIndexPollOptions;
+use crate::searchx::mgmt_options::{EnsureIndexPollOptions, PingOptions};
 use crate::searchx::search::Search;
 use crate::searchx::search_respreader::SearchRespReader;
 use crate::searchx::search_result::{FacetResult, MetaData, ResultHit};
 use crate::service_type::ServiceType;
 use arc_swap::ArcSwap;
+use futures::future::join_all;
 use futures::StreamExt;
 use futures_core::Stream;
 use std::collections::HashMap;
 use std::future::Future;
+use std::ops::Sub;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::select;
 
 pub(crate) struct SearchComponent<C: Client> {
     http_component: HttpComponent<C>,
@@ -84,7 +89,7 @@ impl Stream for SearchResultStream {
         self.inner.poll_next_unpin(cx).map_err(|e| e.into())
     }
 }
-impl<C: Client> SearchComponent<C> {
+impl<C: Client + 'static> SearchComponent<C> {
     pub fn new(
         retry_manager: Arc<RetryManager>,
         http_client: Arc<C>,
@@ -499,6 +504,78 @@ impl<C: Client> SearchComponent<C> {
                     .map_err(error::Error::from)
             })
             .await
+    }
+
+    pub async fn ping_all_endpoints(
+        &self,
+        opts: PingSearchOptions<'_>,
+    ) -> error::Result<Vec<EndpointPingReport>> {
+        let (client, targets) = self.http_component.get_all_targets::<NodeTarget>(&[])?;
+
+        let copts = PingOptions {
+            on_behalf_of: opts.on_behalf_of,
+        };
+        let timeout = opts.timeout;
+
+        let mut handles = Vec::with_capacity(targets.len());
+        let user_agent = self.http_component.user_agent().to_string();
+        for target in targets {
+            let user_agent = user_agent.clone();
+            let client = Search::<C> {
+                http_client: client.clone(),
+                user_agent,
+                endpoint: target.endpoint.clone(),
+                username: target.username,
+                password: target.password,
+
+                vector_search_enabled: self.state.load().vector_search_enabled,
+            };
+
+            let handle = self.ping_one(client, timeout, copts.clone());
+
+            handles.push(handle);
+        }
+
+        let reports = join_all(handles).await;
+
+        Ok(reports)
+    }
+
+    async fn ping_one(
+        &self,
+        client: Search<C>,
+        timeout: Duration,
+        opts: PingOptions<'_>,
+    ) -> EndpointPingReport {
+        let start = std::time::Instant::now();
+        let res = select! {
+            e = tokio::time::sleep(timeout) => {
+                return EndpointPingReport {
+                    remote: client.endpoint,
+                    error: None,
+                    latency: std::time::Instant::now().sub(start),
+                    id: None,
+                    namespace: None,
+                    state: PingState::Timeout,
+                }
+            }
+            r = client.ping(&opts) => r.map_err(error::Error::from),
+        };
+        let end = std::time::Instant::now();
+
+        let (error, state) = match res {
+            Ok(_) => (None, PingState::Ok),
+            Err(e) => (Some(e), PingState::Error),
+        };
+
+        EndpointPingReport {
+            remote: client.endpoint,
+            error,
+            latency: end.sub(start),
+            id: None,
+            namespace: None,
+            state,
+        }
     }
 
     async fn orchestrate_mgmt_call<Fut, Resp>(
