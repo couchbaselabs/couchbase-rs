@@ -32,6 +32,7 @@ pub(crate) trait KvClientManager: Sized + Send + Sync {
     fn get_random_client(
         &self,
     ) -> impl Future<Output = Result<Arc<KvClientManagerClientType<Self>>>> + Send;
+    async fn get_client_per_endpoint(&self) -> Result<Vec<Arc<KvClientManagerClientType<Self>>>>;
     fn shutdown_client(
         &self,
         endpoint: Option<&str>,
@@ -212,6 +213,17 @@ where
         let pool = self.get_random_pool().await?;
 
         pool.get_client().await
+    }
+
+    async fn get_client_per_endpoint(&self) -> Result<Vec<Arc<KvClientManagerClientType<Self>>>> {
+        let state = self.state.load();
+
+        let mut clients = Vec::with_capacity(state.client_pools.len());
+        for pool in state.client_pools.values() {
+            clients.push(pool.get_client().await?);
+        }
+
+        Ok(clients)
     }
 
     async fn shutdown_client(

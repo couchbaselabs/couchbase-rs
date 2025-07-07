@@ -6,7 +6,7 @@ use crate::queryx::error::{Error, ErrorKind, ServerError, ServerErrorKind};
 use crate::queryx::index::{Index, IndexState};
 use crate::queryx::query_options::{
     BuildDeferredIndexesOptions, CreateIndexOptions, CreatePrimaryIndexOptions, DropIndexOptions,
-    DropPrimaryIndexOptions, GetAllIndexesOptions, QueryOptions, WatchIndexesOptions,
+    DropPrimaryIndexOptions, GetAllIndexesOptions, PingOptions, QueryOptions, WatchIndexesOptions,
 };
 use crate::queryx::query_respreader::QueryRespReader;
 use crate::retry::RetryStrategy;
@@ -523,6 +523,35 @@ impl<C: Client> Query<C> {
 
             sleep(cur_interval).await;
         }
+    }
+
+    pub async fn ping(&self, opts: &PingOptions<'_>) -> error::Result<()> {
+        let res = match self
+            .execute(
+                Method::GET,
+                "admin/ping",
+                "",
+                opts.on_behalf_of.cloned(),
+                None,
+            )
+            .await
+        {
+            Ok(r) => r,
+            Err(e) => {
+                return Err(Error::new_http_error(&self.endpoint, None, None).with(Arc::new(e)));
+            }
+        };
+
+        if res.status().is_success() {
+            return Ok(());
+        }
+
+        Err(Error::new_message_error(
+            format!("ping failed with status code: {}", res.status()),
+            Some(self.endpoint.clone()),
+            None,
+            None,
+        ))
     }
 }
 

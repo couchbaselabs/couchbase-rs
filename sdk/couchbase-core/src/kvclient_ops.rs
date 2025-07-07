@@ -13,15 +13,15 @@ use crate::memdx::pendingop::PendingOp;
 use crate::memdx::request::{
     AddRequest, AppendRequest, DecrementRequest, DeleteRequest, GetAndLockRequest,
     GetAndTouchRequest, GetClusterConfigRequest, GetCollectionIdRequest, GetMetaRequest,
-    GetRequest, IncrementRequest, LookupInRequest, MutateInRequest, PrependRequest, ReplaceRequest,
-    SelectBucketRequest, SetRequest, TouchRequest, UnlockRequest,
+    GetRequest, IncrementRequest, LookupInRequest, MutateInRequest, PingRequest, PrependRequest,
+    ReplaceRequest, SelectBucketRequest, SetRequest, TouchRequest, UnlockRequest,
 };
 use crate::memdx::response::{
     AddResponse, AppendResponse, BootstrapResult, DecrementResponse, DeleteResponse,
     GetAndLockResponse, GetAndTouchResponse, GetClusterConfigResponse, GetCollectionIdResponse,
     GetMetaResponse, GetResponse, IncrementResponse, LookupInResponse, MutateInResponse,
-    PrependResponse, ReplaceResponse, SelectBucketResponse, SetResponse, TouchResponse,
-    UnlockResponse,
+    PingResponse, PrependResponse, ReplaceResponse, SelectBucketResponse, SetResponse,
+    TouchResponse, UnlockResponse,
 };
 
 pub(crate) type KvResult<T> = Result<T, MemdxError>;
@@ -81,6 +81,7 @@ pub(crate) trait KvClientOps: Sized + Send + Sync {
         &self,
         req: GetCollectionIdRequest,
     ) -> impl Future<Output = KvResult<GetCollectionIdResponse>> + Send;
+    fn ping(&self, req: PingRequest) -> impl Future<Output = KvResult<PingResponse>> + Send;
 }
 
 impl<D> KvClientOps for StdKvClient<D>
@@ -237,6 +238,13 @@ where
     ) -> KvResult<GetCollectionIdResponse> {
         let mut op = self
             .handle_dispatch_side_result(OpsUtil {}.get_collection_id(self.client(), req).await)?;
+
+        let res = self.handle_response_side_result(op.recv().await)?;
+        Ok(res)
+    }
+
+    async fn ping(&self, req: PingRequest<'_>) -> KvResult<PingResponse> {
+        let mut op = self.handle_dispatch_side_result(OpsUtil {}.ping(self.client(), req).await)?;
 
         let res = self.handle_response_side_result(op.recv().await)?;
         Ok(res)

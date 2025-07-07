@@ -5,8 +5,8 @@ use crate::memdx::magic::Magic;
 use crate::memdx::opcode::OpCode;
 use crate::memdx::packet::RequestPacket;
 use crate::memdx::pendingop::StandardPendingOp;
-use crate::memdx::request::GetCollectionIdRequest;
-use crate::memdx::response::GetCollectionIdResponse;
+use crate::memdx::request::{GetCollectionIdRequest, PingRequest};
+use crate::memdx::response::{GetCollectionIdResponse, PingResponse};
 
 pub struct OpsUtil {}
 
@@ -42,6 +42,35 @@ impl OpsUtil {
                     scope_name: Some(request.scope_name.to_string()),
                     collection_name: Some(request.collection_name.to_string()),
                 }),
+            )
+            .await?;
+
+        Ok(StandardPendingOp::new(op))
+    }
+
+    pub async fn ping<D>(
+        &self,
+        dispatcher: &D,
+        _request: PingRequest<'_>,
+    ) -> Result<StandardPendingOp<PingResponse>>
+    where
+        D: Dispatcher,
+    {
+        let op = dispatcher
+            .dispatch(
+                RequestPacket {
+                    magic: Magic::Req,
+                    op_code: OpCode::Noop,
+                    datatype: 0,
+                    vbucket_id: None,
+                    cas: None,
+                    extras: None,
+                    key: None,
+                    value: None,
+                    framing_extras: None,
+                    opaque: None,
+                },
+                None,
             )
             .await?;
 

@@ -447,3 +447,20 @@ pub struct EnsureIndexPollOptions<C: Client> {
     pub client: Arc<C>,
     pub targets: Vec<NodeTarget>,
 }
+
+#[derive(Debug, Clone, Default)]
+#[non_exhaustive]
+pub struct PingOptions<'a> {
+    pub(crate) on_behalf_of: Option<&'a OnBehalfOfInfo>,
+}
+
+impl<'a> PingOptions<'a> {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn on_behalf_of(mut self, on_behalf_of: impl Into<Option<&'a OnBehalfOfInfo>>) -> Self {
+        self.on_behalf_of = on_behalf_of.into();
+        self
+    }
+}

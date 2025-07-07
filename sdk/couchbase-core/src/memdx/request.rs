@@ -844,3 +844,19 @@ impl<'a> MutateInRequest<'a> {
         self
     }
 }
+
+#[derive(Default, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct PingRequest<'a> {
+    pub(crate) on_behalf_of: Option<&'a str>,
+}
+
+impl<'a> PingRequest<'a> {
+    pub fn new() -> Self {
+        Self { on_behalf_of: None }
+    }
+
+    pub fn on_behalf_of(mut self, on_behalf_of: &'a str) -> Self {
+        self.on_behalf_of = Some(on_behalf_of);
+        self
+    }
+}

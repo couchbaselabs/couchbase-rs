@@ -4,14 +4,14 @@ use crate::httpx::response::Response;
 use crate::mgmtx::mgmt::parse_response_json;
 use crate::searchx::document_analysis::DocumentAnalysis;
 use crate::searchx::error;
-use crate::searchx::error::ServerError;
+use crate::searchx::error::{Error, ServerError};
 use crate::searchx::index::Index;
 use crate::searchx::index_json::{SearchIndexResponseJson, SearchIndexesResponseJson};
 use crate::searchx::mgmt_options::{
     AllowQueryingOptions, AnalyzeDocumentOptions, DeleteIndexOptions, DisallowQueryingOptions,
     FreezePlanOptions, GetAllIndexesOptions, GetIndexOptions, GetIndexedDocumentsCountOptions,
-    PauseIngestOptions, RefreshConfigOptions, ResumeIngestOptions, UnfreezePlanOptions,
-    UpsertIndexOptions,
+    PauseIngestOptions, PingOptions, RefreshConfigOptions, ResumeIngestOptions,
+    UnfreezePlanOptions, UpsertIndexOptions,
 };
 use crate::searchx::query_options::QueryOptions;
 use crate::searchx::search_json::{DocumentAnalysisJson, IndexedDocumentsJson};
@@ -421,6 +421,34 @@ impl<C: Client> Search<C> {
             opts.on_behalf_of,
         )
         .await
+    }
+
+    pub async fn ping(&self, opts: &PingOptions<'_>) -> error::Result<()> {
+        let res = match self
+            .execute(
+                Method::GET,
+                "/api/ping",
+                "",
+                opts.on_behalf_of.cloned(),
+                None,
+                None,
+            )
+            .await
+        {
+            Ok(r) => r,
+            Err(e) => {
+                return Err(Error::new_http_error(&self.endpoint).with(Arc::new(e)));
+            }
+        };
+
+        if res.status().is_success() {
+            return Ok(());
+        }
+
+        Err(Error::new_message_error(
+            format!("ping failed with status code: {}", res.status()),
+            Some(self.endpoint.clone()),
+        ))
     }
 
     async fn control_request(

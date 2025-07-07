@@ -1,9 +1,11 @@
+use serde::Serialize;
 use std::fmt::{Display, Formatter};
 
-#[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Serialize)]
 pub struct ServiceType(InnerServiceType);
 
-#[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "lowercase")]
 pub(crate) enum InnerServiceType {
     Memd,
     Mgmt,
