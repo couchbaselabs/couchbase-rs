@@ -158,7 +158,7 @@ impl CouchbaseQueryIndexMgmtClient {
         let opts = opts.unwrap_or_default();
 
         let mut get_indexes_opts =
-            couchbase_core::queryoptions::GetAllIndexesOptions::new(&self.keyspace.bucket_name)
+            couchbase_core::options::query::GetAllIndexesOptions::new(&self.keyspace.bucket_name)
                 .scope_name(&self.keyspace.scope_name)
                 .collection_name(&self.keyspace.collection_name);
 
@@ -183,7 +183,7 @@ impl CouchbaseQueryIndexMgmtClient {
 
         let fields: Vec<&str> = fields.iter().map(String::as_str).collect();
 
-        let mut create_index_opts = couchbase_core::queryoptions::CreateIndexOptions::new(
+        let mut create_index_opts = couchbase_core::options::query::CreateIndexOptions::new(
             &self.keyspace.bucket_name,
             &index_name,
             &fields,
@@ -214,7 +214,7 @@ impl CouchbaseQueryIndexMgmtClient {
     ) -> error::Result<()> {
         let opts = opts.unwrap_or_default();
 
-        let mut create_index_opts = couchbase_core::queryoptions::CreatePrimaryIndexOptions::new(
+        let mut create_index_opts = couchbase_core::options::query::CreatePrimaryIndexOptions::new(
             &self.keyspace.bucket_name,
         )
         .scope_name(&self.keyspace.scope_name)
@@ -248,7 +248,7 @@ impl CouchbaseQueryIndexMgmtClient {
     ) -> error::Result<()> {
         let opts = opts.unwrap_or_default();
 
-        let mut drop_index_opts = couchbase_core::queryoptions::DropIndexOptions::new(
+        let mut drop_index_opts = couchbase_core::options::query::DropIndexOptions::new(
             &self.keyspace.bucket_name,
             index_name.as_str(),
         )
@@ -273,10 +273,11 @@ impl CouchbaseQueryIndexMgmtClient {
     ) -> error::Result<()> {
         let opts = opts.unwrap_or_default();
 
-        let mut drop_index_opts =
-            couchbase_core::queryoptions::DropPrimaryIndexOptions::new(&self.keyspace.bucket_name)
-                .scope_name(&self.keyspace.scope_name)
-                .collection_name(&self.keyspace.collection_name);
+        let mut drop_index_opts = couchbase_core::options::query::DropPrimaryIndexOptions::new(
+            &self.keyspace.bucket_name,
+        )
+        .scope_name(&self.keyspace.scope_name)
+        .collection_name(&self.keyspace.collection_name);
 
         if let Some(ignore) = opts.ignore_if_not_exists {
             drop_index_opts = drop_index_opts.ignore_if_not_exists(ignore);
@@ -302,7 +303,7 @@ impl CouchbaseQueryIndexMgmtClient {
 
         let index_names_refs: Vec<&str> = index_names.iter().map(String::as_str).collect();
 
-        let mut watch_indexes_opts = couchbase_core::queryoptions::WatchIndexesOptions::new(
+        let mut watch_indexes_opts = couchbase_core::options::query::WatchIndexesOptions::new(
             &self.keyspace.bucket_name,
             &index_names_refs,
         )
@@ -328,7 +329,7 @@ impl CouchbaseQueryIndexMgmtClient {
         let opts = opts.unwrap_or_default();
 
         let mut build_indexes_opts =
-            couchbase_core::queryoptions::BuildDeferredIndexesOptions::new(
+            couchbase_core::options::query::BuildDeferredIndexesOptions::new(
                 &self.keyspace.bucket_name,
             )
             .scope_name(&self.keyspace.scope_name)

@@ -6,11 +6,11 @@ use crate::common::test_config::run_test;
 use couchbase_core::agent::Agent;
 use couchbase_core::cbconfig::CollectionManifest;
 use couchbase_core::features::BucketFeature;
-use couchbase_core::mgmtoptions::{
+use couchbase_core::mgmtx::bucket_settings::{BucketSettings, BucketType};
+use couchbase_core::options::management::{
     CreateBucketOptions, CreateCollectionOptions, DeleteBucketOptions, EnsureBucketOptions,
     EnsureManifestOptions, GetBucketOptions, GetCollectionManifestOptions, UpdateBucketOptions,
 };
-use couchbase_core::mgmtx::bucket_settings::{BucketSettings, BucketType};
 use couchbase_core::{cbconfig, error};
 use serial_test::serial;
 use std::future::Future;

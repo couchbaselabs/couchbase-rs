@@ -7,11 +7,11 @@ use log::debug;
 use tokio::sync::{Mutex, Notify};
 
 use crate::agent::Agent;
-use crate::agentoptions::{AgentOptions, CompressionConfig, ConfigPollerConfig, SeedConfig};
 use crate::auth_mechanism::AuthMechanism;
 use crate::authenticator::Authenticator;
 use crate::error;
 use crate::error::ErrorKind;
+use crate::options::agent::{AgentOptions, CompressionConfig, ConfigPollerConfig, SeedConfig};
 use crate::tls_config::TlsConfig;
 
 #[derive(Clone)]

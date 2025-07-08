@@ -2,12 +2,12 @@ use crate::common::helpers::{generate_key_with_letter_prefix, try_until};
 use crate::common::test_agent::TestAgent;
 use crate::common::test_config::run_test;
 use couchbase_core::agent::Agent;
-use couchbase_core::mgmtoptions::{
+use couchbase_core::mgmtx::user::{Group, Role, User, UserAndMetadata};
+use couchbase_core::options::management::{
     DeleteGroupOptions, DeleteUserOptions, EnsureGroupOptions, EnsureUserOptions,
     GetAllGroupsOptions, GetAllUsersOptions, GetGroupOptions, GetRolesOptions, GetUserOptions,
     UpsertGroupOptions, UpsertUserOptions,
 };
-use couchbase_core::mgmtx::user::{Group, Role, User, UserAndMetadata};
 use couchbase_core::{error, mgmtx};
 use log::error;
 use std::ops::Add;

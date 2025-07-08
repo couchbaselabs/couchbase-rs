@@ -4,7 +4,7 @@ use crate::common::helpers::{
     generate_key_with_letter_prefix, generate_string_key, try_until,
 };
 use crate::common::test_config::run_test;
-use couchbase_core::searchmgmt_options::{
+use couchbase_core::options::search_management::{
     DeleteIndexOptions, EnsureIndexOptions, GetIndexOptions, UpsertIndexOptions,
 };
 use couchbase_core::searchx::ensure_index_helper::DesiredState;

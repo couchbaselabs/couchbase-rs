@@ -60,3 +60,6 @@ native-tls = ["reqwest/native-tls", "dep:tokio-native-tls"]
 [lints.rust]
 # This is temporary whilst we build out the root modules.
 unused = "allow"
+
+[lints.clippy]
+uninlined_format_args = "allow"

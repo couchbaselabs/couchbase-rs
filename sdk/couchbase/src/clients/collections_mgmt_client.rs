@@ -154,7 +154,7 @@ impl CouchbaseCollectionsMgmtClient {
         let agent = self.agent_provider.get_agent().await;
         agent
             .create_scope(
-                &couchbase_core::mgmtoptions::CreateScopeOptions::new(
+                &couchbase_core::options::management::CreateScopeOptions::new(
                     &self.bucket_name,
                     scope_name.into().as_str(),
                 )
@@ -173,7 +173,7 @@ impl CouchbaseCollectionsMgmtClient {
         let agent = self.agent_provider.get_agent().await;
         agent
             .delete_scope(
-                &couchbase_core::mgmtoptions::DeleteScopeOptions::new(
+                &couchbase_core::options::management::DeleteScopeOptions::new(
                     &self.bucket_name,
                     scope_name.into().as_str(),
                 )
@@ -194,7 +194,7 @@ impl CouchbaseCollectionsMgmtClient {
         let agent = self.agent_provider.get_agent().await;
         let scope_name = scope_name.into();
         let collection_name = collection_name.into();
-        let mut opts = couchbase_core::mgmtoptions::CreateCollectionOptions::new(
+        let mut opts = couchbase_core::options::management::CreateCollectionOptions::new(
             &self.bucket_name,
             scope_name.as_str(),
             collection_name.as_str(),
@@ -224,7 +224,7 @@ impl CouchbaseCollectionsMgmtClient {
         let agent = self.agent_provider.get_agent().await;
         let scope_name = scope_name.into();
         let collection_name = collection_name.into();
-        let mut opts = couchbase_core::mgmtoptions::UpdateCollectionOptions::new(
+        let mut opts = couchbase_core::options::management::UpdateCollectionOptions::new(
             &self.bucket_name,
             scope_name.as_str(),
             collection_name.as_str(),
@@ -253,7 +253,7 @@ impl CouchbaseCollectionsMgmtClient {
         let agent = self.agent_provider.get_agent().await;
         agent
             .delete_collection(
-                &couchbase_core::mgmtoptions::DeleteCollectionOptions::new(
+                &couchbase_core::options::management::DeleteCollectionOptions::new(
                     &self.bucket_name,
                     scope_name.into().as_str(),
                     collection_name.into().as_str(),
@@ -269,8 +269,10 @@ impl CouchbaseCollectionsMgmtClient {
         let agent = self.agent_provider.get_agent().await;
         let manifest = agent
             .get_collection_manifest(
-                &couchbase_core::mgmtoptions::GetCollectionManifestOptions::new(&self.bucket_name)
-                    .retry_strategy(self.default_retry_strategy.clone()),
+                &couchbase_core::options::management::GetCollectionManifestOptions::new(
+                    &self.bucket_name,
+                )
+                .retry_strategy(self.default_retry_strategy.clone()),
             )
             .await?;
 

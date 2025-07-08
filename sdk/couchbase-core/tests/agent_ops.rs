@@ -8,13 +8,13 @@ use crate::common::helpers::{
 };
 use crate::common::test_config::{run_test, setup_test};
 use couchbase_core::agent::Agent;
-use couchbase_core::crudoptions::{
+use couchbase_core::memdx::error::{ErrorKind, ServerErrorKind, SubdocErrorKind};
+use couchbase_core::memdx::subdoc::{LookupInOp, LookupInOpType, MutateInOp, MutateInOpType};
+use couchbase_core::options::crud::{
     AddOptions, AppendOptions, DecrementOptions, DeleteOptions, GetAndLockOptions,
     GetAndTouchOptions, GetOptions, IncrementOptions, LookupInOptions, MutateInOptions,
     PrependOptions, ReplaceOptions, TouchOptions, UnlockOptions, UpsertOptions,
 };
-use couchbase_core::memdx::error::{ErrorKind, ServerErrorKind, SubdocErrorKind};
-use couchbase_core::memdx::subdoc::{LookupInOp, LookupInOpType, MutateInOp, MutateInOpType};
 use couchbase_core::retrybesteffort::{BestEffortRetryStrategy, ExponentialBackoffCalculator};
 use couchbase_core::retryfailfast::FailFastRetryStrategy;
 use rand::distr::Alphanumeric;

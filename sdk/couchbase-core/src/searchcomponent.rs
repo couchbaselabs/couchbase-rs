@@ -5,16 +5,16 @@ use crate::error::ErrorKind;
 use crate::httpcomponent::{HttpComponent, HttpComponentState};
 use crate::httpx::client::Client;
 use crate::mgmtx::node_target::NodeTarget;
-use crate::pingreport::{EndpointPingReport, PingState};
-use crate::retry::{orchestrate_retries, RetryInfo, RetryManager, DEFAULT_RETRY_STRATEGY};
-use crate::retrybesteffort::ExponentialBackoffCalculator;
-use crate::searchmgmt_options::{
+use crate::options::search::SearchOptions;
+use crate::options::search_management::{
     AllowQueryingOptions, AnalyzeDocumentOptions, DeleteIndexOptions, DisallowQueryingOptions,
     EnsureIndexOptions, FreezePlanOptions, GetAllIndexesOptions, GetIndexOptions,
     GetIndexedDocumentsCountOptions, PauseIngestOptions, ResumeIngestOptions, UnfreezePlanOptions,
     UpsertIndexOptions,
 };
-use crate::searchoptions::SearchOptions;
+use crate::pingreport::{EndpointPingReport, PingState};
+use crate::retry::{orchestrate_retries, RetryInfo, RetryManager, DEFAULT_RETRY_STRATEGY};
+use crate::retrybesteffort::ExponentialBackoffCalculator;
 use crate::searchx::document_analysis::DocumentAnalysis;
 use crate::searchx::ensure_index_helper::EnsureIndexHelper;
 use crate::searchx::index::Index;

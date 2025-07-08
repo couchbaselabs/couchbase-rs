@@ -7,7 +7,7 @@ use crate::kvclient_ops::KvClientOps;
 use crate::kvclientmanager::KvClientManager;
 use crate::kvclientpool::KvClientPool;
 use crate::memdx::request::PingRequest;
-use crate::pingoptions::PingOptions;
+use crate::options::ping::PingOptions;
 use crate::pingreport::{EndpointPingReport, PingReport, PingState};
 use crate::querycomponent::QueryComponent;
 use crate::retry::RetryManager;

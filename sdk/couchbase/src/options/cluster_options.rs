@@ -1,7 +1,7 @@
 use crate::authenticator::Authenticator;
-use couchbase_core::agentoptions::CompressionConfig;
-pub use couchbase_core::agentoptions::CompressionMode;
 use couchbase_core::ondemand_agentmanager::OnDemandAgentManagerOptions;
+use couchbase_core::options::agent::CompressionConfig;
+pub use couchbase_core::options::agent::CompressionMode;
 use log::debug;
 use std::io::Cursor;
 use std::sync::Arc;

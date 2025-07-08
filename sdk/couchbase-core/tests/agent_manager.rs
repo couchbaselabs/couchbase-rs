@@ -1,6 +1,6 @@
-use couchbase_core::crudoptions::UpsertOptions;
 use couchbase_core::ondemand_agentmanager::{OnDemandAgentManager, OnDemandAgentManagerOptions};
-use couchbase_core::queryoptions::QueryOptions;
+use couchbase_core::options::crud::UpsertOptions;
+use couchbase_core::options::query::QueryOptions;
 
 use crate::common::default_agent_options::create_default_options;
 use crate::common::helpers::{generate_bytes_value, generate_key};

@@ -1,6 +1,6 @@
 use crate::common::test_config::TestSetupConfig;
-use couchbase_core::agentoptions::{AgentOptions, SeedConfig};
 use couchbase_core::authenticator::{Authenticator, PasswordAuthenticator};
+use couchbase_core::options::agent::{AgentOptions, SeedConfig};
 #[cfg(feature = "rustls-tls")]
 use {
     couchbase_core::insecure_certverfier::InsecureCertVerifier, std::sync::Arc,

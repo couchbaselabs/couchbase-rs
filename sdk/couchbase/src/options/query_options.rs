@@ -1,7 +1,8 @@
 use crate::error;
 use crate::error::Error;
 use crate::mutation_state::MutationState;
-use couchbase_core::{queryoptions, queryx};
+use couchbase_core::options::query;
+use couchbase_core::queryx;
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -227,10 +228,10 @@ impl QueryOptions {
     }
 }
 
-impl TryFrom<QueryOptions> for queryoptions::QueryOptions {
+impl TryFrom<QueryOptions> for query::QueryOptions {
     type Error = error::Error;
 
-    fn try_from(opts: QueryOptions) -> Result<queryoptions::QueryOptions, Self::Error> {
+    fn try_from(opts: QueryOptions) -> Result<query::QueryOptions, Self::Error> {
         let (mutation_state, scan_consistency) = if let Some(mutation_state) = opts.consistent_with
         {
             (
@@ -241,7 +242,7 @@ impl TryFrom<QueryOptions> for queryoptions::QueryOptions {
             (None, opts.scan_consistency.map(|sc| sc.into()))
         };
 
-        let mut builder = queryoptions::QueryOptions::new()
+        let mut builder = query::QueryOptions::new()
             .args(opts.positional_parameters)
             .client_context_id(opts.client_context_id)
             .max_parallelism(opts.max_parallelism)
