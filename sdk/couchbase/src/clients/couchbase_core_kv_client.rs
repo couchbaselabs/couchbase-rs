@@ -55,7 +55,7 @@ impl CouchbaseCoreKvClient {
         let agent = self.agent_provider.get_agent().await;
         let result = agent
             .upsert(
-                couchbase_core::crudoptions::UpsertOptions::new(
+                couchbase_core::options::crud::UpsertOptions::new(
                     id.as_bytes(),
                     &self.scope_name,
                     &self.collection_name,
@@ -89,7 +89,7 @@ impl CouchbaseCoreKvClient {
         let agent = self.agent_provider.get_agent().await;
         let result = agent
             .add(
-                couchbase_core::crudoptions::AddOptions::new(
+                couchbase_core::options::crud::AddOptions::new(
                     id.as_bytes(),
                     &self.scope_name,
                     &self.collection_name,
@@ -122,7 +122,7 @@ impl CouchbaseCoreKvClient {
         let agent = self.agent_provider.get_agent().await;
         let result = agent
             .replace(
-                couchbase_core::crudoptions::ReplaceOptions::new(
+                couchbase_core::options::crud::ReplaceOptions::new(
                     id.as_bytes(),
                     &self.scope_name,
                     &self.collection_name,
@@ -151,7 +151,7 @@ impl CouchbaseCoreKvClient {
         let agent = self.agent_provider.get_agent().await;
         let result = agent
             .delete(
-                couchbase_core::crudoptions::DeleteOptions::new(
+                couchbase_core::options::crud::DeleteOptions::new(
                     id.as_bytes(),
                     &self.scope_name,
                     &self.collection_name,
@@ -176,7 +176,7 @@ impl CouchbaseCoreKvClient {
         let agent = self.agent_provider.get_agent().await;
         let res = agent
             .get(
-                couchbase_core::crudoptions::GetOptions::new(
+                couchbase_core::options::crud::GetOptions::new(
                     id.as_bytes(),
                     &self.scope_name,
                     &self.collection_name,
@@ -192,7 +192,7 @@ impl CouchbaseCoreKvClient {
         let agent = self.agent_provider.get_agent().await;
         let res = agent
             .get_meta(
-                couchbase_core::crudoptions::GetMetaOptions::new(
+                couchbase_core::options::crud::GetMetaOptions::new(
                     id.as_bytes(),
                     &self.scope_name,
                     &self.collection_name,
@@ -213,7 +213,7 @@ impl CouchbaseCoreKvClient {
         let agent = self.agent_provider.get_agent().await;
         let res = agent
             .get_and_touch(
-                couchbase_core::crudoptions::GetAndTouchOptions::new(
+                couchbase_core::options::crud::GetAndTouchOptions::new(
                     id.as_bytes(),
                     &self.scope_name,
                     &self.collection_name,
@@ -235,7 +235,7 @@ impl CouchbaseCoreKvClient {
         let agent = self.agent_provider.get_agent().await;
         let res = agent
             .get_and_lock(
-                couchbase_core::crudoptions::GetAndLockOptions::new(
+                couchbase_core::options::crud::GetAndLockOptions::new(
                     id.as_bytes(),
                     &self.scope_name,
                     &self.collection_name,
@@ -252,7 +252,7 @@ impl CouchbaseCoreKvClient {
         let agent = self.agent_provider.get_agent().await;
         agent
             .unlock(
-                couchbase_core::crudoptions::UnlockOptions::new(
+                couchbase_core::options::crud::UnlockOptions::new(
                     id.as_bytes(),
                     &self.scope_name,
                     &self.collection_name,
@@ -274,7 +274,7 @@ impl CouchbaseCoreKvClient {
         let agent = self.agent_provider.get_agent().await;
         let result = agent
             .touch(
-                couchbase_core::crudoptions::TouchOptions::new(
+                couchbase_core::options::crud::TouchOptions::new(
                     id.as_bytes(),
                     &self.scope_name,
                     &self.collection_name,
@@ -296,7 +296,7 @@ impl CouchbaseCoreKvClient {
         let agent = self.agent_provider.get_agent().await;
         let result = agent
             .append(
-                couchbase_core::crudoptions::AppendOptions::new(
+                couchbase_core::options::crud::AppendOptions::new(
                     id.as_bytes(),
                     &self.scope_name,
                     &self.collection_name,
@@ -326,7 +326,7 @@ impl CouchbaseCoreKvClient {
         let agent = self.agent_provider.get_agent().await;
         let result = agent
             .prepend(
-                couchbase_core::crudoptions::PrependOptions::new(
+                couchbase_core::options::crud::PrependOptions::new(
                     id.as_bytes(),
                     &self.scope_name,
                     &self.collection_name,
@@ -355,7 +355,7 @@ impl CouchbaseCoreKvClient {
         let agent = self.agent_provider.get_agent().await;
         let result = agent
             .increment(
-                couchbase_core::crudoptions::IncrementOptions::new(
+                couchbase_core::options::crud::IncrementOptions::new(
                     id.as_bytes(),
                     &self.scope_name,
                     &self.collection_name,
@@ -387,7 +387,7 @@ impl CouchbaseCoreKvClient {
         let agent = self.agent_provider.get_agent().await;
         let result = agent
             .decrement(
-                couchbase_core::crudoptions::DecrementOptions::new(
+                couchbase_core::options::crud::DecrementOptions::new(
                     id.as_bytes(),
                     &self.scope_name,
                     &self.collection_name,
@@ -422,7 +422,7 @@ impl CouchbaseCoreKvClient {
 
         let result = agent
             .lookup_in(
-                couchbase_core::crudoptions::LookupInOptions::new(
+                couchbase_core::options::crud::LookupInOptions::new(
                     id.as_bytes(),
                     &self.scope_name,
                     &self.collection_name,
@@ -472,7 +472,7 @@ impl CouchbaseCoreKvClient {
 
         let result = agent
             .mutate_in(
-                couchbase_core::crudoptions::MutateInOptions::new(
+                couchbase_core::options::crud::MutateInOptions::new(
                     id.as_bytes(),
                     &self.scope_name,
                     &self.collection_name,

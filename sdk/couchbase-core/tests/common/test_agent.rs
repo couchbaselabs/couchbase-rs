@@ -6,21 +6,23 @@ use crate::common::node_version::NodeVersion;
 use crate::common::test_config::TestSetupConfig;
 use couchbase_core::agent::Agent;
 use couchbase_core::cbconfig::CollectionManifest;
-use couchbase_core::crudoptions::*;
 use couchbase_core::crudresults::*;
 use couchbase_core::error::Result;
 use couchbase_core::features::BucketFeature;
-use couchbase_core::mgmtoptions::*;
 use couchbase_core::mgmtx::bucket_settings::BucketDef;
 use couchbase_core::mgmtx::responses::*;
 use couchbase_core::mgmtx::user::{Group, RoleAndDescription, UserAndMetadata};
+use couchbase_core::options::crud::*;
+use couchbase_core::options::management::*;
+use couchbase_core::options::query::*;
+use couchbase_core::options::search::SearchOptions;
+use couchbase_core::options::search_management;
+use couchbase_core::options::search_management::*;
 use couchbase_core::querycomponent::QueryResultStream;
-use couchbase_core::queryoptions::*;
 use couchbase_core::queryx::index::Index;
 use couchbase_core::searchcomponent::SearchResultStream;
-use couchbase_core::searchmgmt_options::*;
+use couchbase_core::searchx;
 use couchbase_core::searchx::document_analysis::DocumentAnalysis;
-use couchbase_core::{searchmgmt_options, searchoptions::SearchOptions, searchx};
 use std::ops::{Deref, DerefMut};
 
 #[derive(Clone)]
@@ -144,7 +146,7 @@ impl TestAgent {
 
     pub async fn get_all_indexes(
         &self,
-        opts: &couchbase_core::queryoptions::GetAllIndexesOptions<'_>,
+        opts: &couchbase_core::options::query::GetAllIndexesOptions<'_>,
     ) -> Result<Vec<Index>> {
         run_with_std_query_deadline(self.agent.get_all_indexes(opts)).await
     }
@@ -197,7 +199,7 @@ impl TestAgent {
 
     pub async fn get_all_search_indexes(
         &self,
-        opts: &searchmgmt_options::GetAllIndexesOptions<'_>,
+        opts: &search_management::GetAllIndexesOptions<'_>,
     ) -> Result<Vec<searchx::index::Index>> {
         run_with_std_mgmt_deadline(self.agent.get_all_search_indexes(opts)).await
     }
@@ -364,7 +366,7 @@ impl TestAgent {
 
     pub async fn ensure_search_index(
         &self,
-        opts: &searchmgmt_options::EnsureIndexOptions<'_>,
+        opts: &search_management::EnsureIndexOptions<'_>,
     ) -> Result<()> {
         run_with_std_ensure_deadline(self.agent.ensure_search_index(opts)).await
     }

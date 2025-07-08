@@ -176,7 +176,7 @@ impl CouchbaseSearchClient {
             None
         };
 
-        let core_opts = couchbase_core::searchoptions::SearchOptions::new(index_name)
+        let core_opts = couchbase_core::options::search::SearchOptions::new(index_name)
             .collections(opts.collections)
             .control(control)
             .explain(opts.explain)

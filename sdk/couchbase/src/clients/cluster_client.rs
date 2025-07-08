@@ -13,8 +13,8 @@ use crate::clients::user_mgmt_client::{
 use crate::error;
 use crate::options::cluster_options::ClusterOptions;
 use couchbase_connstr::{parse, resolve, Address, SrvRecord};
-use couchbase_core::agentoptions::{CompressionConfig, SeedConfig};
 use couchbase_core::ondemand_agentmanager::{OnDemandAgentManager, OnDemandAgentManagerOptions};
+use couchbase_core::options::agent::{CompressionConfig, SeedConfig};
 use couchbase_core::retry::RetryStrategy;
 use couchbase_core::retrybesteffort::{BestEffortRetryStrategy, ExponentialBackoffCalculator};
 use std::collections::HashMap;

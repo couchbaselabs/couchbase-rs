@@ -5,7 +5,7 @@ use serde_json::Value;
 
 use crate::common::helpers::generate_string_key;
 use crate::common::test_config::run_test;
-use couchbase_core::queryoptions::{
+use couchbase_core::options::query::{
     BuildDeferredIndexesOptions, CreateIndexOptions, CreatePrimaryIndexOptions, DropIndexOptions,
     DropPrimaryIndexOptions, EnsureIndexOptions, GetAllIndexesOptions, QueryOptions,
     WatchIndexesOptions,

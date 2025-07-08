@@ -1,5 +1,5 @@
 use crate::common::test_config::run_test;
-use couchbase_core::pingoptions::PingOptions;
+use couchbase_core::options::ping::PingOptions;
 use couchbase_core::pingreport::PingState;
 use std::future::Future;
 use std::time::Duration;

@@ -1,15 +1,15 @@
 use crate::common::test_agent::TestAgent;
 use couchbase_core::agent::Agent;
-use couchbase_core::crudoptions::GetCollectionIdOptions;
 use couchbase_core::error::{Error, ErrorKind};
 use couchbase_core::features::BucketFeature;
 use couchbase_core::memdx::error::ServerErrorKind;
-use couchbase_core::mgmtoptions::{
-    CreateCollectionOptions, CreateScopeOptions, DeleteCollectionOptions, DeleteScopeOptions,
-    EnsureManifestOptions,
-};
 use couchbase_core::mgmtx::responses::{
     CreateCollectionResponse, CreateScopeResponse, DeleteCollectionResponse, DeleteScopeResponse,
+};
+use couchbase_core::options::crud::GetCollectionIdOptions;
+use couchbase_core::options::management::{
+    CreateCollectionOptions, CreateScopeOptions, DeleteCollectionOptions, DeleteScopeOptions,
+    EnsureManifestOptions,
 };
 use couchbase_core::{error, memdx};
 use rand::distr::Alphanumeric;

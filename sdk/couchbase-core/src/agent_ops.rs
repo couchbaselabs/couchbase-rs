@@ -1,11 +1,5 @@
 use crate::agent::Agent;
 use crate::cbconfig::CollectionManifest;
-use crate::crudoptions::{
-    AddOptions, AppendOptions, DecrementOptions, DeleteOptions, GetAndLockOptions,
-    GetAndTouchOptions, GetCollectionIdOptions, GetMetaOptions, GetOptions, IncrementOptions,
-    LookupInOptions, MutateInOptions, PrependOptions, ReplaceOptions, TouchOptions, UnlockOptions,
-    UpsertOptions,
-};
 use crate::crudresults::{
     AddResult, AppendResult, DecrementResult, DeleteResult, GetAndLockResult, GetAndTouchResult,
     GetCollectionIdResult, GetMetaResult, GetResult, IncrementResult, LookupInResult,
@@ -13,7 +7,19 @@ use crate::crudresults::{
 };
 use crate::error::Result;
 use crate::features::BucketFeature;
-use crate::mgmtoptions::{
+use crate::mgmtx::bucket_settings::BucketDef;
+use crate::mgmtx::responses::{
+    CreateCollectionResponse, CreateScopeResponse, DeleteCollectionResponse, DeleteScopeResponse,
+    UpdateCollectionResponse,
+};
+use crate::mgmtx::user::{Group, RoleAndDescription, UserAndMetadata};
+use crate::options::crud::{
+    AddOptions, AppendOptions, DecrementOptions, DeleteOptions, GetAndLockOptions,
+    GetAndTouchOptions, GetCollectionIdOptions, GetMetaOptions, GetOptions, IncrementOptions,
+    LookupInOptions, MutateInOptions, PrependOptions, ReplaceOptions, TouchOptions, UnlockOptions,
+    UpsertOptions,
+};
+use crate::options::management::{
     ChangePasswordOptions, CreateBucketOptions, CreateCollectionOptions, CreateScopeOptions,
     DeleteBucketOptions, DeleteCollectionOptions, DeleteGroupOptions, DeleteScopeOptions,
     DeleteUserOptions, EnsureBucketOptions, EnsureGroupOptions, EnsureManifestOptions,
@@ -22,30 +28,25 @@ use crate::mgmtoptions::{
     GetRolesOptions, GetUserOptions, UpdateBucketOptions, UpdateCollectionOptions,
     UpsertGroupOptions, UpsertUserOptions,
 };
-use crate::mgmtx::bucket_settings::BucketDef;
-use crate::mgmtx::responses::{
-    CreateCollectionResponse, CreateScopeResponse, DeleteCollectionResponse, DeleteScopeResponse,
-    UpdateCollectionResponse,
-};
-use crate::mgmtx::user::{Group, RoleAndDescription, UserAndMetadata};
-use crate::pingoptions::PingOptions;
-use crate::pingreport::PingReport;
-use crate::querycomponent::QueryResultStream;
-use crate::queryoptions::{
+use crate::options::ping::PingOptions;
+use crate::options::query::{
     BuildDeferredIndexesOptions, CreateIndexOptions, CreatePrimaryIndexOptions, DropIndexOptions,
     DropPrimaryIndexOptions, EnsureIndexOptions, GetAllIndexesOptions, QueryOptions,
     WatchIndexesOptions,
 };
-use crate::queryx::index::Index;
-use crate::searchcomponent::SearchResultStream;
-use crate::searchmgmt_options::{
+use crate::options::search::SearchOptions;
+use crate::options::search_management;
+use crate::options::search_management::{
     AllowQueryingOptions, AnalyzeDocumentOptions, DeleteIndexOptions, DisallowQueryingOptions,
     FreezePlanOptions, GetIndexOptions, GetIndexedDocumentsCountOptions, PauseIngestOptions,
     ResumeIngestOptions, UnfreezePlanOptions, UpsertIndexOptions,
 };
-use crate::searchoptions::SearchOptions;
+use crate::pingreport::PingReport;
+use crate::querycomponent::QueryResultStream;
+use crate::queryx::index::Index;
+use crate::searchcomponent::SearchResultStream;
+use crate::searchx;
 use crate::searchx::document_analysis::DocumentAnalysis;
-use crate::{searchmgmt_options, searchx};
 
 impl Agent {
     pub async fn bucket_features(&self) -> Result<Vec<BucketFeature>> {
@@ -187,7 +188,7 @@ impl Agent {
 
     pub async fn get_all_search_indexes(
         &self,
-        opts: &searchmgmt_options::GetAllIndexesOptions<'_>,
+        opts: &search_management::GetAllIndexesOptions<'_>,
     ) -> Result<Vec<searchx::index::Index>> {
         self.inner.search.get_all_indexes(opts).await
     }
@@ -358,7 +359,7 @@ impl Agent {
 
     pub async fn ensure_search_index(
         &self,
-        opts: &searchmgmt_options::EnsureIndexOptions<'_>,
+        opts: &search_management::EnsureIndexOptions<'_>,
     ) -> Result<()> {
         self.inner.search.ensure_index(opts).await
     }

@@ -71,7 +71,7 @@ impl CouchbaseQueryClient {
 
         let ad_hoc = opts.ad_hoc.unwrap_or(true);
 
-        let mut query_opts = couchbase_core::queryoptions::QueryOptions::try_from(opts)?;
+        let mut query_opts = couchbase_core::options::query::QueryOptions::try_from(opts)?;
         query_opts = query_opts.statement(statement);
 
         if let Some(keyspace) = &self.keyspace {

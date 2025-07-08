@@ -1,4 +1,3 @@
-use crate::agentoptions::AgentOptions;
 use crate::auth_mechanism::AuthMechanism;
 use crate::authenticator::Authenticator;
 use crate::cbconfig::TerseConfig;
@@ -34,6 +33,7 @@ use crate::mgmtcomponent::{MgmtComponent, MgmtComponentConfig, MgmtComponentOpti
 use crate::mgmtx::options::{GetTerseBucketConfigOptions, GetTerseClusterConfigOptions};
 use crate::networktypeheuristic::NetworkTypeHeuristic;
 use crate::nmvbhandler::{ConfigUpdater, StdNotMyVbucketConfigHandler};
+use crate::options::agent::AgentOptions;
 use crate::parsedconfig::{ParsedConfig, ParsedConfigBucketFeature, ParsedConfigFeature};
 use crate::querycomponent::{QueryComponent, QueryComponentConfig, QueryComponentOptions};
 use crate::retry::RetryManager;

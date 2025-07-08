@@ -5,12 +5,12 @@ use crate::error::ErrorKind;
 use crate::httpcomponent::{HttpComponent, HttpComponentState};
 use crate::httpx::client::Client;
 use crate::mgmtx::node_target::NodeTarget;
-use crate::pingreport::{EndpointPingReport, PingState};
-use crate::queryoptions::{
+use crate::options::query::{
     BuildDeferredIndexesOptions, CreateIndexOptions, CreatePrimaryIndexOptions, DropIndexOptions,
     DropPrimaryIndexOptions, EnsureIndexOptions, GetAllIndexesOptions, QueryOptions,
     WatchIndexesOptions,
 };
+use crate::pingreport::{EndpointPingReport, PingState};
 use crate::queryx::ensure_index_helper::EnsureIndexHelper;
 use crate::queryx::index::Index;
 use crate::queryx::preparedquery::{PreparedQuery, PreparedStatementCache};

@@ -3,15 +3,6 @@ use crate::cbconfig::CollectionManifest;
 use crate::error::ErrorKind;
 use crate::httpcomponent::{HttpComponent, HttpComponentState};
 use crate::httpx::client::Client;
-use crate::mgmtoptions::{
-    ChangePasswordOptions, CreateBucketOptions, CreateCollectionOptions, CreateScopeOptions,
-    DeleteBucketOptions, DeleteCollectionOptions, DeleteGroupOptions, DeleteScopeOptions,
-    DeleteUserOptions, EnsureBucketOptions, EnsureGroupOptions, EnsureManifestOptions,
-    EnsureUserOptions, FlushBucketOptions, GetAllBucketsOptions, GetAllGroupsOptions,
-    GetAllUsersOptions, GetBucketOptions, GetCollectionManifestOptions, GetGroupOptions,
-    GetRolesOptions, GetUserOptions, UpdateBucketOptions, UpdateCollectionOptions,
-    UpsertGroupOptions, UpsertUserOptions,
-};
 use crate::mgmtx::bucket_helper::EnsureBucketHelper;
 use crate::mgmtx::bucket_settings::BucketDef;
 use crate::mgmtx::group_helper::EnsureGroupHelper;
@@ -27,6 +18,15 @@ use crate::mgmtx::responses::{
 };
 use crate::mgmtx::user::{Group, RoleAndDescription, UserAndMetadata};
 use crate::mgmtx::user_helper::EnsureUserHelper;
+use crate::options::management::{
+    ChangePasswordOptions, CreateBucketOptions, CreateCollectionOptions, CreateScopeOptions,
+    DeleteBucketOptions, DeleteCollectionOptions, DeleteGroupOptions, DeleteScopeOptions,
+    DeleteUserOptions, EnsureBucketOptions, EnsureGroupOptions, EnsureManifestOptions,
+    EnsureUserOptions, FlushBucketOptions, GetAllBucketsOptions, GetAllGroupsOptions,
+    GetAllUsersOptions, GetBucketOptions, GetCollectionManifestOptions, GetGroupOptions,
+    GetRolesOptions, GetUserOptions, UpdateBucketOptions, UpdateCollectionOptions,
+    UpsertGroupOptions, UpsertUserOptions,
+};
 use crate::retry::{orchestrate_retries, RetryInfo, RetryManager};
 use crate::retrybesteffort::ExponentialBackoffCalculator;
 use crate::service_type::ServiceType;

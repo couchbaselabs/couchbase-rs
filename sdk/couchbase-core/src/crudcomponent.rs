@@ -4,12 +4,6 @@ use std::sync::Arc;
 
 use crate::collectionresolver::{orchestrate_memd_collection_id, CollectionResolver};
 use crate::compressionmanager::{CompressionManager, Compressor};
-use crate::crudoptions::{
-    AddOptions, AppendOptions, DecrementOptions, DeleteOptions, GetAndLockOptions,
-    GetAndTouchOptions, GetCollectionIdOptions, GetMetaOptions, GetOptions, IncrementOptions,
-    LookupInOptions, MutateInOptions, PrependOptions, ReplaceOptions, TouchOptions, UnlockOptions,
-    UpsertOptions,
-};
 use crate::crudresults::{
     AddResult, AppendResult, DecrementResult, DeleteResult, GetAndLockResult, GetAndTouchResult,
     GetCollectionIdResult, GetMetaResult, GetResult, IncrementResult, LookupInResult,
@@ -36,6 +30,12 @@ use crate::memdx::request::{
 use crate::memdx::response::{LookupInResponse, MutateInResponse};
 use crate::mutationtoken::MutationToken;
 use crate::nmvbhandler::NotMyVbucketConfigHandler;
+use crate::options::crud::{
+    AddOptions, AppendOptions, DecrementOptions, DeleteOptions, GetAndLockOptions,
+    GetAndTouchOptions, GetCollectionIdOptions, GetMetaOptions, GetOptions, IncrementOptions,
+    LookupInOptions, MutateInOptions, PrependOptions, ReplaceOptions, TouchOptions, UnlockOptions,
+    UpsertOptions,
+};
 use crate::retry::{error_to_retry_reason, orchestrate_retries, RetryInfo, RetryManager};
 use crate::vbucketrouter::{orchestrate_memd_routing, VbucketRouter};
 use futures::{FutureExt, TryFutureExt};

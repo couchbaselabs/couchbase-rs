@@ -3,10 +3,10 @@ use std::marker::PhantomData;
 
 use snap::raw::Encoder;
 
-use crate::agentoptions::{CompressionConfig, CompressionMode};
 use crate::error;
 use crate::error::ErrorKind;
 use crate::memdx::datatype::DataTypeFlag;
+use crate::options::agent::{CompressionConfig, CompressionMode};
 
 pub(crate) trait Compressor: Send + Sync + Debug {
     fn new(compression_config: &CompressionConfig) -> Self;

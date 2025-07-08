@@ -2,7 +2,7 @@ on:
   pull_request:
   push:
     branches:
-      - nativex
+      - main
 name: Clippy check
 
 # Make sure CI fails on all warnings, including Clippy lints

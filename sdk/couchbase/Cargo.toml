@@ -54,3 +54,6 @@ harness = false
 [[bench]]
 name = "query"
 harness = false
+
+[lints.clippy]
+uninlined_format_args = "allow"
