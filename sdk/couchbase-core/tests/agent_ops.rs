@@ -90,7 +90,7 @@ fn test_upsert_retry_locked_until_deadline() {
         )
         .await;
 
-        assert!(res.is_err(), "Expected timeout error, got {:?}", res);
+        assert!(res.is_err(), "Expected timeout error, got {res:?}");
     });
 }
 
@@ -480,7 +480,7 @@ fn test_lookup_in() {
                 }
                 _ => panic!("Expected subdoc error, got {:?}", e.kind()),
             },
-            _ => panic!("Expected server error, got {:?}", kind),
+            _ => panic!("Expected server error, got {kind:?}"),
         }
 
         assert!(lookup_in_result.value[2].err.is_none());

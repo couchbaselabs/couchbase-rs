@@ -89,16 +89,16 @@ pub enum ErrorKind {
 impl Display for ErrorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ErrorKind::Server(e) => write!(f, "server error: {}", e),
-            ErrorKind::Resource(e) => write!(f, "resource error: {}", e),
+            ErrorKind::Server(e) => write!(f, "server error: {e}"),
+            ErrorKind::Resource(e) => write!(f, "resource error: {e}"),
             ErrorKind::InvalidArgument { msg, arg } => {
                 if let Some(arg) = arg {
-                    write!(f, "invalid argument: {}: {}", msg, arg)
+                    write!(f, "invalid argument: {msg}: {arg}")
                 } else {
-                    write!(f, "invalid argument: {}", msg)
+                    write!(f, "invalid argument: {msg}")
                 }
             }
-            ErrorKind::Message(msg) => write!(f, "{}", msg),
+            ErrorKind::Message(msg) => write!(f, "{msg}"),
         }
     }
 }
@@ -194,7 +194,7 @@ impl Display for ServerErrorKind {
         match self {
             ServerErrorKind::AccessDenied => write!(f, "access denied"),
             ServerErrorKind::UnsupportedFeature { feature } => {
-                write!(f, "unsupported feature {}", feature)
+                write!(f, "unsupported feature {feature}")
             }
             ServerErrorKind::ScopeExists => write!(f, "scope exists"),
             ServerErrorKind::ScopeNotFound => write!(f, "scope not found"),
@@ -204,7 +204,7 @@ impl Display for ServerErrorKind {
             ServerErrorKind::BucketNotFound => write!(f, "bucket not found"),
             ServerErrorKind::FlushDisabled => write!(f, "flush disabled"),
             ServerErrorKind::ServerInvalidArg { arg, reason } => {
-                write!(f, "server invalid argument: {} - {}", arg, reason)
+                write!(f, "server invalid argument: {arg} - {reason}")
             }
             ServerErrorKind::BucketUuidMismatch => write!(f, "bucket uuid mismatch"),
             ServerErrorKind::UserNotFound => write!(f, "user not found"),

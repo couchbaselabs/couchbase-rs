@@ -46,12 +46,12 @@ impl Display for Error {
 impl Display for ErrorKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            ErrorKind::Parse(s) => write!(f, "Parse error: {}", s),
+            ErrorKind::Parse(s) => write!(f, "Parse error: {s}"),
             ErrorKind::InvalidArgument { msg, arg } => {
-                write!(f, "Invalid argument: {} ({})", msg, arg)
+                write!(f, "Invalid argument: {msg} ({arg})")
             }
-            ErrorKind::Io(e) => write!(f, "IO error: {}", e),
-            ErrorKind::Resolve(e) => write!(f, "Resolve error: {}", e),
+            ErrorKind::Io(e) => write!(f, "IO error: {e}"),
+            ErrorKind::Resolve(e) => write!(f, "Resolve error: {e}"),
         }
     }
 }

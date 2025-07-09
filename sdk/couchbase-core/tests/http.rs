@@ -54,7 +54,7 @@ fn test_row_streamer() {
         let basic_auth = BasicAuth::new(config.username, config.password);
 
         let request_body = json!({"statement": "FROM RANGE(0, 999) AS i SELECT *"});
-        let uri = format!("http://{}:8095/analytics/service", ip);
+        let uri = format!("http://{ip}:8095/analytics/service");
 
         let request = Request::new(Method::POST, uri)
             .user_agent("rscbcorex".to_string())
@@ -95,7 +95,7 @@ fn test_row_streamer() {
                     epilog = Some(meta);
                 }
                 Err(e) => {
-                    panic!("Failed reading from stream: {}", e);
+                    panic!("Failed reading from stream: {e}");
                 }
             }
         }
@@ -121,7 +121,7 @@ fn test_json_block_read() {
         let ip = addrs.first().unwrap().split(":").next().unwrap();
 
         let basic_auth = BasicAuth::new(config.username, config.password);
-        let uri = format!("http://{}:8091/pools/default/terseClusterInfo", ip);
+        let uri = format!("http://{ip}:8091/pools/default/terseClusterInfo");
 
         let request = Request::new(Method::GET, uri)
             .user_agent("rscbcorex".to_string())

@@ -232,7 +232,7 @@ where
                 Box::pin(async move {
                     if let Some(sender) = unsolicited_packet_tx {
                         if let Err(e) = sender.send(p) {
-                            warn!("Failed to send unsolicited packet {:?}", e);
+                            warn!("Failed to send unsolicited packet {e:?}");
                         };
                     }
                 })

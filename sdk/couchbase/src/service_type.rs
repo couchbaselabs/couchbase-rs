@@ -33,10 +33,10 @@ impl Display for ServiceType {
             InnerServiceType::Query => "query",
             InnerServiceType::Search => "search",
             InnerServiceType::Eventing => "eventing",
-            InnerServiceType::Other(val) => return write!(f, "unknown({})", val),
+            InnerServiceType::Other(val) => return write!(f, "unknown({val})"),
         };
 
-        write!(f, "{}", txt)
+        write!(f, "{txt}")
     }
 }
 

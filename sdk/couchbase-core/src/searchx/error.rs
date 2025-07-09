@@ -148,25 +148,25 @@ pub enum ErrorKind {
 impl Display for ErrorKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            ErrorKind::Server(e) => write!(f, "{}", e),
-            ErrorKind::Http { endpoint } => write!(f, "http error for endpoint {}", endpoint),
+            ErrorKind::Server(e) => write!(f, "{e}"),
+            ErrorKind::Http { endpoint } => write!(f, "http error for endpoint {endpoint}"),
             ErrorKind::Message { msg, endpoint } => {
                 if let Some(endpoint) = endpoint {
-                    write!(f, "message error for endpoint {}: {}", endpoint, msg)
+                    write!(f, "message error for endpoint {endpoint}: {msg}")
                 } else {
-                    write!(f, "message error: {}", msg)
+                    write!(f, "message error: {msg}")
                 }
             }
             ErrorKind::InvalidArgument { msg, arg } => {
                 if let Some(arg) = arg {
-                    write!(f, "invalid argument error for argument {}: {}", arg, msg)
+                    write!(f, "invalid argument error for argument {arg}: {msg}")
                 } else {
-                    write!(f, "invalid argument error: {}", msg)
+                    write!(f, "invalid argument error: {msg}")
                 }
             }
-            ErrorKind::Encoding { msg } => write!(f, "encoding error: {}", msg),
+            ErrorKind::Encoding { msg } => write!(f, "encoding error: {msg}"),
             ErrorKind::UnsupportedFeature { feature } => {
-                write!(f, "unsupported feature: {}", feature)
+                write!(f, "unsupported feature: {feature}")
             }
         }
     }

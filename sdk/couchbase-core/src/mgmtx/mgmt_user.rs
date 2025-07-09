@@ -343,16 +343,16 @@ impl<C: Client> Management<C> {
         let mut role_str = role.name.clone();
 
         if let Some(bucket) = &role.bucket {
-            role_str = format!("{}[{}", role_str, bucket);
+            role_str = format!("{role_str}[{bucket}");
 
             if let Some(scope) = &role.scope {
-                role_str = format!("{}:{}", role_str, scope);
+                role_str = format!("{role_str}:{scope}");
             }
             if let Some(collection) = &role.collection {
-                role_str = format!("{}:{}", role_str, collection);
+                role_str = format!("{role_str}:{collection}");
             }
 
-            role_str = format!("{}]", role_str);
+            role_str = format!("{role_str}]");
         }
 
         role_str

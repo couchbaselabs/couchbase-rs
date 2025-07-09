@@ -17,6 +17,3 @@ genprotos = ["tonic-build", "glob"]
 [[bin]]
 name = "genprotos"
 required-features = ["genprotos"]
-
-[lints.clippy]
-uninlined_format_args = "allow"

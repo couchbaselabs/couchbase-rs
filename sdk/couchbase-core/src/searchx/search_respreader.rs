@@ -84,7 +84,7 @@ impl SearchRespReader {
             let body = match resp.bytes().await {
                 Ok(b) => b,
                 Err(e) => {
-                    debug!("Failed to read response body on error {}", e);
+                    debug!("Failed to read response body on error {e}");
                     return Err(error::Error::new_http_error(endpoint).with(Arc::new(e)));
                 }
             };
@@ -94,9 +94,7 @@ impl SearchRespReader {
                 Err(e) => {
                     return Err(error::Error::new_message_error(
                         format!(
-                        "non-200 status code received {} but parsing error response body failed {}",
-                        status_code,
-                        e
+                        "non-200 status code received {status_code} but parsing error response body failed {e}"
                     ),
                         endpoint,
                     ));

@@ -36,12 +36,12 @@ pub(crate) struct ErrMapError {
 
 pub(crate) fn parse_error_map(map_bytes: &[u8]) -> error::Result<ErrMap> {
     let cfg_err_map: CfgErrMap = serde_json::from_slice(map_bytes)
-        .map_err(|e| Error::new_message_error(format!("failed to deserialize error map: {}", e)))?;
+        .map_err(|e| Error::new_message_error(format!("failed to deserialize error map: {e}")))?;
     let mut errors = HashMap::new();
 
     for (code, err) in cfg_err_map.errors {
         let code: u16 = u16::from_str_radix(&code, 16)
-            .map_err(|e| Error::new_message_error(format!("failed to parse error code: {}", e)))?;
+            .map_err(|e| Error::new_message_error(format!("failed to parse error code: {e}")))?;
         errors.insert(
             code,
             ErrMapError {

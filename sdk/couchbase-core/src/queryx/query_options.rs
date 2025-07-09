@@ -511,7 +511,7 @@ impl Serialize for QueryOptions {
                 let key = if key.starts_with('$') {
                     key
                 } else {
-                    &format!("${}", key)
+                    &format!("${key}")
                 };
                 map.serialize_entry(key, value)?;
             }

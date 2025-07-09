@@ -162,8 +162,8 @@ pub enum ErrorKind {
 impl Display for ErrorKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            ErrorKind::Server(e) => write!(f, "{}", e),
-            ErrorKind::Resource(e) => write!(f, "{}", e),
+            ErrorKind::Server(e) => write!(f, "{e}"),
+            ErrorKind::Resource(e) => write!(f, "{e}"),
             ErrorKind::InvalidArgument { msg, arg } => {
                 let base_msg = format!("invalid argument: {msg}");
                 if let Some(arg) = arg {
@@ -301,10 +301,10 @@ impl Display for ServerError {
         )?;
 
         if let Some(client_context_id) = &self.client_context_id {
-            write!(f, ", client context id: {}", client_context_id)?;
+            write!(f, ", client context id: {client_context_id}")?;
         }
         if let Some(statement) = &self.statement {
-            write!(f, ", statement: {}", statement)?;
+            write!(f, ", statement: {statement}")?;
         }
 
         write!(
@@ -514,16 +514,16 @@ impl Display for ResourceError {
         write!(f, "resource error caused by: {}", self.cause)?;
 
         if let Some(bucket_name) = &self.bucket_name {
-            write!(f, ", bucket: {}", bucket_name)?;
+            write!(f, ", bucket: {bucket_name}")?;
         }
         if let Some(scope_name) = &self.scope_name {
-            write!(f, ", scope: {}", scope_name)?;
+            write!(f, ", scope: {scope_name}")?;
         }
         if let Some(collection_name) = &self.collection_name {
-            write!(f, ", collection: {}", collection_name)?;
+            write!(f, ", collection: {collection_name}")?;
         }
         if let Some(index_name) = &self.index_name {
-            write!(f, ", index: {}", index_name)?;
+            write!(f, ", index: {index_name}")?;
         }
 
         Ok(())
@@ -641,8 +641,7 @@ impl Display for ServerErrorKind {
             ServerErrorKind::CollectionNotFound => write!(f, "collection not found"),
             ServerErrorKind::InvalidArgument { argument, reason } => write!(
                 f,
-                "server invalid argument: (argument: {}, reason: {})",
-                argument, reason
+                "server invalid argument: (argument: {argument}, reason: {reason})"
             ),
             ServerErrorKind::BuildAlreadyInProgress => write!(f, "build already in progress"),
             ServerErrorKind::Unknown => write!(f, "unknown query error"),

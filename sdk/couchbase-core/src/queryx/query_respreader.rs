@@ -101,8 +101,7 @@ impl QueryRespReader {
                 Err(e) => {
                     return Err(Error::new_message_error(
                         format!(
-                        "non-200 status code received {} but parsing error response body failed {}",
-                        status_code, e
+                        "non-200 status code received {status_code} but parsing error response body failed {e}"
                     ),
                         None,
                         None,
@@ -114,8 +113,7 @@ impl QueryRespReader {
             if errors.errors.is_empty() {
                 return Err(Error::new_message_error(
                     format!(
-                        "Non-200 status code received {} but response body contained no errors",
-                        status_code,
+                        "Non-200 status code received {status_code} but response body contained no errors",
                     ),
                     None,
                     None,
@@ -211,7 +209,7 @@ impl QueryRespReader {
 
         let early_metadata: QueryEarlyMetaData = serde_json::from_slice(&prelude).map_err(|e| {
             Error::new_message_error(
-                format!("failed to parse metadata from response: {}", e),
+                format!("failed to parse metadata from response: {e}"),
                 endpoint.to_string(),
                 statement.to_string(),
                 client_context_id.to_string(),
@@ -228,7 +226,7 @@ impl QueryRespReader {
             Ok(m) => m,
             Err(e) => {
                 return Err(Error::new_message_error(
-                    format!("failed to parse query metadata from epilog: {}", e),
+                    format!("failed to parse query metadata from epilog: {e}"),
                     self.endpoint.clone(),
                     self.statement.clone(),
                     self.client_context_id.clone(),

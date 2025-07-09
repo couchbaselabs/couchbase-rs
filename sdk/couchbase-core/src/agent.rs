@@ -136,7 +136,7 @@ impl AgentInner {
         if packet.op_code == OpCode::Set {
             if let Some(ref extras) = packet.extras {
                 if extras.len() < 16 {
-                    warn!("Received Set packet with too short extras: {:?}", packet);
+                    warn!("Received Set packet with too short extras: {packet:?}");
                     return;
                 }
 
@@ -152,7 +152,7 @@ impl AgentInner {
                     self.apply_config(config).await;
                 }
             } else {
-                warn!("Received Set packet with no extras: {:?}", packet);
+                warn!("Received Set packet with no extras: {packet:?}");
             }
         }
     }
@@ -161,8 +161,9 @@ impl AgentInner {
         let mut state = self.state.lock().await;
 
         info!(
-            "Agent applying updated config: rev_id={}, rev_epoch={}",
-            config.rev_id, config.rev_epoch
+            "Agent applying updated config: rev_id={rev_id}, rev_epoch={rev_epoch}",
+            rev_id = config.rev_id,
+            rev_epoch = config.rev_epoch
         );
         state.latest_config = config;
 
@@ -198,10 +199,7 @@ impl AgentInner {
             })
             .await
         {
-            error!(
-                "Failed to reconfigure connection manager (old clients); {}",
-                e
-            );
+            error!("Failed to reconfigure connection manager (old clients); {e}");
         };
 
         self.vb_router
@@ -211,7 +209,7 @@ impl AgentInner {
             .cfg_manager
             .reconfigure(agent_component_configs.config_manager_memd_config)
         {
-            error!("Failed to reconfigure memd config watcher component; {}", e);
+            error!("Failed to reconfigure memd config watcher component; {e}");
         }
 
         if let Err(e) = self
@@ -222,17 +220,14 @@ impl AgentInner {
             })
             .await
         {
-            error!(
-                "Failed to reconfigure connection manager (updated clients); {}",
-                e,
-            );
+            error!("Failed to reconfigure connection manager (updated clients); {e}");
         }
 
         if let Err(e) = self
             .http_client
             .reconfigure(agent_component_configs.http_client_config)
         {
-            error!("Failed to reconfigure http client: {}", e);
+            error!("Failed to reconfigure http client: {e}");
         }
 
         self.query.reconfigure(agent_component_configs.query_config);
@@ -415,7 +410,7 @@ impl ConfigUpdater for AgentInner {
 impl Agent {
     pub async fn new(opts: AgentOptions) -> Result<Self> {
         let build_version = env!("CARGO_PKG_VERSION");
-        let client_name = format!("couchbase-rs-core {}", build_version);
+        let client_name = format!("couchbase-rs-core {build_version}");
 
         let auth_mechanisms = if opts.auth_mechanisms.is_empty() {
             if opts.tls_config.is_some() {
@@ -500,7 +495,7 @@ impl Agent {
                     connect_throttle_period,
                     unsolicited_packet_tx: Some(unsolicited_packet_tx),
                     orphan_handler: Arc::new(|packet| {
-                        info!("Orphan : {:?}", packet);
+                        info!("Orphan : {packet:?}");
                     }),
                     on_err_map_fetched_handler: Some(Arc::new(move |err_map| {
                         err_map_component_conn_mgr.on_err_map(err_map);
@@ -662,7 +657,7 @@ impl Agent {
                             orphan_handler: Arc::new(|packet| {}),
                             on_close: Arc::new(|id| {
                                 Box::pin(async move {
-                                    debug!("Bootstrap client {} closed", id);
+                                    debug!("Bootstrap client {id} closed");
                                 })
                             }),
                             on_err_map_fetched: Some(Arc::new(move |err_map| {
@@ -679,7 +674,7 @@ impl Agent {
                     Ok(client_result) => match client_result {
                         Ok(client) => client,
                         Err(e) => {
-                            warn!("Failed to connect to endpoint: {}", e);
+                            warn!("Failed to connect to endpoint: {e}");
                             continue;
                         }
                     },
@@ -700,7 +695,7 @@ impl Agent {
 
                 let config: TerseConfig =
                     serde_json::from_slice(raw_config.as_slice()).map_err(|e| {
-                        Error::new_message_error(format!("failed to deserialize config: {}", e))
+                        Error::new_message_error(format!("failed to deserialize config: {e}"))
                     })?;
 
                 match ConfigParser::parse_terse_config(config, host) {
@@ -800,7 +795,7 @@ impl Agent {
     ) -> HashMap<String, KvClientConfig> {
         let mut clients = HashMap::new();
         for addr in memd_addrs {
-            let node_id = format!("kv{}", addr);
+            let node_id = format!("kv{addr}");
             let config = KvClientConfig {
                 address: addr.clone(),
                 tls: state.tls_config.clone(),
@@ -824,14 +819,14 @@ impl Agent {
     ) -> HashMap<String, FirstHttpConfig> {
         let mut clients = HashMap::new();
         for addr in mgmt_addrs {
-            let node_id = format!("mgmt{}", addr);
+            let node_id = format!("mgmt{addr}");
             let base = if state.tls_config.is_some() {
                 "https"
             } else {
                 "http"
             };
             let config = FirstHttpConfig {
-                endpoint: format!("{}://{}", base, addr),
+                endpoint: format!("{base}://{addr}"),
                 tls: state.tls_config.clone(),
                 user_agent: state.client_name.clone(),
                 authenticator: state.authenticator.clone(),

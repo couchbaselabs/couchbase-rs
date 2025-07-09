@@ -157,7 +157,7 @@ impl CouchbaseClusterBackend {
             Some(
                 tls_config
                     .try_into()
-                    .map_err(|e| error::Error::other_failure(format!("{:?}", e)))?,
+                    .map_err(|e| error::Error::other_failure(format!("{e:?}")))?,
             )
         } else {
             None
@@ -252,7 +252,7 @@ impl CouchbaseClusterBackend {
                 "kv_connect_timeout" => {
                     opts.connect_timeout =
                         Some(Duration::from_millis(v[0].parse().map_err(|e| {
-                            error::Error::other_failure(format!("{:?}", e))
+                            error::Error::other_failure(format!("{e:?}"))
                         })?))
                 }
                 "placeholder" => {}

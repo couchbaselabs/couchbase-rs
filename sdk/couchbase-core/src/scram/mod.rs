@@ -137,8 +137,7 @@ where
             )));
         } else if !isv {
             return Err(ScramError::new(format!(
-                "Unsupported SCRAM final message from server: {:?}",
-                input
+                "Unsupported SCRAM final message from server: {input:?}"
             )));
         }
 

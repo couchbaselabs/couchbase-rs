@@ -294,7 +294,7 @@ where
                 let on_client_close_tx = on_client_close_tx.clone();
                 Box::pin(async move {
                     if let Err(e) = on_client_close_tx.send(client_id).await {
-                        debug!("Failed to send client close notification: {}", e);
+                        debug!("Failed to send client close notification: {e}");
                     }
                 })
             }),

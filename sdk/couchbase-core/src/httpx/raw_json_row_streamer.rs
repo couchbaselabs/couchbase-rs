@@ -115,7 +115,7 @@ impl RawJsonRowStreamer {
 
             let value = self.stream.decode().await?;
             let value = serde_json::from_slice(&value)
-                .map_err(|e| Error::new_message_error(format!("failed to parse value: {}", e)))?;
+                .map_err(|e| Error::new_message_error(format!("failed to parse value: {e}")))?;
 
             self.attribs.insert(key, value);
         }
@@ -134,12 +134,12 @@ impl RawJsonRowStreamer {
     pub async fn read_prelude(&mut self) -> HttpxResult<Vec<u8>> {
         self.begin().await?;
         serde_json::to_vec(&self.attribs)
-            .map_err(|e| Error::new_message_error(format!("failed to read prelude: {}", e)))
+            .map_err(|e| Error::new_message_error(format!("failed to read prelude: {e}")))
     }
 
     pub fn epilog(&mut self) -> HttpxResult<Vec<u8>> {
         serde_json::to_vec(&self.attribs)
-            .map_err(|e| Error::new_message_error(format!("failed to read epilogue: {}", e)))
+            .map_err(|e| Error::new_message_error(format!("failed to read epilogue: {e}")))
     }
 
     pub async fn next(&mut self) -> Option<HttpxResult<RawJsonRowItem>> {
@@ -160,7 +160,7 @@ impl RawJsonRowStreamer {
                         self.state = RowStreamState::End;
 
                         let metadata = match serde_json::to_vec(&self.attribs).map_err(|e| {
-                            Error::new_message_error(format!("failed to encode metadata: {}", e))
+                            Error::new_message_error(format!("failed to encode metadata: {e}"))
                         }) {
                             Ok(m) => m,
                             Err(e) => return Some(Err(e)),
@@ -184,8 +184,7 @@ impl RawJsonRowStreamer {
                     Ok(v) => v,
                     Err(e) => {
                         return Some(Err(Error::new_message_error(format!(
-                            "failed to parse value: {}",
-                            e
+                            "failed to parse value: {e}"
                         ))))
                     }
                 };

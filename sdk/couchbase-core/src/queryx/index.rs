@@ -46,6 +46,6 @@ impl fmt::Display for IndexState {
             IndexState::Abridged => "Abridged",
             IndexState::Scheduled => "Scheduled",
         };
-        write!(f, "{}", state_str)
+        write!(f, "{state_str}")
     }
 }

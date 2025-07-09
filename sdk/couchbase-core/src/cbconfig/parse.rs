@@ -7,13 +7,12 @@ pub fn parse_terse_config(config: &[u8], source_hostname: &str) -> error::Result
         Ok(v) => v.to_string(),
         Err(e) => {
             return Err(Error::new_message_error(format!(
-                "failed to parse terse config: {}",
-                e
+                "failed to parse terse config: {e}"
             )));
         }
     };
     config = config.replace("$HOST", source_hostname);
     let config_out: TerseConfig = serde_json::from_str(&config)
-        .map_err(|e| Error::new_message_error(format!("failed to parse terse config: {}", e)))?;
+        .map_err(|e| Error::new_message_error(format!("failed to parse terse config: {e}")))?;
     Ok(config_out)
 }

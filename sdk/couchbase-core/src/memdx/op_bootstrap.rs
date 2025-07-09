@@ -88,7 +88,7 @@ impl OpBootstrap {
                 {
                     Ok(r) => Some(r),
                     Err(e) => {
-                        warn!("Hello failed {}", e);
+                        warn!("Hello failed {e}");
                         None
                     }
                 };
@@ -103,7 +103,7 @@ impl OpBootstrap {
             {
                 Ok(r) => Some(r),
                 Err(e) => {
-                    warn!("Get error map failed {}", e);
+                    warn!("Get error map failed {e}");
                     None
                 }
             };
@@ -116,7 +116,7 @@ impl OpBootstrap {
             {
                 Ok(_) => {}
                 Err(e) => {
-                    warn!("Auth failed {}", e);
+                    warn!("Auth failed {e}");
                     return Err(e);
                 }
             };
@@ -128,7 +128,7 @@ impl OpBootstrap {
             {
                 Ok(r) => Some(r),
                 Err(e) => {
-                    warn!("Select bucket failed {}", e);
+                    warn!("Select bucket failed {e}");
                     return Err(e);
                 }
             };
@@ -143,7 +143,7 @@ impl OpBootstrap {
             {
                 Ok(r) => Some(r),
                 Err(e) => {
-                    warn!("Get cluster config failed {}", e);
+                    warn!("Get cluster config failed {e}");
                     None
                 }
             }

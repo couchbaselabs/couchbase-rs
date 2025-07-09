@@ -12,6 +12,3 @@ url = "2.5.2"
 
 [dev-dependencies]
 tokio = { version = "1.40", features = ["rt", "net", "macros"] }
-
-[lints.clippy]
-uninlined_format_args = "allow"

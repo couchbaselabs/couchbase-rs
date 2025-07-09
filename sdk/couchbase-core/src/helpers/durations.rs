@@ -155,7 +155,7 @@ fn leading_fraction(s: &str) -> (u64, f64, &str) {
 }
 
 fn quote(s: &str) -> String {
-    format!("\"{}\"", s)
+    format!("\"{s}\"")
 }
 
 pub fn duration_to_golang_string(duration: &Duration) -> String {
@@ -342,12 +342,11 @@ mod tests {
                 Ok(duration) => {
                     assert_eq!(
                         duration, expected,
-                        "ParseDuration({}) = {:?}, want {:?}",
-                        input, duration, expected
+                        "ParseDuration({input}) = {duration:?}, want {expected:?}"
                     );
                 }
                 Err(e) => {
-                    panic!("ParseDuration({}) returned error: {}", input, e);
+                    panic!("ParseDuration({input}) returned error: {e}");
                 }
             }
         }
@@ -378,8 +377,7 @@ mod tests {
             let actual = duration_to_golang_string(&input);
             assert_eq!(
                 actual, expected,
-                "DurationToString({:?}) = {:?}, want {:?}",
-                input, actual, expected
+                "DurationToString({input:?}) = {actual:?}, want {expected:?}"
             );
         }
     }

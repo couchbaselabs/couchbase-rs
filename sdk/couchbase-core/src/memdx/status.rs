@@ -403,13 +403,13 @@ impl Display for Status {
             Status::RangeScanComplete => "range scan complete",
             Status::RangeScanVBUUIDNotEqual => "range scan vb-uuid not equal",
             Status::Unknown(status) => {
-                let t = format!("unknown status 0x{:x}", status);
+                let t = format!("unknown status 0x{status:x}");
 
-                write!(f, "{}", t)?;
+                write!(f, "{t}")?;
                 return Ok(());
             }
         };
 
-        write!(f, "{}", txt)
+        write!(f, "{txt}")
     }
 }

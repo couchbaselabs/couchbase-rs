@@ -154,23 +154,23 @@ impl Display for ErrorKind {
             ErrorKind::VbucketMapOutdated => write!(f, "vbucket map outdated"),
             ErrorKind::InvalidArgument { msg, arg } => {
                 if let Some(arg) = arg {
-                    write!(f, "invalid argument {}: {}", arg, msg)
+                    write!(f, "invalid argument {arg}: {msg}")
                 } else {
-                    write!(f, "invalid argument: {}", msg)
+                    write!(f, "invalid argument: {msg}")
                 }
             }
-            ErrorKind::Memdx(err) => write!(f, "{}", err),
-            ErrorKind::Query(err) => write!(f, "{}", err),
-            ErrorKind::Search(err) => write!(f, "{}", err),
-            ErrorKind::Http(err) => write!(f, "{}", err),
-            ErrorKind::Mgmt(err) => write!(f, "{}", err),
+            ErrorKind::Memdx(err) => write!(f, "{err}"),
+            ErrorKind::Query(err) => write!(f, "{err}"),
+            ErrorKind::Search(err) => write!(f, "{err}"),
+            ErrorKind::Http(err) => write!(f, "{err}"),
+            ErrorKind::Mgmt(err) => write!(f, "{err}"),
             ErrorKind::EndpointNotKnown { endpoint } => {
-                write!(f, "endpoint not known: {}", endpoint)
+                write!(f, "endpoint not known: {endpoint}")
             }
             ErrorKind::NoEndpointsAvailable => write!(f, "no endpoints available"),
             ErrorKind::Shutdown => write!(f, "shutdown"),
             ErrorKind::NoBucket => write!(f, "no bucket selected"),
-            ErrorKind::IllegalState { msg } => write!(f, "illegal state: {}", msg),
+            ErrorKind::IllegalState { msg } => write!(f, "illegal state: {msg}"),
             ErrorKind::NoVbucketMap => write!(f, "invalid vbucket map"),
             ErrorKind::CollectionManifestOutdated {
                 manifest_uid,
@@ -178,38 +178,35 @@ impl Display for ErrorKind {
             } => {
                 write!(
                     f,
-                    "collection manifest outdated: our manifest uid: {}, server manifest uid: {}",
-                    manifest_uid, server_manifest_uid
+                    "collection manifest outdated: our manifest uid: {manifest_uid}, server manifest uid: {server_manifest_uid}"
                 )
             }
-            ErrorKind::Message { msg } => write!(f, "{}", msg),
+            ErrorKind::Message { msg } => write!(f, "{msg}"),
             ErrorKind::ServiceNotAvailable { service } => {
-                write!(f, "service not available: {}", service)
+                write!(f, "service not available: {service}")
             }
             ErrorKind::FeatureNotAvailable { feature, msg } => {
-                write!(f, "feature not available: {}, {}", feature, msg)
+                write!(f, "feature not available: {feature}, {msg}")
             }
-            ErrorKind::Internal { msg } => write!(f, "internal error: {}", msg),
+            ErrorKind::Internal { msg } => write!(f, "internal error: {msg}"),
             ErrorKind::NoServerAssigned { requested_vb_id } => {
-                write!(f, "no server assigned for vbucket id: {}", requested_vb_id)
+                write!(f, "no server assigned for vbucket id: {requested_vb_id}")
             }
             ErrorKind::InvalidVbucket {
                 requested_vb_id,
                 num_vbuckets,
             } => write!(
                 f,
-                "invalid vbucket id: {}, num vbuckets: {}",
-                requested_vb_id, num_vbuckets
+                "invalid vbucket id: {requested_vb_id}, num vbuckets: {num_vbuckets}"
             ),
             ErrorKind::InvalidReplica {
                 requested_replica,
                 num_servers,
             } => write!(
                 f,
-                "invalid replica: {}, num servers: {}",
-                requested_replica, num_servers
+                "invalid replica: {requested_replica}, num servers: {num_servers}"
             ),
-            ErrorKind::Compression { msg } => write!(f, "compression error: {}", msg),
+            ErrorKind::Compression { msg } => write!(f, "compression error: {msg}"),
         }
     }
 }
@@ -312,10 +309,10 @@ impl Display for MemdxError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.inner.source)?;
         if let Some(ref dispatched_to) = self.inner.dispatched_to {
-            write!(f, ", dispatched to: {}", dispatched_to)?;
+            write!(f, ", dispatched to: {dispatched_to}")?;
         }
         if let Some(ref dispatched_from) = self.inner.dispatched_from {
-            write!(f, ", dispatched from: {}", dispatched_from)?;
+            write!(f, ", dispatched from: {dispatched_from}")?;
         }
         Ok(())
     }

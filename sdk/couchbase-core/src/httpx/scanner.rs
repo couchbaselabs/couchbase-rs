@@ -517,7 +517,7 @@ mod tests {
         ];
 
         for (data, expected) in tests {
-            assert_eq!(valid(data.as_bytes()), expected, "data: {}", data);
+            assert_eq!(valid(data.as_bytes()), expected, "data: {data}");
         }
     }
 }

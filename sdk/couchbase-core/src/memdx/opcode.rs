@@ -182,9 +182,9 @@ impl Display for OpCode {
             OpCode::SubDocGetCount => "SubDoc get count",
             OpCode::SubDocReplaceBodyWithXattr => "SubDoc replace body with Xattr",
             OpCode::Unknown(code) => {
-                return write!(f, "x{:02x}", code);
+                return write!(f, "x{code:02x}");
             }
         };
-        write!(f, "{}", txt)
+        write!(f, "{txt}")
     }
 }

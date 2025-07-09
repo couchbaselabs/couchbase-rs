@@ -217,8 +217,8 @@ pub enum ErrorKind {
 impl Display for ErrorKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            ErrorKind::Server(e) => write!(f, "{}", e),
-            ErrorKind::Resource(e) => write!(f, "{}", e),
+            ErrorKind::Server(e) => write!(f, "{e}"),
+            ErrorKind::Resource(e) => write!(f, "{e}"),
             ErrorKind::Dispatch { opaque, op_code } => {
                 write!(f, "dispatch failed: opaque: {opaque}, op_code: {op_code}")
             }
@@ -324,17 +324,17 @@ impl Display for ServerError {
             if let Some(parsed) = Self::parse_context(context) {
                 base_msg.push_str(" (");
                 if let Some(text) = &parsed.text {
-                    base_msg.push_str(&format!("context: {}, ", text));
+                    base_msg.push_str(&format!("context: {text}, "));
                 }
 
                 if let Some(error_ref) = &parsed.error_ref {
-                    base_msg.push_str(&format!("error_ref: {}", error_ref));
+                    base_msg.push_str(&format!("error_ref: {error_ref}"));
                 }
                 base_msg.push(')');
             }
         }
 
-        write!(f, "{}", base_msg)
+        write!(f, "{base_msg}")
     }
 }
 
@@ -481,13 +481,13 @@ impl Display for ServerErrorKind {
             ServerErrorKind::NoBucket => write!(f, "no bucket selected"),
             ServerErrorKind::UnknownBucketName => write!(f, "unknown bucket name"),
             ServerErrorKind::Access => write!(f, "access error"),
-            ServerErrorKind::Auth { msg } => write!(f, "auth error {}", msg),
+            ServerErrorKind::Auth { msg } => write!(f, "auth error {msg}"),
             ServerErrorKind::ConfigNotSet => write!(f, "config not set"),
             ServerErrorKind::UnknownScopeName => write!(f, "scope name unknown"),
             ServerErrorKind::UnknownCollectionName => write!(f, "collection name unknown"),
-            ServerErrorKind::Subdoc { error } => write!(f, "{}", error),
+            ServerErrorKind::Subdoc { error } => write!(f, "{error}"),
             ServerErrorKind::UnknownStatus { status } => {
-                write!(f, "server status unexpected for operation: {}", status)
+                write!(f, "server status unexpected for operation: {status}")
             }
             ServerErrorKind::BadDelta => write!(f, "bad delta"),
             ServerErrorKind::UnknownCommand => write!(f, "unknown command"),
@@ -553,10 +553,10 @@ impl Display for SubdocError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         if let Some(op_index) = self.op_index {
             let base_msg = format!("Subdoc error: {}, op_index: {}", self.kind, op_index);
-            write!(f, "{}", base_msg)
+            write!(f, "{base_msg}")
         } else {
             let base_msg = format!("Subdoc error: {}", self.kind);
-            write!(f, "{}", base_msg)
+            write!(f, "{base_msg}")
         }
     }
 }
@@ -622,8 +622,7 @@ impl Display for SubdocErrorKind {
             }
             SubdocErrorKind::UnknownStatus { status } => write!(
                 f,
-                "subdoc unknown status unexpected for operation: {}",
-                status
+                "subdoc unknown status unexpected for operation: {status}"
             ),
         }
     }
@@ -645,7 +644,7 @@ impl Display for CancellationErrorKind {
             CancellationErrorKind::ClosedInFlight => "Closed in flight",
         };
 
-        write!(f, "{}", txt)
+        write!(f, "{txt}")
     }
 }
 

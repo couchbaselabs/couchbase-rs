@@ -24,20 +24,21 @@ impl Response {
 
     pub async fn bytes(self) -> error::Result<Bytes> {
         self.inner.bytes().await.map_err(|e| {
-            Error::new_message_error(format!("failed to read bytes from response: {}", e))
+            Error::new_message_error(format!("failed to read bytes from response: {e}"))
         })
     }
 
     pub fn bytes_stream(self) -> impl Stream<Item = error::Result<Bytes>> + Unpin {
         self.inner.bytes_stream().map_err(|e| {
-            Error::new_message_error(format!("failed to read bytes stream from response: {}", e))
+            Error::new_message_error(format!("failed to read bytes stream from response: {e}"))
         })
     }
 
     pub async fn json<T: DeserializeOwned>(self) -> error::Result<T> {
-        self.inner.json().await.map_err(|e| {
-            Error::new_decoding_error(format!("failed to decode body into json: {}", e))
-        })
+        self.inner
+            .json()
+            .await
+            .map_err(|e| Error::new_decoding_error(format!("failed to decode body into json: {e}")))
     }
 
     pub fn url(&self) -> &str {

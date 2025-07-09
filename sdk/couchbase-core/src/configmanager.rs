@@ -87,8 +87,11 @@ impl<M: KvClientManager + 'static> ConfigManagerMemdInner<M> {
             if rev_epoch < latest_rev_epoch
                 || (rev_epoch == latest_rev_epoch && rev_id <= latest_rev_id)
             {
-                debug!("Skipping out-of-band fetch, already have newer or same version: new: rev_epoch={}, rev_id={}, old: rev_epoch={}, rev_id={}",
-                       rev_epoch, rev_id, latest_rev_epoch, latest_rev_id);
+                debug!(
+                    "Skipping out-of-band fetch, already have newer or same version: new: \
+                rev_epoch={rev_epoch}, rev_id={rev_id}, old: rev_epoch={latest_rev_epoch}, \
+                rev_id={latest_rev_id}"
+                );
                 // No need to poll, we already have a newer version.
                 return None;
             }
@@ -134,7 +137,7 @@ impl<M: KvClientManager + 'static> ConfigManagerMemdInner<M> {
                             drop(latest_config);
 
                             if let Err(e) = self.latest_version_tx.send(new_latest_version) {
-                                warn!("Failed to send new config version: {}", e);
+                                warn!("Failed to send new config version: {e}");
                             }
 
                             self.performing_out_of_band_fetch
@@ -173,7 +176,7 @@ impl<M: KvClientManager + 'static> ConfigManagerMemdInner<M> {
             drop(latest_config);
 
             if let Err(e) = self.latest_version_tx.send(new_latest_version) {
-                warn!("Failed to send new config version: {}", e);
+                warn!("Failed to send new config version: {e}");
             }
 
             return Some(parsed_config);
@@ -185,14 +188,14 @@ impl<M: KvClientManager + 'static> ConfigManagerMemdInner<M> {
     fn send_new_config(&self, parsed_config: ParsedConfig) {
         for tx in self.on_new_config_txs.iter() {
             if let Err(e) = tx.send(parsed_config.clone()) {
-                warn!("Failed to send new config: {}", e);
+                warn!("Failed to send new config: {e}");
             }
         }
     }
 
     fn shutdown(&self) {
         if let Err(e) = self.watcher_shutdown_tx.send(()) {
-            debug!("Failed to send shutdown signal to watcher: {}", e);
+            debug!("Failed to send shutdown signal to watcher: {e}");
         }
     }
 

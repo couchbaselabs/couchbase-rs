@@ -85,7 +85,7 @@ impl ReqwestClient {
         }
         let client = builder
             .build()
-            .map_err(|e| Error::new_message_error(format!("failed to build http client {}", e)))?;
+            .map_err(|e| Error::new_message_error(format!("failed to build http client {e}")))?;
         Ok(client)
     }
 }

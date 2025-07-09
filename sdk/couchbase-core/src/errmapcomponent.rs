@@ -58,7 +58,7 @@ impl ErrMapComponent {
                 }
             }
             Err(e) => {
-                log::info!("Failed to parse error map: {}", e);
+                log::info!("Failed to parse error map: {e}");
             }
         }
     }

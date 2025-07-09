@@ -46,7 +46,7 @@ where
             Ok(Some(r)) => return r,
             Ok(None) => {}
             Err(e) => {
-                error!("{:?}", e);
+                error!("{e:?}");
             }
         };
 

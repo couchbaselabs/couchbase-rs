@@ -225,7 +225,7 @@ async fn create_and_ensure_user(agent: &TestAgent, user: &User) {
         {
             Ok(_) => Ok(Some(())),
             Err(e) => {
-                error!("failed to ensure user: {}", e);
+                error!("failed to ensure user: {e}");
                 Err(e)
             }
         },
@@ -249,7 +249,7 @@ async fn create_and_ensure_group(agent: &TestAgent, group: &Group) {
         {
             Ok(_) => Ok(Some(())),
             Err(e) => {
-                error!("failed to ensure group: {}", e);
+                error!("failed to ensure group: {e}");
                 Err(e)
             }
         },
@@ -273,7 +273,7 @@ async fn delete_and_ensure_user(agent: &TestAgent, username: &str) {
         {
             Ok(_) => Ok(Some(())),
             Err(e) => {
-                error!("failed to ensure user: {}", e);
+                error!("failed to ensure user: {e}");
                 Err(e)
             }
         },
@@ -297,7 +297,7 @@ async fn delete_and_ensure_group(agent: &TestAgent, group_name: &str) {
         {
             Ok(_) => Ok(Some(())),
             Err(e) => {
-                error!("failed to ensure group: {}", e);
+                error!("failed to ensure group: {e}");
                 Err(e)
             }
         },

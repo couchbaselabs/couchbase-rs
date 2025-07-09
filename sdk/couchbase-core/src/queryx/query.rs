@@ -90,7 +90,7 @@ impl<C: Client> Query<C> {
         let on_behalf_of = opts.on_behalf_of.clone();
 
         let mut serialized = serde_json::to_value(opts)
-            .map_err(|e| Error::new_encoding_error(format!("failed to encode options: {}", e)))?;
+            .map_err(|e| Error::new_encoding_error(format!("failed to encode options: {e}")))?;
 
         let mut obj = serialized.as_object_mut().unwrap();
         let mut client_context_id_entry = obj.get("client_context_id");
@@ -106,7 +106,7 @@ impl<C: Client> Query<C> {
                 let key = if k.starts_with("$") {
                     k.clone()
                 } else {
-                    format!("${}", k)
+                    format!("${k}")
                 };
                 obj.insert(key, v.clone());
             }
@@ -120,7 +120,7 @@ impl<C: Client> Query<C> {
 
         let body =
             Bytes::from(serde_json::to_vec(&serialized).map_err(|e| {
-                Error::new_encoding_error(format!("failed to encode options: {}", e))
+                Error::new_encoding_error(format!("failed to encode options: {e}"))
             })?);
 
         let res = match self
@@ -154,8 +154,7 @@ impl<C: Client> Query<C> {
                 if !opts.bucket_name.is_empty() {
                     let encoded_bucket = encode_value(&opts.bucket_name)?;
                     format!(
-                        "(keyspace_id={} AND bucket_id IS MISSING) OR bucket_id={}",
-                        encoded_bucket, encoded_bucket
+                        "(keyspace_id={encoded_bucket} AND bucket_id IS MISSING) OR bucket_id={encoded_bucket}"
                     )
                 } else {
                     "1=1".to_string()
@@ -170,14 +169,12 @@ impl<C: Client> Query<C> {
                 let encoded_collection = encode_value(&collection_name)?;
 
                 let temp_where = format!(
-                    "bucket_id={} AND scope_id={} AND keyspace_id={}",
-                    encoded_bucket, encoded_scope, encoded_collection
+                    "bucket_id={encoded_bucket} AND scope_id={encoded_scope} AND keyspace_id={encoded_collection}"
                 );
 
                 if scope_name == "_default" && collection_name == "_default" {
                     format!(
-                        "({}) OR (keyspace_id={} AND bucket_id IS MISSING)",
-                        temp_where, encoded_bucket
+                        "({temp_where}) OR (keyspace_id={encoded_bucket} AND bucket_id IS MISSING)"
                     )
                 } else {
                     temp_where
@@ -189,10 +186,7 @@ impl<C: Client> Query<C> {
                 let encoded_bucket = encode_value(&opts.bucket_name)?;
                 let encoded_scope = encode_value(&scope_name)?;
 
-                format!(
-                    "bucket_id={} AND scope_id={}",
-                    encoded_bucket, encoded_scope
-                )
+                format!("bucket_id={encoded_bucket} AND scope_id={encoded_scope}")
             }
             _ => {
                 return Err(Error::new_invalid_argument_error(
@@ -202,10 +196,9 @@ impl<C: Client> Query<C> {
             }
         };
 
-        where_clause = format!("({}) AND `using`=\"gsi\"", where_clause);
+        where_clause = format!("({where_clause}) AND `using`=\"gsi\"");
         let qs = format!(
-            "SELECT `idx`.* FROM system:indexes AS idx WHERE {} ORDER BY is_primary DESC, name ASC",
-            where_clause
+            "SELECT `idx`.* FROM system:indexes AS idx WHERE {where_clause} ORDER BY is_primary DESC, name ASC"
         );
 
         let opts = QueryOptions::new()
@@ -219,7 +212,7 @@ impl<C: Client> Query<C> {
             let bytes = row?;
             let index: Index = serde_json::from_slice(&bytes).map_err(|e| {
                 Error::new_message_error(
-                    format!("failed to parse index from response: {}", e),
+                    format!("failed to parse index from response: {e}"),
                     None,
                     None,
                     None,
@@ -259,7 +252,7 @@ impl<C: Client> Query<C> {
 
         if !with.is_empty() {
             let with = encode_value(&with)?;
-            qs.push_str(&format!(" WITH {}", with));
+            qs.push_str(&format!(" WITH {with}"));
         }
 
         let query_opts = QueryOptions::new()
@@ -312,7 +305,7 @@ impl<C: Client> Query<C> {
 
         if !with.is_empty() {
             let with = encode_value(&with)?;
-            qs.push_str(&format!(" WITH {}", with));
+            qs.push_str(&format!(" WITH {with}"));
         }
 
         let query_opts = QueryOptions::new()
@@ -351,13 +344,13 @@ impl<C: Client> Query<C> {
             let encoded_name = encode_identifier(index_name);
 
             if opts.scope_name.is_some() || opts.collection_name.is_some() {
-                qs.push_str(&format!("DROP INDEX {}", encoded_name));
-                qs.push_str(&format!(" ON {}", keyspace));
+                qs.push_str(&format!("DROP INDEX {encoded_name}"));
+                qs.push_str(&format!(" ON {keyspace}"));
             } else {
-                qs.push_str(&format!("DROP INDEX {}.{}", keyspace, encoded_name));
+                qs.push_str(&format!("DROP INDEX {keyspace}.{encoded_name}"));
             }
         } else {
-            qs.push_str(&format!("DROP PRIMARY INDEX ON {}", keyspace));
+            qs.push_str(&format!("DROP PRIMARY INDEX ON {keyspace}"));
         }
 
         let query_opts = QueryOptions::new()
@@ -388,10 +381,10 @@ impl<C: Client> Query<C> {
 
         let mut qs = String::new();
         if opts.scope_name.is_some() || opts.collection_name.is_some() {
-            qs.push_str(&format!("DROP INDEX {}", encoded_name));
-            qs.push_str(&format!(" ON {}", keyspace));
+            qs.push_str(&format!("DROP INDEX {encoded_name}"));
+            qs.push_str(&format!(" ON {keyspace}"));
         } else {
-            qs.push_str(&format!("DROP INDEX {}.{}", keyspace, encoded_name));
+            qs.push_str(&format!("DROP INDEX {keyspace}.{encoded_name}"));
         }
 
         let query_opts = QueryOptions::new()
@@ -640,12 +633,12 @@ fn check_indexes_active(indexes: &[Index], check_list: &Vec<&str>) -> error::Res
 fn encode_identifier(identifier: &str) -> String {
     let mut out = identifier.replace("\\", "\\\\");
     out = out.replace("`", "\\`");
-    format!("`{}`", out)
+    format!("`{out}`")
 }
 
 fn encode_value<T: serde::Serialize>(value: &T) -> error::Result<String> {
     let bytes = serde_json::to_string(value).map_err(|e| {
-        Error::new_message_error(format!("failed to encode value: {}", e), None, None, None)
+        Error::new_message_error(format!("failed to encode value: {e}"), None, None, None)
     })?;
     Ok(bytes)
 }

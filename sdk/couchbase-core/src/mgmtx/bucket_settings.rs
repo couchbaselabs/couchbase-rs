@@ -173,7 +173,7 @@ impl Display for BucketType {
         match &self.0 {
             InnerBucketType::Couchbase => write!(f, "membase"),
             InnerBucketType::Ephemeral => write!(f, "ephemeral"),
-            InnerBucketType::Other(val) => write!(f, "unknown({})", val),
+            InnerBucketType::Other(val) => write!(f, "unknown({val})"),
         }
     }
 }
@@ -212,7 +212,7 @@ impl Display for EvictionPolicyType {
             InnerEvictionPolicyType::Full => write!(f, "fullEviction"),
             InnerEvictionPolicyType::NotRecentlyUsed => write!(f, "nruEviction"),
             InnerEvictionPolicyType::NoEviction => write!(f, "noEviction"),
-            InnerEvictionPolicyType::Other(val) => write!(f, "unknown({})", val),
+            InnerEvictionPolicyType::Other(val) => write!(f, "unknown({val})"),
         }
     }
 }
@@ -247,7 +247,7 @@ impl Display for CompressionMode {
             InnerCompressionMode::Off => write!(f, "off"),
             InnerCompressionMode::Passive => write!(f, "passive"),
             InnerCompressionMode::Active => write!(f, "active"),
-            InnerCompressionMode::Other(val) => write!(f, "unknown({})", val),
+            InnerCompressionMode::Other(val) => write!(f, "unknown({val})"),
         }
     }
 }
@@ -286,7 +286,7 @@ impl Display for DurabilityLevel {
             InnerDurabilityLevel::Majority => write!(f, "majority"),
             InnerDurabilityLevel::MajorityAndPersistActive => write!(f, "majorityAndPersistActive"),
             InnerDurabilityLevel::PersistToMajority => write!(f, "persistToMajority"),
-            InnerDurabilityLevel::Other(val) => write!(f, "unknown({})", val),
+            InnerDurabilityLevel::Other(val) => write!(f, "unknown({val})"),
         }
     }
 }
@@ -324,7 +324,7 @@ impl Display for ConflictResolutionType {
             InnerConflictResolutionType::SequenceNumber => write!(f, "seqno"),
             InnerConflictResolutionType::Timestamp => write!(f, "lww"),
             InnerConflictResolutionType::Custom => write!(f, "custom"),
-            InnerConflictResolutionType::Other(val) => write!(f, "unknown({})", val),
+            InnerConflictResolutionType::Other(val) => write!(f, "unknown({val})"),
         }
     }
 }
@@ -355,7 +355,7 @@ impl Display for StorageBackend {
         match &self.0 {
             InnerStorageBackend::Couchstore => write!(f, "couchstore"),
             InnerStorageBackend::Magma => write!(f, "magma"),
-            InnerStorageBackend::Other(val) => write!(f, "unknown({})", val),
+            InnerStorageBackend::Other(val) => write!(f, "unknown({val})"),
         }
     }
 }
