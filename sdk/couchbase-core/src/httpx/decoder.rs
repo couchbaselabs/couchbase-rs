@@ -309,7 +309,7 @@ impl Decoder {
                         self.token_state = TokenState::TopValue;
                         let decoded = self.decode().await?;
                         let x = serde_json::from_slice(&decoded)
-                            .map_err(|e| error::Error::new_message_error(format!("{}", e)))?;
+                            .map_err(|e| error::Error::new_message_error(format!("{e}")))?;
                         self.token_state = old;
                         self.token_state = TokenState::ObjectColon;
                         return Ok(Token::String(x));

@@ -121,8 +121,7 @@ impl<M: KvClientManager> ConfigWatcherMemdInner<M> {
                         client.has_feature(HelloFeature::ClusterMapChangeNotificationBrief);
                     if !supported {
                         debug!(
-                            "Polling config from {} with rev_id: {}, rev_epoch: {}",
-                            endpoint, rev_id, rev_epoch
+                            "Polling config from {endpoint} with rev_id: {rev_id}, rev_epoch: {rev_epoch}"
                         );
                     }
 

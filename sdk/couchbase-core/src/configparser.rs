@@ -99,7 +99,7 @@ impl ConfigParser {
     fn parse_config_hostname(hostname: &Option<String>, source_hostname: &str) -> String {
         if let Some(hostname) = hostname {
             if hostname.contains(':') {
-                return format!("[{}]", hostname);
+                return format!("[{hostname}]");
             }
 
             hostname.to_string()

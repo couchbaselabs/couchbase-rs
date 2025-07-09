@@ -109,7 +109,7 @@ impl<C: Client> Search<C> {
         let on_behalf_of = opts.on_behalf_of.clone();
 
         let body = serde_json::to_vec(&opts).map_err(|e| {
-            error::Error::new_encoding_error(format!("could not serialize query options: {}", e))
+            error::Error::new_encoding_error(format!("could not serialize query options: {e}"))
         })?;
 
         let res = self
@@ -131,7 +131,7 @@ impl<C: Client> Search<C> {
         let req_uri = Self::get_uri(&opts.index.name, opts.bucket_name, opts.scope_name)?;
 
         let body = serde_json::to_vec(&opts.index).map_err(|e| {
-            error::Error::new_encoding_error(format!("could not serialize index: {}", e))
+            error::Error::new_encoding_error(format!("could not serialize index: {e}"))
         })?;
 
         let mut headers = HashMap::new();
@@ -467,7 +467,7 @@ impl<C: Client> Search<C> {
         }
 
         let req_uri = if scope_name.is_none() && bucket_name.is_none() {
-            format!("/api/index/{}/{}", index_name, control)
+            format!("/api/index/{index_name}/{control}")
         } else if scope_name.is_some() && bucket_name.is_some() {
             format!(
                 "/api/bucket/{}/scope/{}/index/{}/{}",
@@ -567,7 +567,7 @@ pub(crate) async fn decode_response_error(
         Ok(s) => s.to_lowercase(),
         Err(e) => {
             return error::Error::new_message_error(
-                format!("could not parse error response: {}", e),
+                format!("could not parse error response: {e}"),
                 endpoint,
             );
         }

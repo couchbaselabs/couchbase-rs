@@ -73,9 +73,9 @@ pub enum ErrorKind {
 impl Display for ErrorKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Connection { msg } => write!(f, "connection error {}", msg),
-            Self::Decoding(msg) => write!(f, "decoding error: {}", msg),
-            Self::Message(msg) => write!(f, "{}", msg),
+            Self::Connection { msg } => write!(f, "connection error {msg}"),
+            Self::Decoding(msg) => write!(f, "decoding error: {msg}"),
+            Self::Message(msg) => write!(f, "{msg}"),
         }
     }
 }

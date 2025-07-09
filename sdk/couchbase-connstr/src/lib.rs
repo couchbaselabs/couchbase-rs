@@ -79,7 +79,7 @@ impl Display for ConnSpec {
         let scheme = self
             .scheme
             .clone()
-            .map(|scheme| format!("{}://", scheme))
+            .map(|scheme| format!("{scheme}://"))
             .unwrap_or_default();
 
         let hosts = self
@@ -98,22 +98,22 @@ impl Display for ConnSpec {
         let mut url_options = self.options.iter().fold(String::new(), |acc, (k, v)| {
             let values = v
                 .iter()
-                .map(|value| format!("{}={}", k, value))
+                .map(|value| format!("{k}={value}"))
                 .collect::<Vec<String>>()
                 .join("&");
             if acc.is_empty() {
                 values
             } else {
-                format!("{}&{}", acc, values)
+                format!("{acc}&{values}")
             }
         });
         if !url_options.is_empty() {
-            url_options = format!("?{}", url_options);
+            url_options = format!("?{url_options}");
         }
 
-        let out = format!("{}{}{}", scheme, hosts, url_options);
+        let out = format!("{scheme}{hosts}{url_options}");
 
-        write!(f, "{}", out)
+        write!(f, "{out}")
     }
 }
 
@@ -136,10 +136,11 @@ pub fn parse(conn_str: impl AsRef<str>) -> error::Result<ConnSpec> {
                 };
 
                 if let Some(port) = host_info.get(5) {
-                    address.port =
-                        Some(port.as_str().parse().map_err(|e| {
-                            ErrorKind::Parse(format!("failed to parse port: {}", e))
-                        })?);
+                    address.port = Some(
+                        port.as_str()
+                            .parse()
+                            .map_err(|e| ErrorKind::Parse(format!("failed to parse port: {e}")))?,
+                    );
                 }
 
                 addresses.push(address);
@@ -221,7 +222,7 @@ pub async fn resolve(conn_spec: ConnSpec) -> error::Result<ResolvedConnSpec> {
                 });
             }
             Err(e) => {
-                debug!("Srv lookup failed {}", e);
+                debug!("Srv lookup failed {e}");
             }
         };
     };
@@ -342,7 +343,7 @@ async fn lookup_srv(scheme: &str, proto: &str, host: &str) -> error::Result<Vec<
 
     let resolver = TokioAsyncResolver::tokio(ResolverConfig::default(), ResolverOpts::default());
 
-    let name = format!("_{}._{}.{}", scheme, proto, host);
+    let name = format!("_{scheme}._{proto}.{host}");
     let response = resolver.srv_lookup(name).await?;
 
     let mut addresses = vec![];
@@ -369,13 +370,13 @@ mod test {
     use std::collections::HashMap;
 
     fn parse_or_die(conn_str: &str) -> ConnSpec {
-        parse(conn_str).unwrap_or_else(|e| panic!("Failed to parse {}: {:?}", conn_str, e))
+        parse(conn_str).unwrap_or_else(|e| panic!("Failed to parse {conn_str}: {e:?}"))
     }
 
     async fn resolve_or_die(conn_spec: ConnSpec) -> ResolvedConnSpec {
         resolve(conn_spec.clone())
             .await
-            .unwrap_or_else(|e| panic!("Failed to resolve {:?}: {:?}", conn_spec, e))
+            .unwrap_or_else(|e| panic!("Failed to resolve {conn_spec:?}: {e:?}"))
     }
 
     fn check_address_parsing(
@@ -385,7 +386,7 @@ mod test {
         check_str: bool,
     ) {
         if check_str && cs.to_string() != conn_str {
-            panic!("ConnStr round-trip should match. {} != {}", cs, conn_str);
+            panic!("ConnStr round-trip should match. {cs} != {conn_str}");
         }
 
         assert_eq!(cs.scheme, expected_spec.scheme, "Parsed incorrect scheme");

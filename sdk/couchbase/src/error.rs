@@ -32,19 +32,13 @@ impl Error {
     // We don't use a From impl as it'd be a blanket coverage and we want to
     // distinguish encoding from decoding.
     pub(crate) fn encoding_failure_from_serde(e: serde_json::Error) -> Self {
-        Self::new(ErrorKind::EncodingFailure(format!(
-            "encoding failed: {}",
-            e
-        )))
+        Self::new(ErrorKind::EncodingFailure(format!("encoding failed: {e}")))
     }
 
     // We don't use a From impl as it'd be a blanket coverage and we want to
     // distinguish encoding from decoding.
     pub(crate) fn decoding_failure_from_serde(e: serde_json::Error) -> Self {
-        Self::new(ErrorKind::DecodingFailure(format!(
-            "decoding failed: {}",
-            e
-        )))
+        Self::new(ErrorKind::DecodingFailure(format!("decoding failed: {e}")))
     }
 
     pub(crate) fn invalid_argument(arg: impl Into<String>, msg: impl Into<String>) -> Self {
@@ -131,9 +125,9 @@ impl Display for Error {
         let msg = self.kind.to_string();
 
         if let Some(context) = self.context.deref() {
-            write!(f, "{}: {}", msg, context)
+            write!(f, "{msg}: {context}")
         } else {
-            write!(f, "{}", msg)
+            write!(f, "{msg}")
         }
     }
 }
@@ -217,33 +211,33 @@ impl Display for ErrorKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let msg = match self {
             ErrorKind::OtherFailure(msg) => {
-                return write!(f, "{}", msg);
+                return write!(f, "{msg}");
             }
             ErrorKind::InvalidArgument(invalid_arg_kind) => {
                 let arg = &invalid_arg_kind.arg;
                 let msg = &invalid_arg_kind.msg;
 
                 return if let Some(arg) = arg {
-                    write!(f, "invalid argument for {}: {}", arg, msg)
+                    write!(f, "invalid argument for {arg}: {msg}")
                 } else {
-                    write!(f, "invalid argument: {}", msg)
+                    write!(f, "invalid argument: {msg}")
                 };
             }
             ErrorKind::ServiceNotAvailable(service) => {
-                return write!(f, "service not available: {}", service);
+                return write!(f, "service not available: {service}");
             }
             ErrorKind::FeatureNotAvailable(feature_not_available_kind) => {
                 let msg = &feature_not_available_kind.msg;
                 let feature = &feature_not_available_kind.feature;
 
                 return if let Some(msg) = msg {
-                    write!(f, "feature not available: {} ({})", feature, msg)
+                    write!(f, "feature not available: {feature} ({msg})")
                 } else {
-                    write!(f, "feature not available: {}", feature)
+                    write!(f, "feature not available: {feature}")
                 };
             }
-            ErrorKind::EncodingFailure(msg) => return write!(f, "encoding failure: {}", msg),
-            ErrorKind::DecodingFailure(msg) => return write!(f, "decoding failure: {}", msg),
+            ErrorKind::EncodingFailure(msg) => return write!(f, "encoding failure: {msg}"),
+            ErrorKind::DecodingFailure(msg) => return write!(f, "decoding failure: {msg}"),
             ErrorKind::InternalServerFailure => "internal server failure",
             ErrorKind::AuthenticationFailure => "authentication failure",
             ErrorKind::TemporaryFailure => "temporary failure",
@@ -302,7 +296,7 @@ impl Display for ErrorKind {
             ErrorKind::ServerTimeout => "server timeout",
         };
 
-        write!(f, "{}", msg)
+        write!(f, "{msg}")
     }
 }
 

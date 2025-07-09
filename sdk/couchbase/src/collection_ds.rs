@@ -79,7 +79,7 @@ impl CouchbaseList<'_> {
             .collection
             .lookup_in(
                 &self.id,
-                &[LookupInSpec::get(format!("[{}]", index), None)],
+                &[LookupInSpec::get(format!("[{index}]"), None)],
                 None,
             )
             .await?;
@@ -91,7 +91,7 @@ impl CouchbaseList<'_> {
         self.collection
             .mutate_in(
                 &self.id,
-                &[MutateInSpec::remove(format!("[{}]", index), None)],
+                &[MutateInSpec::remove(format!("[{index}]"), None)],
                 None,
             )
             .await?;
@@ -298,7 +298,7 @@ impl CouchbaseSet<'_> {
                     .collection
                     .mutate_in(
                         &self.id,
-                        &[MutateInSpec::remove(format!("[{}]", index), None)],
+                        &[MutateInSpec::remove(format!("[{index}]"), None)],
                         MutateInOptions::new().cas(cas),
                     )
                     .await;

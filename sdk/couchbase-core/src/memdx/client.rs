@@ -199,7 +199,7 @@ impl Client {
                                                             match sender.send(Err(Error::new_decompression_error().with(e))).await{
                                                                 Ok(_) => {}
                                                                 Err(e) => {
-                                                                    debug!("Sending response to caller failed: {}", e);
+                                                                    debug!("Sending response to caller failed: {e}");
                                                                 }
                                                             };
                                                          continue;
@@ -222,7 +222,7 @@ impl Client {
                                         match sender.send(Ok(resp)).await {
                                             Ok(_) => {}
                                             Err(e) => {
-                                                debug!("Sending response to caller failed: {}", e);
+                                                debug!("Sending response to caller failed: {e}");
                                             }
                                         };
                                         drop(context);

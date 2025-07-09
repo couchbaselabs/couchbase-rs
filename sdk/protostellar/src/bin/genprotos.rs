@@ -11,7 +11,7 @@ fn main() {
         .out_dir("genproto")
         .protoc_arg("--experimental_allow_proto3_optional") // Need this for the linux build
         .compile_protos(&proto_files, &proto_include_paths)
-        .unwrap_or_else(|e| panic!("Failed to compile protos {:?}", e));
+        .unwrap_or_else(|e| panic!("Failed to compile protos {e:?}"));
 
     for proto in &proto_files {
         println!(
@@ -27,7 +27,7 @@ fn get_protos() -> Vec<PathBuf> {
     {
         match entry {
             Ok(path) => protos.push(path.clone()),
-            Err(e) => panic!("{:?}", e),
+            Err(e) => panic!("{e:?}"),
         }
     }
     protos

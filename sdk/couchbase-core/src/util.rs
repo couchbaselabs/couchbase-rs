@@ -5,16 +5,16 @@ use crate::error::Error;
 
 pub(crate) fn get_host_port_from_uri(uri: &str) -> error::Result<String> {
     let parsed = Url::parse(uri)
-        .map_err(|e| Error::new_message_error(format!("failed to parse uri: {}", e)))?;
+        .map_err(|e| Error::new_message_error(format!("failed to parse uri: {e}")))?;
 
     let host = if let Some(host) = parsed.host() {
         if let Some(port) = parsed.port() {
-            format!("{}:{}", host, port)
+            format!("{host}:{port}")
         } else {
             host.to_string()
         }
     } else {
-        return Err(Error::new_message_error(format!("no host in URI {}", uri)));
+        return Err(Error::new_message_error(format!("no host in URI {uri}")));
     };
 
     Ok(host)
@@ -32,7 +32,7 @@ pub(crate) fn get_hostname_from_host_port(host_port: &str) -> error::Result<Stri
     let (host, _) = split_host_port(host_port)?;
 
     if host.contains(':') {
-        return Ok(format!("[{}]", host));
+        return Ok(format!("[{host}]"));
     }
 
     Ok(host.to_string())
@@ -44,8 +44,7 @@ fn split_host_port(hostport: &str) -> error::Result<(&str, &str)> {
 
     let addr_err = |addr: &str, why: &str| -> error::Result<(&str, &str)> {
         Err(Error::new_message_error(format!(
-            "invalid address '{}': {}",
-            addr, why
+            "invalid address '{addr}': {why}"
         )))
     };
 

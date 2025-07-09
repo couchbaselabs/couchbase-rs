@@ -24,7 +24,7 @@ impl Display for DurabilityLevel {
             InnerDurabilityLevel::Majority => write!(f, "majority"),
             InnerDurabilityLevel::MajorityAndPersistActive => write!(f, "majorityAndPersistActive"),
             InnerDurabilityLevel::PersistToMajority => write!(f, "persistToMajority"),
-            InnerDurabilityLevel::Other(val) => write!(f, "unknown({})", val),
+            InnerDurabilityLevel::Other(val) => write!(f, "unknown({val})"),
         }
     }
 }

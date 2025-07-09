@@ -244,10 +244,7 @@ impl<C: Client> HttpComponent<C> {
             }
 
             let sleep = backoff.backoff(attempt_idx);
-            debug!(
-                "Retrying ensure_resource, after {:?}, attempt number: {}",
-                sleep, attempt_idx
-            );
+            debug!("Retrying ensure_resource, after {sleep:?}, attempt number: {attempt_idx}");
 
             tokio::time::sleep(sleep).await;
             attempt_idx += 1;

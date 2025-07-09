@@ -84,7 +84,7 @@ fn edition_modifier_from_str(
         "enterprise" => Some(NodeEdition::Enterprise),
         "community" => Some(NodeEdition::Community),
         "dp" => None,
-        _ => return Err(format!("Unrecognised edition or modifier: {}", edition_str)),
+        _ => return Err(format!("Unrecognised edition or modifier: {edition_str}")),
     };
     let modifier = if parts.len() > 1 {
         Some(parts[1].to_lowercase())

@@ -52,7 +52,7 @@ impl TryFrom<u8> for Magic {
             0x82 => Magic::ServerReq,
             0x83 => Magic::ServerRes,
             _ => {
-                return Err(Error::new_message_error(format!("unknown magic {}", value)));
+                return Err(Error::new_message_error(format!("unknown magic {value}")));
             }
         };
 
@@ -70,6 +70,6 @@ impl Display for Magic {
             Magic::ServerReq => "ServerReq",
             Magic::ServerRes => "ServerRes",
         };
-        write!(f, "{}", txt)
+        write!(f, "{txt}")
     }
 }
