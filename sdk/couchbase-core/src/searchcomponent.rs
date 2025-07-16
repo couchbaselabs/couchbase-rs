@@ -1,6 +1,5 @@
 use crate::authenticator::Authenticator;
-use crate::diagnosticscomponent::PingSearchOptions;
-use crate::error;
+use crate::diagnosticscomponent::PingSearchReportOptions;
 use crate::error::ErrorKind;
 use crate::httpcomponent::{HttpComponent, HttpComponentState};
 use crate::httpx::client::Client;
@@ -23,6 +22,7 @@ use crate::searchx::search::Search;
 use crate::searchx::search_respreader::SearchRespReader;
 use crate::searchx::search_result::{FacetResult, MetaData, ResultHit};
 use crate::service_type::ServiceType;
+use crate::{error, httpx};
 use arc_swap::ArcSwap;
 use futures::future::join_all;
 use futures::StreamExt;
@@ -508,7 +508,38 @@ impl<C: Client + 'static> SearchComponent<C> {
 
     pub async fn ping_all_endpoints(
         &self,
-        opts: PingSearchOptions<'_>,
+        on_behalf_of: Option<&httpx::request::OnBehalfOfInfo>,
+    ) -> error::Result<Vec<error::Result<()>>> {
+        let (client, targets) = self.http_component.get_all_targets::<NodeTarget>(&[])?;
+
+        let copts = PingOptions { on_behalf_of };
+
+        let mut handles = Vec::with_capacity(targets.len());
+        let user_agent = self.http_component.user_agent().to_string();
+        for target in targets {
+            let user_agent = user_agent.clone();
+            let client = Search::<C> {
+                http_client: client.clone(),
+                user_agent,
+                endpoint: target.endpoint.clone(),
+                username: target.username,
+                password: target.password,
+                vector_search_enabled: false,
+            };
+
+            let handle = self.ping_one(client, copts.clone());
+
+            handles.push(handle);
+        }
+
+        let results = join_all(handles).await;
+
+        Ok(results)
+    }
+
+    pub async fn create_ping_report(
+        &self,
+        opts: PingSearchReportOptions<'_>,
     ) -> error::Result<Vec<EndpointPingReport>> {
         let (client, targets) = self.http_component.get_all_targets::<NodeTarget>(&[])?;
 
@@ -531,7 +562,7 @@ impl<C: Client + 'static> SearchComponent<C> {
                 vector_search_enabled: self.state.load().vector_search_enabled,
             };
 
-            let handle = self.ping_one(client, timeout, copts.clone());
+            let handle = self.create_one_report(client, timeout, copts.clone());
 
             handles.push(handle);
         }
@@ -541,7 +572,11 @@ impl<C: Client + 'static> SearchComponent<C> {
         Ok(reports)
     }
 
-    async fn ping_one(
+    async fn ping_one(&self, client: Search<C>, opts: PingOptions<'_>) -> error::Result<()> {
+        client.ping(&opts).await.map_err(error::Error::from)
+    }
+
+    async fn create_one_report(
         &self,
         client: Search<C>,
         timeout: Duration,

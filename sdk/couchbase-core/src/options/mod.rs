@@ -5,3 +5,4 @@ pub mod ping;
 pub mod query;
 pub mod search;
 pub mod search_management;
+pub mod waituntilready;

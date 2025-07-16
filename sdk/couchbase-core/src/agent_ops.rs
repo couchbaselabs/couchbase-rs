@@ -41,6 +41,7 @@ use crate::options::search_management::{
     FreezePlanOptions, GetIndexOptions, GetIndexedDocumentsCountOptions, PauseIngestOptions,
     ResumeIngestOptions, UnfreezePlanOptions, UpsertIndexOptions,
 };
+use crate::options::waituntilready::WaitUntilReadyOptions;
 use crate::pingreport::PingReport;
 use crate::querycomponent::QueryResultStream;
 use crate::queryx::index::Index;
@@ -362,5 +363,9 @@ impl Agent {
         opts: &search_management::EnsureIndexOptions<'_>,
     ) -> Result<()> {
         self.inner.search.ensure_index(opts).await
+    }
+
+    pub async fn wait_until_ready(&self, opts: &WaitUntilReadyOptions) -> Result<()> {
+        self.inner.diagnostics.wait_until_ready(opts).await
     }
 }

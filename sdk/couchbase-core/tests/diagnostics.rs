@@ -1,7 +1,11 @@
-use crate::common::test_config::run_test;
+use crate::common::default_agent_options::create_default_options;
+use crate::common::test_config::{run_test, setup_test};
+use couchbase_core::agent::Agent;
 use couchbase_core::options::ping::PingOptions;
+use couchbase_core::options::waituntilready::WaitUntilReadyOptions;
 use couchbase_core::pingreport::PingState;
 use std::future::Future;
+use std::ops::Add;
 use std::time::Duration;
 
 mod common;
@@ -11,7 +15,7 @@ fn test_ping() {
     run_test(async |mut agent| {
         let report = agent
             .ping(&PingOptions {
-                service_types: vec![],
+                service_types: None,
                 kv_timeout: Duration::from_millis(1000),
                 query_timeout: Duration::from_millis(1000),
                 search_timeout: Duration::from_millis(1000),
@@ -80,4 +84,18 @@ fn test_ping() {
             assert!(!node.remote.is_empty());
         }
     });
+}
+
+#[test]
+fn test_wait_until_ready() {
+    setup_test(async |config| {
+        let agent_opts = create_default_options(config.clone()).await;
+
+        let mut agent = Agent::new(agent_opts).await.unwrap();
+
+        agent
+            .wait_until_ready(&WaitUntilReadyOptions::new())
+            .await
+            .unwrap();
+    })
 }

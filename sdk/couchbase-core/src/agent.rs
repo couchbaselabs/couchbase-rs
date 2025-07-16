@@ -105,11 +105,7 @@ pub(crate) struct AgentInner {
     pub(crate) query: Arc<QueryComponent<ReqwestClient>>,
     pub(crate) search: Arc<SearchComponent<ReqwestClient>>,
     pub(crate) mgmt: MgmtComponent<ReqwestClient>,
-    pub(crate) diagnostics: DiagnosticsComponent<
-        ReqwestClient,
-        AgentClientManager,
-        ConfigManagerMemd<AgentClientManager>,
-    >,
+    pub(crate) diagnostics: DiagnosticsComponent<ReqwestClient, AgentClientManager>,
 }
 
 #[derive(Clone)]
@@ -239,9 +235,9 @@ impl AgentInner {
     }
 
     fn gen_agent_component_configs(state: &mut AgentState) -> AgentComponentConfigs {
-        let network_info = state
-            .latest_config
-            .addresses_group_for_network_type(&state.network_type);
+        let config = &state.latest_config;
+        let rev_id = config.rev_id;
+        let network_info = config.addresses_group_for_network_type(&state.network_type);
 
         let mut kv_data_node_ids = Vec::new();
         let mut kv_data_hosts: HashMap<String, String> = HashMap::new();
@@ -324,6 +320,14 @@ impl AgentInner {
             }
         };
 
+        let mut available_services = vec![ServiceType::MEMD];
+        if !query_endpoints.is_empty() {
+            available_services.push(ServiceType::QUERY)
+        }
+        if !search_endpoints.is_empty() {
+            available_services.push(ServiceType::SEARCH)
+        }
+
         AgentComponentConfigs {
             config_manager_memd_config: ConfigManagerMemdConfig {
                 endpoints: kv_data_node_ids,
@@ -351,6 +355,8 @@ impl AgentInner {
             },
             diagnostics_config: DiagnosticsComponentConfig {
                 bucket: state.bucket.clone(),
+                services: available_services,
+                rev_id,
             },
         }
     }
@@ -577,7 +583,6 @@ impl Agent {
             conn_mgr.clone(),
             query.clone(),
             search.clone(),
-            cfg_manager.clone(),
             retry_manager.clone(),
             agent_component_configs.diagnostics_config,
         );

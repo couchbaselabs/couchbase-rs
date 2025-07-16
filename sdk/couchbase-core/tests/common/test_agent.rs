@@ -18,12 +18,15 @@ use couchbase_core::options::query::*;
 use couchbase_core::options::search::SearchOptions;
 use couchbase_core::options::search_management;
 use couchbase_core::options::search_management::*;
+use couchbase_core::options::waituntilready::WaitUntilReadyOptions;
 use couchbase_core::querycomponent::QueryResultStream;
 use couchbase_core::queryx::index::Index;
 use couchbase_core::searchcomponent::SearchResultStream;
 use couchbase_core::searchx;
 use couchbase_core::searchx::document_analysis::DocumentAnalysis;
-use std::ops::{Deref, DerefMut};
+use std::ops::{Add, Deref, DerefMut};
+use std::time::Duration;
+use tokio::time::{timeout_at, Instant};
 
 #[derive(Clone)]
 pub struct TestAgent {
@@ -369,5 +372,14 @@ impl TestAgent {
         opts: &search_management::EnsureIndexOptions<'_>,
     ) -> Result<()> {
         run_with_std_ensure_deadline(self.agent.ensure_search_index(opts)).await
+    }
+
+    pub async fn wait_until_ready(&self, opts: &WaitUntilReadyOptions) -> Result<()> {
+        timeout_at(
+            Instant::now().add(Duration::from_millis(10000)),
+            self.agent.wait_until_ready(opts),
+        )
+        .await
+        .unwrap()
     }
 }
