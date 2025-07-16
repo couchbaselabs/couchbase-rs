@@ -8,29 +8,39 @@ use crate::kvclientmanager::KvClientManager;
 use crate::kvclientpool::KvClientPool;
 use crate::memdx::request::PingRequest;
 use crate::options::ping::PingOptions;
+use crate::options::waituntilready::{ClusterState, WaitUntilReadyOptions};
 use crate::pingreport::{EndpointPingReport, PingReport, PingState};
 use crate::querycomponent::QueryComponent;
-use crate::retry::RetryManager;
+use crate::retry::{RetryInfo, RetryManager, RetryReason};
+use crate::retrybesteffort::{BestEffortRetryStrategy, ExponentialBackoffCalculator};
 use crate::searchcomponent::SearchComponent;
 use crate::service_type::ServiceType;
 use futures::future::join_all;
+use futures::stream::FuturesUnordered;
+use futures::StreamExt;
+use log::debug;
 use serde::ser::SerializeStruct;
 use std::collections::HashMap;
 use std::fmt::Display;
+use std::future::Future;
 use std::ops::Sub;
+use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::select;
+use tokio::sync::watch;
+use tokio::sync::watch::{Receiver, Sender};
+use tokio::time::sleep;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Default)]
-pub(crate) struct PingQueryOptions<'a> {
+pub(crate) struct PingQueryReportOptions<'a> {
     pub(crate) on_behalf_of: Option<&'a OnBehalfOfInfo>,
     pub(crate) timeout: Duration,
 }
 
 #[derive(Debug, Clone, Default)]
-pub(crate) struct PingSearchOptions<'a> {
+pub(crate) struct PingSearchReportOptions<'a> {
     pub(crate) on_behalf_of: Option<&'a OnBehalfOfInfo>,
     pub(crate) timeout: Duration,
 }
@@ -39,13 +49,18 @@ pub(crate) struct PingSearchOptions<'a> {
 pub(crate) struct PingKvOptions<'a> {
     pub(crate) on_behalf_of: Option<&'a str>,
     pub(crate) timeout: Duration,
+    pub(crate) bucket: Option<&'a str>,
 }
 
-pub struct DiagnosticsComponent<C: Client, M: KvClientManager, CM: ConfigManager> {
+#[derive(Debug, Clone, Default)]
+struct PingEveryKvConnectionOptions<'a> {
+    pub(crate) on_behalf_of: Option<&'a str>,
+}
+
+pub struct DiagnosticsComponent<C: Client, M: KvClientManager> {
     kv_client_manager: Arc<M>,
     query_component: Arc<QueryComponent<C>>,
     search_component: Arc<SearchComponent<C>>,
-    config_manager: Arc<CM>,
 
     state: Mutex<DiagnosticsComponentState>,
 
@@ -55,47 +70,65 @@ pub struct DiagnosticsComponent<C: Client, M: KvClientManager, CM: ConfigManager
 #[derive(Debug)]
 pub(crate) struct DiagnosticsComponentConfig {
     pub bucket: Option<String>,
+    pub services: Vec<ServiceType>,
+    pub rev_id: i64,
 }
 
 struct DiagnosticsComponentState {
     bucket: Option<String>,
+    services: Vec<ServiceType>,
+    rev_id: i64,
 }
 
-impl<C: Client + 'static, M: KvClientManager, CM: ConfigManager> DiagnosticsComponent<C, M, CM> {
+impl<C: Client + 'static, M: KvClientManager> DiagnosticsComponent<C, M> {
     pub fn new(
         kv_client_manager: Arc<M>,
         query_component: Arc<QueryComponent<C>>,
         search_component: Arc<SearchComponent<C>>,
-        config_manager: Arc<CM>,
         retry_manager: Arc<RetryManager>,
         config: DiagnosticsComponentConfig,
     ) -> Self {
+        let state = Mutex::new(DiagnosticsComponentState {
+            bucket: config.bucket,
+            services: config.services,
+            rev_id: config.rev_id,
+        });
+
         Self {
             kv_client_manager,
             query_component,
             search_component,
-            config_manager,
 
             retry_manager,
-            state: Mutex::new(DiagnosticsComponentState {
-                bucket: config.bucket,
-            }),
+
+            state,
         }
     }
 
     pub fn reconfigure(&self, config: DiagnosticsComponentConfig) {
-        let mut state_guard = self.state.lock().unwrap();
-        state_guard.bucket = config.bucket;
+        let mut state = self.state.lock().unwrap();
+        state.rev_id = config.rev_id;
+        state.bucket = config.bucket.clone();
+        state.services = config.services.clone();
     }
 
     pub async fn ping(&self, opts: &PingOptions) -> crate::error::Result<PingReport>
     where
         <<M as KvClientManager>::Pool as KvClientPool>::Client: 'static,
     {
-        let service_types = if opts.service_types.is_empty() {
-            vec![ServiceType::QUERY, ServiceType::SEARCH, ServiceType::MEMD]
+        let (rev_id, bucket, available_services) = {
+            let state = self.state.lock().unwrap();
+            (state.rev_id, state.bucket.clone(), state.services.clone())
+        };
+
+        let service_types = if let Some(st) = &opts.service_types {
+            if st.is_empty() {
+                available_services
+            } else {
+                st.clone()
+            }
         } else {
-            opts.service_types.clone()
+            available_services
         };
 
         let on_behalf_of = opts.on_behalf_of.as_ref();
@@ -104,7 +137,7 @@ impl<C: Client + 'static, M: KvClientManager, CM: ConfigManager> DiagnosticsComp
         if service_types.contains(&ServiceType::QUERY) {
             let query_report = self
                 .query_component
-                .ping_all_endpoints(PingQueryOptions {
+                .create_ping_report(PingQueryReportOptions {
                     on_behalf_of,
                     timeout: opts.query_timeout,
                 })
@@ -115,7 +148,7 @@ impl<C: Client + 'static, M: KvClientManager, CM: ConfigManager> DiagnosticsComp
         if service_types.contains(&ServiceType::SEARCH) {
             let search_report = self
                 .search_component
-                .ping_all_endpoints(PingSearchOptions {
+                .create_ping_report(PingSearchReportOptions {
                     on_behalf_of,
                     timeout: opts.search_timeout,
                 })
@@ -129,6 +162,7 @@ impl<C: Client + 'static, M: KvClientManager, CM: ConfigManager> DiagnosticsComp
                 .ping_all_kv_nodes(PingKvOptions {
                     on_behalf_of,
                     timeout: opts.kv_timeout,
+                    bucket: bucket.as_deref(),
                 })
                 .await?;
             services.insert(ServiceType::MEMD, kv_report);
@@ -138,9 +172,174 @@ impl<C: Client + 'static, M: KvClientManager, CM: ConfigManager> DiagnosticsComp
             version: 2,
             id: Uuid::new_v4().to_string(),
             sdk: "rust".to_string(),
-            config_rev: self.config_manager.current_config().rev_id,
+            config_rev: rev_id,
             services,
         })
+    }
+
+    pub async fn wait_until_ready(&self, opts: &WaitUntilReadyOptions) -> crate::error::Result<()> {
+        let desired_state = opts.desired_state.unwrap_or(ClusterState::Online);
+        if desired_state == ClusterState::Offline {
+            return Err(Error::new_invalid_argument_error(
+                "cannot be Offline",
+                Some("desired_state".to_string()),
+            ));
+        }
+
+        let mut retry_info = RetryInfo::new(
+            "wait_until_ready",
+            true,
+            Arc::new(BestEffortRetryStrategy::new(
+                ExponentialBackoffCalculator::default(),
+            )),
+        );
+
+        let available_services = {
+            let state = self.state.lock().unwrap();
+            state.services.clone()
+        };
+
+        let service_types = if let Some(st) = &opts.service_types {
+            if st.is_empty() {
+                available_services
+            } else {
+                st.clone()
+            }
+        } else {
+            available_services
+        };
+
+        let on_behalf_of = opts.on_behalf_of.as_ref();
+
+        loop {
+            let mut handles = FuturesUnordered::<Pin<Box<dyn Future<Output = bool>>>>::new();
+            if service_types.contains(&ServiceType::QUERY) {
+                handles.push(Box::pin(
+                    self.is_query_ready(opts.on_behalf_of.as_ref(), desired_state),
+                ));
+            }
+
+            if service_types.contains(&ServiceType::SEARCH) {
+                handles.push(Box::pin(
+                    self.is_search_ready(opts.on_behalf_of.as_ref(), desired_state),
+                ));
+            }
+
+            if service_types.contains(&ServiceType::MEMD) {
+                let on_behalf_of = on_behalf_of.map(|b| b.username.as_str());
+                handles.push(Box::pin(self.is_kv_ready(on_behalf_of, desired_state)));
+            }
+
+            let mut all_ready = true;
+            while let Some(ready) = handles.next().await {
+                if !ready {
+                    all_ready = false;
+                    break;
+                }
+            }
+
+            if all_ready {
+                return Ok(());
+            }
+
+            let duration = self
+                .retry_manager
+                .maybe_retry(&mut retry_info, RetryReason::NotReady)
+                .await;
+
+            if let Some(duration) = duration {
+                debug!(
+                    "Retrying {} after {:?} due to {}",
+                    &retry_info,
+                    duration,
+                    RetryReason::NotReady
+                );
+
+                sleep(duration).await;
+            } else {
+                return Err(Error::new_message_error(
+                    "retry manager indicated no retry, this is a bug",
+                ));
+            }
+        }
+    }
+
+    async fn is_query_ready(
+        &self,
+        on_behalf_of: Option<&OnBehalfOfInfo>,
+        desired_state: ClusterState,
+    ) -> bool {
+        let query_result = match self.query_component.ping_all_endpoints(on_behalf_of).await {
+            Ok(res) => res,
+            Err(_e) => {
+                return false;
+            }
+        };
+
+        if desired_state == ClusterState::Online {
+            query_result.into_iter().all(|res| res.is_ok())
+        } else {
+            query_result.into_iter().any(|res| res.is_ok())
+        }
+    }
+
+    async fn is_search_ready(
+        &self,
+        on_behalf_of: Option<&OnBehalfOfInfo>,
+        desired_state: ClusterState,
+    ) -> bool {
+        let search_result = match self.search_component.ping_all_endpoints(on_behalf_of).await {
+            Ok(res) => res,
+            Err(_e) => {
+                return false;
+            }
+        };
+
+        if desired_state == ClusterState::Online {
+            search_result.into_iter().all(|res| res.is_ok())
+        } else {
+            search_result.into_iter().any(|res| res.is_ok())
+        }
+    }
+
+    async fn is_kv_ready(&self, on_behalf_of: Option<&str>, desired_state: ClusterState) -> bool {
+        let clients = match self.kv_client_manager.get_all_clients().await {
+            Ok(clients) => clients,
+            Err(_e) => {
+                return false;
+            }
+        };
+
+        let req = PingRequest { on_behalf_of };
+
+        let mut handles = Vec::with_capacity(clients.len());
+        for client in clients {
+            let req = req.clone();
+
+            if let Some(client) = client {
+                let client = client.clone();
+                let handle = async move {
+                    let res = client
+                        .ping(req)
+                        .await
+                        .map_err(Error::new_contextual_memdx_error);
+
+                    res.is_ok()
+                };
+
+                handles.push(handle);
+            } else {
+                return false;
+            }
+        }
+
+        let results = join_all(handles).await;
+
+        if desired_state == ClusterState::Online {
+            results.into_iter().all(|ready| ready)
+        } else {
+            results.into_iter().any(|ready| ready)
+        }
     }
 
     async fn ping_all_kv_nodes(
@@ -157,10 +356,7 @@ impl<C: Client + 'static, M: KvClientManager, CM: ConfigManager> DiagnosticsComp
         };
 
         let mut handles = Vec::with_capacity(clients.len());
-        let bucket = {
-            let state_guard = self.state.lock().unwrap();
-            state_guard.bucket.clone()
-        };
+        let bucket = { opts.bucket.map(|b| b.to_string()) };
 
         for client in clients {
             let client = client.clone();

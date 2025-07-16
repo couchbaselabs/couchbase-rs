@@ -1,6 +1,5 @@
 use crate::authenticator::Authenticator;
-use crate::diagnosticscomponent::PingQueryOptions;
-use crate::error;
+use crate::diagnosticscomponent::PingQueryReportOptions;
 use crate::error::ErrorKind;
 use crate::httpcomponent::{HttpComponent, HttpComponentState};
 use crate::httpx::client::Client;
@@ -21,6 +20,7 @@ use crate::queryx::query_result::{EarlyMetaData, MetaData};
 use crate::retry::{orchestrate_retries, RetryInfo, RetryManager, DEFAULT_RETRY_STRATEGY};
 use crate::retrybesteffort::ExponentialBackoffCalculator;
 use crate::service_type::ServiceType;
+use crate::{error, httpx};
 use bytes::Bytes;
 use futures::future::join_all;
 use futures::{Stream, StreamExt};
@@ -439,7 +439,37 @@ impl<C: Client + 'static> QueryComponent<C> {
 
     pub async fn ping_all_endpoints(
         &self,
-        opts: PingQueryOptions<'_>,
+        on_behalf_of: Option<&httpx::request::OnBehalfOfInfo>,
+    ) -> error::Result<Vec<error::Result<()>>> {
+        let (client, targets) = self.http_component.get_all_targets::<NodeTarget>(&[])?;
+
+        let copts = PingOptions { on_behalf_of };
+
+        let mut handles = Vec::with_capacity(targets.len());
+        let user_agent = self.http_component.user_agent().to_string();
+        for target in targets {
+            let user_agent = user_agent.clone();
+            let client = Query::<C> {
+                http_client: client.clone(),
+                user_agent,
+                endpoint: target.endpoint.clone(),
+                username: target.username,
+                password: target.password,
+            };
+
+            let handle = self.ping_one(client, copts.clone());
+
+            handles.push(handle);
+        }
+
+        let results = join_all(handles).await;
+
+        Ok(results)
+    }
+
+    pub async fn create_ping_report(
+        &self,
+        opts: PingQueryReportOptions<'_>,
     ) -> error::Result<Vec<EndpointPingReport>> {
         let (client, targets) = self.http_component.get_all_targets::<NodeTarget>(&[])?;
 
@@ -460,7 +490,7 @@ impl<C: Client + 'static> QueryComponent<C> {
                 password: target.password,
             };
 
-            let handle = self.ping_one(client, timeout, copts.clone());
+            let handle = self.create_one_report(client, timeout, copts.clone());
 
             handles.push(handle);
         }
@@ -470,13 +500,18 @@ impl<C: Client + 'static> QueryComponent<C> {
         Ok(reports)
     }
 
-    async fn ping_one(
+    async fn ping_one(&self, client: Query<C>, opts: PingOptions<'_>) -> error::Result<()> {
+        client.ping(&opts).await.map_err(error::Error::from)
+    }
+
+    async fn create_one_report(
         &self,
         client: Query<C>,
         timeout: Duration,
         opts: PingOptions<'_>,
     ) -> EndpointPingReport {
         let start = std::time::Instant::now();
+
         let res = select! {
             e = tokio::time::sleep(timeout) => {
                 return EndpointPingReport {

@@ -35,6 +35,9 @@ pub(crate) trait KvClientPool: Sized + Send + Sync {
     fn shutdown_client(&self, client: Arc<Self::Client>) -> impl Future<Output = ()> + Send;
     fn close(&self) -> impl Future<Output = Result<()>> + Send;
     fn reconfigure(&self, config: KvClientPoolConfig) -> impl Future<Output = Result<()>> + Send;
+    fn get_all_clients(
+        &self,
+    ) -> impl Future<Output = Result<Vec<Option<Arc<Self::Client>>>>> + Send;
 }
 
 #[derive(Clone)]
@@ -210,6 +213,20 @@ where
         Ok(())
     }
 
+    pub async fn get_all_clients(&self) -> Result<Vec<Option<Arc<K>>>> {
+        if self.closed.load(Ordering::SeqCst) {
+            return Err(ErrorKind::Shutdown.into());
+        }
+
+        let guard = self.state.lock().await;
+        let mut clients = Vec::with_capacity(guard.clients.len());
+        for client in guard.clients.values() {
+            clients.push(client.clone());
+        }
+
+        Ok(clients)
+    }
+
     async fn get_client_slow(&self) -> Result<Arc<K>> {
         if self.closed.load(Ordering::SeqCst) {
             return Err(ErrorKind::Shutdown.into());
@@ -307,6 +324,14 @@ where
         let notify = self.shutdown_notify.clone();
 
         tokio::spawn(async move {
+            {
+                let guard = state.lock().await;
+                if let Some(e) = &guard.connection_error {
+                    // TODO(RSCBC-52): Make configurable.
+                    sleep(Duration::from_millis(5000)).await;
+                }
+            }
+
             let client_result = select! {
                 _ = notify.notified() => {
                     debug!("Shutdown notified");
@@ -447,6 +472,10 @@ where
 
     async fn get_client(&self) -> Result<Arc<K>> {
         self.inner.get_client().await
+    }
+
+    async fn get_all_clients(&self) -> Result<Vec<Option<Arc<Self::Client>>>> {
+        self.inner.get_all_clients().await
     }
 
     async fn shutdown_client(&self, client: Arc<K>) {

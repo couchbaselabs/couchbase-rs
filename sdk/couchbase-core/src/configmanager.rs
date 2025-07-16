@@ -25,7 +25,6 @@ pub(crate) trait ConfigManager: Sized + Send + Sync {
         rev_epoch: i64,
     ) -> impl Future<Output = Option<ParsedConfig>> + Send;
     fn out_of_band_config(&self, config: ParsedConfig) -> Option<ParsedConfig>;
-    fn current_config(&self) -> ParsedConfig;
 }
 
 #[derive(Debug, Clone)]
@@ -285,9 +284,5 @@ impl<M: KvClientManager + 'static> ConfigManager for ConfigManagerMemd<M> {
 
     fn out_of_band_config(&self, config: ParsedConfig) -> Option<ParsedConfig> {
         self.inner.out_of_band_config(config)
-    }
-
-    fn current_config(&self) -> ParsedConfig {
-        self.inner.latest_config.lock().unwrap().clone()
     }
 }

@@ -19,6 +19,12 @@ where
     }
 }
 
+impl Default for BestEffortRetryStrategy<ExponentialBackoffCalculator> {
+    fn default() -> Self {
+        Self::new(ExponentialBackoffCalculator::default())
+    }
+}
+
 #[async_trait]
 impl<Calc> RetryStrategy for BestEffortRetryStrategy<Calc>
 where

@@ -37,6 +37,7 @@ pub enum RetryReason {
     QueryPreparedStatementFailure,
     QueryIndexNotFound,
     SearchTooManyRequests,
+    NotReady,
 }
 
 impl RetryReason {
@@ -56,6 +57,7 @@ impl RetryReason {
                 | RetryReason::QueryPreparedStatementFailure
                 | RetryReason::QueryIndexNotFound
                 | RetryReason::SearchTooManyRequests
+                | RetryReason::NotReady
         )
     }
 
@@ -67,6 +69,7 @@ impl RetryReason {
             RetryReason::KvCollectionOutdated => true,
             RetryReason::KvErrorMapRetryIndicated => false,
             RetryReason::KvLocked => false,
+            RetryReason::NotReady => false,
             _ => false,
         }
     }
@@ -93,6 +96,7 @@ impl Display for RetryReason {
             }
             RetryReason::QueryIndexNotFound => write!(f, "QUERY_INDEX_NOT_FOUND"),
             RetryReason::SearchTooManyRequests => write!(f, "SEARCH_TOO_MANY_REQUESTS"),
+            RetryReason::NotReady => write!(f, "NOT_READY"),
         }
     }
 }
