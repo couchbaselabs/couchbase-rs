@@ -1,11 +1,3 @@
-use std::future::Future;
-use std::net::SocketAddr;
-use std::ops::{Add, Deref};
-use std::sync::atomic::Ordering::SeqCst;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
-use std::time::Duration;
-
 use crate::auth_mechanism::AuthMechanism;
 use crate::authenticator::Authenticator;
 use crate::error::Error;
@@ -23,8 +15,16 @@ use crate::memdx::request::{GetErrorMapRequest, HelloRequest, SelectBucketReques
 use crate::service_type::ServiceType;
 use crate::tls_config::TlsConfig;
 use crate::util::hostname_from_addr_str;
+use chrono::{DateTime, FixedOffset, Local, NaiveDateTime, Utc};
 use futures::future::BoxFuture;
 use log::{debug, warn};
+use std::future::Future;
+use std::net::SocketAddr;
+use std::ops::{Add, Deref};
+use std::sync::atomic::Ordering::SeqCst;
+use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
+use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::{mpsc, Mutex};
 use tokio::time::Instant;
 use uuid::Uuid;
@@ -84,6 +84,7 @@ pub(crate) trait KvClient: Sized + PartialEq + Send + Sync {
     fn remote_hostname(&self) -> &str;
     fn remote_addr(&self) -> SocketAddr;
     fn local_addr(&self) -> SocketAddr;
+    fn last_activity(&self) -> DateTime<FixedOffset>;
     fn close(&self) -> impl Future<Output = Result<()>> + Send;
     fn id(&self) -> &str;
 }
@@ -105,6 +106,8 @@ pub(crate) struct StdKvClient<D: Dispatcher> {
     // we send the operation to select the bucket, since things happen
     // asynchronously and we do not support changing selected buckets.
     pub(crate) selected_bucket: std::sync::Mutex<Option<String>>,
+
+    pub(crate) last_activity_timestamp_micros: AtomicI64,
 
     id: String,
 }
@@ -294,6 +297,7 @@ where
             supported_features: vec![],
             selected_bucket: std::sync::Mutex::new(None),
             id: id.clone(),
+            last_activity_timestamp_micros: AtomicI64::new(Utc::now().timestamp_micros()),
         };
 
         if should_bootstrap {
@@ -335,6 +339,7 @@ where
     }
 
     async fn reconfigure(&self, config: KvClientConfig) -> Result<()> {
+        debug!("Reconfiguring KvClient {}", &self.id);
         let mut current_config = self.current_config.lock().await;
 
         // TODO: compare root certs or something somehow.
@@ -416,6 +421,14 @@ where
 
     fn local_addr(&self) -> SocketAddr {
         self.local_addr
+    }
+
+    fn last_activity(&self) -> DateTime<FixedOffset> {
+        let last_activity = self.last_activity_timestamp_micros.load(SeqCst);
+
+        DateTime::from_timestamp_micros(last_activity)
+            .unwrap_or_default()
+            .fixed_offset()
     }
 
     async fn close(&self) -> Result<()> {

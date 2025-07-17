@@ -858,10 +858,8 @@ struct FirstHttpConfig {
     pub bucket_name: Option<String>,
 }
 
-// impl Drop for Agent {
-//     fn drop(&mut self) {
-//         self.config_watcher_shutdown_tx.send(()).unwrap_or_default();
-//
-//         block_on(async { self.inner.conn_mgr.close().await }).unwrap_or_default();
-//     }
-// }
+impl Drop for Agent {
+    fn drop(&mut self) {
+        debug!("Dropping agent");
+    }
+}

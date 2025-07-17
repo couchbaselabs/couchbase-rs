@@ -1,12 +1,15 @@
 use crate::configmanager::ConfigManager;
+use crate::connection_state::ConnectionState;
+use crate::diagnosticsresult::{DiagnosticsResult, EndpointDiagnostics};
 use crate::error::Error;
 use crate::httpx::client::Client;
 use crate::httpx::request::OnBehalfOfInfo;
 use crate::kvclient::KvClient;
 use crate::kvclient_ops::KvClientOps;
 use crate::kvclientmanager::KvClientManager;
-use crate::kvclientpool::KvClientPool;
+use crate::kvclientpool::{KvClientPool, KvClientPoolClient};
 use crate::memdx::request::PingRequest;
+use crate::options::diagnostics::DiagnosticsOptions;
 use crate::options::ping::PingOptions;
 use crate::options::waituntilready::{ClusterState, WaitUntilReadyOptions};
 use crate::pingreport::{EndpointPingReport, PingReport, PingState};
@@ -15,6 +18,7 @@ use crate::retry::{RetryInfo, RetryManager, RetryReason};
 use crate::retrybesteffort::{BestEffortRetryStrategy, ExponentialBackoffCalculator};
 use crate::searchcomponent::SearchComponent;
 use crate::service_type::ServiceType;
+use chrono::Utc;
 use futures::future::join_all;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
@@ -110,6 +114,50 @@ impl<C: Client + 'static, M: KvClientManager> DiagnosticsComponent<C, M> {
         state.rev_id = config.rev_id;
         state.bucket = config.bucket.clone();
         state.services = config.services.clone();
+    }
+
+    pub async fn diagnostics(
+        &self,
+        _opts: &DiagnosticsOptions,
+    ) -> crate::error::Result<DiagnosticsResult> {
+        let pools = self.kv_client_manager.get_all_pools();
+
+        let mut endpoint_reports = vec![];
+        for (endpoint, pool) in &pools {
+            for (id, client) in pool.get_all_clients().await? {
+                let (local_address, last_activity) = if let Some(cli) = &client.client {
+                    (
+                        Some(cli.local_addr().to_string()),
+                        Some(
+                            Utc::now()
+                                .sub(cli.last_activity().to_utc())
+                                .num_microseconds()
+                                .unwrap_or_default(),
+                        ),
+                    )
+                } else {
+                    (None, None)
+                };
+
+                endpoint_reports.push(EndpointDiagnostics {
+                    service_type: ServiceType::MEMD,
+                    id,
+                    local_address,
+                    remote_address: endpoint.to_string(),
+                    last_activity,
+                    namespace: pool.get_bucket().await,
+                    state: client.connection_state,
+                });
+            }
+        }
+
+        Ok(DiagnosticsResult {
+            version: 2,
+            config_rev: self.state.lock().unwrap().rev_id,
+            id: Uuid::new_v4().to_string(),
+            sdk: "rust".to_string(),
+            services: HashMap::from([(ServiceType::MEMD, endpoint_reports)]),
+        })
     }
 
     pub async fn ping(&self, opts: &PingOptions) -> crate::error::Result<PingReport>
@@ -303,42 +351,70 @@ impl<C: Client + 'static, M: KvClientManager> DiagnosticsComponent<C, M> {
     }
 
     async fn is_kv_ready(&self, on_behalf_of: Option<&str>, desired_state: ClusterState) -> bool {
-        let clients = match self.kv_client_manager.get_all_clients().await {
-            Ok(clients) => clients,
-            Err(_e) => {
-                return false;
-            }
-        };
+        let pools = self.kv_client_manager.get_all_pools();
 
         let req = PingRequest { on_behalf_of };
 
-        let mut handles = Vec::with_capacity(clients.len());
-        for client in clients {
+        let mut handles = Vec::with_capacity(pools.len());
+        for (pool_id, pool) in pools {
+            let clients = match pool.get_all_clients().await {
+                Ok(clients) => clients,
+                Err(e) => {
+                    debug!("Failed to get clients from pool: {e}");
+                    return false;
+                }
+            };
+
             let req = req.clone();
+            let handle = async move {
+                debug!("Pinging pool {pool_id} with {} clients", clients.len());
+                let mut pool_handles = Vec::with_capacity(clients.len());
+                for (id, client) in clients {
+                    let req = req.clone();
 
-            if let Some(client) = client {
-                let client = client.clone();
-                let handle = async move {
-                    let res = client
-                        .ping(req)
-                        .await
-                        .map_err(Error::new_contextual_memdx_error);
+                    let handle = self.maybe_ping_client(id.clone(), req, client);
 
-                    res.is_ok()
-                };
+                    pool_handles.push(handle);
+                }
 
-                handles.push(handle);
-            } else {
-                return false;
-            }
+                let results = join_all(pool_handles).await;
+
+                if desired_state == ClusterState::Online {
+                    results.into_iter().all(|ready| ready)
+                } else {
+                    results.into_iter().any(|ready| ready)
+                }
+            };
+
+            handles.push(handle);
         }
 
         let results = join_all(handles).await;
 
-        if desired_state == ClusterState::Online {
-            results.into_iter().all(|ready| ready)
+        results.into_iter().all(|ready| ready)
+    }
+
+    async fn maybe_ping_client<K>(
+        &self,
+        pool_id: String,
+        req: PingRequest<'_>,
+        client: KvClientPoolClient<K>,
+    ) -> bool
+    where
+        K: KvClient + KvClientOps,
+    {
+        if let Some(client) = &client.client {
+            let client = client.clone();
+            match client.ping(req).await {
+                Ok(_) => true,
+                Err(e) => {
+                    debug!("Ping against client {} failed: {}", client.id(), e);
+                    false
+                }
+            }
         } else {
-            results.into_iter().any(|ready| ready)
+            debug!("Client {pool_id} is not connected");
+            false
         }
     }
 

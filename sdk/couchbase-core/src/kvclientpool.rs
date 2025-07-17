@@ -1,10 +1,13 @@
+use std::backtrace::Backtrace;
 use std::collections::HashMap;
 use std::future::Future;
+use std::net::SocketAddr;
 use std::ops::{Deref, Sub};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::connection_state::ConnectionState;
 use crate::error::Result;
 use crate::error::{Error, ErrorKind};
 use crate::kvclient::{
@@ -37,7 +40,8 @@ pub(crate) trait KvClientPool: Sized + Send + Sync {
     fn reconfigure(&self, config: KvClientPoolConfig) -> impl Future<Output = Result<()>> + Send;
     fn get_all_clients(
         &self,
-    ) -> impl Future<Output = Result<Vec<Option<Arc<Self::Client>>>>> + Send;
+    ) -> impl Future<Output = Result<HashMap<String, KvClientPoolClient<Self::Client>>>> + Send;
+    async fn get_bucket(&self) -> Option<String>;
 }
 
 #[derive(Clone)]
@@ -61,7 +65,45 @@ struct ConnectionError {
     pub connect_error_time: Instant,
 }
 
-type KvClientPoolClients<K> = HashMap<String, Option<Arc<K>>>;
+#[derive(Debug)]
+pub(crate) struct KvClientPoolClient<K: KvClient> {
+    pub client: Option<Arc<K>>,
+    pub connection_state: ConnectionState,
+}
+
+impl<K: KvClient> Clone for KvClientPoolClient<K> {
+    fn clone(&self) -> Self {
+        KvClientPoolClient {
+            client: self.client.clone(),
+            connection_state: self.connection_state,
+        }
+    }
+}
+
+impl<K: KvClient> KvClientPoolClient<K> {
+    pub fn new() -> Self {
+        KvClientPoolClient {
+            client: None,
+            connection_state: ConnectionState::Disconnected,
+        }
+    }
+
+    pub fn with_connection_state(connection_state: ConnectionState) -> Self {
+        KvClientPoolClient {
+            client: None,
+            connection_state,
+        }
+    }
+
+    pub fn with_client(client: Arc<K>, connection_state: ConnectionState) -> Self {
+        KvClientPoolClient {
+            client: Some(client),
+            connection_state,
+        }
+    }
+}
+
+type KvClientPoolClients<K> = HashMap<String, KvClientPoolClient<K>>;
 
 struct KvClientPoolClientState<K: KvClient> {
     current_config: KvClientConfig,
@@ -129,7 +171,7 @@ where
             let mut state = self.state.lock().await;
             for (_id, client) in state.clients.iter() {
                 // TODO: probably log
-                if let Some(client) = &client {
+                if let Some(client) = &client.client {
                     client.close().await.unwrap_or_default();
                 }
             }
@@ -151,7 +193,9 @@ where
                 let client_id = Uuid::new_v4().to_string();
                 let config = state.current_config.clone();
                 debug!("Creating new client with id {}", &client_id);
-                state.clients.insert(client_id.clone(), None);
+                state
+                    .clients
+                    .insert(client_id.clone(), KvClientPoolClient::new());
 
                 self.start_new_client(config, client_id).await;
             }
@@ -161,9 +205,10 @@ where
             let num_excess_clients = num_clients - num_wanted_clients;
             let mut clients = &mut state.clients;
             let mut ids_to_remove = vec![];
-            for (id, client) in clients.iter() {
-                if let Some(client) = &client {
-                    client.close().await.unwrap_or_default();
+            for (id, client) in clients.iter_mut() {
+                if let Some(cli) = &client.client {
+                    client.connection_state = ConnectionState::Disconnecting;
+                    cli.close().await.unwrap_or_default();
                     ids_to_remove.push(id.clone());
                 }
 
@@ -178,50 +223,59 @@ where
     }
 
     pub async fn reconfigure(&self, config: KvClientPoolConfig) -> Result<()> {
+        debug!("Reconfiging NaiveKvClientPool");
         self.num_connections_wanted
             .store(config.num_connections, Ordering::SeqCst);
 
         {
             let mut state = self.state.lock().await;
-            let mut new_clients = HashMap::new();
-            for (id, client) in state.clients.iter() {
-                if let Some(client) = &client {
-                    let res = select! {
-                        _ = self.shutdown_notify.notified() => {
-                            debug!("Shutdown notified");
-                            return Ok(());
-                        }
-                        res = client.reconfigure(config.client_config.clone()) => res
-                    };
+            if state.current_config != config.client_config {
+                let mut clients_to_remove = Vec::new();
+                for (id, client) in state.clients.iter_mut() {
+                    if let Some(cli) = &client.client {
+                        client.connection_state = ConnectionState::Connecting;
+                        let res = select! {
+                            _ = self.shutdown_notify.notified() => {
+                                debug!("Shutdown notified");
+                                return Ok(());
+                            }
+                            res = cli.reconfigure(config.client_config.clone()) => res
+                        };
 
-                    if let Err(e) = res {
-                        // TODO: log here.
-                        dbg!(e);
-                        client.close().await.unwrap_or_default();
-                        continue;
-                    };
+                        if let Err(e) = res {
+                            // TODO: log here.
+                            dbg!(e);
+                            cli.close().await.unwrap_or_default();
+                            client.connection_state = ConnectionState::Disconnected;
+                            clients_to_remove.push(id.clone());
+                            continue;
+                        };
+
+                        client.connection_state = ConnectionState::Connected;
+                    }
                 }
 
-                new_clients.insert(id.clone(), client.clone());
+                for id in clients_to_remove {
+                    state.clients.remove(&id);
+                }
             }
-
-            state.clients = new_clients;
         }
 
         self.check_connections().await;
+        self.rebuild_fast_map().await;
 
         Ok(())
     }
 
-    pub async fn get_all_clients(&self) -> Result<Vec<Option<Arc<K>>>> {
+    pub async fn get_all_clients(&self) -> Result<HashMap<String, KvClientPoolClient<K>>> {
         if self.closed.load(Ordering::SeqCst) {
             return Err(ErrorKind::Shutdown.into());
         }
 
         let guard = self.state.lock().await;
-        let mut clients = Vec::with_capacity(guard.clients.len());
-        for client in guard.clients.values() {
-            clients.push(client.clone());
+        let mut clients = HashMap::new();
+        for (id, client) in &guard.clients {
+            clients.insert(id.clone(), client.clone());
         }
 
         Ok(clients)
@@ -237,7 +291,7 @@ where
             let clients = &state.clients;
             let available_clients: Vec<_> = clients
                 .iter()
-                .filter_map(|(_id, c)| c.as_ref().map(|client| client.clone()))
+                .filter_map(|(_id, c)| c.client.as_ref().map(|client| client.clone()))
                 .collect();
             if !available_clients.is_empty() {
                 let idx = self.client_idx.fetch_add(1, Ordering::SeqCst);
@@ -257,8 +311,6 @@ where
     }
 
     pub async fn handle_client_close(&self, client_id: String) {
-        debug!("Client id {} closed", &client_id);
-
         // TODO: not sure the ordering of close leading to here is great.
         if self.closed.load(Ordering::SeqCst) {
             debug!("Pool is closed, ignoring client close for {}", &client_id);
@@ -281,7 +333,7 @@ where
         let clients = &state.clients;
         let mut new_map = Vec::new();
         for client in clients.values() {
-            if let Some(client) = &client {
+            if let Some(client) = &client.client {
                 new_map.push(client.clone());
             }
         }
@@ -325,10 +377,14 @@ where
 
         tokio::spawn(async move {
             {
-                let guard = state.lock().await;
+                let mut guard = state.lock().await;
                 if let Some(e) = &guard.connection_error {
                     // TODO(RSCBC-52): Make configurable.
                     sleep(Duration::from_millis(5000)).await;
+                }
+
+                if let Some(client) = guard.clients.get_mut(&id) {
+                    client.connection_state = ConnectionState::Connecting;
                 }
             }
 
@@ -342,45 +398,56 @@ where
 
             match client_result {
                 Ok(r) => {
-                    debug!("New client created successfully");
-                    let mut guard = state.lock().await;
-                    guard.connection_error = None;
+                    debug!("New client created successfully: {}", r.id());
+                    let new_config = {
+                        let mut guard = state.lock().await;
+                        guard.connection_error = None;
 
-                    if config != guard.current_config {
-                        match r.reconfigure(guard.current_config.clone()).await {
-                            Ok(_) => {
-                                debug!("Reconfigured client {} to new config", r.id());
-                                let mut clients = &mut guard.clients;
-                                if let Some(mut client) = clients.get(r.id()) {
-                                    if client.is_none() {
-                                        clients.insert(r.id().to_string(), Some(Arc::new(r)));
-                                    }
-                                } else {
-                                    // TODO: handle this.
-                                    let _ = r.close().await;
-                                };
-                            }
-                            Err(e) => {
-                                debug!("Failed to reconfigure client {}: {}", r.id(), e);
+                        if config == guard.current_config {
+                            let mut clients = &mut guard.clients;
+                            if let Some(mut client) = clients.get_mut(r.id()) {
+                                debug!("Changing client {} connection state to Connected", r.id());
+                                client.connection_state = ConnectionState::Connected;
+                                client.client = Some(Arc::new(r));
+
+                                let _ = tx.send(());
+                            } else {
+                                // TODO: handle this.
+                                let _ = r.close().await;
+                            };
+
+                            return;
+                        }
+
+                        guard.current_config.clone()
+                    };
+
+                    match r.reconfigure(new_config).await {
+                        Ok(_) => {
+                            debug!("Reconfigured client {} to new config", r.id());
+                            let mut guard = state.lock().await;
+                            let mut clients = &mut guard.clients;
+                            if let Some(mut client) = clients.get_mut(r.id()) {
+                                client.connection_state = ConnectionState::Connected;
+                                client.client = Some(Arc::new(r));
+
+                                let _ = tx.send(());
+                            } else {
+                                // TODO: handle this.
+                                let _ = r.close().await;
+                            };
+                        }
+                        Err(e) => {
+                            debug!("Failed to reconfigure client {}: {}", r.id(), e);
+                            {
+                                let mut guard = state.lock().await;
                                 let mut clients = &mut guard.clients;
                                 // It doesn't matter if this isn't in clients, we just want to make sure
                                 // it isn't.
                                 clients.remove(r.id());
                             }
-                        };
-
-                        return;
-                    }
-
-                    let mut clients = &mut guard.clients;
-                    if let Some(mut client) = clients.get(r.id()) {
-                        if client.is_none() {
-                            // insert will actually perform an update here.
-                            clients.insert(r.id().to_string(), Some(Arc::new(r)));
+                            let _ = r.close().await;
                         }
-                    } else {
-                        // TODO: handle this.
-                        let _ = r.close().await;
                     };
                 }
                 Err(e) => {
@@ -395,10 +462,13 @@ where
                     guard.clients.remove(&id);
                 }
             }
-
-            // TODO: something
-            let _ = tx.send(());
         });
+    }
+
+    async fn get_bucket(&self) -> Option<String> {
+        let state = self.state.lock().await;
+
+        state.current_config.selected_bucket.clone()
     }
 }
 
@@ -410,10 +480,9 @@ where
 
     async fn new(config: KvClientPoolConfig, opts: KvClientPoolOptions) -> Self {
         let (on_client_close_tx, on_client_close_rx) = tokio::sync::mpsc::channel(1);
-
         let mut clients = HashMap::with_capacity(config.num_connections);
         for _ in 0..config.num_connections {
-            clients.insert(Uuid::new_v4().to_string(), None);
+            clients.insert(Uuid::new_v4().to_string(), KvClientPoolClient::new());
         }
 
         let (new_client_watcher_tx, new_client_watcher_rx) = broadcast::channel(1);
@@ -474,10 +543,6 @@ where
         self.inner.get_client().await
     }
 
-    async fn get_all_clients(&self) -> Result<Vec<Option<Arc<Self::Client>>>> {
-        self.inner.get_all_clients().await
-    }
-
     async fn shutdown_client(&self, client: Arc<K>) {
         self.inner.shutdown_client(client).await;
     }
@@ -488,5 +553,22 @@ where
 
     async fn reconfigure(&self, config: KvClientPoolConfig) -> Result<()> {
         self.inner.reconfigure(config).await
+    }
+
+    async fn get_all_clients(&self) -> Result<HashMap<String, KvClientPoolClient<Self::Client>>> {
+        self.inner.get_all_clients().await
+    }
+
+    async fn get_bucket(&self) -> Option<String> {
+        self.inner.get_bucket().await
+    }
+}
+
+impl<K> Drop for NaiveKvClientPool<K>
+where
+    K: KvClient,
+{
+    fn drop(&mut self) {
+        debug!("Dropping NaiveKvClientPool");
     }
 }
