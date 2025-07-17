@@ -1,3 +1,9 @@
+use async_trait::async_trait;
+use bytes::Bytes;
+use futures::{SinkExt, TryFutureExt};
+use log::{debug, error, trace, warn};
+use snap::raw::Decoder;
+use std::backtrace::Backtrace;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::io::empty;
@@ -7,12 +13,6 @@ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
 use std::thread::spawn;
 use std::{env, mem};
-
-use async_trait::async_trait;
-use bytes::Bytes;
-use futures::{SinkExt, TryFutureExt};
-use log::{debug, error, trace, warn};
-use snap::raw::Decoder;
 use tokio::io::{AsyncRead, AsyncWrite, Join, ReadHalf, WriteHalf};
 use tokio::select;
 use tokio::sync::mpsc::unbounded_channel;
@@ -363,6 +363,8 @@ impl Dispatcher for Client {
         if self.closed.swap(true, Ordering::SeqCst) {
             return Ok(());
         }
+
+        debug!("Client {} closing", self.client_id);
 
         let mut close_err = None;
         let mut writer = self.writer.lock().await;
