@@ -1,6 +1,7 @@
 use crate::common::test_config::TestSetupConfig;
 use couchbase_core::authenticator::{Authenticator, PasswordAuthenticator};
 use couchbase_core::options::agent::{AgentOptions, SeedConfig};
+use couchbase_core::tls_config::TlsConfig;
 #[cfg(feature = "rustls-tls")]
 use {
     couchbase_core::insecure_certverfier::InsecureCertVerifier, std::sync::Arc,
@@ -9,18 +10,7 @@ use {
 };
 
 pub async fn create_default_options(config: TestSetupConfig) -> AgentOptions {
-    let tls_config = if config.use_ssl {
-        #[cfg(feature = "native-tls")]
-        {
-            let mut builder = tokio_native_tls::native_tls::TlsConnector::builder();
-            builder.danger_accept_invalid_certs(true);
-            Some(builder.build().unwrap())
-        }
-        #[cfg(all(feature = "rustls-tls", not(feature = "native-tls")))]
-        Some(get_rustls_config())
-    } else {
-        None
-    };
+    let tls_config = create_tls_config(&config);
 
     AgentOptions::new(
         SeedConfig::new()
@@ -33,6 +23,21 @@ pub async fn create_default_options(config: TestSetupConfig) -> AgentOptions {
     )
     .tls_config(tls_config)
     .bucket_name(config.bucket.clone())
+}
+
+pub fn create_tls_config(config: &TestSetupConfig) -> Option<TlsConfig> {
+    if config.use_ssl {
+        #[cfg(feature = "native-tls")]
+        {
+            let mut builder = tokio_native_tls::native_tls::TlsConnector::builder();
+            builder.danger_accept_invalid_certs(true);
+            Some(builder.build().unwrap())
+        }
+        #[cfg(all(feature = "rustls-tls", not(feature = "native-tls")))]
+        Some(get_rustls_config())
+    } else {
+        None
+    }
 }
 
 pub async fn create_options_without_bucket(config: TestSetupConfig) -> AgentOptions {

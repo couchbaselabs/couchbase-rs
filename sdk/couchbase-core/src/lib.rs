@@ -49,7 +49,7 @@ mod scram;
 pub mod searchcomponent;
 pub mod searchx;
 pub mod service_type;
-mod tls_config;
+pub mod tls_config;
 mod util;
 mod vbucketmap;
 mod vbucketrouter;
