@@ -1,4 +1,6 @@
 use crate::configmanager::ConfigManager;
+use crate::connection_state::ConnectionState;
+use crate::diagnosticsresult::{DiagnosticsResult, EndpointDiagnostics};
 use crate::error::Error;
 use crate::httpx::client::Client;
 use crate::httpx::request::OnBehalfOfInfo;
@@ -7,6 +9,7 @@ use crate::kvclient_ops::KvClientOps;
 use crate::kvclientmanager::KvClientManager;
 use crate::kvclientpool::KvClientPool;
 use crate::memdx::request::PingRequest;
+use crate::options::diagnostics::DiagnosticsOptions;
 use crate::options::ping::PingOptions;
 use crate::options::waituntilready::{ClusterState, WaitUntilReadyOptions};
 use crate::pingreport::{EndpointPingReport, PingReport, PingState};
@@ -15,6 +18,7 @@ use crate::retry::{RetryInfo, RetryManager, RetryReason};
 use crate::retrybesteffort::{BestEffortRetryStrategy, ExponentialBackoffCalculator};
 use crate::searchcomponent::SearchComponent;
 use crate::service_type::ServiceType;
+use chrono::Utc;
 use futures::future::join_all;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
@@ -110,6 +114,50 @@ impl<C: Client + 'static, M: KvClientManager> DiagnosticsComponent<C, M> {
         state.rev_id = config.rev_id;
         state.bucket = config.bucket.clone();
         state.services = config.services.clone();
+    }
+
+    pub async fn diagnostics(
+        &self,
+        _opts: &DiagnosticsOptions,
+    ) -> crate::error::Result<DiagnosticsResult> {
+        let pools = self.kv_client_manager.get_all_pools();
+
+        let mut endpoint_reports = vec![];
+        for (endpoint, pool) in &pools {
+            for (id, client) in pool.get_all_clients().await? {
+                let (local_address, last_activity) = if let Some(cli) = &client.client {
+                    (
+                        Some(cli.local_addr().to_string()),
+                        Some(
+                            Utc::now()
+                                .sub(cli.last_activity().to_utc())
+                                .num_microseconds()
+                                .unwrap_or_default(),
+                        ),
+                    )
+                } else {
+                    (None, None)
+                };
+
+                endpoint_reports.push(EndpointDiagnostics {
+                    service_type: ServiceType::MEMD,
+                    id,
+                    local_address,
+                    remote_address: endpoint.to_string(),
+                    last_activity,
+                    namespace: pool.get_bucket().await,
+                    state: client.connection_state,
+                });
+            }
+        }
+
+        Ok(DiagnosticsResult {
+            version: 2,
+            config_rev: self.state.lock().unwrap().rev_id,
+            id: Uuid::new_v4().to_string(),
+            sdk: "rust".to_string(),
+            services: HashMap::from([(ServiceType::MEMD, endpoint_reports)]),
+        })
     }
 
     pub async fn ping(&self, opts: &PingOptions) -> crate::error::Result<PingReport>
@@ -313,10 +361,10 @@ impl<C: Client + 'static, M: KvClientManager> DiagnosticsComponent<C, M> {
         let req = PingRequest { on_behalf_of };
 
         let mut handles = Vec::with_capacity(clients.len());
-        for client in clients {
+        for (_id, client) in clients {
             let req = req.clone();
 
-            if let Some(client) = client {
+            if let Some(client) = &client.client {
                 let client = client.clone();
                 let handle = async move {
                     let res = client

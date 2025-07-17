@@ -1,5 +1,3 @@
-use std::future::Future;
-
 use crate::error::MemdxError;
 use crate::kvclient::{KvClient, StdKvClient};
 use crate::memdx;
@@ -23,6 +21,9 @@ use crate::memdx::response::{
     PingResponse, PrependResponse, ReplaceResponse, SelectBucketResponse, SetResponse,
     TouchResponse, UnlockResponse,
 };
+use chrono::Utc;
+use std::future::Future;
+use std::sync::atomic::Ordering;
 
 pub(crate) type KvResult<T> = Result<T, MemdxError>;
 
@@ -94,6 +95,7 @@ where
     }
 
     async fn set(&self, req: SetRequest<'_>) -> KvResult<SetResponse> {
+        self.update_last_activity();
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().set(self.client(), req).await)?;
 
@@ -102,6 +104,7 @@ where
     }
 
     async fn get(&self, req: GetRequest<'_>) -> KvResult<GetResponse> {
+        self.update_last_activity();
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().get(self.client(), req).await)?;
 
@@ -110,6 +113,7 @@ where
     }
 
     async fn get_meta(&self, req: GetMetaRequest<'_>) -> KvResult<GetMetaResponse> {
+        self.update_last_activity();
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().get_meta(self.client(), req).await)?;
 
@@ -118,6 +122,7 @@ where
     }
 
     async fn delete(&self, req: DeleteRequest<'_>) -> KvResult<DeleteResponse> {
+        self.update_last_activity();
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().delete(self.client(), req).await)?;
 
@@ -126,6 +131,7 @@ where
     }
 
     async fn get_and_lock(&self, req: GetAndLockRequest<'_>) -> KvResult<GetAndLockResponse> {
+        self.update_last_activity();
         let mut op = self
             .handle_dispatch_side_result(self.ops_crud().get_and_lock(self.client(), req).await)?;
 
@@ -134,6 +140,7 @@ where
     }
 
     async fn get_and_touch(&self, req: GetAndTouchRequest<'_>) -> KvResult<GetAndTouchResponse> {
+        self.update_last_activity();
         let mut op = self
             .handle_dispatch_side_result(self.ops_crud().get_and_touch(self.client(), req).await)?;
 
@@ -142,6 +149,7 @@ where
     }
 
     async fn unlock(&self, req: UnlockRequest<'_>) -> KvResult<UnlockResponse> {
+        self.update_last_activity();
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().unlock(self.client(), req).await)?;
 
@@ -150,6 +158,7 @@ where
     }
 
     async fn touch(&self, req: TouchRequest<'_>) -> KvResult<TouchResponse> {
+        self.update_last_activity();
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().touch(self.client(), req).await)?;
 
@@ -158,6 +167,7 @@ where
     }
 
     async fn add(&self, req: AddRequest<'_>) -> KvResult<AddResponse> {
+        self.update_last_activity();
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().add(self.client(), req).await)?;
 
@@ -166,6 +176,7 @@ where
     }
 
     async fn replace(&self, req: ReplaceRequest<'_>) -> KvResult<ReplaceResponse> {
+        self.update_last_activity();
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().replace(self.client(), req).await)?;
 
@@ -174,6 +185,7 @@ where
     }
 
     async fn append(&self, req: AppendRequest<'_>) -> KvResult<AppendResponse> {
+        self.update_last_activity();
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().append(self.client(), req).await)?;
 
@@ -182,6 +194,7 @@ where
     }
 
     async fn prepend(&self, req: PrependRequest<'_>) -> KvResult<PrependResponse> {
+        self.update_last_activity();
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().prepend(self.client(), req).await)?;
 
@@ -190,6 +203,7 @@ where
     }
 
     async fn increment(&self, req: IncrementRequest<'_>) -> KvResult<IncrementResponse> {
+        self.update_last_activity();
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().increment(self.client(), req).await)?;
 
@@ -198,6 +212,7 @@ where
     }
 
     async fn decrement(&self, req: DecrementRequest<'_>) -> KvResult<DecrementResponse> {
+        self.update_last_activity();
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().decrement(self.client(), req).await)?;
 
@@ -206,6 +221,7 @@ where
     }
 
     async fn lookup_in(&self, req: LookupInRequest<'_>) -> KvResult<LookupInResponse> {
+        self.update_last_activity();
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().lookup_in(self.client(), req).await)?;
 
@@ -214,6 +230,7 @@ where
     }
 
     async fn mutate_in(&self, req: MutateInRequest<'_>) -> KvResult<MutateInResponse> {
+        self.update_last_activity();
         let mut op =
             self.handle_dispatch_side_result(self.ops_crud().mutate_in(self.client(), req).await)?;
 
@@ -225,6 +242,7 @@ where
         &self,
         req: GetClusterConfigRequest,
     ) -> KvResult<GetClusterConfigResponse> {
+        self.update_last_activity();
         let mut op = self
             .handle_dispatch_side_result(OpsCore {}.get_cluster_config(self.client(), req).await)?;
 
@@ -236,6 +254,7 @@ where
         &self,
         req: GetCollectionIdRequest<'_>,
     ) -> KvResult<GetCollectionIdResponse> {
+        self.update_last_activity();
         let mut op = self
             .handle_dispatch_side_result(OpsUtil {}.get_collection_id(self.client(), req).await)?;
 
@@ -244,6 +263,7 @@ where
     }
 
     async fn ping(&self, req: PingRequest<'_>) -> KvResult<PingResponse> {
+        self.update_last_activity();
         let mut op = self.handle_dispatch_side_result(OpsUtil {}.ping(self.client(), req).await)?;
 
         let res = self.handle_response_side_result(op.recv().await)?;
@@ -255,6 +275,11 @@ impl<D> StdKvClient<D>
 where
     D: Dispatcher,
 {
+    fn update_last_activity(&self) {
+        self.last_activity_timestamp_micros
+            .store(Utc::now().timestamp_micros(), Ordering::SeqCst);
+    }
+
     fn handle_dispatch_side_result<T>(&self, result: memdx::error::Result<T>) -> KvResult<T> {
         match result {
             Ok(v) => Ok(v),
@@ -284,6 +309,7 @@ where
     }
 
     pub async fn select_bucket(&self, req: SelectBucketRequest) -> KvResult<SelectBucketResponse> {
+        self.update_last_activity();
         let mut op =
             self.handle_dispatch_side_result(OpsCore {}.select_bucket(self.client(), req).await)?;
 
