@@ -10,7 +10,9 @@ use crate::error::ErrorKind;
 use crate::error::Result;
 use crate::kvclient::{KvClient, KvClientConfig, OnErrMapFetchedHandler, UnsolicitedPacketSender};
 use crate::kvclient_ops::KvClientOps;
-use crate::kvclientpool::{KvClientPool, KvClientPoolConfig, KvClientPoolOptions};
+use crate::kvclientpool::{
+    KvClientPool, KvClientPoolClient, KvClientPoolConfig, KvClientPoolOptions,
+};
 use crate::memdx::dispatcher::OrphanResponseHandler;
 
 pub(crate) type KvClientManagerClientType<M> =
@@ -33,7 +35,10 @@ pub(crate) trait KvClientManager: Sized + Send + Sync {
         &self,
     ) -> impl Future<Output = Result<Arc<KvClientManagerClientType<Self>>>> + Send;
     async fn get_client_per_endpoint(&self) -> Result<Vec<Arc<KvClientManagerClientType<Self>>>>;
-    async fn get_all_clients(&self) -> Result<Vec<Option<Arc<KvClientManagerClientType<Self>>>>>;
+    async fn get_all_clients(
+        &self,
+    ) -> Result<HashMap<String, KvClientPoolClient<KvClientManagerClientType<Self>>>>;
+    fn get_all_pools(&self) -> HashMap<String, Arc<Self::Pool>>;
     fn shutdown_client(
         &self,
         endpoint: Option<&str>,
@@ -227,15 +232,27 @@ where
         Ok(clients)
     }
 
-    async fn get_all_clients(&self) -> Result<Vec<Option<Arc<KvClientManagerClientType<Self>>>>> {
+    async fn get_all_clients(
+        &self,
+    ) -> Result<HashMap<String, KvClientPoolClient<KvClientManagerClientType<Self>>>> {
         let state = self.state.load();
 
-        let mut clients = vec![];
+        let mut clients = HashMap::new();
         for pool in state.client_pools.values() {
-            clients.extend_from_slice(pool.get_all_clients().await?.as_slice());
+            clients.extend(pool.get_all_clients().await?);
         }
 
         Ok(clients)
+    }
+
+    fn get_all_pools(&self) -> HashMap<String, Arc<Self::Pool>> {
+        let state = self.state.load();
+        let mut pools = HashMap::new();
+        for (endpoint, pool) in state.client_pools.iter() {
+            pools.insert(endpoint.clone(), pool.clone());
+        }
+
+        pools
     }
 
     async fn shutdown_client(

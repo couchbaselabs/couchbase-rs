@@ -1,5 +1,6 @@
 pub mod agent;
 pub mod crud;
+pub mod diagnostics;
 pub mod management;
 pub mod ping;
 pub mod query;

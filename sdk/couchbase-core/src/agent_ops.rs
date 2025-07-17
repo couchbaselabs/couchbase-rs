@@ -5,6 +5,7 @@ use crate::crudresults::{
     GetCollectionIdResult, GetMetaResult, GetResult, IncrementResult, LookupInResult,
     MutateInResult, PrependResult, ReplaceResult, TouchResult, UnlockResult, UpsertResult,
 };
+use crate::diagnosticsresult::DiagnosticsResult;
 use crate::error::Result;
 use crate::features::BucketFeature;
 use crate::mgmtx::bucket_settings::BucketDef;
@@ -19,6 +20,7 @@ use crate::options::crud::{
     LookupInOptions, MutateInOptions, PrependOptions, ReplaceOptions, TouchOptions, UnlockOptions,
     UpsertOptions,
 };
+use crate::options::diagnostics::DiagnosticsOptions;
 use crate::options::management::{
     ChangePasswordOptions, CreateBucketOptions, CreateCollectionOptions, CreateScopeOptions,
     DeleteBucketOptions, DeleteCollectionOptions, DeleteGroupOptions, DeleteScopeOptions,
@@ -367,5 +369,9 @@ impl Agent {
 
     pub async fn wait_until_ready(&self, opts: &WaitUntilReadyOptions) -> Result<()> {
         self.inner.diagnostics.wait_until_ready(opts).await
+    }
+
+    pub async fn diagnostics(&self, opts: &DiagnosticsOptions) -> Result<DiagnosticsResult> {
+        self.inner.diagnostics.diagnostics(opts).await
     }
 }
