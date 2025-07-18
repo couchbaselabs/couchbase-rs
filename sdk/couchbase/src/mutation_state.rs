@@ -19,6 +19,22 @@ impl MutationToken {
     ) -> Self {
         Self { token, bucket_name }
     }
+
+    pub fn partition_id(&self) -> u16 {
+        self.token.vbid()
+    }
+
+    pub fn partition_uuid(&self) -> u64 {
+        self.token.vbuuid()
+    }
+
+    pub fn sequence_number(&self) -> u64 {
+        self.token.seqno()
+    }
+
+    pub fn bucket_name(&self) -> &str {
+        &self.bucket_name
+    }
 }
 
 #[derive(Default, Clone, Debug, Eq, PartialEq)]
