@@ -1,22 +1,29 @@
 use crate::clients::bucket_client::BucketClient;
 use crate::clients::collections_mgmt_client::CollectionsMgmtClient;
+use crate::clients::diagnostics_client::DiagnosticsClient;
 use crate::collection::Collection;
+use crate::error;
 use crate::management::collections::collection_manager::CollectionManager;
+use crate::options::diagnostic_options::{PingOptions, WaitUntilReadyOptions};
+use crate::results::diagnostics::PingReport;
 use crate::scope::Scope;
-use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct Bucket {
     client: BucketClient,
-    collections_mgmt_client: Arc<CollectionsMgmtClient>,
+    collections_mgmt_client: CollectionsMgmtClient,
+    diagnostics_client: DiagnosticsClient,
 }
 
 impl Bucket {
     pub(crate) fn new(client: BucketClient) -> Self {
-        let collections_mgmt_client = Arc::new(client.collections_management_client());
+        let collections_mgmt_client = client.collections_management_client();
+        let diagnostics_client = client.diagnostics_client();
+
         Self {
             client,
             collections_mgmt_client,
+            diagnostics_client,
         }
     }
 
@@ -40,5 +47,16 @@ impl Bucket {
         CollectionManager {
             client: self.collections_mgmt_client.clone(),
         }
+    }
+
+    pub async fn ping(&self, opts: impl Into<Option<PingOptions>>) -> error::Result<PingReport> {
+        self.diagnostics_client.ping(opts.into()).await
+    }
+
+    pub async fn wait_until_ready(
+        &self,
+        opts: impl Into<Option<WaitUntilReadyOptions>>,
+    ) -> error::Result<()> {
+        self.diagnostics_client.wait_until_ready(opts.into()).await
     }
 }

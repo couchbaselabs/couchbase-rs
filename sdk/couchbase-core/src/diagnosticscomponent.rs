@@ -187,7 +187,9 @@ impl<C: Client + 'static, M: KvClientManager> DiagnosticsComponent<C, M> {
                 .query_component
                 .create_ping_report(PingQueryReportOptions {
                     on_behalf_of,
-                    timeout: opts.query_timeout,
+                    timeout: opts
+                        .query_timeout
+                        .unwrap_or_else(|| Duration::from_secs(75)),
                 })
                 .await?;
             services.insert(ServiceType::QUERY, query_report);
@@ -198,7 +200,9 @@ impl<C: Client + 'static, M: KvClientManager> DiagnosticsComponent<C, M> {
                 .search_component
                 .create_ping_report(PingSearchReportOptions {
                     on_behalf_of,
-                    timeout: opts.search_timeout,
+                    timeout: opts
+                        .search_timeout
+                        .unwrap_or_else(|| Duration::from_secs(75)),
                 })
                 .await?;
             services.insert(ServiceType::SEARCH, search_report);
@@ -209,7 +213,9 @@ impl<C: Client + 'static, M: KvClientManager> DiagnosticsComponent<C, M> {
             let kv_report = self
                 .ping_all_kv_nodes(PingKvOptions {
                     on_behalf_of,
-                    timeout: opts.kv_timeout,
+                    timeout: opts
+                        .kv_timeout
+                        .unwrap_or_else(|| Duration::from_millis(2500)),
                     bucket: bucket.as_deref(),
                 })
                 .await?;

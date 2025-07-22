@@ -5,11 +5,10 @@ pub use crate::management::collections::collection_settings::{
 };
 use crate::options::collection_mgmt_options::*;
 use crate::results::collections_mgmt_results::ScopeSpec;
-use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct CollectionManager {
-    pub(crate) client: Arc<CollectionsMgmtClient>,
+    pub(crate) client: CollectionsMgmtClient,
 }
 
 impl CollectionManager {

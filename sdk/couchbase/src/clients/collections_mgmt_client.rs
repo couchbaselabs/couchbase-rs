@@ -8,6 +8,7 @@ use crate::results::collections_mgmt_results::{CollectionSpec, ScopeSpec};
 use couchbase_core::retry::RetryStrategy;
 use std::sync::Arc;
 
+#[derive(Clone)]
 pub(crate) struct CollectionsMgmtClient {
     backend: CollectionsMgmtClientBackend,
 }
@@ -121,11 +122,13 @@ impl CollectionsMgmtClient {
     }
 }
 
+#[derive(Clone)]
 pub(crate) enum CollectionsMgmtClientBackend {
     CouchbaseCollectionsMgmtClientBackend(CouchbaseCollectionsMgmtClient),
     Couchbase2CollectionsMgmtClientBackend(Couchbase2CollectionsMgmtClient),
 }
 
+#[derive(Clone)]
 pub(crate) struct CouchbaseCollectionsMgmtClient {
     agent_provider: CouchbaseAgentProvider,
     bucket_name: String,
@@ -301,6 +304,7 @@ impl CouchbaseCollectionsMgmtClient {
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct Couchbase2CollectionsMgmtClient {}
 
 impl Couchbase2CollectionsMgmtClient {

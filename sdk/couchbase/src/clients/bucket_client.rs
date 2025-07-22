@@ -2,6 +2,9 @@ use crate::clients::agent_provider::CouchbaseAgentProvider;
 use crate::clients::collections_mgmt_client::{
     CollectionsMgmtClient, CollectionsMgmtClientBackend, CouchbaseCollectionsMgmtClient,
 };
+use crate::clients::diagnostics_client::{
+    CouchbaseDiagnosticsClient, DiagnosticsClient, DiagnosticsClientBackend,
+};
 use crate::clients::scope_client::{
     Couchbase2ScopeClient, CouchbaseScopeClient, ScopeClient, ScopeClientBackend,
 };
@@ -42,6 +45,21 @@ impl BucketClient {
                 CollectionsMgmtClient::new(
                     CollectionsMgmtClientBackend::CouchbaseCollectionsMgmtClientBackend(client),
                 )
+            }
+            BucketClientBackend::Couchbase2BucketBackend(_) => {
+                unimplemented!()
+            }
+        }
+    }
+
+    pub fn diagnostics_client(&self) -> DiagnosticsClient {
+        match &self.backend {
+            BucketClientBackend::CouchbaseBucketBackend(backend) => {
+                let diagnostics_client = backend.diagnostics_client();
+
+                DiagnosticsClient::new(DiagnosticsClientBackend::CouchbaseDiagnosticsClientBackend(
+                    diagnostics_client,
+                ))
             }
             BucketClientBackend::Couchbase2BucketBackend(_) => {
                 unimplemented!()
@@ -97,6 +115,10 @@ impl CouchbaseBucketClient {
             self.name.clone(),
             self.default_retry_strategy.clone(),
         )
+    }
+
+    pub fn diagnostics_client(&self) -> CouchbaseDiagnosticsClient {
+        CouchbaseDiagnosticsClient::new(self.agent_provider.clone())
     }
 }
 

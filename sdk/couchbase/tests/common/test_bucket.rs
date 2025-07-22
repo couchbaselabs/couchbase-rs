@@ -2,6 +2,9 @@ use crate::common::test_collection::TestCollection;
 use crate::common::test_manager::TestCollectionManager;
 use crate::common::test_scope::TestScope;
 use couchbase::bucket::Bucket;
+use couchbase::error;
+use std::time::Duration;
+use tokio::time::timeout;
 
 #[derive(Clone)]
 pub struct TestBucket {
@@ -39,5 +42,23 @@ impl TestBucket {
 
     pub fn collections(&self) -> TestCollectionManager {
         TestCollectionManager::new(self.inner.collections())
+    }
+
+    pub async fn ping(
+        &self,
+        opts: impl Into<Option<couchbase::options::diagnostic_options::PingOptions>>,
+    ) -> error::Result<couchbase::results::diagnostics::PingReport> {
+        timeout(Duration::from_secs(15), self.inner.ping(opts))
+            .await
+            .unwrap()
+    }
+
+    pub async fn wait_until_ready(
+        &self,
+        opts: impl Into<Option<couchbase::options::diagnostic_options::WaitUntilReadyOptions>>,
+    ) -> error::Result<()> {
+        timeout(Duration::from_secs(15), self.inner.wait_until_ready(opts))
+            .await
+            .unwrap()
     }
 }

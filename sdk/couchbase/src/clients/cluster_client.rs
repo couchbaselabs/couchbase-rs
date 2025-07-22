@@ -5,6 +5,9 @@ use crate::clients::bucket_client::{
 use crate::clients::bucket_mgmt_client::{
     BucketMgmtClient, BucketMgmtClientBackend, CouchbaseBucketMgmtClient,
 };
+use crate::clients::diagnostics_client::{
+    CouchbaseDiagnosticsClient, DiagnosticsClient, DiagnosticsClientBackend,
+};
 use crate::clients::query_client::{CouchbaseQueryClient, QueryClient, QueryClientBackend};
 use crate::clients::search_client::{CouchbaseSearchClient, SearchClient, SearchClientBackend};
 use crate::clients::user_mgmt_client::{
@@ -133,6 +136,21 @@ impl ClusterClient {
             }
         }
     }
+
+    pub fn diagnostics_client(&self) -> DiagnosticsClient {
+        match &self.backend {
+            ClusterClientBackend::CouchbaseClusterBackend(backend) => {
+                let diagnostics_client = backend.diagnostics_client();
+
+                DiagnosticsClient::new(DiagnosticsClientBackend::CouchbaseDiagnosticsClientBackend(
+                    diagnostics_client,
+                ))
+            }
+            ClusterClientBackend::Couchbase2ClusterBackend(_) => {
+                unimplemented!()
+            }
+        }
+    }
 }
 
 struct CouchbaseClusterBackend {
@@ -240,6 +258,12 @@ impl CouchbaseClusterBackend {
             CouchbaseAgentProvider::with_agent(agent.clone()),
             self.default_retry_strategy.clone(),
         )
+    }
+
+    fn diagnostics_client(&self) -> CouchbaseDiagnosticsClient {
+        let agent = self.agent_manager.get_cluster_agent();
+
+        CouchbaseDiagnosticsClient::new(CouchbaseAgentProvider::with_agent(agent.clone()))
     }
 
     fn merge_options(
