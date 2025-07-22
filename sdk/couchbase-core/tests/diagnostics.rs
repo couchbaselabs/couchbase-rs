@@ -20,9 +20,9 @@ fn test_ping() {
         let report = agent
             .ping(&PingOptions {
                 service_types: None,
-                kv_timeout: Duration::from_millis(1000),
-                query_timeout: Duration::from_millis(1000),
-                search_timeout: Duration::from_millis(1000),
+                kv_timeout: Some(Duration::from_millis(1000)),
+                query_timeout: Some(Duration::from_millis(1000)),
+                search_timeout: Some(Duration::from_millis(1000)),
                 on_behalf_of: None,
             })
             .await

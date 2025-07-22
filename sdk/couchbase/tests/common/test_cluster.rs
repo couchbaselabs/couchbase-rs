@@ -15,8 +15,8 @@ use tokio::time::timeout;
 
 #[derive(Clone)]
 pub struct TestCluster {
-    pub(crate) cluster_version: NodeVersion,
-    test_setup_config: TestSetupConfig,
+    pub cluster_version: NodeVersion,
+    pub test_setup_config: TestSetupConfig,
     inner: Cluster,
 }
 
@@ -87,5 +87,23 @@ impl TestCluster {
         )
         .await
         .unwrap()
+    }
+
+    pub async fn ping(
+        &self,
+        opts: impl Into<Option<couchbase::options::diagnostic_options::PingOptions>>,
+    ) -> error::Result<couchbase::results::diagnostics::PingReport> {
+        timeout(Duration::from_secs(15), self.inner.ping(opts))
+            .await
+            .unwrap()
+    }
+
+    pub async fn wait_until_ready(
+        &self,
+        opts: impl Into<Option<couchbase::options::diagnostic_options::WaitUntilReadyOptions>>,
+    ) -> error::Result<()> {
+        timeout(Duration::from_secs(15), self.inner.wait_until_ready(opts))
+            .await
+            .unwrap()
     }
 }

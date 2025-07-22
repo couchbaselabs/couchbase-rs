@@ -48,6 +48,11 @@ impl WaitUntilReadyOptions {
         self
     }
 
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = retry_strategy;
+        self
+    }
+
     pub fn on_behalf_of(mut self, info: OnBehalfOfInfo) -> Self {
         self.on_behalf_of = Some(info);
         self

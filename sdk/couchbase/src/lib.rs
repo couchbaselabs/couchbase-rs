@@ -8,6 +8,7 @@ pub mod collection;
 pub mod collection_binary_crud;
 pub mod collection_crud;
 pub mod collection_ds;
+pub mod diagnostics;
 pub mod durability_level;
 pub mod error;
 pub mod error_context;
