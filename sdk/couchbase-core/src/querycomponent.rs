@@ -9,21 +9,19 @@ use crate::options::query::{
     DropPrimaryIndexOptions, EnsureIndexOptions, GetAllIndexesOptions, QueryOptions,
     WatchIndexesOptions,
 };
-use crate::pingreport::{EndpointPingReport, PingState};
 use crate::queryx::ensure_index_helper::EnsureIndexHelper;
 use crate::queryx::index::Index;
 use crate::queryx::preparedquery::{PreparedQuery, PreparedStatementCache};
 use crate::queryx::query::Query;
 use crate::queryx::query_options::{EnsureIndexPollOptions, PingOptions};
-use crate::queryx::query_respreader::QueryRespReader;
-use crate::queryx::query_result::{EarlyMetaData, MetaData};
+use crate::results::pingreport::{EndpointPingReport, PingState};
+use crate::results::query::QueryResultStream;
 use crate::retry::{orchestrate_retries, RetryInfo, RetryManager, DEFAULT_RETRY_STRATEGY};
 use crate::retrybesteffort::ExponentialBackoffCalculator;
 use crate::service_type::ServiceType;
 use crate::{error, httpx};
-use bytes::Bytes;
 use futures::future::join_all;
-use futures::{Stream, StreamExt};
+use futures::StreamExt;
 use std::collections::HashMap;
 use std::future::Future;
 use std::ops::Sub;
@@ -46,36 +44,6 @@ pub(crate) struct QueryComponentConfig {
 
 pub(crate) struct QueryComponentOptions {
     pub user_agent: String,
-}
-
-pub struct QueryResultStream {
-    inner: QueryRespReader,
-    endpoint: String,
-}
-
-impl QueryResultStream {
-    pub fn endpoint(&self) -> &str {
-        &self.endpoint
-    }
-
-    pub fn early_metadata(&self) -> &EarlyMetaData {
-        self.inner.early_metadata()
-    }
-
-    pub fn metadata(&self) -> error::Result<&MetaData> {
-        self.inner.metadata().map_err(|e| e.into())
-    }
-}
-
-impl Stream for QueryResultStream {
-    type Item = error::Result<Bytes>;
-
-    fn poll_next(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Option<Self::Item>> {
-        self.inner.poll_next_unpin(cx).map_err(|e| e.into())
-    }
 }
 
 impl<C: Client + 'static> QueryComponent<C> {

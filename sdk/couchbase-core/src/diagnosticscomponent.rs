@@ -1,6 +1,5 @@
 use crate::configmanager::ConfigManager;
 use crate::connection_state::ConnectionState;
-use crate::diagnosticsresult::{DiagnosticsResult, EndpointDiagnostics};
 use crate::error::Error;
 use crate::httpx::client::Client;
 use crate::httpx::request::OnBehalfOfInfo;
@@ -12,8 +11,9 @@ use crate::memdx::request::PingRequest;
 use crate::options::diagnostics::DiagnosticsOptions;
 use crate::options::ping::PingOptions;
 use crate::options::waituntilready::{ClusterState, WaitUntilReadyOptions};
-use crate::pingreport::{EndpointPingReport, PingReport, PingState};
 use crate::querycomponent::QueryComponent;
+use crate::results::diagnostics::{DiagnosticsResult, EndpointDiagnostics};
+use crate::results::pingreport::{EndpointPingReport, PingReport, PingState};
 use crate::retry::{RetryInfo, RetryManager, RetryReason};
 use crate::retrybesteffort::{BestEffortRetryStrategy, ExponentialBackoffCalculator};
 use crate::searchcomponent::SearchComponent;

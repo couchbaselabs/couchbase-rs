@@ -1,6 +1,6 @@
 use crate::error;
 use chrono::{DateTime, FixedOffset};
-use couchbase_core::searchcomponent::SearchResultStream;
+use couchbase_core::results::search::SearchResultStream;
 use couchbase_core::searchx;
 use couchbase_core::searchx::search_result::ResultHit;
 use futures::{Stream, StreamExt};

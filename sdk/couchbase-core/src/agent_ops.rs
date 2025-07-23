@@ -1,11 +1,5 @@
 use crate::agent::Agent;
 use crate::cbconfig::CollectionManifest;
-use crate::crudresults::{
-    AddResult, AppendResult, DecrementResult, DeleteResult, GetAndLockResult, GetAndTouchResult,
-    GetCollectionIdResult, GetMetaResult, GetResult, IncrementResult, LookupInResult,
-    MutateInResult, PrependResult, ReplaceResult, TouchResult, UnlockResult, UpsertResult,
-};
-use crate::diagnosticsresult::DiagnosticsResult;
 use crate::error::Result;
 use crate::features::BucketFeature;
 use crate::mgmtx::bucket_settings::BucketDef;
@@ -44,10 +38,16 @@ use crate::options::search_management::{
     ResumeIngestOptions, UnfreezePlanOptions, UpsertIndexOptions,
 };
 use crate::options::waituntilready::WaitUntilReadyOptions;
-use crate::pingreport::PingReport;
-use crate::querycomponent::QueryResultStream;
 use crate::queryx::index::Index;
-use crate::searchcomponent::SearchResultStream;
+use crate::results::diagnostics::DiagnosticsResult;
+use crate::results::kv::{
+    AddResult, AppendResult, DecrementResult, DeleteResult, GetAndLockResult, GetAndTouchResult,
+    GetCollectionIdResult, GetMetaResult, GetResult, IncrementResult, LookupInResult,
+    MutateInResult, PrependResult, ReplaceResult, TouchResult, UnlockResult, UpsertResult,
+};
+use crate::results::pingreport::PingReport;
+use crate::results::query::QueryResultStream;
+use crate::results::search::SearchResultStream;
 use crate::searchx;
 use crate::searchx::document_analysis::DocumentAnalysis;
 

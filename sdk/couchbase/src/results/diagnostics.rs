@@ -111,8 +111,8 @@ impl Display for DiagnosticsResult {
     }
 }
 
-impl From<couchbase_core::diagnosticsresult::DiagnosticsResult> for DiagnosticsResult {
-    fn from(value: couchbase_core::diagnosticsresult::DiagnosticsResult) -> Self {
+impl From<couchbase_core::results::diagnostics::DiagnosticsResult> for DiagnosticsResult {
+    fn from(value: couchbase_core::results::diagnostics::DiagnosticsResult) -> Self {
         let mut services = HashMap::new();
         for (service_type, endpoints) in value.services {
             let service_type = ServiceType::from(&service_type);
@@ -140,8 +140,8 @@ impl From<couchbase_core::diagnosticsresult::DiagnosticsResult> for DiagnosticsR
     }
 }
 
-impl From<couchbase_core::pingreport::PingReport> for PingReport {
-    fn from(value: couchbase_core::pingreport::PingReport) -> Self {
+impl From<couchbase_core::results::pingreport::PingReport> for PingReport {
+    fn from(value: couchbase_core::results::pingreport::PingReport) -> Self {
         let mut services = HashMap::new();
         for (service_type, endpoints) in value.services {
             let service_type = ServiceType::from(&service_type);
@@ -154,9 +154,11 @@ impl From<couchbase_core::pingreport::PingReport> for PingReport {
                     id: endpoint.id,
                     namespace: endpoint.namespace,
                     state: match endpoint.state {
-                        couchbase_core::pingreport::PingState::Ok => PingState::Ok,
-                        couchbase_core::pingreport::PingState::Timeout => PingState::Timeout,
-                        couchbase_core::pingreport::PingState::Error => PingState::Error,
+                        couchbase_core::results::pingreport::PingState::Ok => PingState::Ok,
+                        couchbase_core::results::pingreport::PingState::Timeout => {
+                            PingState::Timeout
+                        }
+                        couchbase_core::results::pingreport::PingState::Error => PingState::Error,
                     },
                 })
                 .collect();

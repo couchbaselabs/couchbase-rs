@@ -4,12 +4,6 @@ use std::sync::Arc;
 
 use crate::collectionresolver::{orchestrate_memd_collection_id, CollectionResolver};
 use crate::compressionmanager::{CompressionManager, Compressor};
-use crate::crudresults::{
-    AddResult, AppendResult, DecrementResult, DeleteResult, GetAndLockResult, GetAndTouchResult,
-    GetCollectionIdResult, GetMetaResult, GetResult, IncrementResult, LookupInResult,
-    MutateInResult, PrependResult, ReplaceResult, SubDocResult, TouchResult, UnlockResult,
-    UpsertResult,
-};
 use crate::error;
 use crate::error::{Error, MemdxError, Result};
 use crate::kvclient::KvClient;
@@ -35,6 +29,12 @@ use crate::options::crud::{
     GetAndTouchOptions, GetCollectionIdOptions, GetMetaOptions, GetOptions, IncrementOptions,
     LookupInOptions, MutateInOptions, PrependOptions, ReplaceOptions, TouchOptions, UnlockOptions,
     UpsertOptions,
+};
+use crate::results::kv::{
+    AddResult, AppendResult, DecrementResult, DeleteResult, GetAndLockResult, GetAndTouchResult,
+    GetCollectionIdResult, GetMetaResult, GetResult, IncrementResult, LookupInResult,
+    MutateInResult, PrependResult, ReplaceResult, SubDocResult, TouchResult, UnlockResult,
+    UpsertResult,
 };
 use crate::retry::{error_to_retry_reason, orchestrate_retries, RetryInfo, RetryManager};
 use crate::vbucketrouter::{orchestrate_memd_routing, VbucketRouter};
