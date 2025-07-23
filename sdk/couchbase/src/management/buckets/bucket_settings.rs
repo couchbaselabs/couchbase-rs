@@ -137,10 +137,6 @@ impl BucketType {
     pub const COUCHBASE: BucketType = BucketType(InnerBucketType::Couchbase);
 
     pub const EPHEMERAL: BucketType = BucketType(InnerBucketType::Ephemeral);
-
-    pub(crate) fn unknown(val: String) -> BucketType {
-        BucketType(InnerBucketType::Unknown(val))
-    }
 }
 
 #[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
@@ -164,10 +160,6 @@ impl EvictionPolicyType {
 
     pub const NO_EVICTION: EvictionPolicyType =
         EvictionPolicyType(InnerEvictionPolicyType::NoEviction);
-
-    pub(crate) fn unknown(val: String) -> EvictionPolicyType {
-        EvictionPolicyType(InnerEvictionPolicyType::Unknown(val))
-    }
 }
 
 #[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
@@ -188,10 +180,6 @@ impl CompressionMode {
     pub const PASSIVE: CompressionMode = CompressionMode(InnerCompressionMode::Passive);
 
     pub const ACTIVE: CompressionMode = CompressionMode(InnerCompressionMode::Active);
-
-    pub(crate) fn unknown(val: String) -> CompressionMode {
-        CompressionMode(InnerCompressionMode::Unknown(val))
-    }
 }
 
 #[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
@@ -214,10 +202,6 @@ impl ConflictResolutionType {
 
     pub const CUSTOM: ConflictResolutionType =
         ConflictResolutionType(InnerConflictResolutionType::Custom);
-
-    pub(crate) fn unknown(val: String) -> ConflictResolutionType {
-        ConflictResolutionType(InnerConflictResolutionType::Unknown(val))
-    }
 }
 
 #[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
@@ -235,10 +219,6 @@ impl StorageBackend {
     pub const COUCHSTORE: StorageBackend = StorageBackend(InnerStorageBackend::Couchstore);
 
     pub const MAGMA: StorageBackend = StorageBackend(InnerStorageBackend::Magma);
-
-    pub(crate) fn unknown(val: String) -> StorageBackend {
-        StorageBackend(InnerStorageBackend::Unknown(val))
-    }
 }
 
 #[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
@@ -329,7 +309,7 @@ impl From<couchbase_core::mgmtx::bucket_settings::BucketType> for BucketType {
         match value {
             couchbase_core::mgmtx::bucket_settings::BucketType::COUCHBASE => BucketType::COUCHBASE,
             couchbase_core::mgmtx::bucket_settings::BucketType::EPHEMERAL => BucketType::EPHEMERAL,
-            _ => BucketType::unknown(value.to_string()),
+            _ => BucketType(InnerBucketType::Unknown(value.to_string())),
         }
     }
 }
@@ -349,7 +329,7 @@ impl From<couchbase_core::mgmtx::bucket_settings::EvictionPolicyType> for Evicti
             couchbase_core::mgmtx::bucket_settings::EvictionPolicyType::NO_EVICTION => {
                 EvictionPolicyType::NO_EVICTION
             }
-            _ => EvictionPolicyType::unknown(value.to_string()),
+            _ => EvictionPolicyType(InnerEvictionPolicyType::Unknown(value.to_string())),
         }
     }
 }
@@ -364,7 +344,7 @@ impl From<couchbase_core::mgmtx::bucket_settings::CompressionMode> for Compressi
             couchbase_core::mgmtx::bucket_settings::CompressionMode::ACTIVE => {
                 CompressionMode::ACTIVE
             }
-            _ => CompressionMode::unknown(value.to_string()),
+            _ => CompressionMode(InnerCompressionMode::Unknown(value.to_string())),
         }
     }
 }
@@ -383,7 +363,7 @@ impl From<couchbase_core::mgmtx::bucket_settings::ConflictResolutionType>
             couchbase_core::mgmtx::bucket_settings::ConflictResolutionType::CUSTOM => {
                 ConflictResolutionType::CUSTOM
             }
-            _ => ConflictResolutionType::unknown(value.to_string()),
+            _ => ConflictResolutionType(InnerConflictResolutionType::Unknown(value.to_string())),
         }
     }
 }
@@ -395,7 +375,7 @@ impl From<couchbase_core::mgmtx::bucket_settings::StorageBackend> for StorageBac
                 StorageBackend::COUCHSTORE
             }
             couchbase_core::mgmtx::bucket_settings::StorageBackend::MAGMA => StorageBackend::MAGMA,
-            _ => StorageBackend::unknown(value.to_string()),
+            _ => StorageBackend(InnerStorageBackend::Unknown(value.to_string())),
         }
     }
 }

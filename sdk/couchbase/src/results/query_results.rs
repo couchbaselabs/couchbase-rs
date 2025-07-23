@@ -29,6 +29,7 @@ impl From<queryx::query_result::Warning> for QueryWarning {
 }
 
 #[derive(Debug, Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Hash)]
+#[non_exhaustive]
 pub enum QueryStatus {
     Running,
     Success,
@@ -54,7 +55,7 @@ impl From<queryx::query_result::Status> for QueryStatus {
             queryx::query_result::Status::Closed => Self::Closed,
             queryx::query_result::Status::Fatal => Self::Fatal,
             queryx::query_result::Status::Aborted => Self::Aborted,
-            queryx::query_result::Status::Unknown => Self::Unknown,
+            _ => Self::Unknown,
         }
     }
 }

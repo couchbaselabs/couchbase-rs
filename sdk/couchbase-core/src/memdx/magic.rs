@@ -3,6 +3,7 @@ use std::fmt::{Debug, Display};
 use crate::memdx::error::Error;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum Magic {
     Req,
     Res,

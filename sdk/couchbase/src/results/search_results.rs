@@ -107,6 +107,7 @@ impl<'a> From<&'a searchx::search_result::DateRangeFacetResult> for DateRangeFac
 }
 
 #[derive(Debug, Clone, PartialOrd, PartialEq)]
+#[non_exhaustive]
 pub enum SearchFacetResultType<'a> {
     TermFacets(Vec<TermFacetResult<'a>>),
     NumericRangeFacets(Vec<NumericRangeFacetResult<'a>>),

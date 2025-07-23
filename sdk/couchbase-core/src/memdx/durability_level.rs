@@ -2,6 +2,7 @@ use std::fmt::Display;
 use std::time::Duration;
 
 #[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
+#[non_exhaustive]
 pub struct DurabilityLevel(InnerDurabilityLevel);
 
 impl DurabilityLevel {
@@ -12,10 +13,6 @@ impl DurabilityLevel {
 
     pub const PERSIST_TO_MAJORITY: DurabilityLevel =
         DurabilityLevel(InnerDurabilityLevel::PersistToMajority);
-
-    pub(crate) fn other(val: u8) -> DurabilityLevel {
-        DurabilityLevel(InnerDurabilityLevel::Other(val))
-    }
 }
 
 impl Display for DurabilityLevel {
@@ -54,7 +51,7 @@ impl From<u8> for DurabilityLevel {
             1 => DurabilityLevel::MAJORITY,
             2 => DurabilityLevel::MAJORITY_AND_PERSIST_ACTIVE,
             3 => DurabilityLevel::PERSIST_TO_MAJORITY,
-            _ => DurabilityLevel::other(data),
+            _ => DurabilityLevel(InnerDurabilityLevel::Other(data)),
         }
     }
 }

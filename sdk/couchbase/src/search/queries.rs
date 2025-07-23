@@ -710,6 +710,7 @@ impl GeoPolygonQuery {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub enum Query {
     Match(MatchQuery),
     MatchPhrase(MatchPhraseQuery),
