@@ -135,6 +135,7 @@ impl Display for Error {
 impl StdError for Error {}
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[non_exhaustive]
 pub enum ErrorKind {
     OtherFailure(String),
     ServerTimeout,

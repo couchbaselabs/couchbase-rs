@@ -1,4 +1,5 @@
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[non_exhaustive]
 pub enum HelloFeature {
     DataType,
     Tls,

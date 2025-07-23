@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 #[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
+#[non_exhaustive]
 pub struct DurabilityLevel(InnerDurabilityLevel);
 
 impl DurabilityLevel {
@@ -13,10 +14,6 @@ impl DurabilityLevel {
 
     pub const PERSIST_TO_MAJORITY: DurabilityLevel =
         DurabilityLevel(InnerDurabilityLevel::PersistToMajority);
-
-    pub(crate) fn other(val: String) -> DurabilityLevel {
-        DurabilityLevel(InnerDurabilityLevel::Other(val))
-    }
 }
 
 impl Display for DurabilityLevel {
@@ -82,7 +79,7 @@ impl From<couchbase_core::mgmtx::bucket_settings::DurabilityLevel> for Durabilit
             couchbase_core::mgmtx::bucket_settings::DurabilityLevel::MAJORITY => DurabilityLevel::MAJORITY,
             couchbase_core::mgmtx::bucket_settings::DurabilityLevel::MAJORITY_AND_PERSIST_ACTIVE => DurabilityLevel::MAJORITY_AND_PERSIST_ACTIVE,
             couchbase_core::mgmtx::bucket_settings::DurabilityLevel::PERSIST_TO_MAJORITY => DurabilityLevel::PERSIST_TO_MAJORITY,
-            _ => DurabilityLevel::other(value.to_string()),
+            _ => DurabilityLevel(InnerDurabilityLevel::Other(value.to_string())),
         }
     }
 }

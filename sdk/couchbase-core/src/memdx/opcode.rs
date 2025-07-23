@@ -3,6 +3,7 @@ use std::fmt::{Display, Formatter};
 use crate::memdx::error::Error;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum OpCode {
     Get,
     Set,

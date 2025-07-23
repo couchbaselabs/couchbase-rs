@@ -1,4 +1,5 @@
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[non_exhaustive]
 pub enum ExtReqFrameCode {
     Barrier,
     Durability,
@@ -28,6 +29,7 @@ impl From<ExtReqFrameCode> for u16 {
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[non_exhaustive]
 pub enum ExtResFrameCode {
     ServerDuration,
     ReadUnits,

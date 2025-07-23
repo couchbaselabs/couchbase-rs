@@ -213,6 +213,7 @@ fn test_search_basic() {
             SearchFacetResultType::DateRangeFacets(_) => {
                 panic!("expected term facet")
             }
+            _ => panic!("unexpected facet type"),
         }
 
         let dates = facets.get(&String::from("date")).unwrap();
@@ -236,6 +237,7 @@ fn test_search_basic() {
                 assert_eq!("2000-07-22T20:00:20+00:00", range.start.to_rfc3339());
                 assert_eq!("2020-07-22T20:00:20+00:00", range.end.to_rfc3339());
             }
+            _ => panic!("unexpected facet type"),
         }
 
         let numeric = facets.get(&String::from("numeric")).unwrap();
@@ -259,6 +261,7 @@ fn test_search_basic() {
             SearchFacetResultType::DateRangeFacets(_) => {
                 panic!("expected numeric range facet")
             }
+            _ => panic!("unexpected facet type"),
         }
     })
 }

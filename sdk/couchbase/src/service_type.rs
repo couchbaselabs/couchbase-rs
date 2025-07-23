@@ -2,6 +2,7 @@ use serde::Serialize;
 use std::fmt::{Display, Formatter};
 
 #[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Serialize)]
+#[non_exhaustive]
 pub struct ServiceType(InnerServiceType);
 
 #[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Serialize)]
@@ -20,10 +21,6 @@ impl ServiceType {
     pub const QUERY: ServiceType = ServiceType(InnerServiceType::Query);
     pub const SEARCH: ServiceType = ServiceType(InnerServiceType::Search);
     pub const EVENTING: ServiceType = ServiceType(InnerServiceType::Eventing);
-
-    pub(crate) fn other(val: String) -> ServiceType {
-        ServiceType(InnerServiceType::Other(val))
-    }
 }
 
 impl Display for ServiceType {
@@ -68,7 +65,7 @@ impl From<ServiceType> for couchbase_core::service_type::ServiceType {
             ServiceType::QUERY => couchbase_core::service_type::ServiceType::QUERY,
             ServiceType::SEARCH => couchbase_core::service_type::ServiceType::SEARCH,
             ServiceType::EVENTING => couchbase_core::service_type::ServiceType::EVENTING,
-            ServiceType(InnerServiceType::Other(_val)) => unreachable!(), // This isn't possible, users can't create other, and we just don't.
+            _ => unreachable!(), // This isn't possible, users can't create other, and we just don't.
         }
     }
 }

@@ -1,6 +1,7 @@
 use crate::memdx::error::Error;
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[non_exhaustive]
 pub enum AuthMechanism {
     Plain,
     ScramSha1,

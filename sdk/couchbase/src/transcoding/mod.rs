@@ -5,6 +5,7 @@ use serde::de::DeserializeOwned;
 use serde::{Serialize, Serializer};
 
 #[derive(Debug, PartialEq, Clone, Hash, Ord, PartialOrd, Eq)]
+#[non_exhaustive]
 pub enum DataType {
     Unknown,
     Json,

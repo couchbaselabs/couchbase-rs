@@ -25,6 +25,7 @@ pub struct EnsureIndexHelper<'a> {
 }
 
 #[derive(Copy, Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum DesiredState {
     Created,
     Deleted,

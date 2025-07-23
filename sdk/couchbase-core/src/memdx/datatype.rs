@@ -1,4 +1,5 @@
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum DataTypeFlag {
     None,
     Json,

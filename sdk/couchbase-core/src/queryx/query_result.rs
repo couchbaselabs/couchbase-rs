@@ -6,6 +6,7 @@ use serde_json::value::RawValue;
 
 #[derive(Debug, Clone, Copy, Deserialize, Ord, PartialOrd, Eq, PartialEq, Hash)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum Status {
     Running,
     Success,

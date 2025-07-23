@@ -27,7 +27,6 @@ impl From<ScanConsistency> for queryx::query_options::ScanConsistency {
 }
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
-#[non_exhaustive]
 pub enum ReplicaLevel {
     On,
     Off,

@@ -2,6 +2,7 @@ use serde::Serialize;
 use std::fmt::{Display, Formatter};
 
 #[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Serialize)]
+#[non_exhaustive]
 pub struct ServiceType(InnerServiceType);
 
 #[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Serialize)]
@@ -21,10 +22,6 @@ impl ServiceType {
     pub const QUERY: ServiceType = ServiceType(InnerServiceType::Query);
     pub const SEARCH: ServiceType = ServiceType(InnerServiceType::Search);
     pub const EVENTING: ServiceType = ServiceType(InnerServiceType::Eventing);
-
-    pub(crate) fn other(val: String) -> ServiceType {
-        ServiceType(InnerServiceType::Other(val))
-    }
 }
 
 impl Display for ServiceType {
