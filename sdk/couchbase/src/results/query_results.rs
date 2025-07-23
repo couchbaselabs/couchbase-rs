@@ -1,6 +1,6 @@
 use crate::error;
-use couchbase_core::querycomponent::QueryResultStream;
 use couchbase_core::queryx;
+use couchbase_core::results::query::QueryResultStream;
 use futures::{Stream, StreamExt, TryStreamExt};
 use serde::de::DeserializeOwned;
 use serde_json::value::RawValue;

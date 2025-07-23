@@ -11,7 +11,8 @@ use crate::options::search_management::{
     GetIndexedDocumentsCountOptions, PauseIngestOptions, ResumeIngestOptions, UnfreezePlanOptions,
     UpsertIndexOptions,
 };
-use crate::pingreport::{EndpointPingReport, PingState};
+use crate::results::pingreport::{EndpointPingReport, PingState};
+use crate::results::search::SearchResultStream;
 use crate::retry::{orchestrate_retries, RetryInfo, RetryManager, DEFAULT_RETRY_STRATEGY};
 use crate::retrybesteffort::ExponentialBackoffCalculator;
 use crate::searchx::document_analysis::DocumentAnalysis;
@@ -19,14 +20,11 @@ use crate::searchx::ensure_index_helper::EnsureIndexHelper;
 use crate::searchx::index::Index;
 use crate::searchx::mgmt_options::{EnsureIndexPollOptions, PingOptions};
 use crate::searchx::search::Search;
-use crate::searchx::search_respreader::SearchRespReader;
-use crate::searchx::search_result::{FacetResult, MetaData, ResultHit};
 use crate::service_type::ServiceType;
 use crate::{error, httpx};
 use arc_swap::ArcSwap;
 use futures::future::join_all;
 use futures::StreamExt;
-use futures_core::Stream;
 use std::collections::HashMap;
 use std::future::Future;
 use std::ops::Sub;
@@ -60,35 +58,6 @@ pub(crate) struct SearchComponentOptions {
     pub user_agent: String,
 }
 
-pub struct SearchResultStream {
-    inner: SearchRespReader,
-    endpoint: String,
-}
-
-impl SearchResultStream {
-    pub fn endpoint(&self) -> &str {
-        &self.endpoint
-    }
-
-    pub fn facets(&self) -> error::Result<&HashMap<String, FacetResult>> {
-        self.inner.facets().map_err(|e| e.into())
-    }
-
-    pub fn metadata(&self) -> error::Result<&MetaData> {
-        self.inner.metadata().map_err(|e| e.into())
-    }
-}
-
-impl Stream for SearchResultStream {
-    type Item = error::Result<ResultHit>;
-
-    fn poll_next(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Option<Self::Item>> {
-        self.inner.poll_next_unpin(cx).map_err(|e| e.into())
-    }
-}
 impl<C: Client + 'static> SearchComponent<C> {
     pub fn new(
         retry_manager: Arc<RetryManager>,

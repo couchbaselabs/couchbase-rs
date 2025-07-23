@@ -26,8 +26,8 @@ impl GetResult {
     }
 }
 
-impl From<couchbase_core::crudresults::GetResult> for GetResult {
-    fn from(result: couchbase_core::crudresults::GetResult) -> Self {
+impl From<couchbase_core::results::kv::GetResult> for GetResult {
+    fn from(result: couchbase_core::results::kv::GetResult) -> Self {
         Self {
             content: result.value,
             flags: result.flags,
@@ -36,8 +36,8 @@ impl From<couchbase_core::crudresults::GetResult> for GetResult {
     }
 }
 
-impl From<couchbase_core::crudresults::GetAndTouchResult> for GetResult {
-    fn from(result: couchbase_core::crudresults::GetAndTouchResult) -> Self {
+impl From<couchbase_core::results::kv::GetAndTouchResult> for GetResult {
+    fn from(result: couchbase_core::results::kv::GetAndTouchResult) -> Self {
         Self {
             content: result.value,
             flags: result.flags,
@@ -46,8 +46,8 @@ impl From<couchbase_core::crudresults::GetAndTouchResult> for GetResult {
     }
 }
 
-impl From<couchbase_core::crudresults::GetAndLockResult> for GetResult {
-    fn from(result: couchbase_core::crudresults::GetAndLockResult) -> Self {
+impl From<couchbase_core::results::kv::GetAndLockResult> for GetResult {
+    fn from(result: couchbase_core::results::kv::GetAndLockResult) -> Self {
         Self {
             content: result.value,
             flags: result.flags,
@@ -72,8 +72,8 @@ impl ExistsResult {
     }
 }
 
-impl From<couchbase_core::crudresults::GetMetaResult> for ExistsResult {
-    fn from(result: couchbase_core::crudresults::GetMetaResult) -> Self {
+impl From<couchbase_core::results::kv::GetMetaResult> for ExistsResult {
+    fn from(result: couchbase_core::results::kv::GetMetaResult) -> Self {
         Self {
             exists: !result.deleted,
             cas: result.cas,
@@ -92,8 +92,8 @@ impl TouchResult {
     }
 }
 
-impl From<couchbase_core::crudresults::TouchResult> for TouchResult {
-    fn from(result: couchbase_core::crudresults::TouchResult) -> Self {
+impl From<couchbase_core::results::kv::TouchResult> for TouchResult {
+    fn from(result: couchbase_core::results::kv::TouchResult) -> Self {
         Self { cas: result.cas }
     }
 }
