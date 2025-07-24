@@ -186,7 +186,7 @@ impl CouchbaseClusterBackend {
             .http_addrs(http_hosts.iter().map(|a| a.to_string()).collect());
 
         let mut core_opts: OnDemandAgentManagerOptions =
-            OnDemandAgentManagerOptions::new(seed_config, opts.authenticator)
+            OnDemandAgentManagerOptions::new(seed_config, opts.authenticator.into())
                 .tls_config(tls_config);
 
         if let Some(timeout_opts) = opts.timeout_options {
@@ -194,7 +194,8 @@ impl CouchbaseClusterBackend {
         }
 
         if let Some(compression_mode) = opts.compression_mode {
-            core_opts = core_opts.compression_config(CompressionConfig::new(compression_mode));
+            core_opts =
+                core_opts.compression_config(CompressionConfig::new(compression_mode.into()));
         }
 
         if core_opts.tls_config.is_some() && !use_ssl {
