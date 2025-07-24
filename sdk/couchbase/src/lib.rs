@@ -1,5 +1,6 @@
 extern crate core;
 
+pub mod authenticator;
 pub mod bucket;
 mod capella_ca;
 mod clients;
@@ -21,8 +22,3 @@ pub mod search;
 pub mod service_type;
 pub mod subdoc;
 pub mod transcoding;
-
-pub mod authenticator {
-    pub use couchbase_core::authenticator::Authenticator;
-    pub use couchbase_core::authenticator::PasswordAuthenticator;
-}

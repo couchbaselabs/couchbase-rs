@@ -1,14 +1,13 @@
 use crate::authenticator::Authenticator;
+use crate::error;
 use couchbase_core::ondemand_agentmanager::OnDemandAgentManagerOptions;
-use couchbase_core::options::agent::CompressionConfig;
-pub use couchbase_core::options::agent::CompressionMode;
 use log::debug;
 use std::io::Cursor;
 use std::sync::Arc;
 use std::time::Duration;
 
 use crate::capella_ca::CAPELLA_CERT;
-use crate::error;
+
 #[cfg(all(feature = "rustls-tls", not(feature = "native-tls")))]
 use {
     couchbase_core::insecure_certverfier::InsecureCertVerifier, rustls_pemfile::read_all,
@@ -16,6 +15,37 @@ use {
     tokio_rustls::rustls::pki_types::CertificateDer, tokio_rustls::rustls::RootCertStore,
     webpki_roots::TLS_SERVER_ROOTS,
 };
+
+#[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
+pub enum CompressionMode {
+    Enabled { min_size: usize, min_ratio: f64 },
+    Disabled,
+}
+
+impl Default for CompressionMode {
+    fn default() -> Self {
+        Self::Enabled {
+            min_size: 32,
+            min_ratio: 0.83,
+        }
+    }
+}
+
+impl From<CompressionMode> for couchbase_core::options::agent::CompressionMode {
+    fn from(mode: CompressionMode) -> Self {
+        match mode {
+            CompressionMode::Enabled {
+                min_size,
+                min_ratio,
+            } => couchbase_core::options::agent::CompressionMode::Enabled {
+                min_size,
+                min_ratio,
+            },
+            CompressionMode::Disabled => couchbase_core::options::agent::CompressionMode::Disabled,
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 #[non_exhaustive]
