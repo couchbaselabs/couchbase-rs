@@ -1,0 +1,117 @@
+use crate::auth_mechanism::AuthMechanism;
+use crate::authenticator::Authenticator;
+use crate::options::agent::{
+    AgentOptions, CompressionConfig, ConfigPollerConfig, HttpConfig, KvConfig, SeedConfig,
+};
+use crate::tls_config::TlsConfig;
+use std::time::Duration;
+
+#[derive(Clone)]
+#[non_exhaustive]
+pub struct OnDemandAgentManagerOptions {
+    pub seed_config: SeedConfig,
+    pub authenticator: Authenticator,
+
+    pub auth_mechanisms: Vec<AuthMechanism>,
+    pub tls_config: Option<TlsConfig>,
+
+    pub compression_config: CompressionConfig,
+    pub config_poller_config: ConfigPollerConfig,
+    pub kv_config: KvConfig,
+    pub http_config: HttpConfig,
+    pub tcp_keep_alive_time: Option<Duration>,
+}
+
+impl OnDemandAgentManagerOptions {
+    pub fn new(seed_config: SeedConfig, authenticator: Authenticator) -> Self {
+        Self {
+            tls_config: None,
+            authenticator,
+            seed_config,
+            compression_config: CompressionConfig::default(),
+            config_poller_config: ConfigPollerConfig::default(),
+            auth_mechanisms: vec![],
+            kv_config: KvConfig::default(),
+            http_config: HttpConfig::default(),
+            tcp_keep_alive_time: None,
+        }
+    }
+
+    pub fn seed_config(mut self, seed_config: SeedConfig) -> Self {
+        self.seed_config = seed_config;
+        self
+    }
+
+    pub fn authenticator(mut self, authenticator: Authenticator) -> Self {
+        self.authenticator = authenticator;
+        self
+    }
+
+    pub fn tls_config(mut self, tls_config: impl Into<Option<TlsConfig>>) -> Self {
+        self.tls_config = tls_config.into();
+        self
+    }
+
+    pub fn compression_config(mut self, compression_config: CompressionConfig) -> Self {
+        self.compression_config = compression_config;
+        self
+    }
+
+    pub fn config_poller_config(mut self, config_poller_config: ConfigPollerConfig) -> Self {
+        self.config_poller_config = config_poller_config;
+        self
+    }
+
+    pub fn auth_mechanisms(mut self, auth_mechanisms: impl Into<Vec<AuthMechanism>>) -> Self {
+        self.auth_mechanisms = auth_mechanisms.into();
+        self
+    }
+
+    pub fn kv_config(mut self, kv_config: KvConfig) -> Self {
+        self.kv_config = kv_config;
+        self
+    }
+
+    pub fn http_config(mut self, http_config: HttpConfig) -> Self {
+        self.http_config = http_config;
+        self
+    }
+
+    pub fn tcp_keep_alive_time(mut self, tcp_keep_alive: Duration) -> Self {
+        self.tcp_keep_alive_time = Some(tcp_keep_alive);
+        self
+    }
+}
+
+impl From<OnDemandAgentManagerOptions> for AgentOptions {
+    fn from(opts: OnDemandAgentManagerOptions) -> Self {
+        AgentOptions {
+            tls_config: opts.tls_config,
+            authenticator: opts.authenticator,
+            bucket_name: None,
+            seed_config: opts.seed_config,
+            compression_config: opts.compression_config,
+            config_poller_config: opts.config_poller_config,
+            auth_mechanisms: opts.auth_mechanisms,
+            kv_config: opts.kv_config,
+            http_config: opts.http_config,
+            tcp_keep_alive_time: opts.tcp_keep_alive_time,
+        }
+    }
+}
+
+impl From<AgentOptions> for OnDemandAgentManagerOptions {
+    fn from(opts: AgentOptions) -> Self {
+        OnDemandAgentManagerOptions {
+            authenticator: opts.authenticator,
+            tls_config: opts.tls_config,
+            seed_config: opts.seed_config,
+            compression_config: opts.compression_config,
+            config_poller_config: opts.config_poller_config,
+            auth_mechanisms: opts.auth_mechanisms,
+            kv_config: opts.kv_config,
+            http_config: opts.http_config,
+            tcp_keep_alive_time: opts.tcp_keep_alive_time,
+        }
+    }
+}

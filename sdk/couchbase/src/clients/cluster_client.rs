@@ -16,8 +16,9 @@ use crate::clients::user_mgmt_client::{
 use crate::error;
 use crate::options::cluster_options::ClusterOptions;
 use couchbase_connstr::{parse, resolve, Address, SrvRecord};
-use couchbase_core::ondemand_agentmanager::{OnDemandAgentManager, OnDemandAgentManagerOptions};
+use couchbase_core::ondemand_agentmanager::OnDemandAgentManager;
 use couchbase_core::options::agent::{CompressionConfig, SeedConfig};
+use couchbase_core::options::ondemand_agentmanager::OnDemandAgentManagerOptions;
 use couchbase_core::retry::RetryStrategy;
 use couchbase_core::retrybesteffort::{BestEffortRetryStrategy, ExponentialBackoffCalculator};
 use std::collections::HashMap;
@@ -185,30 +186,35 @@ impl CouchbaseClusterBackend {
             .memd_addrs(memd_hosts.iter().map(|a| a.to_string()).collect())
             .http_addrs(http_hosts.iter().map(|a| a.to_string()).collect());
 
-        let mut core_opts: OnDemandAgentManagerOptions =
-            OnDemandAgentManagerOptions::new(seed_config, opts.authenticator.into())
-                .tls_config(tls_config);
-
-        if let Some(timeout_opts) = opts.timeout_options {
-            core_opts = core_opts.connect_timeout(timeout_opts.kv_connect_timeout);
+        let mut compression_config = CompressionConfig::default();
+        if let Some(cm) = opts.compression_mode {
+            compression_config = compression_config.mode(cm.into());
         }
 
-        if let Some(compression_mode) = opts.compression_mode {
-            core_opts =
-                core_opts.compression_config(CompressionConfig::new(compression_mode.into()));
-        }
-
-        if core_opts.tls_config.is_some() && !use_ssl {
+        if tls_config.is_some() && !use_ssl {
             return Err(error::Error::invalid_argument(
                 "tls_config",
                 "tls config provided but couchbase scheme used",
             ));
-        } else if core_opts.tls_config.is_none() && use_ssl {
+        } else if tls_config.is_none() && use_ssl {
             return Err(error::Error::invalid_argument(
                 "tls_config",
                 "no TLS config provided but couchbases scheme used",
             ));
         }
+
+        let mut core_opts =
+            OnDemandAgentManagerOptions::new(seed_config, opts.authenticator.into())
+                .tls_config(tls_config)
+                .kv_config(opts.kv_options.into())
+                .http_config(opts.http_options.into())
+                .auth_mechanisms(vec![])
+                .compression_config(compression_config)
+                .config_poller_config(opts.poller_options.into())
+                .tcp_keep_alive_time(
+                    opts.tcp_keep_alive_time
+                        .unwrap_or_else(|| Duration::from_secs(60)),
+                );
 
         Self::merge_options(&mut core_opts, extra_opts)?;
 
@@ -273,12 +279,71 @@ impl CouchbaseClusterBackend {
     ) -> error::Result<()> {
         for (k, v) in extra_opts {
             match k.as_str() {
-                // TODO: This doesn't look complete...
                 "kv_connect_timeout" => {
-                    opts.connect_timeout =
-                        Some(Duration::from_millis(v[0].parse().map_err(|e| {
-                            error::Error::other_failure(format!("{e:?}"))
-                        })?))
+                    opts.kv_config.connect_timeout = Duration::from_millis(
+                        v[0].parse()
+                            .map_err(|e| error::Error::other_failure(format!("{e:?}")))?,
+                    )
+                }
+                "enable_tls" => {
+                    let enabled: bool = v[0]
+                        .parse()
+                        .map_err(|e| error::Error::other_failure(format!("{e:?}")))?;
+
+                    if !enabled {
+                        opts.tls_config = None;
+                    }
+
+                    if enabled && opts.tls_config.is_none() {
+                        return Err(error::Error::invalid_argument(
+                            "enable_tls",
+                            "enable_tls is true but no tls_config provided",
+                        ));
+                    }
+                }
+                "enable_mutation_tokens" => {
+                    let enabled = v[0]
+                        .parse()
+                        .map_err(|e| error::Error::other_failure(format!("{e:?}")))?;
+                    opts.kv_config.enable_mutation_tokens = enabled;
+                }
+                "enable_server_durations" => {
+                    let enabled = v[0]
+                        .parse()
+                        .map_err(|e| error::Error::other_failure(format!("{e:?}")))?;
+                    opts.kv_config.enable_server_durations = enabled;
+                }
+                "tcp_keep_alive_time" => {
+                    let duration = v[0]
+                        .parse()
+                        .map_err(|e| error::Error::other_failure(format!("{e:?}")))?;
+                    opts.tcp_keep_alive_time = Some(Duration::from_millis(duration));
+                }
+                "config_poll_interval" => {
+                    let interval = v[0]
+                        .parse()
+                        .map_err(|e| error::Error::other_failure(format!("{e:?}")))?;
+                    opts.config_poller_config.poll_interval = Duration::from_millis(interval);
+                }
+                "num_kv_connections" => {
+                    let num_connections = v[0]
+                        .parse()
+                        .map_err(|e| error::Error::other_failure(format!("{e:?}")))?;
+                    opts.kv_config.num_connections = num_connections;
+                }
+                "max_idle_http_connections_per_host" => {
+                    let max_idle_http_connections = v[0]
+                        .parse()
+                        .map_err(|e| error::Error::other_failure(format!("{e:?}")))?;
+                    opts.http_config.max_idle_connections_per_host =
+                        Some(max_idle_http_connections);
+                }
+                "idle_http_connection_timeout" => {
+                    let idle_http_connection_timeout = v[0]
+                        .parse()
+                        .map_err(|e| error::Error::other_failure(format!("{e:?}")))?;
+                    opts.http_config.idle_connection_timeout =
+                        Duration::from_millis(idle_http_connection_timeout);
                 }
                 "placeholder" => {}
                 _ => (),

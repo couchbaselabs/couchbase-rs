@@ -1,9 +1,11 @@
 use crate::memdx::error::Error;
 use crate::memdx::error::Result;
 use crate::tls_config::TlsConfig;
+use socket2::TcpKeepalive;
 use std::fmt::Debug;
 use std::io;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpStream;
 use tokio::time::{timeout_at, Instant};
@@ -14,6 +16,7 @@ use {tokio_rustls::rustls::pki_types::ServerName, tokio_rustls::TlsConnector};
 #[derive(Debug)]
 pub struct ConnectOptions {
     pub deadline: Instant,
+    pub tcp_keep_alive_time: Duration,
 }
 
 pub trait Stream: Debug + AsyncWrite + AsyncRead + Send + Sync + Unpin + 'static {}
@@ -81,6 +84,10 @@ impl TcpConnection {
         let peer_addr = tcp_socket
             .peer_addr()
             .unwrap_or_else(|_e| SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0));
+
+        // Tokio doesn't expose a keep alive function, but they just call into socket2 for set_linger.
+        socket2::SockRef::from(&tcp_socket)
+            .set_tcp_keepalive(&TcpKeepalive::new().with_time(opts.tcp_keep_alive_time))?;
 
         tcp_socket.set_nodelay(false).map_err(|e| {
             Error::new_connection_failed_error("failed to set tcp nodelay", Box::new(e))

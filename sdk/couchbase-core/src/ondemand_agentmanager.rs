@@ -11,113 +11,11 @@ use crate::auth_mechanism::AuthMechanism;
 use crate::authenticator::Authenticator;
 use crate::error;
 use crate::error::ErrorKind;
-use crate::options::agent::{AgentOptions, CompressionConfig, ConfigPollerConfig, SeedConfig};
+use crate::options::agent::{
+    AgentOptions, CompressionConfig, ConfigPollerConfig, HttpConfig, KvConfig, SeedConfig,
+};
+use crate::options::ondemand_agentmanager::OnDemandAgentManagerOptions;
 use crate::tls_config::TlsConfig;
-
-#[derive(Clone)]
-#[non_exhaustive]
-pub struct OnDemandAgentManagerOptions {
-    pub seed_config: SeedConfig,
-    pub authenticator: Authenticator,
-
-    pub auth_mechanisms: Vec<AuthMechanism>,
-    pub tls_config: Option<TlsConfig>,
-
-    pub connect_timeout: Option<Duration>,
-    pub connect_throttle_timeout: Option<Duration>,
-
-    pub compression_config: CompressionConfig,
-    pub config_poller_config: ConfigPollerConfig,
-}
-
-impl OnDemandAgentManagerOptions {
-    pub fn new(seed_config: SeedConfig, authenticator: Authenticator) -> Self {
-        Self {
-            tls_config: None,
-            authenticator,
-            connect_timeout: None,
-            connect_throttle_timeout: None,
-            seed_config,
-            compression_config: CompressionConfig::default(),
-            config_poller_config: ConfigPollerConfig::default(),
-            auth_mechanisms: vec![],
-        }
-    }
-
-    pub fn seed_config(mut self, seed_config: SeedConfig) -> Self {
-        self.seed_config = seed_config;
-        self
-    }
-
-    pub fn authenticator(mut self, authenticator: Authenticator) -> Self {
-        self.authenticator = authenticator;
-        self
-    }
-
-    pub fn tls_config(mut self, tls_config: impl Into<Option<TlsConfig>>) -> Self {
-        self.tls_config = tls_config.into();
-        self
-    }
-
-    pub fn connect_timeout(mut self, connect_timeout: impl Into<Option<Duration>>) -> Self {
-        self.connect_timeout = connect_timeout.into();
-        self
-    }
-
-    pub fn connect_throttle_timeout(
-        mut self,
-        connect_throttle_timeout: impl Into<Option<Duration>>,
-    ) -> Self {
-        self.connect_throttle_timeout = connect_throttle_timeout.into();
-        self
-    }
-
-    pub fn compression_config(mut self, compression_config: CompressionConfig) -> Self {
-        self.compression_config = compression_config;
-        self
-    }
-
-    pub fn config_poller_config(mut self, config_poller_config: ConfigPollerConfig) -> Self {
-        self.config_poller_config = config_poller_config;
-        self
-    }
-
-    pub fn auth_mechanisms(mut self, auth_mechanisms: impl Into<Vec<AuthMechanism>>) -> Self {
-        self.auth_mechanisms = auth_mechanisms.into();
-        self
-    }
-}
-
-impl From<OnDemandAgentManagerOptions> for AgentOptions {
-    fn from(opts: OnDemandAgentManagerOptions) -> Self {
-        AgentOptions {
-            tls_config: opts.tls_config,
-            authenticator: opts.authenticator,
-            bucket_name: None,
-            connect_timeout: opts.connect_timeout,
-            connect_throttle_timeout: opts.connect_throttle_timeout,
-            seed_config: opts.seed_config,
-            compression_config: opts.compression_config,
-            config_poller_config: opts.config_poller_config,
-            auth_mechanisms: opts.auth_mechanisms,
-        }
-    }
-}
-
-impl From<AgentOptions> for OnDemandAgentManagerOptions {
-    fn from(opts: AgentOptions) -> Self {
-        OnDemandAgentManagerOptions {
-            authenticator: opts.authenticator,
-            tls_config: opts.tls_config,
-            connect_timeout: opts.connect_timeout,
-            connect_throttle_timeout: opts.connect_throttle_timeout,
-            seed_config: opts.seed_config,
-            compression_config: opts.compression_config,
-            config_poller_config: opts.config_poller_config,
-            auth_mechanisms: opts.auth_mechanisms,
-        }
-    }
-}
 
 pub struct OnDemandAgentManager {
     opts: OnDemandAgentManagerOptions,

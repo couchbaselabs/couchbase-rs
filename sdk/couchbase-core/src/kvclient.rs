@@ -36,13 +36,12 @@ pub(crate) struct KvClientConfig {
     pub client_name: String,
     pub authenticator: Arc<Authenticator>,
     pub selected_bucket: Option<String>,
-    pub disable_default_features: bool,
     pub disable_error_map: bool,
+    pub disable_mutation_tokens: bool,
+    pub disable_server_durations: bool,
     pub auth_mechanisms: Vec<AuthMechanism>,
-
-    // disable_bootstrap provides a simple way to validate that all bootstrapping
-    // is disabled on the client, mainly used for testing.
-    pub disable_bootstrap: bool,
+    pub connect_timeout: Duration,
+    pub tcp_keep_alive_time: Duration,
 }
 
 impl PartialEq for KvClientConfig {
@@ -51,9 +50,9 @@ impl PartialEq for KvClientConfig {
         self.address == other.address
             && self.client_name == other.client_name
             && self.selected_bucket == other.selected_bucket
-            && self.disable_default_features == other.disable_default_features
             && self.disable_error_map == other.disable_error_map
-            && self.disable_bootstrap == other.disable_bootstrap
+            && self.disable_server_durations == other.disable_server_durations
+            && self.disable_mutation_tokens == other.disable_mutation_tokens
     }
 }
 
@@ -126,33 +125,35 @@ where
     D: Dispatcher,
 {
     async fn new(config: KvClientConfig, opts: KvClientOptions) -> Result<StdKvClient<D>> {
-        let requested_features = if config.disable_default_features {
-            vec![]
-        } else {
-            vec![
-                HelloFeature::DataType,
-                HelloFeature::SeqNo,
-                HelloFeature::Xattr,
-                HelloFeature::Xerror,
-                HelloFeature::Snappy,
-                HelloFeature::SnappyEverywhere,
-                HelloFeature::Json,
-                HelloFeature::UnorderedExec,
-                HelloFeature::Durations,
-                HelloFeature::SyncReplication,
-                HelloFeature::ReplaceBodyWithXattr,
-                HelloFeature::SelectBucket,
-                HelloFeature::CreateAsDeleted,
-                HelloFeature::AltRequests,
-                HelloFeature::Collections,
-                HelloFeature::ClusterMapKnownVersion,
-                HelloFeature::DedupeNotMyVbucketClustermap,
-                HelloFeature::ClusterMapChangeNotificationBrief,
-                HelloFeature::Duplex,
-            ]
-        };
+        let mut requested_features = vec![
+            HelloFeature::DataType,
+            HelloFeature::Xattr,
+            HelloFeature::Xerror,
+            HelloFeature::Snappy,
+            HelloFeature::SnappyEverywhere,
+            HelloFeature::Json,
+            HelloFeature::UnorderedExec,
+            HelloFeature::SyncReplication,
+            HelloFeature::ReplaceBodyWithXattr,
+            HelloFeature::SelectBucket,
+            HelloFeature::CreateAsDeleted,
+            HelloFeature::AltRequests,
+            HelloFeature::Collections,
+            HelloFeature::ClusterMapKnownVersion,
+            HelloFeature::DedupeNotMyVbucketClustermap,
+            HelloFeature::ClusterMapChangeNotificationBrief,
+            HelloFeature::Duplex,
+        ];
 
-        let boostrap_hello = if !config.client_name.is_empty() && !requested_features.is_empty() {
+        if !config.disable_mutation_tokens {
+            requested_features.push(HelloFeature::SeqNo)
+        }
+
+        if !config.disable_server_durations {
+            requested_features.push(HelloFeature::Durations);
+        }
+
+        let boostrap_hello = if !config.client_name.is_empty() {
             Some(HelloRequest {
                 client_name: Vec::from(config.client_name.clone()),
                 requested_features,
@@ -196,13 +197,6 @@ where
         let should_bootstrap = boostrap_hello.is_some()
             || bootstrap_auth.is_some()
             || bootstrap_get_error_map.is_some();
-
-        if should_bootstrap && config.disable_bootstrap {
-            return Err(Error::new_invalid_argument_error(
-                "bootstrap was disabled but options requiring bootstrap were specified",
-                None,
-            ));
-        }
 
         let closed = Arc::new(AtomicBool::new(false));
         let closed_clone = closed.clone();
@@ -249,7 +243,8 @@ where
                 &config.address,
                 tls,
                 ConnectOptions {
-                    deadline: Instant::now().add(Duration::new(7, 0)),
+                    deadline: Instant::now().add(config.connect_timeout),
+                    tcp_keep_alive_time: config.tcp_keep_alive_time,
                 },
             )
             .await
@@ -266,7 +261,8 @@ where
             let conn = match TcpConnection::connect(
                 &config.address,
                 ConnectOptions {
-                    deadline: Instant::now().add(Duration::new(7, 0)),
+                    deadline: Instant::now().add(config.connect_timeout),
+                    tcp_keep_alive_time: config.tcp_keep_alive_time,
                 },
             )
             .await
@@ -345,9 +341,9 @@ where
         // TODO: compare root certs or something somehow.
         if !(current_config.address == config.address
             && current_config.client_name == config.client_name
-            && current_config.disable_default_features == config.disable_default_features
             && current_config.disable_error_map == config.disable_error_map
-            && current_config.disable_bootstrap == config.disable_bootstrap)
+            && current_config.disable_server_durations == config.disable_server_durations
+            && current_config.disable_mutation_tokens == config.disable_mutation_tokens)
         {
             return Err(Error::new_invalid_argument_error(
                 "cannot reconfigure due to conflicting options",
