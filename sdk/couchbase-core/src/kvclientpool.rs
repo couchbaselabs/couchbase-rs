@@ -371,6 +371,7 @@ where
             on_err_map_fetched: self.on_err_map_fetched.clone(),
             id: id.clone(),
         };
+        let throttle_period = self.connect_throttle_period;
 
         let tx = self.new_client_watcher_tx.clone();
         let notify = self.shutdown_notify.clone();
@@ -380,7 +381,7 @@ where
                 let mut guard = state.lock().await;
                 if let Some(e) = &guard.connection_error {
                     // TODO(RSCBC-52): Make configurable.
-                    sleep(Duration::from_millis(5000)).await;
+                    sleep(throttle_period).await;
                 }
 
                 if let Some(client) = guard.clients.get_mut(&id) {

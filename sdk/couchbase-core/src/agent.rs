@@ -77,6 +77,14 @@ struct AgentState {
     latest_config: ParsedConfig,
     network_type: String,
 
+    disable_mutation_tokens: bool,
+    disable_server_durations: bool,
+    kv_connect_timeout: Duration,
+    kv_connect_throttle_timeout: Duration,
+    http_idle_connection_timeout: Duration,
+    http_max_idle_connections_per_host: Option<usize>,
+    tcp_keep_alive_time: Duration,
+
     client_name: String,
 }
 
@@ -297,10 +305,12 @@ impl AgentInner {
                 client_name: state.client_name.clone(),
                 authenticator: state.authenticator.clone(),
                 selected_bucket: state.bucket.clone(),
-                disable_default_features: false,
                 disable_error_map: false,
-                disable_bootstrap: false,
                 auth_mechanisms: state.auth_mechanisms.clone(),
+                disable_mutation_tokens: state.disable_mutation_tokens,
+                disable_server_durations: state.disable_server_durations,
+                connect_timeout: state.kv_connect_timeout,
+                tcp_keep_alive_time: state.tcp_keep_alive_time,
             };
             clients.insert(node_id, config);
         }
@@ -348,6 +358,9 @@ impl AgentInner {
             },
             http_client_config: ClientConfig {
                 tls_config: state.tls_config.clone(),
+                idle_connection_timeout: state.http_idle_connection_timeout,
+                max_idle_connections_per_host: state.http_max_idle_connections_per_host,
+                tcp_keep_alive_time: state.tcp_keep_alive_time,
             },
             mgmt_config: MgmtComponentConfig {
                 endpoints: mgmt_endpoints,
@@ -452,16 +465,27 @@ impl Agent {
             client_name: client_name.clone(),
             tls_config: opts.tls_config,
             auth_mechanisms,
+            disable_mutation_tokens: !opts.kv_config.enable_mutation_tokens,
+            disable_server_durations: !opts.kv_config.enable_server_durations,
+            kv_connect_timeout: opts.kv_config.connect_timeout,
+            kv_connect_throttle_timeout: opts.kv_config.connect_throttle_timeout,
+            http_idle_connection_timeout: opts.http_config.idle_connection_timeout,
+            http_max_idle_connections_per_host: opts.http_config.max_idle_connections_per_host,
+            tcp_keep_alive_time: opts
+                .tcp_keep_alive_time
+                .unwrap_or_else(|| Duration::from_secs(60)),
         };
-
-        let connect_timeout = opts.connect_timeout.unwrap_or(Duration::from_secs(7));
-        let connect_throttle_period = opts.connect_timeout.unwrap_or(Duration::from_secs(5));
 
         let http_client = Arc::new(ReqwestClient::new(ClientConfig {
             tls_config: state.tls_config.clone(),
+            idle_connection_timeout: state.http_idle_connection_timeout,
+            max_idle_connections_per_host: state.http_max_idle_connections_per_host,
+            tcp_keep_alive_time: state.tcp_keep_alive_time,
         })?);
 
         let err_map_component = Arc::new(ErrMapComponent::new());
+
+        let connect_timeout = opts.kv_config.connect_timeout;
 
         let first_kv_client_configs =
             Self::gen_first_kv_client_configs(&opts.seed_config.memd_addrs, &state);
@@ -498,7 +522,7 @@ impl Agent {
                 },
                 KvClientManagerOptions {
                     connect_timeout,
-                    connect_throttle_period,
+                    connect_throttle_period: opts.kv_config.connect_throttle_timeout,
                     unsolicited_packet_tx: Some(unsolicited_packet_tx),
                     orphan_handler: Arc::new(|packet| {
                         info!("Orphan : {packet:?}");
@@ -807,10 +831,12 @@ impl Agent {
                 client_name: state.client_name.clone(),
                 authenticator: state.authenticator.clone(),
                 selected_bucket: state.bucket.clone(),
-                disable_default_features: false,
                 disable_error_map: false,
-                disable_bootstrap: false,
                 auth_mechanisms: state.auth_mechanisms.clone(),
+                disable_mutation_tokens: state.disable_mutation_tokens,
+                disable_server_durations: state.disable_server_durations,
+                connect_timeout: state.kv_connect_timeout,
+                tcp_keep_alive_time: state.tcp_keep_alive_time,
             };
             clients.insert(node_id, config);
         }

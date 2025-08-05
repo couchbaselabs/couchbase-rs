@@ -6,18 +6,18 @@ use std::time::Duration;
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub struct AgentOptions {
-    pub(crate) seed_config: SeedConfig,
-    pub(crate) authenticator: Authenticator,
+    pub seed_config: SeedConfig,
+    pub authenticator: Authenticator,
 
-    pub(crate) auth_mechanisms: Vec<AuthMechanism>,
-    pub(crate) tls_config: Option<TlsConfig>,
-    pub(crate) bucket_name: Option<String>,
+    pub auth_mechanisms: Vec<AuthMechanism>,
+    pub tls_config: Option<TlsConfig>,
+    pub bucket_name: Option<String>,
 
-    pub(crate) connect_timeout: Option<Duration>,
-    pub(crate) connect_throttle_timeout: Option<Duration>,
-
-    pub(crate) compression_config: CompressionConfig,
-    pub(crate) config_poller_config: ConfigPollerConfig,
+    pub compression_config: CompressionConfig,
+    pub config_poller_config: ConfigPollerConfig,
+    pub kv_config: KvConfig,
+    pub http_config: HttpConfig,
+    pub tcp_keep_alive_time: Option<Duration>,
 }
 
 impl AgentOptions {
@@ -26,12 +26,13 @@ impl AgentOptions {
             tls_config: None,
             authenticator,
             bucket_name: None,
-            connect_timeout: None,
-            connect_throttle_timeout: None,
             seed_config,
             compression_config: CompressionConfig::default(),
             config_poller_config: ConfigPollerConfig::default(),
             auth_mechanisms: vec![],
+            kv_config: KvConfig::default(),
+            http_config: HttpConfig::default(),
+            tcp_keep_alive_time: None,
         }
     }
 
@@ -55,19 +56,6 @@ impl AgentOptions {
         self
     }
 
-    pub fn connect_timeout(mut self, connect_timeout: impl Into<Option<Duration>>) -> Self {
-        self.connect_timeout = connect_timeout.into();
-        self
-    }
-
-    pub fn connect_throttle_timeout(
-        mut self,
-        connect_throttle_timeout: impl Into<Option<Duration>>,
-    ) -> Self {
-        self.connect_throttle_timeout = connect_throttle_timeout.into();
-        self
-    }
-
     pub fn compression_config(mut self, compression_config: CompressionConfig) -> Self {
         self.compression_config = compression_config;
         self
@@ -82,13 +70,28 @@ impl AgentOptions {
         self.auth_mechanisms = auth_mechanisms;
         self
     }
+
+    pub fn kv_config(mut self, kv_config: KvConfig) -> Self {
+        self.kv_config = kv_config;
+        self
+    }
+
+    pub fn http_config(mut self, http_config: HttpConfig) -> Self {
+        self.http_config = http_config;
+        self
+    }
+
+    pub fn tcp_keep_alive_time(mut self, tcp_keep_alive: Duration) -> Self {
+        self.tcp_keep_alive_time = Some(tcp_keep_alive);
+        self
+    }
 }
 
 #[derive(Default, Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub struct SeedConfig {
-    pub(crate) http_addrs: Vec<String>,
-    pub(crate) memd_addrs: Vec<String>,
+    pub http_addrs: Vec<String>,
+    pub memd_addrs: Vec<String>,
 }
 
 impl SeedConfig {
@@ -110,8 +113,8 @@ impl SeedConfig {
 #[derive(Default, Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub struct CompressionConfig {
-    pub(crate) disable_decompression: bool,
-    pub(crate) mode: CompressionMode,
+    pub disable_decompression: bool,
+    pub mode: CompressionMode,
 }
 
 impl CompressionConfig {
@@ -124,6 +127,11 @@ impl CompressionConfig {
 
     pub fn disable_decompression(mut self, disable_decompression: bool) -> Self {
         self.disable_decompression = disable_decompression;
+        self
+    }
+
+    pub fn mode(mut self, mode: CompressionMode) -> Self {
+        self.mode = mode;
         self
     }
 }
@@ -147,8 +155,7 @@ impl Default for CompressionMode {
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub struct ConfigPollerConfig {
-    pub(crate) poll_interval: Duration,
-    pub(crate) floor_interval: Duration,
+    pub poll_interval: Duration,
 }
 
 impl ConfigPollerConfig {
@@ -160,18 +167,97 @@ impl ConfigPollerConfig {
         self.poll_interval = poll_interval;
         self
     }
-
-    pub fn floor_interval(mut self, floor_interval: Duration) -> Self {
-        self.floor_interval = floor_interval;
-        self
-    }
 }
 
 impl Default for ConfigPollerConfig {
     fn default() -> Self {
         Self {
             poll_interval: Duration::from_millis(2500),
-            floor_interval: Duration::from_millis(50),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
+pub struct KvConfig {
+    pub enable_mutation_tokens: bool,
+    pub enable_server_durations: bool,
+    pub num_connections: usize,
+    pub connect_timeout: Duration,
+    pub connect_throttle_timeout: Duration,
+}
+
+impl KvConfig {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn disable_mutation_tokens(mut self) -> Self {
+        self.enable_mutation_tokens = false;
+        self
+    }
+
+    pub fn disable_server_durations(mut self) -> Self {
+        self.enable_server_durations = false;
+        self
+    }
+
+    pub fn connect_timeout(mut self, connect_timeout: Duration) -> Self {
+        self.connect_timeout = connect_timeout;
+        self
+    }
+
+    pub fn connect_throttle_timeout(mut self, connect_throttle_timeout: Duration) -> Self {
+        self.connect_throttle_timeout = connect_throttle_timeout;
+        self
+    }
+
+    pub fn num_connections(mut self, num: usize) -> Self {
+        self.num_connections = num;
+        self
+    }
+}
+
+impl Default for KvConfig {
+    fn default() -> Self {
+        Self {
+            enable_mutation_tokens: true,
+            enable_server_durations: true,
+            num_connections: 1,
+            connect_timeout: Duration::from_secs(10),
+            connect_throttle_timeout: Duration::from_secs(5),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
+pub struct HttpConfig {
+    pub max_idle_connections_per_host: Option<usize>,
+    pub idle_connection_timeout: Duration,
+}
+
+impl HttpConfig {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn max_idle_connections_per_host(mut self, max_idle_connections_per_host: usize) -> Self {
+        self.max_idle_connections_per_host = Some(max_idle_connections_per_host);
+        self
+    }
+
+    pub fn idle_connection_timeout(mut self, idle_connection_timeout: Duration) -> Self {
+        self.idle_connection_timeout = idle_connection_timeout;
+        self
+    }
+}
+
+impl Default for HttpConfig {
+    fn default() -> Self {
+        Self {
+            max_idle_connections_per_host: None,
+            idle_connection_timeout: Duration::from_secs(1),
         }
     }
 }

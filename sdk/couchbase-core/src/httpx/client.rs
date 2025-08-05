@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::httpx::error::ErrorKind::Connection;
 use crate::httpx::error::{Error, Result as HttpxResult};
 use crate::httpx::request::{Auth, OboPasswordOrDomain, Request};
@@ -12,6 +10,8 @@ use base64::Engine;
 use http::header::{CONTENT_TYPE, USER_AGENT};
 use log::trace;
 use reqwest::redirect::Policy;
+use std::sync::Arc;
+use std::time::Duration;
 use uuid::Uuid;
 
 #[async_trait]
@@ -23,6 +23,9 @@ pub trait Client: Send + Sync {
 #[non_exhaustive]
 pub struct ClientConfig {
     pub tls_config: Option<TlsConfig>,
+    pub idle_connection_timeout: Duration,
+    pub max_idle_connections_per_host: Option<usize>,
+    pub tcp_keep_alive_time: Duration,
 }
 
 impl ClientConfig {
@@ -32,6 +35,16 @@ impl ClientConfig {
 
     pub fn tls_config(mut self, tls_config: impl Into<Option<TlsConfig>>) -> Self {
         self.tls_config = tls_config.into();
+        self
+    }
+
+    pub fn idle_connection_timeout(mut self, timeout: Duration) -> Self {
+        self.idle_connection_timeout = timeout;
+        self
+    }
+
+    pub fn max_idle_connections_per_host(mut self, max_idle_connections_per_host: usize) -> Self {
+        self.max_idle_connections_per_host = Some(max_idle_connections_per_host);
         self
     }
 }
@@ -64,29 +77,41 @@ impl ReqwestClient {
         Ok(())
     }
 
-    #[cfg(all(feature = "rustls-tls", not(feature = "native-tls")))]
     fn new_client(cfg: ClientConfig) -> HttpxResult<reqwest::Client> {
-        let mut builder = reqwest::Client::builder().redirect(Policy::limited(10));
-        if let Some(config) = cfg.tls_config {
-            // We have to deref the Arc, otherwise we'll get a runtime error from reqwest.
-            builder = builder.use_preconfigured_tls((*config).clone());
-        }
-        let client = builder
-            .build()
-            .map_err(|e| Error::new_message_error(format!("failed to build http client {}", e)))?;
-        Ok(client)
-    }
+        let mut builder = reqwest::Client::builder()
+            .redirect(Policy::limited(10))
+            .pool_idle_timeout(cfg.idle_connection_timeout)
+            .tcp_keepalive(cfg.tcp_keep_alive_time);
 
-    #[cfg(feature = "native-tls")]
-    fn new_client(cfg: ClientConfig) -> HttpxResult<reqwest::Client> {
-        let mut builder = reqwest::Client::builder().redirect(Policy::limited(10));
-        if let Some(config) = cfg.tls_config {
-            builder = builder.use_preconfigured_tls(config);
+        if let Some(max_idle) = cfg.max_idle_connections_per_host {
+            builder = builder.pool_max_idle_per_host(max_idle);
         }
+
+        if let Some(config) = cfg.tls_config {
+            builder = Self::add_tls_config(builder, config);
+        }
+
         let client = builder
             .build()
             .map_err(|e| Error::new_message_error(format!("failed to build http client {e}")))?;
         Ok(client)
+    }
+
+    #[cfg(all(feature = "rustls-tls", not(feature = "native-tls")))]
+    fn add_tls_config(
+        builder: reqwest::ClientBuilder,
+        tls_config: TlsConfig,
+    ) -> reqwest::ClientBuilder {
+        // We have to deref the Arc, otherwise we'll get a runtime error from reqwest.
+        builder.use_preconfigured_tls((*tls_config).clone())
+    }
+
+    #[cfg(feature = "native-tls")]
+    fn add_tls_config(
+        builder: reqwest::ClientBuilder,
+        tls_config: TlsConfig,
+    ) -> reqwest::ClientBuilder {
+        builder.use_preconfigured_tls(tls_config)
     }
 }
 
