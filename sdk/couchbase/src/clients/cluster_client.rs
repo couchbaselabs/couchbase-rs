@@ -172,12 +172,10 @@ impl CouchbaseClusterBackend {
             ExponentialBackoffCalculator::default(),
         ));
 
-        let tls_config = if let Some(tls_config) = opts.tls_options {
-            Some(
-                tls_config
-                    .try_into()
-                    .map_err(|e| error::Error::other_failure(format!("{e:?}")))?,
-            )
+        let tls_config = if let Some(tls_options) = opts.tls_options {
+            let tls_config = tls_options.try_into_tls_config(&opts.authenticator)?;
+
+            Some(tls_config)
         } else {
             None
         };

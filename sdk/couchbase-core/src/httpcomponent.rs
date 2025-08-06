@@ -80,6 +80,9 @@ impl<C: Client> HttpComponent<C> {
             Authenticator::PasswordAuthenticator(authenticator) => {
                 authenticator.get_credentials(&self.service_type, host)?
             }
+            Authenticator::CertificateAuthenticator(a) => {
+                a.get_credentials(&self.service_type, host)?
+            }
         };
 
         Ok((
@@ -127,6 +130,9 @@ impl<C: Client> HttpComponent<C> {
         let user_pass = match state.authenticator.as_ref() {
             Authenticator::PasswordAuthenticator(authenticator) => {
                 authenticator.get_credentials(&self.service_type, host)?
+            }
+            Authenticator::CertificateAuthenticator(a) => {
+                a.get_credentials(&self.service_type, host)?
             }
         };
 
@@ -211,6 +217,9 @@ impl<C: Client> HttpComponent<C> {
             let user_pass = match state.authenticator.as_ref() {
                 Authenticator::PasswordAuthenticator(authenticator) => {
                     authenticator.get_credentials(&self.service_type, host)?
+                }
+                Authenticator::CertificateAuthenticator(a) => {
+                    a.get_credentials(&self.service_type, host)?
                 }
             };
 

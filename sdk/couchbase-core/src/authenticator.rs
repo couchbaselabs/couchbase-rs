@@ -7,7 +7,7 @@ use crate::service_type::ServiceType;
 #[non_exhaustive]
 pub enum Authenticator {
     PasswordAuthenticator(PasswordAuthenticator),
-    // TODO: get_client_certificate needs some thought about how to expose the certificate
+    CertificateAuthenticator(CertificateAuthenticator),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -38,5 +38,28 @@ impl PasswordAuthenticator {
 impl From<PasswordAuthenticator> for Authenticator {
     fn from(value: PasswordAuthenticator) -> Self {
         Authenticator::PasswordAuthenticator(value)
+    }
+}
+
+// CertificateAuthenticator expects the TlsConfig provided in AgentConfig to contain the certificate chain and private key.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct CertificateAuthenticator {}
+
+impl CertificateAuthenticator {
+    pub fn get_credentials(
+        &self,
+        _service_type: &ServiceType,
+        _host_port: String,
+    ) -> Result<UserPassPair> {
+        Ok(UserPassPair {
+            username: String::new(), // No username for certificate auth
+            password: String::new(), // No password for certificate auth
+        })
+    }
+}
+
+impl From<CertificateAuthenticator> for Authenticator {
+    fn from(value: CertificateAuthenticator) -> Self {
+        Authenticator::CertificateAuthenticator(value)
     }
 }
