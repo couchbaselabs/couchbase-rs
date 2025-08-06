@@ -1,5 +1,5 @@
 use crate::auth_mechanism::AuthMechanism;
-use crate::authenticator::Authenticator;
+use crate::authenticator::{Authenticator, UserPassPair};
 use crate::error::Error;
 use crate::error::{MemdxError, Result};
 use crate::memdx;
@@ -169,22 +169,26 @@ where
         };
 
         let creds = match config.authenticator.as_ref() {
-            // PasswordAuthenticator(auth) => get_credentials(ServiceType::Memd, config.address.to_string())
             Authenticator::PasswordAuthenticator(a) => {
-                a.get_credentials(&ServiceType::MEMD, config.address.to_string())?
+                Some(a.get_credentials(&ServiceType::MEMD, config.address.to_string())?)
             }
+            Authenticator::CertificateAuthenticator(a) => None,
         };
 
-        let bootstrap_auth = Some(SASLAuthAutoOptions {
-            username: creds.username.clone(),
-            password: creds.password.clone(),
-            enabled_mechs: config
-                .auth_mechanisms
-                .iter()
-                .cloned()
-                .map(memdx::auth_mechanism::AuthMechanism::from)
-                .collect(),
-        });
+        let bootstrap_auth = if let Some(creds) = creds {
+            Some(SASLAuthAutoOptions {
+                username: creds.username.clone(),
+                password: creds.password.clone(),
+                enabled_mechs: config
+                    .auth_mechanisms
+                    .iter()
+                    .cloned()
+                    .map(memdx::auth_mechanism::AuthMechanism::from)
+                    .collect(),
+            })
+        } else {
+            None
+        };
 
         let bootstrap_select_bucket =
             config

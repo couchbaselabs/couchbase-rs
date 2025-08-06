@@ -430,6 +430,7 @@ impl Agent {
     pub async fn new(opts: AgentOptions) -> Result<Self> {
         let build_version = env!("CARGO_PKG_VERSION");
         let client_name = format!("couchbase-rs-core {build_version}");
+        info!("Creating new agent {client_name}");
 
         let auth_mechanisms = if opts.auth_mechanisms.is_empty() {
             if opts.tls_config.is_some() {
@@ -743,6 +744,9 @@ impl Agent {
                     Authenticator::PasswordAuthenticator(authenticator) => {
                         authenticator.get_credentials(&ServiceType::MGMT, host)?
                     }
+                    Authenticator::CertificateAuthenticator(authenticator) => {
+                        authenticator.get_credentials(&ServiceType::MGMT, host)?
+                    }
                 };
 
                 match Self::fetch_http_config(
@@ -882,10 +886,4 @@ struct FirstHttpConfig {
     pub user_agent: String,
     pub authenticator: Arc<Authenticator>,
     pub bucket_name: Option<String>,
-}
-
-impl Drop for Agent {
-    fn drop(&mut self) {
-        debug!("Dropping agent");
-    }
 }

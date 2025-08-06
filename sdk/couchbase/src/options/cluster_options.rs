@@ -1,17 +1,22 @@
 use crate::authenticator::Authenticator;
+use crate::capella_ca::CAPELLA_CERT;
 use crate::error;
 use log::debug;
 use std::io::Cursor;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::capella_ca::CAPELLA_CERT;
+#[cfg(feature = "native-tls")]
+use tokio_native_tls::native_tls::Identity;
 
 #[cfg(all(feature = "rustls-tls", not(feature = "native-tls")))]
 use {
-    couchbase_core::insecure_certverfier::InsecureCertVerifier, rustls_pemfile::read_all,
+    couchbase_core::insecure_certverfier::InsecureCertVerifier,
+    rustls_pemfile::read_all,
     tokio_rustls::rustls::crypto::aws_lc_rs::default_provider,
-    tokio_rustls::rustls::pki_types::CertificateDer, tokio_rustls::rustls::RootCertStore,
+    tokio_rustls::rustls::pki_types::pem::{PemObject, SectionKind},
+    tokio_rustls::rustls::pki_types::{CertificateDer, PrivateKeyDer},
+    tokio_rustls::rustls::RootCertStore,
     webpki_roots::TLS_SERVER_ROOTS,
 };
 
@@ -261,18 +266,21 @@ impl TlsOptions {
         self.danger_accept_invalid_hostnames = Some(danger);
         self
     }
-}
 
-#[cfg(all(feature = "rustls-tls", not(feature = "native-tls")))]
-impl TryFrom<TlsOptions> for Arc<tokio_rustls::rustls::ClientConfig> {
-    type Error = error::Error;
-
-    fn try_from(opts: TlsOptions) -> Result<Self, Self::Error> {
-        let store = if let Some(ca_cert) = opts.ca_certificate {
+    #[cfg(all(feature = "rustls-tls", not(feature = "native-tls")))]
+    pub(crate) fn try_into_tls_config(
+        &self,
+        auth: &Authenticator,
+    ) -> Result<Arc<tokio_rustls::rustls::ClientConfig>, error::Error> {
+        let store = if let Some(ca_cert) = &self.ca_certificate {
             let mut store = RootCertStore::empty();
             let mut cursor = Cursor::new(ca_cert);
             let certs = rustls_pemfile::certs(&mut cursor)
-                .map(|item| item.map_err(|e| error::Error::other_failure(e.to_string())))
+                .map(|item| {
+                    item.map_err(|e| {
+                        error::Error::other_failure(format!("failed to add root cert: {e}"))
+                    })
+                })
                 .collect::<error::Result<Vec<CertificateDer>>>()?;
 
             store.add_parsable_certificates(certs);
@@ -285,56 +293,87 @@ impl TryFrom<TlsOptions> for Arc<tokio_rustls::rustls::ClientConfig> {
             debug!("Adding Capella root CA to trust store");
             let mut cursor = Cursor::new(CAPELLA_CERT);
             let certs = rustls_pemfile::certs(&mut cursor)
-                .map(|item| item.map_err(|e| error::Error::other_failure(e.to_string())))
+                .map(|item| {
+                    item.map_err(|e| {
+                        error::Error::other_failure(format!("failed to add capella cert: {e}"))
+                    })
+                })
                 .collect::<error::Result<Vec<CertificateDer>>>()?;
 
             store.add_parsable_certificates(certs);
             store
         };
 
-        let mut config =
+        let mut builder =
             tokio_rustls::rustls::ClientConfig::builder_with_provider(Arc::new(default_provider()))
                 .with_safe_default_protocol_versions()
-                .map_err(|e| error::Error::other_failure(e.to_string()))?;
+                .map_err(|e| {
+                    error::Error::other_failure(format!(
+                        "failed to set safe default protocol versions: {e}"
+                    ))
+                })?;
 
-        let config = if let Some(true) = opts.danger_accept_invalid_certs {
-            config
+        let builder = if let Some(true) = self.danger_accept_invalid_certs {
+            builder
                 .dangerous()
                 .with_custom_certificate_verifier(Arc::new(InsecureCertVerifier {}))
-                .with_no_client_auth()
         } else {
-            config.with_root_certificates(store).with_no_client_auth()
+            builder.with_root_certificates(store)
+        };
+
+        let config = match auth {
+            Authenticator::CertificateAuthenticator(a) => {
+                let clone = a.clone();
+                builder
+                    .with_client_auth_cert(clone.cert_chain, clone.private_key)
+                    .map_err(|e| {
+                        error::Error::other_failure(format!(
+                            "failed to setup client auth cert: {e}"
+                        ))
+                    })?
+            }
+            Authenticator::PasswordAuthenticator(_) => builder.with_no_client_auth(),
         };
 
         Ok(Arc::new(config))
     }
-}
 
-#[cfg(feature = "native-tls")]
-impl TryFrom<TlsOptions> for tokio_native_tls::native_tls::TlsConnector {
-    type Error = error::Error;
-
-    fn try_from(opts: TlsOptions) -> Result<Self, Self::Error> {
+    #[cfg(feature = "native-tls")]
+    pub(crate) fn try_into_tls_config(
+        &self,
+        auth: &Authenticator,
+    ) -> Result<tokio_native_tls::native_tls::TlsConnector, error::Error> {
         let mut builder = tokio_native_tls::native_tls::TlsConnector::builder();
-        if let Some(true) = opts.danger_accept_invalid_certs {
+        if let Some(true) = self.danger_accept_invalid_certs {
             builder.danger_accept_invalid_certs(true);
         }
-        if let Some(true) = opts.danger_accept_invalid_hostnames {
+        if let Some(true) = self.danger_accept_invalid_hostnames {
             builder.danger_accept_invalid_hostnames(true);
         }
-        if let Some(cert) = opts.ca_certificate {
-            let pem = tokio_native_tls::native_tls::Certificate::from_pem(&cert)
-                .map_err(|e| error::Error::other_failure(e.to_string()))?;
+        if let Some(cert) = &self.ca_certificate {
+            let pem = tokio_native_tls::native_tls::Certificate::from_pem(cert).map_err(|e| {
+                error::Error::other_failure(format!("failed to add root cert: {e}"))
+            })?;
             builder.add_root_certificate(pem);
         } else {
             debug!("Adding Capella root CA to trust store");
             let capella_ca =
                 tokio_native_tls::native_tls::Certificate::from_pem(CAPELLA_CERT.as_ref())
-                    .map_err(|e| error::Error::other_failure(e.to_string()))?;
+                    .map_err(|e| {
+                        error::Error::other_failure(format!("failed to add capella cert: {e}"))
+                    })?;
             builder.add_root_certificate(capella_ca);
         }
+
+        match auth {
+            Authenticator::CertificateAuthenticator(a) => {
+                builder.identity(a.identity.clone());
+            }
+            Authenticator::PasswordAuthenticator(_) => {}
+        };
+
         builder
             .build()
-            .map_err(|e| error::Error::other_failure(e.to_string()))
+            .map_err(|e| error::Error::other_failure(format!("failed to build client config: {e}")))
     }
 }
