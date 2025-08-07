@@ -2,6 +2,7 @@ use crate::authenticator::Authenticator;
 use crate::capella_ca::CAPELLA_CERT;
 use crate::error;
 use log::debug;
+use std::fmt::Debug;
 use std::io::Cursor;
 use std::sync::Arc;
 use std::time::Duration;
@@ -20,7 +21,7 @@ use {
     webpki_roots::TLS_SERVER_ROOTS,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 #[non_exhaustive]
 pub struct ClusterOptions {
     // authenticator specifies the authenticator to use with the cluster.
@@ -33,6 +34,20 @@ pub struct ClusterOptions {
     pub(crate) poller_options: PollerOptions,
     pub(crate) http_options: HttpOptions,
     pub(crate) kv_options: KvOptions,
+}
+
+impl Debug for ClusterOptions {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ClusterOptions")
+            .field("authenticator", &self.authenticator)
+            .field("compression_mode", &self.compression_mode)
+            .field("has_tls_options", &self.tls_options.is_some())
+            .field("tcp_keep_alive_time", &self.tcp_keep_alive_time)
+            .field("poller_options", &self.poller_options)
+            .field("http_options", &self.http_options)
+            .field("kv_options", &self.kv_options)
+            .finish()
+    }
 }
 
 impl ClusterOptions {
@@ -236,11 +251,16 @@ impl From<KvOptions> for couchbase_core::options::agent::KvConfig {
     }
 }
 
-#[derive(Clone, Default, Debug, PartialEq)]
+#[derive(Clone, Default)]
 #[non_exhaustive]
 pub struct TlsOptions {
     pub(crate) danger_accept_invalid_certs: Option<bool>,
-    pub(crate) ca_certificate: Option<Vec<u8>>,
+
+    #[cfg(all(feature = "rustls-tls", not(feature = "native-tls")))]
+    pub(crate) ca_certificate: Option<CertificateDer<'static>>,
+
+    #[cfg(feature = "native-tls")]
+    pub(crate) ca_certificate: Option<tokio_native_tls::native_tls::Certificate>,
 
     #[cfg(feature = "native-tls")]
     pub(crate) danger_accept_invalid_hostnames: Option<bool>,
@@ -256,7 +276,14 @@ impl TlsOptions {
         self
     }
 
-    pub fn ca_certificate(mut self, cert: Vec<u8>) -> Self {
+    #[cfg(all(feature = "rustls-tls", not(feature = "native-tls")))]
+    pub fn ca_certificate(mut self, cert: CertificateDer<'static>) -> Self {
+        self.ca_certificate = Some(cert);
+        self
+    }
+
+    #[cfg(feature = "native-tls")]
+    pub fn ca_certificate(mut self, cert: tokio_native_tls::native_tls::Certificate) -> Self {
         self.ca_certificate = Some(cert);
         self
     }
@@ -269,21 +296,14 @@ impl TlsOptions {
 
     #[cfg(all(feature = "rustls-tls", not(feature = "native-tls")))]
     pub(crate) fn try_into_tls_config(
-        &self,
+        self,
         auth: &Authenticator,
     ) -> Result<Arc<tokio_rustls::rustls::ClientConfig>, error::Error> {
-        let store = if let Some(ca_cert) = &self.ca_certificate {
+        let store = if let Some(ca_cert) = self.ca_certificate {
             let mut store = RootCertStore::empty();
-            let mut cursor = Cursor::new(ca_cert);
-            let certs = rustls_pemfile::certs(&mut cursor)
-                .map(|item| {
-                    item.map_err(|e| {
-                        error::Error::other_failure(format!("failed to add root cert: {e}"))
-                    })
-                })
-                .collect::<error::Result<Vec<CertificateDer>>>()?;
-
-            store.add_parsable_certificates(certs);
+            store
+                .add(ca_cert)
+                .map_err(|e| error::Error::other_failure(format!("failed to add cert: {e}")))?;
             store
         } else {
             let mut store = RootCertStore {
@@ -340,7 +360,7 @@ impl TlsOptions {
 
     #[cfg(feature = "native-tls")]
     pub(crate) fn try_into_tls_config(
-        &self,
+        self,
         auth: &Authenticator,
     ) -> Result<tokio_native_tls::native_tls::TlsConnector, error::Error> {
         let mut builder = tokio_native_tls::native_tls::TlsConnector::builder();
@@ -350,11 +370,8 @@ impl TlsOptions {
         if let Some(true) = self.danger_accept_invalid_hostnames {
             builder.danger_accept_invalid_hostnames(true);
         }
-        if let Some(cert) = &self.ca_certificate {
-            let pem = tokio_native_tls::native_tls::Certificate::from_pem(cert).map_err(|e| {
-                error::Error::other_failure(format!("failed to add root cert: {e}"))
-            })?;
-            builder.add_root_certificate(pem);
+        if let Some(cert) = self.ca_certificate {
+            builder.add_root_certificate(cert);
         } else {
             debug!("Adding Capella root CA to trust store");
             let capella_ca =
