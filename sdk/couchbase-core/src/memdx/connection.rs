@@ -10,8 +10,12 @@ use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpStream;
 use tokio::time::{timeout_at, Instant};
 
+use crate::address::Address;
 #[cfg(all(feature = "rustls-tls", not(feature = "native-tls")))]
-use {tokio_rustls::rustls::pki_types::ServerName, tokio_rustls::TlsConnector};
+use {
+    tokio_rustls::rustls::pki_types::DnsName, tokio_rustls::rustls::pki_types::ServerName,
+    tokio_rustls::TlsConnector,
+};
 
 #[derive(Debug)]
 pub struct ConnectOptions {
@@ -96,8 +100,9 @@ impl TcpConnection {
         Ok((tcp_socket, local_addr, peer_addr))
     }
 
-    pub async fn connect(addr: &str, opts: ConnectOptions) -> Result<TcpConnection> {
-        let (stream, local_addr, peer_addr) = TcpConnection::tcp_stream(addr, &opts).await?;
+    pub async fn connect(addr: Address, opts: ConnectOptions) -> Result<TcpConnection> {
+        let (stream, local_addr, peer_addr) =
+            TcpConnection::tcp_stream(addr.to_string().as_str(), &opts).await?;
 
         Ok(TcpConnection {
             stream,
@@ -135,33 +140,36 @@ impl Stream for tokio_native_tls::TlsStream<TcpStream> {}
 impl TlsConnection {
     #[cfg(all(feature = "rustls-tls", not(feature = "native-tls")))]
     pub async fn connect(
-        addr: &str,
+        addr: Address,
         tls_config: TlsConfig,
         opts: ConnectOptions,
     ) -> Result<TlsConnection> {
-        let (tcp_socket, local_addr, peer_addr) = TcpConnection::tcp_stream(addr, &opts).await?;
+        let (tcp_socket, local_addr, peer_addr) =
+            TcpConnection::tcp_stream(addr.to_string().as_str(), &opts).await?;
 
         let connector = TlsConnector::from(tls_config);
 
-        let stream = timeout_at(
-            opts.deadline,
-            connector.connect(
-                ServerName::IpAddress(tokio_rustls::rustls::pki_types::IpAddr::from(
-                    peer_addr.ip(),
-                )),
-                tcp_socket,
-            ),
-        )
-        .await
-        .map_err(|e| {
-            Error::new_connection_failed_error(
-                "failed to upgrade tcp stream to tls within timeout",
-                Box::new(io::Error::new(io::ErrorKind::TimedOut, e)),
-            )
-        })?
-        .map_err(|e| {
-            Error::new_connection_failed_error("failed to upgrade tcp stream to tls", Box::new(e))
-        })?;
+        let server_name = match DnsName::try_from(addr.host) {
+            Ok(name) => ServerName::DnsName(name),
+            Err(_e) => ServerName::IpAddress(tokio_rustls::rustls::pki_types::IpAddr::from(
+                peer_addr.ip(),
+            )),
+        };
+
+        let stream = timeout_at(opts.deadline, connector.connect(server_name, tcp_socket))
+            .await
+            .map_err(|e| {
+                Error::new_connection_failed_error(
+                    "failed to upgrade tcp stream to tls within timeout",
+                    Box::new(io::Error::new(io::ErrorKind::TimedOut, e)),
+                )
+            })?
+            .map_err(|e| {
+                Error::new_connection_failed_error(
+                    "failed to upgrade tcp stream to tls",
+                    Box::new(e),
+                )
+            })?;
 
         Ok(TlsConnection {
             stream,
@@ -172,11 +180,12 @@ impl TlsConnection {
 
     #[cfg(feature = "native-tls")]
     pub async fn connect(
-        addr: &str,
+        addr: Address,
         tls_config: TlsConfig,
         opts: ConnectOptions,
     ) -> Result<TlsConnection> {
-        let (tcp_socket, local_addr, peer_addr) = TcpConnection::tcp_stream(addr, &opts).await?;
+        let (tcp_socket, local_addr, peer_addr) =
+            TcpConnection::tcp_stream(addr.to_string().as_str(), &opts).await?;
 
         let tls_connector = tokio_native_tls::TlsConnector::from(tls_config);
 

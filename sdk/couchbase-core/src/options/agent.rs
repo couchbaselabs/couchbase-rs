@@ -1,3 +1,4 @@
+use crate::address::Address;
 use crate::auth_mechanism::AuthMechanism;
 use crate::authenticator::Authenticator;
 use crate::tls_config::TlsConfig;
@@ -90,8 +91,8 @@ impl AgentOptions {
 #[derive(Default, Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub struct SeedConfig {
-    pub http_addrs: Vec<String>,
-    pub memd_addrs: Vec<String>,
+    pub http_addrs: Vec<Address>,
+    pub memd_addrs: Vec<Address>,
 }
 
 impl SeedConfig {
@@ -99,12 +100,12 @@ impl SeedConfig {
         Default::default()
     }
 
-    pub fn http_addrs(mut self, http_addrs: Vec<String>) -> Self {
+    pub fn http_addrs(mut self, http_addrs: Vec<Address>) -> Self {
         self.http_addrs = http_addrs;
         self
     }
 
-    pub fn memd_addrs(mut self, memd_addrs: Vec<String>) -> Self {
+    pub fn memd_addrs(mut self, memd_addrs: Vec<Address>) -> Self {
         self.memd_addrs = memd_addrs;
         self
     }

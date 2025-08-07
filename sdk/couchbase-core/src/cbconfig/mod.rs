@@ -25,42 +25,42 @@ pub struct ConfigDDocs {
 #[derive(Deserialize, Debug, Default, Clone)]
 pub struct TerseExtNodePorts {
     #[serde(alias = "kv")]
-    pub kv: Option<i64>,
+    pub kv: Option<u16>,
     #[serde(alias = "capi")]
-    pub capi: Option<i64>,
+    pub capi: Option<u16>,
     #[serde(alias = "mgmt")]
-    pub mgmt: i64,
+    pub mgmt: u16,
     #[serde(alias = "n1ql")]
-    pub n1ql: Option<i64>,
+    pub n1ql: Option<u16>,
     #[serde(alias = "fts")]
-    pub fts: Option<i64>,
+    pub fts: Option<u16>,
     #[serde(alias = "cbas")]
-    pub cbas: Option<i64>,
+    pub cbas: Option<u16>,
     #[serde(alias = "eventingAdminPort")]
-    pub eventing: Option<i64>,
+    pub eventing: Option<u16>,
     #[serde(alias = "indexHttp")]
-    pub gsi: Option<i64>,
+    pub gsi: Option<u16>,
     #[serde(alias = "backupAPI")]
-    pub backup: Option<i64>,
+    pub backup: Option<u16>,
 
     #[serde(alias = "kvSSL")]
-    pub kv_ssl: Option<i64>,
+    pub kv_ssl: Option<u16>,
     #[serde(alias = "capiSSL")]
-    pub capi_ssl: Option<i64>,
+    pub capi_ssl: Option<u16>,
     #[serde(alias = "mgmtSSL")]
-    pub mgmt_ssl: i64,
+    pub mgmt_ssl: u16,
     #[serde(alias = "n1qlSSL")]
-    pub n1ql_ssl: Option<i64>,
+    pub n1ql_ssl: Option<u16>,
     #[serde(alias = "ftsSSL")]
-    pub fts_ssl: Option<i64>,
+    pub fts_ssl: Option<u16>,
     #[serde(alias = "cbasSSL")]
-    pub cbas_ssl: Option<i64>,
+    pub cbas_ssl: Option<u16>,
     #[serde(alias = "eventingSSL")]
-    pub eventing_ssl: Option<i64>,
+    pub eventing_ssl: Option<u16>,
     #[serde(alias = "indexHttps")]
-    pub gsi_ssl: Option<i64>,
+    pub gsi_ssl: Option<u16>,
     #[serde(alias = "backupAPIHTTPS")]
-    pub backup_ssl: Option<i64>,
+    pub backup_ssl: Option<u16>,
 }
 
 #[derive(Deserialize, Debug, Clone)]

@@ -1,3 +1,4 @@
+use crate::address::Address;
 use crate::auth_mechanism::AuthMechanism;
 use crate::authenticator::{Authenticator, UserPassPair};
 use crate::error::Error;
@@ -31,7 +32,7 @@ use uuid::Uuid;
 
 #[derive(Clone)]
 pub(crate) struct KvClientConfig {
-    pub address: String,
+    pub address: Address,
     pub tls: Option<TlsConfig>,
     pub client_name: String,
     pub authenticator: Arc<Authenticator>,
@@ -244,7 +245,7 @@ where
 
         let conn = if let Some(tls) = config.tls.clone() {
             let conn = match TlsConnection::connect(
-                &config.address,
+                config.address.clone(),
                 tls,
                 ConnectOptions {
                     deadline: Instant::now().add(config.connect_timeout),
@@ -256,14 +257,14 @@ where
                 Ok(conn) => conn,
                 Err(e) => {
                     return Err(Error::new_contextual_memdx_error(
-                        MemdxError::new(e).with_dispatched_to(config.address),
+                        MemdxError::new(e).with_dispatched_to(config.address.to_string()),
                     ))
                 }
             };
             ConnectionType::Tls(conn)
         } else {
             let conn = match TcpConnection::connect(
-                &config.address,
+                config.address.clone(),
                 ConnectOptions {
                     deadline: Instant::now().add(config.connect_timeout),
                     tcp_keep_alive_time: config.tcp_keep_alive_time,
@@ -274,7 +275,7 @@ where
                 Ok(conn) => conn,
                 Err(e) => {
                     return Err(Error::new_contextual_memdx_error(
-                        MemdxError::new(e).with_dispatched_to(config.address),
+                        MemdxError::new(e).with_dispatched_to(config.address.to_string()),
                     ))
                 }
             };
@@ -283,7 +284,7 @@ where
 
         let remote_addr = *conn.peer_addr();
         let local_addr = *conn.local_addr();
-        let remote_hostname = hostname_from_addr_str(&config.address);
+        let remote_hostname = hostname_from_addr_str(config.address.host.as_str());
 
         let mut cli = D::new(conn, memdx_client_opts);
 

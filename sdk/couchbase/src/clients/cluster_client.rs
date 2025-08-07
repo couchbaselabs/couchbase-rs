@@ -16,6 +16,7 @@ use crate::clients::user_mgmt_client::{
 use crate::error;
 use crate::options::cluster_options::ClusterOptions;
 use couchbase_connstr::{parse, resolve, Address, SrvRecord};
+use couchbase_core::address;
 use couchbase_core::ondemand_agentmanager::OnDemandAgentManager;
 use couchbase_core::options::agent::{CompressionConfig, SeedConfig};
 use couchbase_core::options::ondemand_agentmanager::OnDemandAgentManagerOptions;
@@ -181,8 +182,24 @@ impl CouchbaseClusterBackend {
         };
 
         let seed_config = SeedConfig::new()
-            .memd_addrs(memd_hosts.iter().map(|a| a.to_string()).collect())
-            .http_addrs(http_hosts.iter().map(|a| a.to_string()).collect());
+            .memd_addrs(
+                memd_hosts
+                    .into_iter()
+                    .map(|a| address::Address {
+                        host: a.host,
+                        port: a.port,
+                    })
+                    .collect(),
+            )
+            .http_addrs(
+                http_hosts
+                    .into_iter()
+                    .map(|a| address::Address {
+                        host: a.host,
+                        port: a.port,
+                    })
+                    .collect(),
+            );
 
         let mut compression_config = CompressionConfig::default();
         if let Some(cm) = opts.compression_mode {

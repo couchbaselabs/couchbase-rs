@@ -1,3 +1,4 @@
+use crate::address::Address;
 use crate::auth_mechanism::AuthMechanism;
 use crate::authenticator::Authenticator;
 use crate::cbconfig::TerseConfig;
@@ -248,7 +249,7 @@ impl AgentInner {
         let network_info = config.addresses_group_for_network_type(&state.network_type);
 
         let mut kv_data_node_ids = Vec::new();
-        let mut kv_data_hosts: HashMap<String, String> = HashMap::new();
+        let mut kv_data_hosts: HashMap<String, Address> = HashMap::new();
         let mut mgmt_endpoints: HashMap<String, String> = HashMap::new();
         let mut query_endpoints: HashMap<String, String> = HashMap::new();
         let mut search_endpoints: HashMap<String, String> = HashMap::new();
@@ -265,7 +266,13 @@ impl AgentInner {
 
             if state.tls_config.is_some() {
                 if let Some(p) = node.ssl_ports.kv {
-                    kv_data_hosts.insert(kv_ep_id, format!("{}:{}", node.hostname, p));
+                    kv_data_hosts.insert(
+                        kv_ep_id,
+                        Address {
+                            host: node.hostname.clone(),
+                            port: p,
+                        },
+                    );
                 }
                 mgmt_endpoints.insert(
                     mgmt_ep_id,
@@ -280,7 +287,13 @@ impl AgentInner {
                 }
             } else {
                 if let Some(p) = node.non_ssl_ports.kv {
-                    kv_data_hosts.insert(kv_ep_id, format!("{}:{}", node.hostname, p));
+                    kv_data_hosts.insert(
+                        kv_ep_id,
+                        Address {
+                            host: node.hostname.clone(),
+                            port: p,
+                        },
+                    );
                 }
                 mgmt_endpoints.insert(
                     mgmt_ep_id,
@@ -297,10 +310,9 @@ impl AgentInner {
         }
 
         let mut clients = HashMap::new();
-        for (node_id, addr) in kv_data_hosts {
+        for (node_id, address) in kv_data_hosts {
             let config = KvClientConfig {
-                // TODO: unwrap, return error on fail?
-                address: addr.parse().unwrap(),
+                address,
                 tls: state.tls_config.clone(),
                 client_name: state.client_name.clone(),
                 authenticator: state.authenticator.clone(),
@@ -728,7 +740,7 @@ impl Agent {
                         Error::new_message_error(format!("failed to deserialize config: {e}"))
                     })?;
 
-                match ConfigParser::parse_terse_config(config, host) {
+                match ConfigParser::parse_terse_config(config, host.host.as_str()) {
                     Ok(c) => {
                         return Ok(c);
                     }
@@ -823,7 +835,7 @@ impl Agent {
     }
 
     fn gen_first_kv_client_configs(
-        memd_addrs: &Vec<String>,
+        memd_addrs: &Vec<Address>,
         state: &AgentState,
     ) -> HashMap<String, KvClientConfig> {
         let mut clients = HashMap::new();
@@ -849,7 +861,7 @@ impl Agent {
     }
 
     fn gen_first_http_endpoints(
-        mgmt_addrs: &Vec<String>,
+        mgmt_addrs: &Vec<Address>,
         state: &AgentState,
     ) -> HashMap<String, FirstHttpConfig> {
         let mut clients = HashMap::new();
