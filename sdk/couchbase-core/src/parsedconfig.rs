@@ -12,10 +12,10 @@ pub enum BucketType {
 
 #[derive(Debug, Clone, Eq, PartialEq, Default)]
 pub(crate) struct ParsedConfigNodePorts {
-    pub kv: Option<i64>,
-    pub mgmt: i64,
-    pub query: Option<i64>,
-    pub search: Option<i64>,
+    pub kv: Option<u16>,
+    pub mgmt: u16,
+    pub query: Option<u16>,
+    pub search: Option<u16>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Default)]

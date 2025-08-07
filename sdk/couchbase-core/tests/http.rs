@@ -49,12 +49,12 @@ fn test_row_streamer() {
     setup_test(async |config| {
         let addrs = config.memd_addrs;
 
-        let ip = addrs.first().unwrap().split(":").next().unwrap();
+        let host = addrs.first().unwrap().host.clone();
 
         let basic_auth = BasicAuth::new(config.username, config.password);
 
         let request_body = json!({"statement": "FROM RANGE(0, 999) AS i SELECT *"});
-        let uri = format!("http://{ip}:8095/analytics/service");
+        let uri = format!("http://{host}:8095/analytics/service");
 
         let request = Request::new(Method::POST, uri)
             .user_agent("rscbcorex".to_string())
@@ -118,10 +118,10 @@ fn test_json_block_read() {
     setup_test(async |config| {
         let addrs = config.memd_addrs;
 
-        let ip = addrs.first().unwrap().split(":").next().unwrap();
+        let host = addrs.first().unwrap().host.clone();
 
         let basic_auth = BasicAuth::new(config.username, config.password);
-        let uri = format!("http://{ip}:8091/pools/default/terseClusterInfo");
+        let uri = format!("http://{host}:8091/pools/default/terseClusterInfo");
 
         let request = Request::new(Method::GET, uri)
             .user_agent("rscbcorex".to_string())

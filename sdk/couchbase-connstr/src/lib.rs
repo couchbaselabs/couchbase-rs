@@ -24,8 +24,8 @@ pub struct ConnSpec {
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Address {
-    host: String,
-    port: u16,
+    pub host: String,
+    pub port: u16,
 }
 
 impl Display for Address {
