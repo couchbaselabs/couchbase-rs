@@ -1,4 +1,5 @@
 use crate::error;
+use crate::search::queries::Query;
 use couchbase_core::searchx::query_options::{KnnOperator, KnnQuery};
 
 #[derive(Debug)]
@@ -65,6 +66,7 @@ pub struct VectorQuery {
     pub(crate) base64_query: Option<String>,
     pub(crate) boost: Option<f32>,
     pub(crate) num_candidates: Option<u32>,
+    pub(crate) prefilter: Option<Query>,
 }
 
 impl VectorQuery {
@@ -75,6 +77,7 @@ impl VectorQuery {
             base64_query: None,
             boost: None,
             num_candidates: None,
+            prefilter: None,
         }
     }
 
@@ -88,6 +91,7 @@ impl VectorQuery {
             base64_query: Some(base_64_vector_query.into()),
             boost: None,
             num_candidates: None,
+            prefilter: None,
         }
     }
 
@@ -98,6 +102,11 @@ impl VectorQuery {
 
     pub fn num_candidates(mut self, num_candidates: u32) -> Self {
         self.num_candidates = Some(num_candidates);
+        self
+    }
+
+    pub fn prefilter(mut self, prefilter: Query) -> Self {
+        self.prefilter = Some(prefilter);
         self
     }
 }
@@ -122,6 +131,7 @@ impl TryFrom<VectorQuery> for KnnQuery {
             .boost(value.boost)
             .k(value.num_candidates.map(|n| n as i64))
             .vector(value.query)
-            .vector_base64(value.base64_query))
+            .vector_base64(value.base64_query)
+            .filter(value.prefilter.map(|q| q.into())))
     }
 }
