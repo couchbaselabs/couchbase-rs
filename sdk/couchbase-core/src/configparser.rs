@@ -80,7 +80,7 @@ impl ConfigParser {
         };
 
         let mut features = vec![];
-        if let Some(caps) = config.cluster_capabilities.get("fts") {
+        if let Some(caps) = config.cluster_capabilities.get("search") {
             if caps.contains(&"vectorSearch".to_string()) {
                 features.push(ParsedConfigFeature::FtsVectorSearch);
             }

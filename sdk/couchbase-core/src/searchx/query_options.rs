@@ -152,6 +152,8 @@ pub struct KnnQuery {
     pub vector: Option<Vec<f32>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub vector_base64: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filter: Option<Query>,
 }
 
 impl KnnQuery {
@@ -162,6 +164,7 @@ impl KnnQuery {
             k: None,
             vector: None,
             vector_base64: None,
+            filter: None,
         }
     }
 
@@ -182,6 +185,11 @@ impl KnnQuery {
 
     pub fn vector_base64(mut self, vector_base64: impl Into<Option<String>>) -> Self {
         self.vector_base64 = vector_base64.into();
+        self
+    }
+
+    pub fn filter(mut self, filter: impl Into<Option<Query>>) -> Self {
+        self.filter = filter.into();
         self
     }
 }

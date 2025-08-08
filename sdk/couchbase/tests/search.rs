@@ -1,5 +1,5 @@
 use crate::common::consistency_utils::{verify_collection_created, verify_scope_created};
-use crate::common::doc_generation::import_sample_beer_dataset;
+use crate::common::doc_generation::{import_color_sample, import_sample_beer_dataset};
 use crate::common::features::TestFeatureCode;
 use crate::common::test_config::run_test;
 use crate::common::{new_key, try_until};
@@ -12,9 +12,10 @@ use couchbase::scope::Scope;
 use couchbase::search::facets::{
     DateRange, DateRangeFacet, Facet, NumericRange, NumericRangeFacet, TermFacet,
 };
-use couchbase::search::queries::{Query, TermQuery};
+use couchbase::search::queries::{MatchQuery, Query, TermQuery};
 use couchbase::search::request::SearchRequest;
 use couchbase::search::sort::{Sort, SortId};
+use couchbase::search::vector::{VectorQuery, VectorSearch};
 use futures::StreamExt;
 use log::{error, warn};
 use std::collections::HashMap;
@@ -60,6 +61,7 @@ fn test_search_basic() {
         let index_name = index_name();
 
         import_search_index(
+            "tests/testdata/basic_scoped_search_index.json",
             &scope,
             &index_name,
             cluster.default_bucket(),
@@ -266,14 +268,142 @@ fn test_search_basic() {
     })
 }
 
+#[test]
+fn test_search_vector() {
+    run_test(async |cluster| {
+        if !cluster.supports_feature(&TestFeatureCode::SearchManagementCollections)
+            || !cluster.supports_feature(&TestFeatureCode::VectorSearch)
+        {
+            return;
+        }
+
+        let scope_name = new_key();
+        let collection_name = new_key();
+
+        let bucket = cluster.bucket(cluster.default_bucket());
+        let collection_mgr = bucket.collections();
+        collection_mgr
+            .create_scope(&scope_name, None)
+            .await
+            .unwrap();
+        verify_scope_created(&collection_mgr, &scope_name).await;
+
+        collection_mgr
+            .create_collection(
+                &scope_name,
+                &collection_name,
+                CreateCollectionSettings::new(),
+                None,
+            )
+            .await
+            .unwrap();
+        verify_collection_created(&collection_mgr, &scope_name, &collection_name).await;
+
+        let scope = bucket.scope(&scope_name);
+        let collection = scope.collection(&collection_name);
+
+        let index_name = index_name();
+
+        import_search_index(
+            "tests/testdata/scoped_vector_index.json",
+            &scope,
+            &index_name,
+            cluster.default_bucket(),
+            &scope_name,
+            &collection_name,
+        )
+        .await;
+
+        let import_results = import_color_sample("search", &collection).await;
+
+        let query = MatchQuery::new("primary").field("color_wheel_pos".to_string());
+        let expected_rows = 2;
+        let sort = Sort::Id(SortId::new().descending(true));
+
+        let deadline = Instant::now() + Duration::from_secs(60);
+
+        let res: SearchResult;
+        let rows: Vec<SearchRow>;
+        loop {
+            let vector_query = VectorQuery::with_vector("color_rgb", vec![255.0, 255.0, 255.0])
+                .prefilter(Query::Match(query.clone()))
+                .num_candidates(10);
+
+            let mut this_res = match scope
+                .search(
+                    &index_name,
+                    SearchRequest::with_vector_search(VectorSearch::new(vec![vector_query], None)),
+                    SearchOptions::new()
+                        .include_locations(true)
+                        .server_timeout(Duration::from_secs(10))
+                        .sort(vec![sort.clone()]),
+                )
+                .await
+            {
+                Ok(res) => res,
+                Err(e) => {
+                    error!("search failed: {e}");
+                    let sleep = time::sleep(Duration::from_secs(1));
+                    timeout_at(deadline, sleep).await.unwrap();
+
+                    continue;
+                }
+            };
+
+            let mut this_rows = vec![];
+            while let Some(row) = this_res.rows().next().await {
+                this_rows.push(row.unwrap());
+            }
+
+            if this_rows.len() == expected_rows {
+                rows = this_rows.clone();
+                res = this_res;
+                break;
+            }
+
+            error!(
+                "search returned {} rows, expected {}",
+                this_rows.len(),
+                expected_rows
+            );
+
+            let sleep = time::sleep(Duration::from_secs(1));
+            timeout_at(deadline, sleep).await.unwrap();
+        }
+
+        scope
+            .search_indexes()
+            .drop_index(&index_name, None)
+            .await
+            .unwrap();
+
+        for row in rows {
+            assert!(!row.id.is_empty());
+            assert!(!row.index.is_empty());
+        }
+
+        // Metadata assertions
+        let metadata = res.metadata().unwrap();
+
+        assert!(metadata.errors.is_empty());
+        assert!(!metadata.metrics.took.is_zero());
+        assert_eq!(expected_rows as u64, metadata.metrics.total_hits);
+        assert!(metadata.metrics.max_score >= 0.0);
+        assert_eq!(1, metadata.metrics.successful_partition_count);
+        assert_eq!(1, metadata.metrics.total_partition_count);
+        assert_eq!(0, metadata.metrics.failed_partition_count);
+    })
+}
+
 async fn import_search_index(
+    index_definition_path: &'static str,
     scope: &Scope,
     index_name: &str,
     bucket_name: &str,
     scope_name: &str,
     collection_name: &str,
 ) {
-    let mut data = include_str!("./testdata/basic_scoped_search_index.json");
+    let mut data = std::fs::read_to_string(index_definition_path).unwrap();
     let mut data = data.replace("$indexName", index_name);
     let mut data = data.replace("$bucketName", bucket_name);
     let mut data = data.replace("$scopeName", scope_name);

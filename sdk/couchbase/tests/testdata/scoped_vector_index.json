@@ -1,0 +1,202 @@
+{
+  "type": "fulltext-index",
+  "name": "$indexName",
+  "sourceType": "gocbcore",
+  "sourceName": "$bucketName",
+  "planParams": {
+    "maxPartitionsPerPIndex": 1024,
+    "indexPartitions": 1,
+    "numReplicas": 0
+  },
+  "params": {
+    "doc_config": {
+      "docid_prefix_delim": "",
+      "docid_regexp": "",
+      "mode": "scope.collection.type_field",
+      "type_field": "type"
+    },
+    "mapping": {
+      "analysis": {},
+      "default_analyzer": "standard",
+      "default_datetime_parser": "dateTimeOptional",
+      "default_field": "_all",
+      "default_mapping": {
+        "dynamic": true,
+        "enabled": false
+      },
+      "default_type": "_default",
+      "docvalues_dynamic": false,
+      "index_dynamic": true,
+      "store_dynamic": false,
+      "type_field": "_type",
+      "types": {
+        "$scopeName.$collectionName": {
+          "dynamic": false,
+          "enabled": true,
+          "properties": {
+            "color_brightness": {
+              "dynamic": false,
+              "enabled": true,
+              "fields": [
+                {
+                  "index": true,
+                  "name": "color_brightness",
+                  "store": true,
+                  "type": "number"
+                }
+              ]
+            },
+            "color_embedding_vector_dot": {
+              "dynamic": false,
+              "enabled": true,
+              "fields": [
+                {
+                  "dims": 1536,
+                  "index": true,
+                  "name": "color_embedding_vector_dot",
+                  "similarity": "dot_product",
+                  "type": "vector",
+                  "vector_index_optimized_for": "recall"
+                }
+              ]
+            },
+            "color_hex": {
+              "dynamic": false,
+              "enabled": true,
+              "fields": [
+                {
+                  "analyzer": "en",
+                  "docvalues": true,
+                  "index": true,
+                  "name": "color_hex",
+                  "store": true,
+                  "type": "text"
+                }
+              ]
+            },
+            "color_name": {
+              "dynamic": false,
+              "enabled": true,
+              "fields": [
+                {
+                  "analyzer": "en",
+                  "index": true,
+                  "name": "color_name",
+                  "store": true,
+                  "type": "text"
+                }
+              ]
+            },
+            "color_rgb": {
+              "dynamic": false,
+              "enabled": true,
+              "fields": [
+                {
+                  "dims": 3,
+                  "index": true,
+                  "name": "color_rgb",
+                  "similarity": "l2_norm",
+                  "type": "vector",
+                  "vector_index_optimized_for": "recall"
+                }
+              ]
+            },
+            "color_wheel_pos": {
+              "dynamic": false,
+              "enabled": true,
+              "fields": [
+                {
+                  "analyzer": "en",
+                  "index": true,
+                  "name": "color_wheel_pos",
+                  "store": true,
+                  "type": "text"
+                }
+              ]
+            },
+            "description": {
+              "dynamic": false,
+              "enabled": true,
+              "fields": [
+                {
+                  "analyzer": "en",
+                  "docvalues": true,
+                  "include_term_vectors": true,
+                  "index": true,
+                  "name": "description",
+                  "store": true,
+                  "type": "text"
+                }
+              ]
+            },
+            "geo_location": {
+              "dynamic": false,
+              "enabled": true,
+              "fields": [
+                {
+                  "index": true,
+                  "name": "geo_location",
+                  "store": true,
+                  "type": "geopoint"
+                }
+              ]
+            },
+            "highly_rated": {
+              "dynamic": false,
+              "enabled": true,
+              "fields": [
+                {
+                  "index": true,
+                  "name": "highly_rated",
+                  "type": "boolean"
+                }
+              ]
+            },
+            "last_rated": {
+              "dynamic": false,
+              "enabled": true,
+              "fields": [
+                {
+                  "docvalues": true,
+                  "index": true,
+                  "name": "last_rated",
+                  "store": true,
+                  "type": "datetime"
+                }
+              ]
+            },
+            "perfect_rating": {
+              "dynamic": false,
+              "enabled": true,
+              "fields": [
+                {
+                  "index": true,
+                  "name": "perfect_rating",
+                  "type": "boolean"
+                }
+              ]
+            },
+            "rating": {
+              "dynamic": false,
+              "enabled": true,
+              "fields": [
+                {
+                  "docvalues": true,
+                  "index": true,
+                  "name": "rating",
+                  "store": true,
+                  "type": "number"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "store": {
+      "indexType": "scorch",
+      "segmentVersion": 16
+    }
+  },
+  "sourceParams": {}
+}
