@@ -28,6 +28,15 @@ const SERVER_VERSION_762: NodeVersion = NodeVersion {
     modifier: None,
 };
 
+const SERVER_VERSION_764: NodeVersion = NodeVersion {
+    major: 7,
+    minor: 6,
+    patch: 4,
+    build: 0,
+    edition: None,
+    modifier: None,
+};
+
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum TestFeatureCode {
     KV,
@@ -40,6 +49,7 @@ pub enum TestFeatureCode {
     CollectionNoExpiry,
     CollectionUpdates,
     HistoryRetention,
+    VectorSearch,
 }
 
 impl TestCluster {
@@ -60,6 +70,7 @@ impl TestCluster {
                     && !self.cluster_version.equal(&SERVER_VERSION_722)
             }
             TestFeatureCode::HistoryRetention => !self.cluster_version.lower(&SERVER_VERSION_720),
+            TestFeatureCode::VectorSearch => !self.cluster_version.lower(&SERVER_VERSION_764),
         }
     }
 }
