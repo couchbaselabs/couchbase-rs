@@ -115,7 +115,7 @@ pulled into the main build with `add_subdirectory()`. For example:
 
 New file `CMakeLists.txt.in`:
 
-    cmake_minimum_required(VERSION 2.8.2)
+    cmake_minimum_required(VERSION 3.5)
 
     project(googletest-download NONE)
 
