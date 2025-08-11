@@ -261,7 +261,7 @@ impl Stream for SearchRows<'_> {
 }
 
 impl SearchResult {
-    pub fn metadata(&self) -> error::Result<SearchMetaData> {
+    pub fn metadata(&self) -> error::Result<SearchMetaData<'_>> {
         Ok(self.wrapped.metadata()?.into())
     }
 
@@ -271,7 +271,7 @@ impl SearchResult {
         }
     }
 
-    pub fn facets(&self) -> error::Result<HashMap<&String, SearchFacetResult>> {
+    pub fn facets(&self) -> error::Result<HashMap<&String, SearchFacetResult<'_>>> {
         let mut facets = HashMap::new();
         for (name, facet) in self.wrapped.facets()? {
             if let Some(facet_terms) = &facet.terms {

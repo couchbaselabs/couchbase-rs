@@ -21,7 +21,7 @@ impl Collection {
         &self,
         id: impl Into<String>,
         options: impl Into<Option<CouchbaseListOptions>>,
-    ) -> CouchbaseList {
+    ) -> CouchbaseList<'_> {
         CouchbaseList {
             collection: self,
             id: id.into(),
@@ -33,7 +33,7 @@ impl Collection {
         &self,
         id: impl Into<String>,
         options: impl Into<Option<CouchbaseMapOptions>>,
-    ) -> CouchbaseMap {
+    ) -> CouchbaseMap<'_> {
         CouchbaseMap {
             collection: self,
             id: id.into(),
@@ -45,7 +45,7 @@ impl Collection {
         &self,
         id: impl Into<String>,
         options: impl Into<Option<CouchbaseSetOptions>>,
-    ) -> CouchbaseSet {
+    ) -> CouchbaseSet<'_> {
         CouchbaseSet {
             collection: self,
             id: id.into(),
@@ -57,7 +57,7 @@ impl Collection {
         &self,
         id: impl Into<String>,
         options: impl Into<Option<CouchbaseQueueOptions>>,
-    ) -> CouchbaseQueue {
+    ) -> CouchbaseQueue<'_> {
         CouchbaseQueue {
             collection: self,
             id: id.into(),

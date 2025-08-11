@@ -120,7 +120,7 @@ impl Error {
         } else if let ErrorKind::Resource(e) = inner_kind {
             Some(e.cause.opaque)
         } else if let ErrorKind::Dispatch { opaque, .. } = inner_kind {
-            return Some(*opaque);
+            Some(*opaque)
         } else {
             None
         }
