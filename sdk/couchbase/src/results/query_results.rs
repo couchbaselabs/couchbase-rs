@@ -146,7 +146,7 @@ impl<V: DeserializeOwned> Stream for QueryRows<'_, V> {
 }
 
 impl QueryResult {
-    pub async fn metadata(&self) -> error::Result<QueryMetaData> {
+    pub async fn metadata(&self) -> error::Result<QueryMetaData<'_>> {
         Ok(self.wrapped.metadata()?.into())
     }
 
