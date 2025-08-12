@@ -135,10 +135,11 @@ impl<C: Client> Query<C> {
         {
             Ok(r) => r,
             Err(e) => {
-                return Err(
-                    Error::new_http_error(&self.endpoint, statement, client_context_id)
-                        .with(Arc::new(e)),
-                );
+                return Err(Error::new_http_error(
+                    format!("{}: {}", &self.endpoint, e),
+                    statement,
+                    client_context_id,
+                ));
             }
         };
 
@@ -531,7 +532,11 @@ impl<C: Client> Query<C> {
         {
             Ok(r) => r,
             Err(e) => {
-                return Err(Error::new_http_error(&self.endpoint, None, None).with(Arc::new(e)));
+                return Err(Error::new_http_error(
+                    format!("{}: {}", &self.endpoint, e),
+                    None,
+                    None,
+                ));
             }
         };
 

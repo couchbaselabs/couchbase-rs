@@ -62,11 +62,10 @@ impl Stream for QueryRespReader {
                 Poll::Ready(None)
             }
             Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(Error::new_http_error(
-                &this.endpoint,
+                format!("{}: {}", &this.endpoint, e),
                 Some(this.statement.clone()),
                 this.client_context_id.clone(),
-            )
-            .with(Arc::new(e))))),
+            )))),
             Poll::Ready(None) => Poll::Ready(None),
             Poll::Pending => Poll::Pending,
         }
@@ -89,10 +88,11 @@ impl QueryRespReader {
                 Ok(b) => b,
                 Err(e) => {
                     debug!("Failed to read response body on error {}", &e);
-                    return Err(
-                        Error::new_http_error(endpoint, statement, client_context_id)
-                            .with(Arc::new(e)),
-                    );
+                    return Err(Error::new_http_error(
+                        format!("{endpoint}: {e}"),
+                        statement,
+                        client_context_id,
+                    ));
                 }
             };
 
@@ -143,10 +143,11 @@ impl QueryRespReader {
             epilog = match streamer.epilog() {
                 Ok(epilog) => Some(epilog),
                 Err(e) => {
-                    return Err(
-                        Error::new_http_error(endpoint, statement, client_context_id)
-                            .with(Arc::new(e)),
-                    );
+                    return Err(Error::new_http_error(
+                        format!("{endpoint}: {e}"),
+                        statement,
+                        client_context_id,
+                    ));
                 }
             };
         }
@@ -200,11 +201,10 @@ impl QueryRespReader {
     ) -> error::Result<EarlyMetaData> {
         let prelude = streamer.read_prelude().await.map_err(|e| {
             Error::new_http_error(
-                endpoint,
+                format!("{endpoint}: {e}"),
                 statement.to_string(),
                 client_context_id.to_string(),
             )
-            .with(Arc::new(e))
         })?;
 
         let early_metadata: QueryEarlyMetaData = serde_json::from_slice(&prelude).map_err(|e| {

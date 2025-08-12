@@ -86,7 +86,7 @@ impl<C: Client> Management<C> {
         self.http_client
             .execute(req)
             .await
-            .map_err(|e| error::Error::new_message_error("could not execute request").with(e))
+            .map_err(|e| error::Error::new_message_error(format!("could not execute request: {e}")))
     }
 
     pub(crate) async fn decode_common_error(
@@ -100,14 +100,18 @@ impl<C: Client> Management<C> {
         let body = match response.bytes().await {
             Ok(b) => b,
             Err(e) => {
-                return error::Error::new_message_error("could not parse response body").with(e)
+                return error::Error::new_message_error(format!(
+                    "could not parse response body: {e}"
+                ))
             }
         };
 
         let body_str = match String::from_utf8(body.to_vec()) {
             Ok(s) => s.to_lowercase(),
             Err(e) => {
-                return error::Error::new_message_error("could not parse error response").with(e)
+                return error::Error::new_message_error(format!(
+                    "could not parse error response: {e}"
+                ))
             }
         };
 
@@ -246,10 +250,10 @@ pub(crate) async fn parse_response_json<T: DeserializeOwned>(resp: Response) -> 
     let body = resp
         .bytes()
         .await
-        .map_err(|e| error::Error::new_message_error("could not read response").with(e))?;
+        .map_err(|e| error::Error::new_message_error(format!("could not read response: {e}")))?;
 
     serde_json::from_slice(&body)
-        .map_err(|e| error::Error::new_message_error("could not parse response").with(e))
+        .map_err(|e| error::Error::new_message_error(format!("could not parse response: {e}")))
 }
 
 #[derive(Deserialize)]

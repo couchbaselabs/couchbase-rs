@@ -51,8 +51,9 @@ impl<'a> EnsureManifestHelper<'a> {
         })
         .await?;
 
-        let manifest_uid = u64::from_str_radix(&resp.uid, 16)
-            .map_err(|e| error::Error::new_message_error("Failed to parse manifest uid").with(e))?;
+        let manifest_uid = u64::from_str_radix(&resp.uid, 16).map_err(|e| {
+            error::Error::new_message_error(format!("failed to parse manifest uid: {e}"))
+        })?;
 
         if manifest_uid < self.manifest_uid {
             return Ok(false);

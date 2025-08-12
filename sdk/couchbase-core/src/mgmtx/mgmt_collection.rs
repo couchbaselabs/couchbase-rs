@@ -33,7 +33,7 @@ impl<C: Client> Management<C> {
             )
             .await
             .map_err(|e| {
-                error::Error::new_message_error("could not get collections manifest").with(e)
+                error::Error::new_message_error(format!("could not get collections manifest: {e}"))
             })?;
 
         if resp.status() != 200 {

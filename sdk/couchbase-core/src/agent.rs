@@ -46,17 +46,22 @@ use crate::vbucketrouter::{
     StdVbucketRouter, VbucketRouter, VbucketRouterOptions, VbucketRoutingInfo,
 };
 use crate::{httpx, mgmtx};
+
 use byteorder::BigEndian;
 use futures::executor::block_on;
 use log::{debug, error, info, warn};
+use uuid::Uuid;
+
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::error::Error as StdError;
 use std::fmt::format;
 use std::io::Cursor;
 use std::net::ToSocketAddrs;
 use std::ops::Add;
 use std::sync::Arc;
 use std::time::Duration;
+
 use tokio::io::AsyncReadExt;
 use tokio::net;
 use tokio::runtime::{Handle, Runtime};
@@ -64,7 +69,6 @@ use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::sync::{broadcast, mpsc, Mutex};
 use tokio::task::JoinHandle;
 use tokio::time::{sleep, timeout, timeout_at, Instant};
-use uuid::Uuid;
 
 #[derive(Clone)]
 struct AgentState {
@@ -716,7 +720,11 @@ impl Agent {
                     Ok(client_result) => match client_result {
                         Ok(client) => client,
                         Err(e) => {
-                            warn!("Failed to connect to endpoint: {e}");
+                            let mut msg = format!("Failed to connect to endpoint: {e}");
+                            if let Some(source) = e.source() {
+                                msg = format!("{msg} - {source}");
+                            }
+                            warn!("{msg}");
                             continue;
                         }
                     },

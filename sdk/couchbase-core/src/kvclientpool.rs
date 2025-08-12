@@ -1,5 +1,6 @@
 use std::backtrace::Backtrace;
 use std::collections::HashMap;
+use std::error::Error as StdError;
 use std::future::Future;
 use std::net::SocketAddr;
 use std::ops::{Deref, Sub};
@@ -380,7 +381,6 @@ where
             {
                 let mut guard = state.lock().await;
                 if let Some(e) = &guard.connection_error {
-                    // TODO(RSCBC-52): Make configurable.
                     sleep(throttle_period).await;
                 }
 
@@ -439,7 +439,11 @@ where
                             };
                         }
                         Err(e) => {
-                            debug!("Failed to reconfigure client {}: {}", r.id(), e);
+                            let mut msg = format!("Failed to reconfigure client {}: {}", r.id(), e);
+                            if let Some(source) = e.source() {
+                                msg = format!("{msg} - {source}");
+                            }
+                            debug!("{msg}");
                             {
                                 let mut guard = state.lock().await;
                                 let mut clients = &mut guard.clients;
@@ -452,7 +456,12 @@ where
                     };
                 }
                 Err(e) => {
-                    debug!("Error creating new client: {}", &e);
+                    let mut msg = format!("Error creating new client {e}");
+                    if let Some(source) = e.source() {
+                        msg = format!("{msg} - {source}");
+                    }
+                    debug!("{msg}");
+
                     let mut guard = state.lock().await;
 
                     guard.connection_error = Some(ConnectionError {

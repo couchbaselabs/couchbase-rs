@@ -61,9 +61,8 @@ impl Stream for SearchRespReader {
                 Poll::Ready(None)
             }
             Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(error::Error::new_http_error(
-                &this.endpoint,
-            )
-            .with(Arc::new(e))))),
+                format!("{}: {}", &this.endpoint, e),
+            )))),
             Poll::Ready(None) => Poll::Ready(None),
             Poll::Pending => Poll::Pending,
         }
@@ -85,7 +84,7 @@ impl SearchRespReader {
                 Ok(b) => b,
                 Err(e) => {
                     debug!("Failed to read response body on error {e}");
-                    return Err(error::Error::new_http_error(endpoint).with(Arc::new(e)));
+                    return Err(error::Error::new_http_error(format!("{endpoint}: {e}")));
                 }
             };
 
@@ -115,7 +114,7 @@ impl SearchRespReader {
         match streamer.read_prelude().await {
             Ok(_) => {}
             Err(e) => {
-                return Err(error::Error::new_http_error(endpoint).with(Arc::new(e)));
+                return Err(error::Error::new_http_error(format!("{endpoint}: {e}")));
             }
         };
 
@@ -125,7 +124,7 @@ impl SearchRespReader {
             epilog = match streamer.epilog() {
                 Ok(epilog) => Some(epilog),
                 Err(e) => {
-                    return Err(error::Error::new_http_error(endpoint).with(Arc::new(e)));
+                    return Err(error::Error::new_http_error(format!("{endpoint}: {e}")));
                 }
             };
         }
