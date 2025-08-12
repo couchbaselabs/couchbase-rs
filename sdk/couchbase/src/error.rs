@@ -76,6 +76,10 @@ impl Error {
             collection_name,
         );
 
+        if let Some(source) = e.source() {
+            extended_context = extended_context.with_source_message(source.to_string());
+        }
+
         if let Some(xerror) = e.context() {
             if let Some(parsed) = ServerError::parse_context(xerror) {
                 if let Some(text) = parsed.text {

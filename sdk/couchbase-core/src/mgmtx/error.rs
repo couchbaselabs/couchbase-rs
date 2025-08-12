@@ -15,21 +15,13 @@ impl Display for Error {
     }
 }
 
-impl StdError for Error {
-    fn source(&self) -> Option<&(dyn StdError + 'static)> {
-        self.inner
-            .source
-            .as_ref()
-            .map(|cause| &**cause as &(dyn StdError + 'static))
-    }
-}
+impl StdError for Error {}
 
 impl Error {
     pub(crate) fn new_message_error(msg: impl Into<String>) -> Self {
         Self {
             inner: Box::new(ErrorImpl {
                 kind: ErrorKind::Message(msg.into()),
-                source: None,
             }),
         }
     }
@@ -44,14 +36,8 @@ impl Error {
                     msg: msg.into(),
                     arg: arg.into(),
                 },
-                source: None,
             }),
         }
-    }
-
-    pub(crate) fn with<C: Into<Source>>(mut self, source: C) -> Error {
-        self.inner.source = Some(source.into());
-        self
     }
 
     pub fn kind(&self) -> &ErrorKind {
@@ -59,12 +45,9 @@ impl Error {
     }
 }
 
-type Source = Box<dyn StdError + Send + Sync>;
-
 #[derive(Debug)]
 pub struct ErrorImpl {
     pub kind: ErrorKind,
-    source: Option<Source>,
 }
 
 impl PartialEq for ErrorImpl {
@@ -277,7 +260,6 @@ where
         Self {
             inner: Box::new(ErrorImpl {
                 kind: ErrorKind::from(err),
-                source: None,
             }),
         }
     }
@@ -288,7 +270,6 @@ impl From<ServerError> for Error {
         Self {
             inner: Box::new(ErrorImpl {
                 kind: ErrorKind::Server(value),
-                source: None,
             }),
         }
     }
@@ -299,7 +280,6 @@ impl From<ResourceError> for Error {
         Self {
             inner: Box::new(ErrorImpl {
                 kind: ErrorKind::Resource(value),
-                source: None,
             }),
         }
     }

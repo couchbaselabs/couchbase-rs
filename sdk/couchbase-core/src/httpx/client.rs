@@ -10,6 +10,7 @@ use base64::Engine;
 use http::header::{CONTENT_TYPE, USER_AGENT};
 use log::trace;
 use reqwest::redirect::Policy;
+use std::error::Error as StdError;
 use std::sync::Arc;
 use std::time::Duration;
 use uuid::Uuid;
@@ -183,12 +184,17 @@ impl Client for ReqwestClient {
                 Response::from(response)
             }),
             Err(err) => {
-                trace!(
+                let mut msg = format!(
                     "Received error on {}. Request id={}. Err: {}",
-                    &self.client_id,
-                    &id,
-                    &err,
+                    &self.client_id, &id, &err,
                 );
+
+                if let Some(source) = err.source() {
+                    msg = format!("{msg}. Source: {source}");
+                }
+
+                trace!("{msg}");
+
                 if err.is_connect() {
                     Err(Error::new_connection_error(err.to_string()))
                 } else {

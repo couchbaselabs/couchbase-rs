@@ -3,7 +3,6 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::error::Error as StdError;
 use std::fmt::{Display, Formatter};
-use std::sync::Arc;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -18,21 +17,13 @@ impl Display for Error {
     }
 }
 
-impl StdError for Error {
-    fn source(&self) -> Option<&(dyn StdError + 'static)> {
-        self.inner
-            .source
-            .as_ref()
-            .map(|cause| &**cause as &(dyn StdError + 'static))
-    }
-}
+impl StdError for Error {}
 
 impl Error {
     pub(crate) fn new_server_error(e: ServerError) -> Error {
         Self {
             inner: ErrorImpl {
                 kind: Box::new(ErrorKind::Server(e)),
-                source: None,
             },
         }
     }
@@ -41,7 +32,6 @@ impl Error {
         Self {
             inner: ErrorImpl {
                 kind: Box::new(ErrorKind::Resource(e)),
-                source: None,
             },
         }
     }
@@ -60,7 +50,6 @@ impl Error {
                     statement: statement.into(),
                     client_context_id: client_context_id.into(),
                 }),
-                source: None,
             },
         }
     }
@@ -69,7 +58,6 @@ impl Error {
         Self {
             inner: ErrorImpl {
                 kind: Box::new(ErrorKind::Encoding { msg: msg.into() }),
-                source: None,
             },
         }
     }
@@ -84,7 +72,6 @@ impl Error {
                     msg: msg.into(),
                     arg: arg.into(),
                 }),
-                source: None,
             },
         }
     }
@@ -101,7 +88,6 @@ impl Error {
                     statement: statement.into(),
                     client_context_id: client_context_id.into(),
                 }),
-                source: None,
             },
         }
     }
@@ -109,19 +95,11 @@ impl Error {
     pub fn kind(&self) -> &ErrorKind {
         &self.inner.kind
     }
-
-    pub(crate) fn with(mut self, source: Source) -> Error {
-        self.inner.source = Some(source);
-        self
-    }
 }
-
-type Source = Arc<dyn StdError + Send + Sync>;
 
 #[derive(Debug, Clone)]
 struct ErrorImpl {
     kind: Box<ErrorKind>,
-    source: Option<Source>,
 }
 
 impl PartialEq for ErrorImpl {

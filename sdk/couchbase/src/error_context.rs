@@ -133,6 +133,7 @@ pub(crate) struct KeyValueErrorContext {
     pub(crate) error_desc: Option<String>,
     pub(crate) xcontent: Option<String>,
     pub(crate) xref: Option<String>,
+    pub(crate) source_message: Option<String>,
 }
 
 impl KeyValueErrorContext {
@@ -157,6 +158,7 @@ impl KeyValueErrorContext {
             error_desc: None,
             xcontent: None,
             xref: None,
+            source_message: None,
         }
     }
 
@@ -177,6 +179,11 @@ impl KeyValueErrorContext {
 
     pub fn with_xref(mut self, xref: String) -> Self {
         self.xref = Some(xref);
+        self
+    }
+
+    pub fn with_source_message(mut self, source_message: String) -> Self {
+        self.source_message = Some(source_message);
         self
     }
 }
@@ -209,6 +216,10 @@ impl Serialize for KeyValueErrorContext {
 
         if let Some(ref xref) = self.xref {
             state.serialize_field("xref", xref)?;
+        }
+
+        if let Some(ref source_message) = self.source_message {
+            state.serialize_field("sourceMessage", source_message)?;
         }
 
         state.end()
