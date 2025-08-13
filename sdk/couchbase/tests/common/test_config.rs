@@ -123,7 +123,7 @@ pub async fn create_test_cluster() -> TestCluster {
         username: test_config.username,
         password: test_config.password,
         conn_str: test_config.conn_string,
-        resolved_conn_spec: couchbase_connstr::resolve(conn_spec).await.unwrap(),
+        resolved_conn_spec: couchbase_connstr::resolve(conn_spec, None).await.unwrap(),
     };
 
     TestCluster::new(

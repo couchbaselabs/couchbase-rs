@@ -1,12 +1,16 @@
 pub mod error;
 
 use error::ErrorKind;
+use hickory_resolver::config::*;
+use hickory_resolver::system_conf::read_system_conf;
 use hickory_resolver::TokioAsyncResolver;
 use log::debug;
 use regex::Regex;
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::{Display, Formatter};
+use std::net::SocketAddr;
+use std::time::Duration;
 use url::form_urlencoded;
 
 pub const DEFAULT_LEGACY_HTTP_PORT: u16 = 8091;
@@ -26,6 +30,12 @@ pub struct ConnSpec {
 pub struct Address {
     pub host: String,
     pub port: u16,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DnsConfig {
+    pub namespace: SocketAddr,
+    pub timeout: Option<Duration>,
 }
 
 impl Display for Address {
@@ -184,7 +194,10 @@ pub struct ResolvedConnSpec {
     pub options: HashMap<String, Vec<String>>,
 }
 
-pub async fn resolve(conn_spec: ConnSpec) -> error::Result<ResolvedConnSpec> {
+pub async fn resolve(
+    conn_spec: ConnSpec,
+    dns_config: impl Into<Option<DnsConfig>>,
+) -> error::Result<ResolvedConnSpec> {
     let (default_port, has_explicit_scheme, use_ssl) = if let Some(scheme) = &conn_spec.scheme {
         match scheme.as_str() {
             "couchbase" => (DEFAULT_MEMD_PORT, true, false),
@@ -206,7 +219,14 @@ pub async fn resolve(conn_spec: ConnSpec) -> error::Result<ResolvedConnSpec> {
     };
 
     if let Some(srv_record) = conn_spec.srv_record() {
-        match lookup_srv(&srv_record.scheme, &srv_record.proto, &srv_record.host).await {
+        match lookup_srv(
+            &srv_record.scheme,
+            &srv_record.proto,
+            &srv_record.host,
+            dns_config.into(),
+        )
+        .await
+        {
             Ok(srv_records) => {
                 return Ok(ResolvedConnSpec {
                     use_ssl,
@@ -338,10 +358,33 @@ fn handle_couchbase2_scheme(conn_spec: ConnSpec) -> error::Result<ResolvedConnSp
     })
 }
 
-async fn lookup_srv(scheme: &str, proto: &str, host: &str) -> error::Result<Vec<Address>> {
-    use hickory_resolver::config::*;
+async fn lookup_srv(
+    scheme: &str,
+    proto: &str,
+    host: &str,
+    dns_config: Option<DnsConfig>,
+) -> error::Result<Vec<Address>> {
+    let (resolver_config, resolver_opts) = match dns_config {
+        Some(dns) => {
+            let mut group = NameServerConfigGroup::with_capacity(2);
+            let udp = NameServerConfig::new(dns.namespace, Protocol::Udp);
+            let tcp = NameServerConfig::new(dns.namespace, Protocol::Tcp);
+            group.push(udp);
+            group.push(tcp);
 
-    let resolver = TokioAsyncResolver::tokio(ResolverConfig::default(), ResolverOpts::default());
+            let config = ResolverConfig::from_parts(None, vec![], group);
+
+            let mut opts = ResolverOpts::default();
+            if let Some(timeout) = dns.timeout {
+                opts.timeout = timeout;
+            }
+
+            (config, opts)
+        }
+        None => read_system_conf().map_err(ErrorKind::Resolve)?,
+    };
+
+    let resolver = TokioAsyncResolver::tokio(resolver_config, resolver_opts);
 
     let name = format!("_{scheme}._{proto}.{host}");
     let response = resolver.srv_lookup(name).await?;
@@ -374,7 +417,7 @@ mod test {
     }
 
     async fn resolve_or_die(conn_spec: ConnSpec) -> ResolvedConnSpec {
-        resolve(conn_spec.clone())
+        resolve(conn_spec.clone(), None)
             .await
             .unwrap_or_else(|e| panic!("Failed to resolve {conn_spec:?}: {e:?}"))
     }
@@ -593,11 +636,14 @@ mod test {
         .await;
 
         let cs = parse_or_die("1.2.3.4:8091");
-        assert!(resolve(cs).await.is_err(), "Expected error with http port");
+        assert!(
+            resolve(cs, None).await.is_err(),
+            "Expected error with http port"
+        );
 
         let cs = parse_or_die("1.2.3.4:999");
         assert!(
-            resolve(cs).await.is_err(),
+            resolve(cs, None).await.is_err(),
             "Expected error with non-default port without scheme"
         );
     }
@@ -678,7 +724,7 @@ mod test {
 
         let cs = parse_or_die("couchbase://foo.com:8091");
         assert!(
-            resolve(cs).await.is_err(),
+            resolve(cs, None).await.is_err(),
             "Expected error for couchbase://XXX:8091"
         );
 

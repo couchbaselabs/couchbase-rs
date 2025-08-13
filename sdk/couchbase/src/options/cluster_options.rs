@@ -4,6 +4,7 @@ use crate::error;
 use log::debug;
 use std::fmt::Debug;
 use std::io::Cursor;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -34,6 +35,7 @@ pub struct ClusterOptions {
     pub(crate) poller_options: PollerOptions,
     pub(crate) http_options: HttpOptions,
     pub(crate) kv_options: KvOptions,
+    pub(crate) dns_options: Option<DnsOptions>,
 }
 
 impl Debug for ClusterOptions {
@@ -60,6 +62,7 @@ impl ClusterOptions {
             poller_options: PollerOptions::new(),
             http_options: HttpOptions::new(),
             kv_options: KvOptions::new(),
+            dns_options: None,
         }
     }
 
@@ -90,6 +93,12 @@ impl ClusterOptions {
 
     pub fn kv_options(mut self, kv_options: KvOptions) -> Self {
         self.kv_options = kv_options;
+        self
+    }
+
+    #[cfg(feature = "volatile")]
+    pub fn dns_options(mut self, dns_options: DnsOptions) -> Self {
+        self.dns_options = Some(dns_options);
         self
     }
 }
@@ -392,5 +401,31 @@ impl TlsOptions {
         builder
             .build()
             .map_err(|e| error::Error::other_failure(format!("failed to build client config: {e}")))
+    }
+}
+#[derive(Clone, Debug, PartialEq)]
+pub struct DnsOptions {
+    pub(crate) namespace: SocketAddr,
+    pub(crate) timeout: Option<Duration>,
+}
+impl DnsOptions {
+    pub fn new(namespace: SocketAddr) -> Self {
+        Self {
+            namespace,
+            timeout: None,
+        }
+    }
+
+    pub fn timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = Some(timeout);
+        self
+    }
+}
+impl From<DnsOptions> for couchbase_connstr::DnsConfig {
+    fn from(opts: DnsOptions) -> Self {
+        couchbase_connstr::DnsConfig {
+            namespace: opts.namespace,
+            timeout: opts.timeout,
+        }
     }
 }
