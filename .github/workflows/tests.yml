@@ -39,7 +39,7 @@ jobs:
             nodes:
               - count: 3
                 version: ${{ matrix.server }}
-                services: [kv, n1ql, index, fts, cbas]
+                services: [kv, n1ql, index, fts]
             docker:
               kv-memory: 2048
         run: |

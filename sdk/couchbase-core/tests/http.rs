@@ -53,8 +53,8 @@ fn test_row_streamer() {
 
         let basic_auth = BasicAuth::new(config.username, config.password);
 
-        let request_body = json!({"statement": "FROM RANGE(0, 999) AS i SELECT *"});
-        let uri = format!("http://{host}:8095/analytics/service");
+        let request_body = json!({"statement": "select i from array_range(1, 10000) AS i;"});
+        let uri = format!("http://{host}:8093/query/service");
 
         let request = Request::new(Method::POST, uri)
             .user_agent("rscbcorex".to_string())
@@ -102,7 +102,7 @@ fn test_row_streamer() {
 
         let epilog = epilog.unwrap();
 
-        assert_eq!(rows.len(), 1000);
+        assert_eq!(rows.len(), 9999);
 
         let epilog: QueryMetaData =
             serde_json::from_slice(&epilog).expect("failed parsing epilog as json");
