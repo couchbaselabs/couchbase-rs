@@ -39,6 +39,8 @@ default = ["default-tls"]
 default-tls = ["rustls-tls"]
 rustls-tls = ["dep:tokio-rustls", "couchbase-core/rustls-tls", "dep:rustls-pemfile"]
 native-tls = ["dep:tokio-native-tls", "couchbase-core/native-tls"]
+uncommitted = []
+volatile = []
 
 [lints.rust]
 # This is temporary whilst we build out the root modules.

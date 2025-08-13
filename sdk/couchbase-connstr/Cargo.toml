@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 form_urlencoded = "1.2.1"
-hickory-resolver = { version = "0.24.1", features = ["dns-over-rustls"], default-features = false }
+hickory-resolver = { version = "0.24.1", features = ["tokio-runtime", "system-config"], default-features = false }
 log = "0.4.22"
 regex = "1.11.0"
 url = "2.5.2"

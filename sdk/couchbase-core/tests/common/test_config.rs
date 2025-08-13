@@ -161,7 +161,7 @@ where
 pub async fn create_test_config(test_config: &EnvTestConfig) -> TestSetupConfig {
     let conn_spec = couchbase_connstr::parse(&test_config.conn_string).unwrap();
 
-    let resolved_conn_spec = couchbase_connstr::resolve(conn_spec).await.unwrap();
+    let resolved_conn_spec = couchbase_connstr::resolve(conn_spec, None).await.unwrap();
 
     TestSetupConfig {
         username: test_config.username.clone(),

@@ -23,6 +23,7 @@ use couchbase_core::options::ondemand_agentmanager::OnDemandAgentManagerOptions;
 use couchbase_core::retry::RetryStrategy;
 use couchbase_core::retrybesteffort::{BestEffortRetryStrategy, ExponentialBackoffCalculator};
 use std::collections::HashMap;
+use std::mem::take;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -38,10 +39,20 @@ enum ClusterClientBackend {
 impl ClusterClient {
     pub async fn connect(
         conn_str: impl AsRef<str>,
-        opts: ClusterOptions,
+        mut opts: ClusterOptions,
     ) -> error::Result<ClusterClient> {
         let conn_spec = parse(conn_str)?;
-        let resolved_conn_spec = resolve(conn_spec).await?;
+
+        // This isn't ideal but dns options have to be a part of ClusterOptions, and we need to pull
+        // the dns options out for resolve.
+        // We could create a new type to pass into the backend connect functions but it just
+        // seems unnecessary.
+        let dns_options = take(&mut opts.dns_options);
+        let resolved_conn_spec = resolve(
+            conn_spec,
+            dns_options.map(couchbase_connstr::DnsConfig::from),
+        )
+        .await?;
 
         let backend = if let Some(host) = resolved_conn_spec.couchbase2_host {
             ClusterClientBackend::Couchbase2ClusterBackend(
