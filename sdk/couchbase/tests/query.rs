@@ -36,7 +36,7 @@ fn test_query_basic() {
 
         assert!(row_obj.get("$1").unwrap().as_bool().unwrap());
 
-        let meta = res.metadata().await.unwrap();
+        let meta = res.metadata().unwrap();
         assert_metadata(meta);
     })
 }
@@ -93,7 +93,7 @@ fn test_query_raw_result() {
 
         assert!(row_obj.get("$1").unwrap().as_bool().unwrap());
 
-        let meta = res.metadata().await.unwrap();
+        let meta = res.metadata().unwrap();
         assert_metadata(meta);
     })
 }
@@ -117,7 +117,7 @@ fn test_prepared_query_basic() {
 
         assert!(row_obj.get("$1").unwrap().as_bool().unwrap());
 
-        let meta = res.metadata().await.unwrap();
+        let meta = res.metadata().unwrap();
         assert_metadata(meta);
     })
 }
@@ -145,7 +145,7 @@ fn test_scope_query_basic() {
 
         assert!(row_obj.get("$1").unwrap().as_bool().unwrap());
 
-        let meta = res.metadata().await.unwrap();
+        let meta = res.metadata().unwrap();
         assert_metadata(meta);
     })
 }
