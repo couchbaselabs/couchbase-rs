@@ -41,6 +41,7 @@ rustls-tls = ["dep:tokio-rustls", "couchbase-core/rustls-tls", "dep:rustls-pemfi
 native-tls = ["dep:tokio-native-tls", "couchbase-core/native-tls"]
 uncommitted = []
 volatile = []
+internal = []
 
 [lints.rust]
 # This is temporary whilst we build out the root modules.

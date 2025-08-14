@@ -20,6 +20,14 @@ impl MutationToken {
         Self { token, bucket_name }
     }
 
+    #[cfg(feature = "internal")]
+    pub fn from_parts(vbid: u16, vbuuid: u64, seqno: u64, bucket_name: String) -> Self {
+        Self {
+            token: couchbase_core::mutationtoken::MutationToken::new(vbid, vbuuid, seqno),
+            bucket_name,
+        }
+    }
+
     pub fn partition_id(&self) -> u16 {
         self.token.vbid()
     }
