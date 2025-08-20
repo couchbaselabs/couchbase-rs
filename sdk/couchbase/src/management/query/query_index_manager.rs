@@ -2,7 +2,7 @@ use crate::clients::query_index_mgmt_client::QueryIndexMgmtClient;
 use crate::error;
 use crate::options::query_index_mgmt_options::{
     BuildQueryIndexOptions, CreatePrimaryQueryIndexOptions, CreateQueryIndexOptions,
-    DropPrimaryQueryIndexOptions, DropQueryIndexOptions, GetAllIndexesOptions,
+    DropPrimaryQueryIndexOptions, DropQueryIndexOptions, GetAllQueryIndexesOptions,
     WatchQueryIndexOptions,
 };
 use crate::results::query_index_mgmt_results::QueryIndex;
@@ -16,7 +16,7 @@ pub struct QueryIndexManager {
 impl QueryIndexManager {
     pub async fn get_all_indexes(
         &self,
-        opts: impl Into<Option<GetAllIndexesOptions>>,
+        opts: impl Into<Option<GetAllQueryIndexesOptions>>,
     ) -> error::Result<Vec<QueryIndex>> {
         self.client.get_all_indexes(opts.into()).await
     }

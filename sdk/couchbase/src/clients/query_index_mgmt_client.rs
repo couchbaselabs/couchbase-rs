@@ -2,7 +2,7 @@ use crate::clients::agent_provider::CouchbaseAgentProvider;
 use crate::error;
 use crate::options::query_index_mgmt_options::{
     BuildQueryIndexOptions, CreatePrimaryQueryIndexOptions, CreateQueryIndexOptions,
-    DropPrimaryQueryIndexOptions, DropQueryIndexOptions, GetAllIndexesOptions,
+    DropPrimaryQueryIndexOptions, DropQueryIndexOptions, GetAllQueryIndexesOptions,
     WatchQueryIndexOptions,
 };
 use crate::results::query_index_mgmt_results::QueryIndex;
@@ -20,7 +20,7 @@ impl QueryIndexMgmtClient {
 
     pub async fn get_all_indexes(
         &self,
-        opts: Option<GetAllIndexesOptions>,
+        opts: Option<GetAllQueryIndexesOptions>,
     ) -> error::Result<Vec<QueryIndex>> {
         match &self.backend {
             QueryIndexMgmtClientBackend::CouchbaseQueryIndexMgmtClientBackend(backend) => {
@@ -153,7 +153,7 @@ impl CouchbaseQueryIndexMgmtClient {
 
     async fn get_all_indexes(
         &self,
-        opts: Option<GetAllIndexesOptions>,
+        opts: Option<GetAllQueryIndexesOptions>,
     ) -> error::Result<Vec<QueryIndex>> {
         let opts = opts.unwrap_or_default();
 
@@ -354,7 +354,7 @@ impl Couchbase2QueryIndexMgmtClient {
 
     async fn get_all_indexes(
         &self,
-        _opts: Option<GetAllIndexesOptions>,
+        _opts: Option<GetAllQueryIndexesOptions>,
     ) -> error::Result<Vec<QueryIndex>> {
         unimplemented!()
     }

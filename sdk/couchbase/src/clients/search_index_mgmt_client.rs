@@ -2,9 +2,10 @@ use crate::clients::agent_provider::CouchbaseAgentProvider;
 use crate::error;
 use crate::management::search::index::SearchIndex;
 use crate::options::search_index_mgmt_options::{
-    AllowQueryingOptions, AnalyzeDocumentOptions, DeleteIndexOptions, DisallowQueryingOptions,
-    FreezePlanOptions, GetAllIndexesOptions, GetIndexOptions, GetIndexedDocumentsCountOptions,
-    PauseIngestOptions, ResumeIngestOptions, UnfreezePlanOptions, UpsertIndexOptions,
+    AllowQueryingSearchIndexOptions, AnalyzeDocumentOptions, DisallowQueryingSearchIndexOptions,
+    DropSearchIndexOptions, FreezePlanSearchIndexOptions, GetAllSearchIndexesOptions,
+    GetIndexedDocumentsCountOptions, GetSearchIndexOptions, PauseIngestSearchIndexOptions,
+    ResumeIngestSearchIndexOptions, UnfreezePlanSearchIndexOptions, UpsertSearchIndexOptions,
 };
 use couchbase_core::options::search_management;
 use couchbase_core::retry::RetryStrategy;
@@ -23,7 +24,7 @@ impl SearchIndexMgmtClient {
     pub async fn get_index(
         &self,
         index_name: String,
-        opts: Option<GetIndexOptions>,
+        opts: Option<GetSearchIndexOptions>,
     ) -> error::Result<SearchIndex> {
         match &self.backend {
             SearchIndexMgmtClientBackend::CouchbaseSearchIndexMgmtClientBackend(backend) => {
@@ -37,7 +38,7 @@ impl SearchIndexMgmtClient {
 
     pub async fn get_all_indexes(
         &self,
-        opts: Option<GetAllIndexesOptions>,
+        opts: Option<GetAllSearchIndexesOptions>,
     ) -> error::Result<Vec<SearchIndex>> {
         match &self.backend {
             SearchIndexMgmtClientBackend::CouchbaseSearchIndexMgmtClientBackend(backend) => {
@@ -52,7 +53,7 @@ impl SearchIndexMgmtClient {
     pub async fn upsert_index(
         &self,
         index: SearchIndex,
-        opts: Option<UpsertIndexOptions>,
+        opts: Option<UpsertSearchIndexOptions>,
     ) -> error::Result<()> {
         match &self.backend {
             SearchIndexMgmtClientBackend::CouchbaseSearchIndexMgmtClientBackend(backend) => {
@@ -64,17 +65,17 @@ impl SearchIndexMgmtClient {
         }
     }
 
-    pub async fn delete_index(
+    pub async fn drop_index(
         &self,
         index_name: String,
-        opts: Option<DeleteIndexOptions>,
+        opts: Option<DropSearchIndexOptions>,
     ) -> error::Result<()> {
         match &self.backend {
             SearchIndexMgmtClientBackend::CouchbaseSearchIndexMgmtClientBackend(backend) => {
-                backend.delete_index(index_name, opts).await
+                backend.drop_index(index_name, opts).await
             }
             SearchIndexMgmtClientBackend::Couchbase2SearchIndexMgmtClientBackend(backend) => {
-                backend.delete_index(index_name, opts).await
+                backend.drop_index(index_name, opts).await
             }
         }
     }
@@ -113,7 +114,7 @@ impl SearchIndexMgmtClient {
     pub async fn pause_ingest(
         &self,
         index_name: String,
-        opts: Option<PauseIngestOptions>,
+        opts: Option<PauseIngestSearchIndexOptions>,
     ) -> error::Result<()> {
         match &self.backend {
             SearchIndexMgmtClientBackend::CouchbaseSearchIndexMgmtClientBackend(backend) => {
@@ -128,7 +129,7 @@ impl SearchIndexMgmtClient {
     pub async fn resume_ingest(
         &self,
         index_name: String,
-        opts: Option<ResumeIngestOptions>,
+        opts: Option<ResumeIngestSearchIndexOptions>,
     ) -> error::Result<()> {
         match &self.backend {
             SearchIndexMgmtClientBackend::CouchbaseSearchIndexMgmtClientBackend(backend) => {
@@ -143,7 +144,7 @@ impl SearchIndexMgmtClient {
     pub async fn allow_querying(
         &self,
         index_name: String,
-        opts: Option<AllowQueryingOptions>,
+        opts: Option<AllowQueryingSearchIndexOptions>,
     ) -> error::Result<()> {
         match &self.backend {
             SearchIndexMgmtClientBackend::CouchbaseSearchIndexMgmtClientBackend(backend) => {
@@ -158,7 +159,7 @@ impl SearchIndexMgmtClient {
     pub async fn disallow_querying(
         &self,
         index_name: String,
-        opts: Option<DisallowQueryingOptions>,
+        opts: Option<DisallowQueryingSearchIndexOptions>,
     ) -> error::Result<()> {
         match &self.backend {
             SearchIndexMgmtClientBackend::CouchbaseSearchIndexMgmtClientBackend(backend) => {
@@ -173,7 +174,7 @@ impl SearchIndexMgmtClient {
     pub async fn freeze_plan(
         &self,
         index_name: String,
-        opts: Option<FreezePlanOptions>,
+        opts: Option<FreezePlanSearchIndexOptions>,
     ) -> error::Result<()> {
         match &self.backend {
             SearchIndexMgmtClientBackend::CouchbaseSearchIndexMgmtClientBackend(backend) => {
@@ -188,7 +189,7 @@ impl SearchIndexMgmtClient {
     pub async fn unfreeze_plan(
         &self,
         index_name: String,
-        opts: Option<UnfreezePlanOptions>,
+        opts: Option<UnfreezePlanSearchIndexOptions>,
     ) -> error::Result<()> {
         match &self.backend {
             SearchIndexMgmtClientBackend::CouchbaseSearchIndexMgmtClientBackend(backend) => {
@@ -210,6 +211,7 @@ pub(crate) struct SearchIndexKeyspace {
     pub bucket_name: String,
     pub scope_name: String,
 }
+
 pub(crate) struct CouchbaseSearchIndexMgmtClient {
     agent_provider: CouchbaseAgentProvider,
     keyspace: SearchIndexKeyspace,
@@ -232,7 +234,7 @@ impl CouchbaseSearchIndexMgmtClient {
     async fn get_index(
         &self,
         index_name: String,
-        opts: Option<GetIndexOptions>,
+        opts: Option<GetSearchIndexOptions>,
     ) -> error::Result<SearchIndex> {
         let opts = opts.unwrap_or_default();
         let agent = self.agent_provider.get_agent().await;
@@ -248,7 +250,7 @@ impl CouchbaseSearchIndexMgmtClient {
 
     async fn get_all_indexes(
         &self,
-        opts: Option<GetAllIndexesOptions>,
+        opts: Option<GetAllSearchIndexesOptions>,
     ) -> error::Result<Vec<SearchIndex>> {
         let opts = opts.unwrap_or_default();
 
@@ -267,7 +269,7 @@ impl CouchbaseSearchIndexMgmtClient {
     async fn upsert_index(
         &self,
         index: SearchIndex,
-        opts: Option<UpsertIndexOptions>,
+        opts: Option<UpsertSearchIndexOptions>,
     ) -> error::Result<()> {
         let opts = opts.unwrap_or_default();
         let agent = self.agent_provider.get_agent().await;
@@ -282,10 +284,10 @@ impl CouchbaseSearchIndexMgmtClient {
         Ok(())
     }
 
-    async fn delete_index(
+    async fn drop_index(
         &self,
         index_name: String,
-        opts: Option<DeleteIndexOptions>,
+        opts: Option<DropSearchIndexOptions>,
     ) -> error::Result<()> {
         let opts = opts.unwrap_or_default();
         let agent = self.agent_provider.get_agent().await;
@@ -346,7 +348,7 @@ impl CouchbaseSearchIndexMgmtClient {
     async fn pause_ingest(
         &self,
         index_name: String,
-        opts: Option<PauseIngestOptions>,
+        opts: Option<PauseIngestSearchIndexOptions>,
     ) -> error::Result<()> {
         let opts = opts.unwrap_or_default();
         let agent = self.agent_provider.get_agent().await;
@@ -363,7 +365,7 @@ impl CouchbaseSearchIndexMgmtClient {
     async fn resume_ingest(
         &self,
         index_name: String,
-        opts: Option<ResumeIngestOptions>,
+        opts: Option<ResumeIngestSearchIndexOptions>,
     ) -> error::Result<()> {
         let opts = opts.unwrap_or_default();
         let agent = self.agent_provider.get_agent().await;
@@ -380,7 +382,7 @@ impl CouchbaseSearchIndexMgmtClient {
     async fn allow_querying(
         &self,
         index_name: String,
-        opts: Option<AllowQueryingOptions>,
+        opts: Option<AllowQueryingSearchIndexOptions>,
     ) -> error::Result<()> {
         let opts = opts.unwrap_or_default();
         let agent = self.agent_provider.get_agent().await;
@@ -397,7 +399,7 @@ impl CouchbaseSearchIndexMgmtClient {
     async fn disallow_querying(
         &self,
         index_name: String,
-        opts: Option<DisallowQueryingOptions>,
+        opts: Option<DisallowQueryingSearchIndexOptions>,
     ) -> error::Result<()> {
         let opts = opts.unwrap_or_default();
         let agent = self.agent_provider.get_agent().await;
@@ -414,7 +416,7 @@ impl CouchbaseSearchIndexMgmtClient {
     async fn freeze_plan(
         &self,
         index_name: String,
-        opts: Option<FreezePlanOptions>,
+        opts: Option<FreezePlanSearchIndexOptions>,
     ) -> error::Result<()> {
         let opts = opts.unwrap_or_default();
         let agent = self.agent_provider.get_agent().await;
@@ -431,7 +433,7 @@ impl CouchbaseSearchIndexMgmtClient {
     async fn unfreeze_plan(
         &self,
         index_name: String,
-        opts: Option<UnfreezePlanOptions>,
+        opts: Option<UnfreezePlanSearchIndexOptions>,
     ) -> error::Result<()> {
         let opts = opts.unwrap_or_default();
         let agent = self.agent_provider.get_agent().await;
@@ -456,14 +458,14 @@ impl Couchbase2SearchIndexMgmtClient {
     async fn get_index(
         &self,
         _index_name: String,
-        _opts: Option<GetIndexOptions>,
+        _opts: Option<GetSearchIndexOptions>,
     ) -> error::Result<SearchIndex> {
         unimplemented!()
     }
 
     async fn get_all_indexes(
         &self,
-        _opts: Option<GetAllIndexesOptions>,
+        _opts: Option<GetAllSearchIndexesOptions>,
     ) -> error::Result<Vec<SearchIndex>> {
         unimplemented!()
     }
@@ -471,15 +473,15 @@ impl Couchbase2SearchIndexMgmtClient {
     async fn upsert_index(
         &self,
         _index: SearchIndex,
-        _opts: Option<UpsertIndexOptions>,
+        _opts: Option<UpsertSearchIndexOptions>,
     ) -> error::Result<()> {
         unimplemented!()
     }
 
-    async fn delete_index(
+    async fn drop_index(
         &self,
         _index_name: String,
-        _opts: Option<DeleteIndexOptions>,
+        _opts: Option<DropSearchIndexOptions>,
     ) -> error::Result<()> {
         unimplemented!()
     }
@@ -504,7 +506,7 @@ impl Couchbase2SearchIndexMgmtClient {
     async fn pause_ingest(
         &self,
         _index_name: String,
-        _opts: Option<PauseIngestOptions>,
+        _opts: Option<PauseIngestSearchIndexOptions>,
     ) -> error::Result<()> {
         unimplemented!()
     }
@@ -512,7 +514,7 @@ impl Couchbase2SearchIndexMgmtClient {
     async fn resume_ingest(
         &self,
         _index_name: String,
-        _opts: Option<ResumeIngestOptions>,
+        _opts: Option<ResumeIngestSearchIndexOptions>,
     ) -> error::Result<()> {
         unimplemented!()
     }
@@ -520,7 +522,7 @@ impl Couchbase2SearchIndexMgmtClient {
     async fn allow_querying(
         &self,
         _index_name: String,
-        _opts: Option<AllowQueryingOptions>,
+        _opts: Option<AllowQueryingSearchIndexOptions>,
     ) -> error::Result<()> {
         unimplemented!()
     }
@@ -528,7 +530,7 @@ impl Couchbase2SearchIndexMgmtClient {
     async fn disallow_querying(
         &self,
         _index_name: String,
-        _opts: Option<DisallowQueryingOptions>,
+        _opts: Option<DisallowQueryingSearchIndexOptions>,
     ) -> error::Result<()> {
         unimplemented!()
     }
@@ -536,7 +538,7 @@ impl Couchbase2SearchIndexMgmtClient {
     async fn freeze_plan(
         &self,
         _index_name: String,
-        _opts: Option<FreezePlanOptions>,
+        _opts: Option<FreezePlanSearchIndexOptions>,
     ) -> error::Result<()> {
         unimplemented!()
     }
@@ -544,7 +546,7 @@ impl Couchbase2SearchIndexMgmtClient {
     async fn unfreeze_plan(
         &self,
         _index_name: String,
-        _opts: Option<UnfreezePlanOptions>,
+        _opts: Option<UnfreezePlanSearchIndexOptions>,
     ) -> error::Result<()> {
         unimplemented!()
     }

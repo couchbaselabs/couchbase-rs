@@ -1,8 +1,8 @@
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct GetAllIndexesOptions {}
+pub struct GetAllQueryIndexesOptions {}
 
-impl GetAllIndexesOptions {
+impl GetAllQueryIndexesOptions {
     pub fn new() -> Self {
         Self::default()
     }
