@@ -1,6 +1,8 @@
 use crate::common::new_key;
 use crate::common::test_config::run_test;
+use chrono::Utc;
 use couchbase::options::kv_binary_options::{DecrementOptions, IncrementOptions};
+use couchbase::options::kv_options::{GetOptions, UpsertOptions};
 use couchbase::subdoc::lookup_in_specs::{GetSpecOptions, LookupInSpec};
 use couchbase::subdoc::macros::{LookupInMacros, MutateInMacros};
 use couchbase::subdoc::mutate_in_specs::MutateInSpec;
@@ -430,7 +432,7 @@ fn test_lookup_in() {
             LookupInSpec::get("baz", None),
             LookupInSpec::exists("not-exists", None),
             LookupInSpec::count("arr", None),
-            LookupInSpec::get(LookupInMacros::IsDeleted, GetSpecOptions::new().xattr(true)),
+            LookupInSpec::get(LookupInMacros::IsDeleted, GetSpecOptions::new().xattr()),
             LookupInSpec::get("", None),
         ];
 
@@ -502,5 +504,45 @@ fn test_mutate_in() {
                 arr: vec![1, 2, 3, 5, 6],
             }
         );
+    })
+}
+
+#[test]
+fn get_with_expiry() {
+    run_test(async |cluster| {
+        let collection = cluster
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection());
+
+        let key = new_key();
+
+        collection
+            .upsert(
+                &key,
+                "test",
+                UpsertOptions::new().expiry(Duration::from_secs(30)),
+            )
+            .await
+            .unwrap();
+
+        let res = collection
+            .get(key, GetOptions::new().expiry())
+            .await
+            .unwrap();
+
+        let expiry = *res.expiry_time().expect("Expected expiry time to be set");
+
+        let now = Utc::now();
+
+        assert!(expiry > now, "Expiry time should be in the future");
+        assert!(
+            expiry < now.add(Duration::from_secs(30)),
+            "Expiry time should be within 30 seconds: {expiry} vs {now}"
+        );
+
+        let content: String = res.content_as().unwrap();
+
+        assert_eq!("test", content);
     })
 }

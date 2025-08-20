@@ -11,8 +11,9 @@ use crate::results::kv_results::{
     ExistsResult, GetResult, LookupInResult, LookupInResultEntry, MutateInResult,
     MutateInResultEntry, MutationResult, TouchResult,
 };
-use crate::subdoc::lookup_in_specs::LookupInSpec;
+use crate::subdoc::lookup_in_specs::{GetSpecOptions, LookupInSpec};
 use crate::subdoc::mutate_in_specs::MutateInSpec;
+use chrono::{DateTime, Utc};
 use couchbase_core::memdx::subdoc::{reorder_subdoc_ops, SubdocDocFlag};
 use couchbase_core::retry::RetryStrategy;
 use std::sync::Arc;
@@ -62,7 +63,7 @@ impl CouchbaseCoreKvClient {
                     value,
                 )
                 .flags(flags)
-                .expiry(options.expiry.map(|e| e.as_millis() as u32))
+                .expiry(options.expiry.map(|e| e.as_secs() as u32))
                 .durability_level(parse_optional_durability_level_to_memdx(
                     options.durability_level,
                 ))
@@ -96,7 +97,7 @@ impl CouchbaseCoreKvClient {
                     value,
                 )
                 .flags(flags)
-                .expiry(options.expiry.map(|e| e.as_millis() as u32))
+                .expiry(options.expiry.map(|e| e.as_secs() as u32))
                 .durability_level(parse_optional_durability_level_to_memdx(
                     options.durability_level,
                 ))
@@ -129,7 +130,7 @@ impl CouchbaseCoreKvClient {
                     value,
                 )
                 .flags(flags)
-                .expiry(options.expiry.map(|e| e.as_millis() as u32))
+                .expiry(options.expiry.map(|e| e.as_secs() as u32))
                 .durability_level(parse_optional_durability_level_to_memdx(
                     options.durability_level,
                 ))
@@ -174,6 +175,35 @@ impl CouchbaseCoreKvClient {
 
     pub async fn get(&self, id: &str, options: GetOptions) -> error::Result<GetResult> {
         let agent = self.agent_provider.get_agent().await;
+
+        if let Some(true) = options.expiry {
+            let specs = vec![
+                LookupInSpec::get("$document.exptime", GetSpecOptions::new().xattr()),
+                LookupInSpec::get("$document.flags", GetSpecOptions::new().xattr()),
+                LookupInSpec::get("", None),
+            ];
+
+            let res = self.lookup_in(id, &specs, LookupInOptions::new()).await?;
+            let expiry: u64 = res.content_as(0)?;
+            let expires_at = match DateTime::<Utc>::from_timestamp(expiry as i64, 0) {
+                Some(e) => e,
+                None => {
+                    return Err(error::Error::other_failure(
+                        "invalid expiry time returned from server".to_string(),
+                    ));
+                }
+            };
+            let flags: u32 = res.content_as(1)?;
+            let content: Vec<u8> = res.content_as_raw(2)?.to_vec();
+
+            return Ok(GetResult {
+                content,
+                flags,
+                cas: res.cas,
+                expiry_time: Some(expires_at),
+            });
+        }
+
         let res = agent
             .get(
                 couchbase_core::options::crud::GetOptions::new(
@@ -188,7 +218,7 @@ impl CouchbaseCoreKvClient {
         Ok(res.into())
     }
 
-    pub async fn exists(&self, id: &str, options: ExistsOptions) -> error::Result<ExistsResult> {
+    pub async fn exists(&self, id: &str, _options: ExistsOptions) -> error::Result<ExistsResult> {
         let agent = self.agent_provider.get_agent().await;
         let res = agent
             .get_meta(
@@ -208,7 +238,7 @@ impl CouchbaseCoreKvClient {
         &self,
         id: &str,
         expiry: Duration,
-        options: GetAndTouchOptions,
+        _options: GetAndTouchOptions,
     ) -> error::Result<GetResult> {
         let agent = self.agent_provider.get_agent().await;
         let res = agent
@@ -230,7 +260,7 @@ impl CouchbaseCoreKvClient {
         &self,
         id: &str,
         lock_time: Duration,
-        options: GetAndLockOptions,
+        _options: GetAndLockOptions,
     ) -> error::Result<GetResult> {
         let agent = self.agent_provider.get_agent().await;
         let res = agent
@@ -248,7 +278,7 @@ impl CouchbaseCoreKvClient {
         Ok(res.into())
     }
 
-    pub async fn unlock(&self, id: &str, cas: u64, options: UnlockOptions) -> error::Result<()> {
+    pub async fn unlock(&self, id: &str, cas: u64, _options: UnlockOptions) -> error::Result<()> {
         let agent = self.agent_provider.get_agent().await;
         agent
             .unlock(
@@ -269,7 +299,7 @@ impl CouchbaseCoreKvClient {
         &self,
         id: &str,
         expiry: Duration,
-        options: TouchOptions,
+        _options: TouchOptions,
     ) -> error::Result<TouchResult> {
         let agent = self.agent_provider.get_agent().await;
         let result = agent

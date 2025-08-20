@@ -90,11 +90,18 @@ impl ReplaceOptions {
 
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct GetOptions {}
+pub struct GetOptions {
+    pub(crate) expiry: Option<bool>,
+}
 
 impl GetOptions {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn expiry(mut self) -> Self {
+        self.expiry = Some(true);
+        self
     }
 }
 
@@ -182,8 +189,8 @@ impl LookupInOptions {
         Self::default()
     }
 
-    pub fn access_deleted(mut self, access_deleted: bool) -> Self {
-        self.access_deleted = Some(access_deleted);
+    pub fn access_deleted(mut self) -> Self {
+        self.access_deleted = Some(true);
         self
     }
 }

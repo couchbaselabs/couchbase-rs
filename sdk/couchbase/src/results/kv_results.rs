@@ -2,13 +2,15 @@ use crate::mutation_state::MutationToken;
 use crate::subdoc::lookup_in_specs::LookupInOpType;
 use crate::{error, transcoding};
 use bytes::Bytes;
+use chrono::{DateTime, Utc};
 use serde::de::DeserializeOwned;
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct GetResult {
-    content: Vec<u8>,
-    flags: u32,
-    cas: u64,
+    pub(crate) content: Vec<u8>,
+    pub(crate) flags: u32,
+    pub(crate) cas: u64,
+    pub(crate) expiry_time: Option<DateTime<Utc>>,
 }
 
 impl GetResult {
@@ -24,6 +26,10 @@ impl GetResult {
     pub fn cas(&self) -> u64 {
         self.cas
     }
+
+    pub fn expiry_time(&self) -> Option<&DateTime<Utc>> {
+        self.expiry_time.as_ref()
+    }
 }
 
 impl From<couchbase_core::results::kv::GetResult> for GetResult {
@@ -32,6 +38,7 @@ impl From<couchbase_core::results::kv::GetResult> for GetResult {
             content: result.value,
             flags: result.flags,
             cas: result.cas,
+            expiry_time: None,
         }
     }
 }
@@ -42,6 +49,7 @@ impl From<couchbase_core::results::kv::GetAndTouchResult> for GetResult {
             content: result.value,
             flags: result.flags,
             cas: result.cas,
+            expiry_time: None,
         }
     }
 }
@@ -52,6 +60,7 @@ impl From<couchbase_core::results::kv::GetAndLockResult> for GetResult {
             content: result.value,
             flags: result.flags,
             cas: result.cas,
+            expiry_time: None,
         }
     }
 }
