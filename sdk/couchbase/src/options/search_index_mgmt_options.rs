@@ -1,8 +1,8 @@
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct GetIndexOptions {}
+pub struct GetSearchIndexOptions {}
 
-impl GetIndexOptions {
+impl GetSearchIndexOptions {
     pub fn new() -> Self {
         Self::default()
     }
@@ -10,9 +10,9 @@ impl GetIndexOptions {
 
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct GetAllIndexesOptions {}
+pub struct GetAllSearchIndexesOptions {}
 
-impl GetAllIndexesOptions {
+impl GetAllSearchIndexesOptions {
     pub fn new() -> Self {
         Self::default()
     }
@@ -20,9 +20,9 @@ impl GetAllIndexesOptions {
 
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct UpsertIndexOptions {}
+pub struct UpsertSearchIndexOptions {}
 
-impl UpsertIndexOptions {
+impl UpsertSearchIndexOptions {
     pub fn new() -> Self {
         Self::default()
     }
@@ -30,9 +30,9 @@ impl UpsertIndexOptions {
 
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct DeleteIndexOptions {}
+pub struct DropSearchIndexOptions {}
 
-impl DeleteIndexOptions {
+impl DropSearchIndexOptions {
     pub fn new() -> Self {
         Self::default()
     }
@@ -60,9 +60,9 @@ impl GetIndexedDocumentsCountOptions {
 
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct PauseIngestOptions {}
+pub struct PauseIngestSearchIndexOptions {}
 
-impl PauseIngestOptions {
+impl PauseIngestSearchIndexOptions {
     pub fn new() -> Self {
         Self::default()
     }
@@ -70,9 +70,9 @@ impl PauseIngestOptions {
 
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct ResumeIngestOptions {}
+pub struct ResumeIngestSearchIndexOptions {}
 
-impl ResumeIngestOptions {
+impl ResumeIngestSearchIndexOptions {
     pub fn new() -> Self {
         Self::default()
     }
@@ -80,9 +80,9 @@ impl ResumeIngestOptions {
 
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct AllowQueryingOptions {}
+pub struct AllowQueryingSearchIndexOptions {}
 
-impl AllowQueryingOptions {
+impl AllowQueryingSearchIndexOptions {
     pub fn new() -> Self {
         Self::default()
     }
@@ -90,9 +90,9 @@ impl AllowQueryingOptions {
 
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct DisallowQueryingOptions {}
+pub struct DisallowQueryingSearchIndexOptions {}
 
-impl DisallowQueryingOptions {
+impl DisallowQueryingSearchIndexOptions {
     pub fn new() -> Self {
         Self::default()
     }
@@ -100,9 +100,9 @@ impl DisallowQueryingOptions {
 
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct FreezePlanOptions {}
+pub struct FreezePlanSearchIndexOptions {}
 
-impl FreezePlanOptions {
+impl FreezePlanSearchIndexOptions {
     pub fn new() -> Self {
         Self::default()
     }
@@ -110,9 +110,9 @@ impl FreezePlanOptions {
 
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct UnfreezePlanOptions {}
+pub struct UnfreezePlanSearchIndexOptions {}
 
-impl UnfreezePlanOptions {
+impl UnfreezePlanSearchIndexOptions {
     pub fn new() -> Self {
         Self::default()
     }

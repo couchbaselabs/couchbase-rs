@@ -2,9 +2,10 @@ use crate::clients::search_index_mgmt_client::SearchIndexMgmtClient;
 use crate::error;
 use crate::management::search::index::SearchIndex;
 use crate::options::search_index_mgmt_options::{
-    AllowQueryingOptions, AnalyzeDocumentOptions, DeleteIndexOptions, DisallowQueryingOptions,
-    FreezePlanOptions, GetAllIndexesOptions, GetIndexOptions, GetIndexedDocumentsCountOptions,
-    PauseIngestOptions, ResumeIngestOptions, UnfreezePlanOptions, UpsertIndexOptions,
+    AllowQueryingSearchIndexOptions, AnalyzeDocumentOptions, DisallowQueryingSearchIndexOptions,
+    DropSearchIndexOptions, FreezePlanSearchIndexOptions, GetAllSearchIndexesOptions,
+    GetIndexedDocumentsCountOptions, GetSearchIndexOptions, PauseIngestSearchIndexOptions,
+    ResumeIngestSearchIndexOptions, UnfreezePlanSearchIndexOptions, UpsertSearchIndexOptions,
 };
 use serde_json::Value;
 use std::sync::Arc;
@@ -18,14 +19,14 @@ impl SearchIndexManager {
     pub async fn get_index(
         &self,
         index_name: impl Into<String>,
-        opts: impl Into<Option<GetIndexOptions>>,
+        opts: impl Into<Option<GetSearchIndexOptions>>,
     ) -> error::Result<SearchIndex> {
         self.client.get_index(index_name.into(), opts.into()).await
     }
 
     pub async fn get_all_indexes(
         &self,
-        opts: impl Into<Option<GetAllIndexesOptions>>,
+        opts: impl Into<Option<GetAllSearchIndexesOptions>>,
     ) -> error::Result<Vec<SearchIndex>> {
         self.client.get_all_indexes(opts.into()).await
     }
@@ -33,7 +34,7 @@ impl SearchIndexManager {
     pub async fn upsert_index(
         &self,
         index: SearchIndex,
-        opts: impl Into<Option<UpsertIndexOptions>>,
+        opts: impl Into<Option<UpsertSearchIndexOptions>>,
     ) -> error::Result<()> {
         self.client.upsert_index(index, opts.into()).await
     }
@@ -41,11 +42,9 @@ impl SearchIndexManager {
     pub async fn drop_index(
         &self,
         index_name: impl Into<String>,
-        opts: impl Into<Option<DeleteIndexOptions>>,
+        opts: impl Into<Option<DropSearchIndexOptions>>,
     ) -> error::Result<()> {
-        self.client
-            .delete_index(index_name.into(), opts.into())
-            .await
+        self.client.drop_index(index_name.into(), opts.into()).await
     }
 
     pub async fn analyze_document(
@@ -72,7 +71,7 @@ impl SearchIndexManager {
     pub async fn pause_ingest(
         &self,
         index_name: impl Into<String>,
-        opts: impl Into<Option<PauseIngestOptions>>,
+        opts: impl Into<Option<PauseIngestSearchIndexOptions>>,
     ) -> error::Result<()> {
         self.client
             .pause_ingest(index_name.into(), opts.into())
@@ -82,7 +81,7 @@ impl SearchIndexManager {
     pub async fn resume_ingest(
         &self,
         index_name: impl Into<String>,
-        opts: impl Into<Option<ResumeIngestOptions>>,
+        opts: impl Into<Option<ResumeIngestSearchIndexOptions>>,
     ) -> error::Result<()> {
         self.client
             .resume_ingest(index_name.into(), opts.into())
@@ -92,7 +91,7 @@ impl SearchIndexManager {
     pub async fn allow_querying(
         &self,
         index_name: impl Into<String>,
-        opts: impl Into<Option<AllowQueryingOptions>>,
+        opts: impl Into<Option<AllowQueryingSearchIndexOptions>>,
     ) -> error::Result<()> {
         self.client
             .allow_querying(index_name.into(), opts.into())
@@ -102,7 +101,7 @@ impl SearchIndexManager {
     pub async fn disallow_querying(
         &self,
         index_name: impl Into<String>,
-        opts: impl Into<Option<DisallowQueryingOptions>>,
+        opts: impl Into<Option<DisallowQueryingSearchIndexOptions>>,
     ) -> error::Result<()> {
         self.client
             .disallow_querying(index_name.into(), opts.into())
@@ -112,7 +111,7 @@ impl SearchIndexManager {
     pub async fn freeze_plan(
         &self,
         index_name: impl Into<String>,
-        opts: impl Into<Option<FreezePlanOptions>>,
+        opts: impl Into<Option<FreezePlanSearchIndexOptions>>,
     ) -> error::Result<()> {
         self.client
             .freeze_plan(index_name.into(), opts.into())
@@ -122,7 +121,7 @@ impl SearchIndexManager {
     pub async fn unfreeze_plan(
         &self,
         index_name: impl Into<String>,
-        opts: impl Into<Option<UnfreezePlanOptions>>,
+        opts: impl Into<Option<UnfreezePlanSearchIndexOptions>>,
     ) -> error::Result<()> {
         self.client
             .unfreeze_plan(index_name.into(), opts.into())

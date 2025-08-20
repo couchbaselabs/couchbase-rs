@@ -18,7 +18,7 @@ impl TestSearchIndexManager {
     pub async fn get_index(
         &self,
         index_name: impl Into<String>,
-        opts: impl Into<Option<GetIndexOptions>>,
+        opts: impl Into<Option<GetSearchIndexOptions>>,
     ) -> error::Result<SearchIndex> {
         timeout(
             Duration::from_secs(20),
@@ -30,7 +30,7 @@ impl TestSearchIndexManager {
 
     pub async fn get_all_indexes(
         &self,
-        opts: impl Into<Option<GetAllIndexesOptions>>,
+        opts: impl Into<Option<GetAllSearchIndexesOptions>>,
     ) -> error::Result<Vec<SearchIndex>> {
         timeout(Duration::from_secs(20), self.inner.get_all_indexes(opts))
             .await
@@ -40,7 +40,7 @@ impl TestSearchIndexManager {
     pub async fn upsert_index(
         &self,
         index: SearchIndex,
-        opts: impl Into<Option<UpsertIndexOptions>>,
+        opts: impl Into<Option<UpsertSearchIndexOptions>>,
     ) -> error::Result<()> {
         timeout(
             Duration::from_secs(20),
@@ -53,7 +53,7 @@ impl TestSearchIndexManager {
     pub async fn drop_index(
         &self,
         index_name: impl Into<String>,
-        opts: impl Into<Option<DeleteIndexOptions>>,
+        opts: impl Into<Option<DropSearchIndexOptions>>,
     ) -> error::Result<()> {
         timeout(
             Duration::from_secs(20),
@@ -93,7 +93,7 @@ impl TestSearchIndexManager {
     pub async fn pause_ingest(
         &self,
         index_name: impl Into<String>,
-        opts: impl Into<Option<PauseIngestOptions>>,
+        opts: impl Into<Option<PauseIngestSearchIndexOptions>>,
     ) -> error::Result<()> {
         timeout(
             Duration::from_secs(20),
@@ -106,7 +106,7 @@ impl TestSearchIndexManager {
     pub async fn resume_ingest(
         &self,
         index_name: impl Into<String>,
-        opts: impl Into<Option<ResumeIngestOptions>>,
+        opts: impl Into<Option<ResumeIngestSearchIndexOptions>>,
     ) -> error::Result<()> {
         timeout(
             Duration::from_secs(20),
@@ -119,7 +119,7 @@ impl TestSearchIndexManager {
     pub async fn allow_querying(
         &self,
         index_name: impl Into<String>,
-        opts: impl Into<Option<AllowQueryingOptions>>,
+        opts: impl Into<Option<AllowQueryingSearchIndexOptions>>,
     ) -> error::Result<()> {
         timeout(
             Duration::from_secs(20),
@@ -132,7 +132,7 @@ impl TestSearchIndexManager {
     pub async fn disallow_querying(
         &self,
         index_name: impl Into<String>,
-        opts: impl Into<Option<DisallowQueryingOptions>>,
+        opts: impl Into<Option<DisallowQueryingSearchIndexOptions>>,
     ) -> error::Result<()> {
         timeout(
             Duration::from_secs(20),
@@ -145,7 +145,7 @@ impl TestSearchIndexManager {
     pub async fn freeze_plan(
         &self,
         index_name: impl Into<String>,
-        opts: impl Into<Option<FreezePlanOptions>>,
+        opts: impl Into<Option<FreezePlanSearchIndexOptions>>,
     ) -> error::Result<()> {
         timeout(
             Duration::from_secs(20),
@@ -158,7 +158,7 @@ impl TestSearchIndexManager {
     pub async fn unfreeze_plan(
         &self,
         index_name: impl Into<String>,
-        opts: impl Into<Option<UnfreezePlanOptions>>,
+        opts: impl Into<Option<UnfreezePlanSearchIndexOptions>>,
     ) -> error::Result<()> {
         timeout(
             Duration::from_secs(20),

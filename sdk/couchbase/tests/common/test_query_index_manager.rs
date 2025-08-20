@@ -24,7 +24,7 @@ impl TestQueryIndexManager {
 
     pub async fn get_all_indexes(
         &self,
-        opts: impl Into<Option<GetAllIndexesOptions>>,
+        opts: impl Into<Option<GetAllQueryIndexesOptions>>,
     ) -> error::Result<Vec<QueryIndex>> {
         timeout(Duration::from_secs(20), self.inner.get_all_indexes(opts))
             .await
