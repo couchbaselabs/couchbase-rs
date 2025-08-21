@@ -367,6 +367,13 @@ impl TestAgent {
         run_with_std_ensure_deadline(self.agent.ensure_bucket(opts)).await
     }
 
+    pub async fn ensure_index(
+        &self,
+        opts: &couchbase_core::options::query::EnsureIndexOptions<'_>,
+    ) -> Result<()> {
+        run_with_std_ensure_deadline(self.agent.ensure_index(opts)).await
+    }
+
     pub async fn ensure_search_index(
         &self,
         opts: &search_management::EnsureIndexOptions<'_>,

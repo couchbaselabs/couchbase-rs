@@ -64,9 +64,22 @@ impl ExponentialBackoffCalculator {
 
 impl BackoffCalculator for ExponentialBackoffCalculator {
     fn backoff(&self, retry_attempts: u32) -> Duration {
-        let mut backoff = Duration::from_millis(
-            (self.min.as_millis() * self.backoff_factor.powf(retry_attempts as f64) as u128) as u64,
-        );
+        let factor = self.backoff_factor.powi(retry_attempts as i32);
+        let factor_u128 = factor as u128;
+
+        if u128::MAX / self.min.as_millis() < factor_u128 {
+            // If the factor is too large, we cap it to prevent overflow.
+            return self.max;
+        }
+
+        let val = self.min.as_millis() * factor_u128;
+
+        if val > u64::MAX as u128 {
+            // If the value exceeds u64::MAX, we cap it to max.
+            return self.max;
+        }
+
+        let mut backoff = Duration::from_millis(val as u64);
 
         if backoff > self.max {
             backoff = self.max;
@@ -97,5 +110,50 @@ pub(crate) fn controlled_backoff(retry_attempts: u32) -> Duration {
         3 => Duration::from_millis(100),
         4 => Duration::from_millis(500),
         _ => Duration::from_millis(1000),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_exponential_backoff() {
+        let calculator = ExponentialBackoffCalculator::new(
+            Duration::from_millis(10),
+            Duration::from_millis(1000),
+            2.0,
+        );
+
+        assert_eq!(calculator.backoff(0), Duration::from_millis(10));
+        assert_eq!(calculator.backoff(1), Duration::from_millis(20));
+        assert_eq!(calculator.backoff(2), Duration::from_millis(40));
+        assert_eq!(calculator.backoff(3), Duration::from_millis(80));
+        assert_eq!(calculator.backoff(4), Duration::from_millis(160));
+        assert_eq!(calculator.backoff(5), Duration::from_millis(320));
+        assert_eq!(calculator.backoff(6), Duration::from_millis(640));
+        assert_eq!(calculator.backoff(7), Duration::from_millis(1000));
+    }
+
+    #[test]
+    fn test_exponential_backoff_overflows_u128() {
+        let calculator = ExponentialBackoffCalculator::new(
+            Duration::from_millis(100),
+            Duration::from_millis(1000),
+            1.5,
+        );
+
+        assert_eq!(calculator.backoff(208), Duration::from_millis(1000));
+    }
+
+    #[test]
+    fn test_exponential_backoff_overflows_u64() {
+        let calculator = ExponentialBackoffCalculator::new(
+            Duration::from_millis(100),
+            Duration::from_millis(1000),
+            1.5,
+        );
+
+        assert_eq!(calculator.backoff(207), Duration::from_millis(1000));
     }
 }
