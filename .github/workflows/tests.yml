@@ -70,7 +70,7 @@ jobs:
           RCBCONNSTR: ${{ env.CBDC_CONNSTR }}
           RCBSERVER_VERSION: ${{ matrix.server }}
         run: |
-          cargo test --color=always --no-fail-fast -- --nocapture
+          cargo test --color=always --no-fail-fast -- --nocapture --test-threads 1 
 
 #      - name: Collect couchbase logs
 #        timeout-minutes: 10
