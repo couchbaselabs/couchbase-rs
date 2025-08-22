@@ -34,8 +34,8 @@ impl GetSpecOptions {
         Default::default()
     }
 
-    pub fn xattr(mut self, is_xattr: bool) -> Self {
-        self.is_xattr = Some(is_xattr);
+    pub fn xattr(mut self) -> Self {
+        self.is_xattr = Some(true);
         self
     }
 }
@@ -50,8 +50,8 @@ impl ExistsSpecOptions {
         Default::default()
     }
 
-    pub fn xattr(mut self, is_xattr: bool) -> Self {
-        self.is_xattr = Some(is_xattr);
+    pub fn xattr(mut self) -> Self {
+        self.is_xattr = Some(true);
         self
     }
 }
@@ -67,8 +67,8 @@ impl CountSpecOptions {
         Default::default()
     }
 
-    pub fn xattr(mut self, is_xattr: bool) -> Self {
-        self.is_xattr = Some(is_xattr);
+    pub fn xattr(mut self) -> Self {
+        self.is_xattr = Some(true);
         self
     }
 }
