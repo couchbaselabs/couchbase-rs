@@ -2,7 +2,7 @@ use crate::error;
 use crate::search::queries::Query;
 use couchbase_core::searchx::query_options::{KnnOperator, KnnQuery};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct VectorSearch {
     pub(crate) vector_queries: Vec<VectorQuery>,
     pub(crate) query_combination: Option<VectorQueryCombination>,
@@ -59,7 +59,7 @@ impl From<VectorQueryCombination> for KnnOperator {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct VectorQuery {
     pub(crate) field_name: String,
     pub(crate) query: Option<Vec<f32>>,

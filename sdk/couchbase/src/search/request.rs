@@ -2,7 +2,7 @@ use crate::error;
 use crate::search::queries::Query;
 use crate::search::vector::VectorSearch;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SearchRequest {
     pub(crate) search_query: Option<Query>,
     pub(crate) vector_search: Option<VectorSearch>,
