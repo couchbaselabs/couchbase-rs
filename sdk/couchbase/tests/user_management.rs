@@ -1,12 +1,13 @@
 use crate::common::test_config::run_test;
+use crate::common::test_manager::TestUserManager;
 use crate::common::{new_key, try_until};
 use couchbase::error::ErrorKind;
 use couchbase::management::users::user::{Group, Role, User, UserAndMetadata};
-use couchbase::management::users::user_manager::UserManager;
 use couchbase::options::user_mgmt_options::{
     DropUserOptions, GetAllGroupsOptions, GetAllUsersOptions, GetGroupOptions, GetRolesOptions,
     GetUserOptions, UpsertUserOptions,
 };
+use log::warn;
 use std::ops::Add;
 use std::time::Duration;
 use tokio::time::Instant;
@@ -147,7 +148,25 @@ fn test_delete_user() {
         let user = User::new(&username, display_name, roles).password("password");
         create_user(&cluster.users(), user).await;
 
-        delete_user(&cluster.users(), &username).await;
+        let mgr = cluster.users();
+        try_until(
+            Instant::now().add(Duration::from_secs(30)),
+            Duration::from_millis(500),
+            "user not deleted in time",
+            || async {
+                match mgr
+                    .drop_user(&username, DropUserOptions::new().auth_domain("local"))
+                    .await
+                {
+                    Ok(_) => Ok(Some(())),
+                    Err(e) => {
+                        warn!("failed to drop user: {e}");
+                        Ok(None)
+                    }
+                }
+            },
+        )
+        .await;
 
         let opts = GetUserOptions::new();
         try_until(
@@ -245,22 +264,22 @@ fn assert_user(expected: &User, actual: &UserAndMetadata) {
     assert_eq!(actual.user.roles, expected.roles);
 }
 
-async fn create_user(mgr: &UserManager, user: User) {
+async fn create_user(mgr: &TestUserManager, user: User) {
     mgr.upsert_user(user, UpsertUserOptions::new().auth_domain("local"))
         .await
         .unwrap();
 }
 
-async fn create_group(mgr: &UserManager, group: Group) {
+async fn create_group(mgr: &TestUserManager, group: Group) {
     mgr.upsert_group(group, None).await.unwrap();
 }
 
-async fn delete_user(mgr: &UserManager, name: &str) {
+async fn delete_user(mgr: &TestUserManager, name: &str) {
     mgr.drop_user(name, DropUserOptions::new().auth_domain("local"))
         .await
         .unwrap();
 }
 
-async fn delete_group(mgr: &UserManager, name: &str) {
+async fn delete_group(mgr: &TestUserManager, name: &str) {
     mgr.drop_group(name, None).await.unwrap();
 }
