@@ -537,7 +537,8 @@ fn get_with_expiry() {
 
         assert!(expiry > now, "Expiry time should be in the future");
         assert!(
-            expiry < now.add(Duration::from_secs(30)),
+            // We use 31 seconds to allow for inaccuracies in precision when applying the expiry.
+            expiry < now.add(Duration::from_secs(31)),
             "Expiry time should be within 30 seconds: {expiry} vs {now}"
         );
 
