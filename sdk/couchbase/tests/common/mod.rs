@@ -11,7 +11,7 @@ mod test_bucket;
 mod test_cluster;
 mod test_collection;
 pub mod test_config;
-mod test_manager;
+pub mod test_manager;
 mod test_query_index_manager;
 mod test_scope;
 mod test_search_index_manager;
