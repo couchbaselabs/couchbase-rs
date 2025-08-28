@@ -56,7 +56,7 @@ pub(crate) struct KvClientManagerOptions {
     pub connect_timeout: Duration,
     pub connect_throttle_period: Duration,
     pub unsolicited_packet_tx: Option<UnsolicitedPacketSender>,
-    pub orphan_handler: OrphanResponseHandler,
+    pub orphan_handler: Option<OrphanResponseHandler>,
     pub on_err_map_fetched_handler: Option<OnErrMapFetchedHandler>,
     pub disable_decompression: bool,
 }

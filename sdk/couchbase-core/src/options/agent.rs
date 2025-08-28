@@ -1,10 +1,13 @@
 use crate::address::Address;
 use crate::auth_mechanism::AuthMechanism;
 use crate::authenticator::Authenticator;
+use crate::memdx::dispatcher::OrphanResponseHandler;
 use crate::tls_config::TlsConfig;
+use std::fmt::Debug;
+use std::sync::Arc;
 use std::time::Duration;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 #[non_exhaustive]
 pub struct AgentOptions {
     pub seed_config: SeedConfig,
@@ -19,6 +22,23 @@ pub struct AgentOptions {
     pub kv_config: KvConfig,
     pub http_config: HttpConfig,
     pub tcp_keep_alive_time: Option<Duration>,
+    pub orphan_response_handler: Option<OrphanResponseHandler>,
+}
+
+impl Debug for AgentOptions {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AgentOptions")
+            .field("seed_config", &self.seed_config)
+            .field("auth_mechanisms", &self.auth_mechanisms)
+            .field("tls_config", &self.tls_config)
+            .field("bucket_name", &self.bucket_name)
+            .field("compression_config", &self.compression_config)
+            .field("config_poller_config", &self.config_poller_config)
+            .field("kv_config", &self.kv_config)
+            .field("http_config", &self.http_config)
+            .field("tcp_keep_alive_time", &self.tcp_keep_alive_time)
+            .finish()
+    }
 }
 
 impl AgentOptions {
@@ -34,6 +54,7 @@ impl AgentOptions {
             kv_config: KvConfig::default(),
             http_config: HttpConfig::default(),
             tcp_keep_alive_time: None,
+            orphan_response_handler: None,
         }
     }
 
@@ -84,6 +105,14 @@ impl AgentOptions {
 
     pub fn tcp_keep_alive_time(mut self, tcp_keep_alive: Duration) -> Self {
         self.tcp_keep_alive_time = Some(tcp_keep_alive);
+        self
+    }
+
+    pub fn orphan_reporter_handler(
+        mut self,
+        orphan_response_handler: OrphanResponseHandler,
+    ) -> Self {
+        self.orphan_response_handler = Some(orphan_response_handler);
         self
     }
 }
