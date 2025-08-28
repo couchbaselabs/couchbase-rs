@@ -2,7 +2,7 @@ use crate::clients::agent_provider::CouchbaseAgentProvider;
 use crate::error;
 use crate::management::buckets::bucket_settings::BucketSettings;
 use crate::options::bucket_mgmt_options::{
-    CreateBucketOptions, DeleteBucketOptions, FlushBucketOptions, GetAllBucketsOptions,
+    CreateBucketOptions, DropBucketOptions, FlushBucketOptions, GetAllBucketsOptions,
     GetBucketOptions, UpdateBucketOptions,
 };
 use couchbase_core::mgmtx;
@@ -77,17 +77,17 @@ impl BucketMgmtClient {
         }
     }
 
-    pub async fn delete_bucket(
+    pub async fn drop_bucket(
         &self,
         bucket_name: String,
-        opts: DeleteBucketOptions,
+        opts: DropBucketOptions,
     ) -> error::Result<()> {
         match &self.backend {
             BucketMgmtClientBackend::CouchbaseBucketMgmtClientBackend(client) => {
-                client.delete_bucket(bucket_name, opts).await
+                client.drop_bucket(bucket_name, opts).await
             }
             BucketMgmtClientBackend::Couchbase2BucketMgmtClientBackend(client) => {
-                client.delete_bucket(bucket_name, opts).await
+                client.drop_bucket(bucket_name, opts).await
             }
         }
     }
@@ -307,10 +307,10 @@ impl CouchbaseBucketMgmtClient {
         Ok(())
     }
 
-    pub async fn delete_bucket(
+    pub async fn drop_bucket(
         &self,
         bucket_name: String,
-        opts: DeleteBucketOptions,
+        opts: DropBucketOptions,
     ) -> error::Result<()> {
         let agent = self.agent_provider.get_agent().await;
         let opts = couchbase_core::options::management::DeleteBucketOptions::new(&bucket_name)
@@ -373,10 +373,10 @@ impl Couchbase2BucketMgmtClient {
         unimplemented!()
     }
 
-    pub async fn delete_bucket(
+    pub async fn drop_bucket(
         &self,
         _bucket_name: String,
-        _opts: DeleteBucketOptions,
+        _opts: DropBucketOptions,
     ) -> error::Result<()> {
         unimplemented!()
     }

@@ -76,14 +76,14 @@ impl TestBucketManager {
         .unwrap()
     }
 
-    pub async fn delete_bucket(
+    pub async fn drop_bucket(
         &self,
         bucket_name: impl Into<String>,
-        opts: impl Into<Option<DeleteBucketOptions>>,
+        opts: impl Into<Option<DropBucketOptions>>,
     ) -> error::Result<()> {
         timeout(
             Duration::from_secs(20),
-            self.inner.delete_bucket(bucket_name, opts),
+            self.inner.drop_bucket(bucket_name, opts),
         )
         .await
         .unwrap()

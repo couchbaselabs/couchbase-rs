@@ -62,15 +62,15 @@ impl BucketManager {
             .await
     }
 
-    pub async fn delete_bucket(
+    pub async fn drop_bucket(
         &self,
         bucket_name: impl Into<String>,
-        opts: impl Into<Option<DeleteBucketOptions>>,
+        opts: impl Into<Option<DropBucketOptions>>,
     ) -> error::Result<()> {
         self.client
-            .delete_bucket(
+            .drop_bucket(
                 bucket_name.into(),
-                opts.into().unwrap_or(DeleteBucketOptions::default()),
+                opts.into().unwrap_or(DropBucketOptions::default()),
             )
             .await
     }

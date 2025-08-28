@@ -30,7 +30,7 @@ fn test_create_bucket() {
 
         let bucket = manager.get_bucket(&bucket_name, None).await.unwrap();
 
-        manager.delete_bucket(&bucket_name, None).await.unwrap();
+        manager.drop_bucket(&bucket_name, None).await.unwrap();
         verify_bucket_deleted(&manager, &bucket_name).await;
 
         assert_eq!(bucket.name, bucket_name);
@@ -75,7 +75,7 @@ fn test_update_bucket() {
         )
         .await;
 
-        manager.delete_bucket(&bucket_name, None).await.unwrap();
+        manager.drop_bucket(&bucket_name, None).await.unwrap();
         verify_bucket_deleted(&manager, &bucket_name).await;
     })
 }
@@ -97,7 +97,7 @@ fn test_delete_bucket() {
 
         verify_bucket_created(&manager, &bucket_name).await;
 
-        manager.delete_bucket(&bucket_name, None).await.unwrap();
+        manager.drop_bucket(&bucket_name, None).await.unwrap();
         verify_bucket_deleted(&manager, &bucket_name).await;
     })
 }
@@ -123,7 +123,7 @@ fn test_create_bucket_with_replica_number() {
 
         let bucket = manager.get_bucket(&bucket_name, None).await.unwrap();
 
-        manager.delete_bucket(&bucket_name, None).await.unwrap();
+        manager.drop_bucket(&bucket_name, None).await.unwrap();
         verify_bucket_deleted(&manager, &bucket_name).await;
 
         assert_eq!(bucket.name, bucket_name);
@@ -154,7 +154,7 @@ fn test_create_bucket_with_eviction_policy() {
 
         let bucket = manager.get_bucket(&bucket_name, None).await.unwrap();
 
-        manager.delete_bucket(&bucket_name, None).await.unwrap();
+        manager.drop_bucket(&bucket_name, None).await.unwrap();
         verify_bucket_deleted(&manager, &bucket_name).await;
 
         assert_eq!(bucket.name, bucket_name);
@@ -185,7 +185,7 @@ fn test_create_bucket_with_compression_mode() {
 
         let bucket = manager.get_bucket(&bucket_name, None).await.unwrap();
 
-        manager.delete_bucket(&bucket_name, None).await.unwrap();
+        manager.drop_bucket(&bucket_name, None).await.unwrap();
         verify_bucket_deleted(&manager, &bucket_name).await;
 
         assert_eq!(bucket.name, bucket_name);
@@ -216,7 +216,7 @@ fn test_create_bucket_with_durability_min_level() {
 
         let bucket = manager.get_bucket(&bucket_name, None).await.unwrap();
 
-        manager.delete_bucket(&bucket_name, None).await.unwrap();
+        manager.drop_bucket(&bucket_name, None).await.unwrap();
         verify_bucket_deleted(&manager, &bucket_name).await;
 
         assert_eq!(bucket.name, bucket_name);
@@ -250,7 +250,7 @@ fn test_create_bucket_with_conflict_resolution_type() {
 
         let bucket = manager.get_bucket(&bucket_name, None).await.unwrap();
 
-        manager.delete_bucket(&bucket_name, None).await.unwrap();
+        manager.drop_bucket(&bucket_name, None).await.unwrap();
         verify_bucket_deleted(&manager, &bucket_name).await;
 
         assert_eq!(bucket.name, bucket_name);
@@ -288,7 +288,7 @@ fn test_create_bucket_with_history_retention() {
 
         let bucket = manager.get_bucket(&bucket_name, None).await.unwrap();
 
-        manager.delete_bucket(&bucket_name, None).await.unwrap();
+        manager.drop_bucket(&bucket_name, None).await.unwrap();
         verify_bucket_deleted(&manager, &bucket_name).await;
 
         assert_eq!(bucket.name, bucket_name);

@@ -40,9 +40,9 @@ impl UpdateBucketOptions {
 
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct DeleteBucketOptions {}
+pub struct DropBucketOptions {}
 
-impl DeleteBucketOptions {
+impl DropBucketOptions {
     pub fn new() -> Self {
         Default::default()
     }
