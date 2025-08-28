@@ -14,7 +14,7 @@ use crate::results::kv_results::{
 use crate::subdoc::lookup_in_specs::{GetSpecOptions, LookupInSpec};
 use crate::subdoc::mutate_in_specs::MutateInSpec;
 use chrono::{DateTime, Utc};
-use couchbase_core::memdx::subdoc::{reorder_subdoc_ops, SubdocDocFlag};
+use couchbase_core::memdx::subdoc::{reorder_subdoc_ops, MutateInOp, SubdocDocFlag};
 use couchbase_core::retry::RetryStrategy;
 use std::sync::Arc;
 use std::time::Duration;
@@ -508,8 +508,8 @@ impl CouchbaseCoreKvClient {
                     &self.collection_name,
                     ordered_specs
                         .iter()
-                        .map(|spec| (*spec).into())
-                        .collect::<Vec<_>>()
+                        .map(|spec| (*spec).try_into())
+                        .collect::<error::Result<Vec<MutateInOp>>>()?
                         .as_slice(),
                 )
                 .flags({

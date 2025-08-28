@@ -2,8 +2,8 @@ use crate::error;
 use crate::error::Error;
 use crate::subdoc::macros::MUTATE_IN_MACROS;
 use couchbase_core::memdx::subdoc::MutateInOpType::{
-    ArrayAddUnique, ArrayInsert, ArrayPushFirst, ArrayPushLast, Counter, Delete, DictAdd, DictSet,
-    Replace,
+    ArrayAddUnique, ArrayInsert, ArrayPushFirst, ArrayPushLast, Counter, Delete, DeleteDoc,
+    DictAdd, DictSet, Replace, SetDoc,
 };
 use couchbase_core::memdx::subdoc::{MutateInOp, SubdocOp, SubdocOpFlag};
 use serde::Serialize;
@@ -547,13 +547,45 @@ impl MutateInSpec {
     }
 }
 
-impl<'a> From<&'a MutateInSpec> for MutateInOp<'a> {
-    fn from(value: &'a MutateInSpec) -> Self {
+impl<'a> TryFrom<&'a MutateInSpec> for MutateInOp<'a> {
+    type Error = Error;
+
+    fn try_from(value: &'a MutateInSpec) -> Result<Self, Self::Error> {
         let op_type = match value.op {
-            MutateInOpType::Insert => DictAdd,
-            MutateInOpType::Upsert => DictSet,
-            MutateInOpType::Replace => Replace,
-            MutateInOpType::Remove => Delete,
+            MutateInOpType::Insert => {
+                if value.path.is_empty() {
+                    return Err(Error::invalid_argument(
+                        "path",
+                        "path cannot be empty for insert operation",
+                    ));
+                }
+
+                DictAdd
+            }
+            MutateInOpType::Upsert => {
+                if value.path.is_empty() {
+                    return Err(Error::invalid_argument(
+                        "path",
+                        "path cannot be empty for upsert operation",
+                    ));
+                }
+
+                DictSet
+            }
+            MutateInOpType::Replace => {
+                if value.path.is_empty() {
+                    SetDoc
+                } else {
+                    Replace
+                }
+            }
+            MutateInOpType::Remove => {
+                if value.path.is_empty() {
+                    DeleteDoc
+                } else {
+                    Delete
+                }
+            }
             MutateInOpType::ArrayAppend => ArrayPushLast,
             MutateInOpType::ArrayPrepend => ArrayPushFirst,
             MutateInOpType::ArrayInsert => ArrayInsert,
@@ -573,6 +605,6 @@ impl<'a> From<&'a MutateInSpec> for MutateInOp<'a> {
             op_flags |= SubdocOpFlag::EXPAND_MACROS;
         }
 
-        MutateInOp::new(op_type, value.path.as_bytes(), &value.value).flags(op_flags)
+        Ok(MutateInOp::new(op_type, value.path.as_bytes(), &value.value).flags(op_flags))
     }
 }
