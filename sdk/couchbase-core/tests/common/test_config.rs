@@ -14,6 +14,7 @@ use std::ops::{Add, Deref};
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::LazyLock;
+use std::sync::Mutex;
 use std::time::Duration;
 use tokio::runtime::Runtime;
 use tokio::sync::RwLock;
@@ -22,6 +23,39 @@ use tokio::time::{timeout_at, Instant};
 lazy_static! {
     pub static ref TEST_AGENT: RwLock<Option<TestAgent>> = RwLock::new(None);
     pub static ref LOGGER_INITIATED: AtomicBool = AtomicBool::new(false);
+}
+
+// Shared log capture buffer for log message assertions in core tests
+pub static LOG_CAPTURE: LazyLock<Mutex<String>> = LazyLock::new(|| Mutex::new(String::new()));
+static CAPTURE_LOGS: AtomicBool = AtomicBool::new(false);
+
+fn enable_log_capture() {
+    CAPTURE_LOGS.store(true, SeqCst);
+}
+
+fn disable_log_capture() {
+    CAPTURE_LOGS.store(false, SeqCst);
+}
+
+pub fn take_captured_logs() -> String {
+    let mut s = LOG_CAPTURE.lock().unwrap();
+    let out = s.clone();
+    s.clear();
+    out
+}
+
+pub struct LogCaptureGuard;
+
+impl Drop for LogCaptureGuard {
+    fn drop(&mut self) {
+        disable_log_capture();
+    }
+}
+
+// Will drop log capturing once LogCaptureGuard is out of scope
+pub fn with_log_capture() -> LogCaptureGuard {
+    enable_log_capture();
+    LogCaptureGuard
 }
 
 #[derive(Debug, Clone, Envconfig)]
@@ -90,15 +124,21 @@ where
         if LOGGER_INITIATED.compare_exchange(false, true, SeqCst, SeqCst) == Ok(false) {
             env_logger::Builder::new()
                 .format(|buf, record| {
-                    writeln!(
-                        buf,
+                    let line = format!(
                         "{}:{} {} [{}] - {}",
                         record.file().unwrap_or("unknown"),
                         record.line().unwrap_or(0),
                         chrono::Local::now().format("%Y-%m-%dT%H:%M:%S%.3f"),
                         record.level(),
                         record.args()
-                    )
+                    );
+                    writeln!(buf, "{}", line)?;
+                    if CAPTURE_LOGS.load(SeqCst) {
+                        let mut s = LOG_CAPTURE.lock().unwrap();
+                        s.push_str(&line);
+                        s.push('\n');
+                    }
+                    Ok(())
                 })
                 .filter(Some("rustls"), LevelFilter::Warn)
                 .filter_level(
@@ -133,15 +173,21 @@ where
         if LOGGER_INITIATED.compare_exchange(false, true, SeqCst, SeqCst) == Ok(false) {
             env_logger::Builder::new()
                 .format(|buf, record| {
-                    writeln!(
-                        buf,
+                    let line = format!(
                         "{}:{} {} [{}] - {}",
                         record.file().unwrap_or("unknown"),
                         record.line().unwrap_or(0),
                         chrono::Local::now().format("%Y-%m-%dT%H:%M:%S%.3f"),
                         record.level(),
                         record.args()
-                    )
+                    );
+                    writeln!(buf, "{}", line)?;
+                    if CAPTURE_LOGS.load(SeqCst) {
+                        let mut s = LOG_CAPTURE.lock().unwrap();
+                        s.push_str(&line);
+                        s.push('\n');
+                    }
+                    Ok(())
                 })
                 .filter(Some("rustls"), LevelFilter::Warn)
                 .filter_level(

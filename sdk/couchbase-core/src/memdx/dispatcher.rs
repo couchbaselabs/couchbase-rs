@@ -8,10 +8,11 @@ use crate::memdx::connection::ConnectionType;
 use crate::memdx::error::Result;
 use crate::memdx::packet::{RequestPacket, ResponsePacket};
 use crate::memdx::pendingop::ClientPendingOp;
+use crate::orphan_reporter::OrphanContext;
 
 pub type UnsolicitedPacketHandler =
     Arc<dyn Fn(ResponsePacket) -> BoxFuture<'static, ()> + Send + Sync>;
-pub type OrphanResponseHandler = Arc<dyn Fn(ResponsePacket) + Send + Sync>;
+pub type OrphanResponseHandler = Arc<dyn Fn(ResponsePacket, OrphanContext) + Send + Sync>;
 pub type OnConnectionCloseHandler = Arc<dyn Fn() -> BoxFuture<'static, ()> + Send + Sync>;
 
 pub struct DispatcherOptions {
