@@ -42,14 +42,16 @@ impl CollectionManager {
         &self,
         scope_name: impl Into<String>,
         collection_name: impl Into<String>,
-        settings: CreateCollectionSettings,
+        settings: impl Into<Option<CreateCollectionSettings>>,
         opts: impl Into<Option<CreateCollectionOptions>>,
     ) -> error::Result<()> {
         self.client
             .create_collection(
                 scope_name,
                 collection_name,
-                settings,
+                settings
+                    .into()
+                    .unwrap_or(CreateCollectionSettings::default()),
                 opts.into().unwrap_or(CreateCollectionOptions::default()),
             )
             .await
