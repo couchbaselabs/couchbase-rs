@@ -57,3 +57,4 @@ mod vbucketrouter;
 
 #[cfg(feature = "rustls-tls")]
 pub mod insecure_certverfier;
+pub mod orphan_reporter;

@@ -36,6 +36,7 @@ pub struct ClusterOptions {
     pub(crate) http_options: HttpOptions,
     pub(crate) kv_options: KvOptions,
     pub(crate) dns_options: Option<DnsOptions>,
+    pub(crate) orphan_reporter_options: OrphanReporterOptions,
 }
 
 impl Debug for ClusterOptions {
@@ -48,6 +49,7 @@ impl Debug for ClusterOptions {
             .field("poller_options", &self.poller_options)
             .field("http_options", &self.http_options)
             .field("kv_options", &self.kv_options)
+            .field("orphan_reporter_options", &self.orphan_reporter_options)
             .finish()
     }
 }
@@ -63,6 +65,7 @@ impl ClusterOptions {
             http_options: HttpOptions::new(),
             kv_options: KvOptions::new(),
             dns_options: None,
+            orphan_reporter_options: OrphanReporterOptions::new(),
         }
     }
 
@@ -99,6 +102,14 @@ impl ClusterOptions {
     #[cfg(feature = "volatile")]
     pub fn dns_options(mut self, dns_options: DnsOptions) -> Self {
         self.dns_options = Some(dns_options);
+        self
+    }
+
+    pub fn orphan_reporter_options(
+        mut self,
+        orphan_reporter_options: OrphanReporterOptions,
+    ) -> Self {
+        self.orphan_reporter_options = orphan_reporter_options;
         self
     }
 }
@@ -423,5 +434,52 @@ impl From<DnsOptions> for couchbase_connstr::DnsConfig {
             namespace: opts.namespace,
             timeout: opts.timeout,
         }
+    }
+}
+
+#[derive(Default, Clone, Debug, PartialEq)]
+pub struct OrphanReporterOptions {
+    pub(crate) enabled: Option<bool>,
+    pub(crate) reporter_interval: Option<Duration>,
+    pub(crate) sample_size: Option<usize>,
+}
+
+impl OrphanReporterOptions {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn enabled(mut self, enabled: bool) -> Self {
+        self.enabled = Some(enabled);
+        self
+    }
+
+    pub fn reporter_interval(mut self, reporter_interval: Duration) -> Self {
+        self.reporter_interval = Some(reporter_interval);
+        self
+    }
+
+    pub fn sample_size(mut self, sample_size: usize) -> Self {
+        self.sample_size = Some(sample_size);
+        self
+    }
+}
+
+impl From<OrphanReporterOptions>
+    for couchbase_core::options::orphan_reporter::OrphanReporterConfig
+{
+    fn from(opts: OrphanReporterOptions) -> Self {
+        let mut core_opts =
+            couchbase_core::options::orphan_reporter::OrphanReporterConfig::default();
+
+        if let Some(reporter_interval) = opts.reporter_interval {
+            core_opts = core_opts.reporter_interval(reporter_interval);
+        }
+
+        if let Some(sample_size) = opts.sample_size {
+            core_opts = core_opts.sample_size(sample_size);
+        }
+
+        core_opts
     }
 }
