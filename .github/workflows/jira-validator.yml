@@ -1,0 +1,32 @@
+name: jira-validator
+on: [ pull_request ]
+
+jobs:
+  Jira_Commit_Checker:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          ref: '${{ github.event.pull_request.base.ref }}'
+
+      - name: Prep
+        run: |
+          # Checkout branch
+          git checkout -q ${{ github.event.pull_request.head.ref }}
+          
+          # Set variables
+          BASE_BRANCH=${{ github.event.pull_request.base.ref }}
+          
+          # Write BASE_BRANCH to GITHUB_ENV so commit checker can use
+          echo "BASE_BRANCH=$BASE_BRANCH" | tee -a $GITHUB_ENV
+
+      - name: Jira Commit Checker
+        id: jira_commit_checker
+        uses: couchbaselabs/ActionJiraCommitValidate@master
+        with:
+          jira-username: ${{ vars.JIRA_USER }}
+          jira-api-token: ${{ secrets.JIRA_TOKEN }}
+          JIRA_URL: 'api.atlassian.com/ex/jira/7fa05bac-b453-4b39-9ec3-830a6365e08a'
+          BASE_BRANCH: ${{ env.BASE_BRANCH }}
