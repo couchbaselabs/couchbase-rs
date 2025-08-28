@@ -1,0 +1,17 @@
+name: jira-validator.yml
+on: [ pull_request ]
+
+jobs:
+  action-jira-linter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: btwrk/action-jira-linter@v1.0.1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          jira-token: ${{ secrets.JIRA_TOKEN }}
+          jira-base-url: https://jira.issues.couchbase.com
+          jira-user: 'github-issue-checker'
+          pr-threshold: 2000
+          validate-issue-status: true
+          allowed-issue-statuses: 'New,Open,In Progress,In Review,Reopened'
+          fail-on-error: true
