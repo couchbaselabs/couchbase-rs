@@ -282,6 +282,7 @@ pub struct TermRangeQuery {
     pub boost: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub field: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub inclusive_min: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub inclusive_max: Option<bool>,
@@ -354,8 +355,9 @@ impl ConjunctionQuery {
 pub struct DisjunctionQuery {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub boost: Option<f32>,
-    pub disjuncts: Vec<Query>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub min: Option<u32>,
+    pub disjuncts: Vec<Query>,
 }
 
 impl DisjunctionQuery {
@@ -383,8 +385,11 @@ impl DisjunctionQuery {
 pub struct BooleanQuery {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub boost: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub must: Option<ConjunctionQuery>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub must_not: Option<DisjunctionQuery>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub should: Option<DisjunctionQuery>,
 }
 
@@ -600,7 +605,7 @@ impl PrefixQuery {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Serialize)]
+#[derive(Debug, Default, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct MatchAllQuery {}
 
@@ -610,7 +615,19 @@ impl MatchAllQuery {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Serialize)]
+impl Serialize for MatchAllQuery {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+        let mut map = serializer.serialize_map(Some(1))?;
+        map.serialize_entry("match_all", &serde_json::Value::Null)?;
+        map.end()
+    }
+}
+
+#[derive(Debug, Default, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct MatchNoneQuery {}
 
@@ -620,15 +637,27 @@ impl MatchNoneQuery {
     }
 }
 
+impl Serialize for MatchNoneQuery {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+        let mut map = serializer.serialize_map(Some(1))?;
+        map.serialize_entry("match_none", &serde_json::Value::Null)?;
+        map.end()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[non_exhaustive]
 pub struct GeoDistanceQuery {
-    pub distance: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub boost: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub field: Option<String>,
     pub location: Location,
+    pub distance: String,
 }
 
 impl GeoDistanceQuery {
@@ -655,12 +684,12 @@ impl GeoDistanceQuery {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[non_exhaustive]
 pub struct GeoBoundingBoxQuery {
-    pub bottom_right: Location,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub boost: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub field: Option<String>,
     pub top_left: Location,
+    pub bottom_right: Location,
 }
 
 impl GeoBoundingBoxQuery {
