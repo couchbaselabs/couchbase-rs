@@ -146,8 +146,7 @@ pub struct KnnQuery {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub boost: Option<f32>,
     pub field: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub k: Option<i64>,
+    pub k: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub vector: Option<Vec<f32>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -157,11 +156,11 @@ pub struct KnnQuery {
 }
 
 impl KnnQuery {
-    pub fn new(field: impl Into<String>) -> Self {
+    pub fn new(field: impl Into<String>, k: impl Into<i64>) -> Self {
         Self {
             boost: None,
             field: field.into(),
-            k: None,
+            k: k.into(),
             vector: None,
             vector_base64: None,
             filter: None,
@@ -173,7 +172,7 @@ impl KnnQuery {
         self
     }
 
-    pub fn k(mut self, k: impl Into<Option<i64>>) -> Self {
+    pub fn k(mut self, k: impl Into<i64>) -> Self {
         self.k = k.into();
         self
     }
