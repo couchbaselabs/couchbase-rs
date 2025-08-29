@@ -62,10 +62,10 @@ impl From<VectorQueryCombination> for KnnOperator {
 #[derive(Debug, Clone)]
 pub struct VectorQuery {
     pub(crate) field_name: String,
+    pub(crate) num_candidates: u32,
     pub(crate) query: Option<Vec<f32>>,
     pub(crate) base64_query: Option<String>,
     pub(crate) boost: Option<f32>,
-    pub(crate) num_candidates: Option<u32>,
     pub(crate) prefilter: Option<Query>,
 }
 
@@ -76,7 +76,7 @@ impl VectorQuery {
             query: Some(vector_query),
             base64_query: None,
             boost: None,
-            num_candidates: None,
+            num_candidates: 3,
             prefilter: None,
         }
     }
@@ -90,7 +90,7 @@ impl VectorQuery {
             query: None,
             base64_query: Some(base_64_vector_query.into()),
             boost: None,
-            num_candidates: None,
+            num_candidates: 3,
             prefilter: None,
         }
     }
@@ -101,7 +101,7 @@ impl VectorQuery {
     }
 
     pub fn num_candidates(mut self, num_candidates: u32) -> Self {
-        self.num_candidates = Some(num_candidates);
+        self.num_candidates = num_candidates;
         self
     }
 
@@ -127,9 +127,8 @@ impl TryFrom<VectorQuery> for KnnQuery {
             ));
         }
 
-        Ok(KnnQuery::new(value.field_name)
+        Ok(KnnQuery::new(value.field_name, value.num_candidates)
             .boost(value.boost)
-            .k(value.num_candidates.map(|n| n as i64))
             .vector(value.query)
             .vector_base64(value.base64_query)
             .filter(value.prefilter.map(|q| q.into())))
