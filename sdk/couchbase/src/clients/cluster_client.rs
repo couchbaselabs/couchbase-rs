@@ -20,6 +20,7 @@ use couchbase_core::address;
 use couchbase_core::ondemand_agentmanager::OnDemandAgentManager;
 use couchbase_core::options::agent::{CompressionConfig, SeedConfig};
 use couchbase_core::options::ondemand_agentmanager::OnDemandAgentManagerOptions;
+use couchbase_core::orphan_reporter::OrphanReporter;
 use couchbase_core::retry::RetryStrategy;
 use couchbase_core::retrybesteffort::{BestEffortRetryStrategy, ExponentialBackoffCalculator};
 use std::collections::HashMap;
@@ -229,6 +230,8 @@ impl CouchbaseClusterBackend {
             ));
         }
 
+        let orphan_reporter = OrphanReporter::new(opts.orphan_reporter_options.into());
+
         let mut core_opts =
             OnDemandAgentManagerOptions::new(seed_config, opts.authenticator.into())
                 .tls_config(tls_config)
@@ -240,7 +243,8 @@ impl CouchbaseClusterBackend {
                 .tcp_keep_alive_time(
                     opts.tcp_keep_alive_time
                         .unwrap_or_else(|| Duration::from_secs(60)),
-                );
+                )
+                .orphan_reporter_handler(orphan_reporter.get_handle());
 
         Self::merge_options(&mut core_opts, extra_opts)?;
 

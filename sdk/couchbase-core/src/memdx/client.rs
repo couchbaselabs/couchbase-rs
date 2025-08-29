@@ -39,6 +39,7 @@ use crate::memdx::opcode::OpCode;
 use crate::memdx::packet::{RequestPacket, ResponsePacket};
 use crate::memdx::pendingop::ClientPendingOp;
 use crate::memdx::subdoc::SubdocRequestInfo;
+use crate::orphan_reporter::OrphanContext;
 
 pub(crate) type ResponseSender = Sender<error::Result<ClientResponse>>;
 pub(crate) type OpaqueMap = HashMap<u32, Arc<SenderContext>>;
@@ -65,6 +66,8 @@ struct ReadLoopOptions {
     pub on_connection_close_tx: OnConnectionCloseHandler,
     pub on_client_close_rx: Receiver<()>,
     pub disable_decompression: bool,
+    pub local_addr: SocketAddr,
+    pub peer_addr: SocketAddr,
 }
 
 #[derive(Debug)]
@@ -199,7 +202,15 @@ impl Client {
                                                             match sender.send(Err(Error::new_decompression_error().with(e))).await{
                                                                 Ok(_) => {}
                                                                 Err(e) => {
-                                                                    debug!("Sending response to caller failed: {e}");
+                                                                     debug!("Sending response to caller failed: {e}");
+                                                                     (opts.orphan_handler)(
+                                                                        packet,
+                                                                        OrphanContext {
+                                                                         client_id: opts.client_id.clone(),
+                                                                         local_addr: opts.local_addr,
+                                                                         peer_addr: opts.peer_addr,
+                                                                        },
+                                                                    );
                                                                 }
                                                             };
                                                          continue;
@@ -218,17 +229,31 @@ impl Client {
                                             }
                                         }
 
-                                        let resp = ClientResponse::new(packet, context.context.clone());
+                                        let resp = ClientResponse::new(packet.clone(), context.context.clone());
                                         match sender.send(Ok(resp)).await {
                                             Ok(_) => {}
                                             Err(e) => {
                                                 debug!("Sending response to caller failed: {e}");
+                                                (opts.orphan_handler)(
+                                                    packet,
+                                                    OrphanContext {
+                                                        client_id: opts.client_id.clone(),
+                                                        local_addr: opts.local_addr,
+                                                        peer_addr: opts.peer_addr,
+                                                    },
+                                                );
                                             }
                                         };
                                         drop(context);
                                     } else {
-                                        let opaque = packet.opaque;
-                                        (opts.orphan_handler)(packet);
+                                        (opts.orphan_handler)(
+                                            packet,
+                                            OrphanContext {
+                                                client_id: opts.client_id.clone(),
+                                                local_addr: opts.local_addr,
+                                                peer_addr: opts.peer_addr,
+                                            },
+                                        );
                                     }
                                     drop(requests);
                                 }
@@ -284,6 +309,8 @@ impl Dispatcher for Client {
                     on_connection_close_tx: opts.on_connection_close_handler,
                     on_client_close_rx: close_rx,
                     disable_decompression: opts.disable_decompression,
+                    local_addr,
+                    peer_addr,
                 },
             )
             .await;
