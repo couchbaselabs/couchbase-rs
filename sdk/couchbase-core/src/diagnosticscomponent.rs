@@ -21,7 +21,8 @@ use crate::service_type::ServiceType;
 use chrono::Utc;
 use futures::future::join_all;
 use futures::stream::FuturesUnordered;
-use futures::StreamExt;
+use futures::{FutureExt, StreamExt};
+use futures_core::future::BoxFuture;
 use log::debug;
 use serde::ser::SerializeStruct;
 use std::collections::HashMap;
@@ -266,11 +267,11 @@ impl<C: Client + 'static, M: KvClientManager> DiagnosticsComponent<C, M> {
         let on_behalf_of = opts.on_behalf_of.as_ref();
 
         loop {
-            let mut handles = FuturesUnordered::<Pin<Box<dyn Future<Output = bool>>>>::new();
+            let mut handles = FuturesUnordered::<BoxFuture<bool>>::new();
             if service_types.contains(&ServiceType::QUERY) {
                 handles.push(Box::pin(
                     self.is_query_ready(opts.on_behalf_of.as_ref(), desired_state),
-                ));
+                ))
             }
 
             if service_types.contains(&ServiceType::SEARCH) {
