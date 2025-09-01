@@ -49,12 +49,14 @@ impl ClientPendingOp {
     }
 
     pub async fn recv(&mut self) -> Result<ClientResponse> {
-        if !self.is_persistent {
-            self.completed.store(true, Ordering::SeqCst);
-        }
-
         match self.response_receiver.recv().await {
-            Some(r) => r,
+            Some(r) => {
+                if !self.is_persistent {
+                    self.completed.store(true, Ordering::SeqCst);
+                }
+
+                r
+            }
             None => Err(Error::new_cancelled_error(
                 CancellationErrorKind::RequestCancelled,
             )),
