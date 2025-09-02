@@ -485,7 +485,7 @@ impl Serialize for QueryOptions {
         serialize_if_not_none!(self.pretty, "pretty");
         serialize_if_not_none!(self.profile, "profile");
         serialize_if_not_none!(self.query_context, "query_context");
-        serialize_if_not_none!(self.read_only, "read_only");
+        serialize_if_not_none!(self.read_only, "readonly");
         serialize_if_not_none!(self.scan_cap, "scan_cap");
         serialize_if_not_none!(self.scan_consistency, "scan_consistency");
         serialize_if_not_none!(self.sparse_scan_vector, "scan_vector");
