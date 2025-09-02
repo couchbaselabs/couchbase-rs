@@ -671,11 +671,18 @@ impl Agent {
         let inner = self.inner.clone();
         tokio::spawn(async move {
             loop {
-                match watch_rx.recv().await {
-                    Ok(pc) => {
+                match watch_rx.changed().await {
+                    Ok(_) => {
+                        let pc = {
+                            // apply_config requires an owned ParsedConfig, as it takes ownership of it.
+                            // Doing the clone within a block also means we can release the lock that
+                            // borrow_and_update() takes as soon as possible.
+                            watch_rx.borrow_and_update().clone()
+                        };
                         inner.apply_config(pc).await;
                     }
                     Err(_e) => {
+                        debug!("Config watcher channel closed");
                         return;
                     }
                 }

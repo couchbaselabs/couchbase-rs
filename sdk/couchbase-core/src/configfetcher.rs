@@ -10,6 +10,7 @@ use crate::memdx::hello_feature::HelloFeature;
 use crate::memdx::request::{GetClusterConfigKnownVersion, GetClusterConfigRequest};
 use crate::parsedconfig::ParsedConfig;
 use log::{debug, trace};
+use std::env;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -56,7 +57,9 @@ impl<M: KvClientManager> ConfigFetcherMemd<M> {
 
         let config = cbconfig::parse::parse_terse_config(&resp.config, hostname)?;
 
-        trace!("Fetcher fetched new config {:?}", &config);
+        if env::var("RSCBC_DEBUG_CONFIG").is_ok() {
+            trace!("Fetcher fetched new config {:?}", &config);
+        }
 
         Ok(Some(ConfigParser::parse_terse_config(config, hostname)?))
     }

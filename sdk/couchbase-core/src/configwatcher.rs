@@ -131,8 +131,6 @@ impl<M: KvClientManager> ConfigWatcherMemdInner<M> {
             {
                 Ok(c) => c,
                 Err(e) => {
-                    dbg!(e);
-
                     select! {
                         _ = on_shutdown_rx.recv() => {
                             return;
