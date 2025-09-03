@@ -1,8 +1,7 @@
 use crate::common::default_agent_options;
 use crate::common::node_version::NodeVersion;
 use crate::common::test_agent::TestAgent;
-use couchbase_connstr::ResolvedConnSpec;
-use couchbase_core::address::Address;
+use couchbase_connstr::{Address, ResolvedConnSpec};
 use couchbase_core::agent::Agent;
 use envconfig::Envconfig;
 use lazy_static::lazy_static;
@@ -166,14 +165,7 @@ pub async fn create_test_config(test_config: &EnvTestConfig) -> TestSetupConfig 
     TestSetupConfig {
         username: test_config.username.clone(),
         password: test_config.password.clone(),
-        memd_addrs: resolved_conn_spec
-            .memd_hosts
-            .iter()
-            .map(|h| Address {
-                host: h.host.clone(),
-                port: h.port,
-            })
-            .collect(),
+        memd_addrs: resolved_conn_spec.memd_hosts.clone(),
         data_timeout: test_config.data_timeout.clone(),
         use_ssl: resolved_conn_spec.use_ssl,
         bucket: test_config.default_bucket.clone(),
