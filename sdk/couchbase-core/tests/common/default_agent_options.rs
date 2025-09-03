@@ -23,7 +23,9 @@ pub async fn create_default_options(config: TestSetupConfig) -> AgentOptions {
     };
 
     AgentOptions::new(
-        SeedConfig::new().memd_addrs(config.memd_addrs.clone()),
+        SeedConfig::new()
+            .memd_addrs(config.memd_addrs.clone())
+            .http_addrs(config.http_addrs.clone()),
         Authenticator::PasswordAuthenticator(PasswordAuthenticator {
             username: config.username.clone(),
             password: config.password.clone(),
@@ -48,7 +50,9 @@ pub async fn create_options_without_bucket(config: TestSetupConfig) -> AgentOpti
     };
 
     AgentOptions::new(
-        SeedConfig::new().memd_addrs(config.memd_addrs.clone()),
+        SeedConfig::new()
+            .memd_addrs(config.memd_addrs.clone())
+            .http_addrs(config.http_addrs.clone()),
         Authenticator::PasswordAuthenticator(PasswordAuthenticator {
             username: config.username.clone(),
             password: config.password.clone(),
