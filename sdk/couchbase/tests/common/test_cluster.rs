@@ -65,30 +65,6 @@ impl TestCluster {
         TestUserManager::new(self.inner.users())
     }
 
-    pub async fn query(
-        &self,
-        statement: impl Into<String>,
-        opts: impl Into<Option<QueryOptions>>,
-    ) -> error::Result<QueryResult> {
-        timeout(Duration::from_secs(15), self.inner.query(statement, opts))
-            .await
-            .unwrap()
-    }
-
-    pub async fn search(
-        &self,
-        index_name: impl Into<String>,
-        request: SearchRequest,
-        opts: impl Into<Option<SearchOptions>>,
-    ) -> error::Result<SearchResult> {
-        timeout(
-            Duration::from_secs(15),
-            self.inner.search(index_name, request, opts),
-        )
-        .await
-        .unwrap()
-    }
-
     pub async fn ping(
         &self,
         opts: impl Into<Option<couchbase::options::diagnostic_options::PingOptions>>,

@@ -20,8 +20,11 @@ mod common;
 #[test]
 fn test_query_basic() {
     run_test(async |cluster| {
+        let scope = cluster
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope());
         let opts = QueryOptions::new().metrics(true);
-        let mut res = cluster.query("SELECT 1=1", opts).await.unwrap();
+        let mut res = scope.query("SELECT 1=1", opts).await.unwrap();
 
         let mut rows: Vec<Value> = vec![];
         while let Some(row) = res.rows().next().await {
@@ -44,8 +47,11 @@ fn test_query_basic() {
 #[test]
 fn test_query_empty_result() {
     run_test(async |cluster| {
+        let scope = cluster
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope());
         let opts = QueryOptions::new().metrics(true);
-        let mut res = cluster
+        let mut res = scope
             .query("SELECT * FROM ARRAY_RANGE(0, 0) AS x", opts)
             .await
             .unwrap();
@@ -62,8 +68,11 @@ fn test_query_empty_result() {
 #[test]
 fn test_query_error() {
     run_test(async |cluster| {
+        let scope = cluster
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope());
         let opts = QueryOptions::new().metrics(true);
-        let mut res = cluster.query("SELEC 1=1", opts).await;
+        let mut res = scope.query("SELEC 1=1", opts).await;
 
         let e = res.err().unwrap();
         assert_eq!(&ErrorKind::ParsingFailure, e.kind());
@@ -76,8 +85,11 @@ fn test_query_error() {
 #[test]
 fn test_query_raw_result() {
     run_test(async |cluster| {
+        let scope = cluster
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope());
         let opts = QueryOptions::new().metrics(true);
-        let mut res = cluster.query("SELECT 1=1", opts).await.unwrap();
+        let mut res = scope.query("SELECT 1=1", opts).await.unwrap();
 
         let mut rows: Vec<Box<RawValue>> = vec![];
         while let Some(row) = res.rows().next().await {
@@ -101,34 +113,9 @@ fn test_query_raw_result() {
 #[test]
 fn test_prepared_query_basic() {
     run_test(async |cluster| {
-        let opts = QueryOptions::new().metrics(true);
-        let mut res = cluster.query("SELECT 1=1", opts).await.unwrap();
-
-        let mut rows: Vec<Value> = vec![];
-        while let Some(row) = res.rows().next().await {
-            rows.push(row.unwrap());
-        }
-
-        assert_eq!(1, rows.len());
-
-        let row = rows.first().unwrap();
-
-        let row_obj = row.as_object().unwrap();
-
-        assert!(row_obj.get("$1").unwrap().as_bool().unwrap());
-
-        let meta = res.metadata().unwrap();
-        assert_metadata(meta);
-    })
-}
-
-#[test]
-fn test_scope_query_basic() {
-    run_test(async |cluster| {
         let scope = cluster
             .bucket(cluster.default_bucket())
             .scope(cluster.default_scope());
-
         let opts = QueryOptions::new().metrics(true);
         let mut res = scope.query("SELECT 1=1", opts).await.unwrap();
 

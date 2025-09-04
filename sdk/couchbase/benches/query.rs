@@ -8,10 +8,13 @@ fn query(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
 
     let cluster = rt.block_on(async { create_test_cluster().await });
+    let scope = cluster
+        .bucket(cluster.default_bucket())
+        .scope(cluster.default_scope());
 
     c.bench_function("query", |b| {
         b.to_async(&rt).iter(|| async {
-            cluster.query("SELECT 1=1", None).await.unwrap();
+            scope.query("SELECT 1=1", None).await.unwrap();
         })
     });
 }
