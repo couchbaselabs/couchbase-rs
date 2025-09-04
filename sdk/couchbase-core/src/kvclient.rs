@@ -1,4 +1,3 @@
-use crate::address::Address;
 use crate::auth_mechanism::AuthMechanism;
 use crate::authenticator::{Authenticator, UserPassPair};
 use crate::error::Error;
@@ -17,6 +16,7 @@ use crate::service_type::ServiceType;
 use crate::tls_config::TlsConfig;
 use crate::util::hostname_from_addr_str;
 use chrono::{DateTime, FixedOffset, Local, NaiveDateTime, Utc};
+use couchbase_connstr::Address;
 use futures::future::BoxFuture;
 use log::{debug, warn};
 use std::future::Future;
