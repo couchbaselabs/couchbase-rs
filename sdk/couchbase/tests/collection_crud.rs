@@ -432,7 +432,7 @@ fn test_lookup_in() {
             LookupInSpec::get("baz", None),
             LookupInSpec::exists("not-exists", None),
             LookupInSpec::count("arr", None),
-            LookupInSpec::get(LookupInMacros::IsDeleted, GetSpecOptions::new().xattr()),
+            LookupInSpec::get(LookupInMacros::IsDeleted, GetSpecOptions::new().xattr(true)),
             LookupInSpec::get("", None),
         ];
 
@@ -527,7 +527,7 @@ fn get_with_expiry() {
             .unwrap();
 
         let res = collection
-            .get(key, GetOptions::new().expiry())
+            .get(key, GetOptions::new().expiry(true))
             .await
             .unwrap();
 

@@ -99,8 +99,8 @@ impl GetOptions {
         Self::default()
     }
 
-    pub fn expiry(mut self) -> Self {
-        self.expiry = Some(true);
+    pub fn expiry(mut self, expiry: bool) -> Self {
+        self.expiry = Some(expiry);
         self
     }
 }
@@ -189,8 +189,8 @@ impl LookupInOptions {
         Self::default()
     }
 
-    pub fn access_deleted(mut self) -> Self {
-        self.access_deleted = Some(true);
+    pub fn access_deleted(mut self, access_deleted: bool) -> Self {
+        self.access_deleted = Some(access_deleted);
         self
     }
 }
