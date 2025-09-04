@@ -193,13 +193,13 @@ impl KvConfig {
         Self::default()
     }
 
-    pub fn disable_mutation_tokens(mut self) -> Self {
-        self.enable_mutation_tokens = false;
+    pub fn enable_mutation_tokens(mut self, enable: bool) -> Self {
+        self.enable_mutation_tokens = enable;
         self
     }
 
-    pub fn disable_server_durations(mut self) -> Self {
-        self.enable_server_durations = false;
+    pub fn enable_server_durations(mut self, enable: bool) -> Self {
+        self.enable_server_durations = enable;
         self
     }
 

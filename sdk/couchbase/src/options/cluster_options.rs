@@ -203,13 +203,13 @@ impl KvOptions {
         Self::default()
     }
 
-    pub fn disable_mutation_tokens(mut self) -> Self {
-        self.enable_mutation_tokens = Some(false);
+    pub fn enable_mutation_tokens(mut self, enable: bool) -> Self {
+        self.enable_mutation_tokens = Some(enable);
         self
     }
 
-    pub fn disable_server_durations(mut self) -> Self {
-        self.enable_server_durations = Some(false);
+    pub fn enable_server_durations(mut self, enable: bool) -> Self {
+        self.enable_server_durations = Some(enable);
         self
     }
 
@@ -233,15 +233,11 @@ impl From<KvOptions> for couchbase_core::options::agent::KvConfig {
     fn from(opts: KvOptions) -> Self {
         let mut core_opts = couchbase_core::options::agent::KvConfig::default();
         if let Some(enable) = opts.enable_mutation_tokens {
-            if !enable {
-                core_opts = core_opts.disable_mutation_tokens();
-            }
+            core_opts = core_opts.enable_mutation_tokens(enable);
         }
 
         if let Some(enable) = opts.enable_server_durations {
-            if !enable {
-                core_opts = core_opts.disable_server_durations();
-            }
+            core_opts = core_opts.enable_server_durations(enable);
         }
 
         if let Some(num) = opts.num_connections {

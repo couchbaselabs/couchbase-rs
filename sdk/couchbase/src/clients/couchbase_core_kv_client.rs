@@ -178,8 +178,8 @@ impl CouchbaseCoreKvClient {
 
         if let Some(true) = options.expiry {
             let specs = vec![
-                LookupInSpec::get("$document.exptime", GetSpecOptions::new().xattr()),
-                LookupInSpec::get("$document.flags", GetSpecOptions::new().xattr()),
+                LookupInSpec::get("$document.exptime", GetSpecOptions::new().xattr(true)),
+                LookupInSpec::get("$document.flags", GetSpecOptions::new().xattr(true)),
                 LookupInSpec::get("", None),
             ];
 
