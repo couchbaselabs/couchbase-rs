@@ -21,7 +21,7 @@ pub(crate) struct SearchIndexDefsJson {
 #[derive(Serialize, Deserialize)]
 pub(crate) struct SearchIndexesResponseJson {
     pub status: String,
-    #[serde(rename = "indexDef")]
+    #[serde(rename = "indexDefs")]
     pub indexes: SearchIndexDefsJson,
 }
 
@@ -44,7 +44,7 @@ pub(crate) struct IndexJson {
     pub source_params: Option<HashMap<String, Value>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source_type: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", rename = "sourceUUID")]
     pub source_uuid: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub uuid: Option<String>,
