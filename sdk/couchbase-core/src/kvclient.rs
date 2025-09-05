@@ -66,7 +66,7 @@ pub(crate) type UnsolicitedPacketSender = mpsc::UnboundedSender<ResponsePacket>;
 
 pub(crate) struct KvClientOptions {
     pub unsolicited_packet_tx: Option<UnsolicitedPacketSender>,
-    pub orphan_handler: OrphanResponseHandler,
+    pub orphan_handler: Option<OrphanResponseHandler>,
     pub on_close: OnKvClientCloseHandler,
     pub on_err_map_fetched: Option<OnErrMapFetchedHandler>,
     pub disable_decompression: bool,
