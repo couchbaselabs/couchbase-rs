@@ -41,7 +41,6 @@ pub(crate) struct ConfigManagerMemdOptions<M: KvClientManager> {
     pub polling_period: Duration,
     pub first_config: ParsedConfig,
     pub kv_client_manager: Arc<M>,
-    pub on_shutdown_rx: broadcast::Receiver<()>,
 }
 
 pub(crate) struct ConfigManagerMemd<M: KvClientManager> {
@@ -61,7 +60,6 @@ pub(crate) struct ConfigManagerMemdInner<M: KvClientManager> {
 
     on_new_config_tx: watch::Sender<ParsedConfig>,
 
-    on_shutdown_rx: broadcast::Receiver<()>,
     watcher_shutdown_tx: broadcast::Sender<()>,
 }
 
@@ -239,7 +237,7 @@ impl<M: KvClientManager + 'static> ConfigManagerMemdInner<M> {
                     }
                     Err(e) => {
                         if e == RecvError::Closed {
-                            debug!("Config watcher channel closed");
+                            debug!("Config watcher exited");
                             return;
                         } else {
                             warn!("Config watcher channel error: {e}");
@@ -294,7 +292,6 @@ impl<M: KvClientManager + 'static> ConfigManagerMemd<M> {
 
             on_new_config_tx,
 
-            on_shutdown_rx: opts.on_shutdown_rx,
             watcher_shutdown_tx,
         });
 

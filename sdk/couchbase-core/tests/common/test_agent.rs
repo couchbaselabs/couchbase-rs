@@ -24,7 +24,8 @@ use couchbase_core::results::query::QueryResultStream;
 use couchbase_core::results::search::SearchResultStream;
 use couchbase_core::searchx;
 use couchbase_core::searchx::document_analysis::DocumentAnalysis;
-use std::ops::{Add, Deref, DerefMut};
+use std::ops::{Add, Deref};
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::{timeout_at, Instant};
 
@@ -32,7 +33,7 @@ use tokio::time::{timeout_at, Instant};
 pub struct TestAgent {
     pub test_setup_config: TestSetupConfig,
     pub cluster_version: NodeVersion,
-    agent: Agent,
+    agent: Arc<Agent>,
 }
 
 impl TestAgent {
@@ -44,7 +45,7 @@ impl TestAgent {
         Self {
             test_setup_config,
             cluster_version,
-            agent,
+            agent: Arc::new(agent),
         }
     }
 }
@@ -54,12 +55,6 @@ impl Deref for TestAgent {
 
     fn deref(&self) -> &Self::Target {
         &self.agent
-    }
-}
-
-impl DerefMut for TestAgent {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.agent
     }
 }
 

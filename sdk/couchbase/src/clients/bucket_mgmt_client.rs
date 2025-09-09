@@ -138,7 +138,9 @@ impl CouchbaseBucketMgmtClient {
         let opts = couchbase_core::options::management::GetAllBucketsOptions::new()
             .retry_strategy(self.default_retry_strategy.clone());
 
-        let buckets = agent.get_all_buckets(&opts).await?;
+        let buckets = CouchbaseAgentProvider::upgrade_agent(agent)?
+            .get_all_buckets(&opts)
+            .await?;
 
         Ok(buckets.into_iter().map(|b| b.into()).collect())
     }
@@ -152,7 +154,9 @@ impl CouchbaseBucketMgmtClient {
         let opts = couchbase_core::options::management::GetBucketOptions::new(&bucket_name)
             .retry_strategy(self.default_retry_strategy.clone());
 
-        let bucket = agent.get_bucket(&opts).await?;
+        let bucket = CouchbaseAgentProvider::upgrade_agent(agent)?
+            .get_bucket(&opts)
+            .await?;
 
         Ok(bucket.into())
     }
@@ -229,7 +233,9 @@ impl CouchbaseBucketMgmtClient {
         )
         .retry_strategy(self.default_retry_strategy.clone());
 
-        agent.create_bucket(&opts).await?;
+        CouchbaseAgentProvider::upgrade_agent(agent)?
+            .create_bucket(&opts)
+            .await?;
 
         Ok(())
     }
@@ -302,7 +308,9 @@ impl CouchbaseBucketMgmtClient {
         )
         .retry_strategy(self.default_retry_strategy.clone());
 
-        agent.update_bucket(&opts).await?;
+        CouchbaseAgentProvider::upgrade_agent(agent)?
+            .update_bucket(&opts)
+            .await?;
 
         Ok(())
     }
@@ -316,7 +324,9 @@ impl CouchbaseBucketMgmtClient {
         let opts = couchbase_core::options::management::DeleteBucketOptions::new(&bucket_name)
             .retry_strategy(self.default_retry_strategy.clone());
 
-        agent.delete_bucket(&opts).await?;
+        CouchbaseAgentProvider::upgrade_agent(agent)?
+            .delete_bucket(&opts)
+            .await?;
 
         Ok(())
     }
@@ -329,7 +339,9 @@ impl CouchbaseBucketMgmtClient {
         let agent = self.agent_provider.get_agent().await;
         let opts = couchbase_core::options::management::FlushBucketOptions::new(&bucket_name)
             .retry_strategy(self.default_retry_strategy.clone());
-        agent.flush_bucket(&opts).await?;
+        CouchbaseAgentProvider::upgrade_agent(agent)?
+            .flush_bucket(&opts)
+            .await?;
 
         Ok(())
     }

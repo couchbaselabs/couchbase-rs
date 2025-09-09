@@ -54,7 +54,7 @@ impl CouchbaseCoreKvClient {
         options: UpsertOptions,
     ) -> error::Result<MutationResult> {
         let agent = self.agent_provider.get_agent().await;
-        let result = agent
+        let result = CouchbaseAgentProvider::upgrade_agent(agent)?
             .upsert(
                 couchbase_core::options::crud::UpsertOptions::new(
                     id.as_bytes(),
@@ -88,7 +88,7 @@ impl CouchbaseCoreKvClient {
         options: InsertOptions,
     ) -> error::Result<MutationResult> {
         let agent = self.agent_provider.get_agent().await;
-        let result = agent
+        let result = CouchbaseAgentProvider::upgrade_agent(agent)?
             .add(
                 couchbase_core::options::crud::AddOptions::new(
                     id.as_bytes(),
@@ -121,7 +121,7 @@ impl CouchbaseCoreKvClient {
         options: ReplaceOptions,
     ) -> error::Result<MutationResult> {
         let agent = self.agent_provider.get_agent().await;
-        let result = agent
+        let result = CouchbaseAgentProvider::upgrade_agent(agent)?
             .replace(
                 couchbase_core::options::crud::ReplaceOptions::new(
                     id.as_bytes(),
@@ -150,7 +150,7 @@ impl CouchbaseCoreKvClient {
 
     pub async fn remove(&self, id: &str, options: RemoveOptions) -> error::Result<MutationResult> {
         let agent = self.agent_provider.get_agent().await;
-        let result = agent
+        let result = CouchbaseAgentProvider::upgrade_agent(agent)?
             .delete(
                 couchbase_core::options::crud::DeleteOptions::new(
                     id.as_bytes(),
@@ -204,7 +204,7 @@ impl CouchbaseCoreKvClient {
             });
         }
 
-        let res = agent
+        let res = CouchbaseAgentProvider::upgrade_agent(agent)?
             .get(
                 couchbase_core::options::crud::GetOptions::new(
                     id.as_bytes(),
@@ -220,7 +220,7 @@ impl CouchbaseCoreKvClient {
 
     pub async fn exists(&self, id: &str, _options: ExistsOptions) -> error::Result<ExistsResult> {
         let agent = self.agent_provider.get_agent().await;
-        let res = agent
+        let res = CouchbaseAgentProvider::upgrade_agent(agent)?
             .get_meta(
                 couchbase_core::options::crud::GetMetaOptions::new(
                     id.as_bytes(),
@@ -241,7 +241,7 @@ impl CouchbaseCoreKvClient {
         _options: GetAndTouchOptions,
     ) -> error::Result<GetResult> {
         let agent = self.agent_provider.get_agent().await;
-        let res = agent
+        let res = CouchbaseAgentProvider::upgrade_agent(agent)?
             .get_and_touch(
                 couchbase_core::options::crud::GetAndTouchOptions::new(
                     id.as_bytes(),
@@ -263,7 +263,7 @@ impl CouchbaseCoreKvClient {
         _options: GetAndLockOptions,
     ) -> error::Result<GetResult> {
         let agent = self.agent_provider.get_agent().await;
-        let res = agent
+        let res = CouchbaseAgentProvider::upgrade_agent(agent)?
             .get_and_lock(
                 couchbase_core::options::crud::GetAndLockOptions::new(
                     id.as_bytes(),
@@ -280,7 +280,7 @@ impl CouchbaseCoreKvClient {
 
     pub async fn unlock(&self, id: &str, cas: u64, _options: UnlockOptions) -> error::Result<()> {
         let agent = self.agent_provider.get_agent().await;
-        agent
+        CouchbaseAgentProvider::upgrade_agent(agent)?
             .unlock(
                 couchbase_core::options::crud::UnlockOptions::new(
                     id.as_bytes(),
@@ -302,7 +302,7 @@ impl CouchbaseCoreKvClient {
         _options: TouchOptions,
     ) -> error::Result<TouchResult> {
         let agent = self.agent_provider.get_agent().await;
-        let result = agent
+        let result = CouchbaseAgentProvider::upgrade_agent(agent)?
             .touch(
                 couchbase_core::options::crud::TouchOptions::new(
                     id.as_bytes(),
@@ -324,7 +324,7 @@ impl CouchbaseCoreKvClient {
         options: AppendOptions,
     ) -> error::Result<MutationResult> {
         let agent = self.agent_provider.get_agent().await;
-        let result = agent
+        let result = CouchbaseAgentProvider::upgrade_agent(agent)?
             .append(
                 couchbase_core::options::crud::AppendOptions::new(
                     id.as_bytes(),
@@ -354,7 +354,7 @@ impl CouchbaseCoreKvClient {
         options: PrependOptions,
     ) -> error::Result<MutationResult> {
         let agent = self.agent_provider.get_agent().await;
-        let result = agent
+        let result = CouchbaseAgentProvider::upgrade_agent(agent)?
             .prepend(
                 couchbase_core::options::crud::PrependOptions::new(
                     id.as_bytes(),
@@ -383,7 +383,7 @@ impl CouchbaseCoreKvClient {
         options: IncrementOptions,
     ) -> error::Result<CounterResult> {
         let agent = self.agent_provider.get_agent().await;
-        let result = agent
+        let result = CouchbaseAgentProvider::upgrade_agent(agent)?
             .increment(
                 couchbase_core::options::crud::IncrementOptions::new(
                     id.as_bytes(),
@@ -415,7 +415,7 @@ impl CouchbaseCoreKvClient {
         options: DecrementOptions,
     ) -> error::Result<CounterResult> {
         let agent = self.agent_provider.get_agent().await;
-        let result = agent
+        let result = CouchbaseAgentProvider::upgrade_agent(agent)?
             .decrement(
                 couchbase_core::options::crud::DecrementOptions::new(
                     id.as_bytes(),
@@ -450,7 +450,7 @@ impl CouchbaseCoreKvClient {
         let agent = self.agent_provider.get_agent().await;
         let (ordered_specs, op_indexes) = reorder_subdoc_ops(specs);
 
-        let result = agent
+        let result = CouchbaseAgentProvider::upgrade_agent(agent)?
             .lookup_in(
                 couchbase_core::options::crud::LookupInOptions::new(
                     id.as_bytes(),
@@ -500,7 +500,7 @@ impl CouchbaseCoreKvClient {
         let agent = self.agent_provider.get_agent().await;
         let (ordered_specs, op_indexes) = reorder_subdoc_ops(specs);
 
-        let result = agent
+        let result = CouchbaseAgentProvider::upgrade_agent(agent)?
             .mutate_in(
                 couchbase_core::options::crud::MutateInOptions::new(
                     id.as_bytes(),
