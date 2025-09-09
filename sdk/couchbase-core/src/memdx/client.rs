@@ -21,6 +21,7 @@ use tokio::sync::{mpsc, oneshot, Mutex, MutexGuard, RwLock};
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use tokio_util::codec::{FramedRead, FramedWrite};
+use tokio_util::sync::{CancellationToken, DropGuard};
 use uuid::Uuid;
 
 use crate::memdx::client_response::ClientResponse;
@@ -63,7 +64,7 @@ struct ReadLoopOptions {
     pub unsolicited_packet_handler: UnsolicitedPacketHandler,
     pub orphan_handler: OrphanResponseHandler,
     pub on_connection_close_tx: OnConnectionCloseHandler,
-    pub on_client_close_rx: Receiver<()>,
+    pub on_close_cancel: CancellationToken,
     pub disable_decompression: bool,
 }
 
@@ -86,8 +87,7 @@ pub struct Client {
     client_id: String,
 
     writer: Mutex<FramedWrite<WriteHalf<Box<dyn Stream>>, KeyValueCodec>>,
-    read_handle: Mutex<ClientReadHandle>,
-    close_tx: Sender<()>,
+    on_close_cancel: DropGuard,
 
     local_addr: SocketAddr,
     peer_addr: SocketAddr,
@@ -127,6 +127,7 @@ impl Client {
     }
 
     async fn on_read_loop_close(
+        client_id: &str,
         stream: FramedRead<ReadHalf<Box<dyn Stream>>, KeyValueCodec>,
         opaque_map: Arc<std::sync::Mutex<OpaqueMap>>,
         on_connection_close: OnConnectionCloseHandler,
@@ -136,6 +137,8 @@ impl Client {
         Self::drain_opaque_map(opaque_map).await;
 
         on_connection_close().await;
+
+        debug!("{client_id} read loop shut down");
     }
 
     async fn read_loop(
@@ -145,8 +148,8 @@ impl Client {
     ) {
         loop {
             select! {
-                (_) = opts.on_client_close_rx.recv() => {
-                    Self::on_read_loop_close(stream, opaque_map, opts.on_connection_close_tx).await;
+                (_) = opts.on_close_cancel.cancelled() => {
+                    Self::on_read_loop_close(&opts.client_id, stream, opaque_map, opts.on_connection_close_tx).await;
                     return;
                 },
                 (next) = stream.next() => {
@@ -238,7 +241,7 @@ impl Client {
                             }
                         }
                         None => {
-                            Self::on_read_loop_close(stream, opaque_map, opts.on_connection_close_tx).await;
+                            Self::on_read_loop_close(&opts.client_id, stream, opaque_map, opts.on_connection_close_tx).await;
                             return;
                         }
                     }
@@ -266,14 +269,16 @@ impl Dispatcher for Client {
         let reader = FramedRead::new(r, codec);
         let writer = FramedWrite::new(w, codec);
 
-        let (close_tx, close_rx) = mpsc::channel::<()>(1);
+        let cancel_token = CancellationToken::new();
+        let cancel_child = cancel_token.child_token();
+        let cancel_guard = cancel_token.drop_guard();
 
         let opaque_map = Arc::new(std::sync::Mutex::new(OpaqueMap::default()));
 
         let read_opaque_map = Arc::clone(&opaque_map);
         let read_uuid = opts.id.clone();
 
-        let read_handle = tokio::spawn(async move {
+        tokio::spawn(async move {
             Client::read_loop(
                 reader,
                 read_opaque_map,
@@ -282,7 +287,7 @@ impl Dispatcher for Client {
                     unsolicited_packet_handler: opts.unsolicited_packet_handler,
                     orphan_handler: opts.orphan_handler,
                     on_connection_close_tx: opts.on_connection_close_handler,
-                    on_client_close_rx: close_rx,
+                    on_close_cancel: cancel_child,
                     disable_decompression: opts.disable_decompression,
                 },
             )
@@ -294,10 +299,9 @@ impl Dispatcher for Client {
             opaque_map,
             client_id: opts.id,
 
-            close_tx,
+            on_close_cancel: cancel_guard,
 
             writer: Mutex::new(writer),
-            read_handle: Mutex::new(ClientReadHandle { read_handle }),
 
             local_addr,
             peer_addr,
@@ -375,14 +379,6 @@ impl Dispatcher for Client {
             }
         };
 
-        // TODO: We probably need to be logging any errors here.
-        self.close_tx.send(()).await.unwrap_or_default();
-
-        // Note: doing this doesn't technically consume the handle but calling it twice will
-        // cause a panic.
-        let mut read_handle = self.read_handle.lock().await;
-        read_handle.await_completion().await;
-
         Self::drain_opaque_map(self.opaque_map.clone()).await;
 
         if let Some(e) = close_err {
@@ -390,5 +386,11 @@ impl Dispatcher for Client {
         }
 
         Ok(())
+    }
+}
+
+impl Drop for Client {
+    fn drop(&mut self) {
+        debug!("Client {} exiting", self.client_id);
     }
 }

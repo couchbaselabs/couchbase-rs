@@ -1,6 +1,8 @@
+use crate::error;
+use crate::error::ErrorKind;
 use couchbase_core::agent::Agent;
 use couchbase_core::ondemand_agentmanager::OnDemandAgentManager;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, RwLock, Weak};
 use tokio::sync::Notify;
 
 #[derive(Clone)]
@@ -10,12 +12,12 @@ pub(crate) struct CouchbaseAgentProvider {
 }
 
 struct CouchbaseAgentProviderInner {
-    agent: RwLock<Option<Agent>>,
+    agent: RwLock<Option<Weak<Agent>>>,
     waiter: Notify,
 }
 
 impl CouchbaseAgentProvider {
-    pub fn with_agent(agent: Agent) -> Self {
+    pub fn with_agent(agent: Weak<Agent>) -> Self {
         Self {
             inner: Arc::new(CouchbaseAgentProviderInner {
                 agent: RwLock::new(Some(agent)),
@@ -57,7 +59,7 @@ impl CouchbaseAgentProvider {
     }
 
     // get_agent will return the agent if it is already available, otherwise it will wait until it is available.
-    pub async fn get_agent(&self) -> Agent {
+    pub async fn get_agent(&self) -> Weak<Agent> {
         {
             let guard = self.inner.agent.read().unwrap();
             if let Some(agent) = guard.as_ref() {
@@ -67,5 +69,12 @@ impl CouchbaseAgentProvider {
 
         self.inner.waiter.notified().await;
         Box::pin(self.get_agent()).await
+    }
+
+    pub(crate) fn upgrade_agent(agent: Weak<Agent>) -> error::Result<Arc<Agent>> {
+        match agent.upgrade() {
+            Some(agent) => Ok(agent),
+            None => Err(error::Error::new(ErrorKind::Disconnected)),
+        }
     }
 }

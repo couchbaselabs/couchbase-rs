@@ -44,7 +44,6 @@ pub(crate) trait KvClientManager: Sized + Send + Sync {
         endpoint: Option<&str>,
         client: Arc<KvClientManagerClientType<Self>>,
     ) -> impl Future<Output = Result<()>> + Send;
-    fn close(&self) -> impl Future<Output = Result<()>> + Send;
 }
 
 pub(crate) struct KvClientManagerConfig {
@@ -271,33 +270,6 @@ where
         // we don't know which endpoint this belongs to, so we need to send the
         // shutdown request to all the possibilities...
         self.shutdown_random_client(client).await
-    }
-
-    async fn close(&self) -> Result<()> {
-        let mut guard = self.closed.lock().await;
-        if *guard {
-            return Err(ErrorKind::IllegalState {
-                msg: "close called twice".to_string(),
-            }
-            .into());
-        }
-        *guard = true;
-
-        let state = self.state.load();
-
-        let mut old_pools = HashMap::new();
-        old_pools.clone_from(&state.client_pools);
-
-        self.state.swap(Arc::new(KvClientManagerState {
-            client_pools: HashMap::new(),
-        }));
-
-        for (_, pool) in old_pools {
-            // TODO: log error.
-            pool.close().await.unwrap_or_default();
-        }
-
-        Ok(())
     }
 }
 

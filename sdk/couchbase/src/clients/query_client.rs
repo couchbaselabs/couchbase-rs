@@ -84,9 +84,17 @@ impl CouchbaseQueryClient {
 
         let agent = self.agent_provider.get_agent().await;
         if ad_hoc {
-            Ok(QueryResult::from(agent.query(query_opts).await?))
+            Ok(QueryResult::from(
+                CouchbaseAgentProvider::upgrade_agent(agent)?
+                    .query(query_opts)
+                    .await?,
+            ))
         } else {
-            Ok(QueryResult::from(agent.prepared_query(query_opts).await?))
+            Ok(QueryResult::from(
+                CouchbaseAgentProvider::upgrade_agent(agent)?
+                    .prepared_query(query_opts)
+                    .await?,
+            ))
         }
     }
 }

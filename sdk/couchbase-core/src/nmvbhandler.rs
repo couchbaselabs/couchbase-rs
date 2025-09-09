@@ -1,6 +1,6 @@
 use std::future::Future;
 use std::ops::Deref;
-use std::sync::Arc;
+use std::sync::Weak;
 
 use tokio::sync::Mutex;
 
@@ -23,7 +23,7 @@ pub(crate) trait ConfigUpdater: Send + Sync + Sized {
 }
 
 pub(crate) struct StdNotMyVbucketConfigHandler<C> {
-    watcher: Mutex<Option<Arc<C>>>,
+    watcher: Mutex<Option<Weak<C>>>,
 }
 
 impl<C> StdNotMyVbucketConfigHandler<C>
@@ -36,7 +36,7 @@ where
         }
     }
 
-    pub async fn set_watcher(&self, updater: Arc<C>) {
+    pub async fn set_watcher(&self, updater: Weak<C>) {
         let mut watcher = self.watcher.lock().await;
         *watcher = Some(updater);
     }
@@ -48,7 +48,9 @@ where
 {
     async fn not_my_vbucket_config(&self, config: TerseConfig, source_hostname: &str) {
         if let Some(watcher) = self.watcher.lock().await.deref() {
-            watcher.apply_terse_config(config, source_hostname).await;
+            if let Some(watcher) = watcher.upgrade() {
+                watcher.apply_terse_config(config, source_hostname).await;
+            }
         }
     }
 }

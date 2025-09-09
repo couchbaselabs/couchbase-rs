@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 use http::header::{CONTENT_TYPE, USER_AGENT};
-use log::trace;
+use log::{debug, trace};
 use reqwest::redirect::Policy;
 use std::error::Error as StdError;
 use std::sync::Arc;
@@ -202,5 +202,11 @@ impl Client for ReqwestClient {
                 }
             }
         }
+    }
+}
+
+impl Drop for ReqwestClient {
+    fn drop(&mut self) {
+        debug!("Dropping HTTP Client {}", &self.client_id);
     }
 }

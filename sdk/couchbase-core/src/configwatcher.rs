@@ -186,7 +186,7 @@ where
         let inner = self.inner.clone();
         tokio::spawn(async move {
             inner.watch(on_shutdown_rx, on_new_config_tx).await;
-            debug!("config poll exit")
+            debug!("Config poller exited")
         });
 
         on_new_config_rx

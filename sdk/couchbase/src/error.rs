@@ -143,6 +143,8 @@ impl StdError for Error {}
 pub enum ErrorKind {
     OtherFailure(String),
     ServerTimeout,
+    Disconnected,
+
     // Shared Error Definitions RFC#58@16
     InvalidArgument(InvalidArgumentErrorKind),
     ServiceNotAvailable(ServiceType),
@@ -227,6 +229,9 @@ impl Display for ErrorKind {
                 } else {
                     write!(f, "invalid argument: {msg}")
                 };
+            }
+            ErrorKind::Disconnected => {
+                "the client is disconnected (have the parent bucket or cluster been dropped?)"
             }
             ErrorKind::ServiceNotAvailable(service) => {
                 return write!(f, "service not available: {service}");

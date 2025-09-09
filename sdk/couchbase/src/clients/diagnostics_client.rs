@@ -78,7 +78,9 @@ impl CouchbaseDiagnosticsClient {
             couchbase_core::options::diagnostics::DiagnosticsOptions::new()
         };
 
-        let report = agent.diagnostics(&core_opts).await?;
+        let report = CouchbaseAgentProvider::upgrade_agent(agent)?
+            .diagnostics(&core_opts)
+            .await?;
 
         Ok(DiagnosticsResult::from(report))
     }
@@ -92,7 +94,9 @@ impl CouchbaseDiagnosticsClient {
             couchbase_core::options::ping::PingOptions::new()
         };
 
-        let report = agent.ping(&core_opts).await?;
+        let report = CouchbaseAgentProvider::upgrade_agent(agent)?
+            .ping(&core_opts)
+            .await?;
 
         Ok(PingReport::from(report))
     }
@@ -106,7 +110,9 @@ impl CouchbaseDiagnosticsClient {
             couchbase_core::options::waituntilready::WaitUntilReadyOptions::new()
         };
 
-        Ok(agent.wait_until_ready(&core_opts).await?)
+        Ok(CouchbaseAgentProvider::upgrade_agent(agent)?
+            .wait_until_ready(&core_opts)
+            .await?)
     }
 }
 

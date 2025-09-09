@@ -19,9 +19,30 @@ fn test_get_cluster_agent() {
         let agent = mgr.get_cluster_agent();
 
         agent
+            .upgrade()
+            .unwrap()
             .query(QueryOptions::default().statement("SELECT 1=1".to_string()))
             .await
             .unwrap();
+    });
+}
+
+#[should_panic]
+#[test]
+fn test_get_bucket_agent_drop_manager() {
+    setup_test(async |config| {
+        let agent_opts = OnDemandAgentManagerOptions::from(create_default_options(config).await);
+
+        let agent = {
+            let mgr = OnDemandAgentManager::new(agent_opts).await.unwrap();
+
+            let agent = mgr.get_bucket_agent("default").await.unwrap();
+
+            agent
+        };
+
+        // There should now be no strong references to the agent, so this should fail.
+        agent.upgrade().unwrap();
     });
 }
 
@@ -42,7 +63,7 @@ fn test_get_bucket_agent() {
 
         let upsert_opts = UpsertOptions::new(key.as_slice(), "", "", value.as_slice());
 
-        let upsert_result = agent.upsert(upsert_opts).await.unwrap();
+        let upsert_result = agent.upgrade().unwrap().upsert(upsert_opts).await.unwrap();
 
         assert_ne!(0, upsert_result.cas);
     });
