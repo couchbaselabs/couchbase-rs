@@ -189,8 +189,16 @@ impl<M: KvClientManager + 'static> ConfigManagerMemdInner<M> {
         }
     }
 
+    fn bucket_type_changed(a: &Option<ParsedConfigBucket>, b: &Option<ParsedConfigBucket>) -> bool {
+        match (a, b) {
+            (None, None) => false,
+            (Some(_), None) | (None, Some(_)) => true,
+            (Some(a_bucket), Some(b_bucket)) => a_bucket.bucket_type != b_bucket.bucket_type,
+        }
+    }
+
     fn can_update_config(new_config: &ParsedConfig, old_config: &ParsedConfig) -> bool {
-        if new_config.bucket != old_config.bucket {
+        if Self::bucket_type_changed(&new_config.bucket, &old_config.bucket) {
             debug!(
                 "Switching config due to changed bucket type (bucket takeover) old: {:?} new: {:?}",
                 old_config.bucket, new_config.bucket
