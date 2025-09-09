@@ -165,8 +165,6 @@ fn test_create_couchbase_bucket() {
             bucket.bucket_settings.bucket_type,
             Some(BucketType::COUCHBASE)
         );
-
-        agent.close().await;
     });
 }
 
@@ -203,8 +201,6 @@ fn test_create_ephemeral_bucket() {
             bucket.bucket_settings.bucket_type,
             Some(BucketType::EPHEMERAL)
         );
-
-        agent.close().await;
     });
 }
 
@@ -265,8 +261,6 @@ fn test_update_bucket() {
             bucket.bucket_settings.max_ttl,
             Some(Duration::from_secs(3600))
         );
-
-        agent.close().await;
     });
 }
 

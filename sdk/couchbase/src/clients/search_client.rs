@@ -202,7 +202,11 @@ impl CouchbaseSearchClient {
             .retry_strategy(self.default_retry_strategy.clone());
 
         let agent = self.agent_provider.get_agent().await;
-        Ok(SearchResult::from(agent.search(core_opts).await?))
+        Ok(SearchResult::from(
+            CouchbaseAgentProvider::upgrade_agent(agent)?
+                .search(core_opts)
+                .await?,
+        ))
     }
 }
 

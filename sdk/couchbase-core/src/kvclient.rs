@@ -64,6 +64,7 @@ pub(crate) type OnErrMapFetchedHandler = Arc<dyn Fn(&[u8]) + Send + Sync>;
 
 pub(crate) type UnsolicitedPacketSender = mpsc::UnboundedSender<ResponsePacket>;
 
+#[derive(Clone)]
 pub(crate) struct KvClientOptions {
     pub unsolicited_packet_tx: Option<UnsolicitedPacketSender>,
     pub orphan_handler: OrphanResponseHandler,

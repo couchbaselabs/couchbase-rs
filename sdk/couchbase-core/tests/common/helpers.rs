@@ -61,7 +61,7 @@ pub fn generate_string_value(len: usize) -> String {
 }
 
 pub async fn create_collection_and_wait_for_kv(
-    agent: Agent,
+    agent: &Agent,
     bucket_name: &str,
     scope_name: &str,
     collection_name: &str,
@@ -93,7 +93,7 @@ pub async fn create_collection_and_wait_for_kv(
 }
 
 pub async fn delete_collection_and_wait_for_kv(
-    agent: Agent,
+    agent: &Agent,
     bucket_name: &str,
     scope_name: &str,
     collection_name: &str,

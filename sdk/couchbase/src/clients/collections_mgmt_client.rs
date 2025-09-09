@@ -155,7 +155,7 @@ impl CouchbaseCollectionsMgmtClient {
         opts: CreateScopeOptions,
     ) -> error::Result<()> {
         let agent = self.agent_provider.get_agent().await;
-        agent
+        CouchbaseAgentProvider::upgrade_agent(agent)?
             .create_scope(
                 &couchbase_core::options::management::CreateScopeOptions::new(
                     &self.bucket_name,
@@ -174,7 +174,7 @@ impl CouchbaseCollectionsMgmtClient {
         opts: DropScopeOptions,
     ) -> error::Result<()> {
         let agent = self.agent_provider.get_agent().await;
-        agent
+        CouchbaseAgentProvider::upgrade_agent(agent)?
             .delete_scope(
                 &couchbase_core::options::management::DeleteScopeOptions::new(
                     &self.bucket_name,
@@ -212,7 +212,9 @@ impl CouchbaseCollectionsMgmtClient {
             opts = opts.history_enabled(history_enabled);
         }
 
-        agent.create_collection(&opts).await?;
+        CouchbaseAgentProvider::upgrade_agent(agent)?
+            .create_collection(&opts)
+            .await?;
 
         Ok(())
     }
@@ -242,7 +244,9 @@ impl CouchbaseCollectionsMgmtClient {
             opts = opts.history_enabled(history_enabled);
         }
 
-        agent.update_collection(&opts).await?;
+        CouchbaseAgentProvider::upgrade_agent(agent)?
+            .update_collection(&opts)
+            .await?;
 
         Ok(())
     }
@@ -254,7 +258,7 @@ impl CouchbaseCollectionsMgmtClient {
         opts: DropCollectionOptions,
     ) -> error::Result<()> {
         let agent = self.agent_provider.get_agent().await;
-        agent
+        CouchbaseAgentProvider::upgrade_agent(agent)?
             .delete_collection(
                 &couchbase_core::options::management::DeleteCollectionOptions::new(
                     &self.bucket_name,
@@ -270,7 +274,7 @@ impl CouchbaseCollectionsMgmtClient {
 
     pub async fn get_all_scopes(&self, opts: GetAllScopesOptions) -> error::Result<Vec<ScopeSpec>> {
         let agent = self.agent_provider.get_agent().await;
-        let manifest = agent
+        let manifest = CouchbaseAgentProvider::upgrade_agent(agent)?
             .get_collection_manifest(
                 &couchbase_core::options::management::GetCollectionManifestOptions::new(
                     &self.bucket_name,

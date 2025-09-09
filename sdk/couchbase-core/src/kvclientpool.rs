@@ -9,6 +9,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::connection_state::ConnectionState;
+use crate::error;
 use crate::error::Result;
 use crate::error::{Error, ErrorKind};
 use crate::kvclient::{
@@ -18,11 +19,13 @@ use crate::kvclient::{
 use crate::kvclient_ops::KvClientOps;
 use crate::memdx::dispatcher::{Dispatcher, OrphanResponseHandler, UnsolicitedPacketHandler};
 use arc_swap::ArcSwap;
-use log::debug;
+use futures::executor::block_on;
+use log::{debug, warn};
 use tokio::select;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{broadcast, Mutex, MutexGuard, Notify};
 use tokio::time::{sleep, Instant};
+use tokio_util::sync::CancellationToken;
 use urlencoding::decode_binary;
 use uuid::Uuid;
 // TODO: This needs some work, some more thought should go into the locking strategy as it's possible
@@ -137,7 +140,7 @@ struct KvClientPoolClientInner<K: KvClient> {
     new_client_watcher_rx: broadcast::Receiver<()>,
 
     closed: AtomicBool,
-    shutdown_notify: Arc<Notify>,
+    shutdown_token: CancellationToken,
 }
 
 pub(crate) struct NaiveKvClientPool<K: KvClient> {
@@ -224,7 +227,7 @@ where
     }
 
     pub async fn reconfigure(&self, config: KvClientPoolConfig) -> Result<()> {
-        debug!("Reconfiging NaiveKvClientPool");
+        debug!("Reconfiguring NaiveKvClientPool");
         self.num_connections_wanted
             .store(config.num_connections, Ordering::SeqCst);
 
@@ -236,7 +239,7 @@ where
                     if let Some(cli) = &client.client {
                         client.connection_state = ConnectionState::Connecting;
                         let res = select! {
-                            _ = self.shutdown_notify.notified() => {
+                            _ = self.shutdown_token.cancelled() => {
                                 debug!("Shutdown notified");
                                 return Ok(());
                             }
@@ -354,6 +357,191 @@ where
         client.close().await.unwrap_or_default();
     }
 
+    async fn maybe_throttle_on_error(
+        throttle_period: Duration,
+        guard: &mut MutexGuard<'_, KvClientPoolClientState<K>>,
+        shutdown_token: &CancellationToken,
+    ) -> Result<()> {
+        if let Some(e) = &guard.connection_error {
+            let elapsed = e.connect_error_time.elapsed();
+            if elapsed < throttle_period {
+                let to_sleep = throttle_period.sub(elapsed);
+                debug!("Throttling new connection attempt for {:?}", to_sleep);
+                return select! {
+                    _ = shutdown_token.cancelled() => {
+                        debug!("Shutdown notified");
+                        Err(ErrorKind::Shutdown.into())
+                    }
+                    _ = sleep(to_sleep) => Ok(()),
+                };
+            }
+        }
+
+        Ok(())
+    }
+
+    fn update_client_state_if_exists(
+        mut guard: MutexGuard<'_, KvClientPoolClientState<K>>,
+        id: &str,
+        state: ConnectionState,
+    ) {
+        if let Some(client) = guard.clients.get_mut(id) {
+            client.connection_state = state;
+        }
+    }
+
+    async fn create_client_with_shutdown(
+        config: KvClientConfig,
+        opts: KvClientOptions,
+        shutdown_token: &CancellationToken,
+    ) -> Result<K> {
+        select! {
+            _ = shutdown_token.cancelled() => {
+                debug!("Shutdown notified");
+                Err(ErrorKind::Shutdown.into())
+            }
+            c = K::new(config, opts) => c,
+        }
+    }
+
+    async fn start_new_client_thread(
+        state: Arc<Mutex<KvClientPoolClientState<K>>>,
+        throttle_period: Duration,
+        id: String,
+        config: KvClientConfig,
+        opts: KvClientOptions,
+        shutdown_token: CancellationToken,
+        on_new_client_tx: broadcast::Sender<()>,
+    ) {
+        loop {
+            {
+                let mut guard = state.lock().await;
+                if Self::maybe_throttle_on_error(throttle_period, &mut guard, &shutdown_token)
+                    .await
+                    .is_err()
+                {
+                    debug!("Client pool shutdown during connection throttling");
+                    return;
+                };
+
+                Self::update_client_state_if_exists(guard, &id, ConnectionState::Connecting);
+            }
+
+            match Self::create_client_with_shutdown(config.clone(), opts.clone(), &shutdown_token)
+                .await
+            {
+                Ok(r) => {
+                    debug!("New client created successfully: {}", r.id());
+                    let new_config = {
+                        let mut guard = state.lock().await;
+                        guard.connection_error = None;
+
+                        if config == guard.current_config {
+                            let mut clients = &mut guard.clients;
+                            if let Some(mut client) = clients.get_mut(r.id()) {
+                                debug!("Changing client {} connection state to Connected", r.id());
+                                client.connection_state = ConnectionState::Connected;
+                                client.client = Some(Arc::new(r));
+
+                                drop(guard);
+
+                                match on_new_client_tx.send(()) {
+                                    Ok(_) => {}
+                                    Err(e) => {
+                                        warn!("Error sending new client notification: {e}");
+                                    }
+                                };
+                            } else {
+                                drop(guard);
+
+                                match r.close().await {
+                                    Ok(_) => {}
+                                    Err(e) => {
+                                        debug!("Error closing client {}: {}", r.id(), e);
+                                    }
+                                }
+
+                                continue;
+                            };
+
+                            return;
+                        }
+
+                        guard.current_config.clone()
+                    };
+
+                    match r.reconfigure(new_config).await {
+                        Ok(_) => {
+                            debug!("Reconfigured client {} to new config", r.id());
+                            let mut guard = state.lock().await;
+                            let mut clients = &mut guard.clients;
+                            if let Some(mut client) = clients.get_mut(r.id()) {
+                                client.connection_state = ConnectionState::Connected;
+                                client.client = Some(Arc::new(r));
+
+                                drop(guard);
+
+                                match on_new_client_tx.send(()) {
+                                    Ok(_) => {}
+                                    Err(e) => {
+                                        warn!("Error sending new client notification: {e}");
+                                    }
+                                };
+
+                                return;
+                            } else {
+                                drop(guard);
+
+                                match r.close().await {
+                                    Ok(_) => {}
+                                    Err(e) => {
+                                        debug!("Error closing client {}: {}", r.id(), e);
+                                    }
+                                }
+
+                                continue;
+                            };
+                        }
+                        Err(e) => {
+                            let mut msg = format!("Failed to reconfigure client {}: {}", r.id(), e);
+                            if let Some(source) = e.source() {
+                                msg = format!("{msg} - {source}");
+                            }
+                            debug!("{msg}");
+
+                            match r.close().await {
+                                Ok(_) => {}
+                                Err(e) => {
+                                    debug!("Error closing client {}: {}", r.id(), e);
+                                }
+                            }
+
+                            continue;
+                        }
+                    };
+                }
+                Err(e) => {
+                    let mut msg = format!("Error creating new client {e}");
+                    if *e.kind() == ErrorKind::Shutdown {
+                        return;
+                    }
+
+                    if let Some(source) = e.source() {
+                        msg = format!("{msg} - {source}");
+                    }
+                    debug!("{msg}");
+
+                    let mut guard = state.lock().await;
+
+                    guard.connection_error = Some(ConnectionError {
+                        connect_error: e,
+                        connect_error_time: Instant::now(),
+                    });
+                }
+            }
+        }
+    }
+
     async fn start_new_client(&self, config: KvClientConfig, id: String) {
         let on_client_close_tx = self.on_client_close_tx.clone();
         let state = self.state.clone();
@@ -375,104 +563,17 @@ where
         let throttle_period = self.connect_throttle_period;
 
         let tx = self.new_client_watcher_tx.clone();
-        let notify = self.shutdown_notify.clone();
+        let shutdown_token = self.shutdown_token.child_token();
 
-        tokio::spawn(async move {
-            {
-                let mut guard = state.lock().await;
-                if let Some(e) = &guard.connection_error {
-                    sleep(throttle_period).await;
-                }
-
-                if let Some(client) = guard.clients.get_mut(&id) {
-                    client.connection_state = ConnectionState::Connecting;
-                }
-            }
-
-            let client_result = select! {
-                _ = notify.notified() => {
-                    debug!("Shutdown notified");
-                    return;
-                }
-                c = K::new(config.clone(), opts) => c,
-            };
-
-            match client_result {
-                Ok(r) => {
-                    debug!("New client created successfully: {}", r.id());
-                    let new_config = {
-                        let mut guard = state.lock().await;
-                        guard.connection_error = None;
-
-                        if config == guard.current_config {
-                            let mut clients = &mut guard.clients;
-                            if let Some(mut client) = clients.get_mut(r.id()) {
-                                debug!("Changing client {} connection state to Connected", r.id());
-                                client.connection_state = ConnectionState::Connected;
-                                client.client = Some(Arc::new(r));
-
-                                let _ = tx.send(());
-                            } else {
-                                // TODO: handle this.
-                                let _ = r.close().await;
-                            };
-
-                            return;
-                        }
-
-                        guard.current_config.clone()
-                    };
-
-                    match r.reconfigure(new_config).await {
-                        Ok(_) => {
-                            debug!("Reconfigured client {} to new config", r.id());
-                            let mut guard = state.lock().await;
-                            let mut clients = &mut guard.clients;
-                            if let Some(mut client) = clients.get_mut(r.id()) {
-                                client.connection_state = ConnectionState::Connected;
-                                client.client = Some(Arc::new(r));
-
-                                let _ = tx.send(());
-                            } else {
-                                // TODO: handle this.
-                                let _ = r.close().await;
-                            };
-                        }
-                        Err(e) => {
-                            let mut msg = format!("Failed to reconfigure client {}: {}", r.id(), e);
-                            if let Some(source) = e.source() {
-                                msg = format!("{msg} - {source}");
-                            }
-                            debug!("{msg}");
-                            {
-                                let mut guard = state.lock().await;
-                                let mut clients = &mut guard.clients;
-                                // It doesn't matter if this isn't in clients, we just want to make sure
-                                // it isn't.
-                                clients.remove(r.id());
-                            }
-                            let _ = r.close().await;
-                        }
-                    };
-                }
-                Err(e) => {
-                    let mut msg = format!("Error creating new client {e}");
-                    if let Some(source) = e.source() {
-                        msg = format!("{msg} - {source}");
-                    }
-                    debug!("{msg}");
-
-                    let mut guard = state.lock().await;
-
-                    guard.connection_error = Some(ConnectionError {
-                        connect_error: e,
-                        connect_error_time: Instant::now(),
-                    });
-
-                    guard.clients.remove(&id);
-                }
-            }
-        });
+        tokio::spawn(Self::start_new_client_thread(
+            state,
+            throttle_period,
+            id,
+            config,
+            opts,
+            shutdown_token,
+            tx,
+        ));
     }
 
     async fn get_bucket(&self) -> Option<String> {
@@ -523,15 +624,20 @@ where
             new_client_watcher_rx,
 
             closed: AtomicBool::new(false),
-            shutdown_notify: Arc::new(Notify::new()),
+            shutdown_token: CancellationToken::new(),
         });
 
         {
-            let inner_clone = inner.clone();
+            let inner_clone = Arc::downgrade(&inner);
             tokio::spawn(async move {
                 let mut on_client_close_rx = on_client_close_rx;
                 while let Some(client_id) = on_client_close_rx.recv().await {
-                    inner_clone.handle_client_close(client_id).await;
+                    if let Some(inner) = inner_clone.upgrade() {
+                        inner.handle_client_close(client_id).await;
+                    } else {
+                        debug!("Client close handler exited");
+                        return;
+                    }
                 }
             });
         }
@@ -574,11 +680,11 @@ where
     }
 }
 
-impl<K> Drop for NaiveKvClientPool<K>
+impl<K> Drop for KvClientPoolClientInner<K>
 where
     K: KvClient,
 {
     fn drop(&mut self) {
-        debug!("Dropping NaiveKvClientPool");
+        self.shutdown_token.cancel();
     }
 }

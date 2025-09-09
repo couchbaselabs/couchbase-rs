@@ -244,7 +244,9 @@ impl CouchbaseSearchIndexMgmtClient {
             .scope_name(&self.keyspace.scope_name)
             .retry_strategy(self.default_retry_strategy.clone());
 
-        let index = agent.get_search_index(&get_opts).await?;
+        let index = CouchbaseAgentProvider::upgrade_agent(agent)?
+            .get_search_index(&get_opts)
+            .await?;
         Ok(index.into())
     }
 
@@ -261,7 +263,9 @@ impl CouchbaseSearchIndexMgmtClient {
             .scope_name(&self.keyspace.scope_name)
             .retry_strategy(self.default_retry_strategy.clone());
 
-        let indexes = agent.get_all_search_indexes(&get_all_opts).await?;
+        let indexes = CouchbaseAgentProvider::upgrade_agent(agent)?
+            .get_all_search_indexes(&get_all_opts)
+            .await?;
 
         Ok(indexes.into_iter().map(SearchIndex::from).collect())
     }
@@ -280,7 +284,9 @@ impl CouchbaseSearchIndexMgmtClient {
             .scope_name(&self.keyspace.scope_name)
             .retry_strategy(self.default_retry_strategy.clone());
 
-        agent.upsert_search_index(&upsert_opts).await?;
+        CouchbaseAgentProvider::upgrade_agent(agent)?
+            .upsert_search_index(&upsert_opts)
+            .await?;
         Ok(())
     }
 
@@ -297,7 +303,9 @@ impl CouchbaseSearchIndexMgmtClient {
             .scope_name(&self.keyspace.scope_name)
             .retry_strategy(self.default_retry_strategy.clone());
 
-        agent.delete_search_index(&delete_opts).await?;
+        CouchbaseAgentProvider::upgrade_agent(agent)?
+            .delete_search_index(&delete_opts)
+            .await?;
         Ok(())
     }
 
@@ -318,7 +326,9 @@ impl CouchbaseSearchIndexMgmtClient {
             .scope_name(&self.keyspace.scope_name)
             .retry_strategy(self.default_retry_strategy.clone());
 
-        let analysis = agent.analyze_search_document(&analyze_opts).await?;
+        let analysis = CouchbaseAgentProvider::upgrade_agent(agent)?
+            .analyze_search_document(&analyze_opts)
+            .await?;
 
         let analysed = serde_json::from_slice(&analysis.analyzed)
             .map_err(error::Error::decoding_failure_from_serde)?;
@@ -339,7 +349,7 @@ impl CouchbaseSearchIndexMgmtClient {
             .scope_name(&self.keyspace.scope_name)
             .retry_strategy(self.default_retry_strategy.clone());
 
-        let count = agent
+        let count = CouchbaseAgentProvider::upgrade_agent(agent)?
             .get_search_indexed_documents_count(&count_opts)
             .await?;
         Ok(count)
@@ -358,7 +368,9 @@ impl CouchbaseSearchIndexMgmtClient {
             .scope_name(&self.keyspace.scope_name)
             .retry_strategy(self.default_retry_strategy.clone());
 
-        agent.pause_search_index_ingest(&pause_opts).await?;
+        CouchbaseAgentProvider::upgrade_agent(agent)?
+            .pause_search_index_ingest(&pause_opts)
+            .await?;
         Ok(())
     }
 
@@ -375,7 +387,9 @@ impl CouchbaseSearchIndexMgmtClient {
             .scope_name(&self.keyspace.scope_name)
             .retry_strategy(self.default_retry_strategy.clone());
 
-        agent.resume_search_index_ingest(&resume_opts).await?;
+        CouchbaseAgentProvider::upgrade_agent(agent)?
+            .resume_search_index_ingest(&resume_opts)
+            .await?;
         Ok(())
     }
 
@@ -392,7 +406,9 @@ impl CouchbaseSearchIndexMgmtClient {
             .scope_name(&self.keyspace.scope_name)
             .retry_strategy(self.default_retry_strategy.clone());
 
-        agent.allow_search_index_querying(&allow_opts).await?;
+        CouchbaseAgentProvider::upgrade_agent(agent)?
+            .allow_search_index_querying(&allow_opts)
+            .await?;
         Ok(())
     }
 
@@ -409,7 +425,9 @@ impl CouchbaseSearchIndexMgmtClient {
             .scope_name(&self.keyspace.scope_name)
             .retry_strategy(self.default_retry_strategy.clone());
 
-        agent.disallow_search_index_querying(&disallow_opts).await?;
+        CouchbaseAgentProvider::upgrade_agent(agent)?
+            .disallow_search_index_querying(&disallow_opts)
+            .await?;
         Ok(())
     }
 
@@ -426,7 +444,9 @@ impl CouchbaseSearchIndexMgmtClient {
             .scope_name(&self.keyspace.scope_name)
             .retry_strategy(self.default_retry_strategy.clone());
 
-        agent.freeze_search_index_plan(&freeze_opts).await?;
+        CouchbaseAgentProvider::upgrade_agent(agent)?
+            .freeze_search_index_plan(&freeze_opts)
+            .await?;
         Ok(())
     }
 
@@ -443,7 +463,9 @@ impl CouchbaseSearchIndexMgmtClient {
             .scope_name(&self.keyspace.scope_name)
             .retry_strategy(self.default_retry_strategy.clone());
 
-        agent.unfreeze_search_index_plan(&unfreeze_opts).await?;
+        CouchbaseAgentProvider::upgrade_agent(agent)?
+            .unfreeze_search_index_plan(&unfreeze_opts)
+            .await?;
         Ok(())
     }
 }

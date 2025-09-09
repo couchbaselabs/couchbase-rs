@@ -626,7 +626,7 @@ fn test_unknown_collection_id() {
         let value = generate_bytes_value(32);
 
         create_collection_and_wait_for_kv(
-            agent.clone(),
+            &agent,
             &bucket,
             &scope_name,
             &collection_name,
@@ -649,7 +649,7 @@ fn test_unknown_collection_id() {
         assert!(upsert_result.mutation_token.is_some());
 
         delete_collection_and_wait_for_kv(
-            agent.clone(),
+            &agent,
             &bucket,
             &scope_name,
             &collection_name,
@@ -687,8 +687,6 @@ fn test_unknown_collection_id() {
             },
         )
         .await;
-
-        agent.close().await;
     });
 }
 
@@ -712,7 +710,7 @@ fn test_changed_collection_id() {
         let value = generate_bytes_value(32);
 
         create_collection_and_wait_for_kv(
-            agent.clone(),
+            &agent,
             &bucket,
             &scope_name,
             &collection_name,
@@ -735,7 +733,7 @@ fn test_changed_collection_id() {
         assert!(upsert_result.mutation_token.is_some());
 
         delete_collection_and_wait_for_kv(
-            agent.clone(),
+            &agent,
             &bucket,
             &scope_name,
             &collection_name,
@@ -744,7 +742,7 @@ fn test_changed_collection_id() {
         .await;
 
         create_collection_and_wait_for_kv(
-            agent.clone(),
+            &agent,
             &bucket,
             &scope_name,
             &collection_name,
@@ -767,8 +765,6 @@ fn test_changed_collection_id() {
 
         assert_ne!(0, upsert_result.cas);
         assert!(upsert_result.mutation_token.is_some());
-
-        agent.close().await;
     });
 }
 

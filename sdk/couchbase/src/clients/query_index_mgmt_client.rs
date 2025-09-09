@@ -166,7 +166,9 @@ impl CouchbaseQueryIndexMgmtClient {
 
         let agent = self.agent_provider.get_agent().await;
 
-        let indexes = agent.get_all_indexes(&get_indexes_opts).await?;
+        let indexes = CouchbaseAgentProvider::upgrade_agent(agent)?
+            .get_all_indexes(&get_indexes_opts)
+            .await?;
 
         Ok(indexes.into_iter().map(QueryIndex::from).collect())
     }
@@ -204,7 +206,9 @@ impl CouchbaseQueryIndexMgmtClient {
 
         let agent = self.agent_provider.get_agent().await;
 
-        agent.create_index(&create_index_opts).await?;
+        CouchbaseAgentProvider::upgrade_agent(agent)?
+            .create_index(&create_index_opts)
+            .await?;
         Ok(())
     }
 
@@ -236,7 +240,9 @@ impl CouchbaseQueryIndexMgmtClient {
 
         let agent = self.agent_provider.get_agent().await;
 
-        agent.create_primary_index(&create_index_opts).await?;
+        CouchbaseAgentProvider::upgrade_agent(agent)?
+            .create_primary_index(&create_index_opts)
+            .await?;
 
         Ok(())
     }
@@ -262,7 +268,9 @@ impl CouchbaseQueryIndexMgmtClient {
 
         let agent = self.agent_provider.get_agent().await;
 
-        agent.drop_index(&drop_index_opts).await?;
+        CouchbaseAgentProvider::upgrade_agent(agent)?
+            .drop_index(&drop_index_opts)
+            .await?;
 
         Ok(())
     }
@@ -289,7 +297,9 @@ impl CouchbaseQueryIndexMgmtClient {
 
         let agent = self.agent_provider.get_agent().await;
 
-        agent.drop_primary_index(&drop_index_opts).await?;
+        CouchbaseAgentProvider::upgrade_agent(agent)?
+            .drop_primary_index(&drop_index_opts)
+            .await?;
 
         Ok(())
     }
@@ -317,7 +327,9 @@ impl CouchbaseQueryIndexMgmtClient {
 
         let agent = self.agent_provider.get_agent().await;
 
-        agent.watch_indexes(&watch_indexes_opts).await?;
+        CouchbaseAgentProvider::upgrade_agent(agent)?
+            .watch_indexes(&watch_indexes_opts)
+            .await?;
 
         Ok(())
     }
@@ -339,7 +351,9 @@ impl CouchbaseQueryIndexMgmtClient {
 
         let agent = self.agent_provider.get_agent().await;
 
-        agent.build_deferred_indexes(&build_indexes_opts).await?;
+        CouchbaseAgentProvider::upgrade_agent(agent)?
+            .build_deferred_indexes(&build_indexes_opts)
+            .await?;
 
         Ok(())
     }

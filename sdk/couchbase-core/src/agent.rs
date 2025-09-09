@@ -59,7 +59,7 @@ use std::fmt::format;
 use std::io::Cursor;
 use std::net::ToSocketAddrs;
 use std::ops::Add;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 use std::time::Duration;
 
 use tokio::io::AsyncReadExt;
@@ -121,12 +121,8 @@ pub(crate) struct AgentInner {
     pub(crate) diagnostics: DiagnosticsComponent<ReqwestClient, AgentClientManager>,
 }
 
-#[derive(Clone)]
-#[non_exhaustive]
 pub struct Agent {
     pub(crate) inner: Arc<AgentInner>,
-
-    config_manager_shutdown_tx: Sender<()>,
 }
 
 struct AgentComponentConfigs {
@@ -553,15 +549,12 @@ impl Agent {
             .await?,
         );
 
-        let (config_manager_shutdown_tx, config_manager_shutdown_rx) = broadcast::channel(1);
-
         let cfg_manager = Arc::new(ConfigManagerMemd::new(
             agent_component_configs.config_manager_memd_config,
             ConfigManagerMemdOptions {
                 polling_period: opts.config_poller_config.poll_interval,
                 kv_client_manager: conn_mgr.clone(),
                 first_config,
-                on_shutdown_rx: config_manager_shutdown_rx,
             },
         ));
         let vb_router = Arc::new(StdVbucketRouter::new(
@@ -645,30 +638,39 @@ impl Agent {
             diagnostics,
         });
 
-        let inner_clone = inner.clone();
+        let inner_clone = Arc::downgrade(&inner);
         tokio::spawn(async move {
             while let Some(packet) = unsolicited_packet_rx.recv().await {
-                inner_clone.unsolicited_packet_handler(packet).await;
+                if let Some(inner_clone) = inner_clone.upgrade() {
+                    inner_clone.unsolicited_packet_handler(packet).await;
+                } else {
+                    break;
+                }
             }
             debug!("Unsolicited packet handler exited");
         });
 
-        nmvb_handler.set_watcher(inner.clone()).await;
+        nmvb_handler.set_watcher(Arc::downgrade(&inner)).await;
 
-        let agent = Agent {
-            inner,
-            config_manager_shutdown_tx,
-        };
+        Self::start_config_watcher(Arc::downgrade(&inner), cfg_manager);
 
-        agent.start_config_watcher(cfg_manager);
+        let agent = Agent { inner };
+
+        debug!(
+            "Agent created, {} strong references",
+            Arc::strong_count(&agent.inner)
+        );
 
         Ok(agent)
     }
 
-    fn start_config_watcher(&self, config_watcher: Arc<impl ConfigManager>) {
+    fn start_config_watcher(
+        inner: Weak<AgentInner>,
+        config_watcher: Arc<impl ConfigManager>,
+    ) -> JoinHandle<()> {
         let mut watch_rx = config_watcher.watch();
 
-        let inner = self.inner.clone();
+        let inner = inner.clone();
         tokio::spawn(async move {
             loop {
                 match watch_rx.changed().await {
@@ -679,7 +681,12 @@ impl Agent {
                             // borrow_and_update() takes as soon as possible.
                             watch_rx.borrow_and_update().clone()
                         };
-                        inner.apply_config(pc).await;
+                        if let Some(i) = inner.upgrade() {
+                            i.apply_config(pc).await;
+                        } else {
+                            debug!("Config watcher inner dropped, exiting");
+                            return;
+                        }
                     }
                     Err(_e) => {
                         debug!("Config watcher channel closed");
@@ -687,7 +694,7 @@ impl Agent {
                     }
                 }
             }
-        });
+        })
     }
 
     async fn get_first_config<C: httpx::client::Client>(
@@ -898,12 +905,6 @@ impl Agent {
         }
 
         clients
-    }
-
-    pub async fn close(&mut self) {
-        self.config_manager_shutdown_tx.send(()).unwrap_or_default();
-
-        self.inner.conn_mgr.close().await.unwrap_or_default();
     }
 }
 
