@@ -18,7 +18,7 @@ use crate::tls_config::TlsConfig;
 use crate::util::hostname_from_addr_str;
 use chrono::{DateTime, FixedOffset, Local, NaiveDateTime, Utc};
 use futures::future::BoxFuture;
-use log::{debug, warn};
+use log::{debug, info, warn};
 use std::future::Future;
 use std::net::SocketAddr;
 use std::ops::{Add, Deref};
@@ -145,6 +145,7 @@ where
             HelloFeature::DedupeNotMyVbucketClustermap,
             HelloFeature::ClusterMapChangeNotificationBrief,
             HelloFeature::Duplex,
+            HelloFeature::PreserveExpiry,
         ];
 
         if !config.disable_mutation_tokens {
@@ -327,6 +328,7 @@ where
             };
 
             if let Some(hello) = res.hello {
+                info!("Enabled hello features: {:?}", &hello.enabled_features);
                 kv_cli.supported_features = hello.enabled_features;
             }
 
