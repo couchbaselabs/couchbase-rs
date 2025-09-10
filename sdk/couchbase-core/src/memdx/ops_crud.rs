@@ -1,9 +1,10 @@
 use crate::memdx::client::ResponseContext;
 use crate::memdx::dispatcher::Dispatcher;
-use crate::memdx::durability_level::{DurabilityLevel, DurabilityLevelSettings};
+use crate::memdx::durability_level::DurabilityLevel;
 use crate::memdx::error::Result;
 use crate::memdx::error::{Error, ServerError, ServerErrorKind};
-use crate::memdx::ext_frame_code::{ExtReqFrameCode, ExtResFrameCode};
+use crate::memdx::ext_frame_code::ExtReqFrameCode;
+use crate::memdx::extframe;
 use crate::memdx::magic::Magic;
 use crate::memdx::opcode::OpCode;
 use crate::memdx::ops_core::OpsCore;
@@ -23,7 +24,6 @@ use crate::memdx::status::Status;
 use crate::memdx::subdoc::SubdocRequestInfo;
 use bitflags::Flags;
 use byteorder::{BigEndian, ByteOrder};
-use bytes::BufMut;
 use std::time::Duration;
 
 #[derive(Debug)]
@@ -43,7 +43,7 @@ impl OpsCrud {
     where
         D: Dispatcher,
     {
-        let mut ext_frame_buf: Vec<u8> = vec![];
+        let mut ext_frame_buf: Vec<u8> = Vec::with_capacity(128);
         let magic = self.encode_req_ext_frames(
             request.durability_level,
             request.durability_level_timeout,
@@ -91,7 +91,7 @@ impl OpsCrud {
     where
         D: Dispatcher,
     {
-        let mut ext_frame_buf: Vec<u8> = vec![];
+        let mut ext_frame_buf: Vec<u8> = Vec::with_capacity(128);
         let magic =
             self.encode_req_ext_frames(None, None, None, request.on_behalf_of, &mut ext_frame_buf)?;
 
@@ -130,7 +130,7 @@ impl OpsCrud {
     where
         D: Dispatcher,
     {
-        let mut ext_frame_buf: Vec<u8> = vec![];
+        let mut ext_frame_buf: Vec<u8> = Vec::with_capacity(128);
         let magic =
             self.encode_req_ext_frames(None, None, None, request.on_behalf_of, &mut ext_frame_buf)?;
 
@@ -173,7 +173,7 @@ impl OpsCrud {
     where
         D: Dispatcher,
     {
-        let mut ext_frame_buf: Vec<u8> = vec![];
+        let mut ext_frame_buf: Vec<u8> = Vec::with_capacity(128);
         let magic = self.encode_req_ext_frames(
             request.durability_level,
             request.durability_level_timeout,
@@ -217,7 +217,7 @@ impl OpsCrud {
     where
         D: Dispatcher,
     {
-        let mut ext_frame_buf: Vec<u8> = vec![];
+        let mut ext_frame_buf: Vec<u8> = Vec::with_capacity(128);
         let magic =
             self.encode_req_ext_frames(None, None, None, request.on_behalf_of, &mut ext_frame_buf)?;
 
@@ -259,7 +259,7 @@ impl OpsCrud {
     where
         D: Dispatcher,
     {
-        let mut ext_frame_buf: Vec<u8> = vec![];
+        let mut ext_frame_buf: Vec<u8> = Vec::with_capacity(128);
         let magic =
             self.encode_req_ext_frames(None, None, None, request.on_behalf_of, &mut ext_frame_buf)?;
 
@@ -301,7 +301,7 @@ impl OpsCrud {
     where
         D: Dispatcher,
     {
-        let mut ext_frame_buf: Vec<u8> = vec![];
+        let mut ext_frame_buf: Vec<u8> = Vec::with_capacity(128);
         let magic =
             self.encode_req_ext_frames(None, None, None, request.on_behalf_of, &mut ext_frame_buf)?;
 
@@ -340,7 +340,7 @@ impl OpsCrud {
     where
         D: Dispatcher,
     {
-        let mut ext_frame_buf: Vec<u8> = vec![];
+        let mut ext_frame_buf: Vec<u8> = Vec::with_capacity(128);
         let magic =
             self.encode_req_ext_frames(None, None, None, request.on_behalf_of, &mut ext_frame_buf)?;
 
@@ -382,7 +382,7 @@ impl OpsCrud {
     where
         D: Dispatcher,
     {
-        let mut ext_frame_buf: Vec<u8> = vec![];
+        let mut ext_frame_buf: Vec<u8> = Vec::with_capacity(128);
         let magic = self.encode_req_ext_frames(
             request.durability_level,
             request.durability_level_timeout,
@@ -437,7 +437,7 @@ impl OpsCrud {
             ));
         }
 
-        let mut ext_frame_buf: Vec<u8> = vec![];
+        let mut ext_frame_buf: Vec<u8> = Vec::with_capacity(128);
         let magic = self.encode_req_ext_frames(
             request.durability_level,
             request.durability_level_timeout,
@@ -485,7 +485,7 @@ impl OpsCrud {
     where
         D: Dispatcher,
     {
-        let mut ext_frame_buf: Vec<u8> = vec![];
+        let mut ext_frame_buf: Vec<u8> = Vec::with_capacity(128);
         let magic = self.encode_req_ext_frames(
             request.durability_level,
             request.durability_level_timeout,
@@ -529,7 +529,7 @@ impl OpsCrud {
     where
         D: Dispatcher,
     {
-        let mut ext_frame_buf: Vec<u8> = vec![];
+        let mut ext_frame_buf: Vec<u8> = Vec::with_capacity(128);
         let magic = self.encode_req_ext_frames(
             request.durability_level,
             request.durability_level_timeout,
@@ -590,7 +590,7 @@ impl OpsCrud {
     where
         D: Dispatcher,
     {
-        let mut ext_frame_buf: Vec<u8> = vec![];
+        let mut ext_frame_buf: Vec<u8> = Vec::with_capacity(128);
         let magic = self.encode_req_ext_frames(
             request.durability_level,
             request.durability_level_timeout,
@@ -642,7 +642,7 @@ impl OpsCrud {
     where
         D: Dispatcher,
     {
-        let mut ext_frame_buf: Vec<u8> = vec![];
+        let mut ext_frame_buf: Vec<u8> = Vec::with_capacity(128);
         let magic = self.encode_req_ext_frames(
             request.durability_level,
             request.durability_level_timeout,
@@ -694,7 +694,7 @@ impl OpsCrud {
     where
         D: Dispatcher,
     {
-        let mut ext_frame_buf: Vec<u8> = vec![];
+        let mut ext_frame_buf: Vec<u8> = Vec::with_capacity(128);
         let magic =
             self.encode_req_ext_frames(None, None, None, request.on_behalf_of, &mut ext_frame_buf)?;
 
@@ -783,7 +783,7 @@ impl OpsCrud {
             ));
         }
 
-        let mut ext_frame_buf: Vec<u8> = vec![];
+        let mut ext_frame_buf: Vec<u8> = Vec::with_capacity(128);
         let magic = self.encode_req_ext_frames(
             request.durability_level,
             request.durability_level_timeout,
@@ -895,7 +895,7 @@ impl OpsCrud {
             return Ok(key);
         }
 
-        let encoded_size = make_uleb128_32(collection_id, buf);
+        let encoded_size = extframe::make_uleb128_32(collection_id, buf);
         for (i, k) in key.iter().enumerate() {
             buf[i + encoded_size] = *k;
         }
@@ -911,7 +911,7 @@ impl OpsCrud {
         buf: &mut Vec<u8>,
     ) -> Result<Magic> {
         if let Some(obo) = on_behalf_of {
-            append_ext_frame(ExtReqFrameCode::OnBehalfOf, obo.as_bytes(), buf)?;
+            extframe::append_ext_frame(ExtReqFrameCode::OnBehalfOf, obo.as_bytes(), buf)?;
         }
 
         if let Some(dura) = durability_level {
@@ -922,9 +922,9 @@ impl OpsCrud {
                 ));
             }
 
-            let dura_buf = encode_durability_ext_frame(dura, durability_timeout)?;
+            let dura_buf = extframe::encode_durability_ext_frame(dura, durability_timeout)?;
 
-            append_ext_frame(ExtReqFrameCode::Durability, &dura_buf, buf)?;
+            extframe::append_ext_frame(ExtReqFrameCode::Durability, &dura_buf, buf)?;
         } else if durability_timeout.is_some() {
             return Err(Error::new_invalid_argument_error(
                 "cannot encode durability timeout without durability level",
@@ -940,7 +940,7 @@ impl OpsCrud {
                 ));
             }
 
-            append_ext_frame(ExtReqFrameCode::PreserveTTL, &[], buf)?;
+            extframe::append_ext_frame(ExtReqFrameCode::PreserveTTL, &[], buf)?;
         }
 
         let magic = if !buf.is_empty() {
@@ -1021,202 +1021,4 @@ impl OpsCrud {
 
         OpsCore::decode_error(resp).into()
     }
-}
-
-pub(crate) fn decode_res_ext_frames(buf: &[u8]) -> Result<Option<Duration>> {
-    let mut server_duration_data = None;
-
-    iter_ext_frames(buf, |code, data| {
-        if code == ExtResFrameCode::ServerDuration {
-            server_duration_data = Some(decode_server_duration_ext_frame(data));
-        }
-    })?;
-
-    if let Some(data) = server_duration_data {
-        return Ok(Some(data?));
-    }
-
-    Ok(None)
-}
-
-pub fn decode_ext_frame(buf: &[u8]) -> Result<(ExtResFrameCode, &[u8], usize)> {
-    if buf.is_empty() {
-        return Err(Error::new_protocol_error(
-            "empty value buffer when decoding ext frame",
-        ));
-    }
-
-    let mut buf_pos = 0;
-
-    let frame_header = buf[buf_pos];
-    let mut u_frame_code = (frame_header & 0xF0) >> 4;
-    let mut frame_code = ExtResFrameCode::from(u_frame_code as u16);
-    let mut frame_len = frame_header & 0x0F;
-    buf_pos += 1;
-
-    if u_frame_code == 15 {
-        if buf.len() < buf_pos + 1 {
-            return Err(Error::new_protocol_error(
-                "unexpected eof decoding ext frame",
-            ));
-        }
-
-        let frame_code_ext = buf[buf_pos];
-        u_frame_code = 15 + frame_code_ext;
-        frame_code = ExtResFrameCode::from(u_frame_code as u16);
-        buf_pos += 1;
-    }
-
-    if frame_len == 15 {
-        if buf.len() < buf_pos + 1 {
-            return Err(Error::new_protocol_error(
-                "unexpected eof decoding ext frame",
-            ));
-        }
-
-        let frame_len_ext = buf[buf_pos];
-        frame_len = 15 + frame_len_ext;
-        buf_pos += 1;
-    }
-
-    let u_frame_len = frame_len as usize;
-    if buf.len() < buf_pos + u_frame_len {
-        return Err(Error::new_protocol_error(
-            "unexpected eof decoding ext frame",
-        ));
-    }
-
-    let frame_body = &buf[buf_pos..buf_pos + u_frame_len];
-    buf_pos += u_frame_len;
-
-    Ok((frame_code, frame_body, buf_pos))
-}
-
-fn iter_ext_frames(buf: &[u8], mut cb: impl FnMut(ExtResFrameCode, &[u8])) -> Result<&[u8]> {
-    if !buf.is_empty() {
-        let (frame_code, frame_body, buf_pos) = decode_ext_frame(buf)?;
-
-        cb(frame_code, frame_body);
-
-        return Ok(&buf[buf_pos..]);
-    }
-
-    Ok(buf)
-}
-
-pub fn append_ext_frame(
-    frame_code: ExtReqFrameCode,
-    frame_body: &[u8],
-    buf: &mut Vec<u8>,
-) -> Result<()> {
-    let frame_len = frame_body.len();
-    let buf_len = buf.len();
-
-    buf.push(0);
-    let hdr_byte_ptr = &mut buf[buf_len - 1];
-    let u_frame_code: u16 = frame_code.into();
-
-    if u_frame_code < 15 {
-        *hdr_byte_ptr = (*hdr_byte_ptr as u16 | ((u_frame_code & 0x0f) << 4)) as u8;
-    } else {
-        if u_frame_code - 15 >= 15 {
-            return Err(Error::new_invalid_argument_error(
-                "ext frame code too large to encode",
-                "ext frame".to_string(),
-            ));
-        }
-
-        *hdr_byte_ptr |= 0xF0;
-        buf.put_u16(u_frame_code);
-    }
-
-    if frame_len > 0 {
-        buf.extend_from_slice(frame_body);
-    }
-
-    Ok(())
-}
-
-pub fn make_uleb128_32(collection_id: u32, buf: &mut [u8]) -> usize {
-    let mut cid = collection_id;
-    let mut count = 0;
-    loop {
-        let mut c: u8 = (cid & 0x7f) as u8;
-        cid >>= 7;
-        if cid != 0 {
-            c |= 0x80;
-        }
-
-        buf[count] = c;
-        count += 1;
-        if c & 0x80 == 0 {
-            break;
-        }
-    }
-
-    count
-}
-
-fn encode_durability_ext_frame(
-    level: DurabilityLevel,
-    timeout: Option<Duration>,
-) -> Result<Vec<u8>> {
-    if timeout.is_none() {
-        return Ok(vec![level.into()]);
-    }
-
-    let timeout = timeout.unwrap();
-
-    let mut timeout_millis = timeout.as_millis();
-    if timeout_millis > 65535 {
-        return Err(Error::new_invalid_argument_error(
-            "cannot encode durability timeout greater than 65535 milliseconds",
-            "durability_level_timeout".to_string(),
-        ));
-    }
-
-    if timeout_millis == 0 {
-        timeout_millis = 1;
-    }
-
-    let mut buf = vec![level.into()];
-    buf.put_u128(timeout_millis >> 8);
-    buf.put_u128(timeout_millis);
-
-    Ok(buf)
-}
-
-pub(crate) fn decode_server_duration_ext_frame(mut data: &[u8]) -> Result<Duration> {
-    if data.len() != 2 {
-        return Err(Error::new_protocol_error(
-            "invalid server duration ext frame length",
-        ));
-    }
-
-    let dura_enc = ((data[0] as u32) << 8) | (data[1] as u32);
-    let dura_micros = ((dura_enc as f32).powf(1.74) / 2.0).round();
-
-    Ok(Duration::from_micros(dura_micros as u64))
-}
-
-pub(crate) fn decode_durability_level_ext_frame(
-    data: &mut Vec<u8>,
-) -> Result<DurabilityLevelSettings> {
-    if data.len() == 1 {
-        let durability = DurabilityLevel::from(data.remove(0));
-
-        return Ok(DurabilityLevelSettings::new(durability));
-    } else if data.len() == 3 {
-        let durability = DurabilityLevel::from(data.remove(0));
-        let timeout_millis = ((data.remove(0) as u32) << 8) | (data.remove(0) as u32);
-
-        return Ok(DurabilityLevelSettings::new_with_timeout(
-            durability,
-            Duration::from_millis(timeout_millis as u64),
-        ));
-    }
-
-    Err(Error::new_message_error(
-        "invalid durability ext frame length",
-    ))
 }

@@ -8,6 +8,7 @@ use crate::common::helpers::{
 };
 use crate::common::test_config::{run_test, setup_test};
 use couchbase_core::agent::Agent;
+use couchbase_core::memdx::durability_level::DurabilityLevel;
 use couchbase_core::memdx::error::{ErrorKind, ServerErrorKind, SubdocErrorKind};
 use couchbase_core::memdx::subdoc::{LookupInOp, LookupInOpType, MutateInOp, MutateInOpType};
 use couchbase_core::options::crud::{
@@ -56,6 +57,27 @@ fn test_upsert_and_get() {
 
         assert_eq!(value, get_result.value);
         assert_eq!(upsert_result.cas, get_result.cas);
+    });
+}
+
+#[test]
+fn test_upsert_durability_level_majority() {
+    run_test(async |mut agent| {
+        let strat = Arc::new(BestEffortRetryStrategy::new(
+            ExponentialBackoffCalculator::default(),
+        ));
+
+        let key = generate_key();
+        let value = generate_bytes_value(32);
+
+        let upsert_opts = UpsertOptions::new(key.as_slice(), "", "", value.as_slice())
+            .durability_level(DurabilityLevel::MAJORITY)
+            .retry_strategy(strat.clone());
+
+        let upsert_result = agent.upsert(upsert_opts).await.unwrap();
+
+        assert_ne!(0, upsert_result.cas);
+        assert!(upsert_result.mutation_token.is_some());
     });
 }
 

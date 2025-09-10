@@ -8,6 +8,7 @@ pub mod dispatcher;
 pub mod durability_level;
 pub mod error;
 pub mod ext_frame_code;
+pub mod extframe;
 pub mod hello_feature;
 pub mod magic;
 pub mod op_auth_saslauto;

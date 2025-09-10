@@ -1,5 +1,3 @@
-use std::io;
-
 use tokio_util::bytes::{Buf, BufMut, BytesMut};
 use tokio_util::codec::{Decoder, Encoder};
 
@@ -106,7 +104,7 @@ impl Decoder for KeyValueCodec {
 }
 
 impl Encoder<RequestPacket<'_>> for KeyValueCodec {
-    type Error = io::Error;
+    type Error = Error;
 
     fn encode(&mut self, item: RequestPacket, dst: &mut BytesMut) -> Result<(), Self::Error> {
         let key = item.key;
@@ -130,9 +128,32 @@ impl Encoder<RequestPacket<'_>> for KeyValueCodec {
         dst.put_u8(item.magic.into());
         dst.put_u8(item.op_code.into());
         if framing_extras.is_some() {
-            dst.put_u8(framing_extras_size as u8)
+            if key_size > u8::MAX as usize {
+                return Err(Error::new_invalid_argument_error(
+                    "key size too large",
+                    "key".to_string(),
+                ));
+            }
+
+            if framing_extras_size > u8::MAX as usize {
+                return Err(Error::new_invalid_argument_error(
+                    "frame extras too large",
+                    "frame extras".to_string(),
+                ));
+            }
+
+            dst.put_u8(framing_extras_size as u8);
+            dst.put_u8(key_size as u8);
+        } else {
+            if key_size > u16::MAX as usize {
+                return Err(Error::new_invalid_argument_error(
+                    "key size too large",
+                    "key".to_string(),
+                ));
+            }
+
+            dst.put_u16(key_size as u16);
         }
-        dst.put_u16(key_size as u16);
         dst.put_u8(extras_size as u8);
         dst.put_u8(item.datatype);
         dst.put_u16(item.vbucket_id.unwrap_or_default());
