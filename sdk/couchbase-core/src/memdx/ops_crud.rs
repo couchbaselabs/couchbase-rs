@@ -26,6 +26,9 @@ use byteorder::{BigEndian, ByteOrder};
 use bytes::BufMut;
 use std::time::Duration;
 
+const MAX_KEY_SIZE: usize = 250;
+const MAX_KEY_SIZE_USING_COLLECTIONS: usize = 246;
+
 #[derive(Debug)]
 pub struct OpsCrud {
     pub collections_enabled: bool,
@@ -58,7 +61,7 @@ impl OpsCrud {
             None
         };
 
-        let buf = &mut [0; 255];
+        let buf = &mut [0; 251];
         let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
 
         let mut extra_buf = [0; 8];
@@ -95,7 +98,7 @@ impl OpsCrud {
         let magic =
             self.encode_req_ext_frames(None, None, None, request.on_behalf_of, &mut ext_frame_buf)?;
 
-        let buf = &mut [0; 255];
+        let buf = &mut [0; 251];
         let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
 
         let framing_extras = if !ext_frame_buf.is_empty() {
@@ -134,7 +137,7 @@ impl OpsCrud {
         let magic =
             self.encode_req_ext_frames(None, None, None, request.on_behalf_of, &mut ext_frame_buf)?;
 
-        let buf = &mut [0; 255];
+        let buf = &mut [0; 251];
         let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
 
         let framing_extras = if !ext_frame_buf.is_empty() {
@@ -188,7 +191,7 @@ impl OpsCrud {
             None
         };
 
-        let buf = &mut [0; 255];
+        let buf = &mut [0; 251];
         let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
 
         let packet = RequestPacket {
@@ -221,7 +224,7 @@ impl OpsCrud {
         let magic =
             self.encode_req_ext_frames(None, None, None, request.on_behalf_of, &mut ext_frame_buf)?;
 
-        let buf = &mut [0; 255];
+        let buf = &mut [0; 251];
         let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
 
         let framing_extras = if !ext_frame_buf.is_empty() {
@@ -263,7 +266,7 @@ impl OpsCrud {
         let magic =
             self.encode_req_ext_frames(None, None, None, request.on_behalf_of, &mut ext_frame_buf)?;
 
-        let buf = &mut [0; 255];
+        let buf = &mut [0; 251];
         let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
 
         let framing_extras = if !ext_frame_buf.is_empty() {
@@ -305,7 +308,7 @@ impl OpsCrud {
         let magic =
             self.encode_req_ext_frames(None, None, None, request.on_behalf_of, &mut ext_frame_buf)?;
 
-        let buf = &mut [0; 255];
+        let buf = &mut [0; 251];
         let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
 
         let framing_extras = if !ext_frame_buf.is_empty() {
@@ -344,7 +347,7 @@ impl OpsCrud {
         let magic =
             self.encode_req_ext_frames(None, None, None, request.on_behalf_of, &mut ext_frame_buf)?;
 
-        let buf = &mut [0; 255];
+        let buf = &mut [0; 251];
         let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
 
         let framing_extras = if !ext_frame_buf.is_empty() {
@@ -397,7 +400,7 @@ impl OpsCrud {
             None
         };
 
-        let buf = &mut [0; 255];
+        let buf = &mut [0; 251];
         let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
 
         let mut extra_buf = [0; 8];
@@ -452,7 +455,7 @@ impl OpsCrud {
             None
         };
 
-        let buf = &mut [0; 255];
+        let buf = &mut [0; 251];
         let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
 
         let mut extra_buf = [0; 8];
@@ -500,7 +503,7 @@ impl OpsCrud {
             None
         };
 
-        let buf = &mut [0; 255];
+        let buf = &mut [0; 251];
         let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
 
         let packet = RequestPacket {
@@ -544,7 +547,7 @@ impl OpsCrud {
             None
         };
 
-        let buf = &mut [0; 255];
+        let buf = &mut [0; 251];
         let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
 
         let packet = RequestPacket {
@@ -605,7 +608,7 @@ impl OpsCrud {
             None
         };
 
-        let buf = &mut [0; 255];
+        let buf = &mut [0; 251];
         let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
 
         let mut extra_buf = [0; 20];
@@ -657,7 +660,7 @@ impl OpsCrud {
             None
         };
 
-        let buf = &mut [0; 255];
+        let buf = &mut [0; 251];
         let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
 
         let mut extra_buf = [0; 20];
@@ -704,7 +707,7 @@ impl OpsCrud {
             None
         };
 
-        let buf = &mut [0; 255];
+        let buf = &mut [0; 251];
         let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
 
         let len_ops = request.ops.len();
@@ -798,7 +801,7 @@ impl OpsCrud {
             None
         };
 
-        let buf = &mut [0; 255];
+        let buf = &mut [0; 251];
         let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
 
         let len_ops = request.ops.len();
@@ -884,7 +887,14 @@ impl OpsCrud {
         key: &'a [u8],
         buf: &'a mut [u8],
     ) -> Result<&'a [u8]> {
+        let key_len = key.len();
         if !self.collections_enabled {
+            if key_len > MAX_KEY_SIZE {
+                return Err(Error::new_invalid_argument_error(
+                    format!("key too long, {MAX_KEY_SIZE} bytes max but is {key_len} bytes"),
+                    "key".to_string(),
+                ));
+            }
             if collection_id != 0 {
                 return Err(Error::new_invalid_argument_error(
                     "collections not enabled",
@@ -895,7 +905,20 @@ impl OpsCrud {
             return Ok(key);
         }
 
+        let max_key_size = if collection_id == 0 {
+            MAX_KEY_SIZE
+        } else {
+            MAX_KEY_SIZE_USING_COLLECTIONS
+        };
+
         let encoded_size = make_uleb128_32(collection_id, buf);
+        if key_len > max_key_size {
+            return Err(Error::new_invalid_argument_error(
+                format!("key too long, {max_key_size} bytes max but is {key_len} bytes including collection prefix"),
+                "key".to_string(),
+            ));
+        }
+
         for (i, k) in key.iter().enumerate() {
             buf[i + encoded_size] = *k;
         }
