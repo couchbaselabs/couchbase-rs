@@ -6,9 +6,10 @@ use crate::memdx::client_response::ClientResponse;
 use crate::memdx::error::{
     Error, ResourceError, ServerError, ServerErrorKind, SubdocError, SubdocErrorKind,
 };
+use crate::memdx::extframe::decode_res_ext_frames;
 use crate::memdx::hello_feature::HelloFeature;
 use crate::memdx::ops_core::OpsCore;
-use crate::memdx::ops_crud::{decode_res_ext_frames, OpsCrud};
+use crate::memdx::ops_crud::OpsCrud;
 use crate::memdx::status::Status;
 use crate::memdx::subdoc::{SubDocResult, SubdocDocFlag};
 use byteorder::{BigEndian, ReadBytesExt};

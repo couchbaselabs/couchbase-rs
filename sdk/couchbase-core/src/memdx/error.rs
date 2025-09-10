@@ -77,7 +77,7 @@ impl Error {
         }
     }
 
-    pub(crate) fn new_dispatch_error(opaque: u32, op_code: OpCode, source: Box<io::Error>) -> Self {
+    pub(crate) fn new_dispatch_error(opaque: u32, op_code: OpCode, source: Box<Error>) -> Self {
         Self {
             inner: ErrorImpl {
                 kind: Box::new(ErrorKind::Dispatch { opaque, op_code }),
@@ -86,7 +86,7 @@ impl Error {
         }
     }
 
-    pub(crate) fn new_close_error(msg: String, source: Box<io::Error>) -> Self {
+    pub(crate) fn new_close_error(msg: String, source: Box<Error>) -> Self {
         Self {
             inner: ErrorImpl {
                 kind: Box::new(ErrorKind::Close { msg }),
