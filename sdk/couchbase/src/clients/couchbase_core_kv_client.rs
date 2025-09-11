@@ -389,6 +389,7 @@ impl CouchbaseCoreKvClient {
             .increment(
                 couchbase_core::options::crud::IncrementOptions::new(
                     id.as_bytes(),
+                    options.delta.unwrap_or(1),
                     &self.scope_name,
                     &self.collection_name,
                 )
@@ -397,8 +398,7 @@ impl CouchbaseCoreKvClient {
                 ))
                 .retry_strategy(self.default_retry_strategy.clone())
                 .expiry(options.expiry.map(|e| e.as_secs() as u32))
-                .initial(options.initial)
-                .delta(options.delta),
+                .initial(options.initial),
             )
             .await?;
 
@@ -421,6 +421,7 @@ impl CouchbaseCoreKvClient {
             .decrement(
                 couchbase_core::options::crud::DecrementOptions::new(
                     id.as_bytes(),
+                    options.delta.unwrap_or(1),
                     &self.scope_name,
                     &self.collection_name,
                 )
@@ -429,8 +430,7 @@ impl CouchbaseCoreKvClient {
                 ))
                 .retry_strategy(self.default_retry_strategy.clone())
                 .expiry(options.expiry.map(|e| e.as_secs() as u32))
-                .initial(options.initial)
-                .delta(options.delta),
+                .initial(options.initial),
             )
             .await?;
 

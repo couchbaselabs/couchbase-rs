@@ -569,12 +569,12 @@ impl OpsCrud {
     }
 
     fn encode_counter_values(
-        delta: Option<u64>,
+        delta: u64,
         initial: Option<u64>,
         expiry: Option<u32>,
         buf: &mut [u8; 20],
     ) {
-        byteorder::BigEndian::write_u64(&mut buf[0..8], delta.unwrap_or_default());
+        byteorder::BigEndian::write_u64(&mut buf[0..8], delta);
         if let Some(initial) = initial {
             byteorder::BigEndian::write_u64(&mut buf[8..16], initial);
             byteorder::BigEndian::write_u32(&mut buf[16..20], expiry.unwrap_or_default());

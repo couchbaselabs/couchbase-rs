@@ -630,7 +630,7 @@ pub struct IncrementRequest<'a> {
     pub(crate) key: &'a [u8],
     pub(crate) vbucket_id: u16,
     pub(crate) initial: Option<u64>,
-    pub(crate) delta: Option<u64>,
+    pub(crate) delta: u64,
     pub(crate) expiry: Option<u32>,
     pub(crate) on_behalf_of: Option<&'a str>,
     pub(crate) durability_level: Option<DurabilityLevel>,
@@ -638,13 +638,13 @@ pub struct IncrementRequest<'a> {
 }
 
 impl<'a> IncrementRequest<'a> {
-    pub fn new(collection_id: u32, key: &'a [u8], vbucket_id: u16) -> Self {
+    pub fn new(collection_id: u32, key: &'a [u8], delta: u64, vbucket_id: u16) -> Self {
         Self {
             collection_id,
             key,
             vbucket_id,
             initial: None,
-            delta: None,
+            delta,
             expiry: None,
             on_behalf_of: None,
             durability_level: None,
@@ -654,11 +654,6 @@ impl<'a> IncrementRequest<'a> {
 
     pub fn initial(mut self, initial: u64) -> Self {
         self.initial = Some(initial);
-        self
-    }
-
-    pub fn delta(mut self, delta: u64) -> Self {
-        self.delta = Some(delta);
         self
     }
 
@@ -689,7 +684,7 @@ pub struct DecrementRequest<'a> {
     pub(crate) key: &'a [u8],
     pub(crate) vbucket_id: u16,
     pub(crate) initial: Option<u64>,
-    pub(crate) delta: Option<u64>,
+    pub(crate) delta: u64,
     pub(crate) expiry: Option<u32>,
     pub(crate) on_behalf_of: Option<&'a str>,
     pub(crate) durability_level: Option<DurabilityLevel>,
@@ -697,13 +692,13 @@ pub struct DecrementRequest<'a> {
 }
 
 impl<'a> DecrementRequest<'a> {
-    pub fn new(collection_id: u32, key: &'a [u8], vbucket_id: u16) -> Self {
+    pub fn new(collection_id: u32, key: &'a [u8], delta: u64, vbucket_id: u16) -> Self {
         Self {
             collection_id,
             key,
             vbucket_id,
             initial: None,
-            delta: None,
+            delta,
             expiry: None,
             on_behalf_of: None,
             durability_level: None,
@@ -713,11 +708,6 @@ impl<'a> DecrementRequest<'a> {
 
     pub fn initial(mut self, initial: u64) -> Self {
         self.initial = Some(initial);
-        self
-    }
-
-    pub fn delta(mut self, delta: u64) -> Self {
-        self.delta = Some(delta);
         self
     }
 

@@ -408,9 +408,8 @@ fn test_increment_and_decrement() {
 
         let increment_result = agent
             .increment(
-                IncrementOptions::new(key.as_slice(), "", "")
+                IncrementOptions::new(key.as_slice(), 1, "", "")
                     .retry_strategy(strat.clone())
-                    .delta(1)
                     .initial(42),
             )
             .await
@@ -422,9 +421,7 @@ fn test_increment_and_decrement() {
 
         let decrement_result = agent
             .decrement(
-                DecrementOptions::new(key.as_slice(), "", "")
-                    .retry_strategy(strat.clone())
-                    .delta(2),
+                DecrementOptions::new(key.as_slice(), 2, "", "").retry_strategy(strat.clone()),
             )
             .await
             .unwrap();

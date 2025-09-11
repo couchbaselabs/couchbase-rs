@@ -539,20 +539,20 @@ pub struct IncrementOptions<'a> {
     pub(crate) scope_name: &'a str,
     pub(crate) collection_name: &'a str,
     pub(crate) initial: Option<u64>,
-    pub(crate) delta: Option<u64>,
+    pub(crate) delta: u64,
     pub(crate) expiry: Option<u32>,
     pub(crate) durability_level: Option<DurabilityLevel>,
     pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> IncrementOptions<'a> {
-    pub fn new(key: &'a [u8], scope_name: &'a str, collection_name: &'a str) -> Self {
+    pub fn new(key: &'a [u8], delta: u64, scope_name: &'a str, collection_name: &'a str) -> Self {
         Self {
             key,
             scope_name,
             collection_name,
             initial: None,
-            delta: None,
+            delta,
             expiry: None,
             durability_level: None,
             retry_strategy: DEFAULT_RETRY_STRATEGY.clone(),
@@ -561,11 +561,6 @@ impl<'a> IncrementOptions<'a> {
 
     pub fn initial(mut self, initial: impl Into<Option<u64>>) -> Self {
         self.initial = initial.into();
-        self
-    }
-
-    pub fn delta(mut self, delta: impl Into<Option<u64>>) -> Self {
-        self.delta = delta.into();
         self
     }
 
@@ -595,20 +590,20 @@ pub struct DecrementOptions<'a> {
     pub(crate) scope_name: &'a str,
     pub(crate) collection_name: &'a str,
     pub(crate) initial: Option<u64>,
-    pub(crate) delta: Option<u64>,
+    pub(crate) delta: u64,
     pub(crate) expiry: Option<u32>,
     pub(crate) durability_level: Option<DurabilityLevel>,
     pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> DecrementOptions<'a> {
-    pub fn new(key: &'a [u8], scope_name: &'a str, collection_name: &'a str) -> Self {
+    pub fn new(key: &'a [u8], delta: u64, scope_name: &'a str, collection_name: &'a str) -> Self {
         Self {
             key,
             scope_name,
             collection_name,
             initial: None,
-            delta: None,
+            delta,
             expiry: None,
             durability_level: None,
             retry_strategy: DEFAULT_RETRY_STRATEGY.clone(),
@@ -617,11 +612,6 @@ impl<'a> DecrementOptions<'a> {
 
     pub fn initial(mut self, initial: impl Into<Option<u64>>) -> Self {
         self.initial = initial.into();
-        self
-    }
-
-    pub fn delta(mut self, delta: impl Into<Option<u64>>) -> Self {
-        self.delta = delta.into();
         self
     }
 
