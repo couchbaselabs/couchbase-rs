@@ -1,6 +1,6 @@
 use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::error::Result;
-use crate::memdx::error::{ServerError, ServerErrorKind};
+use crate::memdx::error::{Error, ServerError, ServerErrorKind};
 use crate::memdx::magic::Magic;
 use crate::memdx::op_auth_saslauto::OpSASLAutoEncoder;
 use crate::memdx::op_auth_saslbyname::OpSASLAuthByNameEncoder;
@@ -41,7 +41,7 @@ impl OpsCore {
         base_cause
     }
 
-    pub(crate) fn decode_error(resp: &ResponsePacket) -> ServerError {
+    pub(crate) fn decode_error(resp: &ResponsePacket) -> Error {
         let status = resp.status;
         let base_error_kind = if status == Status::NotMyVbucket {
             ServerErrorKind::NotMyVbucket
@@ -49,11 +49,20 @@ impl OpsCore {
             ServerErrorKind::TmpFail
         } else if status == Status::NoBucket {
             ServerErrorKind::NoBucket
+        } else if status == Status::InvalidArgs {
+            return Error::new_invalid_argument_error(
+                "the server rejected the request because one or more arguments were invalid",
+                None,
+            )
+            .with(Self::decode_error_context(
+                resp,
+                ServerErrorKind::InvalidArgs,
+            ));
         } else {
             ServerErrorKind::UnknownStatus { status }
         };
 
-        Self::decode_error_context(resp, base_error_kind)
+        Self::decode_error_context(resp, base_error_kind).into()
     }
 }
 

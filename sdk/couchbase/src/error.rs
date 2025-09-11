@@ -506,8 +506,13 @@ impl From<&couchbase_core::error::MemdxError> for Error {
                 (kind, None)
             }
             couchbase_core::memdx::error::ErrorKind::InvalidArgument { arg, msg, .. } => {
+                let msg = if let Some(source) = value.source() {
+                    source.to_string()
+                } else {
+                    msg.clone()
+                };
                 let kind = ErrorKind::InvalidArgument(InvalidArgumentErrorKind {
-                    msg: msg.clone(),
+                    msg,
                     arg: arg.clone(),
                 });
                 (kind, None)
