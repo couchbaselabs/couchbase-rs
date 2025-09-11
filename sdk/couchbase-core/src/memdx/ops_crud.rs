@@ -575,8 +575,7 @@ impl OpsCrud {
         buf: &mut [u8; 20],
     ) {
         byteorder::BigEndian::write_u64(&mut buf[0..8], delta.unwrap_or_default());
-        let initial = initial.unwrap_or_default();
-        if initial != 0xFFFFFFFFFFFFFFFF {
+        if let Some(initial) = initial {
             byteorder::BigEndian::write_u64(&mut buf[8..16], initial);
             byteorder::BigEndian::write_u32(&mut buf[16..20], expiry.unwrap_or_default());
         } else {
