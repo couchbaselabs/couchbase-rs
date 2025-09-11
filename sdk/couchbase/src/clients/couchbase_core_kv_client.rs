@@ -332,6 +332,7 @@ impl CouchbaseCoreKvClient {
                     &self.collection_name,
                     value,
                 )
+                .cas(options.cas)
                 .durability_level(parse_optional_durability_level_to_memdx(
                     options.durability_level,
                 ))
@@ -365,6 +366,7 @@ impl CouchbaseCoreKvClient {
                 .durability_level(parse_optional_durability_level_to_memdx(
                     options.durability_level,
                 ))
+                .cas(options.cas)
                 .retry_strategy(self.default_retry_strategy.clone()),
             )
             .await?;
