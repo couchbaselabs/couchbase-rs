@@ -10,28 +10,19 @@ const SERVER_VERSION_720: NodeVersion = NodeVersion {
     modifier: None,
 };
 
-const SERVER_VERSION_722: NodeVersion = NodeVersion {
+const SERVER_VERSION_760: NodeVersion = NodeVersion {
     major: 7,
-    minor: 2,
-    patch: 2,
+    minor: 6,
+    patch: 0,
     build: 0,
     edition: None,
     modifier: None,
 };
 
-const SERVER_VERSION_762: NodeVersion = NodeVersion {
-    major: 7,
-    minor: 6,
-    patch: 2,
-    build: 0,
-    edition: None,
-    modifier: None,
-};
-
-const SERVER_VERSION_764: NodeVersion = NodeVersion {
-    major: 7,
-    minor: 6,
-    patch: 4,
+const SERVER_VERSION_800: NodeVersion = NodeVersion {
+    major: 8,
+    minor: 0,
+    patch: 0,
     build: 0,
     edition: None,
     modifier: None,
@@ -47,7 +38,7 @@ pub enum TestFeatureCode {
     SearchManagementCollections,
     BucketManagement,
     CollectionNoExpiry,
-    CollectionUpdates,
+    CollectionUpdateMaxExpiry,
     HistoryRetention,
     VectorSearch,
 }
@@ -62,15 +53,14 @@ impl TestCluster {
             TestFeatureCode::QueryManagement => true,
             TestFeatureCode::SearchManagement => true,
             TestFeatureCode::SearchManagementCollections => {
-                !self.cluster_version.lower(&SERVER_VERSION_762)
+                !self.cluster_version.lower(&SERVER_VERSION_760)
             }
-            TestFeatureCode::CollectionNoExpiry => !self.cluster_version.lower(&SERVER_VERSION_762),
-            TestFeatureCode::CollectionUpdates => {
-                !self.cluster_version.lower(&SERVER_VERSION_722)
-                    && !self.cluster_version.equal(&SERVER_VERSION_722)
+            TestFeatureCode::CollectionNoExpiry => !self.cluster_version.lower(&SERVER_VERSION_760),
+            TestFeatureCode::CollectionUpdateMaxExpiry => {
+                !self.cluster_version.lower(&SERVER_VERSION_760)
             }
             TestFeatureCode::HistoryRetention => !self.cluster_version.lower(&SERVER_VERSION_720),
-            TestFeatureCode::VectorSearch => !self.cluster_version.lower(&SERVER_VERSION_764),
+            TestFeatureCode::VectorSearch => !self.cluster_version.lower(&SERVER_VERSION_760),
         }
     }
 }
