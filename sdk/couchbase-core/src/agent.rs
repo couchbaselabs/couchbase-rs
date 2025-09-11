@@ -1,4 +1,3 @@
-use crate::address::Address;
 use crate::auth_mechanism::AuthMechanism;
 use crate::authenticator::Authenticator;
 use crate::cbconfig::TerseConfig;
@@ -48,6 +47,7 @@ use crate::vbucketrouter::{
 use crate::{httpx, mgmtx};
 
 use byteorder::BigEndian;
+use couchbase_connstr::Address;
 use futures::executor::block_on;
 use log::{debug, error, info, warn};
 use uuid::Uuid;

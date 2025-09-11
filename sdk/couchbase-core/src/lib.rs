@@ -2,7 +2,6 @@ extern crate core;
 #[macro_use]
 extern crate lazy_static;
 
-pub mod address;
 pub mod agent;
 pub mod agent_ops;
 pub mod auth_mechanism;
@@ -50,7 +49,7 @@ mod scram;
 pub mod searchcomponent;
 pub mod searchx;
 pub mod service_type;
-mod tls_config;
+pub mod tls_config;
 mod util;
 mod vbucketmap;
 mod vbucketrouter;

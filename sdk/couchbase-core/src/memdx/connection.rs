@@ -1,6 +1,7 @@
 use crate::memdx::error::Error;
 use crate::memdx::error::Result;
 use crate::tls_config::TlsConfig;
+use couchbase_connstr::Address;
 use socket2::TcpKeepalive;
 use std::fmt::Debug;
 use std::io;
@@ -10,7 +11,6 @@ use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpStream;
 use tokio::time::{timeout_at, Instant};
 
-use crate::address::Address;
 #[cfg(all(feature = "rustls-tls", not(feature = "native-tls")))]
 use {
     tokio_rustls::rustls::pki_types::DnsName, tokio_rustls::rustls::pki_types::ServerName,
