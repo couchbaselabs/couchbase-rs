@@ -74,7 +74,7 @@ fn test_create_collection() {
 #[test]
 fn test_update_collection() {
     run_test(async |cluster| {
-        if !cluster.supports_feature(&TestFeatureCode::CollectionUpdates) {
+        if !cluster.supports_feature(&TestFeatureCode::CollectionUpdateMaxExpiry) {
             return;
         }
 
