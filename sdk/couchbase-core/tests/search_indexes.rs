@@ -50,8 +50,7 @@ fn test_basic_search_index_management() {
 
         assert_eq!(index.name, actual_index.name);
         assert_eq!(index.index_type, actual_index.index_type);
-        assert_eq!(index.params, actual_index.params);
-        assert_eq!(index.plan_params, actual_index.plan_params);
+        // We don't test params or plan_params as the contents is server version dependent.
         assert_eq!(index.prev_index_uuid, actual_index.prev_index_uuid);
         assert_eq!(index.source_name, actual_index.source_name);
         assert_eq!(index.source_params, actual_index.source_params);
@@ -146,8 +145,7 @@ fn test_basic_search_index_management_collections() {
 
         assert_eq!(index.name, actual_index.name);
         assert_eq!(index.index_type, actual_index.index_type);
-        assert_eq!(index.params, actual_index.params);
-        assert_eq!(index.plan_params, actual_index.plan_params);
+        // We don't test params or plan_params as the contents is server version dependent.
         assert_eq!(index.prev_index_uuid, actual_index.prev_index_uuid);
         assert_eq!(index.source_name, actual_index.source_name);
         assert_eq!(index.source_params, actual_index.source_params);

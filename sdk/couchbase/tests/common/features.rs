@@ -37,6 +37,15 @@ const SERVER_VERSION_764: NodeVersion = NodeVersion {
     modifier: None,
 };
 
+const SERVER_VERSION_800: NodeVersion = NodeVersion {
+    major: 8,
+    minor: 0,
+    patch: 0,
+    build: 0,
+    edition: None,
+    modifier: None,
+};
+
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum TestFeatureCode {
     KV,
