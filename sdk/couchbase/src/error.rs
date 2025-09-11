@@ -610,7 +610,10 @@ impl From<&SubdocError> for ErrorKind {
             SubdocErrorKind::BadDelta => ErrorKind::DeltaInvalid,
             SubdocErrorKind::PathExists => ErrorKind::PathExists,
             SubdocErrorKind::ValueTooDeep => ErrorKind::ValueTooDeep,
-            SubdocErrorKind::InvalidCombo => ErrorKind::XattrInvalidKeyCombo,
+            SubdocErrorKind::InvalidCombo => ErrorKind::InvalidArgument(InvalidArgumentErrorKind {
+                msg: value.to_string(),
+                arg: None,
+            }),
             SubdocErrorKind::XattrInvalidFlagCombo => ErrorKind::XattrInvalidFlagCombo,
             SubdocErrorKind::XattrInvalidKeyCombo => ErrorKind::XattrInvalidKeyCombo,
             SubdocErrorKind::XattrUnknownMacro => ErrorKind::XattrUnknownMacro,
