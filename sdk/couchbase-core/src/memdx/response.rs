@@ -29,7 +29,7 @@ impl TryFromClientResponse for HelloResponse {
         let packet = resp.packet();
         let status = packet.status;
         if status != Status::Success {
-            return Err(OpsCore::decode_error(&packet).into());
+            return Err(OpsCore::decode_error(&packet));
         }
 
         let mut features: Vec<HelloFeature> = Vec::new();
@@ -61,7 +61,7 @@ impl TryFromClientResponse for GetErrorMapResponse {
         let packet = resp.packet();
         let status = packet.status;
         if status != Status::Success {
-            return Err(OpsCore::decode_error(&packet).into());
+            return Err(OpsCore::decode_error(&packet));
         }
 
         let value = packet.value.unwrap_or_default();
@@ -88,7 +88,7 @@ impl TryFromClientResponse for SelectBucketResponse {
                 )
                 .into());
             }
-            return Err(OpsCore::decode_error(&packet).into());
+            return Err(OpsCore::decode_error(&packet));
         }
 
         Ok(SelectBucketResponse {})
@@ -113,7 +113,7 @@ impl TryFromClientResponse for SASLAuthResponse {
         }
 
         if status != Status::Success {
-            return Err(OpsCore::decode_error(&packet).into());
+            return Err(OpsCore::decode_error(&packet));
         }
 
         Ok(SASLAuthResponse {
@@ -134,7 +134,7 @@ impl TryFromClientResponse for SASLStepResponse {
         let packet = resp.packet();
         let status = packet.status;
         if status != Status::Success {
-            return Err(OpsCore::decode_error(&packet).into());
+            return Err(OpsCore::decode_error(&packet));
         }
 
         Ok(SASLStepResponse {
@@ -167,7 +167,7 @@ impl TryFromClientResponse for SASLListMechsResponse {
                 )
                 .into());
             }
-            return Err(OpsCore::decode_error(&packet).into());
+            return Err(OpsCore::decode_error(&packet));
         }
 
         let value = packet.value.unwrap_or_default();
@@ -202,7 +202,7 @@ impl TryFromClientResponse for GetClusterConfigResponse {
         let packet = resp.packet();
         let status = packet.status;
         if status != Status::Success {
-            return Err(OpsCore::decode_error(&packet).into());
+            return Err(OpsCore::decode_error(&packet));
         }
 
         Ok(GetClusterConfigResponse {
@@ -1394,7 +1394,7 @@ impl TryFromClientResponse for GetCollectionIdResponse {
             )
             .into());
         } else if status != Status::Success {
-            return Err(OpsCore::decode_error(&packet).into());
+            return Err(OpsCore::decode_error(&packet));
         }
 
         let extras = if let Some(extras) = &packet.extras {
@@ -1426,7 +1426,7 @@ impl TryFromClientResponse for PingResponse {
         let status = packet.status;
 
         if status != Status::Success {
-            return Err(OpsCore::decode_error(&packet).into());
+            return Err(OpsCore::decode_error(&packet));
         }
 
         Ok(PingResponse {})

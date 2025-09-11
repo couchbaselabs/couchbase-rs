@@ -1034,7 +1034,7 @@ impl OpsCrud {
             return e;
         };
 
-        OpsCore::decode_error(resp).into()
+        OpsCore::decode_error(resp)
     }
 
     pub(crate) fn decode_common_error(resp: &ResponsePacket) -> Error {
@@ -1042,6 +1042,6 @@ impl OpsCrud {
             return e;
         };
 
-        OpsCore::decode_error(resp).into()
+        OpsCore::decode_error(resp)
     }
 }

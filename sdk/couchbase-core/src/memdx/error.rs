@@ -455,6 +455,7 @@ pub enum ServerErrorKind {
     SyncWriteRecommitInProgress,
     RangeScanCancelled,
     RangeScanVBUUIDNotEqual,
+    InvalidArgs,
 
     ConfigNotSet,
     UnknownBucketName,
@@ -515,6 +516,7 @@ impl Display for ServerErrorKind {
             }
             ServerErrorKind::RangeScanCancelled => write!(f, "range scan cancelled"),
             ServerErrorKind::RangeScanVBUUIDNotEqual => write!(f, "range scan vbUUID not equal"),
+            ServerErrorKind::InvalidArgs => write!(f, "invalid args"),
         }
     }
 }
