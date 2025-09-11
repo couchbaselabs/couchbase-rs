@@ -58,7 +58,7 @@ pub(crate) struct KvClientPoolOptions {
     pub connect_timeout: Duration,
     pub connect_throttle_period: Duration,
     pub unsolicited_packet_tx: Option<UnsolicitedPacketSender>,
-    pub orphan_handler: OrphanResponseHandler,
+    pub orphan_handler: Option<OrphanResponseHandler>,
     pub on_err_map_fetched: Option<OnErrMapFetchedHandler>,
     pub disable_decompression: bool,
 }
@@ -123,7 +123,7 @@ struct KvClientPoolClientInner<K: KvClient> {
     connect_throttle_period: Duration,
 
     unsolicited_packet_tx: Option<UnsolicitedPacketSender>,
-    orphan_handler: OrphanResponseHandler,
+    orphan_handler: Option<OrphanResponseHandler>,
     on_client_close_tx: Sender<String>,
     on_err_map_fetched: Option<OnErrMapFetchedHandler>,
 

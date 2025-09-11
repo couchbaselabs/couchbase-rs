@@ -62,6 +62,7 @@ use std::ops::Add;
 use std::sync::{Arc, Weak};
 use std::time::Duration;
 
+use crate::orphan_reporter::OrphanReporter;
 use tokio::io::AsyncReadExt;
 use tokio::net;
 use tokio::runtime::{Handle, Runtime};
@@ -537,9 +538,7 @@ impl Agent {
                     connect_timeout,
                     connect_throttle_period: opts.kv_config.connect_throttle_timeout,
                     unsolicited_packet_tx: Some(unsolicited_packet_tx),
-                    orphan_handler: Arc::new(|packet| {
-                        info!("Orphan : {packet:?}");
-                    }),
+                    orphan_handler: opts.orphan_response_handler,
                     on_err_map_fetched_handler: Some(Arc::new(move |err_map| {
                         err_map_component_conn_mgr.on_err_map(err_map);
                     })),
@@ -714,7 +713,7 @@ impl Agent {
                         endpoint_config.clone(),
                         KvClientOptions {
                             unsolicited_packet_tx: None,
-                            orphan_handler: Arc::new(|packet| {}),
+                            orphan_handler: None,
                             on_close: Arc::new(|id| {
                                 Box::pin(async move {
                                     debug!("Bootstrap client {id} closed");

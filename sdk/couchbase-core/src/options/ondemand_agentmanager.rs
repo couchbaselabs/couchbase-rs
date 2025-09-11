@@ -1,9 +1,11 @@
 use crate::auth_mechanism::AuthMechanism;
 use crate::authenticator::Authenticator;
+use crate::memdx::dispatcher::OrphanResponseHandler;
 use crate::options::agent::{
     AgentOptions, CompressionConfig, ConfigPollerConfig, HttpConfig, KvConfig, SeedConfig,
 };
 use crate::tls_config::TlsConfig;
+use std::sync::Arc;
 use std::time::Duration;
 
 #[derive(Clone)]
@@ -20,6 +22,7 @@ pub struct OnDemandAgentManagerOptions {
     pub kv_config: KvConfig,
     pub http_config: HttpConfig,
     pub tcp_keep_alive_time: Option<Duration>,
+    pub orphan_response_handler: Option<OrphanResponseHandler>,
 }
 
 impl OnDemandAgentManagerOptions {
@@ -34,6 +37,7 @@ impl OnDemandAgentManagerOptions {
             kv_config: KvConfig::default(),
             http_config: HttpConfig::default(),
             tcp_keep_alive_time: None,
+            orphan_response_handler: None,
         }
     }
 
@@ -81,6 +85,14 @@ impl OnDemandAgentManagerOptions {
         self.tcp_keep_alive_time = Some(tcp_keep_alive);
         self
     }
+
+    pub fn orphan_reporter_handler(
+        mut self,
+        orphan_response_handler: Option<OrphanResponseHandler>,
+    ) -> Self {
+        self.orphan_response_handler = orphan_response_handler;
+        self
+    }
 }
 
 impl From<OnDemandAgentManagerOptions> for AgentOptions {
@@ -96,6 +108,7 @@ impl From<OnDemandAgentManagerOptions> for AgentOptions {
             kv_config: opts.kv_config,
             http_config: opts.http_config,
             tcp_keep_alive_time: opts.tcp_keep_alive_time,
+            orphan_response_handler: opts.orphan_response_handler,
         }
     }
 }
@@ -112,6 +125,7 @@ impl From<AgentOptions> for OnDemandAgentManagerOptions {
             kv_config: opts.kv_config,
             http_config: opts.http_config,
             tcp_keep_alive_time: opts.tcp_keep_alive_time,
+            orphan_response_handler: opts.orphan_response_handler,
         }
     }
 }

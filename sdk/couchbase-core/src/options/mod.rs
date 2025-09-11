@@ -3,6 +3,7 @@ pub mod crud;
 pub mod diagnostics;
 pub mod management;
 pub mod ondemand_agentmanager;
+pub mod orphan_reporter;
 pub mod ping;
 pub mod query;
 pub mod search;
