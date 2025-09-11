@@ -6,6 +6,8 @@ use crate::common::{new_key, try_until};
 use chrono::DateTime;
 use couchbase::management::collections::collection_settings::CreateCollectionSettings;
 use couchbase::management::search::index::SearchIndex;
+use couchbase::mutation_state;
+use couchbase::mutation_state::MutationState;
 use couchbase::options::search_options::SearchOptions;
 use couchbase::results::search_results::{SearchFacetResultType, SearchResult, SearchRow};
 use couchbase::scope::Scope;
@@ -70,6 +72,14 @@ fn test_search_basic() {
         )
         .await;
         let import_results = import_sample_beer_dataset("search", &collection).await;
+        let import_results_len = import_results.len();
+
+        let tokens = import_results
+            .into_values()
+            .map(|m| m.mutation_result.mutation_token().clone().unwrap())
+            .collect();
+
+        let state = MutationState::new_with_tokens(tokens);
 
         let query = TermQuery::new("search").field("service".to_string());
 
@@ -113,7 +123,8 @@ fn test_search_basic() {
                         .server_timeout(Duration::from_secs(10))
                         .facets(facets.clone())
                         .sort(vec![sort.clone()])
-                        .fields(vec!["city".to_string()]),
+                        .fields(vec!["city".to_string()])
+                        .consistent_with(state.clone()),
                 )
                 .await
             {
@@ -132,7 +143,7 @@ fn test_search_basic() {
                 this_rows.push(row.unwrap());
             }
 
-            if this_rows.len() == import_results.len() {
+            if this_rows.len() == import_results_len {
                 rows = this_rows.clone();
                 res = this_res;
                 break;
@@ -141,7 +152,7 @@ fn test_search_basic() {
             error!(
                 "search returned {} rows, expected {}",
                 this_rows.len(),
-                import_results.len()
+                import_results_len
             );
 
             let sleep = time::sleep(Duration::from_secs(1));
