@@ -1,5 +1,7 @@
 pub mod json;
 pub mod raw_binary;
+pub mod raw_json;
+pub mod raw_string;
 
 use serde::de::DeserializeOwned;
 use serde::{Serialize, Serializer};
