@@ -1,6 +1,7 @@
 use crate::clients::agent_provider::CouchbaseAgentProvider;
 use crate::durability_level::parse_optional_durability_level_to_memdx;
 use crate::error;
+use crate::error::Error;
 use crate::mutation_state::MutationToken;
 use crate::options::kv_binary_options::{
     AppendOptions, DecrementOptions, IncrementOptions, PrependOptions,
@@ -18,6 +19,8 @@ use couchbase_core::memdx::subdoc::{reorder_subdoc_ops, MutateInOp, SubdocDocFla
 use couchbase_core::retry::RetryStrategy;
 use std::sync::Arc;
 use std::time::Duration;
+
+const SECS_IN_DAY: u64 = 24 * 60 * 60;
 
 #[derive(Clone)]
 pub(crate) struct CouchbaseCoreKvClient {
@@ -46,6 +49,32 @@ impl CouchbaseCoreKvClient {
         }
     }
 
+    fn expiry_to_seconds(expiry: Duration) -> error::Result<u32> {
+        if expiry.as_millis() < 1000 {
+            return Ok(1); // minimum 1 second
+        }
+
+        let expiry_secs = expiry.as_secs();
+        if expiry_secs < (SECS_IN_DAY * 30) {
+            expiry_secs.try_into().map_err(|e| {
+                Error::invalid_argument(
+                    "expiry",
+                    format!("expiry duration is too large for u32: {}", e),
+                )
+            })
+        } else {
+            // treat as unix timestamp
+            let now = Utc::now().timestamp() as u64;
+            let then = now.saturating_add(expiry_secs);
+            then.try_into().map_err(|e| {
+                Error::invalid_argument(
+                    "expiry",
+                    format!("expiry as timestamp is too large for u32: {}", e),
+                )
+            })
+        }
+    }
+
     pub async fn upsert(
         &self,
         id: &str,
@@ -63,7 +92,7 @@ impl CouchbaseCoreKvClient {
                     value,
                 )
                 .flags(flags)
-                .expiry(options.expiry.map(|e| e.as_secs() as u32))
+                .expiry(options.expiry.map(Self::expiry_to_seconds).transpose()?)
                 .durability_level(parse_optional_durability_level_to_memdx(
                     options.durability_level,
                 ))
@@ -97,7 +126,7 @@ impl CouchbaseCoreKvClient {
                     value,
                 )
                 .flags(flags)
-                .expiry(options.expiry.map(|e| e.as_secs() as u32))
+                .expiry(options.expiry.map(Self::expiry_to_seconds).transpose()?)
                 .durability_level(parse_optional_durability_level_to_memdx(
                     options.durability_level,
                 ))
@@ -130,7 +159,7 @@ impl CouchbaseCoreKvClient {
                     value,
                 )
                 .flags(flags)
-                .expiry(options.expiry.map(|e| e.as_secs() as u32))
+                .expiry(options.expiry.map(Self::expiry_to_seconds).transpose()?)
                 .durability_level(parse_optional_durability_level_to_memdx(
                     options.durability_level,
                 ))
@@ -247,7 +276,7 @@ impl CouchbaseCoreKvClient {
                     id.as_bytes(),
                     &self.scope_name,
                     &self.collection_name,
-                    expiry.as_secs() as u32,
+                    Self::expiry_to_seconds(expiry)?,
                 )
                 .retry_strategy(self.default_retry_strategy.clone()),
             )
@@ -308,7 +337,7 @@ impl CouchbaseCoreKvClient {
                     id.as_bytes(),
                     &self.scope_name,
                     &self.collection_name,
-                    expiry.as_secs() as u32,
+                    Self::expiry_to_seconds(expiry)?,
                 )
                 .retry_strategy(self.default_retry_strategy.clone()),
             )
@@ -397,7 +426,7 @@ impl CouchbaseCoreKvClient {
                     options.durability_level,
                 ))
                 .retry_strategy(self.default_retry_strategy.clone())
-                .expiry(options.expiry.map(|e| e.as_secs() as u32))
+                .expiry(options.expiry.map(Self::expiry_to_seconds).transpose()?)
                 .initial(options.initial),
             )
             .await?;
@@ -429,7 +458,7 @@ impl CouchbaseCoreKvClient {
                     options.durability_level,
                 ))
                 .retry_strategy(self.default_retry_strategy.clone())
-                .expiry(options.expiry.map(|e| e.as_secs() as u32))
+                .expiry(options.expiry.map(Self::expiry_to_seconds).transpose()?)
                 .initial(options.initial),
             )
             .await?;
@@ -527,7 +556,7 @@ impl CouchbaseCoreKvClient {
                     flags
                 })
                 .preserve_expiry(options.preserve_expiry)
-                .expiry(options.expiry.map(|e| e.as_secs() as u32))
+                .expiry(options.expiry.map(Self::expiry_to_seconds).transpose()?)
                 .cas(options.cas)
                 .retry_strategy(self.default_retry_strategy.clone()),
             )
