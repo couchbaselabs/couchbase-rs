@@ -116,14 +116,41 @@ impl TryFrom<VectorQuery> for KnnQuery {
 
     fn try_from(value: VectorQuery) -> error::Result<KnnQuery> {
         if value.query.is_none() && value.base64_query.is_none() {
-            return Err(error::Error::other_failure(
-                "vector search query or base64_query must be set",
+            return Err(error::Error::invalid_argument(
+                "query, base64_query",
+                "one of vector search query or base64_query must be set",
             ));
         }
 
         if value.query.is_some() && value.base64_query.is_some() {
-            return Err(error::Error::other_failure(
+            return Err(error::Error::invalid_argument(
+                "query, base64_query",
                 "only one of vector search query or base64_query may be set",
+            ));
+        }
+
+        if let Some(q) = &value.query {
+            if q.is_empty() {
+                return Err(error::Error::invalid_argument(
+                    "query",
+                    "vector search query must be non-empty",
+                ));
+            }
+        }
+
+        if let Some(ref q) = value.base64_query {
+            if q.is_empty() {
+                return Err(error::Error::invalid_argument(
+                    "base64_query",
+                    "base64_query must be a non-empty string",
+                ));
+            }
+        }
+
+        if value.num_candidates == 0 {
+            return Err(error::Error::invalid_argument(
+                "num_candidates",
+                "if set num_candidates must be greater than zero",
             ));
         }
 
