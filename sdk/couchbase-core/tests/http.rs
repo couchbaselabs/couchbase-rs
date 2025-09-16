@@ -1,6 +1,7 @@
+use crate::common::default_agent_options::create_tls_config;
 use crate::common::test_config::setup_test;
 use bytes::Bytes;
-use couchbase_core::httpx::client::{Client, ClientConfig, ReqwestClient};
+use couchbase_core::httpx::client::{self, Client, ClientConfig, ReqwestClient};
 use couchbase_core::httpx::decoder::Decoder;
 use couchbase_core::httpx::raw_json_row_streamer::{RawJsonRowItem, RawJsonRowStreamer};
 use couchbase_core::httpx::request::{Auth, BasicAuth, Request};
@@ -47,14 +48,17 @@ pub struct QueryMetrics {
 #[test]
 fn test_row_streamer() {
     setup_test(async |config| {
-        let addrs = config.memd_addrs;
+        let scheme = if config.use_ssl { "https" } else { "http" };
+        let addrs = &config.http_addrs;
 
-        let host = addrs.first().unwrap().host.clone();
+        let addr = addrs.first().unwrap();
+        let host = &addr.host;
+        let port = addr.port;
 
-        let basic_auth = BasicAuth::new(config.username, config.password);
+        let basic_auth = BasicAuth::new(&config.username, &config.password);
 
         let request_body = json!({"statement": "select i from array_range(1, 10000) AS i;"});
-        let uri = format!("http://{host}:8093/query/service");
+        let uri = format!("{scheme}://{host}:{port}/_p/query/query/service");
 
         let request = Request::new(Method::POST, uri)
             .user_agent("rscbcorex".to_string())
@@ -62,7 +66,8 @@ fn test_row_streamer() {
             .content_type("application/json".to_string())
             .body(Bytes::from(serde_json::to_vec(&request_body).unwrap()));
 
-        let client = ReqwestClient::new(ClientConfig::default()).unwrap();
+        let client_config = ClientConfig::default().tls_config(create_tls_config(&config));
+        let client = ReqwestClient::new(client_config).unwrap();
 
         let resp = timeout(Duration::from_secs(10), client.execute(request))
             .await
@@ -116,19 +121,23 @@ fn test_row_streamer() {
 #[test]
 fn test_json_block_read() {
     setup_test(async |config| {
-        let addrs = config.memd_addrs;
+        let scheme = if config.use_ssl { "https" } else { "http" };
+        let addrs = &config.http_addrs;
 
-        let host = addrs.first().unwrap().host.clone();
+        let addr = addrs.first().unwrap();
+        let host = &addr.host;
+        let port = addr.port;
 
-        let basic_auth = BasicAuth::new(config.username, config.password);
-        let uri = format!("http://{host}:8091/pools/default/terseClusterInfo");
+        let basic_auth = BasicAuth::new(&config.username, &config.password);
+        let uri = format!("{scheme}://{host}:{port}/pools/default/terseClusterInfo");
 
         let request = Request::new(Method::GET, uri)
             .user_agent("rscbcorex".to_string())
             .auth(Auth::BasicAuth(basic_auth))
             .content_type("application/json".to_string());
 
-        let client = ReqwestClient::new(ClientConfig::default()).expect("could not create client");
+        let client_config = ClientConfig::default().tls_config(create_tls_config(&config));
+        let client = ReqwestClient::new(client_config).expect("could not create client");
 
         let res = timeout(Duration::from_secs(10), client.execute(request))
             .await

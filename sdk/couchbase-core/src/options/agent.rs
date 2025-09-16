@@ -1,4 +1,5 @@
-use crate::address::Address;
+use couchbase_connstr::Address;
+
 use crate::auth_mechanism::AuthMechanism;
 use crate::authenticator::Authenticator;
 use crate::tls_config::TlsConfig;

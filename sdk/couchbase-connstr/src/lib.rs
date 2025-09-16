@@ -198,26 +198,40 @@ pub async fn resolve(
     conn_spec: ConnSpec,
     dns_config: impl Into<Option<DnsConfig>>,
 ) -> error::Result<ResolvedConnSpec> {
-    let (default_port, has_explicit_scheme, use_ssl) = if let Some(scheme) = &conn_spec.scheme {
+    if let Some(scheme) = &conn_spec.scheme {
         match scheme.as_str() {
-            "couchbase" => (DEFAULT_MEMD_PORT, true, false),
-            "couchbases" => (DEFAULT_SSL_MEMD_PORT, true, true),
-            "couchbase2" => {
-                return handle_couchbase2_scheme(conn_spec);
+            "couchbase" => {
+                handle_couchbase_scheme(conn_spec, dns_config, DEFAULT_MEMD_PORT, true, false).await
             }
-            "" => (DEFAULT_MEMD_PORT, false, false),
-            _ => {
-                return Err(ErrorKind::InvalidArgument {
-                    msg: "unrecognized scheme".to_string(),
-                    arg: "scheme".to_string(),
-                }
-                .into());
+            "couchbases" => {
+                handle_couchbase_scheme(conn_spec, dns_config, DEFAULT_SSL_MEMD_PORT, true, true)
+                    .await
             }
+            "couchbase2" => handle_couchbase2_scheme(conn_spec),
+            "http" => handle_http_scheme(conn_spec, DEFAULT_LEGACY_HTTP_PORT, true, false).await,
+            "https" => handle_http_scheme(conn_spec, DEFAULT_LEGACY_HTTPS_PORT, true, true).await,
+            "" => {
+                handle_couchbase_scheme(conn_spec, dns_config, DEFAULT_MEMD_PORT, false, false)
+                    .await
+            }
+            _ => Err(ErrorKind::InvalidArgument {
+                msg: "unrecognized scheme".to_string(),
+                arg: "scheme".to_string(),
+            }
+            .into()),
         }
     } else {
-        (DEFAULT_MEMD_PORT, false, false)
-    };
+        handle_couchbase_scheme(conn_spec, dns_config, DEFAULT_MEMD_PORT, false, false).await
+    }
+}
 
+async fn handle_couchbase_scheme(
+    conn_spec: ConnSpec,
+    dns_config: impl Into<Option<DnsConfig>>,
+    default_port: u16,
+    has_explicit_scheme: bool,
+    use_ssl: bool,
+) -> error::Result<ResolvedConnSpec> {
     if let Some(srv_record) = conn_spec.srv_record() {
         match lookup_srv(
             &srv_record.scheme,
@@ -353,6 +367,80 @@ fn handle_couchbase2_scheme(conn_spec: ConnSpec) -> error::Result<ResolvedConnSp
         memd_hosts: vec![],
         http_hosts: vec![],
         couchbase2_host: Some(host),
+        srv_record: None,
+        options: conn_spec.options,
+    })
+}
+
+async fn handle_http_scheme(
+    conn_spec: ConnSpec,
+    default_port: u16,
+    has_explicit_scheme: bool,
+    use_ssl: bool,
+) -> error::Result<ResolvedConnSpec> {
+    if conn_spec.hosts.is_empty() {
+        let (memd_port, http_port) = if use_ssl {
+            (DEFAULT_SSL_MEMD_PORT, DEFAULT_LEGACY_HTTPS_PORT)
+        } else {
+            (DEFAULT_MEMD_PORT, DEFAULT_LEGACY_HTTP_PORT)
+        };
+
+        return Ok(ResolvedConnSpec {
+            use_ssl,
+            memd_hosts: vec![Address {
+                host: "127.0.0.1".to_string(),
+                port: memd_port,
+            }],
+            http_hosts: vec![Address {
+                host: "127.0.0.1".to_string(),
+                port: http_port,
+            }],
+            couchbase2_host: None,
+            srv_record: None,
+            options: conn_spec.options,
+        });
+    }
+
+    let mut memd_hosts = vec![];
+    let mut http_hosts = vec![];
+    for address in conn_spec.hosts {
+        if let Some(port) = &address.port {
+            if !has_explicit_scheme && address.port != Some(default_port) {
+                return Err(ErrorKind::InvalidArgument {
+                    msg: "ambiguous port without scheme".to_string(),
+                    arg: "port".to_string(),
+                }
+                .into());
+            }
+
+            http_hosts.push(Address {
+                host: address.host,
+                port: *port,
+            });
+        } else {
+            let (memd_port, http_port) = if use_ssl {
+                (DEFAULT_SSL_MEMD_PORT, DEFAULT_LEGACY_HTTPS_PORT)
+            } else {
+                (DEFAULT_MEMD_PORT, DEFAULT_LEGACY_HTTP_PORT)
+            };
+
+            memd_hosts.push(Address {
+                host: address.host.clone(),
+                port: memd_port,
+            });
+
+            http_hosts.push(Address {
+                host: address.host,
+                port: http_port,
+            });
+        }
+    }
+
+    Ok(ResolvedConnSpec {
+        use_ssl,
+        memd_hosts,
+        http_hosts,
+        couchbase2_host: None,
         srv_record: None,
         options: conn_spec.options,
     })
