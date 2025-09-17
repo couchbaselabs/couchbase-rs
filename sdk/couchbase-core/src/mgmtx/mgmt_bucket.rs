@@ -144,16 +144,18 @@ impl<C: Client> Management<C> {
 
         if resp.status() != 200 {
             let e = Self::decode_common_error(method, path.clone(), "delete_bucket", resp).await;
-            match e.kind() {
-                error::ErrorKind::Server(e) => {
+            return match e.kind() {
+                error::ErrorKind::Server(se) => {
                     // A delayed operation is considered a success for deletion, since
                     // bucket management is already eventually consistent anyways.
-                    if e.kind() == &error::ServerErrorKind::OperationDelayed {
+                    if se.kind() == &error::ServerErrorKind::OperationDelayed {
                         return Ok(());
                     }
+
+                    Err(e)
                 }
-                _ => return Err(e),
-            }
+                _ => Err(e),
+            };
         }
 
         Ok(())
