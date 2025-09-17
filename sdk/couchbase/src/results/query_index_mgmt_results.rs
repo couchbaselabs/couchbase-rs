@@ -100,7 +100,7 @@ impl From<queryx::index::Index> for QueryIndex {
             name: index.name,
             is_primary: index.is_primary.unwrap_or(false),
             index_type: QueryIndexType::from(index.using.as_str()),
-            state: index.state.to_string(),
+            state: index.state,
             keyspace,
             index_key: index.index_key.unwrap_or_default(),
             condition: index.condition,
