@@ -196,7 +196,7 @@ impl<C: Client> Management<C> {
         opts: &GetTerseClusterConfigOptions<'_>,
     ) -> error::Result<TerseConfig> {
         let method = Method::GET;
-        let path = "/pools/default/nodeServicesStreaming".to_string();
+        let path = "pools/default/nodeServicesStreaming".to_string();
 
         let resp = self
             .execute(
@@ -223,7 +223,7 @@ impl<C: Client> Management<C> {
         opts: &GetTerseBucketConfigOptions<'_>,
     ) -> error::Result<TerseConfig> {
         let method = Method::GET;
-        let path = format!("/pools/default/b/{}", opts.bucket_name);
+        let path = format!("pools/default/b/{}", opts.bucket_name);
 
         let resp = self
             .execute(

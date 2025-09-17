@@ -16,7 +16,7 @@ impl<C: Client> Management<C> {
         opts: &GetAllBucketsOptions<'_>,
     ) -> error::Result<Vec<BucketDef>> {
         let method = Method::GET;
-        let path = "/pools/default/buckets".to_string();
+        let path = "pools/default/buckets".to_string();
 
         let resp = self
             .execute(
@@ -44,7 +44,7 @@ impl<C: Client> Management<C> {
 
     pub async fn get_bucket(&self, opts: &GetBucketOptions<'_>) -> error::Result<BucketDef> {
         let method = Method::GET;
-        let path = format!("/pools/default/buckets/{}", opts.bucket_name).to_string();
+        let path = format!("pools/default/buckets/{}", opts.bucket_name).to_string();
 
         let resp = self
             .execute(
@@ -68,7 +68,7 @@ impl<C: Client> Management<C> {
 
     pub async fn create_bucket(&self, opts: &CreateBucketOptions<'_>) -> error::Result<()> {
         let method = Method::POST;
-        let path = "/pools/default/buckets".to_string();
+        let path = "pools/default/buckets".to_string();
 
         let body = {
             // Serializer is not Send so we need to drop it before making the request.
@@ -99,7 +99,7 @@ impl<C: Client> Management<C> {
 
     pub async fn update_bucket(&self, opts: &UpdateBucketOptions<'_>) -> error::Result<()> {
         let method = Method::POST;
-        let path = format!("/pools/default/buckets/{}", opts.bucket_name).to_string();
+        let path = format!("pools/default/buckets/{}", opts.bucket_name).to_string();
 
         let body = {
             // Serializer is not Send so we need to drop it before making the request.
@@ -129,7 +129,7 @@ impl<C: Client> Management<C> {
 
     pub async fn delete_bucket(&self, opts: &DeleteBucketOptions<'_>) -> error::Result<()> {
         let method = Method::DELETE;
-        let path = format!("/pools/default/buckets/{}", opts.bucket_name).to_string();
+        let path = format!("pools/default/buckets/{}", opts.bucket_name).to_string();
 
         let resp = self
             .execute(
@@ -162,7 +162,7 @@ impl<C: Client> Management<C> {
     pub async fn flush_bucket(&self, opts: &FlushBucketOptions<'_>) -> error::Result<()> {
         let method = Method::POST;
         let path = format!(
-            "/pools/default/buckets/{}/controller/doFlush",
+            "pools/default/buckets/{}/controller/doFlush",
             opts.bucket_name
         )
         .to_string();

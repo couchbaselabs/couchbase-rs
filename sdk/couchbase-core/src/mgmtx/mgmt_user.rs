@@ -15,7 +15,7 @@ impl<C: Client> Management<C> {
     pub async fn get_user(&self, opts: &GetUserOptions<'_>) -> error::Result<UserAndMetadata> {
         let method = Method::GET;
         let path = format!(
-            "/settings/rbac/users/{}/{}",
+            "settings/rbac/users/{}/{}",
             urlencoding::encode(opts.auth_domain),
             urlencoding::encode(opts.username)
         )
@@ -47,7 +47,7 @@ impl<C: Client> Management<C> {
     ) -> error::Result<Vec<UserAndMetadata>> {
         let method = Method::GET;
         let path = format!(
-            "/settings/rbac/users/{}",
+            "settings/rbac/users/{}",
             urlencoding::encode(opts.auth_domain),
         )
         .to_string();
@@ -103,7 +103,7 @@ impl<C: Client> Management<C> {
 
         let method = Method::PUT;
         let path = format!(
-            "/settings/rbac/users/{}/{}",
+            "settings/rbac/users/{}/{}",
             urlencoding::encode(opts.auth_domain),
             urlencoding::encode(&opts.user.username),
         );
@@ -129,7 +129,7 @@ impl<C: Client> Management<C> {
     pub async fn delete_user(&self, opts: &DeleteUserOptions<'_>) -> error::Result<()> {
         let method = Method::DELETE;
         let path = format!(
-            "/settings/rbac/users/{}/{}",
+            "settings/rbac/users/{}/{}",
             urlencoding::encode(opts.auth_domain),
             urlencoding::encode(opts.username),
         )
@@ -158,7 +158,7 @@ impl<C: Client> Management<C> {
         opts: &GetRolesOptions<'_>,
     ) -> error::Result<Vec<RoleAndDescription>> {
         let method = Method::GET;
-        let path = "/settings/rbac/roles".to_string();
+        let path = "settings/rbac/roles".to_string();
 
         let resp = self
             .execute(
@@ -185,7 +185,7 @@ impl<C: Client> Management<C> {
 
     pub async fn get_group(&self, opts: &GetGroupOptions<'_>) -> error::Result<Group> {
         let method = Method::GET;
-        let path = format!("/settings/rbac/groups/{}", opts.group_name).to_string();
+        let path = format!("settings/rbac/groups/{}", opts.group_name).to_string();
 
         let resp = self
             .execute(
@@ -212,7 +212,7 @@ impl<C: Client> Management<C> {
         opts: &GetAllGroupsOptions<'_>,
     ) -> error::Result<Vec<Group>> {
         let method = Method::GET;
-        let path = "/settings/rbac/groups".to_string();
+        let path = "settings/rbac/groups".to_string();
 
         let resp = self
             .execute(
@@ -237,7 +237,7 @@ impl<C: Client> Management<C> {
     pub async fn upsert_group(&self, opts: &UpsertGroupOptions<'_>) -> error::Result<()> {
         let method = Method::PUT;
         let path = format!(
-            "/settings/rbac/groups/{}",
+            "settings/rbac/groups/{}",
             urlencoding::encode(&opts.group.name),
         )
         .to_string();
@@ -287,7 +287,7 @@ impl<C: Client> Management<C> {
     pub async fn delete_group(&self, opts: &DeleteGroupOptions<'_>) -> error::Result<()> {
         let method = Method::DELETE;
         let path = format!(
-            "/settings/rbac/groups/{}",
+            "settings/rbac/groups/{}",
             urlencoding::encode(opts.group_name),
         )
         .to_string();
@@ -312,7 +312,7 @@ impl<C: Client> Management<C> {
 
     pub async fn change_password(&self, opts: &ChangePasswordOptions<'_>) -> error::Result<()> {
         let method = Method::POST;
-        let path = "/controller/changePassword".to_string();
+        let path = "controller/changePassword".to_string();
 
         let body = {
             let mut form = url::form_urlencoded::Serializer::new(String::new());
