@@ -92,7 +92,7 @@ pub struct QueryMetaData<'a> {
     pub request_id: &'a str,
     pub client_context_id: &'a str,
     pub status: QueryStatus,
-    pub metrics: QueryMetrics,
+    pub metrics: Option<QueryMetrics>,
     pub signature: Option<&'a RawValue>,
     pub warnings: Vec<QueryWarning>,
     pub profile: Option<&'a RawValue>,
@@ -105,7 +105,7 @@ impl<'a> From<&'a queryx::query_result::MetaData> for QueryMetaData<'a> {
             request_id: meta.request_id.as_ref(),
             client_context_id: meta.client_context_id.as_ref(),
             status: meta.status.into(),
-            metrics: QueryMetrics::from(&meta.metrics),
+            metrics: meta.metrics.as_ref().map(QueryMetrics::from),
             signature: meta.signature.as_deref(),
             warnings: meta
                 .warnings

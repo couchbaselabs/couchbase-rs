@@ -48,7 +48,7 @@ pub struct MetaData {
     pub request_id: String,
     pub client_context_id: String,
     pub status: Status,
-    pub metrics: Metrics,
+    pub metrics: Option<Metrics>,
     pub signature: Option<Box<RawValue>>,
     pub warnings: Vec<Warning>,
     pub profile: Option<Box<RawValue>>,
@@ -58,7 +58,7 @@ impl Display for MetaData {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "prepared: {:?}, request_id: {}, client_context_id: {}, status: {}, metrics: {}, signature: {:?}, warnings: {:?}, profile: {:?}",
+            "prepared: {:?}, request_id: {}, client_context_id: {}, status: {}, metrics: {:?}, signature: {:?}, warnings: {:?}, profile: {:?}",
             self.prepared,
             self.request_id,
             self.client_context_id,

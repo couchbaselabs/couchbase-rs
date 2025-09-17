@@ -263,33 +263,31 @@ impl QueryRespReader {
         })
     }
 
-    fn parse_metrics(&self, metrics: Option<QueryMetrics>) -> Metrics {
-        if let Some(metrics) = metrics {
-            let elapsed_time = if let Some(elapsed) = metrics.elapsed_time {
+    fn parse_metrics(&self, metrics: Option<QueryMetrics>) -> Option<Metrics> {
+        metrics.map(|m| {
+            let elapsed_time = if let Some(elapsed) = m.elapsed_time {
                 parse_duration_from_golang_string(&elapsed).unwrap_or_default()
             } else {
                 Duration::default()
             };
 
-            let execution_time = if let Some(execution) = metrics.execution_time {
+            let execution_time = if let Some(execution) = m.execution_time {
                 parse_duration_from_golang_string(&execution).unwrap_or_default()
             } else {
                 Duration::default()
             };
 
-            return Metrics {
+            Metrics {
                 elapsed_time,
                 execution_time,
-                result_count: metrics.result_count.unwrap_or_default(),
-                result_size: metrics.result_size.unwrap_or_default(),
-                mutation_count: metrics.mutation_count.unwrap_or_default(),
-                sort_count: metrics.sort_count.unwrap_or_default(),
-                error_count: metrics.error_count.unwrap_or_default(),
-                warning_count: metrics.warning_count.unwrap_or_default(),
-            };
-        }
-
-        Metrics::default()
+                result_count: m.result_count.unwrap_or_default(),
+                result_size: m.result_size.unwrap_or_default(),
+                mutation_count: m.mutation_count.unwrap_or_default(),
+                sort_count: m.sort_count.unwrap_or_default(),
+                error_count: m.error_count.unwrap_or_default(),
+                warning_count: m.warning_count.unwrap_or_default(),
+            }
+        })
     }
 
     fn parse_warnings(&self, warnings: Vec<QueryWarning>) -> Vec<Warning> {
