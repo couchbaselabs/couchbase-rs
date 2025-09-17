@@ -400,6 +400,11 @@ impl QueryRespReader {
                 .is_match(&error.msg)
             {
                 ServerErrorKind::IndexExists
+            } else if Regex::new(".*?ndex .*? not exist.*")
+                .unwrap()
+                .is_match(&error.msg)
+            {
+                ServerErrorKind::IndexNotFound
             } else {
                 ServerErrorKind::Internal
             }
