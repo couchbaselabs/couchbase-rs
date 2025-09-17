@@ -76,7 +76,7 @@ impl CouchbaseQueryClient {
 
         if let Some(keyspace) = &self.keyspace {
             query_opts = query_opts.query_context(format!(
-                "{}.{}",
+                "`{}`.`{}`",
                 keyspace.bucket_name.clone(),
                 keyspace.scope_name.clone()
             ));
