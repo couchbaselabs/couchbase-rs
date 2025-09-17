@@ -43,14 +43,19 @@ fn test_query_basic() {
         assert!(meta.profile.is_none());
         assert!(meta.warnings.is_empty());
 
-        assert!(!meta.metrics.elapsed_time.is_zero());
-        assert!(!meta.metrics.execution_time.is_zero());
-        assert_eq!(1, meta.metrics.result_count);
-        assert_ne!(0, meta.metrics.result_size);
-        assert_eq!(0, meta.metrics.mutation_count);
-        assert_eq!(0, meta.metrics.sort_count);
-        assert_eq!(0, meta.metrics.error_count);
-        assert_eq!(0, meta.metrics.warning_count);
+        let metrics = meta
+            .metrics
+            .as_ref()
+            .expect("expected metrics to be present");
+
+        assert!(!metrics.elapsed_time.is_zero());
+        assert!(!metrics.execution_time.is_zero());
+        assert_eq!(1, metrics.result_count);
+        assert_ne!(0, metrics.result_size);
+        assert_eq!(0, metrics.mutation_count);
+        assert_eq!(0, metrics.sort_count);
+        assert_eq!(0, metrics.error_count);
+        assert_eq!(0, metrics.warning_count);
 
         assert_eq!(
             "{\"$1\":\"boolean\"}",
@@ -87,14 +92,19 @@ fn test_prepared_query_basic() {
         assert!(meta.profile.is_none());
         assert!(meta.warnings.is_empty());
 
-        assert!(!meta.metrics.elapsed_time.is_zero());
-        assert!(!meta.metrics.execution_time.is_zero());
-        assert_eq!(1, meta.metrics.result_count);
-        assert_ne!(0, meta.metrics.result_size);
-        assert_eq!(0, meta.metrics.mutation_count);
-        assert_eq!(0, meta.metrics.sort_count);
-        assert_eq!(0, meta.metrics.error_count);
-        assert_eq!(0, meta.metrics.warning_count);
+        let metrics = meta
+            .metrics
+            .as_ref()
+            .expect("expected metrics to be present");
+
+        assert!(!metrics.elapsed_time.is_zero());
+        assert!(!metrics.execution_time.is_zero());
+        assert_eq!(1, metrics.result_count);
+        assert_ne!(0, metrics.result_size);
+        assert_eq!(0, metrics.mutation_count);
+        assert_eq!(0, metrics.sort_count);
+        assert_eq!(0, metrics.error_count);
+        assert_eq!(0, metrics.warning_count);
 
         dbg!(&meta.signature);
 

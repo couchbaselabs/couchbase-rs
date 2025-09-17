@@ -245,7 +245,7 @@ impl TryFrom<QueryOptions> for query::QueryOptions {
             .args(opts.positional_parameters)
             .client_context_id(opts.client_context_id)
             .max_parallelism(opts.max_parallelism)
-            .metrics(opts.metrics)
+            .metrics(opts.metrics.unwrap_or_default())
             .pipeline_batch(opts.pipeline_batch)
             .pipeline_cap(opts.pipeline_cap)
             .preserve_expiry(opts.preserve_expiry)
