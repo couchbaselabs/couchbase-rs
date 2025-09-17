@@ -3,7 +3,7 @@ use crate::httpx::request::{Auth, BasicAuth, OnBehalfOfInfo, Request};
 use crate::httpx::response::Response;
 use crate::queryx::error;
 use crate::queryx::error::{Error, ErrorKind, ServerError, ServerErrorKind};
-use crate::queryx::index::{Index, IndexState};
+use crate::queryx::index::Index;
 use crate::queryx::query_options::{
     BuildDeferredIndexesOptions, CreateIndexOptions, CreatePrimaryIndexOptions, DropIndexOptions,
     DropPrimaryIndexOptions, GetAllIndexesOptions, PingOptions, QueryOptions, WatchIndexesOptions,
@@ -425,7 +425,7 @@ impl<C: Client> Query<C> {
 
         let deferred_items: Vec<_> = indexes
             .iter()
-            .filter(|index| index.state == IndexState::Deferred)
+            .filter(|index| index.state == "deferred")
             .map(|index| {
                 let (bucket, scope, collection) = index_to_namespace_parts(index);
                 let deferred_index = DeferredIndexName {
@@ -623,7 +623,7 @@ fn check_indexes_active(indexes: &[Index], check_list: &Vec<&str>) -> error::Res
     }
 
     for index in check_indexes {
-        if index.state != IndexState::Online {
+        if index.state != "online" {
             debug!(
                 "Index {} is not ready yet, current state is {}",
                 index.name, index.state

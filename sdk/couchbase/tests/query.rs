@@ -200,14 +200,14 @@ fn test_query_indexes() {
 
         let primary_index = indexes.iter().find(|idx| idx.name() == "#primary").unwrap();
         assert!(primary_index.is_primary());
-        assert_eq!(primary_index.state(), "Online");
+        assert_eq!(primary_index.state(), "online");
 
         let test_index = indexes
             .iter()
             .find(|idx| idx.name() == "test_index")
             .unwrap();
         assert!(!test_index.is_primary());
-        assert_eq!(test_index.state(), "Deferred");
+        assert_eq!(test_index.state(), "deferred");
         assert_eq!(test_index.keyspace(), &collection);
 
         manager.build_deferred_indexes(None).await.unwrap();
