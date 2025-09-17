@@ -169,7 +169,10 @@ impl CouchbaseBucketMgmtClient {
         let agent = self.agent_provider.get_agent().await;
 
         let mut core_settings = mgmtx::bucket_settings::BucketSettings::default();
-        core_settings = core_settings.ram_quota_mb(settings.ram_quota_mb);
+
+        if let Some(ram_quota_mb) = settings.ram_quota_mb {
+            core_settings = core_settings.ram_quota_mb(ram_quota_mb);
+        }
 
         if let Some(flush_enabled) = settings.flush_enabled {
             core_settings = core_settings.flush_enabled(flush_enabled);
@@ -248,7 +251,10 @@ impl CouchbaseBucketMgmtClient {
         let agent = self.agent_provider.get_agent().await;
 
         let mut core_settings = mgmtx::bucket_settings::BucketSettings::default();
-        core_settings = core_settings.ram_quota_mb(settings.ram_quota_mb);
+
+        if let Some(ram_quota_mb) = settings.ram_quota_mb {
+            core_settings = core_settings.ram_quota_mb(ram_quota_mb);
+        }
 
         if let Some(flush_enabled) = settings.flush_enabled {
             core_settings = core_settings.flush_enabled(flush_enabled);

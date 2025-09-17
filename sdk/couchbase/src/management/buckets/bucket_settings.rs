@@ -4,9 +4,10 @@ use std::fmt::Display;
 use std::time::Duration;
 
 #[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
+#[non_exhaustive]
 pub struct BucketSettings {
     pub name: String,
-    pub ram_quota_mb: u64,
+    pub ram_quota_mb: Option<u64>,
     pub flush_enabled: Option<bool>,
     pub num_replicas: Option<u32>,
     pub eviction_policy: Option<EvictionPolicyType>,
@@ -24,10 +25,10 @@ pub struct BucketSettings {
 }
 
 impl BucketSettings {
-    pub fn new(name: impl Into<String>, ram_quota_mb: u64) -> Self {
+    pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
-            ram_quota_mb,
+            ram_quota_mb: None,
             flush_enabled: None,
             num_replicas: None,
             eviction_policy: None,
@@ -51,7 +52,7 @@ impl BucketSettings {
     }
 
     pub fn ram_quota_mb(mut self, ram_quota_mb: u64) -> Self {
-        self.ram_quota_mb = ram_quota_mb;
+        self.ram_quota_mb = Some(ram_quota_mb);
         self
     }
 
@@ -384,7 +385,7 @@ impl From<BucketDef> for BucketSettings {
     fn from(value: BucketDef) -> Self {
         Self {
             name: value.name,
-            ram_quota_mb: value.bucket_settings.ram_quota_mb.unwrap_or(0),
+            ram_quota_mb: value.bucket_settings.ram_quota_mb,
             flush_enabled: value.bucket_settings.flush_enabled,
             num_replicas: value.bucket_settings.replica_number,
             eviction_policy: value.bucket_settings.eviction_policy.map(|v| v.into()),

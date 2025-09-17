@@ -22,7 +22,9 @@ fn test_create_bucket() {
         let manager = cluster.buckets();
 
         let bucket_name = generate_string_value(10);
-        let settings = BucketSettings::new(&bucket_name, 100).flush_enabled(true);
+        let settings = BucketSettings::new(&bucket_name)
+            .ram_quota_mb(100)
+            .flush_enabled(true);
 
         manager.create_bucket(settings, None).await.unwrap();
 
@@ -34,7 +36,7 @@ fn test_create_bucket() {
         verify_bucket_deleted(&manager, &bucket_name).await;
 
         assert_eq!(bucket.name, bucket_name);
-        assert_eq!(bucket.ram_quota_mb, 100);
+        assert_eq!(bucket.ram_quota_mb, Some(100));
         assert_eq!(bucket.flush_enabled, Some(true));
     })
 }
@@ -50,7 +52,9 @@ fn test_update_bucket() {
         let manager = cluster.buckets();
 
         let bucket_name = generate_string_value(10);
-        let settings = BucketSettings::new(&bucket_name, 100).flush_enabled(true);
+        let settings = BucketSettings::new(&bucket_name)
+            .ram_quota_mb(100)
+            .flush_enabled(true);
 
         manager.create_bucket(settings.clone(), None).await.unwrap();
 
@@ -66,7 +70,7 @@ fn test_update_bucket() {
             || async {
                 let bucket = manager.get_bucket(&bucket_name, None).await?;
 
-                if bucket.ram_quota_mb == 200 {
+                if bucket.ram_quota_mb == Some(200) {
                     Ok(Some(()))
                 } else {
                     Ok(None)
@@ -91,7 +95,9 @@ fn test_delete_bucket() {
         let manager = cluster.buckets();
 
         let bucket_name = generate_string_value(10);
-        let settings = BucketSettings::new(&bucket_name, 100).flush_enabled(true);
+        let settings = BucketSettings::new(&bucket_name)
+            .ram_quota_mb(100)
+            .flush_enabled(true);
 
         manager.create_bucket(settings, None).await.unwrap();
 
@@ -113,7 +119,8 @@ fn test_create_bucket_with_replica_number() {
         let manager = cluster.buckets();
 
         let bucket_name = generate_string_value(10);
-        let settings = BucketSettings::new(&bucket_name, 100)
+        let settings = BucketSettings::new(&bucket_name)
+            .ram_quota_mb(100)
             .flush_enabled(true)
             .num_replicas(2);
 
@@ -127,7 +134,7 @@ fn test_create_bucket_with_replica_number() {
         verify_bucket_deleted(&manager, &bucket_name).await;
 
         assert_eq!(bucket.name, bucket_name);
-        assert_eq!(bucket.ram_quota_mb, 100);
+        assert_eq!(bucket.ram_quota_mb, Some(100));
         assert_eq!(bucket.flush_enabled, Some(true));
         assert_eq!(bucket.num_replicas, Some(2));
     })
@@ -144,7 +151,8 @@ fn test_create_bucket_with_eviction_policy() {
         let manager = cluster.buckets();
 
         let bucket_name = generate_string_value(10);
-        let settings = BucketSettings::new(&bucket_name, 100)
+        let settings = BucketSettings::new(&bucket_name)
+            .ram_quota_mb(100)
             .flush_enabled(true)
             .eviction_policy(EvictionPolicyType::VALUE_ONLY);
 
@@ -158,7 +166,7 @@ fn test_create_bucket_with_eviction_policy() {
         verify_bucket_deleted(&manager, &bucket_name).await;
 
         assert_eq!(bucket.name, bucket_name);
-        assert_eq!(bucket.ram_quota_mb, 100);
+        assert_eq!(bucket.ram_quota_mb, Some(100));
         assert_eq!(bucket.flush_enabled, Some(true));
         assert_eq!(bucket.eviction_policy, Some(EvictionPolicyType::VALUE_ONLY));
     })
@@ -175,7 +183,8 @@ fn test_create_bucket_with_compression_mode() {
         let manager = cluster.buckets();
 
         let bucket_name = generate_string_value(10);
-        let settings = BucketSettings::new(&bucket_name, 100)
+        let settings = BucketSettings::new(&bucket_name)
+            .ram_quota_mb(100)
             .flush_enabled(true)
             .compression_mode(CompressionMode::ACTIVE);
 
@@ -189,7 +198,7 @@ fn test_create_bucket_with_compression_mode() {
         verify_bucket_deleted(&manager, &bucket_name).await;
 
         assert_eq!(bucket.name, bucket_name);
-        assert_eq!(bucket.ram_quota_mb, 100);
+        assert_eq!(bucket.ram_quota_mb, Some(100));
         assert_eq!(bucket.flush_enabled, Some(true));
         assert_eq!(bucket.compression_mode, Some(CompressionMode::ACTIVE));
     })
@@ -206,7 +215,8 @@ fn test_create_bucket_with_durability_min_level() {
         let manager = cluster.buckets();
 
         let bucket_name = generate_string_value(10);
-        let settings = BucketSettings::new(&bucket_name, 100)
+        let settings = BucketSettings::new(&bucket_name)
+            .ram_quota_mb(100)
             .flush_enabled(true)
             .minimum_durability_level(DurabilityLevel::MAJORITY);
 
@@ -220,7 +230,7 @@ fn test_create_bucket_with_durability_min_level() {
         verify_bucket_deleted(&manager, &bucket_name).await;
 
         assert_eq!(bucket.name, bucket_name);
-        assert_eq!(bucket.ram_quota_mb, 100);
+        assert_eq!(bucket.ram_quota_mb, Some(100));
         assert_eq!(bucket.flush_enabled, Some(true));
         assert_eq!(
             bucket.minimum_durability_level,
@@ -240,7 +250,8 @@ fn test_create_bucket_with_conflict_resolution_type() {
         let manager = cluster.buckets();
 
         let bucket_name = generate_string_value(10);
-        let settings = BucketSettings::new(&bucket_name, 100)
+        let settings = BucketSettings::new(&bucket_name)
+            .ram_quota_mb(100)
             .flush_enabled(true)
             .conflict_resolution_type(ConflictResolutionType::TIMESTAMP);
 
@@ -254,7 +265,7 @@ fn test_create_bucket_with_conflict_resolution_type() {
         verify_bucket_deleted(&manager, &bucket_name).await;
 
         assert_eq!(bucket.name, bucket_name);
-        assert_eq!(bucket.ram_quota_mb, 100);
+        assert_eq!(bucket.ram_quota_mb, Some(100));
         assert_eq!(bucket.flush_enabled, Some(true));
         assert_eq!(
             bucket.conflict_resolution_type,
@@ -276,7 +287,8 @@ fn test_create_bucket_with_history_retention() {
         let manager = cluster.buckets();
 
         let bucket_name = generate_string_value(10);
-        let settings = BucketSettings::new(&bucket_name, 1024)
+        let settings = BucketSettings::new(&bucket_name)
+            .ram_quota_mb(1024)
             .storage_backend(StorageBackend::MAGMA)
             .history_retention_collection_default(true)
             .history_retention_bytes(2147483648)
@@ -292,7 +304,7 @@ fn test_create_bucket_with_history_retention() {
         verify_bucket_deleted(&manager, &bucket_name).await;
 
         assert_eq!(bucket.name, bucket_name);
-        assert_eq!(bucket.ram_quota_mb, 1024);
+        assert_eq!(bucket.ram_quota_mb, Some(1024));
         assert_eq!(bucket.history_retention_collection_default, Some(true));
         assert_eq!(bucket.history_retention_bytes, Some(2147483648));
         assert_eq!(
