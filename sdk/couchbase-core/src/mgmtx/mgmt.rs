@@ -107,7 +107,7 @@ impl<C: Client> Management<C> {
         };
 
         let body_str = match String::from_utf8(body.to_vec()) {
-            Ok(s) => s.to_lowercase(),
+            Ok(s) => s,
             Err(e) => {
                 return error::Error::new_message_error(format!(
                     "could not parse error response: {e}"
@@ -115,36 +115,40 @@ impl<C: Client> Management<C> {
             }
         };
 
-        let kind = if body_str.contains("not found") && body_str.contains("collection") {
+        let lower_body_str = body_str.to_lowercase();
+
+        let kind = if lower_body_str.contains("not found") && lower_body_str.contains("collection")
+        {
             error::ServerErrorKind::CollectionNotFound
-        } else if body_str.contains("not found") && body_str.contains("scope") {
+        } else if lower_body_str.contains("not found") && lower_body_str.contains("scope") {
             error::ServerErrorKind::ScopeNotFound
-        } else if body_str.contains("not found") && body_str.contains("bucket") {
+        } else if lower_body_str.contains("not found") && lower_body_str.contains("bucket") {
             error::ServerErrorKind::BucketNotFound
-        } else if (body_str.contains("not found") && body_str.contains("user"))
-            || body_str.contains("unknown user")
+        } else if (lower_body_str.contains("not found") && lower_body_str.contains("user"))
+            || lower_body_str.contains("unknown user")
         {
             error::ServerErrorKind::UserNotFound
-        } else if (body_str.contains("not found") && body_str.contains("group"))
-            || body_str.contains("unknown group")
+        } else if (lower_body_str.contains("not found") && lower_body_str.contains("group"))
+            || lower_body_str.contains("unknown group")
         {
             error::ServerErrorKind::GroupNotFound
-        } else if body_str.contains("already exists") && body_str.contains("collection") {
+        } else if lower_body_str.contains("already exists") && lower_body_str.contains("collection")
+        {
             error::ServerErrorKind::CollectionExists
-        } else if body_str.contains("already exists") && body_str.contains("scope") {
+        } else if lower_body_str.contains("already exists") && lower_body_str.contains("scope") {
             error::ServerErrorKind::ScopeExists
-        } else if body_str.contains("already exists") && body_str.contains("bucket") {
+        } else if lower_body_str.contains("already exists") && lower_body_str.contains("bucket") {
             error::ServerErrorKind::BucketExists
-        } else if body_str.contains("flush is disabled") {
+        } else if lower_body_str.contains("flush is disabled") {
             error::ServerErrorKind::FlushDisabled
-        } else if body_str.contains("requested resource not found")
-            || body_str.contains("non existent bucket")
+        } else if lower_body_str.contains("requested resource not found")
+            || lower_body_str.contains("non existent bucket")
         {
             error::ServerErrorKind::BucketNotFound
-        } else if body_str.contains("not yet complete, but will continue") {
+        } else if lower_body_str.contains("not yet complete, but will continue") {
             error::ServerErrorKind::OperationDelayed
         } else if status == 400 {
-            let s_err = Self::parse_for_invalid_arg(&body_str);
+            let s_err = Self::parse_for_invalid_arg(&lower_body_str);
             if let Some(ia) = s_err {
                 let key = ia.0;
                 if FIELD_NAME_MAP.contains_key(&key) {
@@ -155,9 +159,9 @@ impl<C: Client> Management<C> {
                 } else {
                     error::ServerErrorKind::Unknown
                 }
-            } else if body_str.contains("not allowed on this type of bucket") {
+            } else if lower_body_str.contains("not allowed on this type of bucket") {
                 error::ServerErrorKind::ServerInvalidArg {
-                    arg: "history_enabled".to_string(),
+                    arg: "historyEnabled".to_string(),
                     reason: body_str.to_string(),
                 }
             } else {
