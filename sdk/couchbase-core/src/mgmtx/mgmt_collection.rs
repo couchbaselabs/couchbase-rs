@@ -20,7 +20,7 @@ impl<C: Client> Management<C> {
         opts: &GetCollectionManifestOptions<'_>,
     ) -> error::Result<CollectionManifest> {
         let method = Method::GET;
-        let path = format!("/pools/default/buckets/{}/scopes", opts.bucket_name).to_string();
+        let path = format!("pools/default/buckets/{}/scopes", opts.bucket_name).to_string();
 
         let resp = self
             .execute(
@@ -50,7 +50,7 @@ impl<C: Client> Management<C> {
         opts: &CreateScopeOptions<'_>,
     ) -> error::Result<CreateScopeResponse> {
         let method = Method::POST;
-        let path = format!("/pools/default/buckets/{}/scopes", opts.bucket_name).to_string();
+        let path = format!("pools/default/buckets/{}/scopes", opts.bucket_name).to_string();
 
         let body = url::form_urlencoded::Serializer::new(String::new())
             .append_pair("name", opts.scope_name)
@@ -84,7 +84,7 @@ impl<C: Client> Management<C> {
     ) -> error::Result<DeleteScopeResponse> {
         let method = Method::DELETE;
         let path = format!(
-            "/pools/default/buckets/{}/scopes/{}",
+            "pools/default/buckets/{}/scopes/{}",
             opts.bucket_name, opts.scope_name
         )
         .to_string();
@@ -117,7 +117,7 @@ impl<C: Client> Management<C> {
     ) -> error::Result<CreateCollectionResponse> {
         let method = Method::POST;
         let path = format!(
-            "/pools/default/buckets/{}/scopes/{}/collections",
+            "pools/default/buckets/{}/scopes/{}/collections",
             opts.bucket_name, opts.scope_name
         )
         .to_string();
@@ -169,7 +169,7 @@ impl<C: Client> Management<C> {
     ) -> error::Result<UpdateCollectionResponse> {
         let method = Method::PATCH;
         let path = format!(
-            "/pools/default/buckets/{}/scopes/{}/collections/{}",
+            "pools/default/buckets/{}/scopes/{}/collections/{}",
             opts.bucket_name, opts.scope_name, opts.collection_name
         )
         .to_string();
@@ -220,7 +220,7 @@ impl<C: Client> Management<C> {
     ) -> error::Result<DeleteCollectionResponse> {
         let method = Method::DELETE;
         let path = format!(
-            "/pools/default/buckets/{}/scopes/{}/collections/{}",
+            "pools/default/buckets/{}/scopes/{}/collections/{}",
             opts.bucket_name, opts.scope_name, opts.collection_name
         )
         .to_string();
