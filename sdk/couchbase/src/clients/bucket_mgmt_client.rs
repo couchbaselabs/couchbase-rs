@@ -227,6 +227,10 @@ impl CouchbaseBucketMgmtClient {
             core_settings = core_settings.storage_backend(storage_backend);
         }
 
+        if let Some(num_vbuckets) = settings.num_vbuckets {
+            core_settings = core_settings.num_vbuckets(num_vbuckets);
+        }
+
         let opts = couchbase_core::options::management::CreateBucketOptions::new(
             &settings.name,
             &core_settings,
@@ -300,6 +304,10 @@ impl CouchbaseBucketMgmtClient {
 
         if let Some(bucket_type) = settings.bucket_type {
             core_settings = core_settings.bucket_type(bucket_type);
+        }
+
+        if let Some(num_vbuckets) = settings.num_vbuckets {
+            core_settings = core_settings.num_vbuckets(num_vbuckets);
         }
 
         let opts = couchbase_core::options::management::UpdateBucketOptions::new(
