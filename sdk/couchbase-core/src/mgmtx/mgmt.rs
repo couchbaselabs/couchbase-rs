@@ -22,6 +22,7 @@ lazy_static! {
             ("replicanumber".to_string(), "ReplicaNumber".to_string()),
             ("maxttl".to_string(), "MaxTTL".to_string()),
             ("history".to_string(), "HistoryEnabled".to_string()),
+            ("numvbuckets".to_string(), "numVBuckets".to_string()),
         ])
     };
 }
