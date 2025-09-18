@@ -102,6 +102,15 @@ impl CouchbaseSearchClient {
             ));
         }
 
+        if let Some(vector_search) = &request.vector_search {
+            if vector_search.vector_queries.is_empty() {
+                return Err(error::Error::invalid_argument(
+                    "vector_search.vector_queries",
+                    "must contain at least one vector query",
+                ));
+            }
+        }
+
         let control = {
             let scan_consistency = if let Some(scan_consistency) = opts.scan_consistency {
                 Some(Consistency::default().level(scan_consistency))
