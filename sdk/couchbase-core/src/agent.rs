@@ -905,6 +905,27 @@ impl Agent {
 
         clients
     }
+
+    pub(crate) async fn run_with_bucket_feature_check<T, Fut>(
+        &self,
+        feature: BucketFeature,
+        operation: impl FnOnce() -> Fut,
+        message: impl Into<String>,
+    ) -> Result<T>
+    where
+        Fut: std::future::Future<Output = Result<T>>,
+    {
+        let features = self.bucket_features().await?;
+
+        if !features.contains(&feature) {
+            return Err(Error::new_feature_not_available_error(
+                format!("{feature:?}"),
+                message.into(),
+            ));
+        }
+
+        operation().await
+    }
 }
 
 struct FirstHttpConfig {
