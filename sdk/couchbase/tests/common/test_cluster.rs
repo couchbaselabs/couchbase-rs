@@ -57,6 +57,16 @@ impl TestCluster {
         TestBucket::new(self.inner.bucket(name))
     }
 
+    pub async fn query(
+        &self,
+        statement: impl Into<String>,
+        opts: impl Into<Option<QueryOptions>>,
+    ) -> error::Result<QueryResult> {
+        timeout(Duration::from_secs(15), self.inner.query(statement, opts))
+            .await
+            .unwrap()
+    }
+
     pub fn buckets(&self) -> TestBucketManager {
         TestBucketManager::new(self.inner.buckets())
     }
