@@ -63,6 +63,16 @@ impl Error {
         })
     }
 
+    pub(crate) fn new_feature_not_available_error(
+        feature: impl Into<String>,
+        msg: impl Into<String>,
+    ) -> Self {
+        Self::new(ErrorKind::FeatureNotAvailable {
+            feature: feature.into(),
+            msg: msg.into(),
+        })
+    }
+
     pub fn kind(&self) -> &ErrorKind {
         &self.kind
     }
