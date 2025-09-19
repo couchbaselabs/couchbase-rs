@@ -138,6 +138,30 @@ fn test_prepared_query_basic() {
 }
 
 #[test]
+fn test_query_basic_cluster() {
+    run_test(async |cluster| {
+        let opts = QueryOptions::new().metrics(true);
+        let mut res = cluster.query("SELECT 1=1", opts).await.unwrap();
+
+        let mut rows: Vec<Value> = vec![];
+        while let Some(row) = res.rows().next().await {
+            rows.push(row.unwrap());
+        }
+
+        assert_eq!(1, rows.len());
+
+        let row = rows.first().unwrap();
+
+        let row_obj = row.as_object().unwrap();
+
+        assert!(row_obj.get("$1").unwrap().as_bool().unwrap());
+
+        let meta = res.metadata().unwrap();
+        assert_metadata(meta);
+    })
+}
+
+#[test]
 fn test_query_indexes() {
     run_test(async |cluster| {
         let coll_manager = cluster.bucket(cluster.default_bucket()).collections();
