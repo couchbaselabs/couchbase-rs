@@ -8,22 +8,12 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::time::Duration;
 
-#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum ScanConsistency {
     NotBounded,
     RequestPlus,
-    AtPlus,
-}
-
-impl From<ScanConsistency> for queryx::query_options::ScanConsistency {
-    fn from(sc: ScanConsistency) -> Self {
-        match sc {
-            ScanConsistency::NotBounded => queryx::query_options::ScanConsistency::NotBounded,
-            ScanConsistency::RequestPlus => queryx::query_options::ScanConsistency::RequestPlus,
-            ScanConsistency::AtPlus => queryx::query_options::ScanConsistency::AtPlus,
-        }
-    }
+    AtPlus(MutationState),
 }
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
@@ -64,7 +54,6 @@ impl From<ProfileMode> for queryx::query_options::ProfileMode {
 pub struct QueryOptions {
     pub(crate) ad_hoc: Option<bool>,
     pub(crate) client_context_id: Option<String>,
-    pub(crate) consistent_with: Option<MutationState>,
     pub(crate) flex_index: Option<bool>,
     pub(crate) max_parallelism: Option<u32>,
     pub(crate) metrics: Option<bool>,
@@ -95,11 +84,6 @@ impl QueryOptions {
 
     pub fn client_context_id(mut self, client_context_id: impl Into<String>) -> Self {
         self.client_context_id = Some(client_context_id.into());
-        self
-    }
-
-    pub fn consistent_with(mut self, consistent_with: MutationState) -> Self {
-        self.consistent_with = Some(consistent_with);
         self
     }
 
@@ -231,14 +215,20 @@ impl TryFrom<QueryOptions> for query::QueryOptions {
     type Error = error::Error;
 
     fn try_from(opts: QueryOptions) -> Result<query::QueryOptions, Self::Error> {
-        let (mutation_state, scan_consistency) = if let Some(mutation_state) = opts.consistent_with
-        {
-            (
-                Some(mutation_state.into()),
+        let (mutation_state, scan_consistency) = match opts.scan_consistency {
+            Some(ScanConsistency::AtPlus(state)) => (
+                Some(state.into()),
                 Some(queryx::query_options::ScanConsistency::AtPlus),
-            )
-        } else {
-            (None, opts.scan_consistency.map(|sc| sc.into()))
+            ),
+            Some(ScanConsistency::NotBounded) => (
+                None,
+                Some(queryx::query_options::ScanConsistency::NotBounded),
+            ),
+            Some(ScanConsistency::RequestPlus) => (
+                None,
+                Some(queryx::query_options::ScanConsistency::RequestPlus),
+            ),
+            None => (None, None),
         };
 
         let mut builder = query::QueryOptions::new()
