@@ -273,10 +273,10 @@ pub struct TlsOptions {
     pub(crate) danger_accept_invalid_certs: Option<bool>,
 
     #[cfg(all(feature = "rustls-tls", not(feature = "native-tls")))]
-    pub(crate) ca_certificate: Option<CertificateDer<'static>>,
+    pub(crate) ca_certificates: Option<Vec<CertificateDer<'static>>>,
 
     #[cfg(feature = "native-tls")]
-    pub(crate) ca_certificate: Option<tokio_native_tls::native_tls::Certificate>,
+    pub(crate) ca_certificates: Option<Vec<tokio_native_tls::native_tls::Certificate>>,
 
     #[cfg(feature = "native-tls")]
     pub(crate) danger_accept_invalid_hostnames: Option<bool>,
@@ -293,14 +293,38 @@ impl TlsOptions {
     }
 
     #[cfg(all(feature = "rustls-tls", not(feature = "native-tls")))]
-    pub fn ca_certificate(mut self, cert: CertificateDer<'static>) -> Self {
-        self.ca_certificate = Some(cert);
+    pub fn add_ca_certificate(mut self, cert: CertificateDer<'static>) -> Self {
+        self.ca_certificates.get_or_insert_with(Vec::new).push(cert);
+        self
+    }
+
+    #[cfg(all(feature = "rustls-tls", not(feature = "native-tls")))]
+    pub fn add_ca_certificates<T: IntoIterator<Item = CertificateDer<'static>>>(
+        mut self,
+        certs: T,
+    ) -> Self {
+        self.ca_certificates
+            .get_or_insert_with(Vec::new)
+            .extend(certs);
         self
     }
 
     #[cfg(feature = "native-tls")]
-    pub fn ca_certificate(mut self, cert: tokio_native_tls::native_tls::Certificate) -> Self {
-        self.ca_certificate = Some(cert);
+    pub fn add_ca_certificate(mut self, cert: tokio_native_tls::native_tls::Certificate) -> Self {
+        self.ca_certificates.get_or_insert_with(Vec::new).push(cert);
+        self
+    }
+
+    #[cfg(feature = "native-tls")]
+    pub fn add_ca_certificates<
+        T: IntoIterator<Item = tokio_native_tls::native_tls::Certificate>,
+    >(
+        mut self,
+        certs: T,
+    ) -> Self {
+        self.ca_certificates
+            .get_or_insert_with(Vec::new)
+            .extend(certs);
         self
     }
 
@@ -315,29 +339,40 @@ impl TlsOptions {
         self,
         auth: &Authenticator,
     ) -> Result<Arc<tokio_rustls::rustls::ClientConfig>, error::Error> {
-        let store = if let Some(ca_cert) = self.ca_certificate {
-            let mut store = RootCertStore::empty();
-            store
-                .add(ca_cert)
-                .map_err(|e| error::Error::other_failure(format!("failed to add cert: {e}")))?;
-            store
-        } else {
-            let mut store = RootCertStore {
-                roots: TLS_SERVER_ROOTS.to_vec(),
-            };
+        let store = match self.ca_certificates {
+            Some(certs) if certs.is_empty() => {
+                return Err(error::Error::invalid_argument(
+                    "ca_certificates",
+                    "ca_certificates list was provided but is empty",
+                ));
+            }
+            Some(certs) => {
+                let mut store = RootCertStore::empty();
+                for cert in certs {
+                    store.add(cert).map_err(|e| {
+                        error::Error::other_failure(format!("failed to add cert: {e}"))
+                    })?;
+                }
+                store
+            }
+            None => {
+                let mut store = RootCertStore {
+                    roots: TLS_SERVER_ROOTS.to_vec(),
+                };
 
-            debug!("Adding Capella root CA to trust store");
-            let mut cursor = Cursor::new(CAPELLA_CERT);
-            let certs = rustls_pemfile::certs(&mut cursor)
-                .map(|item| {
-                    item.map_err(|e| {
-                        error::Error::other_failure(format!("failed to add capella cert: {e}"))
+                debug!("Adding Capella root CA to trust store");
+                let mut cursor = Cursor::new(CAPELLA_CERT);
+                let certs = rustls_pemfile::certs(&mut cursor)
+                    .map(|item| {
+                        item.map_err(|e| {
+                            error::Error::other_failure(format!("failed to add capella cert: {e}"))
+                        })
                     })
-                })
-                .collect::<error::Result<Vec<CertificateDer>>>()?;
+                    .collect::<error::Result<Vec<CertificateDer>>>()?;
 
-            store.add_parsable_certificates(certs);
-            store
+                store.add_parsable_certificates(certs);
+                store
+            }
         };
 
         let mut builder =
@@ -386,16 +421,28 @@ impl TlsOptions {
         if let Some(true) = self.danger_accept_invalid_hostnames {
             builder.danger_accept_invalid_hostnames(true);
         }
-        if let Some(cert) = self.ca_certificate {
-            builder.add_root_certificate(cert);
-        } else {
-            debug!("Adding Capella root CA to trust store");
-            let capella_ca =
-                tokio_native_tls::native_tls::Certificate::from_pem(CAPELLA_CERT.as_ref())
-                    .map_err(|e| {
-                        error::Error::other_failure(format!("failed to add capella cert: {e}"))
-                    })?;
-            builder.add_root_certificate(capella_ca);
+
+        match self.ca_certificates {
+            Some(certs) if certs.is_empty() => {
+                return Err(error::Error::invalid_argument(
+                    "ca_certificates",
+                    "ca_certificates list was provided but is empty",
+                ));
+            }
+            Some(certs) => {
+                for cert in certs {
+                    builder.add_root_certificate(cert);
+                }
+            }
+            None => {
+                debug!("Adding Capella root CA to trust store");
+                let capella_ca =
+                    tokio_native_tls::native_tls::Certificate::from_pem(CAPELLA_CERT.as_ref())
+                        .map_err(|e| {
+                            error::Error::other_failure(format!("failed to add capella cert: {e}"))
+                        })?;
+                builder.add_root_certificate(capella_ca);
+            }
         }
 
         match auth {
