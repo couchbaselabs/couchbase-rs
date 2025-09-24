@@ -76,18 +76,7 @@ impl MutationState {
         }
     }
 
-    pub fn new_with_tokens(tokens: Vec<MutationToken>) -> Self {
-        let mut state = Self {
-            tokens: HashMap::default(),
-        };
-        for token in tokens {
-            state.push_token(token);
-        }
-
-        state
-    }
-
-    pub fn push_token(&mut self, token: MutationToken) {
+    pub fn push_token(mut self, token: MutationToken) -> Self {
         let key = MutationStateKey {
             bucket_name: token.bucket_name,
             vbid: token.token.vbid(),
@@ -100,6 +89,8 @@ impl MutationState {
         } else {
             self.tokens.insert(key, token.token);
         }
+
+        self
     }
 
     pub fn tokens(&self) -> Vec<MutationToken> {
@@ -107,6 +98,22 @@ impl MutationState {
             .iter()
             .map(|(key, token)| MutationToken::new(token.clone(), key.bucket_name.clone()))
             .collect()
+    }
+}
+
+impl From<MutationToken> for MutationState {
+    fn from(value: MutationToken) -> Self {
+        MutationState::new().push_token(value)
+    }
+}
+
+impl From<Vec<MutationToken>> for MutationState {
+    fn from(value: Vec<MutationToken>) -> Self {
+        let mut state = MutationState::new();
+        for token in value {
+            state = state.push_token(token);
+        }
+        state
     }
 }
 
@@ -200,7 +207,7 @@ macro_rules! mutation_state {
         {
             let mut state = MutationState::new();
             $(
-                state.push_token($x);
+                state = state.push_token($x);
             )*
             state
         }
