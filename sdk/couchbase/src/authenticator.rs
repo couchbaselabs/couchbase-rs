@@ -49,8 +49,11 @@ pub struct PasswordAuthenticator {
 }
 
 impl PasswordAuthenticator {
-    pub fn new(username: String, password: String) -> Self {
-        Self { username, password }
+    pub fn new(username: impl Into<String>, password: impl Into<String>) -> Self {
+        Self {
+            username: username.into(),
+            password: password.into(),
+        }
     }
 
     pub(crate) fn get_credentials(
