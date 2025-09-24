@@ -23,17 +23,23 @@ impl SearchRequest {
         }
     }
 
-    pub fn vector_search(&mut self, vector_search: VectorSearch) -> error::Result<&mut Self> {
+    pub fn vector_search(mut self, vector_search: VectorSearch) -> error::Result<Self> {
         if self.vector_search.is_some() {
-            return Err(error::Error::other_failure("search query already set"));
+            return Err(error::Error::invalid_argument(
+                "vector_search",
+                "vector search already set",
+            ));
         }
         self.vector_search = Some(vector_search);
         Ok(self)
     }
 
-    pub fn search_query(&mut self, search_query: Query) -> error::Result<&mut Self> {
-        if self.vector_search.is_some() {
-            return Err(error::Error::other_failure("vector search already set"));
+    pub fn search_query(mut self, search_query: Query) -> error::Result<Self> {
+        if self.search_query.is_some() {
+            return Err(error::Error::invalid_argument(
+                "search_query",
+                "search query already set",
+            ));
         }
         self.search_query = Some(search_query);
         Ok(self)
