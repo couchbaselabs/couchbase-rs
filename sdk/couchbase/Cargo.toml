@@ -44,6 +44,10 @@ native-tls = ["dep:tokio-native-tls", "couchbase-core/native-tls"]
 # Enables options for DNS-SRV bootstrap.
 unstable-dns-options = []
 
+# Uncomitted: This feature may change in the future
+# Allows explicit construction of the Error type e.g. for mocking purposes.
+unstable-error-construction = []
+
 internal = []
 
 [lints.rust]
