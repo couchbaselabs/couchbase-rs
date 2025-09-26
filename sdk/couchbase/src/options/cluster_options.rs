@@ -99,7 +99,7 @@ impl ClusterOptions {
         self
     }
 
-    #[cfg(feature = "volatile")]
+    #[cfg(feature = "experimental")]
     pub fn dns_options(mut self, dns_options: DnsOptions) -> Self {
         self.dns_options = Some(dns_options);
         self

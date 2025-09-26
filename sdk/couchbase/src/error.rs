@@ -18,11 +18,38 @@ pub struct Error {
 }
 
 impl Error {
+    #[cfg(feature = "unstable")]
+    pub fn new(kind: ErrorKind) -> Self {
+        Self::new_internal(kind)
+    }
+
+    #[cfg(not(feature = "unstable"))]
     pub(crate) fn new(kind: ErrorKind) -> Self {
-        Self {
-            kind: Box::new(kind),
-            context: Box::new(None),
-        }
+        Self::new_internal(kind)
+    }
+
+    #[cfg(feature = "unstable")]
+    pub fn invalid_argument(arg: impl Into<String>, msg: impl Into<String>) -> Self {
+        Self::invalid_argument_internal(arg, msg)
+    }
+
+    #[cfg(not(feature = "unstable"))]
+    pub(crate) fn invalid_argument(arg: impl Into<String>, msg: impl Into<String>) -> Self {
+        Self::invalid_argument_internal(arg, msg)
+    }
+
+    #[cfg(feature = "unstable")]
+    pub fn feature_not_available(feature: impl Into<String>, msg: impl Into<String>) -> Self {
+        Self::feature_not_available_internal(feature, msg)
+    }
+
+    #[cfg(not(feature = "unstable"))]
+    pub(crate) fn feature_not_available(feature: impl Into<String>, msg: impl Into<String>) -> Self {
+        Self::feature_not_available_internal(feature, msg)
+    }
+    
+    pub fn kind(&self) -> &ErrorKind {
+        &self.kind
     }
 
     pub(crate) fn other_failure(msg: impl Into<String>) -> Self {
@@ -41,20 +68,30 @@ impl Error {
         Self::new(ErrorKind::DecodingFailure(format!("decoding failed: {e}")))
     }
 
-    pub(crate) fn invalid_argument(arg: impl Into<String>, msg: impl Into<String>) -> Self {
+    pub(crate) fn with_context(mut self, context: ErrorContext) -> Self {
+        self.context = Box::new(Some(context));
+        self
+    }
+
+    fn new_internal(kind: ErrorKind) -> Self {
+        Self {
+            kind: Box::new(kind),
+            context: Box::new(None),
+        }
+    }
+
+    fn invalid_argument_internal(arg: impl Into<String>, msg: impl Into<String>) -> Self {
         Self::new(ErrorKind::InvalidArgument(InvalidArgumentErrorKind {
             msg: msg.into(),
             arg: Some(arg.into()),
         }))
     }
 
-    pub(crate) fn with_context(mut self, context: ErrorContext) -> Self {
-        self.context = Box::new(Some(context));
-        self
-    }
-
-    pub fn kind(&self) -> &ErrorKind {
-        &self.kind
+    fn feature_not_available_internal(feature: impl Into<String>, msg: impl Into<String>) -> Self {
+        Self::new(ErrorKind::FeatureNotAvailable(FeatureNotAvailableErrorKind {
+            feature: feature.into(),
+            msg: Some(msg.into()),
+        }))
     }
 
     fn parse_kv_server_error(
