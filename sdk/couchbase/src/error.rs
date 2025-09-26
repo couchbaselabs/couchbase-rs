@@ -18,11 +18,18 @@ pub struct Error {
 }
 
 impl Error {
+    #[cfg(feature = "unstable-error-construction")]
+    pub fn new(kind: ErrorKind) -> Self {
+        Self::new_internal(kind)
+    }
+
+    #[cfg(not(feature = "unstable-error-construction"))]
     pub(crate) fn new(kind: ErrorKind) -> Self {
-        Self {
-            kind: Box::new(kind),
-            context: Box::new(None),
-        }
+        Self::new_internal(kind)
+    }
+
+    pub fn kind(&self) -> &ErrorKind {
+        &self.kind
     }
 
     pub(crate) fn other_failure(msg: impl Into<String>) -> Self {
@@ -53,8 +60,11 @@ impl Error {
         self
     }
 
-    pub fn kind(&self) -> &ErrorKind {
-        &self.kind
+    fn new_internal(kind: ErrorKind) -> Self {
+        Self {
+            kind: Box::new(kind),
+            context: Box::new(None),
+        }
     }
 
     fn parse_kv_server_error(
@@ -313,24 +323,32 @@ impl Display for ErrorKind {
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct InvalidArgumentErrorKind {
     pub(crate) msg: String,
-    pub(crate) arg: Option<String>,
+    pub arg: Option<String>,
 }
 
 impl InvalidArgumentErrorKind {
-    pub fn arg(&self) -> Option<&String> {
-        self.arg.as_ref()
+    #[cfg(feature = "unstable-error-construction")]
+    pub fn new(arg: impl Into<Option<String>>, msg: impl Into<String>) -> Self {
+        Self {
+            msg: msg.into(),
+            arg: arg.into(),
+        }
     }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct FeatureNotAvailableErrorKind {
-    pub(crate) feature: String,
+    pub feature: String,
     pub(crate) msg: Option<String>,
 }
 
 impl FeatureNotAvailableErrorKind {
-    pub fn feature(&self) -> &str {
-        &self.feature
+    #[cfg(feature = "unstable-error-construction")]
+    pub fn new(feature: impl Into<String>, msg: impl Into<Option<String>>) -> Self {
+        Self {
+            feature: feature.into(),
+            msg: msg.into(),
+        }
     }
 }
 
