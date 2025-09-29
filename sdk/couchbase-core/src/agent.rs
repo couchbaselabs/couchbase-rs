@@ -472,7 +472,7 @@ impl Agent {
         let mut state = AgentState {
             bucket: opts.bucket_name.clone(),
             authenticator: Arc::new(opts.authenticator),
-            num_pool_connections: 1,
+            num_pool_connections: opts.kv_config.num_connections,
             last_clients: Default::default(),
             latest_config: ParsedConfig::default(),
             network_type: "".to_string(),
