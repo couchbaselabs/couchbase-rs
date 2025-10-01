@@ -39,8 +39,11 @@ default = ["default-tls"]
 default-tls = ["rustls-tls"]
 rustls-tls = ["dep:tokio-rustls", "couchbase-core/rustls-tls", "dep:rustls-pemfile"]
 native-tls = ["dep:tokio-native-tls", "couchbase-core/native-tls"]
-uncommitted = []
-volatile = []
+
+# Volatile: This feature is subject to change at any time
+# Enables options for DNS-SRV bootstrap.
+unstable-dns-options = []
+
 internal = []
 
 [lints.rust]
