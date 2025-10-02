@@ -163,7 +163,19 @@ where
             }
         }
 
-        self.get_client_slow().await
+        match self.get_client_slow().await {
+            Ok(c) => Ok(c),
+            Err(e) => {
+                // If we failed to get a client, we should check connections and rebuild the fast map.
+                // For example, when all clients are terminated by server side sending TCP RST,
+                // the clients will be evicted from the pool, and therefore, when we try to get a client
+                // from the pool again, the get will fail, and we need to check connections to create new clients.
+                debug!("Error getting client from pool: {}", e);
+                self.check_connections().await;
+                self.rebuild_fast_map().await;
+                Err(e)
+            }
+       }
     }
 
     pub async fn close(&self) -> Result<()> {
