@@ -5,9 +5,10 @@ use crate::memdx::error::ServerErrorKind;
 use crate::memdx::response::TryFromClientResponse;
 use crate::nmvbhandler::NotMyVbucketConfigHandler;
 use crate::vbucketmap::VbucketMap;
+use arc_swap::{ArcSwap, Guard};
 use log::debug;
 use std::future::Future;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::Arc;
 
 pub(crate) trait VbucketRouter: Send + Sync {
     fn update_vbucket_info(&self, info: VbucketRoutingInfo);
@@ -26,17 +27,17 @@ pub(crate) struct VbucketRoutingInfo {
 pub(crate) struct VbucketRouterOptions {}
 
 pub(crate) struct StdVbucketRouter {
-    routing_info: Arc<Mutex<VbucketRoutingInfo>>,
+    routing_info: ArcSwap<VbucketRoutingInfo>,
 }
 
 impl StdVbucketRouter {
     pub(crate) fn new(info: VbucketRoutingInfo, _opts: VbucketRouterOptions) -> Self {
         Self {
-            routing_info: Arc::new(Mutex::new(info)),
+            routing_info: ArcSwap::new(Arc::new(info)),
         }
     }
 
-    fn get_vbucket_info<'a>(info: &'a MutexGuard<VbucketRoutingInfo>) -> Result<&'a VbucketMap> {
+    fn get_vbucket_info(info: &Guard<Arc<VbucketRoutingInfo>>) -> Result<&VbucketMap> {
         if let Some(i) = &info.vbucket_info {
             return Ok(i);
         }
@@ -47,11 +48,11 @@ impl StdVbucketRouter {
 
 impl VbucketRouter for StdVbucketRouter {
     fn update_vbucket_info(&self, info: VbucketRoutingInfo) {
-        *self.routing_info.lock().unwrap() = info;
+        self.routing_info.store(Arc::new(info));
     }
 
     fn dispatch_by_key(&self, key: &[u8], vbucket_server_idx: u32) -> Result<(String, u16)> {
-        let info = self.routing_info.lock().unwrap();
+        let info = self.routing_info.load();
         if !info.bucket_selected {
             return Err(ErrorKind::NoBucket.into());
         }
@@ -72,7 +73,7 @@ impl VbucketRouter for StdVbucketRouter {
     }
 
     fn dispatch_to_vbucket(&self, vb_id: u16) -> Result<String> {
-        let info = self.routing_info.lock().unwrap();
+        let info = self.routing_info.load();
         if !info.bucket_selected {
             return Err(ErrorKind::NoBucket.into());
         }
