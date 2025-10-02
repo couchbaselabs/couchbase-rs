@@ -4,9 +4,9 @@ use std::time::Duration;
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct UpsertOptions {
-    pub(crate) expiry: Option<Duration>,
-    pub(crate) durability_level: Option<DurabilityLevel>,
-    pub(crate) preserve_expiry: Option<bool>,
+    pub expiry: Option<Duration>,
+    pub durability_level: Option<DurabilityLevel>,
+    pub preserve_expiry: Option<bool>,
 }
 
 impl UpsertOptions {
@@ -33,8 +33,8 @@ impl UpsertOptions {
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct InsertOptions {
-    pub(crate) expiry: Option<Duration>,
-    pub(crate) durability_level: Option<DurabilityLevel>,
+    pub expiry: Option<Duration>,
+    pub durability_level: Option<DurabilityLevel>,
 }
 
 impl InsertOptions {
@@ -56,10 +56,10 @@ impl InsertOptions {
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct ReplaceOptions {
-    pub(crate) expiry: Option<Duration>,
-    pub(crate) durability_level: Option<DurabilityLevel>,
-    pub(crate) preserve_expiry: Option<bool>,
-    pub(crate) cas: Option<u64>,
+    pub expiry: Option<Duration>,
+    pub durability_level: Option<DurabilityLevel>,
+    pub preserve_expiry: Option<bool>,
+    pub cas: Option<u64>,
 }
 
 impl ReplaceOptions {
@@ -91,7 +91,7 @@ impl ReplaceOptions {
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct GetOptions {
-    pub(crate) expiry: Option<bool>,
+    pub expiry: Option<bool>,
 }
 
 impl GetOptions {
@@ -118,8 +118,8 @@ impl ExistsOptions {
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct RemoveOptions {
-    pub(crate) durability_level: Option<DurabilityLevel>,
-    pub(crate) cas: Option<u64>,
+    pub durability_level: Option<DurabilityLevel>,
+    pub cas: Option<u64>,
 }
 
 impl RemoveOptions {
@@ -181,7 +181,7 @@ impl TouchOptions {
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct LookupInOptions {
-    pub(crate) access_deleted: Option<bool>,
+    pub access_deleted: Option<bool>,
 }
 
 impl LookupInOptions {
@@ -206,12 +206,12 @@ pub enum StoreSemantics {
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct MutateInOptions {
-    pub(crate) expiry: Option<Duration>,
-    pub(crate) preserve_expiry: Option<bool>,
-    pub(crate) cas: Option<u64>,
-    pub(crate) durability_level: Option<DurabilityLevel>,
-    pub(crate) store_semantics: Option<StoreSemantics>,
-    pub(crate) access_deleted: Option<bool>,
+    pub expiry: Option<Duration>,
+    pub preserve_expiry: Option<bool>,
+    pub cas: Option<u64>,
+    pub durability_level: Option<DurabilityLevel>,
+    pub store_semantics: Option<StoreSemantics>,
+    pub access_deleted: Option<bool>,
 }
 
 impl MutateInOptions {

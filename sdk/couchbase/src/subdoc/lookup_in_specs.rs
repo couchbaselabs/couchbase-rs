@@ -4,9 +4,9 @@ use couchbase_core::memdx::subdoc::{LookupInOp, SubdocOp, SubdocOpFlag};
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct LookupInSpec {
-    pub(crate) op: LookupInOpType,
-    pub(crate) path: String,
-    pub(crate) is_xattr: bool,
+    pub op: LookupInOpType,
+    pub path: String,
+    pub is_xattr: bool,
 }
 
 impl SubdocOp for LookupInSpec {
@@ -26,7 +26,7 @@ pub enum LookupInOpType {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct GetSpecOptions {
-    pub(crate) is_xattr: Option<bool>,
+    pub is_xattr: Option<bool>,
 }
 
 impl GetSpecOptions {
@@ -42,7 +42,7 @@ impl GetSpecOptions {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 pub struct ExistsSpecOptions {
-    pub(crate) is_xattr: Option<bool>,
+    pub is_xattr: Option<bool>,
 }
 
 impl ExistsSpecOptions {
@@ -59,7 +59,7 @@ impl ExistsSpecOptions {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct CountSpecOptions {
-    pub(crate) is_xattr: Option<bool>,
+    pub is_xattr: Option<bool>,
 }
 
 impl CountSpecOptions {

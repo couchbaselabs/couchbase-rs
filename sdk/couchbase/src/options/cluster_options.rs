@@ -26,17 +26,17 @@ use {
 #[non_exhaustive]
 pub struct ClusterOptions {
     // authenticator specifies the authenticator to use with the cluster.
-    pub(crate) authenticator: Authenticator,
+    pub authenticator: Authenticator,
     // timeout_options specifies various operation timeouts.
     // compression_mode specifies compression related configuration options.
-    pub(crate) compression_mode: Option<CompressionMode>,
-    pub(crate) tls_options: Option<TlsOptions>,
-    pub(crate) tcp_keep_alive_time: Option<Duration>,
-    pub(crate) poller_options: PollerOptions,
-    pub(crate) http_options: HttpOptions,
-    pub(crate) kv_options: KvOptions,
-    pub(crate) dns_options: Option<DnsOptions>,
-    pub(crate) orphan_reporter_options: OrphanReporterOptions,
+    pub compression_mode: Option<CompressionMode>,
+    pub tls_options: Option<TlsOptions>,
+    pub tcp_keep_alive_time: Option<Duration>,
+    pub poller_options: PollerOptions,
+    pub http_options: HttpOptions,
+    pub kv_options: KvOptions,
+    pub dns_options: Option<DnsOptions>,
+    pub orphan_reporter_options: OrphanReporterOptions,
 }
 
 impl Debug for ClusterOptions {
@@ -137,8 +137,9 @@ impl From<CompressionMode> for couchbase_core::options::agent::CompressionMode {
 }
 
 #[derive(Default, Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct PollerOptions {
-    pub(crate) config_poll_interval: Option<Duration>,
+    pub config_poll_interval: Option<Duration>,
 }
 
 impl PollerOptions {
@@ -164,9 +165,10 @@ impl From<PollerOptions> for couchbase_core::options::agent::ConfigPollerConfig 
 }
 
 #[derive(Default, Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct HttpOptions {
-    pub(crate) max_idle_connections_per_host: Option<usize>,
-    pub(crate) idle_connection_timeout: Option<Duration>,
+    pub max_idle_connections_per_host: Option<usize>,
+    pub idle_connection_timeout: Option<Duration>,
 }
 
 impl HttpOptions {
@@ -201,12 +203,13 @@ impl From<HttpOptions> for couchbase_core::options::agent::HttpConfig {
 }
 
 #[derive(Default, Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct KvOptions {
-    pub(crate) enable_mutation_tokens: Option<bool>,
-    pub(crate) enable_server_durations: Option<bool>,
-    pub(crate) num_connections: Option<usize>,
-    pub(crate) connect_timeout: Option<Duration>,
-    pub(crate) connect_throttle_timeout: Option<Duration>,
+    pub enable_mutation_tokens: Option<bool>,
+    pub enable_server_durations: Option<bool>,
+    pub num_connections: Option<usize>,
+    pub connect_timeout: Option<Duration>,
+    pub connect_throttle_timeout: Option<Duration>,
 }
 
 impl KvOptions {
@@ -270,16 +273,16 @@ impl From<KvOptions> for couchbase_core::options::agent::KvConfig {
 #[derive(Clone, Default)]
 #[non_exhaustive]
 pub struct TlsOptions {
-    pub(crate) danger_accept_invalid_certs: Option<bool>,
+    pub danger_accept_invalid_certs: Option<bool>,
 
     #[cfg(all(feature = "rustls-tls", not(feature = "native-tls")))]
-    pub(crate) ca_certificates: Option<Vec<CertificateDer<'static>>>,
+    pub ca_certificates: Option<Vec<CertificateDer<'static>>>,
 
     #[cfg(feature = "native-tls")]
-    pub(crate) ca_certificates: Option<Vec<tokio_native_tls::native_tls::Certificate>>,
+    pub ca_certificates: Option<Vec<tokio_native_tls::native_tls::Certificate>>,
 
     #[cfg(feature = "native-tls")]
-    pub(crate) danger_accept_invalid_hostnames: Option<bool>,
+    pub danger_accept_invalid_hostnames: Option<bool>,
 }
 
 impl TlsOptions {
@@ -458,9 +461,10 @@ impl TlsOptions {
     }
 }
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct DnsOptions {
-    pub(crate) namespace: SocketAddr,
-    pub(crate) timeout: Option<Duration>,
+    pub namespace: SocketAddr,
+    pub timeout: Option<Duration>,
 }
 impl DnsOptions {
     pub fn new(namespace: SocketAddr) -> Self {
@@ -485,10 +489,11 @@ impl From<DnsOptions> for couchbase_connstr::DnsConfig {
 }
 
 #[derive(Default, Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct OrphanReporterOptions {
-    pub(crate) enabled: Option<bool>,
-    pub(crate) reporter_interval: Option<Duration>,
-    pub(crate) sample_size: Option<usize>,
+    pub enabled: Option<bool>,
+    pub reporter_interval: Option<Duration>,
+    pub sample_size: Option<usize>,
 }
 
 impl OrphanReporterOptions {

@@ -4,8 +4,8 @@ use std::time::Duration;
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct AppendOptions {
-    pub(crate) durability_level: Option<DurabilityLevel>,
-    pub(crate) cas: Option<u64>,
+    pub durability_level: Option<DurabilityLevel>,
+    pub cas: Option<u64>,
 }
 
 impl AppendOptions {
@@ -27,8 +27,8 @@ impl AppendOptions {
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct PrependOptions {
-    pub(crate) durability_level: Option<DurabilityLevel>,
-    pub(crate) cas: Option<u64>,
+    pub durability_level: Option<DurabilityLevel>,
+    pub cas: Option<u64>,
 }
 
 impl PrependOptions {
@@ -50,10 +50,10 @@ impl PrependOptions {
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct IncrementOptions {
-    pub(crate) expiry: Option<Duration>,
-    pub(crate) initial: Option<u64>,
-    pub(crate) delta: Option<u64>,
-    pub(crate) durability_level: Option<DurabilityLevel>,
+    pub expiry: Option<Duration>,
+    pub initial: Option<u64>,
+    pub delta: Option<u64>,
+    pub durability_level: Option<DurabilityLevel>,
 }
 
 impl IncrementOptions {
@@ -85,10 +85,10 @@ impl IncrementOptions {
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct DecrementOptions {
-    pub(crate) expiry: Option<Duration>,
-    pub(crate) initial: Option<u64>,
-    pub(crate) delta: Option<u64>,
-    pub(crate) durability_level: Option<DurabilityLevel>,
+    pub expiry: Option<Duration>,
+    pub initial: Option<u64>,
+    pub delta: Option<u64>,
+    pub durability_level: Option<DurabilityLevel>,
 }
 
 impl DecrementOptions {

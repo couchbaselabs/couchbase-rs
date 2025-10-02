@@ -1,8 +1,8 @@
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct Location {
-    pub(crate) lat: f64,
-    pub(crate) lon: f64,
+    pub lat: f64,
+    pub lon: f64,
 }
 
 impl Location {

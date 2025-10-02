@@ -1,4 +1,5 @@
 #[derive(Debug, Default, Clone)]
+#[non_exhaustive]
 pub struct DiagnosticsOptions {}
 
 impl DiagnosticsOptions {

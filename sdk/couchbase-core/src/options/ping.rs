@@ -3,6 +3,7 @@ use crate::service_type::ServiceType;
 use std::fmt::Display;
 
 #[derive(Debug, Default, Clone)]
+#[non_exhaustive]
 pub struct PingOptions {
     pub service_types: Option<Vec<ServiceType>>,
 

@@ -3,8 +3,8 @@ use chrono::{DateTime, FixedOffset};
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct TermFacet {
-    pub(crate) field: String,
-    pub(crate) size: Option<u64>,
+    pub field: String,
+    pub size: Option<u64>,
 }
 
 impl TermFacet {
@@ -30,9 +30,9 @@ impl From<TermFacet> for couchbase_core::searchx::facets::TermFacet {
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct NumericRange {
-    pub(crate) name: String,
-    pub(crate) min: Option<f64>,
-    pub(crate) max: Option<f64>,
+    pub name: String,
+    pub min: Option<f64>,
+    pub max: Option<f64>,
 }
 
 impl NumericRange {
@@ -66,9 +66,9 @@ impl From<NumericRange> for couchbase_core::searchx::facets::NumericRange {
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct NumericRangeFacet {
-    pub(crate) field: String,
-    pub(crate) size: Option<u64>,
-    pub(crate) numeric_ranges: Vec<NumericRange>,
+    pub field: String,
+    pub size: Option<u64>,
+    pub numeric_ranges: Vec<NumericRange>,
 }
 
 impl NumericRangeFacet {
@@ -119,9 +119,9 @@ impl From<NumericRangeFacet> for couchbase_core::searchx::facets::NumericRangeFa
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct DateRange {
-    pub(crate) name: String,
-    pub(crate) start: Option<DateTime<FixedOffset>>,
-    pub(crate) end: Option<DateTime<FixedOffset>>,
+    pub name: String,
+    pub start: Option<DateTime<FixedOffset>>,
+    pub end: Option<DateTime<FixedOffset>>,
 }
 
 impl DateRange {
@@ -155,9 +155,9 @@ impl From<DateRange> for couchbase_core::searchx::facets::DateRange {
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct DateRangeFacet {
-    pub(crate) field: String,
-    pub(crate) size: Option<u64>,
-    pub(crate) date_ranges: Vec<DateRange>,
+    pub field: String,
+    pub size: Option<u64>,
+    pub date_ranges: Vec<DateRange>,
 }
 
 impl DateRangeFacet {
