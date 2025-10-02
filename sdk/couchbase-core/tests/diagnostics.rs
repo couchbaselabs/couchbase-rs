@@ -17,16 +17,12 @@ mod common;
 #[test]
 fn test_ping() {
     run_test(async |mut agent| {
-        let report = agent
-            .ping(&PingOptions {
-                service_types: None,
-                kv_timeout: Some(Duration::from_millis(1000)),
-                query_timeout: Some(Duration::from_millis(1000)),
-                search_timeout: Some(Duration::from_millis(1000)),
-                on_behalf_of: None,
-            })
-            .await
-            .unwrap();
+        let opts = PingOptions::new()
+            .kv_timeout(Duration::from_millis(1000))
+            .query_timeout(Duration::from_millis(1000))
+            .search_timeout(Duration::from_millis(1000));
+
+        let report = agent.ping(&opts).await.unwrap();
 
         assert!(report.config_rev > 0);
         assert!(!report.id.is_empty());

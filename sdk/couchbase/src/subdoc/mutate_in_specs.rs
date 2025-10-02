@@ -12,12 +12,12 @@ use serde::Serialize;
 #[non_exhaustive]
 // TODO: Should this be an enum?
 pub struct MutateInSpec {
-    pub(crate) op: MutateInOpType,
-    pub(crate) path: String,
-    pub(crate) value: Vec<u8>,
-    pub(crate) create_path: bool,
-    pub(crate) is_xattr: bool,
-    pub(crate) expand_macros: bool,
+    pub op: MutateInOpType,
+    pub path: String,
+    pub value: Vec<u8>,
+    pub create_path: bool,
+    pub is_xattr: bool,
+    pub expand_macros: bool,
 }
 
 impl SubdocOp for MutateInSpec {
@@ -43,8 +43,8 @@ pub enum MutateInOpType {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct InsertSpecOptions {
-    pub(crate) create_path: Option<bool>,
-    pub(crate) is_xattr: Option<bool>,
+    pub create_path: Option<bool>,
+    pub is_xattr: Option<bool>,
 }
 
 impl InsertSpecOptions {
@@ -66,8 +66,8 @@ impl InsertSpecOptions {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct UpsertSpecOptions {
-    pub(crate) create_path: Option<bool>,
-    pub(crate) is_xattr: Option<bool>,
+    pub create_path: Option<bool>,
+    pub is_xattr: Option<bool>,
 }
 
 impl UpsertSpecOptions {
@@ -89,7 +89,7 @@ impl UpsertSpecOptions {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct ReplaceSpecOptions {
-    pub(crate) is_xattr: Option<bool>,
+    pub is_xattr: Option<bool>,
 }
 
 impl ReplaceSpecOptions {
@@ -106,7 +106,7 @@ impl ReplaceSpecOptions {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct RemoveSpecOptions {
-    pub(crate) is_xattr: Option<bool>,
+    pub is_xattr: Option<bool>,
 }
 
 impl RemoveSpecOptions {
@@ -123,8 +123,8 @@ impl RemoveSpecOptions {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct ArrayAppendSpecOptions {
-    pub(crate) create_path: Option<bool>,
-    pub(crate) is_xattr: Option<bool>,
+    pub create_path: Option<bool>,
+    pub is_xattr: Option<bool>,
 }
 
 impl ArrayAppendSpecOptions {
@@ -146,8 +146,8 @@ impl ArrayAppendSpecOptions {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct ArrayPrependSpecOptions {
-    pub(crate) create_path: Option<bool>,
-    pub(crate) is_xattr: Option<bool>,
+    pub create_path: Option<bool>,
+    pub is_xattr: Option<bool>,
 }
 
 impl ArrayPrependSpecOptions {
@@ -169,8 +169,8 @@ impl ArrayPrependSpecOptions {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct ArrayInsertSpecOptions {
-    pub(crate) create_path: Option<bool>,
-    pub(crate) is_xattr: Option<bool>,
+    pub create_path: Option<bool>,
+    pub is_xattr: Option<bool>,
 }
 
 impl ArrayInsertSpecOptions {
@@ -192,8 +192,8 @@ impl ArrayInsertSpecOptions {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct ArrayAddUniqueSpecOptions {
-    pub(crate) create_path: Option<bool>,
-    pub(crate) is_xattr: Option<bool>,
+    pub create_path: Option<bool>,
+    pub is_xattr: Option<bool>,
 }
 
 impl ArrayAddUniqueSpecOptions {
@@ -215,8 +215,8 @@ impl ArrayAddUniqueSpecOptions {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct IncrementSpecOptions {
-    pub(crate) create_path: Option<bool>,
-    pub(crate) is_xattr: Option<bool>,
+    pub create_path: Option<bool>,
+    pub is_xattr: Option<bool>,
 }
 
 impl IncrementSpecOptions {
@@ -238,8 +238,8 @@ impl IncrementSpecOptions {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct DecrementSpecOptions {
-    pub(crate) create_path: Option<bool>,
-    pub(crate) is_xattr: Option<bool>,
+    pub create_path: Option<bool>,
+    pub is_xattr: Option<bool>,
 }
 
 impl DecrementSpecOptions {

@@ -11,9 +11,9 @@ impl GetAllQueryIndexesOptions {
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct CreateQueryIndexOptions {
-    pub(crate) ignore_if_exists: Option<bool>,
-    pub(crate) num_replicas: Option<u32>,
-    pub(crate) deferred: Option<bool>,
+    pub ignore_if_exists: Option<bool>,
+    pub num_replicas: Option<u32>,
+    pub deferred: Option<bool>,
 }
 
 impl CreateQueryIndexOptions {
@@ -44,10 +44,10 @@ impl CreateQueryIndexOptions {
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct CreatePrimaryQueryIndexOptions {
-    pub(crate) index_name: Option<String>,
-    pub(crate) ignore_if_exists: Option<bool>,
-    pub(crate) num_replicas: Option<u32>,
-    pub(crate) deferred: Option<bool>,
+    pub index_name: Option<String>,
+    pub ignore_if_exists: Option<bool>,
+    pub num_replicas: Option<u32>,
+    pub deferred: Option<bool>,
 }
 
 impl CreatePrimaryQueryIndexOptions {
@@ -84,7 +84,7 @@ impl CreatePrimaryQueryIndexOptions {
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct DropQueryIndexOptions {
-    pub(crate) ignore_if_not_exists: Option<bool>,
+    pub ignore_if_not_exists: Option<bool>,
 }
 
 impl DropQueryIndexOptions {
@@ -103,8 +103,8 @@ impl DropQueryIndexOptions {
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct DropPrimaryQueryIndexOptions {
-    pub(crate) index_name: Option<String>,
-    pub(crate) ignore_if_not_exists: Option<bool>,
+    pub index_name: Option<String>,
+    pub ignore_if_not_exists: Option<bool>,
 }
 
 impl DropPrimaryQueryIndexOptions {
@@ -129,7 +129,7 @@ impl DropPrimaryQueryIndexOptions {
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct WatchQueryIndexOptions {
-    pub(crate) watch_primary: Option<bool>,
+    pub watch_primary: Option<bool>,
 }
 
 impl WatchQueryIndexOptions {

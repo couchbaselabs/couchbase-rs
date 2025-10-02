@@ -8,10 +8,10 @@ use crate::retry::{RetryStrategy, DEFAULT_RETRY_STRATEGY};
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub struct GetOptions<'a> {
-    pub(crate) key: &'a [u8],
-    pub(crate) scope_name: &'a str,
-    pub(crate) collection_name: &'a str,
-    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
+    pub key: &'a [u8],
+    pub scope_name: &'a str,
+    pub collection_name: &'a str,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> GetOptions<'a> {
@@ -33,10 +33,10 @@ impl<'a> GetOptions<'a> {
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub struct GetMetaOptions<'a> {
-    pub(crate) key: &'a [u8],
-    pub(crate) scope_name: &'a str,
-    pub(crate) collection_name: &'a str,
-    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
+    pub key: &'a [u8],
+    pub scope_name: &'a str,
+    pub collection_name: &'a str,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> GetMetaOptions<'a> {
@@ -58,17 +58,17 @@ impl<'a> GetMetaOptions<'a> {
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub struct UpsertOptions<'a> {
-    pub(crate) key: &'a [u8],
-    pub(crate) scope_name: &'a str,
-    pub(crate) collection_name: &'a str,
-    pub(crate) value: &'a [u8],
-    pub(crate) flags: u32,
-    pub(crate) datatype: DataTypeFlag,
-    pub(crate) expiry: Option<u32>,
-    pub(crate) preserve_expiry: Option<bool>,
-    pub(crate) cas: Option<u64>,
-    pub(crate) durability_level: Option<DurabilityLevel>,
-    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
+    pub key: &'a [u8],
+    pub scope_name: &'a str,
+    pub collection_name: &'a str,
+    pub value: &'a [u8],
+    pub flags: u32,
+    pub datatype: DataTypeFlag,
+    pub expiry: Option<u32>,
+    pub preserve_expiry: Option<bool>,
+    pub cas: Option<u64>,
+    pub durability_level: Option<DurabilityLevel>,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> UpsertOptions<'a> {
@@ -135,12 +135,12 @@ impl<'a> UpsertOptions<'a> {
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub struct DeleteOptions<'a> {
-    pub(crate) key: &'a [u8],
-    pub(crate) scope_name: &'a str,
-    pub(crate) collection_name: &'a str,
-    pub(crate) cas: Option<u64>,
-    pub(crate) durability_level: Option<DurabilityLevel>,
-    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
+    pub key: &'a [u8],
+    pub scope_name: &'a str,
+    pub collection_name: &'a str,
+    pub cas: Option<u64>,
+    pub durability_level: Option<DurabilityLevel>,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> DeleteOptions<'a> {
@@ -177,12 +177,12 @@ impl<'a> DeleteOptions<'a> {
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub struct GetAndLockOptions<'a> {
-    pub(crate) key: &'a [u8],
-    pub(crate) scope_name: &'a str,
-    pub(crate) collection_name: &'a str,
-    pub(crate) lock_time: u32,
-    pub(crate) collection_id: Option<u32>,
-    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
+    pub key: &'a [u8],
+    pub scope_name: &'a str,
+    pub collection_name: &'a str,
+    pub lock_time: u32,
+    pub collection_id: Option<u32>,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> GetAndLockOptions<'a> {
@@ -216,11 +216,11 @@ impl<'a> GetAndLockOptions<'a> {
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub struct GetAndTouchOptions<'a> {
-    pub(crate) key: &'a [u8],
-    pub(crate) scope_name: &'a str,
-    pub(crate) collection_name: &'a str,
-    pub(crate) expiry: u32,
-    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
+    pub key: &'a [u8],
+    pub scope_name: &'a str,
+    pub collection_name: &'a str,
+    pub expiry: u32,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> GetAndTouchOptions<'a> {
@@ -243,11 +243,11 @@ impl<'a> GetAndTouchOptions<'a> {
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub struct UnlockOptions<'a> {
-    pub(crate) key: &'a [u8],
-    pub(crate) scope_name: &'a str,
-    pub(crate) collection_name: &'a str,
-    pub(crate) cas: u64,
-    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
+    pub key: &'a [u8],
+    pub scope_name: &'a str,
+    pub collection_name: &'a str,
+    pub cas: u64,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> UnlockOptions<'a> {
@@ -270,11 +270,11 @@ impl<'a> UnlockOptions<'a> {
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub struct TouchOptions<'a> {
-    pub(crate) key: &'a [u8],
-    pub(crate) scope_name: &'a str,
-    pub(crate) collection_name: &'a str,
-    pub(crate) expiry: u32,
-    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
+    pub key: &'a [u8],
+    pub scope_name: &'a str,
+    pub collection_name: &'a str,
+    pub expiry: u32,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> TouchOptions<'a> {
@@ -297,15 +297,15 @@ impl<'a> TouchOptions<'a> {
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub struct AddOptions<'a> {
-    pub(crate) key: &'a [u8],
-    pub(crate) scope_name: &'a str,
-    pub(crate) collection_name: &'a str,
-    pub(crate) value: &'a [u8],
-    pub(crate) flags: u32,
-    pub(crate) datatype: DataTypeFlag,
-    pub(crate) expiry: Option<u32>,
-    pub(crate) durability_level: Option<DurabilityLevel>,
-    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
+    pub key: &'a [u8],
+    pub scope_name: &'a str,
+    pub collection_name: &'a str,
+    pub value: &'a [u8],
+    pub flags: u32,
+    pub datatype: DataTypeFlag,
+    pub expiry: Option<u32>,
+    pub durability_level: Option<DurabilityLevel>,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> AddOptions<'a> {
@@ -360,17 +360,17 @@ impl<'a> AddOptions<'a> {
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub struct ReplaceOptions<'a> {
-    pub(crate) key: &'a [u8],
-    pub(crate) scope_name: &'a str,
-    pub(crate) collection_name: &'a str,
-    pub(crate) value: &'a [u8],
-    pub(crate) flags: u32,
-    pub(crate) datatype: DataTypeFlag,
-    pub(crate) expiry: Option<u32>,
-    pub(crate) preserve_expiry: Option<bool>,
-    pub(crate) cas: Option<u64>,
-    pub(crate) durability_level: Option<DurabilityLevel>,
-    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
+    pub key: &'a [u8],
+    pub scope_name: &'a str,
+    pub collection_name: &'a str,
+    pub value: &'a [u8],
+    pub flags: u32,
+    pub datatype: DataTypeFlag,
+    pub expiry: Option<u32>,
+    pub preserve_expiry: Option<bool>,
+    pub cas: Option<u64>,
+    pub durability_level: Option<DurabilityLevel>,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> ReplaceOptions<'a> {
@@ -437,13 +437,13 @@ impl<'a> ReplaceOptions<'a> {
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub struct AppendOptions<'a> {
-    pub(crate) key: &'a [u8],
-    pub(crate) scope_name: &'a str,
-    pub(crate) collection_name: &'a str,
-    pub(crate) value: &'a [u8],
-    pub(crate) cas: Option<u64>,
-    pub(crate) durability_level: Option<DurabilityLevel>,
-    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
+    pub key: &'a [u8],
+    pub scope_name: &'a str,
+    pub collection_name: &'a str,
+    pub value: &'a [u8],
+    pub cas: Option<u64>,
+    pub durability_level: Option<DurabilityLevel>,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> AppendOptions<'a> {
@@ -486,13 +486,13 @@ impl<'a> AppendOptions<'a> {
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub struct PrependOptions<'a> {
-    pub(crate) key: &'a [u8],
-    pub(crate) scope_name: &'a str,
-    pub(crate) collection_name: &'a str,
-    pub(crate) value: &'a [u8],
-    pub(crate) cas: Option<u64>,
-    pub(crate) durability_level: Option<DurabilityLevel>,
-    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
+    pub key: &'a [u8],
+    pub scope_name: &'a str,
+    pub collection_name: &'a str,
+    pub value: &'a [u8],
+    pub cas: Option<u64>,
+    pub durability_level: Option<DurabilityLevel>,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> PrependOptions<'a> {
@@ -535,14 +535,14 @@ impl<'a> PrependOptions<'a> {
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub struct IncrementOptions<'a> {
-    pub(crate) key: &'a [u8],
-    pub(crate) scope_name: &'a str,
-    pub(crate) collection_name: &'a str,
-    pub(crate) initial: Option<u64>,
-    pub(crate) delta: u64,
-    pub(crate) expiry: Option<u32>,
-    pub(crate) durability_level: Option<DurabilityLevel>,
-    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
+    pub key: &'a [u8],
+    pub scope_name: &'a str,
+    pub collection_name: &'a str,
+    pub initial: Option<u64>,
+    pub delta: u64,
+    pub expiry: Option<u32>,
+    pub durability_level: Option<DurabilityLevel>,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> IncrementOptions<'a> {
@@ -586,14 +586,14 @@ impl<'a> IncrementOptions<'a> {
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub struct DecrementOptions<'a> {
-    pub(crate) key: &'a [u8],
-    pub(crate) scope_name: &'a str,
-    pub(crate) collection_name: &'a str,
-    pub(crate) initial: Option<u64>,
-    pub(crate) delta: u64,
-    pub(crate) expiry: Option<u32>,
-    pub(crate) durability_level: Option<DurabilityLevel>,
-    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
+    pub key: &'a [u8],
+    pub scope_name: &'a str,
+    pub collection_name: &'a str,
+    pub initial: Option<u64>,
+    pub delta: u64,
+    pub expiry: Option<u32>,
+    pub durability_level: Option<DurabilityLevel>,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> DecrementOptions<'a> {
@@ -637,12 +637,12 @@ impl<'a> DecrementOptions<'a> {
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub struct LookupInOptions<'a> {
-    pub(crate) key: &'a [u8],
-    pub(crate) scope_name: &'a str,
-    pub(crate) collection_name: &'a str,
-    pub(crate) ops: &'a [LookupInOp<'a>],
-    pub(crate) flags: SubdocDocFlag,
-    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
+    pub key: &'a [u8],
+    pub scope_name: &'a str,
+    pub collection_name: &'a str,
+    pub ops: &'a [LookupInOp<'a>],
+    pub flags: SubdocDocFlag,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> LookupInOptions<'a> {
@@ -676,16 +676,16 @@ impl<'a> LookupInOptions<'a> {
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub struct MutateInOptions<'a> {
-    pub(crate) key: &'a [u8],
-    pub(crate) scope_name: &'a str,
-    pub(crate) collection_name: &'a str,
-    pub(crate) ops: &'a [MutateInOp<'a>],
-    pub(crate) flags: SubdocDocFlag,
-    pub(crate) expiry: Option<u32>,
-    pub(crate) preserve_expiry: Option<bool>,
-    pub(crate) cas: Option<u64>,
-    pub(crate) durability_level: Option<DurabilityLevel>,
-    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
+    pub key: &'a [u8],
+    pub scope_name: &'a str,
+    pub collection_name: &'a str,
+    pub ops: &'a [MutateInOp<'a>],
+    pub flags: SubdocDocFlag,
+    pub expiry: Option<u32>,
+    pub preserve_expiry: Option<bool>,
+    pub cas: Option<u64>,
+    pub durability_level: Option<DurabilityLevel>,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> MutateInOptions<'a> {
@@ -746,9 +746,9 @@ impl<'a> MutateInOptions<'a> {
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub struct GetCollectionIdOptions<'a> {
-    pub(crate) scope_name: &'a str,
-    pub(crate) collection_name: &'a str,
-    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
+    pub scope_name: &'a str,
+    pub collection_name: &'a str,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> GetCollectionIdOptions<'a> {

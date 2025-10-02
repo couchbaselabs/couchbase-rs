@@ -45,13 +45,13 @@ impl Display for MatchOperator {
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct MatchQuery {
-    pub(crate) analyzer: Option<String>,
-    pub(crate) boost: Option<f32>,
-    pub(crate) field: Option<String>,
-    pub(crate) fuzziness: Option<u64>,
-    pub(crate) match_input: String,
-    pub(crate) operator: Option<MatchOperator>,
-    pub(crate) prefix_length: Option<u64>,
+    pub analyzer: Option<String>,
+    pub boost: Option<f32>,
+    pub field: Option<String>,
+    pub fuzziness: Option<u64>,
+    pub match_input: String,
+    pub operator: Option<MatchOperator>,
+    pub prefix_length: Option<u64>,
 }
 
 impl MatchQuery {
@@ -101,10 +101,10 @@ impl MatchQuery {
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct MatchPhraseQuery {
-    pub(crate) analyzer: Option<String>,
-    pub(crate) boost: Option<f32>,
-    pub(crate) field: Option<String>,
-    pub(crate) match_phrase: String,
+    pub analyzer: Option<String>,
+    pub boost: Option<f32>,
+    pub field: Option<String>,
+    pub match_phrase: String,
 }
 
 impl MatchPhraseQuery {
@@ -136,9 +136,9 @@ impl MatchPhraseQuery {
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct RegexpQuery {
-    pub(crate) boost: Option<f32>,
-    pub(crate) field: Option<String>,
-    pub(crate) regexp: String,
+    pub boost: Option<f32>,
+    pub field: Option<String>,
+    pub regexp: String,
 }
 
 impl RegexpQuery {
@@ -164,8 +164,8 @@ impl RegexpQuery {
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct QueryStringQuery {
-    pub(crate) boost: Option<f32>,
-    pub(crate) query: String,
+    pub boost: Option<f32>,
+    pub query: String,
 }
 
 impl QueryStringQuery {
@@ -185,12 +185,12 @@ impl QueryStringQuery {
 #[derive(Debug, Default, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct NumericRangeQuery {
-    pub(crate) boost: Option<f32>,
-    pub(crate) field: Option<String>,
-    pub(crate) inclusive_min: Option<bool>,
-    pub(crate) inclusive_max: Option<bool>,
-    pub(crate) min: Option<f32>,
-    pub(crate) max: Option<f32>,
+    pub boost: Option<f32>,
+    pub field: Option<String>,
+    pub inclusive_min: Option<bool>,
+    pub inclusive_max: Option<bool>,
+    pub min: Option<f32>,
+    pub max: Option<f32>,
 }
 
 impl NumericRangeQuery {
@@ -234,13 +234,13 @@ impl NumericRangeQuery {
 #[derive(Debug, Default, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct DateRangeQuery {
-    pub(crate) boost: Option<f32>,
-    pub(crate) field: Option<String>,
-    pub(crate) datetime_parser: Option<String>,
-    pub(crate) end: Option<String>,
-    pub(crate) inclusive_start: Option<bool>,
-    pub(crate) inclusive_end: Option<bool>,
-    pub(crate) start: Option<String>,
+    pub boost: Option<f32>,
+    pub field: Option<String>,
+    pub datetime_parser: Option<String>,
+    pub end: Option<String>,
+    pub inclusive_start: Option<bool>,
+    pub inclusive_end: Option<bool>,
+    pub start: Option<String>,
 }
 
 impl DateRangeQuery {
@@ -289,12 +289,12 @@ impl DateRangeQuery {
 #[derive(Debug, Default, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct TermRangeQuery {
-    pub(crate) boost: Option<f32>,
-    pub(crate) field: Option<String>,
-    pub(crate) inclusive_min: Option<bool>,
-    pub(crate) inclusive_max: Option<bool>,
-    pub(crate) max: Option<String>,
-    pub(crate) min: Option<String>,
+    pub boost: Option<f32>,
+    pub field: Option<String>,
+    pub inclusive_min: Option<bool>,
+    pub inclusive_max: Option<bool>,
+    pub max: Option<String>,
+    pub min: Option<String>,
 }
 
 impl TermRangeQuery {
@@ -338,8 +338,8 @@ impl TermRangeQuery {
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct ConjunctionQuery {
-    pub(crate) boost: Option<f32>,
-    pub(crate) conjuncts: Vec<Query>,
+    pub boost: Option<f32>,
+    pub conjuncts: Vec<Query>,
 }
 
 impl ConjunctionQuery {
@@ -364,9 +364,9 @@ impl ConjunctionQuery {
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct DisjunctionQuery {
-    pub(crate) boost: Option<f32>,
-    pub(crate) disjuncts: Vec<Query>,
-    pub(crate) min: Option<u32>,
+    pub boost: Option<f32>,
+    pub disjuncts: Vec<Query>,
+    pub min: Option<u32>,
 }
 
 impl DisjunctionQuery {
@@ -397,10 +397,10 @@ impl DisjunctionQuery {
 #[derive(Debug, Default, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct BooleanQuery {
-    pub(crate) boost: Option<f32>,
-    pub(crate) must: Option<ConjunctionQuery>,
-    pub(crate) must_not: Option<DisjunctionQuery>,
-    pub(crate) should: Option<DisjunctionQuery>,
+    pub boost: Option<f32>,
+    pub must: Option<ConjunctionQuery>,
+    pub must_not: Option<DisjunctionQuery>,
+    pub should: Option<DisjunctionQuery>,
 }
 
 impl BooleanQuery {
@@ -432,9 +432,9 @@ impl BooleanQuery {
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct WildcardQuery {
-    pub(crate) boost: Option<f32>,
-    pub(crate) field: Option<String>,
-    pub(crate) wildcard: String,
+    pub boost: Option<f32>,
+    pub field: Option<String>,
+    pub wildcard: String,
 }
 
 impl WildcardQuery {
@@ -460,8 +460,8 @@ impl WildcardQuery {
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct DocIDQuery {
-    pub(crate) boost: Option<f32>,
-    pub(crate) ids: Vec<String>,
+    pub boost: Option<f32>,
+    pub ids: Vec<String>,
 }
 
 impl DocIDQuery {
@@ -478,9 +478,9 @@ impl DocIDQuery {
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct BooleanFieldQuery {
-    pub(crate) bool_value: bool,
-    pub(crate) boost: Option<f32>,
-    pub(crate) field: Option<String>,
+    pub bool_value: bool,
+    pub boost: Option<f32>,
+    pub field: Option<String>,
 }
 
 impl BooleanFieldQuery {
@@ -506,11 +506,11 @@ impl BooleanFieldQuery {
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct TermQuery {
-    pub(crate) boost: Option<f32>,
-    pub(crate) field: Option<String>,
-    pub(crate) fuzziness: Option<u32>,
-    pub(crate) prefix_length: Option<u32>,
-    pub(crate) term: String,
+    pub boost: Option<f32>,
+    pub field: Option<String>,
+    pub fuzziness: Option<u32>,
+    pub prefix_length: Option<u32>,
+    pub term: String,
 }
 
 impl TermQuery {
@@ -548,9 +548,9 @@ impl TermQuery {
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct PhraseQuery {
-    pub(crate) boost: Option<f32>,
-    pub(crate) field: Option<String>,
-    pub(crate) terms: Vec<String>,
+    pub boost: Option<f32>,
+    pub field: Option<String>,
+    pub terms: Vec<String>,
 }
 
 impl PhraseQuery {
@@ -576,9 +576,9 @@ impl PhraseQuery {
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct PrefixQuery {
-    pub(crate) boost: Option<f32>,
-    pub(crate) field: Option<String>,
-    pub(crate) prefix: String,
+    pub boost: Option<f32>,
+    pub field: Option<String>,
+    pub prefix: String,
 }
 
 impl PrefixQuery {
@@ -624,10 +624,10 @@ impl MatchNoneQuery {
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct GeoDistanceQuery {
-    pub(crate) distance: String,
-    pub(crate) boost: Option<f32>,
-    pub(crate) field: Option<String>,
-    pub(crate) location: Location,
+    pub distance: String,
+    pub boost: Option<f32>,
+    pub field: Option<String>,
+    pub location: Location,
 }
 
 impl GeoDistanceQuery {
@@ -654,10 +654,10 @@ impl GeoDistanceQuery {
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct GeoBoundingBoxQuery {
-    pub(crate) bottom_right: Location,
-    pub(crate) boost: Option<f32>,
-    pub(crate) field: Option<String>,
-    pub(crate) top_left: Location,
+    pub bottom_right: Location,
+    pub boost: Option<f32>,
+    pub field: Option<String>,
+    pub top_left: Location,
 }
 
 impl GeoBoundingBoxQuery {
@@ -684,9 +684,9 @@ impl GeoBoundingBoxQuery {
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct GeoPolygonQuery {
-    pub(crate) boost: Option<f32>,
-    pub(crate) field: Option<String>,
-    pub(crate) polygon_points: Vec<Location>,
+    pub boost: Option<f32>,
+    pub field: Option<String>,
+    pub polygon_points: Vec<Location>,
 }
 
 impl GeoPolygonQuery {

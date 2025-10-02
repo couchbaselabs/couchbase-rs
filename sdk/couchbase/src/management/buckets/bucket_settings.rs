@@ -132,6 +132,7 @@ impl BucketSettings {
 }
 
 #[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
+#[non_exhaustive]
 pub struct BucketType(InnerBucketType);
 
 impl BucketType {
@@ -148,6 +149,7 @@ pub(crate) enum InnerBucketType {
 }
 
 #[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
+#[non_exhaustive]
 pub struct EvictionPolicyType(InnerEvictionPolicyType);
 
 impl EvictionPolicyType {
@@ -173,6 +175,7 @@ pub(crate) enum InnerEvictionPolicyType {
 }
 
 #[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
+#[non_exhaustive]
 pub struct CompressionMode(InnerCompressionMode);
 
 impl CompressionMode {
@@ -192,6 +195,7 @@ pub(crate) enum InnerCompressionMode {
 }
 
 #[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
+#[non_exhaustive]
 pub struct ConflictResolutionType(InnerConflictResolutionType);
 
 impl ConflictResolutionType {
@@ -214,6 +218,7 @@ pub(crate) enum InnerConflictResolutionType {
 }
 
 #[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
+#[non_exhaustive]
 pub struct StorageBackend(InnerStorageBackend);
 
 impl StorageBackend {

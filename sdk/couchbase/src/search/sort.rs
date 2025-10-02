@@ -3,7 +3,7 @@ use crate::search::location::Location;
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct SortScore {
-    pub(crate) descending: Option<bool>,
+    pub descending: Option<bool>,
 }
 
 impl SortScore {
@@ -26,7 +26,7 @@ impl From<SortScore> for couchbase_core::searchx::sort::SortScore {
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct SortId {
-    pub(crate) descending: Option<bool>,
+    pub descending: Option<bool>,
 }
 
 impl SortId {
@@ -121,11 +121,11 @@ impl From<SortFieldMissing> for Option<couchbase_core::searchx::sort::SortFieldM
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct SortField {
-    pub(crate) field: String,
-    pub(crate) descending: Option<bool>,
-    pub(crate) sort_type: Option<SortFieldType>,
-    pub(crate) mode: Option<SortFieldMode>,
-    pub(crate) missing: Option<SortFieldMissing>,
+    pub field: String,
+    pub descending: Option<bool>,
+    pub sort_type: Option<SortFieldType>,
+    pub mode: Option<SortFieldMode>,
+    pub missing: Option<SortFieldMissing>,
 }
 
 impl SortField {
@@ -221,10 +221,10 @@ impl From<SortGeoDistanceUnit> for Option<couchbase_core::searchx::sort::SortGeo
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct SortGeoDistance {
-    pub(crate) field: String,
-    pub(crate) descending: Option<bool>,
-    pub(crate) location: Location,
-    pub(crate) unit: Option<SortGeoDistanceUnit>,
+    pub field: String,
+    pub descending: Option<bool>,
+    pub location: Location,
+    pub unit: Option<SortGeoDistanceUnit>,
 }
 
 impl SortGeoDistance {

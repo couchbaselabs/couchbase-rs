@@ -3,9 +3,10 @@ use crate::search::queries::Query;
 use couchbase_core::searchx::query_options::{KnnOperator, KnnQuery};
 
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct VectorSearch {
-    pub(crate) vector_queries: Vec<VectorQuery>,
-    pub(crate) query_combination: Option<VectorQueryCombination>,
+    pub vector_queries: Vec<VectorQuery>,
+    pub query_combination: Option<VectorQueryCombination>,
 }
 
 impl VectorSearch {
@@ -28,8 +29,9 @@ impl VectorSearch {
 }
 
 #[derive(Debug, Default)]
+#[non_exhaustive]
 pub struct VectorSearchOptions {
-    pub(crate) query_combination: Option<VectorQueryCombination>,
+    pub query_combination: Option<VectorQueryCombination>,
 }
 
 impl VectorSearchOptions {
@@ -60,13 +62,14 @@ impl From<VectorQueryCombination> for KnnOperator {
 }
 
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct VectorQuery {
-    pub(crate) field_name: String,
-    pub(crate) num_candidates: u32,
-    pub(crate) query: Option<Vec<f32>>,
-    pub(crate) base64_query: Option<String>,
-    pub(crate) boost: Option<f32>,
-    pub(crate) prefilter: Option<Query>,
+    pub field_name: String,
+    pub num_candidates: u32,
+    pub query: Option<Vec<f32>>,
+    pub base64_query: Option<String>,
+    pub boost: Option<f32>,
+    pub prefilter: Option<Query>,
 }
 
 impl VectorQuery {

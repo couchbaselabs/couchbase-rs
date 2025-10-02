@@ -58,8 +58,8 @@ impl From<HighlightStyle> for Option<couchbase_core::searchx::query_options::Hig
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Highlight {
-    pub(crate) style: Option<HighlightStyle>,
-    pub(crate) fields: Option<Vec<String>>,
+    pub style: Option<HighlightStyle>,
+    pub fields: Option<Vec<String>>,
 }
 
 impl Highlight {
@@ -94,20 +94,20 @@ impl From<Highlight> for Option<couchbase_core::searchx::query_options::Highligh
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct SearchOptions {
-    pub(crate) collections: Option<Vec<String>>,
-    pub(crate) limit: Option<u32>,
-    pub(crate) skip: Option<u32>,
-    pub(crate) explain: Option<bool>,
-    pub(crate) highlight: Option<Highlight>,
-    pub(crate) fields: Option<Vec<String>>,
-    pub(crate) scan_consistency: Option<ScanConsistency>,
-    pub(crate) consistent_with: Option<MutationState>,
-    pub(crate) sort: Option<Vec<Sort>>,
-    pub(crate) facets: Option<HashMap<String, Facet>>,
-    pub(crate) raw: Option<HashMap<String, Value>>,
-    pub(crate) include_locations: Option<bool>,
-    pub(crate) disable_scoring: Option<bool>,
-    pub(crate) server_timeout: Option<Duration>,
+    pub collections: Option<Vec<String>>,
+    pub limit: Option<u32>,
+    pub skip: Option<u32>,
+    pub explain: Option<bool>,
+    pub highlight: Option<Highlight>,
+    pub fields: Option<Vec<String>>,
+    pub scan_consistency: Option<ScanConsistency>,
+    pub consistent_with: Option<MutationState>,
+    pub sort: Option<Vec<Sort>>,
+    pub facets: Option<HashMap<String, Facet>>,
+    pub raw: Option<HashMap<String, Value>>,
+    pub include_locations: Option<bool>,
+    pub disable_scoring: Option<bool>,
+    pub server_timeout: Option<Duration>,
 }
 
 impl SearchOptions {

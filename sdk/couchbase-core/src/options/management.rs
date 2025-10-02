@@ -8,10 +8,10 @@ use std::sync::Arc;
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct GetCollectionManifestOptions<'a> {
-    pub(crate) on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
-    pub(crate) bucket_name: &'a str,
+    pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+    pub bucket_name: &'a str,
 
-    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> GetCollectionManifestOptions<'a> {
@@ -48,11 +48,11 @@ impl<'a> From<&GetCollectionManifestOptions<'a>>
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct CreateScopeOptions<'a> {
-    pub(crate) on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
-    pub(crate) bucket_name: &'a str,
-    pub(crate) scope_name: &'a str,
+    pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+    pub bucket_name: &'a str,
+    pub scope_name: &'a str,
 
-    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> CreateScopeOptions<'a> {
@@ -89,11 +89,11 @@ impl<'a> From<&CreateScopeOptions<'a>> for mgmtx::options::CreateScopeOptions<'a
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct DeleteScopeOptions<'a> {
-    pub(crate) on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
-    pub(crate) bucket_name: &'a str,
-    pub(crate) scope_name: &'a str,
+    pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+    pub bucket_name: &'a str,
+    pub scope_name: &'a str,
 
-    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> DeleteScopeOptions<'a> {
@@ -130,14 +130,14 @@ impl<'a> From<&DeleteScopeOptions<'a>> for mgmtx::options::DeleteScopeOptions<'a
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct CreateCollectionOptions<'a> {
-    pub(crate) on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
-    pub(crate) bucket_name: &'a str,
-    pub(crate) scope_name: &'a str,
-    pub(crate) collection_name: &'a str,
-    pub(crate) max_ttl: Option<i32>,
-    pub(crate) history_enabled: Option<bool>,
+    pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+    pub bucket_name: &'a str,
+    pub scope_name: &'a str,
+    pub collection_name: &'a str,
+    pub max_ttl: Option<i32>,
+    pub history_enabled: Option<bool>,
 
-    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> CreateCollectionOptions<'a> {
@@ -190,14 +190,14 @@ impl<'a> From<&CreateCollectionOptions<'a>> for mgmtx::options::CreateCollection
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct UpdateCollectionOptions<'a> {
-    pub(crate) on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
-    pub(crate) bucket_name: &'a str,
-    pub(crate) scope_name: &'a str,
-    pub(crate) collection_name: &'a str,
-    pub(crate) max_ttl: Option<i32>,
-    pub(crate) history_enabled: Option<bool>,
+    pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+    pub bucket_name: &'a str,
+    pub scope_name: &'a str,
+    pub collection_name: &'a str,
+    pub max_ttl: Option<i32>,
+    pub history_enabled: Option<bool>,
 
-    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> UpdateCollectionOptions<'a> {
@@ -250,12 +250,12 @@ impl<'a> From<&UpdateCollectionOptions<'a>> for mgmtx::options::UpdateCollection
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct DeleteCollectionOptions<'a> {
-    pub(crate) on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
-    pub(crate) bucket_name: &'a str,
-    pub(crate) scope_name: &'a str,
-    pub(crate) collection_name: &'a str,
+    pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+    pub bucket_name: &'a str,
+    pub scope_name: &'a str,
+    pub collection_name: &'a str,
 
-    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> DeleteCollectionOptions<'a> {
@@ -294,9 +294,9 @@ impl<'a> From<&DeleteCollectionOptions<'a>> for mgmtx::options::DeleteCollection
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct EnsureManifestOptions<'a> {
-    pub(crate) on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
-    pub(crate) bucket_name: &'a str,
-    pub(crate) manifest_uid: u64,
+    pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+    pub bucket_name: &'a str,
+    pub manifest_uid: u64,
 }
 
 impl<'a> EnsureManifestOptions<'a> {
@@ -317,9 +317,9 @@ impl<'a> EnsureManifestOptions<'a> {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct GetAllBucketsOptions<'a> {
-    pub(crate) on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+    pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
 
-    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> GetAllBucketsOptions<'a> {
@@ -358,10 +358,10 @@ impl<'a> From<&GetAllBucketsOptions<'a>> for mgmtx::options::GetAllBucketsOption
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct GetBucketOptions<'a> {
-    pub(crate) on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
-    pub(crate) bucket_name: &'a str,
+    pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+    pub bucket_name: &'a str,
 
-    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> GetBucketOptions<'a> {
@@ -396,11 +396,11 @@ impl<'a> From<&GetBucketOptions<'a>> for mgmtx::options::GetBucketOptions<'a> {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct CreateBucketOptions<'a> {
-    pub(crate) on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
-    pub(crate) bucket_name: &'a str,
-    pub(crate) bucket_settings: &'a BucketSettings,
+    pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+    pub bucket_name: &'a str,
+    pub bucket_settings: &'a BucketSettings,
 
-    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> CreateBucketOptions<'a> {
@@ -437,11 +437,11 @@ impl<'a> From<&CreateBucketOptions<'a>> for mgmtx::options::CreateBucketOptions<
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct UpdateBucketOptions<'a> {
-    pub(crate) on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
-    pub(crate) bucket_name: &'a str,
-    pub(crate) bucket_settings: &'a BucketSettings,
+    pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+    pub bucket_name: &'a str,
+    pub bucket_settings: &'a BucketSettings,
 
-    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> UpdateBucketOptions<'a> {
@@ -478,10 +478,10 @@ impl<'a> From<&UpdateBucketOptions<'a>> for mgmtx::options::UpdateBucketOptions<
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct DeleteBucketOptions<'a> {
-    pub(crate) on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
-    pub(crate) bucket_name: &'a str,
+    pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+    pub bucket_name: &'a str,
 
-    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> DeleteBucketOptions<'a> {
@@ -516,10 +516,10 @@ impl<'a> From<&DeleteBucketOptions<'a>> for mgmtx::options::DeleteBucketOptions<
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct FlushBucketOptions<'a> {
-    pub(crate) on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
-    pub(crate) bucket_name: &'a str,
+    pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+    pub bucket_name: &'a str,
 
-    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> FlushBucketOptions<'a> {
@@ -554,10 +554,10 @@ impl<'a> From<&FlushBucketOptions<'a>> for mgmtx::options::FlushBucketOptions<'a
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct EnsureBucketOptions<'a> {
-    pub(crate) on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
-    pub(crate) bucket_name: &'a str,
-    pub(crate) bucket_uuid: Option<&'a str>,
-    pub(crate) want_missing: bool,
+    pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+    pub bucket_name: &'a str,
+    pub bucket_uuid: Option<&'a str>,
+    pub want_missing: bool,
 }
 
 impl<'a> EnsureBucketOptions<'a> {
@@ -969,10 +969,10 @@ impl<'a> From<&ChangePasswordOptions<'a>> for mgmtx::options::ChangePasswordOpti
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct EnsureUserOptions<'a> {
-    pub(crate) on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
-    pub(crate) username: &'a str,
-    pub(crate) auth_domain: &'a str,
-    pub(crate) want_missing: bool,
+    pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+    pub username: &'a str,
+    pub auth_domain: &'a str,
+    pub want_missing: bool,
 }
 
 impl<'a> EnsureUserOptions<'a> {
@@ -984,14 +984,19 @@ impl<'a> EnsureUserOptions<'a> {
             want_missing,
         }
     }
+
+    pub fn on_behalf_of_info(mut self, on_behalf_of_info: &'a OnBehalfOfInfo) -> Self {
+        self.on_behalf_of_info = Some(on_behalf_of_info);
+        self
+    }
 }
 
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct EnsureGroupOptions<'a> {
-    pub(crate) on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
-    pub(crate) group_name: &'a str,
-    pub(crate) want_missing: bool,
+    pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+    pub group_name: &'a str,
+    pub want_missing: bool,
 }
 
 impl<'a> EnsureGroupOptions<'a> {
@@ -1001,5 +1006,10 @@ impl<'a> EnsureGroupOptions<'a> {
             group_name,
             want_missing,
         }
+    }
+
+    pub fn on_behalf_of_info(mut self, on_behalf_of_info: &'a OnBehalfOfInfo) -> Self {
+        self.on_behalf_of_info = Some(on_behalf_of_info);
+        self
     }
 }

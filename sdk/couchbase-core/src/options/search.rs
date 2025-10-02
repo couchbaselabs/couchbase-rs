@@ -11,34 +11,34 @@ use std::sync::Arc;
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct SearchOptions {
-    pub(crate) collections: Option<Vec<String>>,
-    pub(crate) control: Option<Control>,
-    pub(crate) explain: Option<bool>,
-    pub(crate) facets: Option<HashMap<String, Facet>>,
-    pub(crate) fields: Option<Vec<String>>,
-    pub(crate) from: Option<u32>,
-    pub(crate) highlight: Option<Highlight>,
-    pub(crate) include_locations: Option<bool>,
-    pub(crate) query: Option<Query>,
-    pub(crate) score: Option<String>,
-    pub(crate) search_after: Option<Vec<String>>,
-    pub(crate) search_before: Option<Vec<String>>,
-    pub(crate) show_request: Option<bool>,
-    pub(crate) size: Option<u32>,
-    pub(crate) sort: Option<Vec<Sort>>,
-    pub(crate) knn: Option<Vec<KnnQuery>>,
-    pub(crate) knn_operator: Option<KnnOperator>,
+    pub collections: Option<Vec<String>>,
+    pub control: Option<Control>,
+    pub explain: Option<bool>,
+    pub facets: Option<HashMap<String, Facet>>,
+    pub fields: Option<Vec<String>>,
+    pub from: Option<u32>,
+    pub highlight: Option<Highlight>,
+    pub include_locations: Option<bool>,
+    pub query: Option<Query>,
+    pub score: Option<String>,
+    pub search_after: Option<Vec<String>>,
+    pub search_before: Option<Vec<String>>,
+    pub show_request: Option<bool>,
+    pub size: Option<u32>,
+    pub sort: Option<Vec<Sort>>,
+    pub knn: Option<Vec<KnnQuery>>,
+    pub knn_operator: Option<KnnOperator>,
 
-    pub(crate) raw: Option<HashMap<String, serde_json::Value>>,
+    pub raw: Option<HashMap<String, serde_json::Value>>,
 
-    pub(crate) index_name: String,
-    pub(crate) scope_name: Option<String>,
-    pub(crate) bucket_name: Option<String>,
+    pub index_name: String,
+    pub scope_name: Option<String>,
+    pub bucket_name: Option<String>,
 
-    pub(crate) on_behalf_of: Option<OnBehalfOfInfo>,
+    pub on_behalf_of: Option<OnBehalfOfInfo>,
 
-    pub(crate) endpoint: Option<String>,
-    pub(crate) retry_strategy: Option<Arc<dyn RetryStrategy>>,
+    pub endpoint: Option<String>,
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl SearchOptions {

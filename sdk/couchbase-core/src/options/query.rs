@@ -12,56 +12,56 @@ use crate::retry::RetryStrategy;
 #[derive(Debug, Default, Clone)]
 #[non_exhaustive]
 pub struct QueryOptions {
-    pub(crate) args: Option<Vec<Value>>,
-    pub(crate) atr_collection: Option<String>,
-    pub(crate) auto_execute: Option<bool>,
-    pub(crate) client_context_id: Option<String>,
-    pub(crate) compression: Option<queryx::query_options::Compression>,
-    pub(crate) controls: Option<bool>,
-    pub(crate) creds: Option<Vec<queryx::query_options::CredsJson>>,
-    pub(crate) durability_level: Option<queryx::query_options::DurabilityLevel>,
-    pub(crate) encoded_plan: Option<String>,
-    pub(crate) encoding: Option<queryx::query_options::Encoding>,
-    pub(crate) format: Option<queryx::query_options::Format>,
-    pub(crate) kv_timeout: Option<Duration>,
-    pub(crate) max_parallelism: Option<u32>,
-    pub(crate) memory_quota: Option<u32>,
-    pub(crate) metrics: Option<bool>,
-    pub(crate) namespace: Option<String>,
-    pub(crate) num_atrs: Option<u32>,
-    pub(crate) pipeline_batch: Option<u32>,
-    pub(crate) pipeline_cap: Option<u32>,
-    pub(crate) prepared: Option<String>,
-    pub(crate) preserve_expiry: Option<bool>,
-    pub(crate) pretty: Option<bool>,
-    pub(crate) profile: Option<queryx::query_options::ProfileMode>,
-    pub(crate) query_context: Option<String>,
-    pub(crate) read_only: Option<bool>,
-    pub(crate) scan_cap: Option<u32>,
-    pub(crate) scan_consistency: Option<queryx::query_options::ScanConsistency>,
-    pub(crate) sparse_scan_vector: Option<SparseScanVectors>,
-    pub(crate) full_scan_vector: Option<FullScanVectors>,
-    pub(crate) sparse_scan_vectors: Option<HashMap<String, SparseScanVectors>>,
-    pub(crate) full_scan_vectors: Option<HashMap<String, FullScanVectors>>,
-    pub(crate) scan_wait: Option<Duration>,
-    pub(crate) signature: Option<bool>,
-    pub(crate) statement: Option<String>,
-    pub(crate) timeout: Option<Duration>,
-    pub(crate) tx_data: Option<Vec<u8>>,
-    pub(crate) tx_id: Option<String>,
-    pub(crate) tx_implicit: Option<bool>,
-    pub(crate) tx_stmt_num: Option<u32>,
-    pub(crate) tx_timeout: Option<Duration>,
-    pub(crate) use_cbo: Option<bool>,
-    pub(crate) use_fts: Option<bool>,
-    pub(crate) use_replica: Option<queryx::query_options::ReplicaLevel>,
+    pub args: Option<Vec<Value>>,
+    pub atr_collection: Option<String>,
+    pub auto_execute: Option<bool>,
+    pub client_context_id: Option<String>,
+    pub compression: Option<queryx::query_options::Compression>,
+    pub controls: Option<bool>,
+    pub creds: Option<Vec<queryx::query_options::CredsJson>>,
+    pub durability_level: Option<queryx::query_options::DurabilityLevel>,
+    pub encoded_plan: Option<String>,
+    pub encoding: Option<queryx::query_options::Encoding>,
+    pub format: Option<queryx::query_options::Format>,
+    pub kv_timeout: Option<Duration>,
+    pub max_parallelism: Option<u32>,
+    pub memory_quota: Option<u32>,
+    pub metrics: Option<bool>,
+    pub namespace: Option<String>,
+    pub num_atrs: Option<u32>,
+    pub pipeline_batch: Option<u32>,
+    pub pipeline_cap: Option<u32>,
+    pub prepared: Option<String>,
+    pub preserve_expiry: Option<bool>,
+    pub pretty: Option<bool>,
+    pub profile: Option<queryx::query_options::ProfileMode>,
+    pub query_context: Option<String>,
+    pub read_only: Option<bool>,
+    pub scan_cap: Option<u32>,
+    pub scan_consistency: Option<queryx::query_options::ScanConsistency>,
+    pub sparse_scan_vector: Option<SparseScanVectors>,
+    pub full_scan_vector: Option<FullScanVectors>,
+    pub sparse_scan_vectors: Option<HashMap<String, SparseScanVectors>>,
+    pub full_scan_vectors: Option<HashMap<String, FullScanVectors>>,
+    pub scan_wait: Option<Duration>,
+    pub signature: Option<bool>,
+    pub statement: Option<String>,
+    pub timeout: Option<Duration>,
+    pub tx_data: Option<Vec<u8>>,
+    pub tx_id: Option<String>,
+    pub tx_implicit: Option<bool>,
+    pub tx_stmt_num: Option<u32>,
+    pub tx_timeout: Option<Duration>,
+    pub use_cbo: Option<bool>,
+    pub use_fts: Option<bool>,
+    pub use_replica: Option<queryx::query_options::ReplicaLevel>,
 
-    pub(crate) named_args: Option<HashMap<String, Value>>,
-    pub(crate) raw: Option<HashMap<String, Value>>,
+    pub named_args: Option<HashMap<String, Value>>,
+    pub raw: Option<HashMap<String, Value>>,
 
-    pub(crate) on_behalf_of: Option<OnBehalfOfInfo>,
-    pub(crate) endpoint: Option<String>,
-    pub(crate) retry_strategy: Option<Arc<dyn RetryStrategy>>,
+    pub on_behalf_of: Option<OnBehalfOfInfo>,
+    pub endpoint: Option<String>,
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl QueryOptions {
@@ -404,12 +404,12 @@ impl From<QueryOptions> for queryx::query_options::QueryOptions {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct GetAllIndexesOptions<'a> {
-    pub(crate) bucket_name: &'a str,
-    pub(crate) scope_name: Option<&'a str>,
-    pub(crate) collection_name: Option<&'a str>,
-    pub(crate) on_behalf_of: Option<&'a OnBehalfOfInfo>,
-    pub(crate) endpoint: Option<String>,
-    pub(crate) retry_strategy: Option<Arc<dyn RetryStrategy>>,
+    pub bucket_name: &'a str,
+    pub scope_name: Option<&'a str>,
+    pub collection_name: Option<&'a str>,
+    pub on_behalf_of: Option<&'a OnBehalfOfInfo>,
+    pub endpoint: Option<String>,
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl<'a> GetAllIndexesOptions<'a> {
@@ -464,16 +464,16 @@ impl<'a> From<&GetAllIndexesOptions<'a>> for queryx::query_options::GetAllIndexe
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct CreatePrimaryIndexOptions<'a> {
-    pub(crate) bucket_name: &'a str,
-    pub(crate) scope_name: Option<&'a str>,
-    pub(crate) collection_name: Option<&'a str>,
-    pub(crate) index_name: Option<&'a str>,
-    pub(crate) num_replicas: Option<u32>,
-    pub(crate) deferred: Option<bool>,
-    pub(crate) ignore_if_exists: Option<bool>,
-    pub(crate) on_behalf_of: Option<&'a OnBehalfOfInfo>,
-    pub(crate) endpoint: Option<String>,
-    pub(crate) retry_strategy: Option<Arc<dyn RetryStrategy>>,
+    pub bucket_name: &'a str,
+    pub scope_name: Option<&'a str>,
+    pub collection_name: Option<&'a str>,
+    pub index_name: Option<&'a str>,
+    pub num_replicas: Option<u32>,
+    pub deferred: Option<bool>,
+    pub ignore_if_exists: Option<bool>,
+    pub on_behalf_of: Option<&'a OnBehalfOfInfo>,
+    pub endpoint: Option<String>,
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl<'a> CreatePrimaryIndexOptions<'a> {
@@ -558,17 +558,17 @@ impl<'a> From<&CreatePrimaryIndexOptions<'a>>
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct CreateIndexOptions<'a> {
-    pub(crate) bucket_name: &'a str,
-    pub(crate) scope_name: Option<&'a str>,
-    pub(crate) collection_name: Option<&'a str>,
-    pub(crate) index_name: &'a str,
-    pub(crate) num_replicas: Option<u32>,
-    pub(crate) fields: &'a [&'a str],
-    pub(crate) deferred: Option<bool>,
-    pub(crate) ignore_if_exists: Option<bool>,
-    pub(crate) on_behalf_of: Option<&'a OnBehalfOfInfo>,
-    pub(crate) endpoint: Option<String>,
-    pub(crate) retry_strategy: Option<Arc<dyn RetryStrategy>>,
+    pub bucket_name: &'a str,
+    pub scope_name: Option<&'a str>,
+    pub collection_name: Option<&'a str>,
+    pub index_name: &'a str,
+    pub num_replicas: Option<u32>,
+    pub fields: &'a [&'a str],
+    pub deferred: Option<bool>,
+    pub ignore_if_exists: Option<bool>,
+    pub on_behalf_of: Option<&'a OnBehalfOfInfo>,
+    pub endpoint: Option<String>,
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl<'a> CreateIndexOptions<'a> {
@@ -648,14 +648,14 @@ impl<'a> From<&CreateIndexOptions<'a>> for queryx::query_options::CreateIndexOpt
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct DropPrimaryIndexOptions<'a> {
-    pub(crate) bucket_name: &'a str,
-    pub(crate) scope_name: Option<&'a str>,
-    pub(crate) collection_name: Option<&'a str>,
-    pub(crate) index_name: Option<&'a str>,
-    pub(crate) ignore_if_not_exists: Option<bool>,
-    pub(crate) on_behalf_of: Option<&'a OnBehalfOfInfo>,
-    pub(crate) endpoint: Option<String>,
-    pub(crate) retry_strategy: Option<Arc<dyn RetryStrategy>>,
+    pub bucket_name: &'a str,
+    pub scope_name: Option<&'a str>,
+    pub collection_name: Option<&'a str>,
+    pub index_name: Option<&'a str>,
+    pub ignore_if_not_exists: Option<bool>,
+    pub on_behalf_of: Option<&'a OnBehalfOfInfo>,
+    pub endpoint: Option<String>,
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl<'a> DropPrimaryIndexOptions<'a> {
@@ -724,14 +724,14 @@ impl<'a> From<&DropPrimaryIndexOptions<'a>> for queryx::query_options::DropPrima
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct DropIndexOptions<'a> {
-    pub(crate) bucket_name: &'a str,
-    pub(crate) scope_name: Option<&'a str>,
-    pub(crate) collection_name: Option<&'a str>,
-    pub(crate) index_name: &'a str,
-    pub(crate) ignore_if_not_exists: Option<bool>,
-    pub(crate) on_behalf_of: Option<&'a OnBehalfOfInfo>,
-    pub(crate) endpoint: Option<String>,
-    pub(crate) retry_strategy: Option<Arc<dyn RetryStrategy>>,
+    pub bucket_name: &'a str,
+    pub scope_name: Option<&'a str>,
+    pub collection_name: Option<&'a str>,
+    pub index_name: &'a str,
+    pub ignore_if_not_exists: Option<bool>,
+    pub on_behalf_of: Option<&'a OnBehalfOfInfo>,
+    pub endpoint: Option<String>,
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl<'a> DropIndexOptions<'a> {
@@ -795,12 +795,12 @@ impl<'a> From<&DropIndexOptions<'a>> for queryx::query_options::DropIndexOptions
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct BuildDeferredIndexesOptions<'a> {
-    pub(crate) bucket_name: &'a str,
-    pub(crate) scope_name: Option<&'a str>,
-    pub(crate) collection_name: Option<&'a str>,
-    pub(crate) on_behalf_of: Option<&'a OnBehalfOfInfo>,
-    pub(crate) endpoint: Option<String>,
-    pub(crate) retry_strategy: Option<Arc<dyn RetryStrategy>>,
+    pub bucket_name: &'a str,
+    pub scope_name: Option<&'a str>,
+    pub collection_name: Option<&'a str>,
+    pub on_behalf_of: Option<&'a OnBehalfOfInfo>,
+    pub endpoint: Option<String>,
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl<'a> BuildDeferredIndexesOptions<'a> {
@@ -857,14 +857,14 @@ impl<'a> From<&BuildDeferredIndexesOptions<'a>>
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct WatchIndexesOptions<'a> {
-    pub(crate) bucket_name: &'a str,
-    pub(crate) scope_name: Option<&'a str>,
-    pub(crate) collection_name: Option<&'a str>,
-    pub(crate) indexes: &'a [&'a str],
-    pub(crate) watch_primary: Option<bool>,
-    pub(crate) on_behalf_of: Option<&'a OnBehalfOfInfo>,
-    pub(crate) endpoint: Option<String>,
-    pub(crate) retry_strategy: Option<Arc<dyn RetryStrategy>>,
+    pub bucket_name: &'a str,
+    pub scope_name: Option<&'a str>,
+    pub collection_name: Option<&'a str>,
+    pub indexes: &'a [&'a str],
+    pub watch_primary: Option<bool>,
+    pub on_behalf_of: Option<&'a OnBehalfOfInfo>,
+    pub endpoint: Option<String>,
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl<'a> WatchIndexesOptions<'a> {

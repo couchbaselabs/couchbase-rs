@@ -10,15 +10,12 @@ mod common;
 #[test]
 fn test_cluster_ping() {
     run_test(async |mut cluster| {
-        let report = cluster
-            .ping(PingOptions {
-                service_types: None,
-                kv_timeout: Some(Duration::from_millis(1000)),
-                query_timeout: Some(Duration::from_millis(1000)),
-                search_timeout: Some(Duration::from_millis(1000)),
-            })
-            .await
-            .unwrap();
+        let opts = PingOptions::new()
+            .kv_timeout(Duration::from_millis(1000))
+            .query_timeout(Duration::from_millis(1000))
+            .search_timeout(Duration::from_millis(1000));
+
+        let report = cluster.ping(opts).await.unwrap();
 
         verify_ping_report(report, None);
     })
@@ -31,15 +28,12 @@ fn test_bucket_ping() {
 
         bucket.wait_until_ready(None).await.unwrap();
 
-        let report = bucket
-            .ping(PingOptions {
-                service_types: None,
-                kv_timeout: Some(Duration::from_millis(1000)),
-                query_timeout: Some(Duration::from_millis(1000)),
-                search_timeout: Some(Duration::from_millis(1000)),
-            })
-            .await
-            .unwrap();
+        let opts = PingOptions::new()
+            .kv_timeout(Duration::from_millis(1000))
+            .query_timeout(Duration::from_millis(1000))
+            .search_timeout(Duration::from_millis(1000));
+
+        let report = bucket.ping(opts).await.unwrap();
 
         verify_ping_report(report, Some(cluster.default_bucket().to_string()));
     })
