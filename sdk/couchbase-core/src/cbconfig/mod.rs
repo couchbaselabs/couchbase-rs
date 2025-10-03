@@ -29,7 +29,7 @@ pub struct TerseExtNodePorts {
     #[serde(alias = "capi")]
     pub capi: Option<u16>,
     #[serde(alias = "mgmt")]
-    pub mgmt: u16,
+    pub mgmt: Option<u16>,
     #[serde(alias = "n1ql")]
     pub n1ql: Option<u16>,
     #[serde(alias = "fts")]
@@ -48,7 +48,7 @@ pub struct TerseExtNodePorts {
     #[serde(alias = "capiSSL")]
     pub capi_ssl: Option<u16>,
     #[serde(alias = "mgmtSSL")]
-    pub mgmt_ssl: u16,
+    pub mgmt_ssl: Option<u16>,
     #[serde(alias = "n1qlSSL")]
     pub n1ql_ssl: Option<u16>,
     #[serde(alias = "ftsSSL")]

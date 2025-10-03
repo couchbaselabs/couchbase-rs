@@ -13,7 +13,7 @@ pub enum BucketType {
 #[derive(Debug, Clone, Eq, PartialEq, Default)]
 pub(crate) struct ParsedConfigNodePorts {
     pub kv: Option<u16>,
-    pub mgmt: u16,
+    pub mgmt: Option<u16>,
     pub query: Option<u16>,
     pub search: Option<u16>,
 }
@@ -128,10 +128,14 @@ impl ParsedConfig {
     pub fn addresses_group_for_network_type(&self, network_type: &str) -> NetworkConfig {
         let mut nodes = Vec::with_capacity(self.nodes.len());
         for node in &self.nodes {
-            let node_id = format!(
-                "ep-{}-{}",
-                node.addresses.hostname, node.addresses.non_ssl_ports.mgmt
-            );
+            let node_id = if let Some(mgmt) = node.addresses.non_ssl_ports.mgmt {
+                format!("ep-{}-{}", node.addresses.hostname, mgmt)
+            } else if let Some(mgmt) = node.addresses.ssl_ports.mgmt {
+                format!("ep-{}-{}s", node.addresses.hostname, mgmt)
+            } else {
+                // Fail?
+                format!("ep-{}", node.addresses.hostname)
+            };
 
             let node_info = if network_type == "default" {
                 NetworkConfigNode {
