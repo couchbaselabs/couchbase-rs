@@ -132,6 +132,7 @@ struct KvClientPoolClientInner<K: KvClient> {
     num_connections_wanted: AtomicUsize,
     fast_map: ArcSwap<Vec<Arc<K>>>,
 
+    id: String,
     state: Arc<Mutex<KvClientPoolClientState<K>>>,
     client_idx: AtomicUsize,
 
@@ -171,6 +172,8 @@ where
             return Err(ErrorKind::Shutdown.into());
         }
 
+        debug!("Closing pool {}", &self.id);
+
         {
             let mut state = self.state.lock().await;
             for (_id, client) in state.clients.iter() {
@@ -196,7 +199,6 @@ where
             for _ in 0..num_needed_clients {
                 let client_id = Uuid::new_v4().to_string();
                 let config = state.current_config.clone();
-                debug!("Creating new client with id {}", &client_id);
                 state
                     .clients
                     .insert(client_id.clone(), KvClientPoolClient::new());
@@ -227,7 +229,7 @@ where
     }
 
     pub async fn reconfigure(&self, config: KvClientPoolConfig) -> Result<()> {
-        debug!("Reconfiguring NaiveKvClientPool");
+        debug!("Reconfiguring client pool {}", &self.id);
         self.num_connections_wanted
             .store(config.num_connections, Ordering::SeqCst);
 
@@ -240,7 +242,7 @@ where
                         client.connection_state = ConnectionState::Connecting;
                         let res = select! {
                             _ = self.shutdown_token.cancelled() => {
-                                debug!("Shutdown notified");
+                                debug!("Client pool {} shutdown notified during client reconfigure", &self.id);
                                 return Ok(());
                             }
                             res = cli.reconfigure(config.client_config.clone()) => res
@@ -317,7 +319,10 @@ where
     pub async fn handle_client_close(&self, client_id: String) {
         // TODO: not sure the ordering of close leading to here is great.
         if self.closed.load(Ordering::SeqCst) {
-            debug!("Pool is closed, ignoring client close for {}", &client_id);
+            debug!(
+                "Client pool {} is closed, ignoring client close for {}",
+                &self.id, &client_id
+            );
             return;
         }
 
@@ -358,6 +363,7 @@ where
     }
 
     async fn maybe_throttle_on_error(
+        pool_id: &str,
         throttle_period: Duration,
         guard: &mut MutexGuard<'_, KvClientPoolClientState<K>>,
         shutdown_token: &CancellationToken,
@@ -366,10 +372,13 @@ where
             let elapsed = e.connect_error_time.elapsed();
             if elapsed < throttle_period {
                 let to_sleep = throttle_period.sub(elapsed);
-                debug!("Throttling new connection attempt for {:?}", to_sleep);
+                debug!(
+                    "Client pool {} throttling new connection attempt for {:?}",
+                    &pool_id, to_sleep
+                );
                 return select! {
                     _ = shutdown_token.cancelled() => {
-                        debug!("Shutdown notified");
+                        debug!("Client pool {pool_id} shutdown notified during throttle sleep");
                         Err(ErrorKind::Shutdown.into())
                     }
                     _ = sleep(to_sleep) => Ok(()),
@@ -391,13 +400,14 @@ where
     }
 
     async fn create_client_with_shutdown(
+        pool_id: &str,
         config: KvClientConfig,
         opts: KvClientOptions,
         shutdown_token: &CancellationToken,
     ) -> Result<K> {
         select! {
             _ = shutdown_token.cancelled() => {
-                debug!("Shutdown notified");
+                debug!("Client pool {pool_id} shutdown notified during client creation");
                 Err(ErrorKind::Shutdown.into())
             }
             c = K::new(config, opts) => c,
@@ -407,7 +417,7 @@ where
     async fn start_new_client_thread(
         state: Arc<Mutex<KvClientPoolClientState<K>>>,
         throttle_period: Duration,
-        id: String,
+        pool_id: String,
         config: KvClientConfig,
         opts: KvClientOptions,
         shutdown_token: CancellationToken,
@@ -416,22 +426,39 @@ where
         loop {
             {
                 let mut guard = state.lock().await;
-                if Self::maybe_throttle_on_error(throttle_period, &mut guard, &shutdown_token)
-                    .await
-                    .is_err()
+                if Self::maybe_throttle_on_error(
+                    &pool_id,
+                    throttle_period,
+                    &mut guard,
+                    &shutdown_token,
+                )
+                .await
+                .is_err()
                 {
-                    debug!("Client pool shutdown during connection throttling");
+                    debug!(
+                        "Client pool {} shutdown during connection throttling",
+                        &pool_id
+                    );
                     return;
                 };
 
-                Self::update_client_state_if_exists(guard, &id, ConnectionState::Connecting);
+                Self::update_client_state_if_exists(guard, &opts.id, ConnectionState::Connecting);
             }
 
-            match Self::create_client_with_shutdown(config.clone(), opts.clone(), &shutdown_token)
-                .await
+            match Self::create_client_with_shutdown(
+                &pool_id,
+                config.clone(),
+                opts.clone(),
+                &shutdown_token,
+            )
+            .await
             {
                 Ok(r) => {
-                    debug!("New client created successfully: {}", r.id());
+                    debug!(
+                        "Client pool {} created client successfully: {}",
+                        &pool_id,
+                        r.id()
+                    );
                     let new_config = {
                         let mut guard = state.lock().await;
                         guard.connection_error = None;
@@ -439,7 +466,7 @@ where
                         if config == guard.current_config {
                             let mut clients = &mut guard.clients;
                             if let Some(mut client) = clients.get_mut(r.id()) {
-                                debug!("Changing client {} connection state to Connected", r.id());
+                                debug!("Client pool {} changing client {} connection state to Connected", &pool_id, r.id());
                                 client.connection_state = ConnectionState::Connected;
                                 client.client = Some(Arc::new(r));
 
@@ -448,7 +475,7 @@ where
                                 match on_new_client_tx.send(()) {
                                     Ok(_) => {}
                                     Err(e) => {
-                                        warn!("Error sending new client notification: {e}");
+                                        warn!("Client pool {pool_id} error sending new client notification: {e}");
                                     }
                                 };
                             } else {
@@ -457,7 +484,12 @@ where
                                 match r.close().await {
                                     Ok(_) => {}
                                     Err(e) => {
-                                        debug!("Error closing client {}: {}", r.id(), e);
+                                        debug!(
+                                            "Client pool {} error closing client {}: {}",
+                                            &pool_id,
+                                            r.id(),
+                                            e
+                                        );
                                     }
                                 }
 
@@ -472,7 +504,11 @@ where
 
                     match r.reconfigure(new_config).await {
                         Ok(_) => {
-                            debug!("Reconfigured client {} to new config", r.id());
+                            debug!(
+                                "Client pool {} reconfigured client {} to new config",
+                                &pool_id,
+                                r.id()
+                            );
                             let mut guard = state.lock().await;
                             let mut clients = &mut guard.clients;
                             if let Some(mut client) = clients.get_mut(r.id()) {
@@ -484,7 +520,7 @@ where
                                 match on_new_client_tx.send(()) {
                                     Ok(_) => {}
                                     Err(e) => {
-                                        warn!("Error sending new client notification: {e}");
+                                        warn!("Client pool {pool_id} error sending new client notification: {e}");
                                     }
                                 };
 
@@ -495,7 +531,12 @@ where
                                 match r.close().await {
                                     Ok(_) => {}
                                     Err(e) => {
-                                        debug!("Error closing client {}: {}", r.id(), e);
+                                        debug!(
+                                            "Client pool {} error closing client {}: {}",
+                                            &pool_id,
+                                            r.id(),
+                                            e
+                                        );
                                     }
                                 }
 
@@ -503,7 +544,12 @@ where
                             };
                         }
                         Err(e) => {
-                            let mut msg = format!("Failed to reconfigure client {}: {}", r.id(), e);
+                            let mut msg = format!(
+                                "Client pool {} failed to reconfigure client {}: {}",
+                                &pool_id,
+                                r.id(),
+                                e
+                            );
                             if let Some(source) = e.source() {
                                 msg = format!("{msg} - {source}");
                             }
@@ -512,7 +558,12 @@ where
                             match r.close().await {
                                 Ok(_) => {}
                                 Err(e) => {
-                                    debug!("Error closing client {}: {}", r.id(), e);
+                                    debug!(
+                                        "Client pool {} error closing client {}: {}",
+                                        &pool_id,
+                                        r.id(),
+                                        e
+                                    );
                                 }
                             }
 
@@ -521,7 +572,7 @@ where
                     };
                 }
                 Err(e) => {
-                    let mut msg = format!("Error creating new client {e}");
+                    let mut msg = format!("Client pool {pool_id} error creating new client {e}");
                     if *e.kind() == ErrorKind::Shutdown {
                         return;
                     }
@@ -543,6 +594,11 @@ where
     }
 
     async fn start_new_client(&self, config: KvClientConfig, id: String) {
+        debug!(
+            "Client pool {} creating new client with id {}",
+            &self.id, &id
+        );
+
         let on_client_close_tx = self.on_client_close_tx.clone();
         let state = self.state.clone();
         let opts = KvClientOptions {
@@ -565,10 +621,12 @@ where
         let tx = self.new_client_watcher_tx.clone();
         let shutdown_token = self.shutdown_token.child_token();
 
+        let pool_id = self.id.clone();
+
         tokio::spawn(Self::start_new_client_thread(
             state,
             throttle_period,
-            id,
+            pool_id,
             config,
             opts,
             shutdown_token,
@@ -590,6 +648,12 @@ where
     type Client = K;
 
     async fn new(config: KvClientPoolConfig, opts: KvClientPoolOptions) -> Self {
+        let id = uuid::Uuid::new_v4().to_string();
+        debug!(
+            "Creating new client pool {} for {}",
+            &id, &config.client_config.address
+        );
+
         let (on_client_close_tx, on_client_close_rx) = tokio::sync::mpsc::channel(1);
         let mut clients = HashMap::with_capacity(config.num_connections);
         for _ in 0..config.num_connections {
@@ -606,6 +670,7 @@ where
             client_idx: AtomicUsize::new(0),
             fast_map: ArcSwap::from_pointee(vec![]),
 
+            id,
             state: Arc::new(Mutex::new(KvClientPoolClientState {
                 current_config: config.client_config,
                 connection_error: None,

@@ -177,6 +177,8 @@ impl AgentInner {
     }
 
     async fn update_state(&self, state: &mut AgentState) {
+        debug!("Agent updating state");
+
         let agent_component_configs = Self::gen_agent_component_configs(state);
 
         // In order to avoid race conditions between operations selecting the
@@ -249,6 +251,7 @@ impl AgentInner {
         let rev_id = config.rev_id;
         let network_info = config.addresses_group_for_network_type(&state.network_type);
 
+        let mut gcccp_node_ids = Vec::new();
         let mut kv_data_node_ids = Vec::new();
         let mut kv_data_hosts: HashMap<String, Address> = HashMap::new();
         let mut mgmt_endpoints: HashMap<String, String> = HashMap::new();
@@ -260,6 +263,8 @@ impl AgentInner {
             let mgmt_ep_id = format!("mgmt{}", node.node_id);
             let query_ep_id = format!("query{}", node.node_id);
             let search_ep_id = format!("search{}", node.node_id);
+
+            gcccp_node_ids.push(kv_ep_id.clone());
 
             if node.has_data {
                 kv_data_node_ids.push(kv_ep_id.clone());
@@ -330,15 +335,14 @@ impl AgentInner {
 
         let vbucket_routing_info = if let Some(info) = &state.latest_config.bucket {
             VbucketRoutingInfo {
-                // TODO: Clone
                 vbucket_info: info.vbucket_map.clone(),
-                server_list: kv_data_node_ids.clone(),
+                server_list: kv_data_node_ids,
                 bucket_selected: state.bucket.is_some(),
             }
         } else {
             VbucketRoutingInfo {
                 vbucket_info: None,
-                server_list: kv_data_node_ids.clone(),
+                server_list: kv_data_node_ids,
                 bucket_selected: state.bucket.is_some(),
             }
         };
@@ -353,7 +357,7 @@ impl AgentInner {
 
         AgentComponentConfigs {
             config_manager_memd_config: ConfigManagerMemdConfig {
-                endpoints: kv_data_node_ids,
+                endpoints: gcccp_node_ids,
             },
             kv_client_manager_client_configs: clients,
             vbucket_routing_info,

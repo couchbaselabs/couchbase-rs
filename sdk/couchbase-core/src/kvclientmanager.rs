@@ -4,6 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use arc_swap::ArcSwap;
+use log::debug;
 use tokio::sync::Mutex;
 
 use crate::error::ErrorKind;
@@ -168,6 +169,8 @@ where
             .into());
         }
 
+        debug!("Reconfiguring client manager");
+
         let mut new_state = KvClientManagerState::<P> {
             client_pools: Default::default(),
         };
@@ -185,11 +188,12 @@ where
 
             let old_pool = old_pools.remove(&endpoint);
             let new_pool = if let Some(pool) = old_pool {
-                // TODO: log on error.
-                if pool.reconfigure(pool_config.clone()).await.is_ok() {
-                    pool
-                } else {
-                    self.create_pool(pool_config).await
+                match pool.reconfigure(pool_config.clone()).await {
+                    Ok(_) => pool,
+                    Err(e) => {
+                        debug!("Failed to reconfigure client pool: {}", e);
+                        self.create_pool(pool_config).await
+                    }
                 }
             } else {
                 self.create_pool(pool_config).await
