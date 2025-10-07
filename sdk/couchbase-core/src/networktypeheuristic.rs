@@ -9,8 +9,10 @@ impl NetworkTypeHeuristic {
                 return true;
             }
         }
-        if format!("{}:{}", node.hostname, node.non_ssl_ports.mgmt) == addr {
-            return true;
+        if let Some(p) = node.non_ssl_ports.mgmt {
+            if format!("{}:{}", node.hostname, p) == addr {
+                return true;
+            }
         }
         if let Some(p) = node.ssl_ports.kv {
             if format!("{}:{}", node.hostname, p) == addr {

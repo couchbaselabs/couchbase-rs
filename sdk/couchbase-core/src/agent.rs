@@ -280,10 +280,9 @@ impl AgentInner {
                         },
                     );
                 }
-                mgmt_endpoints.insert(
-                    mgmt_ep_id,
-                    format!("https://{}:{}", node.hostname, node.ssl_ports.mgmt),
-                );
+                if let Some(p) = node.ssl_ports.mgmt {
+                    mgmt_endpoints.insert(mgmt_ep_id, format!("https://{}:{}", node.hostname, p));
+                }
                 if let Some(p) = node.ssl_ports.query {
                     query_endpoints.insert(query_ep_id, format!("https://{}:{}", node.hostname, p));
                 }
@@ -301,10 +300,9 @@ impl AgentInner {
                         },
                     );
                 }
-                mgmt_endpoints.insert(
-                    mgmt_ep_id,
-                    format!("http://{}:{}", node.hostname, node.non_ssl_ports.mgmt),
-                );
+                if let Some(p) = node.non_ssl_ports.mgmt {
+                    mgmt_endpoints.insert(mgmt_ep_id, format!("http://{}:{}", node.hostname, p));
+                }
                 if let Some(p) = node.non_ssl_ports.query {
                     query_endpoints.insert(query_ep_id, format!("http://{}:{}", node.hostname, p));
                 }
