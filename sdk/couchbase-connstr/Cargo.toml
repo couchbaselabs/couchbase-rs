@@ -1,14 +1,23 @@
 [package]
 name = "couchbase-connstr"
-version = "0.1.0"
+version = "1.0.0-beta.1"
 edition = "2021"
+description = "Couchbase SDK connection string parsing and DNS resolution, not intended for direct use"
+license = "Apache-2.0"
+readme = "../../README.md"
+repository = "https://github.com/couchbaselabs/couchbase-rs"
+authors = [
+    "Charles Dixon <charles.dixon@couchbase.com>",
+    "Matt Wozakowski <matt.wozakowski@couchbase.com>",
+    "Will Broadbelt <william.broadbelt@couchbase.com>"
+]
 
 [dependencies]
-form_urlencoded = "1.2.1"
-hickory-resolver = { version = "0.24.1", features = ["tokio-runtime", "system-config"], default-features = false }
-log = "0.4.22"
-regex = "1.11.0"
-url = "2.5.2"
+form_urlencoded = "1.2.2"
+hickory-resolver = { version = "0.24.4", features = ["tokio-runtime", "system-config"], default-features = false }
+log = "0.4.28"
+regex = "1.11.3"
+url = "2.5.7"
 
 [dev-dependencies]
-tokio = { version = "1.40", features = ["rt", "net", "macros"] }
+tokio = { version = "1.47", features = ["rt", "net", "macros"] }

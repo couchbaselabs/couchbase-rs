@@ -1,0 +1,22 @@
+name: Publish crate
+on:
+  push:
+    tags:
+      - v*
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Rust toolchain and cache
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{secrets.CARGO_REGISTRY_TOKEN}}
+        run: |
+          cargo publish -p couchbase-connstr
+          cargo publish -p couchbase-core
+          cargo publish -p couchbase
