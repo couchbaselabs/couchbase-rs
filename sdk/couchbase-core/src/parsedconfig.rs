@@ -13,7 +13,15 @@ pub enum BucketType {
 #[derive(Debug, Clone, Eq, PartialEq, Default)]
 pub(crate) struct ParsedConfigNodePorts {
     pub kv: Option<u16>,
-    pub mgmt: u16,
+    pub mgmt: Option<u16>,
+    pub query: Option<u16>,
+    pub search: Option<u16>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Default)]
+pub(crate) struct ParsedConfigNodeSSLPorts {
+    pub kv: Option<u16>,
+    pub mgmt: Option<u16>,
     pub query: Option<u16>,
     pub search: Option<u16>,
 }
@@ -130,7 +138,11 @@ impl ParsedConfig {
         for node in &self.nodes {
             let node_id = format!(
                 "ep-{}-{}",
-                node.addresses.hostname, node.addresses.non_ssl_ports.mgmt
+                // addresses.non_ssl_ports.mgmt can never actually be None here.
+                // This is the set of ports exposed by the server directly, not the alt_addr ports.
+                // If it somehow was None then we have no way to identify the node anyway.
+                node.addresses.hostname,
+                node.addresses.non_ssl_ports.mgmt.unwrap()
             );
 
             let node_info = if network_type == "default" {
