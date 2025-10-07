@@ -1,12 +1,21 @@
 [package]
 name = "protostellar"
-version = "0.1.0"
+version = "1.0.0-beta.1"
 edition = "2021"
+description = "Couchbase SDK couchbase2 protocol support, not intended for direct use"
+license = "Apache-2.0"
+readme = "../../README.md"
+repository = "https://github.com/couchbaselabs/couchbase-rs"
+authors = [
+    "Charles Dixon <charles.dixon@couchbase.com>",
+    "Matt Wozakowski <matt.wozakowski@couchbase.com>",
+    "Will Broadbelt <william.broadbelt@couchbase.com>"
+]
 
 [dependencies]
-glob = { version = "0.3.1", optional = true }
+glob = { version = "0.3.3", optional = true }
 prost = "0.13"
-prost-types = "0.13.1"
+prost-types = "0.13.5"
 tonic = "0.12"
 tonic-build = { version = "0.12", optional = true }
 
