@@ -43,9 +43,11 @@ use couchbase_core::orphan_reporter::OrphanReporter;
 use couchbase_core::retry::RetryStrategy;
 use couchbase_core::retrybesteffort::{BestEffortRetryStrategy, ExponentialBackoffCalculator};
 use std::collections::HashMap;
-use std::mem::take;
 use std::sync::Arc;
 use std::time::Duration;
+
+#[cfg(feature = "unstable-dns-options")]
+use std::mem::take;
 
 pub(crate) struct ClusterClient {
     backend: ClusterClientBackend,
@@ -67,12 +69,12 @@ impl ClusterClient {
         // the dns options out for resolve.
         // We could create a new type to pass into the backend connect functions but it just
         // seems unnecessary.
-        let dns_options = take(&mut opts.dns_options);
-        let resolved_conn_spec = resolve(
-            conn_spec,
-            dns_options.map(couchbase_connstr::DnsConfig::from),
-        )
-        .await?;
+        #[cfg(feature = "unstable-dns-options")]
+        let dns_options = take(&mut opts.dns_options).map(couchbase_connstr::DnsConfig::from);
+        #[cfg(not(feature = "unstable-dns-options"))]
+        let dns_options = None;
+
+        let resolved_conn_spec = resolve(conn_spec, dns_options).await?;
 
         let backend = if let Some(host) = resolved_conn_spec.couchbase2_host {
             ClusterClientBackend::Couchbase2ClusterBackend(

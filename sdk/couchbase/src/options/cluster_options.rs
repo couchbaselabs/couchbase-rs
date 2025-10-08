@@ -53,6 +53,7 @@ pub struct ClusterOptions {
     pub poller_options: PollerOptions,
     pub http_options: HttpOptions,
     pub kv_options: KvOptions,
+    #[cfg(feature = "unstable-dns-options")]
     pub dns_options: Option<DnsOptions>,
     pub orphan_reporter_options: OrphanReporterOptions,
 }
@@ -82,6 +83,7 @@ impl ClusterOptions {
             poller_options: PollerOptions::new(),
             http_options: HttpOptions::new(),
             kv_options: KvOptions::new(),
+            #[cfg(feature = "unstable-dns-options")]
             dns_options: None,
             orphan_reporter_options: OrphanReporterOptions::new(),
         }
@@ -480,10 +482,12 @@ impl TlsOptions {
 }
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
+#[cfg(feature = "unstable-dns-options")]
 pub struct DnsOptions {
     pub namespace: SocketAddr,
     pub timeout: Option<Duration>,
 }
+#[cfg(feature = "unstable-dns-options")]
 impl DnsOptions {
     pub fn new(namespace: SocketAddr) -> Self {
         Self {
@@ -497,6 +501,7 @@ impl DnsOptions {
         self
     }
 }
+#[cfg(feature = "unstable-dns-options")]
 impl From<DnsOptions> for couchbase_connstr::DnsConfig {
     fn from(opts: DnsOptions) -> Self {
         couchbase_connstr::DnsConfig {
