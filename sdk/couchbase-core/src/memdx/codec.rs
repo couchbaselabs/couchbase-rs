@@ -132,7 +132,7 @@ impl Encoder<RequestPacket<'_>> for KeyValueCodec {
 
         let key_size = if let Some(k) = &key { k.len() } else { 0 };
         let extras_size = if let Some(e) = &extras { e.len() } else { 0 };
-        let framing_extras_size = if let Some(e) = &framing_extras {
+        let framing_extras_size = if let Some(e) = framing_extras {
             e.len()
         } else {
             0
@@ -180,19 +180,19 @@ impl Encoder<RequestPacket<'_>> for KeyValueCodec {
         dst.put_u64(item.cas.unwrap_or_default());
 
         if let Some(framing_extras) = framing_extras {
-            dst.extend(framing_extras);
+            dst.extend_from_slice(framing_extras);
         }
 
         if let Some(extras) = extras {
-            dst.extend(extras);
+            dst.extend_from_slice(extras);
         }
 
         if let Some(key) = key {
-            dst.extend(key);
+            dst.extend_from_slice(key);
         }
 
         if let Some(body) = body {
-            dst.extend(body);
+            dst.extend_from_slice(body);
         }
 
         Ok(())
