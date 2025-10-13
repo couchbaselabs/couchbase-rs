@@ -16,6 +16,7 @@
  *
  */
 
+use crate::common::features::TestFeatureCode;
 use crate::common::helpers::{generate_key_with_letter_prefix, try_until};
 use crate::common::test_agent::TestAgent;
 use crate::common::test_config::run_test;
@@ -50,11 +51,15 @@ fn test_get_all_roles() {
 #[test]
 fn test_delete_group() {
     run_test(async |mut agent| {
+        if !agent.supports_feature(&TestFeatureCode::UserGroups) {
+            return;
+        }
+
         let group_name = generate_key_with_letter_prefix();
         let desc = generate_key_with_letter_prefix();
         let roles = vec![
-            Role::new("replication_target").bucket(&agent.test_setup_config.bucket),
-            Role::new("replication_admin"),
+            Role::new("bucket_full_access").bucket(&agent.test_setup_config.bucket),
+            Role::new("ro_admin"),
         ];
 
         let group = Group::new(&group_name, desc, roles);
@@ -84,11 +89,15 @@ fn test_delete_group() {
 #[test]
 fn test_get_group() {
     run_test(async |mut agent| {
+        if !agent.supports_feature(&TestFeatureCode::UserGroups) {
+            return;
+        }
+
         let group_name = generate_key_with_letter_prefix();
         let desc = generate_key_with_letter_prefix();
         let roles = vec![
-            Role::new("replication_target").bucket(&agent.test_setup_config.bucket),
-            Role::new("replication_admin"),
+            Role::new("bucket_full_access").bucket(&agent.test_setup_config.bucket),
+            Role::new("ro_admin"),
         ];
 
         let group = Group::new(&group_name, desc, roles);
@@ -107,11 +116,15 @@ fn test_get_group() {
 #[test]
 fn test_get_all_groups() {
     run_test(async |mut agent| {
+        if !agent.supports_feature(&TestFeatureCode::UserGroups) {
+            return;
+        }
+
         let group_name = generate_key_with_letter_prefix();
         let desc = generate_key_with_letter_prefix();
         let roles = vec![
-            Role::new("replication_target").bucket(&agent.test_setup_config.bucket),
-            Role::new("replication_admin"),
+            Role::new("bucket_full_access").bucket(&agent.test_setup_config.bucket),
+            Role::new("ro_admin"),
         ];
 
         let group = Group::new(&group_name, desc, roles);
@@ -142,8 +155,8 @@ fn test_delete_user() {
         let username = generate_key_with_letter_prefix();
         let display_name = generate_key_with_letter_prefix();
         let roles = vec![
-            Role::new("replication_target").bucket(&agent.test_setup_config.bucket),
-            Role::new("replication_admin"),
+            Role::new("bucket_full_access").bucket(&agent.test_setup_config.bucket),
+            Role::new("ro_admin"),
         ];
 
         let user = User::new(&username, display_name, roles).password("password");
@@ -176,8 +189,8 @@ fn test_get_user() {
         let username = generate_key_with_letter_prefix();
         let display_name = generate_key_with_letter_prefix();
         let roles = vec![
-            Role::new("replication_target").bucket(&agent.test_setup_config.bucket),
-            Role::new("replication_admin"),
+            Role::new("bucket_full_access").bucket(&agent.test_setup_config.bucket),
+            Role::new("ro_admin"),
         ];
 
         let user = User::new(&username, display_name, roles).password("password");
@@ -196,8 +209,8 @@ fn test_get_all_users() {
         let username = generate_key_with_letter_prefix();
         let display_name = generate_key_with_letter_prefix();
         let roles = vec![
-            Role::new("replication_target").bucket(&agent.test_setup_config.bucket),
-            Role::new("replication_admin"),
+            Role::new("bucket_full_access").bucket(&agent.test_setup_config.bucket),
+            Role::new("ro_admin"),
         ];
 
         let user = User::new(username, display_name, roles).password("password");

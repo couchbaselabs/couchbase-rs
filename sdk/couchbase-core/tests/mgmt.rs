@@ -16,16 +16,16 @@
  *
  */
 
+use crate::common::features::TestFeatureCode;
 use crate::common::helpers::{
-    create_scope, delete_collection, delete_scope, feature_supported, generate_string_value,
+    create_scope, delete_collection, delete_scope, ensure_manifest, generate_string_value,
     try_until,
 };
 use crate::common::test_config::run_test;
 use common::helpers;
 use couchbase_core::agent::Agent;
 use couchbase_core::cbconfig::CollectionManifest;
-use couchbase_core::features::BucketFeature;
-use couchbase_core::mgmtx::bucket_settings::{BucketSettings, BucketType};
+use couchbase_core::mgmtx::bucket_settings::{BucketSettings, BucketType, StorageBackend};
 use couchbase_core::options::management::{
     CreateBucketOptions, CreateCollectionOptions, DeleteBucketOptions, EnsureBucketOptions,
     GetBucketOptions, GetCollectionManifestOptions, UpdateBucketOptions,
@@ -70,14 +70,32 @@ fn test_scopes() {
     });
 }
 
+#[serial]
 #[test]
-fn test_collections() {
+fn test_collections_history_retention() {
     run_test(async |mut agent| {
-        let history_supported = feature_supported(&agent, BucketFeature::NonDedupedHistory).await;
+        if !agent.supports_feature(&TestFeatureCode::HistoryRetention) {
+            return;
+        }
 
         let scope_name = generate_string_value(10);
         let collection_name = generate_string_value(10);
-        let bucket_name = agent.test_setup_config.bucket.clone();
+        let bucket_name = generate_string_value(10);
+
+        let settings = BucketSettings::default()
+            .bucket_type(BucketType::COUCHBASE)
+            .storage_backend(StorageBackend::MAGMA)
+            .history_retention_seconds(5)
+            .ram_quota_mb(1024);
+
+        let opts = &CreateBucketOptions::new(&bucket_name, &settings);
+
+        agent.create_bucket(opts).await.unwrap();
+
+        agent
+            .ensure_bucket(&EnsureBucketOptions::new(&bucket_name, false))
+            .await
+            .unwrap();
 
         let resp = create_scope(&agent, &bucket_name, &scope_name)
             .await
@@ -86,12 +104,11 @@ fn test_collections() {
 
         helpers::ensure_manifest(&agent, &bucket_name, resp.manifest_uid).await;
 
-        let mut opts =
-            CreateCollectionOptions::new(&bucket_name, &scope_name, &collection_name).max_ttl(25);
-
-        if history_supported {
-            opts = opts.history_enabled(true)
-        };
+        let mut opts = CreateCollectionOptions::new(&bucket_name, &scope_name, &collection_name)
+            .history_enabled(true);
+        if agent.supports_feature(&TestFeatureCode::CollectionMaxExpiry) {
+            opts = opts.max_ttl(25);
+        }
 
         let resp = agent.create_collection(&opts).await.unwrap();
         assert!(!resp.manifest_uid.is_empty());
@@ -106,13 +123,80 @@ fn test_collections() {
 
         assert!(collection_found.is_some());
         let collection_found = collection_found.unwrap();
-        assert_eq!(collection_found.max_ttl, Some(25));
-        if history_supported {
-            assert_eq!(collection_found.history, Some(true));
-        } else {
-            // Depending on server version the collection may have inherited the bucket default.
-            assert!(collection_found.history.is_none() || collection_found.history == Some(false));
+        if agent.supports_feature(&TestFeatureCode::CollectionMaxExpiry) {
+            assert_eq!(collection_found.max_ttl, Some(25));
         }
+        assert_eq!(collection_found.history, Some(true));
+
+        let resp = delete_collection(&agent, &bucket_name, &scope_name, &collection_name)
+            .await
+            .unwrap();
+        assert!(!resp.manifest_uid.is_empty());
+
+        ensure_manifest(&agent, &bucket_name, resp.manifest_uid).await;
+
+        let manifest = get_manifest(&agent, &bucket_name).await.unwrap();
+
+        let mut scope_found = find_scope(&manifest, &scope_name);
+        let scope_found = scope_found.unwrap();
+        let mut collection_found = find_collection(&scope_found, &collection_name);
+        assert!(collection_found.is_none());
+
+        let resp = delete_scope(&agent, &bucket_name, &scope_name)
+            .await
+            .unwrap();
+        assert!(!resp.manifest_uid.is_empty());
+
+        let _ = agent
+            .delete_bucket(&DeleteBucketOptions::new(&bucket_name))
+            .await;
+
+        // We can't fire and forget the delete, the server will error if we try to update a bucket
+        // whilst one is being deleted which could fail other tests.
+        agent
+            .ensure_bucket(&EnsureBucketOptions::new(&bucket_name, true))
+            .await
+            .unwrap();
+    });
+}
+
+#[test]
+fn test_collections() {
+    run_test(async |mut agent| {
+        let scope_name = generate_string_value(10);
+        let collection_name = generate_string_value(10);
+        let bucket_name = agent.test_setup_config.bucket.clone();
+
+        let resp = create_scope(&agent, &bucket_name, &scope_name)
+            .await
+            .unwrap();
+        assert!(!resp.manifest_uid.is_empty());
+
+        ensure_manifest(&agent, &bucket_name, resp.manifest_uid).await;
+
+        let mut opts = CreateCollectionOptions::new(&bucket_name, &scope_name, &collection_name);
+        if agent.supports_feature(&TestFeatureCode::CollectionMaxExpiry) {
+            opts = opts.max_ttl(25);
+        }
+
+        let resp = agent.create_collection(&opts).await.unwrap();
+        assert!(!resp.manifest_uid.is_empty());
+
+        ensure_manifest(&agent, &bucket_name, resp.manifest_uid).await;
+
+        let manifest = get_manifest(&agent, &bucket_name).await.unwrap();
+        assert!(!manifest.uid.is_empty());
+
+        let scope_found = find_scope(&manifest, &scope_name).unwrap();
+        let mut collection_found = find_collection(&scope_found, &collection_name);
+
+        assert!(collection_found.is_some());
+        let collection_found = collection_found.unwrap();
+        if agent.supports_feature(&TestFeatureCode::CollectionMaxExpiry) {
+            assert_eq!(collection_found.max_ttl, Some(25));
+        }
+        // Depending on server version the collection may have inherited the bucket default.
+        assert!(collection_found.history.is_none() || collection_found.history == Some(false));
 
         let resp = delete_collection(&agent, &bucket_name, &scope_name, &collection_name)
             .await
@@ -241,9 +325,11 @@ fn test_update_bucket() {
             .await
             .unwrap();
 
-        let update_settings = BucketSettings::default()
-            .ram_quota_mb(200)
-            .max_ttl(Duration::from_secs(3600));
+        let mut update_settings = BucketSettings::default().ram_quota_mb(200);
+
+        if agent.supports_feature(&TestFeatureCode::CollectionMaxExpiry) {
+            update_settings = update_settings.max_ttl(Duration::from_secs(3600));
+        }
 
         agent
             .update_bucket(&UpdateBucketOptions::new(&bucket_name, &update_settings))
@@ -276,10 +362,13 @@ fn test_update_bucket() {
             .unwrap();
 
         assert_eq!(bucket.bucket_settings.ram_quota_mb, Some(200));
-        assert_eq!(
-            bucket.bucket_settings.max_ttl,
-            Some(Duration::from_secs(3600))
-        );
+
+        if agent.supports_feature(&TestFeatureCode::CollectionMaxExpiry) {
+            assert_eq!(
+                bucket.bucket_settings.max_ttl,
+                Some(Duration::from_secs(3600))
+            );
+        }
     });
 }
 

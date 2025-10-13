@@ -69,8 +69,10 @@ fn test_create_collection() {
         manager.create_scope(&scope_name, None).await.unwrap();
         verify_scope_created(&manager, &scope_name).await;
 
-        let settings = CreateCollectionSettings::new()
-            .max_expiry(MaxExpiryValue::Seconds(Duration::from_secs(2000)));
+        let mut settings = CreateCollectionSettings::new();
+        if cluster.supports_feature(&TestFeatureCode::CollectionMaxExpiry) {
+            settings = settings.max_expiry(MaxExpiryValue::Seconds(Duration::from_secs(2000)));
+        }
 
         manager
             .create_collection(&scope_name, &collection_name, settings, None)
@@ -81,10 +83,12 @@ fn test_create_collection() {
 
         assert_eq!(collection_name, collection.name());
         assert_eq!(scope_name, collection.scope_name());
-        assert_eq!(
-            MaxExpiryValue::Seconds(Duration::from_secs(2000)),
-            collection.max_expiry()
-        );
+        if cluster.supports_feature(&TestFeatureCode::CollectionMaxExpiry) {
+            assert_eq!(
+                MaxExpiryValue::Seconds(Duration::from_secs(2000)),
+                collection.max_expiry()
+            );
+        }
         assert!(!collection.history());
     })
 }

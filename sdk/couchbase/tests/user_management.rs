@@ -16,6 +16,7 @@
  *
  */
 
+use crate::common::features::TestFeatureCode;
 use crate::common::test_config::run_test;
 use crate::common::test_manager::TestUserManager;
 use crate::common::{new_key, try_until};
@@ -49,11 +50,15 @@ fn test_get_all_roles() {
 #[test]
 fn test_delete_group() {
     run_test(async |cluster| {
+        if !cluster.supports_feature(&TestFeatureCode::UserGroups) {
+            return;
+        }
+
         let group_name = new_key();
         let desc = new_key();
         let roles = vec![
-            Role::new("replication_target").bucket(cluster.default_bucket()),
-            Role::new("replication_admin"),
+            Role::new("bucket_full_access").bucket(cluster.default_bucket()),
+            Role::new("ro_admin"),
         ];
 
         let group = Group::new(&group_name, desc, roles);
@@ -86,11 +91,15 @@ fn test_delete_group() {
 #[test]
 fn test_get_group() {
     run_test(async |cluster| {
+        if !cluster.supports_feature(&TestFeatureCode::UserGroups) {
+            return;
+        }
+
         let group_name = new_key();
         let desc = new_key();
         let roles = vec![
-            Role::new("replication_target").bucket(cluster.default_bucket()),
-            Role::new("replication_admin"),
+            Role::new("bucket_full_access").bucket(cluster.default_bucket()),
+            Role::new("ro_admin"),
         ];
 
         let group = Group::new(&group_name, desc, roles);
@@ -119,11 +128,15 @@ fn test_get_group() {
 #[test]
 fn test_get_all_groups() {
     run_test(async |cluster| {
+        if !cluster.supports_feature(&TestFeatureCode::UserGroups) {
+            return;
+        }
+
         let group_name = new_key();
         let desc = new_key();
         let roles = vec![
-            Role::new("replication_target").bucket(cluster.default_bucket()),
-            Role::new("replication_admin"),
+            Role::new("bucket_full_access").bucket(cluster.default_bucket()),
+            Role::new("ro_admin"),
         ];
 
         let group = Group::new(&group_name, desc, roles);
@@ -159,8 +172,8 @@ fn test_delete_user() {
         let username = new_key();
         let display_name = new_key();
         let roles = vec![
-            Role::new("replication_target").bucket(cluster.default_bucket()),
-            Role::new("replication_admin"),
+            Role::new("bucket_full_access").bucket(cluster.default_bucket()),
+            Role::new("ro_admin"),
         ];
 
         let user = User::new(&username, display_name, roles).password("password");
@@ -214,8 +227,8 @@ fn test_get_user() {
         let username = new_key();
         let display_name = new_key();
         let roles = vec![
-            Role::new("replication_target").bucket(cluster.default_bucket()),
-            Role::new("replication_admin"),
+            Role::new("bucket_full_access").bucket(cluster.default_bucket()),
+            Role::new("ro_admin"),
         ];
 
         let user = User::new(&username, display_name, roles).password("password");
@@ -244,8 +257,8 @@ fn test_get_all_users() {
         let username = new_key();
         let display_name = new_key();
         let roles = vec![
-            Role::new("replication_target").bucket(cluster.default_bucket()),
-            Role::new("replication_admin"),
+            Role::new("bucket_full_access").bucket(cluster.default_bucket()),
+            Role::new("ro_admin"),
         ];
 
         let user = User::new(&username, display_name, roles).password("password");
