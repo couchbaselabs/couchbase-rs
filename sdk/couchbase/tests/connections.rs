@@ -17,15 +17,15 @@
  */
 
 use crate::common::test_config::{create_test_cluster, run_test};
-use crate::common::{new_key, try_until};
+use crate::common::{new_key, try_times};
 use couchbase::error::ErrorKind;
 use std::ops::Add;
 use std::time::Duration;
-use tokio::time::Instant;
 
 mod common;
 
-// Tests in this file use try_until as it takes some time for the drop chain to be realized.
+// Tests in this file use try_times as it takes some time for the drop chain to be realized,
+// but by the time that the operation runs a second time it should be completed.
 
 #[test]
 fn test_collection_use_after_cluster_drop() {
@@ -41,9 +41,9 @@ fn test_collection_use_after_cluster_drop() {
 
         let key = new_key();
 
-        try_until(
-            Instant::now().add(Duration::from_millis(1000)),
-            Duration::from_millis(10),
+        try_times(
+            2,
+            Duration::from_millis(1000),
             "operation didn't fail with disconnected",
             async || {
                 let err = match collection.upsert(&key, "test", None).await {
@@ -76,8 +76,8 @@ fn test_collection_level_mgr_use_after_cluster_drop() {
             collection.query_indexes()
         };
 
-        try_until(
-            Instant::now().add(Duration::from_millis(1000)),
+        try_times(
+            2,
             Duration::from_millis(10),
             "operation didn't fail with disconnected",
             async || {
@@ -108,8 +108,8 @@ fn test_scope_use_after_cluster_drop() {
                 .scope(cluster.default_scope())
         };
 
-        try_until(
-            Instant::now().add(Duration::from_millis(1000)),
+        try_times(
+            2,
             Duration::from_millis(10),
             "operation didn't fail with disconnected",
             async || {
@@ -142,8 +142,8 @@ fn test_scope_level_mgr_use_after_cluster_drop() {
             scope.search_indexes()
         };
 
-        try_until(
-            Instant::now().add(Duration::from_millis(1000)),
+        try_times(
+            2,
             Duration::from_millis(10),
             "operation didn't fail with disconnected",
             async || {
@@ -174,8 +174,8 @@ fn test_bucket_level_mgr_use_after_cluster_drop() {
             bucket.collections()
         };
 
-        try_until(
-            Instant::now().add(Duration::from_millis(1000)),
+        try_times(
+            2,
             Duration::from_millis(10),
             "operation didn't fail with disconnected",
             async || {
@@ -204,8 +204,8 @@ fn test_cluster_level_mgr_use_after_cluster_drop() {
             cluster.users()
         };
 
-        try_until(
-            Instant::now().add(Duration::from_millis(1000)),
+        try_times(
+            2,
             Duration::from_millis(10),
             "operation didn't fail with disconnected",
             async || {

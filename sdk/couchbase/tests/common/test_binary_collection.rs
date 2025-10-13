@@ -16,17 +16,19 @@
  *
  */
 
+use crate::common::helpers::run_with_std_kv_deadline;
+use crate::common::node_version::NodeVersion;
 use couchbase::collection::BinaryCollection;
 use couchbase::error;
 use couchbase::options::kv_binary_options::*;
 use couchbase::results::kv_binary_results::CounterResult;
 use couchbase::results::kv_results::*;
 use std::ops::Deref;
-use tokio::time::{timeout, Duration};
 
 #[derive(Clone)]
 pub struct TestBinaryCollection {
     inner: BinaryCollection,
+    node_version: NodeVersion,
 }
 
 impl Deref for TestBinaryCollection {
@@ -38,8 +40,11 @@ impl Deref for TestBinaryCollection {
 }
 
 impl TestBinaryCollection {
-    pub fn new(inner: BinaryCollection) -> Self {
-        Self { inner }
+    pub fn new(inner: BinaryCollection, node_version: NodeVersion) -> Self {
+        Self {
+            inner,
+            node_version,
+        }
     }
 
     pub async fn append(
@@ -48,12 +53,7 @@ impl TestBinaryCollection {
         value: &[u8],
         options: impl Into<Option<AppendOptions>>,
     ) -> error::Result<MutationResult> {
-        timeout(
-            Duration::from_millis(2500),
-            self.inner.append(id, value, options),
-        )
-        .await
-        .unwrap()
+        run_with_std_kv_deadline(&self.node_version, self.inner.append(id, value, options)).await
     }
 
     pub async fn prepend(
@@ -62,12 +62,7 @@ impl TestBinaryCollection {
         value: &[u8],
         options: impl Into<Option<PrependOptions>>,
     ) -> error::Result<MutationResult> {
-        timeout(
-            Duration::from_millis(2500),
-            self.inner.prepend(id, value, options),
-        )
-        .await
-        .unwrap()
+        run_with_std_kv_deadline(&self.node_version, self.inner.prepend(id, value, options)).await
     }
 
     pub async fn increment(
@@ -75,12 +70,7 @@ impl TestBinaryCollection {
         id: impl AsRef<str>,
         options: impl Into<Option<IncrementOptions>>,
     ) -> error::Result<CounterResult> {
-        timeout(
-            Duration::from_millis(2500),
-            self.inner.increment(id, options),
-        )
-        .await
-        .unwrap()
+        run_with_std_kv_deadline(&self.node_version, self.inner.increment(id, options)).await
     }
 
     pub async fn decrement(
@@ -88,11 +78,6 @@ impl TestBinaryCollection {
         id: impl AsRef<str>,
         options: impl Into<Option<DecrementOptions>>,
     ) -> error::Result<CounterResult> {
-        timeout(
-            Duration::from_millis(2500),
-            self.inner.decrement(id, options),
-        )
-        .await
-        .unwrap()
+        run_with_std_kv_deadline(&self.node_version, self.inner.decrement(id, options)).await
     }
 }

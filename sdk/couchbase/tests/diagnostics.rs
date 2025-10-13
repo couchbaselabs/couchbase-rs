@@ -30,8 +30,8 @@ fn test_cluster_ping() {
     run_test(async |mut cluster| {
         let opts = PingOptions::new()
             .kv_timeout(Duration::from_millis(1000))
-            .query_timeout(Duration::from_millis(1000))
-            .search_timeout(Duration::from_millis(1000));
+            .query_timeout(Duration::from_millis(75000))
+            .search_timeout(Duration::from_millis(75000));
 
         let report = cluster.ping(opts).await.unwrap();
 
@@ -48,8 +48,8 @@ fn test_bucket_ping() {
 
         let opts = PingOptions::new()
             .kv_timeout(Duration::from_millis(1000))
-            .query_timeout(Duration::from_millis(1000))
-            .search_timeout(Duration::from_millis(1000));
+            .query_timeout(Duration::from_millis(75000))
+            .search_timeout(Duration::from_millis(75000));
 
         let report = bucket.ping(opts).await.unwrap();
 

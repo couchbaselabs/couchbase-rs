@@ -274,16 +274,6 @@ impl Agent {
         &self,
         opts: &CreateCollectionOptions<'_>,
     ) -> Result<CreateCollectionResponse> {
-        if opts.history_enabled.is_some() {
-            return self.run_with_bucket_feature_check(
-                BucketFeature::NonDedupedHistory,
-                || async {
-                    self.inner.mgmt.create_collection(opts).await
-                },
-                "History retention is not supported - note that the Magma storage engine must be used",
-            ).await;
-        }
-
         self.inner.mgmt.create_collection(opts).await
     }
 
@@ -298,16 +288,6 @@ impl Agent {
         &self,
         opts: &UpdateCollectionOptions<'_>,
     ) -> Result<UpdateCollectionResponse> {
-        if opts.history_enabled.is_some() {
-            return self.run_with_bucket_feature_check(
-                BucketFeature::NonDedupedHistory,
-                || async {
-                    self.inner.mgmt.update_collection(opts).await
-                },
-                "History retention is not supported - note that the Magma storage engine must be used",
-            )
-                .await;
-        }
         self.inner.mgmt.update_collection(opts).await
     }
 

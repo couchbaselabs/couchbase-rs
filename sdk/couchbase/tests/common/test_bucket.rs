@@ -16,6 +16,7 @@
  *
  */
 
+use crate::common::node_version::NodeVersion;
 use crate::common::test_collection::TestCollection;
 use crate::common::test_manager::TestCollectionManager;
 use crate::common::test_scope::TestScope;
@@ -27,6 +28,7 @@ use tokio::time::timeout;
 #[derive(Clone)]
 pub struct TestBucket {
     inner: Bucket,
+    node_version: NodeVersion,
 }
 
 impl std::ops::Deref for TestBucket {
@@ -38,8 +40,11 @@ impl std::ops::Deref for TestBucket {
 }
 
 impl TestBucket {
-    pub fn new(inner: Bucket) -> Self {
-        Self { inner }
+    pub fn new(inner: Bucket, node_version: NodeVersion) -> Self {
+        Self {
+            inner,
+            node_version,
+        }
     }
 
     pub fn name(&self) -> &str {
@@ -47,15 +52,15 @@ impl TestBucket {
     }
 
     pub fn scope(&self, name: impl Into<String>) -> TestScope {
-        TestScope::new(self.inner.scope(name))
+        TestScope::new(self.inner.scope(name), self.node_version.clone())
     }
 
     pub fn collection(&self, name: impl Into<String>) -> TestCollection {
-        TestCollection::new(self.inner.collection(name))
+        TestCollection::new(self.inner.collection(name), self.node_version.clone())
     }
 
     pub fn default_collection(&self) -> TestCollection {
-        TestCollection::new(self.inner.default_collection())
+        TestCollection::new(self.inner.default_collection(), self.node_version.clone())
     }
 
     pub fn collections(&self) -> TestCollectionManager {

@@ -16,6 +16,7 @@
  *
  */
 
+use crate::common::node_version::NodeVersion;
 use crate::common::test_collection::TestCollection;
 use crate::common::test_search_index_manager::TestSearchIndexManager;
 use couchbase::error;
@@ -32,6 +33,7 @@ use tokio::time::timeout;
 #[derive(Clone)]
 pub struct TestScope {
     inner: Scope,
+    node_version: NodeVersion,
 }
 
 impl Deref for TestScope {
@@ -43,12 +45,15 @@ impl Deref for TestScope {
 }
 
 impl TestScope {
-    pub fn new(inner: Scope) -> Self {
-        Self { inner }
+    pub fn new(inner: Scope, node_version: NodeVersion) -> Self {
+        Self {
+            inner,
+            node_version,
+        }
     }
 
     pub fn collection(&self, name: impl Into<String>) -> TestCollection {
-        TestCollection::new(self.inner.collection(name))
+        TestCollection::new(self.inner.collection(name), self.node_version.clone())
     }
 
     pub fn search_indexes(&self) -> TestSearchIndexManager {
