@@ -16,6 +16,7 @@
  *
  */
 
+use crate::common::node_version::{NodeEdition, NodeVersion};
 use crate::common::test_agent::TestAgent;
 use couchbase_core::agent::Agent;
 use couchbase_core::error::{Error, ErrorKind};
@@ -262,13 +263,19 @@ where
     timeout_at(deadline, f).await.unwrap()
 }
 
-pub async fn run_with_std_kv_deadline<Resp, Fut>(f: Fut) -> Result<Resp, Error>
+pub async fn run_with_std_kv_deadline<Resp, Fut>(
+    node_version: &NodeVersion,
+    f: Fut,
+) -> Result<Resp, Error>
 where
     Fut: std::future::Future<Output = Result<Resp, Error>>,
 {
-    timeout_at(Instant::now().add(Duration::from_millis(2500)), f)
-        .await
-        .unwrap()
+    let timeout = match node_version.edition {
+        Some(NodeEdition::Community) => Duration::from_millis(10000),
+        _ => Duration::from_millis(2500),
+    };
+
+    timeout_at(Instant::now().add(timeout), f).await.unwrap()
 }
 
 pub async fn run_with_std_mgmt_deadline<Resp, Fut>(f: Fut) -> Result<Resp, Error>

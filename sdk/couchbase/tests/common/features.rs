@@ -16,7 +16,7 @@
  *
  */
 
-use crate::common::node_version::NodeVersion;
+use crate::common::node_version::{NodeEdition, NodeVersion};
 use crate::common::test_cluster::TestCluster;
 
 const SERVER_VERSION_720: NodeVersion = NodeVersion {
@@ -46,6 +46,15 @@ const SERVER_VERSION_800: NodeVersion = NodeVersion {
     modifier: None,
 };
 
+const SERVER_VERSION_800_COMMUNITY: NodeVersion = NodeVersion {
+    major: 8,
+    minor: 0,
+    patch: 0,
+    build: 0,
+    edition: Some(NodeEdition::Community),
+    modifier: None,
+};
+
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum TestFeatureCode {
     KV,
@@ -55,10 +64,14 @@ pub enum TestFeatureCode {
     SearchManagement,
     SearchManagementCollections,
     BucketManagement,
-    CollectionNoExpiry,
+    BucketManagementCompressionMode,
+    BucketManagementConflictResolutionType,
+    CollectionMaxExpiry,
     CollectionUpdateMaxExpiry,
     HistoryRetention,
     VectorSearch,
+    UserGroups,
+    UsersMB69096,
 }
 
 impl TestCluster {
@@ -68,17 +81,38 @@ impl TestCluster {
             TestFeatureCode::Search => true,
             TestFeatureCode::Query => true,
             TestFeatureCode::BucketManagement => true,
+            TestFeatureCode::BucketManagementCompressionMode => {
+                self.cluster_version.edition != Some(NodeEdition::Community)
+            }
+            TestFeatureCode::BucketManagementConflictResolutionType => {
+                self.cluster_version.edition != Some(NodeEdition::Community)
+            }
             TestFeatureCode::QueryManagement => true,
             TestFeatureCode::SearchManagement => true,
             TestFeatureCode::SearchManagementCollections => {
                 !self.cluster_version.lower(&SERVER_VERSION_760)
             }
-            TestFeatureCode::CollectionNoExpiry => !self.cluster_version.lower(&SERVER_VERSION_760),
-            TestFeatureCode::CollectionUpdateMaxExpiry => {
-                !self.cluster_version.lower(&SERVER_VERSION_760)
+            TestFeatureCode::CollectionMaxExpiry => {
+                self.cluster_version.edition != Some(NodeEdition::Community)
             }
-            TestFeatureCode::HistoryRetention => !self.cluster_version.lower(&SERVER_VERSION_720),
-            TestFeatureCode::VectorSearch => !self.cluster_version.lower(&SERVER_VERSION_760),
+            TestFeatureCode::CollectionUpdateMaxExpiry => {
+                self.cluster_version.edition != Some(NodeEdition::Community)
+                    && !self.cluster_version.lower(&SERVER_VERSION_760)
+            }
+            TestFeatureCode::HistoryRetention => {
+                self.cluster_version.edition != Some(NodeEdition::Community)
+                    && !self.cluster_version.lower(&SERVER_VERSION_720)
+            }
+            TestFeatureCode::VectorSearch => {
+                self.cluster_version.edition != Some(NodeEdition::Community)
+                    && !self.cluster_version.lower(&SERVER_VERSION_760)
+            }
+            TestFeatureCode::UserGroups => {
+                self.cluster_version.edition != Some(NodeEdition::Community)
+            }
+            TestFeatureCode::UsersMB69096 => {
+                !self.cluster_version.equal(&SERVER_VERSION_800_COMMUNITY)
+            }
         }
     }
 }

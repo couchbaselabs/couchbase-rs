@@ -16,6 +16,8 @@
  *
  */
 
+use crate::common::helpers::run_with_std_kv_deadline;
+use crate::common::node_version::NodeVersion;
 use crate::common::test_binary_collection::TestBinaryCollection;
 use crate::common::test_query_index_manager::TestQueryIndexManager;
 use couchbase::collection::Collection;
@@ -27,11 +29,11 @@ use couchbase::subdoc::mutate_in_specs::MutateInSpec;
 use serde::Serialize;
 use std::ops::Deref;
 use std::time::Duration;
-use tokio::time::timeout;
 
 #[derive(Clone)]
 pub struct TestCollection {
     inner: Collection,
+    node_version: NodeVersion,
 }
 
 impl Deref for TestCollection {
@@ -43,8 +45,11 @@ impl Deref for TestCollection {
 }
 
 impl TestCollection {
-    pub fn new(inner: Collection) -> Self {
-        Self { inner }
+    pub fn new(inner: Collection, node_version: NodeVersion) -> Self {
+        Self {
+            inner,
+            node_version,
+        }
     }
 
     pub fn query_indexes(&self) -> TestQueryIndexManager {
@@ -57,12 +62,7 @@ impl TestCollection {
         value: V,
         options: impl Into<Option<UpsertOptions>>,
     ) -> error::Result<MutationResult> {
-        timeout(
-            Duration::from_millis(2500),
-            self.inner.upsert(id, value, options),
-        )
-        .await
-        .unwrap()
+        run_with_std_kv_deadline(&self.node_version, self.inner.upsert(id, value, options)).await
     }
 
     pub async fn upsert_raw(
@@ -72,12 +72,11 @@ impl TestCollection {
         flags: u32,
         options: impl Into<Option<UpsertOptions>>,
     ) -> error::Result<MutationResult> {
-        timeout(
-            Duration::from_millis(2500),
+        run_with_std_kv_deadline(
+            &self.node_version,
             self.inner.upsert_raw(id, value, flags, options),
         )
         .await
-        .unwrap()
     }
 
     pub async fn insert<V: Serialize>(
@@ -86,12 +85,7 @@ impl TestCollection {
         value: V,
         options: impl Into<Option<InsertOptions>>,
     ) -> error::Result<MutationResult> {
-        timeout(
-            Duration::from_millis(2500),
-            self.inner.insert(id, value, options),
-        )
-        .await
-        .unwrap()
+        run_with_std_kv_deadline(&self.node_version, self.inner.insert(id, value, options)).await
     }
 
     pub async fn insert_raw(
@@ -101,12 +95,11 @@ impl TestCollection {
         flags: u32,
         options: impl Into<Option<InsertOptions>>,
     ) -> error::Result<MutationResult> {
-        timeout(
-            Duration::from_millis(2500),
+        run_with_std_kv_deadline(
+            &self.node_version,
             self.inner.insert_raw(id, value, flags, options),
         )
         .await
-        .unwrap()
     }
 
     pub async fn replace<V: Serialize>(
@@ -115,12 +108,7 @@ impl TestCollection {
         value: V,
         options: impl Into<Option<ReplaceOptions>>,
     ) -> error::Result<MutationResult> {
-        timeout(
-            Duration::from_millis(2500),
-            self.inner.replace(id, value, options),
-        )
-        .await
-        .unwrap()
+        run_with_std_kv_deadline(&self.node_version, self.inner.replace(id, value, options)).await
     }
 
     pub async fn replace_raw(
@@ -130,12 +118,11 @@ impl TestCollection {
         flags: u32,
         options: impl Into<Option<ReplaceOptions>>,
     ) -> error::Result<MutationResult> {
-        timeout(
-            Duration::from_millis(2500),
+        run_with_std_kv_deadline(
+            &self.node_version,
             self.inner.replace_raw(id, value, flags, options),
         )
         .await
-        .unwrap()
     }
 
     pub async fn remove(
@@ -143,9 +130,7 @@ impl TestCollection {
         id: impl AsRef<str>,
         options: impl Into<Option<RemoveOptions>>,
     ) -> error::Result<MutationResult> {
-        timeout(Duration::from_millis(2500), self.inner.remove(id, options))
-            .await
-            .unwrap()
+        run_with_std_kv_deadline(&self.node_version, self.inner.remove(id, options)).await
     }
 
     pub async fn get(
@@ -153,9 +138,7 @@ impl TestCollection {
         id: impl AsRef<str>,
         options: impl Into<Option<GetOptions>>,
     ) -> error::Result<GetResult> {
-        timeout(Duration::from_millis(2500), self.inner.get(id, options))
-            .await
-            .unwrap()
+        run_with_std_kv_deadline(&self.node_version, self.inner.get(id, options)).await
     }
 
     pub async fn exists(
@@ -163,9 +146,7 @@ impl TestCollection {
         id: impl AsRef<str>,
         options: impl Into<Option<ExistsOptions>>,
     ) -> error::Result<ExistsResult> {
-        timeout(Duration::from_millis(2500), self.inner.exists(id, options))
-            .await
-            .unwrap()
+        run_with_std_kv_deadline(&self.node_version, self.inner.exists(id, options)).await
     }
 
     pub async fn get_and_touch(
@@ -174,12 +155,11 @@ impl TestCollection {
         expiry: Duration,
         options: impl Into<Option<GetAndTouchOptions>>,
     ) -> error::Result<GetResult> {
-        timeout(
-            Duration::from_millis(2500),
+        run_with_std_kv_deadline(
+            &self.node_version,
             self.inner.get_and_touch(id, expiry, options),
         )
         .await
-        .unwrap()
     }
 
     pub async fn get_and_lock(
@@ -188,12 +168,11 @@ impl TestCollection {
         lock_time: Duration,
         options: impl Into<Option<GetAndLockOptions>>,
     ) -> error::Result<GetResult> {
-        timeout(
-            Duration::from_millis(2500),
+        run_with_std_kv_deadline(
+            &self.node_version,
             self.inner.get_and_lock(id, lock_time, options),
         )
         .await
-        .unwrap()
     }
 
     pub async fn unlock(
@@ -202,12 +181,7 @@ impl TestCollection {
         cas: u64,
         options: impl Into<Option<UnlockOptions>>,
     ) -> error::Result<()> {
-        timeout(
-            Duration::from_millis(2500),
-            self.inner.unlock(id, cas, options),
-        )
-        .await
-        .unwrap()
+        run_with_std_kv_deadline(&self.node_version, self.inner.unlock(id, cas, options)).await
     }
 
     pub async fn touch(
@@ -216,12 +190,7 @@ impl TestCollection {
         expiry: Duration,
         options: impl Into<Option<TouchOptions>>,
     ) -> error::Result<TouchResult> {
-        timeout(
-            Duration::from_millis(2500),
-            self.inner.touch(id, expiry, options),
-        )
-        .await
-        .unwrap()
+        run_with_std_kv_deadline(&self.node_version, self.inner.touch(id, expiry, options)).await
     }
 
     pub async fn lookup_in(
@@ -230,12 +199,7 @@ impl TestCollection {
         specs: &[LookupInSpec],
         options: impl Into<Option<LookupInOptions>>,
     ) -> error::Result<LookupInResult> {
-        timeout(
-            Duration::from_millis(2500),
-            self.inner.lookup_in(id, specs, options),
-        )
-        .await
-        .unwrap()
+        run_with_std_kv_deadline(&self.node_version, self.inner.lookup_in(id, specs, options)).await
     }
 
     pub async fn mutate_in(
@@ -244,15 +208,10 @@ impl TestCollection {
         specs: &[MutateInSpec],
         options: impl Into<Option<MutateInOptions>>,
     ) -> error::Result<MutateInResult> {
-        timeout(
-            Duration::from_millis(2500),
-            self.inner.mutate_in(id, specs, options),
-        )
-        .await
-        .unwrap()
+        run_with_std_kv_deadline(&self.node_version, self.inner.mutate_in(id, specs, options)).await
     }
 
     pub fn binary(&self) -> TestBinaryCollection {
-        TestBinaryCollection::new(self.inner.binary())
+        TestBinaryCollection::new(self.inner.binary(), self.node_version.clone())
     }
 }

@@ -82,74 +82,74 @@ impl TestAgent {
     }
 
     pub async fn upsert(&self, opts: UpsertOptions<'_>) -> Result<UpsertResult> {
-        run_with_std_kv_deadline(self.agent.upsert(opts)).await
+        run_with_std_kv_deadline(&self.cluster_version, self.agent.upsert(opts)).await
     }
 
     pub async fn get(&self, opts: GetOptions<'_>) -> Result<GetResult> {
-        run_with_std_kv_deadline(self.agent.get(opts)).await
+        run_with_std_kv_deadline(&self.cluster_version, self.agent.get(opts)).await
     }
 
     pub async fn get_meta(&self, opts: GetMetaOptions<'_>) -> Result<GetMetaResult> {
-        run_with_std_kv_deadline(self.agent.get_meta(opts)).await
+        run_with_std_kv_deadline(&self.cluster_version, self.agent.get_meta(opts)).await
     }
 
     pub async fn delete(&self, opts: DeleteOptions<'_>) -> Result<DeleteResult> {
-        run_with_std_kv_deadline(self.agent.delete(opts)).await
+        run_with_std_kv_deadline(&self.cluster_version, self.agent.delete(opts)).await
     }
 
     pub async fn get_and_lock(&self, opts: GetAndLockOptions<'_>) -> Result<GetAndLockResult> {
-        run_with_std_kv_deadline(self.agent.get_and_lock(opts)).await
+        run_with_std_kv_deadline(&self.cluster_version, self.agent.get_and_lock(opts)).await
     }
 
     pub async fn get_and_touch(&self, opts: GetAndTouchOptions<'_>) -> Result<GetAndTouchResult> {
-        run_with_std_kv_deadline(self.agent.get_and_touch(opts)).await
+        run_with_std_kv_deadline(&self.cluster_version, self.agent.get_and_touch(opts)).await
     }
 
     pub async fn unlock(&self, opts: UnlockOptions<'_>) -> Result<UnlockResult> {
-        run_with_std_kv_deadline(self.agent.unlock(opts)).await
+        run_with_std_kv_deadline(&self.cluster_version, self.agent.unlock(opts)).await
     }
 
     pub async fn touch(&self, opts: TouchOptions<'_>) -> Result<TouchResult> {
-        run_with_std_kv_deadline(self.agent.touch(opts)).await
+        run_with_std_kv_deadline(&self.cluster_version, self.agent.touch(opts)).await
     }
 
     pub async fn add(&self, opts: AddOptions<'_>) -> Result<AddResult> {
-        run_with_std_kv_deadline(self.agent.add(opts)).await
+        run_with_std_kv_deadline(&self.cluster_version, self.agent.add(opts)).await
     }
 
     pub async fn replace(&self, opts: ReplaceOptions<'_>) -> Result<ReplaceResult> {
-        run_with_std_kv_deadline(self.agent.replace(opts)).await
+        run_with_std_kv_deadline(&self.cluster_version, self.agent.replace(opts)).await
     }
 
     pub async fn append(&self, opts: AppendOptions<'_>) -> Result<AppendResult> {
-        run_with_std_kv_deadline(self.agent.append(opts)).await
+        run_with_std_kv_deadline(&self.cluster_version, self.agent.append(opts)).await
     }
 
     pub async fn prepend(&self, opts: PrependOptions<'_>) -> Result<PrependResult> {
-        run_with_std_kv_deadline(self.agent.prepend(opts)).await
+        run_with_std_kv_deadline(&self.cluster_version, self.agent.prepend(opts)).await
     }
 
     pub async fn increment(&self, opts: IncrementOptions<'_>) -> Result<IncrementResult> {
-        run_with_std_kv_deadline(self.agent.increment(opts)).await
+        run_with_std_kv_deadline(&self.cluster_version, self.agent.increment(opts)).await
     }
 
     pub async fn decrement(&self, opts: DecrementOptions<'_>) -> Result<DecrementResult> {
-        run_with_std_kv_deadline(self.agent.decrement(opts)).await
+        run_with_std_kv_deadline(&self.cluster_version, self.agent.decrement(opts)).await
     }
 
     pub async fn get_collection_id(
         &self,
         opts: GetCollectionIdOptions<'_>,
     ) -> Result<GetCollectionIdResult> {
-        run_with_std_kv_deadline(self.agent.get_collection_id(opts)).await
+        run_with_std_kv_deadline(&self.cluster_version, self.agent.get_collection_id(opts)).await
     }
 
     pub async fn lookup_in(&self, opts: LookupInOptions<'_>) -> Result<LookupInResult> {
-        run_with_std_kv_deadline(self.agent.lookup_in(opts)).await
+        run_with_std_kv_deadline(&self.cluster_version, self.agent.lookup_in(opts)).await
     }
 
     pub async fn mutate_in(&self, opts: MutateInOptions<'_>) -> Result<MutateInResult> {
-        run_with_std_kv_deadline(self.agent.mutate_in(opts)).await
+        run_with_std_kv_deadline(&self.cluster_version, self.agent.mutate_in(opts)).await
     }
 
     pub async fn query(&self, opts: QueryOptions) -> Result<QueryResultStream> {

@@ -23,6 +23,7 @@ pub mod consistency_utils;
 pub mod default_cluster_options;
 pub mod doc_generation;
 pub mod features;
+mod helpers;
 pub mod node_version;
 mod test_binary_collection;
 mod test_bucket;
@@ -48,6 +49,31 @@ pub fn generate_string_value(len: usize) -> String {
         .take(len)
         .map(char::from)
         .collect::<String>()
+}
+
+pub async fn try_times<Fut, T>(
+    times: usize,
+    sleep: tokio::time::Duration,
+    fail_msg: impl AsRef<str>,
+    mut f: impl FnMut() -> Fut,
+) -> T
+where
+    Fut: std::future::Future<Output = Result<Option<T>, couchbase::error::Error>>,
+{
+    let mut count = 0;
+    while count < times {
+        match f().await {
+            Ok(Some(r)) => return r,
+            Ok(None) => {}
+            Err(e) => {
+                error!("{e:?}");
+            }
+        };
+
+        tokio::time::sleep(sleep).await;
+        count += 1;
+    }
+    panic!("{}", fail_msg.as_ref());
 }
 
 pub async fn try_until<Fut, T>(

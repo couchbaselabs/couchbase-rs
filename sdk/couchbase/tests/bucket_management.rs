@@ -194,7 +194,9 @@ fn test_create_bucket_with_eviction_policy() {
 #[test]
 fn test_create_bucket_with_compression_mode() {
     run_test(async |cluster| {
-        if !cluster.supports_feature(&TestFeatureCode::BucketManagement) {
+        if !cluster.supports_feature(&TestFeatureCode::BucketManagement)
+            || !cluster.supports_feature(&TestFeatureCode::BucketManagementCompressionMode)
+        {
             return;
         }
 
@@ -261,7 +263,9 @@ fn test_create_bucket_with_durability_min_level() {
 #[test]
 fn test_create_bucket_with_conflict_resolution_type() {
     run_test(async |cluster| {
-        if !cluster.supports_feature(&TestFeatureCode::BucketManagement) {
+        if !cluster.supports_feature(&TestFeatureCode::BucketManagement)
+            || !cluster.supports_feature(&TestFeatureCode::BucketManagementConflictResolutionType)
+        {
             return;
         }
 

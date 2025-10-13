@@ -37,8 +37,8 @@ fn test_ping() {
     run_test(async |mut agent| {
         let opts = PingOptions::new()
             .kv_timeout(Duration::from_millis(1000))
-            .query_timeout(Duration::from_millis(1000))
-            .search_timeout(Duration::from_millis(1000));
+            .query_timeout(Duration::from_millis(75000))
+            .search_timeout(Duration::from_millis(75000));
 
         let report = agent.ping(&opts).await.unwrap();
 

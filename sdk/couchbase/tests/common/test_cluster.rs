@@ -44,6 +44,16 @@ impl Deref for TestCluster {
 }
 
 impl TestCluster {
+    pub async fn new(cluster_version: NodeVersion, test_setup_config: TestSetupConfig) -> Self {
+        let inner = test_setup_config.setup_cluster().await;
+
+        Self {
+            cluster_version,
+            test_setup_config,
+            inner,
+        }
+    }
+
     pub fn default_bucket(&self) -> &str {
         &self.test_setup_config.default_bucket
     }
@@ -55,21 +65,9 @@ impl TestCluster {
     pub fn default_collection(&self) -> &str {
         &self.test_setup_config.default_collection
     }
-}
-
-impl TestCluster {
-    pub async fn new(cluster_version: NodeVersion, test_setup_config: TestSetupConfig) -> Self {
-        let inner = test_setup_config.setup_cluster().await;
-
-        Self {
-            cluster_version,
-            test_setup_config,
-            inner,
-        }
-    }
 
     pub fn bucket(&self, name: impl Into<String>) -> TestBucket {
-        TestBucket::new(self.inner.bucket(name))
+        TestBucket::new(self.inner.bucket(name), self.cluster_version.clone())
     }
 
     pub async fn query(

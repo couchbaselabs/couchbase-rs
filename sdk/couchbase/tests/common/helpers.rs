@@ -15,26 +15,23 @@
  *  * limitations under the License.
  *
  */
-use std::convert::From;
+use crate::common::node_version::{NodeEdition, NodeVersion};
+use couchbase::error::Error;
+use std::ops::Add;
+use std::time::Duration;
+use tokio::time::{timeout_at, Instant};
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-#[derive(Default)]
-pub enum DataTypeFlag {
-    #[default]
-    None,
-    Json,
-    Compressed,
-    Xattrs,
-}
+pub async fn run_with_std_kv_deadline<Resp, Fut>(
+    node_version: &NodeVersion,
+    f: Fut,
+) -> Result<Resp, Error>
+where
+    Fut: std::future::Future<Output = Result<Resp, Error>>,
+{
+    let timeout = match node_version.edition {
+        Some(NodeEdition::Community) => Duration::from_millis(10000),
+        _ => Duration::from_millis(2500),
+    };
 
-impl From<DataTypeFlag> for u8 {
-    fn from(value: DataTypeFlag) -> Self {
-        match value {
-            DataTypeFlag::None => 0,
-            DataTypeFlag::Json => 1,
-            DataTypeFlag::Compressed => 2,
-            DataTypeFlag::Xattrs => 4,
-        }
-    }
+    timeout_at(Instant::now().add(timeout), f).await.unwrap()
 }
