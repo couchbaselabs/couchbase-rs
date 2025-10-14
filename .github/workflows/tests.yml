@@ -20,13 +20,14 @@ jobs:
           - 7.2.7
           - 7.1.6
           - 7.0.4
+          - community-7.6.2
 
     runs-on: ubuntu-latest
     steps:
       - name: Install cbdinocluster
         run: |
           mkdir -p "$HOME/bin"
-          wget -nv -O $HOME/bin/cbdinocluster https://github.com/couchbaselabs/cbdinocluster/releases/download/v0.0.41/cbdinocluster-linux-amd64
+          wget -nv -O $HOME/bin/cbdinocluster https://github.com/couchbaselabs/cbdinocluster/releases/download/v0.0.88/cbdinocluster-linux-amd64
           chmod +x $HOME/bin/cbdinocluster
           echo "$HOME/bin" >> $GITHUB_PATH
 
@@ -40,7 +41,10 @@ jobs:
         env:
           CLUSTERCONFIG: |
             nodes:
-              - count: 3
+              - count: 2
+                version: ${{ matrix.server }}
+                services: [kv, n1ql, index]
+              - count: 1
                 version: ${{ matrix.server }}
                 services: [kv, n1ql, index, fts]
             docker:
