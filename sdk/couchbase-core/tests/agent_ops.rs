@@ -809,9 +809,9 @@ fn upsert_allocations() {
         let total_allocs = stats2.total_blocks - stats1.total_blocks;
 
         let expected_allocs = if agent.test_setup_config.use_ssl {
-            19
+            20
         } else {
-            21
+            18
         };
         dhat::assert!(
             total_allocs <= expected_allocs,

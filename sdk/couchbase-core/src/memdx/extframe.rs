@@ -15,7 +15,6 @@
  *  * limitations under the License.
  *
  */
-
 use crate::memdx::durability_level::{DurabilityLevel, DurabilityLevelSettings};
 use crate::memdx::error;
 use crate::memdx::error::Error;
@@ -107,11 +106,11 @@ fn iter_ext_frames(buf: &[u8], mut cb: impl FnMut(ExtResFrameCode, &[u8])) -> er
 pub fn append_ext_frame(
     frame_code: ExtReqFrameCode,
     frame_body: &[u8],
-    buf: &mut Vec<u8>,
+    mut buf: &mut [u8],
 ) -> error::Result<()> {
     let frame_len = frame_body.len();
 
-    buf.push(0);
+    buf[buf.len()] = 0;
     let orig_buf_len = buf.len();
     let hdr_byte_ptr = &mut buf[orig_buf_len - 1];
     let u_frame_code: u16 = frame_code.into();
@@ -146,7 +145,7 @@ pub fn append_ext_frame(
     }
 
     if frame_len > 0 {
-        buf.extend_from_slice(frame_body);
+        buf.copy_from_slice(frame_body);
     }
 
     Ok(())

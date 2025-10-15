@@ -64,13 +64,13 @@ impl OpsCrud {
     where
         D: Dispatcher,
     {
-        let mut ext_frame_buf: Vec<u8> = Vec::with_capacity(128);
+        let mut ext_frame_buf = &mut [0; 128];
         let magic = self.encode_req_ext_frames(
             request.durability_level,
             request.durability_level_timeout,
             request.preserve_expiry,
             request.on_behalf_of,
-            &mut ext_frame_buf,
+            ext_frame_buf,
         )?;
 
         let framing_extras = if !ext_frame_buf.is_empty() {
@@ -112,9 +112,9 @@ impl OpsCrud {
     where
         D: Dispatcher,
     {
-        let mut ext_frame_buf: Vec<u8> = Vec::with_capacity(128);
+        let mut ext_frame_buf = &mut [0; 128];
         let magic =
-            self.encode_req_ext_frames(None, None, None, request.on_behalf_of, &mut ext_frame_buf)?;
+            self.encode_req_ext_frames(None, None, None, request.on_behalf_of, ext_frame_buf)?;
 
         let buf = &mut [0; 251];
         let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
@@ -151,9 +151,9 @@ impl OpsCrud {
     where
         D: Dispatcher,
     {
-        let mut ext_frame_buf: Vec<u8> = Vec::with_capacity(128);
+        let mut ext_frame_buf = &mut [0; 128];
         let magic =
-            self.encode_req_ext_frames(None, None, None, request.on_behalf_of, &mut ext_frame_buf)?;
+            self.encode_req_ext_frames(None, None, None, request.on_behalf_of, ext_frame_buf)?;
 
         let buf = &mut [0; 251];
         let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
@@ -194,13 +194,13 @@ impl OpsCrud {
     where
         D: Dispatcher,
     {
-        let mut ext_frame_buf: Vec<u8> = Vec::with_capacity(128);
+        let mut ext_frame_buf = &mut [0; 128];
         let magic = self.encode_req_ext_frames(
             request.durability_level,
             request.durability_level_timeout,
             None,
             request.on_behalf_of,
-            &mut ext_frame_buf,
+            ext_frame_buf,
         )?;
 
         let framing_extras = if !ext_frame_buf.is_empty() {
@@ -238,9 +238,9 @@ impl OpsCrud {
     where
         D: Dispatcher,
     {
-        let mut ext_frame_buf: Vec<u8> = Vec::with_capacity(128);
+        let mut ext_frame_buf = &mut [0; 128];
         let magic =
-            self.encode_req_ext_frames(None, None, None, request.on_behalf_of, &mut ext_frame_buf)?;
+            self.encode_req_ext_frames(None, None, None, request.on_behalf_of, ext_frame_buf)?;
 
         let buf = &mut [0; 251];
         let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
@@ -280,9 +280,9 @@ impl OpsCrud {
     where
         D: Dispatcher,
     {
-        let mut ext_frame_buf: Vec<u8> = Vec::with_capacity(128);
+        let mut ext_frame_buf = &mut [0; 128];
         let magic =
-            self.encode_req_ext_frames(None, None, None, request.on_behalf_of, &mut ext_frame_buf)?;
+            self.encode_req_ext_frames(None, None, None, request.on_behalf_of, ext_frame_buf)?;
 
         let buf = &mut [0; 251];
         let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
@@ -322,9 +322,9 @@ impl OpsCrud {
     where
         D: Dispatcher,
     {
-        let mut ext_frame_buf: Vec<u8> = Vec::with_capacity(128);
+        let mut ext_frame_buf = &mut [0; 128];
         let magic =
-            self.encode_req_ext_frames(None, None, None, request.on_behalf_of, &mut ext_frame_buf)?;
+            self.encode_req_ext_frames(None, None, None, request.on_behalf_of, ext_frame_buf)?;
 
         let buf = &mut [0; 251];
         let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
@@ -361,9 +361,9 @@ impl OpsCrud {
     where
         D: Dispatcher,
     {
-        let mut ext_frame_buf: Vec<u8> = Vec::with_capacity(128);
+        let mut ext_frame_buf = &mut [0; 128];
         let magic =
-            self.encode_req_ext_frames(None, None, None, request.on_behalf_of, &mut ext_frame_buf)?;
+            self.encode_req_ext_frames(None, None, None, request.on_behalf_of, ext_frame_buf)?;
 
         let buf = &mut [0; 251];
         let key = self.encode_collection_and_key(request.collection_id, request.key, buf)?;
@@ -403,13 +403,13 @@ impl OpsCrud {
     where
         D: Dispatcher,
     {
-        let mut ext_frame_buf: Vec<u8> = Vec::with_capacity(128);
+        let mut ext_frame_buf = &mut [0; 128];
         let magic = self.encode_req_ext_frames(
             request.durability_level,
             request.durability_level_timeout,
             None,
             request.on_behalf_of,
-            &mut ext_frame_buf,
+            ext_frame_buf,
         )?;
 
         let framing_extras = if !ext_frame_buf.is_empty() {
@@ -458,13 +458,13 @@ impl OpsCrud {
             ));
         }
 
-        let mut ext_frame_buf: Vec<u8> = Vec::with_capacity(128);
+        let mut ext_frame_buf = &mut [0; 128];
         let magic = self.encode_req_ext_frames(
             request.durability_level,
             request.durability_level_timeout,
             request.preserve_expiry,
             request.on_behalf_of,
-            &mut ext_frame_buf,
+            ext_frame_buf,
         )?;
 
         let framing_extras = if !ext_frame_buf.is_empty() {
@@ -506,13 +506,13 @@ impl OpsCrud {
     where
         D: Dispatcher,
     {
-        let mut ext_frame_buf: Vec<u8> = Vec::with_capacity(128);
+        let mut ext_frame_buf = &mut [0; 128];
         let magic = self.encode_req_ext_frames(
             request.durability_level,
             request.durability_level_timeout,
             None,
             request.on_behalf_of,
-            &mut ext_frame_buf,
+            ext_frame_buf,
         )?;
 
         let framing_extras = if !ext_frame_buf.is_empty() {
@@ -550,13 +550,13 @@ impl OpsCrud {
     where
         D: Dispatcher,
     {
-        let mut ext_frame_buf: Vec<u8> = Vec::with_capacity(128);
+        let mut ext_frame_buf = &mut [0; 128];
         let magic = self.encode_req_ext_frames(
             request.durability_level,
             request.durability_level_timeout,
             None,
             request.on_behalf_of,
-            &mut ext_frame_buf,
+            ext_frame_buf,
         )?;
 
         let framing_extras = if !ext_frame_buf.is_empty() {
@@ -610,13 +610,13 @@ impl OpsCrud {
     where
         D: Dispatcher,
     {
-        let mut ext_frame_buf: Vec<u8> = Vec::with_capacity(128);
+        let mut ext_frame_buf = &mut [0; 128];
         let magic = self.encode_req_ext_frames(
             request.durability_level,
             request.durability_level_timeout,
             None,
             request.on_behalf_of,
-            &mut ext_frame_buf,
+            ext_frame_buf,
         )?;
 
         let framing_extras = if !ext_frame_buf.is_empty() {
@@ -662,13 +662,13 @@ impl OpsCrud {
     where
         D: Dispatcher,
     {
-        let mut ext_frame_buf: Vec<u8> = Vec::with_capacity(128);
+        let mut ext_frame_buf = &mut [0; 128];
         let magic = self.encode_req_ext_frames(
             request.durability_level,
             request.durability_level_timeout,
             None,
             request.on_behalf_of,
-            &mut ext_frame_buf,
+            ext_frame_buf,
         )?;
 
         let framing_extras = if !ext_frame_buf.is_empty() {
@@ -714,9 +714,9 @@ impl OpsCrud {
     where
         D: Dispatcher,
     {
-        let mut ext_frame_buf: Vec<u8> = Vec::with_capacity(128);
+        let mut ext_frame_buf = &mut [0; 128];
         let magic =
-            self.encode_req_ext_frames(None, None, None, request.on_behalf_of, &mut ext_frame_buf)?;
+            self.encode_req_ext_frames(None, None, None, request.on_behalf_of, ext_frame_buf)?;
 
         let framing_extras = if !ext_frame_buf.is_empty() {
             Some(ext_frame_buf.as_slice())
@@ -803,13 +803,13 @@ impl OpsCrud {
             ));
         }
 
-        let mut ext_frame_buf: Vec<u8> = Vec::with_capacity(128);
+        let mut ext_frame_buf = &mut [0; 128];
         let magic = self.encode_req_ext_frames(
             request.durability_level,
             request.durability_level_timeout,
             request.preserve_expiry,
             request.on_behalf_of,
-            &mut ext_frame_buf,
+            ext_frame_buf,
         )?;
 
         let framing_extras = if !ext_frame_buf.is_empty() {
@@ -948,7 +948,7 @@ impl OpsCrud {
         durability_timeout: Option<Duration>,
         preserve_expiry: Option<bool>,
         on_behalf_of: Option<&str>,
-        buf: &mut Vec<u8>,
+        buf: &mut [u8],
     ) -> Result<Magic> {
         if let Some(obo) = on_behalf_of {
             extframe::append_ext_frame(ExtReqFrameCode::OnBehalfOf, obo.as_bytes(), buf)?;
