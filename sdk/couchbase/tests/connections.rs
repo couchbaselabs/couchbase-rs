@@ -44,7 +44,7 @@ fn test_collection_use_after_cluster_drop() {
         try_until(
             Instant::now().add(Duration::from_millis(1000)),
             Duration::from_millis(10),
-            "operation didn't fail with disconnected",
+            "operation didn't fail with disconnected!",
             async || {
                 let err = match collection.upsert(&key, "test", None).await {
                     Ok(_) => return Ok(None),
