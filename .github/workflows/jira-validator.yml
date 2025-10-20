@@ -13,15 +13,12 @@ jobs:
 
       - name: Prep
         run: |
-          # Checkout branch
-          git checkout -q ${{ github.event.pull_request.head.ref }}
-          
-          # Set variables
           BASE_BRANCH=${{ github.event.pull_request.base.ref }}
-          
-          # Write BASE_BRANCH to GITHUB_ENV so commit checker can use
-          echo "BASE_BRANCH=$BASE_BRANCH" | tee -a $GITHUB_ENV
+          HEAD_REPO=${{ github.event.pull_request.head.repo.clone_url }}
+          HEAD_REF=${{ github.event.pull_request.head.ref }}
 
+          git fetch --no-tags "$HEAD_REPO" "$HEAD_REF":pr_branch
+          echo "BASE_BRANCH=$BASE_BRANCH" >> $GITHUB_ENV
       - name: Jira Commit Checker
         id: jira_commit_checker
         uses: couchbaselabs/ActionJiraCommitValidate@master
