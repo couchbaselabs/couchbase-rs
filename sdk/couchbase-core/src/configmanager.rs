@@ -18,10 +18,10 @@
 
 use crate::agent::AgentInner;
 use crate::cbconfig::TerseConfig;
-use crate::configfetcher::ConfigFetcherMemd;
+use crate::configfetcher::{ConfigFetcherMemd, ConfigFetcherMemdOptions};
 use crate::configparser::ConfigParser;
 use crate::configwatcher::{ConfigWatcherMemd, ConfigWatcherMemdConfig, ConfigWatcherMemdOptions};
-use crate::kvclientmanager::KvClientManager;
+use crate::kvendpointclientmanager::KvEndpointClientManager;
 use crate::nmvbhandler::ConfigUpdater;
 use crate::parsedconfig::{ParsedConfig, ParsedConfigBucket};
 use log::{debug, warn};
@@ -41,6 +41,7 @@ pub(crate) trait ConfigManager: Sized + Send + Sync {
         &self,
         rev_id: i64,
         rev_epoch: i64,
+        endpoint_id: String,
     ) -> impl Future<Output = Option<ParsedConfig>> + Send;
     fn out_of_band_config(&self, config: ParsedConfig) -> Option<ParsedConfig>;
 }
@@ -55,17 +56,18 @@ pub(crate) struct ConfigManagerMemdConfig {
     pub endpoints: Vec<String>,
 }
 
-pub(crate) struct ConfigManagerMemdOptions<M: KvClientManager> {
+pub(crate) struct ConfigManagerMemdOptions<M: KvEndpointClientManager> {
     pub polling_period: Duration,
     pub first_config: ParsedConfig,
     pub kv_client_manager: Arc<M>,
+    pub fetch_timeout: Duration,
 }
 
-pub(crate) struct ConfigManagerMemd<M: KvClientManager> {
+pub(crate) struct ConfigManagerMemd<M: KvEndpointClientManager> {
     inner: Arc<ConfigManagerMemdInner<M>>,
 }
 
-pub(crate) struct ConfigManagerMemdInner<M: KvClientManager> {
+pub(crate) struct ConfigManagerMemdInner<M: KvEndpointClientManager> {
     fetcher: Arc<ConfigFetcherMemd<M>>,
     watcher: Arc<ConfigWatcherMemd<M>>,
 
@@ -81,7 +83,7 @@ pub(crate) struct ConfigManagerMemdInner<M: KvClientManager> {
     watcher_shutdown_tx: broadcast::Sender<()>,
 }
 
-impl<M: KvClientManager + 'static> ConfigManagerMemdInner<M> {
+impl<M: KvEndpointClientManager + 'static> ConfigManagerMemdInner<M> {
     pub fn watch(&self) -> watch::Receiver<ParsedConfig> {
         self.on_new_config_tx.subscribe()
     }
@@ -92,7 +94,12 @@ impl<M: KvClientManager + 'static> ConfigManagerMemdInner<M> {
         })
     }
 
-    async fn perform_out_of_band_fetch(&self, rev_id: i64, rev_epoch: i64) -> Option<ParsedConfig> {
+    async fn perform_out_of_band_fetch(
+        &self,
+        rev_id: i64,
+        rev_epoch: i64,
+        endpoint_id: String,
+    ) -> Option<ParsedConfig> {
         loop {
             let (latest_rev_epoch, latest_rev_id) = {
                 let latest_config = self.latest_config.lock().unwrap();
@@ -104,8 +111,8 @@ impl<M: KvClientManager + 'static> ConfigManagerMemdInner<M> {
             {
                 debug!(
                     "Skipping out-of-band fetch, already have newer or same version: new: \
-                rev_epoch={rev_epoch}, rev_id={rev_id}, old: rev_epoch={latest_rev_epoch}, \
-                rev_id={latest_rev_id}"
+                    rev_epoch={rev_epoch}, rev_id={rev_id}, old: rev_epoch={latest_rev_epoch}, \
+                    rev_id={latest_rev_id}"
                 );
                 // No need to poll, we already have a newer version.
                 return None;
@@ -123,34 +130,30 @@ impl<M: KvClientManager + 'static> ConfigManagerMemdInner<M> {
                 self.out_of_band_notify.notified().await;
                 continue;
             } else {
-                let endpoints = self.watcher.endpoints();
-
-                for endpoint in endpoints {
-                    let parsed_config = match self
-                        .fetcher
-                        .poll_one(&endpoint, latest_rev_id, latest_rev_epoch, |_c| false)
-                        .await
-                    {
-                        Ok(c) => c,
-                        Err(e) => {
-                            warn!("Out-of-band fetch from {endpoint} failed: {e}");
-                            continue;
-                        }
-                    };
-
-                    if let Some(parsed_config) = parsed_config {
-                        if let Some(cfg) = Self::handle_config(
-                            self.latest_config.lock().unwrap(),
-                            parsed_config,
-                            self.latest_version_tx.clone(),
-                        ) {
-                            self.performing_out_of_band_fetch
-                                .store(false, std::sync::atomic::Ordering::SeqCst);
-                            self.out_of_band_notify.notify_waiters();
-
-                            return Some(cfg);
-                        };
+                let parsed_config = match self
+                    .fetcher
+                    .poll_one(&endpoint_id, latest_rev_id, latest_rev_epoch, |_c| false)
+                    .await
+                {
+                    Ok(c) => c,
+                    Err(e) => {
+                        debug!("Out-of-band fetch from {endpoint_id} failed: {e}");
+                        return None;
                     }
+                };
+
+                if let Some(parsed_config) = parsed_config {
+                    if let Some(cfg) = Self::handle_config(
+                        self.latest_config.lock().unwrap(),
+                        parsed_config,
+                        self.latest_version_tx.clone(),
+                    ) {
+                        self.performing_out_of_band_fetch
+                            .store(false, std::sync::atomic::Ordering::SeqCst);
+                        self.out_of_band_notify.notify_waiters();
+
+                        return Some(cfg);
+                    };
                 }
 
                 debug!("No newer config found during out-of-band fetch");
@@ -164,8 +167,14 @@ impl<M: KvClientManager + 'static> ConfigManagerMemdInner<M> {
         }
     }
 
-    pub async fn out_of_band_version(&self, rev_id: i64, rev_epoch: i64) -> Option<ParsedConfig> {
-        self.perform_out_of_band_fetch(rev_id, rev_epoch).await
+    pub async fn out_of_band_version(
+        &self,
+        rev_id: i64,
+        rev_epoch: i64,
+        endpoint_id: String,
+    ) -> Option<ParsedConfig> {
+        self.perform_out_of_band_fetch(rev_id, rev_epoch, endpoint_id)
+            .await
     }
 
     pub fn out_of_band_config(&self, parsed_config: ParsedConfig) -> Option<ParsedConfig> {
@@ -267,7 +276,7 @@ impl<M: KvClientManager + 'static> ConfigManagerMemdInner<M> {
     }
 }
 
-impl<M: KvClientManager + 'static> ConfigManagerMemd<M> {
+impl<M: KvEndpointClientManager + 'static> ConfigManagerMemd<M> {
     pub fn new(
         config: ConfigManagerMemdConfig,
         opts: ConfigManagerMemdOptions<M>,
@@ -279,7 +288,10 @@ impl<M: KvClientManager + 'static> ConfigManagerMemd<M> {
 
         let (latest_version_tx, latest_version_rx) = watch::channel(latest_version.clone());
 
-        let fetcher = Arc::new(ConfigFetcherMemd::new(opts.kv_client_manager));
+        let fetcher = Arc::new(ConfigFetcherMemd::new(ConfigFetcherMemdOptions {
+            kv_client_manager: opts.kv_client_manager,
+            fetch_timeout: opts.fetch_timeout,
+        }));
         let watcher = Arc::new(ConfigWatcherMemd::new(
             ConfigWatcherMemdConfig {
                 endpoints: config.endpoints,
@@ -319,7 +331,7 @@ impl<M: KvClientManager + 'static> ConfigManagerMemd<M> {
     }
 }
 
-impl<M: KvClientManager + 'static> ConfigManager for ConfigManagerMemd<M> {
+impl<M: KvEndpointClientManager + 'static> ConfigManager for ConfigManagerMemd<M> {
     fn watch(&self) -> watch::Receiver<ParsedConfig> {
         self.inner.watch()
     }
@@ -328,9 +340,16 @@ impl<M: KvClientManager + 'static> ConfigManager for ConfigManagerMemd<M> {
         self.inner.reconfigure(config)
     }
 
-    async fn out_of_band_version(&self, rev_id: i64, rev_epoch: i64) -> Option<ParsedConfig> {
+    async fn out_of_band_version(
+        &self,
+        rev_id: i64,
+        rev_epoch: i64,
+        endpoint_id: String,
+    ) -> Option<ParsedConfig> {
         let inner = self.inner.clone();
-        inner.out_of_band_version(rev_id, rev_epoch).await
+        inner
+            .out_of_band_version(rev_id, rev_epoch, endpoint_id)
+            .await
     }
 
     fn out_of_band_config(&self, config: ParsedConfig) -> Option<ParsedConfig> {

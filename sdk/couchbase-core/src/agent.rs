@@ -36,14 +36,11 @@ use crate::error::{Error, ErrorKind, Result};
 use crate::features::BucketFeature;
 use crate::httpcomponent::HttpComponent;
 use crate::httpx::client::{ClientConfig, ReqwestClient};
-use crate::kvclient::{KvClient, KvClientConfig, KvClientOptions, StdKvClient};
+use crate::kvclient::{
+    KvClient, KvClientBootstrapOptions, KvClientOptions, StdKvClient, UnsolicitedPacket,
+};
 use crate::kvclient_ops::KvClientOps;
-use crate::kvclientmanager::{
-    KvClientManager, KvClientManagerConfig, KvClientManagerOptions, StdKvClientManager,
-};
-use crate::kvclientpool::{
-    KvClientPool, KvClientPoolConfig, KvClientPoolOptions, NaiveKvClientPool,
-};
+use crate::kvclientpool::{KvClientPool, KvClientPoolOptions, StdKvClientPool};
 use crate::memdx::client::Client;
 use crate::memdx::opcode::OpCode;
 use crate::memdx::packet::ResponsePacket;
@@ -76,10 +73,15 @@ use std::error::Error as StdError;
 use std::fmt::format;
 use std::io::Cursor;
 use std::net::ToSocketAddrs;
-use std::ops::Add;
+use std::ops::{Add, Deref};
 use std::sync::{Arc, Weak};
 use std::time::Duration;
 
+use crate::componentconfigs::{AgentComponentConfigs, HttpClientConfig};
+use crate::kvclient_babysitter::{KvTarget, StdKvClientBabysitter};
+use crate::kvendpointclientmanager::{
+    KvEndpointClientManager, KvEndpointClientManagerOptions, StdKvEndpointClientManager,
+};
 use crate::orphan_reporter::OrphanReporter;
 use tokio::io::AsyncReadExt;
 use tokio::net;
@@ -89,18 +91,18 @@ use tokio::sync::{broadcast, mpsc, Mutex};
 use tokio::task::JoinHandle;
 use tokio::time::{sleep, timeout, timeout_at, Instant};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct AgentState {
     bucket: Option<String>,
     tls_config: Option<TlsConfig>,
-    authenticator: Arc<Authenticator>,
+    authenticator: Authenticator,
     auth_mechanisms: Vec<AuthMechanism>,
     num_pool_connections: usize,
     // http_transport:
-    last_clients: HashMap<String, KvClientConfig>,
     latest_config: ParsedConfig,
     network_type: String,
 
+    disable_error_map: bool,
     disable_mutation_tokens: bool,
     disable_server_durations: bool,
     kv_connect_timeout: Duration,
@@ -112,7 +114,10 @@ struct AgentState {
     client_name: String,
 }
 
-type AgentClientManager = StdKvClientManager<NaiveKvClientPool<StdKvClient<Client>>>;
+type AgentClientManager = StdKvEndpointClientManager<
+    StdKvClientPool<StdKvClientBabysitter<StdKvClient<Client>>, StdKvClient<Client>>,
+    StdKvClient<Client>,
+>;
 type AgentCollectionResolver = CollectionResolverCached<CollectionResolverMemd<AgentClientManager>>;
 
 pub(crate) struct AgentInner {
@@ -144,19 +149,24 @@ pub struct Agent {
     pub(crate) inner: Arc<AgentInner>,
 }
 
-struct AgentComponentConfigs {
-    pub config_manager_memd_config: ConfigManagerMemdConfig,
-    pub kv_client_manager_client_configs: HashMap<String, KvClientConfig>,
-    pub vbucket_routing_info: VbucketRoutingInfo,
-    pub query_config: QueryComponentConfig,
-    pub search_config: SearchComponentConfig,
-    pub mgmt_config: MgmtComponentConfig,
-    pub diagnostics_config: DiagnosticsComponentConfig,
-    pub http_client_config: ClientConfig,
-}
-
 impl AgentInner {
-    pub async fn unsolicited_packet_handler(&self, packet: ResponsePacket) {
+    fn gen_agent_component_configs_locked(state: &AgentState) -> AgentComponentConfigs {
+        AgentComponentConfigs::gen_from_config(
+            &state.latest_config,
+            &state.network_type,
+            state.tls_config.clone(),
+            state.bucket.clone(),
+            state.authenticator.clone(),
+            HttpClientConfig {
+                idle_connection_timeout: state.http_idle_connection_timeout,
+                max_idle_connections_per_host: state.http_max_idle_connections_per_host,
+                tcp_keep_alive_time: state.tcp_keep_alive_time,
+            },
+        )
+    }
+
+    pub async fn unsolicited_packet_handler(&self, up: UnsolicitedPacket) {
+        let packet = up.packet;
         if packet.op_code == OpCode::Set {
             if let Some(ref extras) = packet.extras {
                 if extras.len() < 16 {
@@ -170,7 +180,7 @@ impl AgentInner {
 
                 if let Some(config) = self
                     .cfg_manager
-                    .out_of_band_version(server_rev_id, server_rev_epoch)
+                    .out_of_band_version(server_rev_id, server_rev_epoch, up.endpoint_id)
                     .await
                 {
                     self.apply_config(config).await;
@@ -191,13 +201,13 @@ impl AgentInner {
         );
         state.latest_config = config;
 
-        self.update_state(&mut state).await;
+        self.update_state_locked(&mut state).await;
     }
 
-    async fn update_state(&self, state: &mut AgentState) {
-        debug!("Agent updating state");
+    async fn update_state_locked(&self, state: &mut AgentState) {
+        debug!("Agent updating state {:?}", state);
 
-        let agent_component_configs = Self::gen_agent_component_configs(state);
+        let agent_component_configs = Self::gen_agent_component_configs_locked(state);
 
         // In order to avoid race conditions between operations selecting the
         // endpoint they need to send the request to, and fetching an actual
@@ -206,26 +216,12 @@ impl AgentInner {
         // the routing table.  Then go back and remove the old entries from
         // the connection manager list.
 
-        let mut old_clients = HashMap::new();
-        for (client_name, client) in &state.last_clients {
-            old_clients.insert(client_name.clone(), client.clone());
-        }
-
-        for (client_name, client) in &agent_component_configs.kv_client_manager_client_configs {
-            old_clients
-                .entry(client_name.clone())
-                .or_insert(client.clone());
-        }
-
         if let Err(e) = self
             .conn_mgr
-            .reconfigure(KvClientManagerConfig {
-                num_pool_connections: state.num_pool_connections,
-                clients: old_clients,
-            })
+            .update_endpoints(agent_component_configs.kv_targets.clone(), true)
             .await
         {
-            error!("Failed to reconfigure connection manager (old clients); {e}");
+            error!("Failed to reconfigure connection manager (add-only); {e}");
         };
 
         self.vb_router
@@ -240,13 +236,10 @@ impl AgentInner {
 
         if let Err(e) = self
             .conn_mgr
-            .reconfigure(KvClientManagerConfig {
-                num_pool_connections: state.num_pool_connections,
-                clients: agent_component_configs.kv_client_manager_client_configs,
-            })
+            .update_endpoints(agent_component_configs.kv_targets, false)
             .await
         {
-            error!("Failed to reconfigure connection manager (updated clients); {e}");
+            error!("Failed to reconfigure connection manager; {e}");
         }
 
         if let Err(e) = self
@@ -264,150 +257,6 @@ impl AgentInner {
             .reconfigure(agent_component_configs.diagnostics_config);
     }
 
-    fn gen_agent_component_configs(state: &mut AgentState) -> AgentComponentConfigs {
-        let config = &state.latest_config;
-        let rev_id = config.rev_id;
-        let network_info = config.addresses_group_for_network_type(&state.network_type);
-
-        let mut gcccp_node_ids = Vec::new();
-        let mut kv_data_node_ids = Vec::new();
-        let mut kv_data_hosts: HashMap<String, Address> = HashMap::new();
-        let mut mgmt_endpoints: HashMap<String, String> = HashMap::new();
-        let mut query_endpoints: HashMap<String, String> = HashMap::new();
-        let mut search_endpoints: HashMap<String, String> = HashMap::new();
-
-        for node in network_info.nodes {
-            let kv_ep_id = format!("kv{}", node.node_id);
-            let mgmt_ep_id = format!("mgmt{}", node.node_id);
-            let query_ep_id = format!("query{}", node.node_id);
-            let search_ep_id = format!("search{}", node.node_id);
-
-            gcccp_node_ids.push(kv_ep_id.clone());
-
-            if node.has_data {
-                kv_data_node_ids.push(kv_ep_id.clone());
-            }
-
-            if state.tls_config.is_some() {
-                if let Some(p) = node.ssl_ports.kv {
-                    kv_data_hosts.insert(
-                        kv_ep_id,
-                        Address {
-                            host: node.hostname.clone(),
-                            port: p,
-                        },
-                    );
-                }
-                if let Some(p) = node.ssl_ports.mgmt {
-                    mgmt_endpoints.insert(mgmt_ep_id, format!("https://{}:{}", node.hostname, p));
-                }
-                if let Some(p) = node.ssl_ports.query {
-                    query_endpoints.insert(query_ep_id, format!("https://{}:{}", node.hostname, p));
-                }
-                if let Some(p) = node.ssl_ports.search {
-                    search_endpoints
-                        .insert(search_ep_id, format!("https://{}:{}", node.hostname, p));
-                }
-            } else {
-                if let Some(p) = node.non_ssl_ports.kv {
-                    kv_data_hosts.insert(
-                        kv_ep_id,
-                        Address {
-                            host: node.hostname.clone(),
-                            port: p,
-                        },
-                    );
-                }
-                if let Some(p) = node.non_ssl_ports.mgmt {
-                    mgmt_endpoints.insert(mgmt_ep_id, format!("http://{}:{}", node.hostname, p));
-                }
-                if let Some(p) = node.non_ssl_ports.query {
-                    query_endpoints.insert(query_ep_id, format!("http://{}:{}", node.hostname, p));
-                }
-                if let Some(p) = node.non_ssl_ports.search {
-                    search_endpoints
-                        .insert(search_ep_id, format!("http://{}:{}", node.hostname, p));
-                }
-            }
-        }
-
-        let mut clients = HashMap::new();
-        for (node_id, address) in kv_data_hosts {
-            let config = KvClientConfig {
-                address,
-                tls: state.tls_config.clone(),
-                client_name: state.client_name.clone(),
-                authenticator: state.authenticator.clone(),
-                selected_bucket: state.bucket.clone(),
-                disable_error_map: false,
-                auth_mechanisms: state.auth_mechanisms.clone(),
-                disable_mutation_tokens: state.disable_mutation_tokens,
-                disable_server_durations: state.disable_server_durations,
-                connect_timeout: state.kv_connect_timeout,
-                tcp_keep_alive_time: state.tcp_keep_alive_time,
-            };
-            clients.insert(node_id, config);
-        }
-
-        let vbucket_routing_info = if let Some(info) = &state.latest_config.bucket {
-            VbucketRoutingInfo {
-                vbucket_info: info.vbucket_map.clone(),
-                server_list: kv_data_node_ids,
-                bucket_selected: state.bucket.is_some(),
-            }
-        } else {
-            VbucketRoutingInfo {
-                vbucket_info: None,
-                server_list: kv_data_node_ids,
-                bucket_selected: state.bucket.is_some(),
-            }
-        };
-
-        let mut available_services = vec![ServiceType::MEMD];
-        if !query_endpoints.is_empty() {
-            available_services.push(ServiceType::QUERY)
-        }
-        if !search_endpoints.is_empty() {
-            available_services.push(ServiceType::SEARCH)
-        }
-
-        AgentComponentConfigs {
-            config_manager_memd_config: ConfigManagerMemdConfig {
-                endpoints: gcccp_node_ids,
-            },
-            kv_client_manager_client_configs: clients,
-            vbucket_routing_info,
-            query_config: QueryComponentConfig {
-                endpoints: query_endpoints,
-                authenticator: state.authenticator.clone(),
-            },
-            search_config: SearchComponentConfig {
-                endpoints: search_endpoints,
-                authenticator: state.authenticator.clone(),
-                vector_search_enabled: state
-                    .latest_config
-                    .features
-                    .contains(&ParsedConfigFeature::FtsVectorSearch),
-            },
-            http_client_config: ClientConfig {
-                tls_config: state.tls_config.clone(),
-                idle_connection_timeout: state.http_idle_connection_timeout,
-                max_idle_connections_per_host: state.http_max_idle_connections_per_host,
-                tcp_keep_alive_time: state.tcp_keep_alive_time,
-            },
-            mgmt_config: MgmtComponentConfig {
-                endpoints: mgmt_endpoints,
-                authenticator: state.authenticator.clone(),
-            },
-            diagnostics_config: DiagnosticsComponentConfig {
-                bucket: state.bucket.clone(),
-                services: available_services,
-                rev_id,
-            },
-        }
-    }
-
-    // TODO: This really shouldn't be async
     pub async fn bucket_features(&self) -> Result<Vec<BucketFeature>> {
         let guard = self.state.lock().await;
 
@@ -491,14 +340,14 @@ impl Agent {
 
         let mut state = AgentState {
             bucket: opts.bucket_name.clone(),
-            authenticator: Arc::new(opts.authenticator),
+            authenticator: opts.authenticator.clone(),
             num_pool_connections: opts.kv_config.num_connections,
-            last_clients: Default::default(),
             latest_config: ParsedConfig::default(),
             network_type: "".to_string(),
             client_name: client_name.clone(),
             tls_config: opts.tls_config,
-            auth_mechanisms,
+            auth_mechanisms: auth_mechanisms.clone(),
+            disable_error_map: !opts.kv_config.enable_error_map,
             disable_mutation_tokens: !opts.kv_config.enable_mutation_tokens,
             disable_server_durations: !opts.kv_config.enable_server_durations,
             kv_connect_timeout: opts.kv_config.connect_timeout,
@@ -527,6 +376,7 @@ impl Agent {
             Self::gen_first_http_endpoints(&opts.seed_config.http_addrs, &state);
         let first_config = Self::get_first_config(
             first_kv_client_configs,
+            &state,
             first_http_client_configs,
             http_client.clone(),
             err_map_component.clone(),
@@ -539,32 +389,38 @@ impl Agent {
         let network_type = NetworkTypeHeuristic::identify(&state.latest_config);
         state.network_type = network_type;
 
-        let agent_component_configs = AgentInner::gen_agent_component_configs(&mut state);
+        let agent_component_configs = AgentInner::gen_agent_component_configs_locked(&state);
 
         let err_map_component_conn_mgr = err_map_component.clone();
 
         let num_pool_connections = state.num_pool_connections;
-        let state = Arc::new(Mutex::new(state));
 
         let (unsolicited_packet_tx, mut unsolicited_packet_rx) = mpsc::unbounded_channel();
 
         let conn_mgr = Arc::new(
-            StdKvClientManager::new(
-                KvClientManagerConfig {
-                    num_pool_connections,
-                    clients: agent_component_configs.kv_client_manager_client_configs,
-                },
-                KvClientManagerOptions {
-                    connect_timeout,
-                    connect_throttle_period: opts.kv_config.connect_throttle_timeout,
-                    unsolicited_packet_tx: Some(unsolicited_packet_tx),
-                    orphan_handler: opts.orphan_response_handler,
-                    on_err_map_fetched_handler: Some(Arc::new(move |err_map| {
+            StdKvEndpointClientManager::new(KvEndpointClientManagerOptions {
+                on_close_handler: Arc::new(|_manager_id| {}),
+                num_pool_connections,
+                connect_throttle_period: opts.kv_config.connect_throttle_timeout,
+                bootstrap_options: KvClientBootstrapOptions {
+                    client_name: client_name.clone(),
+                    disable_error_map: state.disable_error_map,
+                    disable_mutation_tokens: state.disable_mutation_tokens,
+                    disable_server_durations: state.disable_server_durations,
+                    on_err_map_fetched: Some(Arc::new(move |err_map| {
                         err_map_component_conn_mgr.on_err_map(err_map);
                     })),
-                    disable_decompression: opts.compression_config.disable_decompression,
+                    tcp_keep_alive_time: state.tcp_keep_alive_time,
+                    auth_mechanisms,
+                    connect_timeout,
                 },
-            )
+                unsolicited_packet_tx: Some(unsolicited_packet_tx),
+                orphan_handler: opts.orphan_response_handler,
+                endpoints: agent_component_configs.kv_targets,
+                authenticator: opts.authenticator,
+                disable_decompression: opts.compression_config.disable_decompression,
+                selected_bucket: opts.bucket_name,
+            })
             .await?,
         );
 
@@ -574,6 +430,7 @@ impl Agent {
                 polling_period: opts.config_poller_config.poll_interval,
                 kv_client_manager: conn_mgr.clone(),
                 first_config,
+                fetch_timeout: opts.config_poller_config.fetch_timeout,
             },
         ));
         let vb_router = Arc::new(StdVbucketRouter::new(
@@ -639,6 +496,8 @@ impl Agent {
             retry_manager.clone(),
             agent_component_configs.diagnostics_config,
         );
+
+        let state = Arc::new(Mutex::new(state));
 
         let inner = Arc::new(AgentInner {
             state,
@@ -717,35 +576,46 @@ impl Agent {
     }
 
     async fn get_first_config<C: httpx::client::Client>(
-        kv_client_manager_client_configs: HashMap<String, KvClientConfig>,
+        kv_targets: HashMap<String, KvTarget>,
+        state: &AgentState,
         http_configs: HashMap<String, FirstHttpConfig>,
         http_client: Arc<C>,
         err_map_component: Arc<ErrMapComponent>,
         connect_timeout: Duration,
     ) -> Result<ParsedConfig> {
         loop {
-            for endpoint_config in kv_client_manager_client_configs.values() {
-                let host = &endpoint_config.address;
+            for target in kv_targets.values() {
+                let host = &target.address;
                 let err_map_component_clone = err_map_component.clone();
                 let timeout_result = timeout(
                     connect_timeout,
-                    StdKvClient::new(
-                        endpoint_config.clone(),
-                        KvClientOptions {
-                            unsolicited_packet_tx: None,
-                            orphan_handler: None,
-                            on_close: Arc::new(|id| {
-                                Box::pin(async move {
-                                    debug!("Bootstrap client {id} closed");
-                                })
-                            }),
+                    StdKvClient::new(KvClientOptions {
+                        address: target.clone(),
+                        authenticator: state.authenticator.clone(),
+                        selected_bucket: state.bucket.clone(),
+                        bootstrap_options: KvClientBootstrapOptions {
+                            client_name: state.client_name.clone(),
+                            disable_error_map: state.disable_error_map,
+                            disable_mutation_tokens: true,
+                            disable_server_durations: true,
                             on_err_map_fetched: Some(Arc::new(move |err_map| {
                                 err_map_component_clone.on_err_map(err_map);
                             })),
-                            disable_decompression: false,
-                            id: Uuid::new_v4().to_string(),
+                            tcp_keep_alive_time: state.tcp_keep_alive_time,
+                            auth_mechanisms: state.auth_mechanisms.clone(),
+                            connect_timeout,
                         },
-                    ),
+                        endpoint_id: "".to_string(),
+                        unsolicited_packet_tx: None,
+                        orphan_handler: None,
+                        on_close: Arc::new(|id| {
+                            Box::pin(async move {
+                                debug!("Bootstrap client {id} closed");
+                            })
+                        }),
+                        disable_decompression: false,
+                        id: Uuid::new_v4().to_string(),
+                    }),
                 )
                 .await;
 
@@ -793,7 +663,7 @@ impl Agent {
             for endpoint_config in http_configs.values() {
                 let endpoint = endpoint_config.endpoint.clone();
                 let host = get_host_port_from_uri(&endpoint)?;
-                let user_pass = match endpoint_config.authenticator.as_ref() {
+                let user_pass = match &endpoint_config.authenticator {
                     Authenticator::PasswordAuthenticator(authenticator) => {
                         authenticator.get_credentials(&ServiceType::MGMT, host)?
                     }
@@ -878,24 +748,15 @@ impl Agent {
     fn gen_first_kv_client_configs(
         memd_addrs: &Vec<Address>,
         state: &AgentState,
-    ) -> HashMap<String, KvClientConfig> {
+    ) -> HashMap<String, KvTarget> {
         let mut clients = HashMap::new();
         for addr in memd_addrs {
-            let node_id = format!("kv{addr}");
-            let config = KvClientConfig {
+            let node_id = format!("kv-{addr}");
+            let target = KvTarget {
                 address: addr.clone(),
-                tls: state.tls_config.clone(),
-                client_name: state.client_name.clone(),
-                authenticator: state.authenticator.clone(),
-                selected_bucket: state.bucket.clone(),
-                disable_error_map: false,
-                auth_mechanisms: state.auth_mechanisms.clone(),
-                disable_mutation_tokens: state.disable_mutation_tokens,
-                disable_server_durations: state.disable_server_durations,
-                connect_timeout: state.kv_connect_timeout,
-                tcp_keep_alive_time: state.tcp_keep_alive_time,
+                tls_config: state.tls_config.clone(),
             };
-            clients.insert(node_id, config);
+            clients.insert(node_id, target);
         }
 
         clients
@@ -952,6 +813,6 @@ struct FirstHttpConfig {
     pub endpoint: String,
     pub tls: Option<TlsConfig>,
     pub user_agent: String,
-    pub authenticator: Arc<Authenticator>,
+    pub authenticator: Authenticator,
     pub bucket_name: Option<String>,
 }

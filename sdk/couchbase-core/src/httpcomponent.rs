@@ -40,7 +40,7 @@ pub(crate) struct HttpComponent<C: Client> {
 
 pub(crate) struct HttpComponentState {
     endpoints: HashMap<String, String>,
-    authenticator: Arc<Authenticator>,
+    authenticator: Authenticator,
 }
 
 pub(crate) struct HttpEndpointProperties {
@@ -94,7 +94,7 @@ impl<C: Client> HttpComponent<C> {
         };
 
         let host = get_host_port_from_uri(found_endpoint)?;
-        let user_pass = match state.authenticator.as_ref() {
+        let user_pass = match &state.authenticator {
             Authenticator::PasswordAuthenticator(authenticator) => {
                 authenticator.get_credentials(&self.service_type, host)?
             }
@@ -145,7 +145,7 @@ impl<C: Client> HttpComponent<C> {
         let endpoint = remaining_endpoints[endpoint_id];
 
         let host = get_host_port_from_uri(endpoint)?;
-        let user_pass = match state.authenticator.as_ref() {
+        let user_pass = match &state.authenticator {
             Authenticator::PasswordAuthenticator(authenticator) => {
                 authenticator.get_credentials(&self.service_type, host)?
             }
@@ -232,7 +232,7 @@ impl<C: Client> HttpComponent<C> {
         for (_ep_id, endpoint) in remaining_endpoints {
             let host = get_host_port_from_uri(endpoint)?;
 
-            let user_pass = match state.authenticator.as_ref() {
+            let user_pass = match &state.authenticator {
                 Authenticator::PasswordAuthenticator(authenticator) => {
                     authenticator.get_credentials(&self.service_type, host)?
                 }
@@ -280,7 +280,7 @@ impl<C: Client> HttpComponent<C> {
 }
 
 impl HttpComponentState {
-    pub fn new(endpoints: HashMap<String, String>, authenticator: Arc<Authenticator>) -> Self {
+    pub fn new(endpoints: HashMap<String, String>, authenticator: Authenticator) -> Self {
         Self {
             endpoints,
             authenticator,

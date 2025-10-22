@@ -22,7 +22,6 @@ use crate::authenticator::Authenticator;
 use crate::memdx::dispatcher::OrphanResponseHandler;
 use crate::tls_config::TlsConfig;
 use std::fmt::Debug;
-use std::sync::Arc;
 use std::time::Duration;
 
 #[derive(Clone)]
@@ -204,6 +203,7 @@ impl Default for CompressionMode {
 #[non_exhaustive]
 pub struct ConfigPollerConfig {
     pub poll_interval: Duration,
+    pub fetch_timeout: Duration,
 }
 
 impl ConfigPollerConfig {
@@ -215,12 +215,18 @@ impl ConfigPollerConfig {
         self.poll_interval = poll_interval;
         self
     }
+
+    pub fn fetch_timeout(mut self, fetch_timeout: Duration) -> Self {
+        self.fetch_timeout = fetch_timeout;
+        self
+    }
 }
 
 impl Default for ConfigPollerConfig {
     fn default() -> Self {
         Self {
             poll_interval: Duration::from_millis(2500),
+            fetch_timeout: Duration::from_millis(2500),
         }
     }
 }
@@ -228,6 +234,7 @@ impl Default for ConfigPollerConfig {
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub struct KvConfig {
+    pub enable_error_map: bool,
     pub enable_mutation_tokens: bool,
     pub enable_server_durations: bool,
     pub num_connections: usize,
@@ -238,6 +245,11 @@ pub struct KvConfig {
 impl KvConfig {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn enable_error_map(mut self, enable: bool) -> Self {
+        self.enable_error_map = enable;
+        self
     }
 
     pub fn enable_mutation_tokens(mut self, enable: bool) -> Self {
@@ -269,6 +281,7 @@ impl KvConfig {
 impl Default for KvConfig {
     fn default() -> Self {
         Self {
+            enable_error_map: true,
             enable_mutation_tokens: true,
             enable_server_durations: true,
             num_connections: 1,

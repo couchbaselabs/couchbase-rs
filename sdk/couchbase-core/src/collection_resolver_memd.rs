@@ -18,10 +18,9 @@
 
 use crate::collectionresolver::CollectionResolver;
 use crate::error::{Error, Result};
+use crate::kv_orchestration::{orchestrate_kv_client, KvClientManagerClientType};
 use crate::kvclient_ops::KvClientOps;
-use crate::kvclientmanager::{
-    orchestrate_random_memd_client, KvClientManager, KvClientManagerClientType,
-};
+use crate::kvendpointclientmanager::KvEndpointClientManager;
 use crate::memdx::request::GetCollectionIdRequest;
 use crate::memdx::response::GetCollectionIdResponse;
 use futures::TryFutureExt;
@@ -37,7 +36,7 @@ pub(crate) struct CollectionResolverMemdOptions<K> {
 
 impl<K> CollectionResolverMemd<K>
 where
-    K: KvClientManager,
+    K: KvEndpointClientManager,
 {
     pub fn new(opts: CollectionResolverMemdOptions<K>) -> Self {
         Self {
@@ -48,14 +47,14 @@ where
 
 impl<K> CollectionResolver for CollectionResolverMemd<K>
 where
-    K: KvClientManager,
+    K: KvEndpointClientManager + Send + Sync,
 {
     async fn resolve_collection_id(
         &self,
         scope_name: &str,
         collection_name: &str,
     ) -> Result<(u32, u64)> {
-        let resp: GetCollectionIdResponse = orchestrate_random_memd_client(
+        let resp: GetCollectionIdResponse = orchestrate_kv_client(
             self.conn_mgr.clone(),
             async |client: Arc<KvClientManagerClientType<K>>| {
                 client
