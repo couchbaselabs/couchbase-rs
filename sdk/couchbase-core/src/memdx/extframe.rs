@@ -107,17 +107,25 @@ fn iter_ext_frames(buf: &[u8], mut cb: impl FnMut(ExtResFrameCode, &[u8])) -> er
 pub fn append_ext_frame(
     frame_code: ExtReqFrameCode,
     frame_body: &[u8],
-    buf: &mut Vec<u8>,
+    buf: &mut [u8],
+    offset: &mut usize,
 ) -> error::Result<()> {
     let frame_len = frame_body.len();
 
-    buf.push(0);
-    let orig_buf_len = buf.len();
-    let hdr_byte_ptr = &mut buf[orig_buf_len - 1];
+    if *offset >= buf.len() {
+        return Err(Error::new_invalid_argument_error(
+            "buffer overflow",
+            "ext frame".to_string(),
+        ));
+    }
+
+    buf[*offset] = 0;
+    let hdr_byte_ptr = *offset;
+    *offset += 1;
     let u_frame_code: u16 = frame_code.into();
 
     if u_frame_code < 15 {
-        *hdr_byte_ptr = (*hdr_byte_ptr as u16 | ((u_frame_code & 0x0f) << 4)) as u8;
+        buf[hdr_byte_ptr] |= ((u_frame_code & 0x0f) << 4) as u8;
     } else {
         if u_frame_code - 15 >= 15 {
             return Err(Error::new_invalid_argument_error(
@@ -125,14 +133,20 @@ pub fn append_ext_frame(
                 "ext frame".to_string(),
             ));
         }
+        buf[hdr_byte_ptr] |= 0xF0;
 
-        *hdr_byte_ptr |= 0xF0;
-        buf.put_u16(u_frame_code);
+        if *offset + 2 > buf.len() {
+            return Err(Error::new_invalid_argument_error(
+                "buffer overflow",
+                "ext frame".to_string(),
+            ));
+        }
+        buf[*offset..*offset + 2].copy_from_slice(&(u_frame_code.to_be_bytes()));
+        *offset += 2;
     }
 
-    let hdr_byte_ptr = &mut buf[orig_buf_len - 1];
     if frame_len < 15 {
-        *hdr_byte_ptr |= (frame_len as u8) & 0xF;
+        buf[hdr_byte_ptr] |= (frame_len as u8) & 0xF;
     } else {
         if frame_len - 15 >= 15 {
             return Err(Error::new_invalid_argument_error(
@@ -140,13 +154,26 @@ pub fn append_ext_frame(
                 "ext frame".to_string(),
             ));
         }
-
-        *hdr_byte_ptr |= 0x0F;
-        buf.put_u16((frame_len - 15) as u16);
+        buf[hdr_byte_ptr] |= 0x0F;
+        if *offset + 2 > buf.len() {
+            return Err(Error::new_invalid_argument_error(
+                "buffer overflow",
+                "ext frame".to_string(),
+            ));
+        }
+        buf[*offset..*offset + 2].copy_from_slice(&((frame_len - 15) as u16).to_be_bytes());
+        *offset += 2;
     }
 
     if frame_len > 0 {
-        buf.extend_from_slice(frame_body);
+        if *offset + frame_len > buf.len() {
+            return Err(Error::new_invalid_argument_error(
+                "buffer overflow",
+                "ext frame".to_string(),
+            ));
+        }
+        buf[*offset..*offset + frame_len].copy_from_slice(frame_body);
+        *offset += frame_len;
     }
 
     Ok(())
@@ -316,25 +343,34 @@ mod tests {
 
     #[test]
     fn test_append_preserve_expiry() {
-        let mut buf = Vec::with_capacity(128);
-        append_ext_frame(ExtReqFrameCode::PreserveTTL, &[], &mut buf).unwrap();
+        let mut buf = [0; 128];
+        let mut offset = 0;
+        append_ext_frame(ExtReqFrameCode::PreserveTTL, &[], &mut buf, &mut offset).unwrap();
 
-        assert_eq!(buf, vec![80]);
+        assert_eq!(&buf[..offset], &[80]);
     }
 
     #[test]
     fn test_append_durability_level_no_timeout() {
-        let mut buf = Vec::with_capacity(128);
-        append_ext_frame(ExtReqFrameCode::Durability, &[0x01], &mut buf).unwrap();
+        let mut buf = [0; 128];
+        let mut offset = 0;
+        append_ext_frame(ExtReqFrameCode::Durability, &[0x01], &mut buf, &mut offset).unwrap();
 
-        assert_eq!(buf, vec![17, 1]);
+        assert_eq!(&buf[..offset], &[17, 1]);
     }
 
     #[test]
     fn test_append_durability_level_timeout() {
-        let mut buf = Vec::with_capacity(128);
-        append_ext_frame(ExtReqFrameCode::Durability, &[0x01, 0x00, 0x01], &mut buf).unwrap();
+        let mut buf = [0u8; 128];
+        let mut offset = 0;
+        append_ext_frame(
+            ExtReqFrameCode::Durability,
+            &[0x01, 0x00, 0x01],
+            &mut buf,
+            &mut offset,
+        )
+        .unwrap();
 
-        assert_eq!(buf, vec![19, 1, 0, 1]);
+        assert_eq!(&buf[..offset], &[19, 1, 0, 1]);
     }
 }
