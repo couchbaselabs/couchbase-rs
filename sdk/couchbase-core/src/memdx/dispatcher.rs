@@ -31,12 +31,12 @@ use crate::orphan_reporter::OrphanContext;
 pub type UnsolicitedPacketHandler =
     Arc<dyn Fn(ResponsePacket) -> BoxFuture<'static, ()> + Send + Sync>;
 pub type OrphanResponseHandler = Arc<dyn Fn(ResponsePacket, OrphanContext) + Send + Sync>;
-pub type OnConnectionCloseHandler = Arc<dyn Fn() -> BoxFuture<'static, ()> + Send + Sync>;
+pub type OnReadLoopCloseHandler = Arc<dyn Fn() -> BoxFuture<'static, ()> + Send + Sync>;
 
 pub struct DispatcherOptions {
     pub unsolicited_packet_handler: UnsolicitedPacketHandler,
     pub orphan_handler: Option<OrphanResponseHandler>,
-    pub on_connection_close_handler: OnConnectionCloseHandler,
+    pub on_read_close_handler: OnReadLoopCloseHandler,
     pub disable_decompression: bool,
     pub id: String,
 }

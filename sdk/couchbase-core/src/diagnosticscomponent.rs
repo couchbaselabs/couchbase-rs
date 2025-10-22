@@ -23,8 +23,8 @@ use crate::httpx::client::Client;
 use crate::httpx::request::OnBehalfOfInfo;
 use crate::kvclient::KvClient;
 use crate::kvclient_ops::KvClientOps;
-use crate::kvclientmanager::KvClientManager;
-use crate::kvclientpool::{KvClientPool, KvClientPoolClient};
+use crate::kvclientpool::KvClientPool;
+use crate::kvendpointclientmanager::KvEndpointClientManager;
 use crate::memdx::request::PingRequest;
 use crate::options::diagnostics::DiagnosticsOptions;
 use crate::options::ping::PingOptions;
@@ -80,7 +80,7 @@ struct PingEveryKvConnectionOptions<'a> {
     pub(crate) on_behalf_of: Option<&'a str>,
 }
 
-pub struct DiagnosticsComponent<C: Client, M: KvClientManager> {
+pub struct DiagnosticsComponent<C: Client, M: KvEndpointClientManager> {
     kv_client_manager: Arc<M>,
     query_component: Arc<QueryComponent<C>>,
     search_component: Arc<SearchComponent<C>>,
@@ -103,7 +103,7 @@ struct DiagnosticsComponentState {
     rev_id: i64,
 }
 
-impl<C: Client + 'static, M: KvClientManager> DiagnosticsComponent<C, M> {
+impl<C: Client + 'static, M: KvEndpointClientManager> DiagnosticsComponent<C, M> {
     pub fn new(
         kv_client_manager: Arc<M>,
         query_component: Arc<QueryComponent<C>>,
@@ -139,36 +139,7 @@ impl<C: Client + 'static, M: KvClientManager> DiagnosticsComponent<C, M> {
         &self,
         _opts: &DiagnosticsOptions,
     ) -> crate::error::Result<DiagnosticsResult> {
-        let pools = self.kv_client_manager.get_all_pools();
-
-        let mut endpoint_reports = vec![];
-        for (endpoint, pool) in &pools {
-            for (id, client) in pool.get_all_clients().await? {
-                let (local_address, last_activity) = if let Some(cli) = &client.client {
-                    (
-                        Some(cli.local_addr().to_string()),
-                        Some(
-                            Utc::now()
-                                .sub(cli.last_activity().to_utc())
-                                .num_microseconds()
-                                .unwrap_or_default(),
-                        ),
-                    )
-                } else {
-                    (None, None)
-                };
-
-                endpoint_reports.push(EndpointDiagnostics {
-                    service_type: ServiceType::MEMD,
-                    id,
-                    local_address,
-                    remote_address: endpoint.to_string(),
-                    last_activity,
-                    namespace: pool.get_bucket().await,
-                    state: client.connection_state,
-                });
-            }
-        }
+        let endpoint_reports = self.kv_client_manager.endpoint_diagnostics().await;
 
         Ok(DiagnosticsResult {
             version: 2,
@@ -181,7 +152,7 @@ impl<C: Client + 'static, M: KvClientManager> DiagnosticsComponent<C, M> {
 
     pub async fn ping(&self, opts: &PingOptions) -> crate::error::Result<PingReport>
     where
-        <<M as KvClientManager>::Pool as KvClientPool>::Client: 'static,
+        <M as KvEndpointClientManager>::Client: 'static,
     {
         let (rev_id, bucket, available_services) = {
             let state = self.state.lock().unwrap();
@@ -376,71 +347,22 @@ impl<C: Client + 'static, M: KvClientManager> DiagnosticsComponent<C, M> {
     }
 
     async fn is_kv_ready(&self, on_behalf_of: Option<&str>, desired_state: ClusterState) -> bool {
-        let pools = self.kv_client_manager.get_all_pools();
-
         let req = PingRequest { on_behalf_of };
 
-        let mut handles = Vec::with_capacity(pools.len());
-        for (pool_id, pool) in pools {
-            let clients = match pool.get_all_clients().await {
-                Ok(clients) => clients,
-                Err(e) => {
-                    debug!("Failed to get clients from pool: {e}");
-                    return false;
-                }
+        let responses = self.kv_client_manager.ping_all_clients(req).await;
+
+        let mut pools_ok = Vec::with_capacity(responses.len());
+        for response in responses.values() {
+            let is_pool_ok = if desired_state == ClusterState::Online {
+                response.iter().all(|res| res.is_ok())
+            } else {
+                response.iter().any(|res| res.is_ok())
             };
 
-            let req = req.clone();
-            let handle = async move {
-                debug!("Pinging pool {pool_id} with {} clients", clients.len());
-                let mut pool_handles = Vec::with_capacity(clients.len());
-                for (id, client) in clients {
-                    let req = req.clone();
-
-                    let handle = self.maybe_ping_client(id.clone(), req, client);
-
-                    pool_handles.push(handle);
-                }
-
-                let results = join_all(pool_handles).await;
-
-                if desired_state == ClusterState::Online {
-                    results.into_iter().all(|ready| ready)
-                } else {
-                    results.into_iter().any(|ready| ready)
-                }
-            };
-
-            handles.push(handle);
+            pools_ok.push(is_pool_ok);
         }
 
-        let results = join_all(handles).await;
-
-        results.into_iter().all(|ready| ready)
-    }
-
-    async fn maybe_ping_client<K>(
-        &self,
-        pool_id: String,
-        req: PingRequest<'_>,
-        client: KvClientPoolClient<K>,
-    ) -> bool
-    where
-        K: KvClient + KvClientOps,
-    {
-        if let Some(client) = &client.client {
-            let client = client.clone();
-            match client.ping(req).await {
-                Ok(_) => true,
-                Err(e) => {
-                    debug!("Ping against client {} failed: {}", client.id(), e);
-                    false
-                }
-            }
-        } else {
-            debug!("Client {pool_id} is not connected");
-            false
-        }
+        pools_ok.into_iter().all(|ready| ready)
     }
 
     async fn ping_all_kv_nodes(
@@ -448,7 +370,7 @@ impl<C: Client + 'static, M: KvClientManager> DiagnosticsComponent<C, M> {
         opts: PingKvOptions<'_>,
     ) -> crate::error::Result<Vec<EndpointPingReport>>
     where
-        <<M as KvClientManager>::Pool as KvClientPool>::Client: 'static,
+        <M as KvEndpointClientManager>::Client: 'static,
     {
         let clients = self.kv_client_manager.get_client_per_endpoint().await?;
 
@@ -498,7 +420,7 @@ impl<C: Client + 'static, M: KvClientManager> DiagnosticsComponent<C, M> {
 
     async fn ping_one_kv_node(
         &self,
-        client: Arc<<<M as KvClientManager>::Pool as KvClientPool>::Client>,
+        client: Arc<<M as KvEndpointClientManager>::Client>,
         timeout: Duration,
         req: PingRequest<'_>,
     ) -> EndpointPingReport {

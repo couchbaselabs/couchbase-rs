@@ -19,26 +19,38 @@
 use crate::cbconfig;
 use crate::configparser::ConfigParser;
 use crate::configwatcher::ConfigWatcherMemd;
-use crate::error::Error;
+use crate::error::{Error, ErrorKind};
+use crate::kv_orchestration::KvClientManagerClientType;
 use crate::kvclient::{KvClient, StdKvClient};
 use crate::kvclient_ops::KvClientOps;
-use crate::kvclientmanager::{KvClientManager, KvClientManagerClientType};
 use crate::kvclientpool::KvClientPool;
+use crate::kvendpointclientmanager::KvEndpointClientManager;
 use crate::memdx::hello_feature::HelloFeature;
 use crate::memdx::request::{GetClusterConfigKnownVersion, GetClusterConfigRequest};
 use crate::parsedconfig::ParsedConfig;
 use log::{debug, trace};
 use std::env;
 use std::sync::Arc;
+use std::time::Duration;
+use tokio::time::{timeout, timeout_at};
 
 #[derive(Clone)]
-pub(crate) struct ConfigFetcherMemd<M: KvClientManager> {
+pub(crate) struct ConfigFetcherMemd<M: KvEndpointClientManager> {
     kv_client_manager: Arc<M>,
+    fetch_timeout: Duration,
 }
 
-impl<M: KvClientManager> ConfigFetcherMemd<M> {
-    pub fn new(kv_client_manager: Arc<M>) -> Self {
-        Self { kv_client_manager }
+pub(crate) struct ConfigFetcherMemdOptions<M: KvEndpointClientManager> {
+    pub kv_client_manager: Arc<M>,
+    pub fetch_timeout: Duration,
+}
+
+impl<M: KvEndpointClientManager> ConfigFetcherMemd<M> {
+    pub fn new(opts: ConfigFetcherMemdOptions<M>) -> Self {
+        Self {
+            kv_client_manager: opts.kv_client_manager.clone(),
+            fetch_timeout: opts.fetch_timeout,
+        }
     }
     pub(crate) async fn poll_one(
         &self,
@@ -47,7 +59,7 @@ impl<M: KvClientManager> ConfigFetcherMemd<M> {
         rev_epoch: i64,
         skip_fetch_cb: impl FnOnce(Arc<KvClientManagerClientType<M>>) -> bool,
     ) -> crate::error::Result<Option<ParsedConfig>> {
-        let client = self.kv_client_manager.get_client(endpoint).await?;
+        let client = self.kv_client_manager.get_endpoint_client(endpoint).await?;
 
         if skip_fetch_cb(client.clone()) {
             return Ok(None);
@@ -64,10 +76,13 @@ impl<M: KvClientManager> ConfigFetcherMemd<M> {
             }
         };
 
-        let resp = client
-            .get_cluster_config(GetClusterConfigRequest { known_version })
-            .await
-            .map_err(Error::new_contextual_memdx_error)?;
+        let resp = timeout(
+            self.fetch_timeout,
+            client.get_cluster_config(GetClusterConfigRequest { known_version }),
+        )
+        .await
+        .map_err(|e| Error::new_message_error("get cluster config timed out"))?
+        .map_err(Error::new_contextual_memdx_error)?;
 
         if resp.config.is_empty() {
             return Ok(None);

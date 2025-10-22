@@ -57,7 +57,7 @@ pub(crate) struct QueryComponent<C: Client> {
 #[derive(Debug)]
 pub(crate) struct QueryComponentConfig {
     pub endpoints: HashMap<String, String>,
-    pub authenticator: Arc<Authenticator>,
+    pub authenticator: Authenticator,
 }
 
 pub(crate) struct QueryComponentOptions {

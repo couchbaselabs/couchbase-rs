@@ -47,7 +47,7 @@ use crate::memdx::codec::KeyValueCodec;
 use crate::memdx::connection::{ConnectionType, Stream};
 use crate::memdx::datatype::DataTypeFlag;
 use crate::memdx::dispatcher::{
-    Dispatcher, DispatcherOptions, OnConnectionCloseHandler, OrphanResponseHandler,
+    Dispatcher, DispatcherOptions, OnReadLoopCloseHandler, OrphanResponseHandler,
     UnsolicitedPacketHandler,
 };
 use crate::memdx::error;
@@ -82,7 +82,7 @@ struct ReadLoopOptions {
     pub client_id: String,
     pub unsolicited_packet_handler: UnsolicitedPacketHandler,
     pub orphan_handler: Option<OrphanResponseHandler>,
-    pub on_connection_close_tx: OnConnectionCloseHandler,
+    pub on_read_close_handler: OnReadLoopCloseHandler,
     pub on_close_cancel: CancellationToken,
     pub disable_decompression: bool,
     pub local_addr: SocketAddr,
@@ -151,13 +151,13 @@ impl Client {
         client_id: &str,
         stream: FramedRead<ReadHalf<Box<dyn Stream>>, KeyValueCodec>,
         opaque_map: Arc<std::sync::Mutex<OpaqueMap>>,
-        on_connection_close: OnConnectionCloseHandler,
+        on_read_loop_close: OnReadLoopCloseHandler,
     ) {
         drop(stream);
 
         Self::drain_opaque_map(opaque_map).await;
 
-        on_connection_close().await;
+        on_read_loop_close().await;
 
         debug!("{client_id} read loop shut down");
     }
@@ -170,7 +170,7 @@ impl Client {
         loop {
             select! {
                 (_) = opts.on_close_cancel.cancelled() => {
-                    Self::on_read_loop_close(&opts.client_id, stream, opaque_map, opts.on_connection_close_tx).await;
+                    Self::on_read_loop_close(&opts.client_id, stream, opaque_map, opts.on_read_close_handler).await;
                     return;
                 },
                 (next) = stream.next() => {
@@ -244,6 +244,8 @@ impl Client {
                                             Ok(_) => {}
                                             Err(e) => {
                                                 debug!("Sending response to caller failed: {e}");
+                                                Self::on_read_loop_close(&opts.client_id, stream, opaque_map, opts.on_read_close_handler).await;
+                                                return;
                                             }
                                         };
                                     } else if let Some(ref orphan_handler) = opts.orphan_handler {
@@ -260,11 +262,13 @@ impl Client {
                                 }
                                 Err(e) => {
                                     warn!("{} failed to read frame {}", opts.client_id, e);
+                                    Self::on_read_loop_close(&opts.client_id, stream, opaque_map, opts.on_read_close_handler).await;
+                                    return;
                                 }
                             }
                         }
                         None => {
-                            Self::on_read_loop_close(&opts.client_id, stream, opaque_map, opts.on_connection_close_tx).await;
+                            Self::on_read_loop_close(&opts.client_id, stream, opaque_map, opts.on_read_close_handler).await;
                             return;
                         }
                     }
@@ -309,7 +313,7 @@ impl Dispatcher for Client {
                     client_id: read_uuid,
                     unsolicited_packet_handler: opts.unsolicited_packet_handler,
                     orphan_handler: opts.orphan_handler,
-                    on_connection_close_tx: opts.on_connection_close_handler,
+                    on_read_close_handler: opts.on_read_close_handler,
                     on_close_cancel: cancel_child,
                     disable_decompression: opts.disable_decompression,
                     local_addr,

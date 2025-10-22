@@ -20,8 +20,9 @@ use crate::address::Address;
 use crate::auth_mechanism::AuthMechanism;
 use crate::authenticator::{Authenticator, UserPassPair};
 use crate::error::Error;
+use crate::error::ErrorKind::Memdx;
 use crate::error::{MemdxError, Result};
-use crate::memdx;
+use crate::kvclient_babysitter::KvTarget;
 use crate::memdx::connection::{ConnectOptions, ConnectionType, TcpConnection, TlsConnection};
 use crate::memdx::dispatcher::{
     Dispatcher, DispatcherOptions, OrphanResponseHandler, UnsolicitedPacketHandler,
@@ -34,6 +35,8 @@ use crate::memdx::request::{GetErrorMapRequest, HelloRequest, SelectBucketReques
 use crate::service_type::ServiceType;
 use crate::tls_config::TlsConfig;
 use crate::util::hostname_from_addr_str;
+use crate::{error, memdx};
+use arc_swap::ArcSwap;
 use chrono::{DateTime, FixedOffset, Local, NaiveDateTime, Utc};
 use futures::future::BoxFuture;
 use log::{debug, info, warn};
@@ -41,7 +44,7 @@ use std::future::Future;
 use std::net::SocketAddr;
 use std::ops::{Add, Deref};
 use std::sync::atomic::Ordering::SeqCst;
-use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicPtr, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{mpsc, Mutex};
@@ -49,30 +52,42 @@ use tokio::time::Instant;
 use uuid::Uuid;
 
 #[derive(Clone)]
-pub(crate) struct KvClientConfig {
-    pub address: Address,
-    pub tls: Option<TlsConfig>,
+pub(crate) struct KvClientBootstrapOptions {
     pub client_name: String,
-    pub authenticator: Arc<Authenticator>,
-    pub selected_bucket: Option<String>,
+
     pub disable_error_map: bool,
     pub disable_mutation_tokens: bool,
     pub disable_server_durations: bool,
+
+    pub on_err_map_fetched: Option<OnErrMapFetchedHandler>,
+    pub tcp_keep_alive_time: Duration,
     pub auth_mechanisms: Vec<AuthMechanism>,
     pub connect_timeout: Duration,
-    pub tcp_keep_alive_time: Duration,
 }
 
-impl PartialEq for KvClientConfig {
+impl PartialEq for KvClientBootstrapOptions {
     fn eq(&self, other: &Self) -> bool {
-        // TODO: compare root certs or something somehow.
-        self.address == other.address
-            && self.client_name == other.client_name
-            && self.selected_bucket == other.selected_bucket
+        self.client_name == other.client_name
             && self.disable_error_map == other.disable_error_map
             && self.disable_server_durations == other.disable_server_durations
             && self.disable_mutation_tokens == other.disable_mutation_tokens
     }
+}
+
+#[derive(Clone)]
+pub(crate) struct KvClientOptions {
+    pub address: KvTarget,
+    pub authenticator: Authenticator,
+    pub selected_bucket: Option<String>,
+
+    pub bootstrap_options: KvClientBootstrapOptions,
+    pub endpoint_id: String,
+
+    pub unsolicited_packet_tx: Option<UnsolicitedPacketSender>,
+    pub orphan_handler: Option<OrphanResponseHandler>,
+    pub on_close: OnKvClientCloseHandler,
+    pub disable_decompression: bool,
+    pub id: String,
 }
 
 pub(crate) type OnKvClientCloseHandler =
@@ -80,26 +95,18 @@ pub(crate) type OnKvClientCloseHandler =
 
 pub(crate) type OnErrMapFetchedHandler = Arc<dyn Fn(&[u8]) + Send + Sync>;
 
-pub(crate) type UnsolicitedPacketSender = mpsc::UnboundedSender<ResponsePacket>;
-
-#[derive(Clone)]
-pub(crate) struct KvClientOptions {
-    pub unsolicited_packet_tx: Option<UnsolicitedPacketSender>,
-    pub orphan_handler: Option<OrphanResponseHandler>,
-    pub on_close: OnKvClientCloseHandler,
-    pub on_err_map_fetched: Option<OnErrMapFetchedHandler>,
-    pub disable_decompression: bool,
-    pub id: String,
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(crate) struct UnsolicitedPacket {
+    pub packet: ResponsePacket,
+    pub endpoint_id: String,
 }
 
+pub(crate) type UnsolicitedPacketSender = mpsc::UnboundedSender<UnsolicitedPacket>;
+
 pub(crate) trait KvClient: Sized + PartialEq + Send + Sync {
-    fn new(
-        config: KvClientConfig,
-        opts: KvClientOptions,
-    ) -> impl Future<Output = Result<Self>> + Send;
-    fn reconfigure(&self, config: KvClientConfig) -> impl Future<Output = Result<()>> + Send;
+    fn new(opts: KvClientOptions) -> impl Future<Output = Result<Self>> + Send;
+    fn select_bucket(&self, bucket_name: String) -> impl Future<Output = Result<()>> + Send;
     fn has_feature(&self, feature: HelloFeature) -> bool;
-    fn load_factor(&self) -> f64;
     fn remote_hostname(&self) -> &str;
     fn remote_addr(&self) -> SocketAddr;
     fn local_addr(&self) -> SocketAddr;
@@ -113,17 +120,14 @@ pub(crate) struct StdKvClient<D: Dispatcher> {
     remote_addr: SocketAddr,
     local_addr: SocketAddr,
     remote_hostname: String,
+    endpoint_id: String,
 
-    pending_operations: u64,
     cli: D,
-    current_config: Mutex<KvClientConfig>,
+    closed: Arc<AtomicBool>,
+    on_close: OnKvClientCloseHandler,
 
     supported_features: Vec<HelloFeature>,
 
-    // selected_bucket atomically stores the currently selected bucket,
-    // so that we can use it in our errors.  Note that it is set before
-    // we send the operation to select the bucket, since things happen
-    // asynchronously and we do not support changing selected buckets.
     pub(crate) selected_bucket: std::sync::Mutex<Option<String>>,
 
     pub(crate) last_activity_timestamp_micros: AtomicI64,
@@ -144,7 +148,7 @@ impl<D> KvClient for StdKvClient<D>
 where
     D: Dispatcher,
 {
-    async fn new(config: KvClientConfig, opts: KvClientOptions) -> Result<StdKvClient<D>> {
+    async fn new(opts: KvClientOptions) -> Result<StdKvClient<D>> {
         let mut requested_features = vec![
             HelloFeature::DataType,
             HelloFeature::Xattr,
@@ -166,41 +170,44 @@ where
             HelloFeature::PreserveExpiry,
         ];
 
-        if !config.disable_mutation_tokens {
+        if !opts.bootstrap_options.disable_mutation_tokens {
             requested_features.push(HelloFeature::SeqNo)
         }
 
-        if !config.disable_server_durations {
+        if !opts.bootstrap_options.disable_server_durations {
             requested_features.push(HelloFeature::Durations);
         }
 
-        let boostrap_hello = if !config.client_name.is_empty() {
+        let boostrap_hello = if !opts.bootstrap_options.client_name.is_empty() {
             Some(HelloRequest {
-                client_name: Vec::from(config.client_name.clone()),
+                client_name: Vec::from(opts.bootstrap_options.client_name.clone()),
                 requested_features,
             })
         } else {
             None
         };
 
-        let bootstrap_get_error_map = if !config.disable_error_map {
+        let bootstrap_get_error_map = if !opts.bootstrap_options.disable_error_map {
             Some(GetErrorMapRequest { version: 2 })
         } else {
             None
         };
 
-        let creds = match config.authenticator.as_ref() {
+        let address = opts.address.address;
+
+        let creds = match opts.authenticator {
             Authenticator::PasswordAuthenticator(a) => {
-                Some(a.get_credentials(&ServiceType::MEMD, config.address.to_string())?)
+                Some(a.get_credentials(&ServiceType::MEMD, address.to_string())?)
             }
-            Authenticator::CertificateAuthenticator(a) => None,
+            Authenticator::CertificateAuthenticator(_a) => None,
         };
 
         let bootstrap_auth = if let Some(creds) = creds {
             Some(SASLAuthAutoOptions {
                 username: creds.username.clone(),
                 password: creds.password.clone(),
-                enabled_mechs: config
+                enabled_mechs: opts
+                    .bootstrap_options
                     .auth_mechanisms
                     .iter()
                     .cloned()
@@ -212,8 +219,7 @@ where
         };
 
         let bootstrap_select_bucket =
-            config
-                .selected_bucket
+            opts.selected_bucket
                 .as_ref()
                 .map(|bucket_name| SelectBucketRequest {
                     bucket_name: bucket_name.clone(),
@@ -232,15 +238,21 @@ where
 
         debug!(
             "Kvclient {} assigning client id {} for {}",
-            &id, &client_id, &config.address
+            &id, &client_id, &address
         );
 
         let unsolicited_packet_tx = opts.unsolicited_packet_tx.clone();
         let on_close = opts.on_close.clone();
+        let endpoint_id = opts.endpoint_id.clone();
         let memdx_client_opts = DispatcherOptions {
-            on_connection_close_handler: Arc::new(move || {
+            on_read_close_handler: Arc::new(move || {
                 // There's not much to do when the connection closes so just mark us as closed.
-                closed_clone.store(true, Ordering::SeqCst);
+                if closed_clone.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+                    != Ok(true)
+                {
+                    return Box::pin(async move {});
+                }
+
                 let on_close = on_close.clone();
                 let read_id = read_id.clone();
 
@@ -251,9 +263,13 @@ where
             orphan_handler: opts.orphan_handler,
             unsolicited_packet_handler: Arc::new(move |p| {
                 let unsolicited_packet_tx = unsolicited_packet_tx.clone();
+                let endpoint_id = endpoint_id.clone();
                 Box::pin(async move {
                     if let Some(sender) = unsolicited_packet_tx {
-                        if let Err(e) = sender.send(p) {
+                        if let Err(e) = sender.send(UnsolicitedPacket {
+                            packet: p,
+                            endpoint_id,
+                        }) {
                             warn!("Failed to send unsolicited packet {e:?}");
                         };
                     }
@@ -263,13 +279,13 @@ where
             id: client_id,
         };
 
-        let conn = if let Some(tls) = config.tls.clone() {
+        let conn = if let Some(tls) = opts.address.tls_config {
             let conn = match TlsConnection::connect(
-                config.address.clone(),
+                address.clone(),
                 tls,
                 ConnectOptions {
-                    deadline: Instant::now().add(config.connect_timeout),
-                    tcp_keep_alive_time: config.tcp_keep_alive_time,
+                    deadline: Instant::now().add(opts.bootstrap_options.connect_timeout),
+                    tcp_keep_alive_time: opts.bootstrap_options.tcp_keep_alive_time,
                 },
             )
             .await
@@ -277,17 +293,17 @@ where
                 Ok(conn) => conn,
                 Err(e) => {
                     return Err(Error::new_contextual_memdx_error(
-                        MemdxError::new(e).with_dispatched_to(config.address.to_string()),
+                        MemdxError::new(e).with_dispatched_to(address.to_string()),
                     ))
                 }
             };
             ConnectionType::Tls(conn)
         } else {
             let conn = match TcpConnection::connect(
-                config.address.clone(),
+                address.clone(),
                 ConnectOptions {
-                    deadline: Instant::now().add(config.connect_timeout),
-                    tcp_keep_alive_time: config.tcp_keep_alive_time,
+                    deadline: Instant::now().add(opts.bootstrap_options.connect_timeout),
+                    tcp_keep_alive_time: opts.bootstrap_options.tcp_keep_alive_time,
                 },
             )
             .await
@@ -295,7 +311,7 @@ where
                 Ok(conn) => conn,
                 Err(e) => {
                     return Err(Error::new_contextual_memdx_error(
-                        MemdxError::new(e).with_dispatched_to(config.address.to_string()),
+                        MemdxError::new(e).with_dispatched_to(address.to_string()),
                     ))
                 }
             };
@@ -304,7 +320,7 @@ where
 
         let remote_addr = *conn.peer_addr();
         let local_addr = *conn.local_addr();
-        let remote_hostname = hostname_from_addr_str(config.address.host.as_str());
+        let remote_hostname = hostname_from_addr_str(address.host.as_str());
 
         let mut cli = D::new(conn, memdx_client_opts);
 
@@ -312,9 +328,10 @@ where
             remote_addr,
             local_addr,
             remote_hostname,
-            pending_operations: 0,
+            endpoint_id: opts.endpoint_id,
             cli,
-            current_config: Mutex::new(config),
+            closed,
+            on_close: opts.on_close,
             supported_features: vec![],
             selected_bucket: std::sync::Mutex::new(None),
             id: id.clone(),
@@ -350,7 +367,7 @@ where
                 kv_cli.supported_features = hello.enabled_features;
             }
 
-            if let Some(handler) = opts.on_err_map_fetched {
+            if let Some(handler) = opts.bootstrap_options.on_err_map_fetched {
                 if let Some(err_map) = res.error_map {
                     handler(&err_map.error_map);
                 }
@@ -360,77 +377,39 @@ where
         Ok(kv_cli)
     }
 
-    async fn reconfigure(&self, config: KvClientConfig) -> Result<()> {
-        debug!("Reconfiguring KvClient {}", &self.id);
-        let mut current_config = self.current_config.lock().await;
+    async fn select_bucket(&self, bucket_name: String) -> Result<()> {
+        debug!("Selecting bucket on KvClient {}", &self.id);
 
-        // TODO: compare root certs or something somehow.
-        if !(current_config.address == config.address
-            && current_config.client_name == config.client_name
-            && current_config.disable_error_map == config.disable_error_map
-            && current_config.disable_server_durations == config.disable_server_durations
-            && current_config.disable_mutation_tokens == config.disable_mutation_tokens)
         {
-            return Err(Error::new_invalid_argument_error(
-                "cannot reconfigure due to conflicting options",
-                None,
-            ));
-        }
-
-        let selected_bucket_name = if current_config.selected_bucket != config.selected_bucket {
-            if current_config.selected_bucket.is_some() {
+            let mut guard = self.selected_bucket.lock().unwrap();
+            let selected_bucket = guard.as_ref();
+            if selected_bucket.is_some() {
                 return Err(Error::new_invalid_argument_error(
-                    "cannot reconfigure from one selected bucket to another",
-                    None,
+                    "cannot select bucket when a bucket is already selected",
+                    Some("bucket_name".to_string()),
                 ));
             }
 
-            current_config
-                .selected_bucket
-                .clone_from(&config.selected_bucket);
-            config.selected_bucket.clone()
-        } else {
-            None
-        };
-
-        if *current_config.deref() != config {
-            return Err(Error::new_invalid_argument_error(
-                "client config after reconfigure did not match new configuration",
-                None,
-            ));
+            *guard = Some(bucket_name.clone());
         }
 
-        if let Some(bucket_name) = selected_bucket_name {
-            {
-                let mut current_bucket = self.selected_bucket.lock().unwrap();
-                *current_bucket = Some(bucket_name.clone());
-            }
-
-            match self
-                .select_bucket(SelectBucketRequest { bucket_name })
-                .await
-            {
-                Ok(_) => {}
-                Err(_e) => {
-                    {
-                        let mut current_bucket = self.selected_bucket.lock().unwrap();
-                        *current_bucket = None;
-                    }
-
-                    current_config.selected_bucket = None;
-                }
+        match self
+            .select_bucket(SelectBucketRequest {
+                bucket_name: bucket_name.clone(),
+            })
+            .await
+        {
+            Ok(_r) => Ok(()),
+            Err(e) => {
+                let mut guard = self.selected_bucket.lock().unwrap();
+                *guard = None;
+                Err(Error::new(Memdx(e)))
             }
         }
-
-        Ok(())
     }
 
     fn has_feature(&self, feature: HelloFeature) -> bool {
         self.supported_features.contains(&feature)
-    }
-
-    fn load_factor(&self) -> f64 {
-        0.0
     }
 
     fn remote_hostname(&self) -> &str {
@@ -454,10 +433,24 @@ where
     }
 
     async fn close(&self) -> Result<()> {
+        if self
+            .closed
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            != Ok(true)
+        {
+            return Ok(());
+        }
+
+        info!("Closing kvclient {}", self.id);
+
         self.cli
             .close()
             .await
-            .map_err(|e| Error::new_contextual_memdx_error(MemdxError::new(e)))
+            .map_err(|e| Error::new_contextual_memdx_error(MemdxError::new(e)))?;
+
+        (self.on_close)(self.id.clone()).await;
+
+        Ok(())
     }
 
     fn id(&self) -> &str {
@@ -471,5 +464,29 @@ where
 {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
+    }
+}
+
+impl<D> StdKvClient<D>
+where
+    D: Dispatcher,
+{
+    pub(crate) async fn mark_closed(&self) {
+        if self
+            .closed
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            != Ok(true)
+        {
+            return;
+        }
+
+        if let Err(e) = self.cli.close().await {
+            debug!(
+                "Failed to close connection for kvclient {}: {}",
+                &self.id, e
+            );
+        }
+
+        (self.on_close)(self.id.clone()).await;
     }
 }
