@@ -110,6 +110,7 @@ impl ReplaceOptions {
 #[non_exhaustive]
 pub struct GetOptions {
     pub expiry: Option<bool>,
+    pub projections: Option<Vec<String>>,
 }
 
 impl GetOptions {
@@ -119,6 +120,10 @@ impl GetOptions {
 
     pub fn expiry(mut self, expiry: bool) -> Self {
         self.expiry = Some(expiry);
+        self
+    }
+    pub fn projections(mut self, projections: Vec<String>) -> Self {
+        self.projections = Some(projections);
         self
     }
 }

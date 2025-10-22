@@ -30,6 +30,7 @@ use crate::results::kv_results::{
     ExistsResult, GetResult, LookupInResult, LookupInResultEntry, MutateInResult,
     MutateInResultEntry, MutationResult, TouchResult,
 };
+use crate::results::projection::{build_from_full_doc, build_from_subdoc_entries};
 use crate::subdoc::lookup_in_specs::{GetSpecOptions, LookupInSpec};
 use crate::subdoc::mutate_in_specs::MutateInSpec;
 use chrono::{DateTime, Utc};
@@ -221,35 +222,15 @@ impl CouchbaseCoreKvClient {
     }
 
     pub async fn get(&self, id: &str, options: GetOptions) -> error::Result<GetResult> {
-        let agent = self.agent_provider.get_agent().await;
-
-        if let Some(true) = options.expiry {
-            let specs = vec![
-                LookupInSpec::get("$document.exptime", GetSpecOptions::new().xattr(true)),
-                LookupInSpec::get("$document.flags", GetSpecOptions::new().xattr(true)),
-                LookupInSpec::get("", None),
-            ];
-
-            let res = self.lookup_in(id, &specs, LookupInOptions::new()).await?;
-            let expiry: u64 = res.content_as(0)?;
-            let expires_at = match DateTime::<Utc>::from_timestamp(expiry as i64, 0) {
-                Some(e) => e,
-                None => {
-                    return Err(error::Error::other_failure(
-                        "invalid expiry time returned from server".to_string(),
-                    ));
-                }
-            };
-            let flags: u32 = res.content_as(1)?;
-            let content: Vec<u8> = res.content_as_raw(2)?.to_vec();
-
-            return Ok(GetResult {
-                content,
-                flags,
-                cas: res.cas,
-                expiry_time: Some(expires_at),
-            });
+        if options.expiry.is_some() || options.projections.is_some() {
+            self.get_with_projections(id, options).await
+        } else {
+            self.get_direct(id, options).await
         }
+    }
+
+    async fn get_direct(&self, id: &str, options: GetOptions) -> error::Result<GetResult> {
+        let agent = self.agent_provider.get_agent().await;
 
         let res = CouchbaseAgentProvider::upgrade_agent(agent)?
             .get(
@@ -263,6 +244,92 @@ impl CouchbaseCoreKvClient {
             .await?;
 
         Ok(res.into())
+    }
+
+    async fn get_with_projections(
+        &self,
+        id: &str,
+        options: GetOptions,
+    ) -> error::Result<GetResult> {
+        let mut num_lookups = options.projections.as_deref().map_or(0, |p| p.len());
+        let mut with_flags = false;
+
+        if let Some(true) = options.expiry {
+            if num_lookups == 0 {
+                // Full doc get with expiry
+                with_flags = true;
+            }
+            num_lookups += 1;
+        }
+
+        // Max number of look up ops we can do at once is 16, so do a full look up if there are > 16,
+        // or if there are no projections (expiry only)
+        let full_lookup = num_lookups > 16 || options.projections.as_deref().is_none();
+
+        let mut specs = vec![];
+
+        if let Some(true) = options.expiry {
+            specs.push(LookupInSpec::get(
+                "$document.exptime",
+                GetSpecOptions::new().xattr(true),
+            ));
+
+            if with_flags {
+                // We need to fetch the flags for transcoding as they aren't included in a LookupIn
+                // response. We only need them when doing a full get with expiry.
+                specs.push(LookupInSpec::get(
+                    "$document.flags",
+                    GetSpecOptions::new().xattr(true),
+                ));
+            }
+        }
+
+        if full_lookup {
+            specs.push(LookupInSpec::get("", None));
+        } else {
+            for projection in options.projections.as_deref().unwrap() {
+                specs.push(LookupInSpec::get(projection, None));
+                num_lookups += 1;
+            }
+        }
+
+        let mut res = self.lookup_in(id, &specs, LookupInOptions::new()).await?;
+        let mut expires_at = None;
+        let mut flags: u32 = 0;
+
+        if let Some(true) = options.expiry {
+            let expiry: u64 = res.content_as(0)?;
+            expires_at = match DateTime::<Utc>::from_timestamp(expiry as i64, 0) {
+                Some(e) => Option::from(e),
+                None => {
+                    return Err(error::Error::other_failure(
+                        "invalid expiry time returned from server".to_string(),
+                    ));
+                }
+            };
+            res.entries.remove(0);
+            specs.remove(0);
+
+            if with_flags {
+                flags = res.content_as(0)?;
+                res.entries.remove(0);
+                specs.remove(0);
+            }
+        }
+
+        let mut content: Vec<u8>;
+        if full_lookup {
+            content = build_from_full_doc(&res, options.projections.as_deref())?;
+        } else {
+            content = build_from_subdoc_entries(&specs, &res.entries)?;
+        }
+
+        Ok(GetResult {
+            content,
+            flags,
+            cas: res.cas,
+            expiry_time: expires_at,
+        })
     }
 
     pub async fn exists(&self, id: &str, _options: ExistsOptions) -> error::Result<ExistsResult> {
