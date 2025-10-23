@@ -18,16 +18,15 @@
 
 use crate::memdx::client::ResponseContext;
 use crate::memdx::packet::ResponsePacket;
-use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct ClientResponse {
     packet: ResponsePacket,
-    response_context: Arc<ResponseContext>,
+    response_context: Option<ResponseContext>,
 }
 
 impl ClientResponse {
-    pub fn new(packet: ResponsePacket, response_context: Arc<ResponseContext>) -> Self {
+    pub fn new(packet: ResponsePacket, response_context: Option<ResponseContext>) -> Self {
         Self {
             packet,
             response_context,
@@ -38,7 +37,7 @@ impl ClientResponse {
         self.packet
     }
 
-    pub fn response_context(&self) -> Arc<ResponseContext> {
-        self.response_context.clone()
+    pub fn response_context(&self) -> Option<&ResponseContext> {
+        self.response_context.as_ref()
     }
 }

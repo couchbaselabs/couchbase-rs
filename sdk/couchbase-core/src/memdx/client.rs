@@ -61,13 +61,12 @@ use crate::memdx::subdoc::SubdocRequestInfo;
 use crate::orphan_reporter::OrphanContext;
 
 pub(crate) type ResponseSender = Sender<error::Result<ClientResponse>>;
-pub(crate) type OpaqueMap = HashMap<u32, Arc<SenderContext>>;
+pub(crate) type OpaqueMap = HashMap<u32, SenderContext>;
 
 #[derive(Debug, Clone)]
 pub struct ResponseContext {
     pub cas: Option<u64>,
     pub subdoc_info: Option<SubdocRequestInfo>,
-    pub is_persistent: bool,
     pub scope_name: Option<String>,
     pub collection_name: Option<String>,
 }
@@ -75,7 +74,8 @@ pub struct ResponseContext {
 #[derive(Debug, Clone)]
 pub(crate) struct SenderContext {
     pub sender: ResponseSender,
-    pub context: Arc<ResponseContext>,
+    pub is_persistent: bool,
+    pub context: Option<ResponseContext>,
 }
 
 struct ReadLoopOptions {
@@ -122,7 +122,7 @@ impl Client {
 
         let opaque = self.current_opaque.fetch_add(1, Ordering::SeqCst);
 
-        map.insert(opaque, Arc::new(response_context));
+        map.insert(opaque, response_context);
 
         opaque
     }
@@ -202,14 +202,11 @@ impl Client {
 
                                     let requests: Arc<std::sync::Mutex<OpaqueMap>> = Arc::clone(&opaque_map);
                                     let context = {
-                                        let map = requests.lock().unwrap();
-
-                                        let t = map.get(&opaque);
-
-                                        t.map(Arc::clone)
+                                        let mut map = requests.lock().unwrap();
+                                        map.remove(&opaque)
                                     };
 
-                                    if let Some(context) = context {
+                                    if let Some(mut context) = context {
                                         let sender = &context.sender;
 
                                         if let Some(value) = &packet.value {
@@ -235,21 +232,20 @@ impl Client {
                                             }
                                         }
 
-                                        if !context.context.is_persistent {
+                                        if context.is_persistent {
                                             {
                                                 let mut map = requests.lock().unwrap();
-                                                map.remove(&opaque);
+                                                map.insert(opaque, context.clone());
                                             }
                                         }
 
-                                        let resp = ClientResponse::new(packet, context.context.clone());
+                                        let resp = ClientResponse::new(packet, context.context);
                                         match sender.send(Ok(resp)).await {
                                             Ok(_) => {}
                                             Err(e) => {
                                                 debug!("Sending response to caller failed: {e}");
                                             }
                                         };
-                                        drop(context);
                                     } else if let Some(ref orphan_handler) = opts.orphan_handler {
                                         orphan_handler(
                                             packet,
@@ -342,20 +338,15 @@ impl Dispatcher for Client {
     async fn dispatch<'a>(
         &self,
         mut packet: RequestPacket<'a>,
+        is_persistent: bool,
         response_context: Option<ResponseContext>,
     ) -> error::Result<ClientPendingOp> {
         let (response_tx, response_rx) = mpsc::channel(1);
-        let context = response_context.unwrap_or(ResponseContext {
-            cas: packet.cas,
-            subdoc_info: None,
-            is_persistent: false,
-            scope_name: None,
-            collection_name: None,
-        });
-        let is_persistent = context.is_persistent;
+
         let opaque = self.register_handler(SenderContext {
             sender: response_tx,
-            context: Arc::new(context),
+            is_persistent,
+            context: response_context,
         });
         packet.opaque = Some(opaque);
         let op_code = packet.op_code;

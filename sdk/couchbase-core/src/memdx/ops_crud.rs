@@ -99,7 +99,7 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, None).await?;
+        let pending_op = dispatcher.dispatch(packet, false, None).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -138,7 +138,7 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, None).await?;
+        let pending_op = dispatcher.dispatch(packet, false, None).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -181,7 +181,7 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, None).await?;
+        let pending_op = dispatcher.dispatch(packet, false, None).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -225,7 +225,7 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, None).await?;
+        let pending_op = dispatcher.dispatch(packet, false, None).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -267,7 +267,7 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, None).await?;
+        let pending_op = dispatcher.dispatch(packet, false, None).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -309,7 +309,7 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, None).await?;
+        let pending_op = dispatcher.dispatch(packet, false, None).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -348,7 +348,7 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, None).await?;
+        let pending_op = dispatcher.dispatch(packet, false, None).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -390,7 +390,7 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, None).await?;
+        let pending_op = dispatcher.dispatch(packet, false, None).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -438,7 +438,7 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, None).await?;
+        let pending_op = dispatcher.dispatch(packet, false, None).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -493,7 +493,7 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, None).await?;
+        let pending_op = dispatcher.dispatch(packet, false, None).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -537,7 +537,18 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, None).await?;
+        let pending_op = dispatcher
+            .dispatch(
+                packet,
+                false,
+                Some(ResponseContext {
+                    cas: request.cas,
+                    subdoc_info: None,
+                    scope_name: None,
+                    collection_name: None,
+                }),
+            )
+            .await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -581,7 +592,18 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, None).await?;
+        let pending_op = dispatcher
+            .dispatch(
+                packet,
+                false,
+                Some(ResponseContext {
+                    cas: request.cas,
+                    subdoc_info: None,
+                    scope_name: None,
+                    collection_name: None,
+                }),
+            )
+            .await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -649,7 +671,7 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, None).await?;
+        let pending_op = dispatcher.dispatch(packet, false, None).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -701,7 +723,7 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, None).await?;
+        let pending_op = dispatcher.dispatch(packet, false, None).await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -778,12 +800,13 @@ impl OpsCrud {
                 flags: request.flags,
                 op_count: request.ops.len() as u8,
             }),
-            is_persistent: false,
             scope_name: None,
             collection_name: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, Some(response_context)).await?;
+        let pending_op = dispatcher
+            .dispatch(packet, false, Some(response_context))
+            .await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }
@@ -888,12 +911,13 @@ impl OpsCrud {
                 flags: request.flags,
                 op_count: request.ops.len() as u8,
             }),
-            is_persistent: false,
             scope_name: None,
             collection_name: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, Some(response_context)).await?;
+        let pending_op = dispatcher
+            .dispatch(packet, false, Some(response_context))
+            .await?;
 
         Ok(StandardPendingOp::new(pending_op))
     }

@@ -47,6 +47,7 @@ pub trait Dispatcher: Send + Sync {
     async fn dispatch<'a>(
         &self,
         packet: RequestPacket<'a>,
+        is_persistent: bool,
         response_context: Option<ResponseContext>,
     ) -> Result<ClientPendingOp>;
     async fn close(&self) -> Result<()>;

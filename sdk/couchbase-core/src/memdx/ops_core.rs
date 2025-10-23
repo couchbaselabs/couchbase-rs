@@ -114,6 +114,7 @@ impl OpBootstrapEncoder for OpsCore {
                     framing_extras: None,
                     opaque: None,
                 },
+                false,
                 None,
             )
             .await?;
@@ -145,6 +146,7 @@ impl OpBootstrapEncoder for OpsCore {
                     framing_extras: None,
                     opaque: None,
                 },
+                false,
                 None,
             )
             .await?;
@@ -176,6 +178,7 @@ impl OpBootstrapEncoder for OpsCore {
                     framing_extras: None,
                     opaque: None,
                 },
+                false,
                 None,
             )
             .await?;
@@ -215,6 +218,7 @@ impl OpBootstrapEncoder for OpsCore {
                     framing_extras: None,
                     opaque: None,
                 },
+                false,
                 None,
             )
             .await?;
@@ -250,6 +254,7 @@ impl OpSASLPlainEncoder for OpsCore {
                     framing_extras: None,
                     opaque: None,
                 },
+                false,
                 None,
             )
             .await?;
@@ -283,6 +288,7 @@ impl OpSASLAutoEncoder for OpsCore {
                     framing_extras: None,
                     opaque: None,
                 },
+                false,
                 None,
             )
             .await?;
@@ -318,6 +324,7 @@ impl OpSASLScramEncoder for OpsCore {
                     framing_extras: None,
                     opaque: None,
                 },
+                false,
                 None,
             )
             .await?;
