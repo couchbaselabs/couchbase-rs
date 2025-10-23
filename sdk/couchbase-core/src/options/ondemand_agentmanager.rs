@@ -23,7 +23,6 @@ use crate::options::agent::{
     AgentOptions, CompressionConfig, ConfigPollerConfig, HttpConfig, KvConfig, SeedConfig,
 };
 use crate::tls_config::TlsConfig;
-use std::sync::Arc;
 use std::time::Duration;
 
 #[derive(Clone)]
@@ -34,6 +33,7 @@ pub struct OnDemandAgentManagerOptions {
 
     pub auth_mechanisms: Vec<AuthMechanism>,
     pub tls_config: Option<TlsConfig>,
+    pub network: Option<String>,
 
     pub compression_config: CompressionConfig,
     pub config_poller_config: ConfigPollerConfig,
@@ -52,6 +52,7 @@ impl OnDemandAgentManagerOptions {
             compression_config: CompressionConfig::default(),
             config_poller_config: ConfigPollerConfig::default(),
             auth_mechanisms: vec![],
+            network: None,
             kv_config: KvConfig::default(),
             http_config: HttpConfig::default(),
             tcp_keep_alive_time: None,
@@ -89,6 +90,11 @@ impl OnDemandAgentManagerOptions {
         self
     }
 
+    pub fn network(mut self, network: impl Into<String>) -> Self {
+        self.network = Some(network.into());
+        self
+    }
+
     pub fn kv_config(mut self, kv_config: KvConfig) -> Self {
         self.kv_config = kv_config;
         self
@@ -119,6 +125,7 @@ impl From<OnDemandAgentManagerOptions> for AgentOptions {
             tls_config: opts.tls_config,
             authenticator: opts.authenticator,
             bucket_name: None,
+            network: opts.network,
             seed_config: opts.seed_config,
             compression_config: opts.compression_config,
             config_poller_config: opts.config_poller_config,
@@ -135,6 +142,7 @@ impl From<AgentOptions> for OnDemandAgentManagerOptions {
     fn from(opts: AgentOptions) -> Self {
         OnDemandAgentManagerOptions {
             authenticator: opts.authenticator,
+            network: opts.network,
             tls_config: opts.tls_config,
             seed_config: opts.seed_config,
             compression_config: opts.compression_config,

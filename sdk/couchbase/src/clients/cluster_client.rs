@@ -401,7 +401,13 @@ impl CouchbaseClusterBackend {
                     opts.http_config.idle_connection_timeout =
                         Duration::from_millis(idle_http_connection_timeout);
                 }
-                "placeholder" => {}
+                "network" => {
+                    let network = v[0]
+                        .parse()
+                        .map_err(|e| error::Error::other_failure(format!("{e:?}")))?;
+
+                    opts.network = Some(network);
+                }
                 _ => (),
             }
         }

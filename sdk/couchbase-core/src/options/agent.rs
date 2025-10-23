@@ -22,7 +22,6 @@ use crate::authenticator::Authenticator;
 use crate::memdx::dispatcher::OrphanResponseHandler;
 use crate::tls_config::TlsConfig;
 use std::fmt::Debug;
-use std::sync::Arc;
 use std::time::Duration;
 
 #[derive(Clone)]
@@ -34,6 +33,7 @@ pub struct AgentOptions {
     pub auth_mechanisms: Vec<AuthMechanism>,
     pub tls_config: Option<TlsConfig>,
     pub bucket_name: Option<String>,
+    pub network: Option<String>,
 
     pub compression_config: CompressionConfig,
     pub config_poller_config: ConfigPollerConfig,
@@ -50,6 +50,7 @@ impl Debug for AgentOptions {
             .field("auth_mechanisms", &self.auth_mechanisms)
             .field("tls_config", &self.tls_config)
             .field("bucket_name", &self.bucket_name)
+            .field("network", &self.network)
             .field("compression_config", &self.compression_config)
             .field("config_poller_config", &self.config_poller_config)
             .field("kv_config", &self.kv_config)
@@ -65,6 +66,7 @@ impl AgentOptions {
             tls_config: None,
             authenticator,
             bucket_name: None,
+            network: None,
             seed_config,
             compression_config: CompressionConfig::default(),
             config_poller_config: ConfigPollerConfig::default(),
@@ -93,6 +95,11 @@ impl AgentOptions {
 
     pub fn bucket_name(mut self, bucket_name: impl Into<Option<String>>) -> Self {
         self.bucket_name = bucket_name.into();
+        self
+    }
+
+    pub fn network(mut self, network: impl Into<Option<String>>) -> Self {
+        self.network = network.into();
         self
     }
 
