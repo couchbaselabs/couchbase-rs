@@ -265,7 +265,8 @@ impl KvOptions {
 
 impl From<KvOptions> for couchbase_core::options::agent::KvConfig {
     fn from(opts: KvOptions) -> Self {
-        let mut core_opts = couchbase_core::options::agent::KvConfig::default();
+        let mut core_opts =
+            couchbase_core::options::agent::KvConfig::default().enable_error_map(true);
         if let Some(enable) = opts.enable_mutation_tokens {
             core_opts = core_opts.enable_mutation_tokens(enable);
         }

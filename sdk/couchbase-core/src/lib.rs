@@ -45,9 +45,10 @@ mod helpers;
 mod httpcomponent;
 pub mod httpx;
 mod kvclient;
+mod kvclient_babysitter;
 mod kvclient_ops;
-mod kvclientmanager;
 mod kvclientpool;
+mod kvendpointclientmanager;
 pub mod memdx;
 pub mod mgmtcomponent;
 pub mod mgmtx;
@@ -57,6 +58,7 @@ mod nmvbhandler;
 pub mod on_behalf_of;
 pub mod ondemand_agentmanager;
 pub mod options;
+pub mod orphan_reporter;
 mod parsedconfig;
 pub mod querycomponent;
 pub mod queryx;
@@ -73,6 +75,7 @@ mod util;
 mod vbucketmap;
 mod vbucketrouter;
 
+mod componentconfigs;
 #[cfg(feature = "rustls-tls")]
 pub mod insecure_certverfier;
-pub mod orphan_reporter;
+mod kv_orchestration;

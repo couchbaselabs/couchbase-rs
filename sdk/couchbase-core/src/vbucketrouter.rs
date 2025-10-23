@@ -174,7 +174,6 @@ where
 #[cfg(test)]
 mod tests {
     use crate::cbconfig::TerseConfig;
-    use crate::kvclientmanager::KvClientManager;
     use crate::vbucketmap::VbucketMap;
     use crate::vbucketrouter::{
         NotMyVbucketConfigHandler, StdVbucketRouter, VbucketRouter, VbucketRouterOptions,

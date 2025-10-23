@@ -24,7 +24,7 @@ use crate::configparser::ConfigParser;
 use crate::error::{Error, Result};
 use crate::kvclient::KvClient;
 use crate::kvclient_ops::KvClientOps;
-use crate::kvclientmanager::KvClientManager;
+use crate::kvendpointclientmanager::KvEndpointClientManager;
 use crate::memdx::hello_feature::HelloFeature;
 use crate::memdx::request::{GetClusterConfigKnownVersion, GetClusterConfigRequest};
 use crate::parsedconfig::ParsedConfig;
@@ -46,20 +46,20 @@ pub(crate) struct ConfigWatcherMemdConfig {
     pub endpoints: Vec<String>,
 }
 
-pub(crate) struct ConfigWatcherMemdOptions<M: KvClientManager> {
+pub(crate) struct ConfigWatcherMemdOptions<M: KvEndpointClientManager> {
     pub polling_period: Duration,
     pub config_fetcher: Arc<ConfigFetcherMemd<M>>,
     pub latest_version_rx: watch::Receiver<ConfigVersion>,
 }
 
-pub struct ConfigWatcherMemdInner<M: KvClientManager> {
+pub struct ConfigWatcherMemdInner<M: KvEndpointClientManager> {
     config_fetcher: Arc<ConfigFetcherMemd<M>>,
     polling_period: Duration,
     endpoints: Mutex<Vec<String>>,
     latest_version_rx: watch::Receiver<ConfigVersion>,
 }
 
-impl<M: KvClientManager> ConfigWatcherMemdInner<M> {
+impl<M: KvEndpointClientManager> ConfigWatcherMemdInner<M> {
     pub fn reconfigure(&self, config: ConfigWatcherMemdConfig) -> Result<()> {
         let mut endpoints = self.endpoints.lock().unwrap();
         *endpoints = config.endpoints;
@@ -179,13 +179,13 @@ impl<M: KvClientManager> ConfigWatcherMemdInner<M> {
 }
 
 #[derive(Clone)]
-pub(crate) struct ConfigWatcherMemd<M: KvClientManager> {
+pub(crate) struct ConfigWatcherMemd<M: KvEndpointClientManager> {
     inner: Arc<ConfigWatcherMemdInner<M>>,
 }
 
 impl<M> ConfigWatcherMemd<M>
 where
-    M: KvClientManager + 'static,
+    M: KvEndpointClientManager + 'static,
 {
     pub fn new(config: ConfigWatcherMemdConfig, opts: ConfigWatcherMemdOptions<M>) -> Self {
         Self {

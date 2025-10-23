@@ -24,12 +24,12 @@ use crate::collectionresolver::{orchestrate_memd_collection_id, CollectionResolv
 use crate::compressionmanager::{CompressionManager, Compressor};
 use crate::error;
 use crate::error::{Error, MemdxError, Result};
+use crate::kv_orchestration::{
+    orchestrate_endpoint_kv_client, orchestrate_kv_client, KvClientManagerClientType,
+};
 use crate::kvclient::KvClient;
 use crate::kvclient_ops::KvClientOps;
-use crate::kvclientmanager::{
-    orchestrate_memd_client, orchestrate_random_memd_client, KvClientManager,
-    KvClientManagerClientType,
-};
+use crate::kvendpointclientmanager::KvEndpointClientManager;
 use crate::memdx::datatype::DataTypeFlag;
 use crate::memdx::error::ServerErrorKind;
 use crate::memdx::hello_feature::HelloFeature;
@@ -61,7 +61,7 @@ use log::debug;
 use tokio::time::sleep;
 
 pub(crate) struct CrudComponent<
-    M: KvClientManager,
+    M: KvEndpointClientManager,
     V: VbucketRouter,
     Nmvb: NotMyVbucketConfigHandler,
     C: CollectionResolver,
@@ -77,7 +77,7 @@ pub(crate) struct CrudComponent<
 
 // TODO: So much clone.
 impl<
-        M: KvClientManager,
+        M: KvEndpointClientManager,
         V: VbucketRouter,
         Nmvb: NotMyVbucketConfigHandler,
         C: CollectionResolver,
@@ -907,34 +907,33 @@ impl<
         let mut retry_info = RetryInfo::new("get_collection_id", true, opts.retry_strategy);
 
         loop {
-            let mut err =
-                match orchestrate_random_memd_client(self.conn_manager.clone(), async |client| {
-                    client
-                        .get_collection_id(GetCollectionIdRequest {
-                            scope_name: opts.scope_name,
-                            collection_name: opts.collection_name,
-                        })
-                        .map_err(|e| {
-                            let e = e
-                                .set_bucket_name(client.bucket_name().unwrap_or_default())
-                                .set_collection_name(opts.collection_name.to_string())
-                                .set_scope_name(opts.scope_name.to_string());
+            let mut err = match orchestrate_kv_client(self.conn_manager.clone(), async |client| {
+                client
+                    .get_collection_id(GetCollectionIdRequest {
+                        scope_name: opts.scope_name,
+                        collection_name: opts.collection_name,
+                    })
+                    .map_err(|e| {
+                        let e = e
+                            .set_bucket_name(client.bucket_name().unwrap_or_default())
+                            .set_collection_name(opts.collection_name.to_string())
+                            .set_scope_name(opts.scope_name.to_string());
 
-                            Error::new_contextual_memdx_error(e)
-                        })
-                        .map_ok(|resp| GetCollectionIdResult {
-                            collection_id: resp.collection_id,
-                            manifest_rev: resp.manifest_rev,
-                        })
-                        .await
-                })
-                .await
-                {
-                    Ok(r) => {
-                        return Ok(r);
-                    }
-                    Err(e) => e,
-                };
+                        Error::new_contextual_memdx_error(e)
+                    })
+                    .map_ok(|resp| GetCollectionIdResult {
+                        collection_id: resp.collection_id,
+                        manifest_rev: resp.manifest_rev,
+                    })
+                    .await
+            })
+            .await
+            {
+                Ok(r) => {
+                    return Ok(r);
+                }
+                Err(e) => e,
+            };
 
             if let Some(memdx_err) = err.is_memdx_error() {
                 if memdx_err.is_server_error_kind(ServerErrorKind::UnknownCollectionName) {
@@ -991,7 +990,7 @@ impl<
                         key,
                         0,
                         async |endpoint: String, vb_id: u16| {
-                            orchestrate_memd_client(
+                            orchestrate_endpoint_kv_client(
                                 self.conn_manager.clone(),
                                 &endpoint,
                                 async |client: Arc<KvClientManagerClientType<M>>| {
