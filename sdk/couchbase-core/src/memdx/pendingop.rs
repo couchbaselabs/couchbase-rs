@@ -90,9 +90,7 @@ impl ClientPendingOp {
             let requests: Arc<Mutex<OpaqueMap>> = Arc::clone(&self.opaque_map);
             let mut map = requests.lock().unwrap();
 
-            let t = map.remove(&self.opaque);
-
-            t.map(|map_entry| Arc::clone(&map_entry))
+            map.remove(&self.opaque)
         };
 
         if let Some(context) = context {

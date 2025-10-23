@@ -790,7 +790,10 @@ pub struct AppendResponse {
 
 impl TryFromClientResponse for AppendResponse {
     fn try_from(resp: ClientResponse) -> Result<Self, Error> {
-        let cas = resp.response_context().cas;
+        let cas = resp
+            .response_context()
+            .expect("response did not have a response context")
+            .cas;
         let packet = resp.packet();
         let status = packet.status;
 
@@ -843,7 +846,10 @@ pub struct PrependResponse {
 
 impl TryFromClientResponse for PrependResponse {
     fn try_from(resp: ClientResponse) -> Result<Self, Error> {
-        let cas = resp.response_context().cas;
+        let cas = resp
+            .response_context()
+            .expect("response did not have a response context")
+            .cas;
         let packet = resp.packet();
         let status = packet.status;
 
@@ -1022,6 +1028,7 @@ impl TryFromClientResponse for LookupInResponse {
     fn try_from(resp: ClientResponse) -> Result<Self, Error> {
         let subdoc_info = resp
             .response_context()
+            .expect("response did not have a response context")
             .subdoc_info
             .expect("missing subdoc info in response context");
         let packet = resp.packet();
@@ -1181,6 +1188,7 @@ impl TryFromClientResponse for MutateInResponse {
     fn try_from(resp: ClientResponse) -> Result<Self, Error> {
         let subdoc_info = resp
             .response_context()
+            .expect("response did not have a response context")
             .subdoc_info
             .expect("missing subdoc info in response context");
 
@@ -1378,12 +1386,18 @@ pub struct GetCollectionIdResponse {
 
 impl TryFromClientResponse for GetCollectionIdResponse {
     fn try_from(resp: ClientResponse) -> Result<Self, Error> {
-        let context = resp.response_context();
-        let scope_name = context.scope_name.as_ref().expect("missing scope name");
-        let collection_name = context
-            .collection_name
-            .as_ref()
-            .expect("missing collection name");
+        let (scope_name, collection_name) = {
+            let context = resp
+                .response_context()
+                .expect("response did not have a response context");
+            let scope_name = context.scope_name.clone().expect("missing scope name");
+            let collection_name = context
+                .collection_name
+                .clone()
+                .expect("missing collection name");
+
+            (scope_name, collection_name)
+        };
         let packet = resp.packet();
         let status = packet.status;
 

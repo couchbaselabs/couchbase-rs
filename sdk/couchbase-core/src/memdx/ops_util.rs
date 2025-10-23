@@ -53,10 +53,10 @@ impl OpsUtil {
                     framing_extras: None,
                     opaque: None,
                 },
+                false,
                 Some(ResponseContext {
                     cas: None,
                     subdoc_info: None,
-                    is_persistent: false,
                     scope_name: Some(request.scope_name.to_string()),
                     collection_name: Some(request.collection_name.to_string()),
                 }),
@@ -88,6 +88,7 @@ impl OpsUtil {
                     framing_extras: None,
                     opaque: None,
                 },
+                false,
                 None,
             )
             .await?;
