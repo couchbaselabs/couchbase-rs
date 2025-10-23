@@ -536,7 +536,15 @@ impl Agent {
 
         state.latest_config = first_config.clone();
 
-        let network_type = NetworkTypeHeuristic::identify(&state.latest_config);
+        let network_type = if let Some(network) = opts.network {
+            if network == "auto" || network.is_empty() {
+                NetworkTypeHeuristic::identify(&state.latest_config)
+            } else {
+                network
+            }
+        } else {
+            NetworkTypeHeuristic::identify(&state.latest_config)
+        };
         state.network_type = network_type;
 
         let agent_component_configs = AgentInner::gen_agent_component_configs(&mut state);
