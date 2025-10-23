@@ -16,6 +16,10 @@
  *
  */
 
+use crate::common::doc_generation::{
+    import_projection_doc, HobbyDetails, Location, Person, PersonAttributes, PersonDimensions,
+    PersonHobbies,
+};
 use crate::common::new_key;
 use crate::common::test_config::run_test;
 use chrono::Utc;
@@ -563,5 +567,325 @@ fn get_with_expiry() {
         let content: String = res.content_as().unwrap();
 
         assert_eq!("test", content);
+    })
+}
+
+#[test]
+fn get_with_projections() {
+    run_test(async |cluster| {
+        let collection = cluster
+            .bucket(cluster.default_bucket())
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection());
+
+        let projection_id = import_projection_doc(&collection).await;
+
+        // Load baseline person for expected values
+        let content = std::fs::read_to_string("tests/testdata/projection_doc.json").unwrap();
+        let person: Person = serde_json::from_str(content.as_str()).unwrap();
+
+        #[derive(Debug)]
+        struct TCase {
+            name: &'static str,
+            project: Vec<String>,
+            expected: Person,
+        }
+
+        let cases: Vec<TCase> = vec![
+            TCase {
+                name: "string",
+                project: vec!["name".to_string()],
+                expected: Person {
+                    name: person.name.clone(),
+                    ..Default::default()
+                },
+            },
+            TCase {
+                name: "int",
+                project: vec!["age".to_string()],
+                expected: Person {
+                    age: person.age,
+                    ..Default::default()
+                },
+            },
+            TCase {
+                name: "array",
+                project: vec!["animals".to_string()],
+                expected: Person {
+                    animals: person.animals.clone(),
+                    ..Default::default()
+                },
+            },
+            TCase {
+                name: "array-index1",
+                project: vec!["animals[0]".to_string()],
+                expected: Person {
+                    animals: vec![person.animals[0].clone()],
+                    ..Default::default()
+                },
+            },
+            TCase {
+                name: "array-index2",
+                project: vec!["animals[1]".to_string()],
+                expected: Person {
+                    animals: vec![person.animals[1].clone()],
+                    ..Default::default()
+                },
+            },
+            TCase {
+                name: "array-index3",
+                project: vec!["animals[2]".to_string()],
+                expected: Person {
+                    animals: vec![person.animals[2].clone()],
+                    ..Default::default()
+                },
+            },
+            TCase {
+                name: "full-object-field",
+                project: vec!["attributes".to_string()],
+                expected: Person {
+                    attributes: person.attributes.clone(),
+                    ..Default::default()
+                },
+            },
+            TCase {
+                name: "nested-object-field1",
+                project: vec!["attributes.hair".to_string()],
+                expected: Person {
+                    attributes: PersonAttributes {
+                        hair: person.attributes.hair.clone(),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+            },
+            TCase {
+                name: "nested-object-field2",
+                project: vec!["attributes.dimensions".to_string()],
+                expected: Person {
+                    attributes: PersonAttributes {
+                        dimensions: person.attributes.dimensions.clone(),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+            },
+            TCase {
+                name: "nested-object-field3",
+                project: vec!["attributes.dimensions.height".to_string()],
+                expected: Person {
+                    attributes: PersonAttributes {
+                        dimensions: PersonDimensions {
+                            height: person.attributes.dimensions.height,
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+            },
+            TCase {
+                name: "nested-object-field3",
+                project: vec!["attributes.dimensions.weight".to_string()],
+                expected: Person {
+                    attributes: PersonAttributes {
+                        dimensions: PersonDimensions {
+                            weight: person.attributes.dimensions.weight,
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+            },
+            TCase {
+                name: "nested-object-field4",
+                project: vec!["attributes.hobbies".to_string()],
+                expected: Person {
+                    attributes: PersonAttributes {
+                        hobbies: person.attributes.hobbies.clone(),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+            },
+            TCase {
+                name: "nested-array-object-field1",
+                project: vec!["attributes.hobbies[0].type".to_string()],
+                expected: Person {
+                    attributes: PersonAttributes {
+                        hobbies: vec![PersonHobbies {
+                            r#type: person.attributes.hobbies[0].r#type.clone(),
+                            ..Default::default()
+                        }],
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+            },
+            TCase {
+                name: "nested-array-object-field2",
+                project: vec!["attributes.hobbies[1].type".to_string()],
+                expected: Person {
+                    attributes: PersonAttributes {
+                        hobbies: vec![PersonHobbies {
+                            r#type: person.attributes.hobbies[1].r#type.clone(),
+                            ..Default::default()
+                        }],
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+            },
+            TCase {
+                name: "nested-array-object-field3",
+                project: vec!["attributes.hobbies[0].name".to_string()],
+                expected: Person {
+                    attributes: PersonAttributes {
+                        hobbies: vec![PersonHobbies {
+                            name: person.attributes.hobbies[0].name.clone(),
+                            ..Default::default()
+                        }],
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+            },
+            TCase {
+                name: "nested-array-object-field4",
+                project: vec!["attributes.hobbies[1].name".to_string()],
+                expected: Person {
+                    attributes: PersonAttributes {
+                        hobbies: vec![PersonHobbies {
+                            name: person.attributes.hobbies[1].name.clone(),
+                            ..Default::default()
+                        }],
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+            },
+            TCase {
+                name: "nested-array-object-field5",
+                project: vec!["attributes.hobbies[1].details".to_string()],
+                expected: Person {
+                    attributes: PersonAttributes {
+                        hobbies: vec![PersonHobbies {
+                            details: person.attributes.hobbies[1].details.clone(),
+                            ..Default::default()
+                        }],
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+            },
+            TCase {
+                name: "nested-array-object-nested-field1",
+                project: vec!["attributes.hobbies[1].details.location".to_string()],
+                expected: Person {
+                    attributes: PersonAttributes {
+                        hobbies: vec![PersonHobbies {
+                            details: HobbyDetails {
+                                location: person.attributes.hobbies[1].details.location.clone(),
+                            },
+                            ..Default::default()
+                        }],
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+            },
+            TCase {
+                name: "nested-array-object-nested-nested-field1",
+                project: vec!["attributes.hobbies[1].details.location.lat".to_string()],
+                expected: Person {
+                    attributes: PersonAttributes {
+                        hobbies: vec![PersonHobbies {
+                            details: HobbyDetails {
+                                location: Location {
+                                    lat: person.attributes.hobbies[1].details.location.lat,
+                                    ..Default::default()
+                                },
+                            },
+                            ..Default::default()
+                        }],
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+            },
+            TCase {
+                name: "nested-array-object-nested-nested-field2",
+                project: vec!["attributes.hobbies[1].details.location.long".to_string()],
+                expected: Person {
+                    attributes: PersonAttributes {
+                        hobbies: vec![PersonHobbies {
+                            details: HobbyDetails {
+                                location: Location {
+                                    long: person.attributes.hobbies[1].details.location.long,
+                                    ..Default::default()
+                                },
+                            },
+                            ..Default::default()
+                        }],
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+            },
+            TCase {
+                name: "array-of-arrays-object",
+                project: vec!["tracking.locations[1][1].lat".to_string()],
+                expected: Person {
+                    tracking: crate::common::doc_generation::Tracking {
+                        locations: vec![vec![Location {
+                            lat: person.tracking.locations[1][1].lat,
+                            ..Default::default()
+                        }]],
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+            },
+            TCase {
+                name: "array-of-arrays-native",
+                project: vec!["tracking.raw[1][1]".to_string()],
+                expected: Person {
+                    tracking: crate::common::doc_generation::Tracking {
+                        raw: vec![vec![person.tracking.raw[1][1]]],
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+            },
+        ];
+
+        let mut errors: Vec<String> = Vec::new();
+        for case in cases.into_iter() {
+            match collection
+                .get(&projection_id, GetOptions::new().projections(case.project))
+                .await
+            {
+                Ok(res) => match res.content_as::<Person>() {
+                    Ok(got) => {
+                        if got != case.expected {
+                            errors.push(format!(
+                                "{}: mismatch\n expected: {:?}\n got: {:?}",
+                                case.name, case.expected, got
+                            ));
+                        }
+                    }
+                    Err(e) => errors.push(format!("{}: deserialization error: {:?}", case.name, e)),
+                },
+                Err(e) => errors.push(format!("{}: got error: {:?}", case.name, e)),
+            }
+        }
+        if !errors.is_empty() {
+            panic!(
+                "projection cases failed ({}):\n{}",
+                errors.len(),
+                errors.join("\n")
+            );
+        }
     })
 }

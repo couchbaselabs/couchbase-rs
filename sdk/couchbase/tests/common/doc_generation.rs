@@ -16,6 +16,7 @@
  *
  */
 
+use crate::common::new_key;
 use couchbase::collection::Collection;
 use couchbase::results::kv_results::MutationResult;
 use serde::{Deserialize, Serialize};
@@ -106,6 +107,68 @@ pub async fn import_sample_beer_dataset(
     }
 
     results
+}
+
+pub async fn import_projection_doc(collection: &Collection) -> String {
+    let content = read_to_string("tests/testdata/projection_doc.json").unwrap();
+    let doc: serde_json::Value = serde_json::from_str(content.as_str()).unwrap();
+
+    let key = new_key();
+    collection.upsert(key.clone(), &doc, None).await.unwrap();
+    key
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, PartialOrd, Default)]
+#[serde(default)]
+pub struct PersonDimensions {
+    pub height: i32,
+    pub weight: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, PartialOrd, Default)]
+#[serde(default)]
+pub struct Location {
+    pub lat: f32,
+    pub long: f32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, PartialOrd, Default)]
+#[serde(default)]
+pub struct HobbyDetails {
+    pub location: Location,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, PartialOrd, Default)]
+#[serde(default)]
+pub struct PersonHobbies {
+    pub r#type: String,
+    pub name: String,
+    pub details: HobbyDetails,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, PartialOrd, Default)]
+#[serde(default)]
+pub struct PersonAttributes {
+    pub hair: String,
+    pub dimensions: PersonDimensions,
+    pub hobbies: Vec<PersonHobbies>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, PartialOrd, Default)]
+#[serde(default)]
+pub struct Tracking {
+    pub locations: Vec<Vec<Location>>, // [][]Location
+    pub raw: Vec<Vec<f32>>,            // [][]float32
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, PartialOrd, Default)]
+#[serde(default)]
+pub struct Person {
+    pub name: String,
+    pub age: i32,
+    pub animals: Vec<String>,
+    pub attributes: PersonAttributes,
+    pub tracking: Tracking,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, PartialOrd)]
