@@ -21,13 +21,14 @@ use crate::common::helpers::{
     try_until,
 };
 use crate::common::test_config::run_test;
+use common::helpers;
 use couchbase_core::agent::Agent;
 use couchbase_core::cbconfig::CollectionManifest;
 use couchbase_core::features::BucketFeature;
 use couchbase_core::mgmtx::bucket_settings::{BucketSettings, BucketType};
 use couchbase_core::options::management::{
     CreateBucketOptions, CreateCollectionOptions, DeleteBucketOptions, EnsureBucketOptions,
-    EnsureManifestOptions, GetBucketOptions, GetCollectionManifestOptions, UpdateBucketOptions,
+    GetBucketOptions, GetCollectionManifestOptions, UpdateBucketOptions,
 };
 use couchbase_core::{cbconfig, error};
 use serial_test::serial;
@@ -47,7 +48,7 @@ fn test_scopes() {
         let resp = create_scope(&agent, &bucket_name, &name).await.unwrap();
         assert!(!resp.manifest_uid.is_empty());
 
-        ensure_manifest(&agent, &bucket_name, resp.manifest_uid).await;
+        helpers::ensure_manifest(&agent, &bucket_name, resp.manifest_uid).await;
 
         let manifest = get_manifest(&agent, &bucket_name).await.unwrap();
 
@@ -60,7 +61,7 @@ fn test_scopes() {
         let resp = delete_scope(&agent, &bucket_name, &name).await.unwrap();
         assert!(!resp.manifest_uid.is_empty());
 
-        ensure_manifest(&agent, &bucket_name, resp.manifest_uid).await;
+        helpers::ensure_manifest(&agent, &bucket_name, resp.manifest_uid).await;
 
         let manifest = get_manifest(&agent, &bucket_name).await.unwrap();
 
@@ -83,7 +84,7 @@ fn test_collections() {
             .unwrap();
         assert!(!resp.manifest_uid.is_empty());
 
-        ensure_manifest(&agent, &bucket_name, resp.manifest_uid).await;
+        helpers::ensure_manifest(&agent, &bucket_name, resp.manifest_uid).await;
 
         let mut opts =
             CreateCollectionOptions::new(&bucket_name, &scope_name, &collection_name).max_ttl(25);
@@ -95,7 +96,7 @@ fn test_collections() {
         let resp = agent.create_collection(&opts).await.unwrap();
         assert!(!resp.manifest_uid.is_empty());
 
-        ensure_manifest(&agent, &bucket_name, resp.manifest_uid).await;
+        helpers::ensure_manifest(&agent, &bucket_name, resp.manifest_uid).await;
 
         let manifest = get_manifest(&agent, &bucket_name).await.unwrap();
         assert!(!manifest.uid.is_empty());
@@ -118,7 +119,7 @@ fn test_collections() {
             .unwrap();
         assert!(!resp.manifest_uid.is_empty());
 
-        ensure_manifest(&agent, &bucket_name, resp.manifest_uid).await;
+        helpers::ensure_manifest(&agent, &bucket_name, resp.manifest_uid).await;
 
         let manifest = get_manifest(&agent, &bucket_name).await.unwrap();
 
@@ -337,13 +338,6 @@ fn find_collection(
         }
     }
     None
-}
-
-async fn ensure_manifest(agent: &Agent, bucket_name: &str, manifest_uid: String) {
-    let ensure_opts =
-        &EnsureManifestOptions::new(bucket_name, u64::from_str_radix(&manifest_uid, 16).unwrap());
-
-    agent.ensure_manifest(ensure_opts).await.unwrap();
 }
 
 async fn get_manifest(agent: &Agent, bucket_name: &str) -> error::Result<CollectionManifest> {

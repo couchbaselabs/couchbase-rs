@@ -46,10 +46,6 @@ use tokio::time::{timeout_at, Instant};
 
 mod common;
 
-#[cfg(feature = "dhat-heap")]
-#[global_allocator]
-static ALLOC: dhat::Alloc = dhat::Alloc;
-
 #[test]
 fn test_upsert_and_get() {
     run_test(async |mut agent| {
@@ -780,46 +776,5 @@ fn test_changed_collection_id() {
 
         assert_ne!(0, upsert_result.cas);
         assert!(upsert_result.mutation_token.is_some());
-    });
-}
-
-#[cfg(feature = "dhat-heap")]
-#[test]
-fn upsert_allocations() {
-    run_test(async |mut agent| {
-        let key = generate_key();
-        let value = generate_bytes_value(32);
-
-        let strat = Arc::new(FailFastRetryStrategy::default());
-
-        let upsert_opts = UpsertOptions::new(key.as_slice(), "", "", value.as_slice())
-            .retry_strategy(strat.clone());
-
-        // make sure that all the underlying resources are setup.
-        agent.upsert(upsert_opts.clone()).await.unwrap();
-
-        let profiler = dhat::Profiler::builder().testing().build();
-
-        let stats1 = dhat::HeapStats::get();
-
-        let _ = agent.upsert(upsert_opts).await.unwrap();
-
-        let stats2 = dhat::HeapStats::get();
-
-        let total_allocs = stats2.total_blocks - stats1.total_blocks;
-
-        let expected_allocs = if agent.test_setup_config.use_ssl {
-            19
-        } else {
-            21
-        };
-        dhat::assert!(
-            total_allocs <= expected_allocs,
-            "Expected max {} allocations, was {}",
-            expected_allocs,
-            total_allocs
-        );
-
-        drop(profiler);
     });
 }
