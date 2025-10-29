@@ -15,7 +15,6 @@
  *  * limitations under the License.
  *
  */
-
 use crate::collectionresolver::CollectionResolver;
 use crate::error::{Error, Result};
 use crate::kv_orchestration::{orchestrate_kv_client, KvClientManagerClientType};
@@ -71,12 +70,5 @@ where
         Ok((resp.collection_id, resp.manifest_rev))
     }
 
-    async fn invalidate_collection_id(
-        &self,
-        scope_name: &str,
-        collection_name: &str,
-        endpoint: &str,
-        manifest_rev: u64,
-    ) {
-    }
+    async fn invalidate_collection_id(&self, scope_name: &str, collection_name: &str) {}
 }
