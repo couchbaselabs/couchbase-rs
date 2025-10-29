@@ -17,7 +17,7 @@
  */
 
 use crate::error::{Error, Result};
-use crate::memdx::error::{ServerError, ServerErrorKind};
+use crate::memdx::error::ServerErrorKind;
 use std::future::Future;
 use std::sync::Arc;
 
@@ -32,8 +32,6 @@ pub(crate) trait CollectionResolver: Sized + Send + Sync {
         &self,
         scope_name: &str,
         collection_name: &str,
-        endpoint: &str,
-        manifest_rev: u64,
     ) -> impl Future<Output = ()> + Send;
 }
 
@@ -54,20 +52,13 @@ where
         return operation(0).await;
     }
 
-    let (collection_id, manifest_rev) = match resolver
+    let (collection_id, _manifest_rev) = match resolver
         .resolve_collection_id(scope_name, collection_name)
         .await
     {
         Ok(r) => r,
         Err(e) => {
-            return Err(maybe_invalidate_collection_id(
-                resolver,
-                e,
-                0,
-                scope_name,
-                collection_name,
-            )
-            .await);
+            return Err(invalidate_collection_id(resolver, e, scope_name, collection_name).await);
         }
     };
 
@@ -76,52 +67,27 @@ where
         Err(e) => e,
     };
 
-    Err(
-        maybe_invalidate_collection_id(resolver, err, manifest_rev, scope_name, collection_name)
-            .await,
-    )
+    Err(invalidate_collection_id(resolver, err, scope_name, collection_name).await)
 }
 
-async fn maybe_invalidate_collection_id<Cr>(
+async fn invalidate_collection_id<Cr>(
     resolver: Arc<Cr>,
     err: Error,
-    our_manifest_rev: u64,
     scope_name: &str,
     collection_name: &str,
 ) -> Error
 where
     Cr: CollectionResolver,
 {
-    let invalidating_manifest_rev = match parse_manifest_rev_from_error(&err) {
-        Some(rev) => rev,
-        None => {
-            return err;
-        }
-    };
-
-    if invalidating_manifest_rev > 0 && invalidating_manifest_rev < our_manifest_rev {
-        return err;
-    }
-
-    resolver
-        .invalidate_collection_id(scope_name, collection_name, "", invalidating_manifest_rev)
-        .await;
-
-    err
-}
-
-fn parse_manifest_rev_from_error(e: &Error) -> Option<u64> {
-    if let Some(memdx_err) = e.is_memdx_error() {
+    if let Some(memdx_err) = err.is_memdx_error() {
         if memdx_err.is_server_error_kind(ServerErrorKind::UnknownCollectionID)
             || memdx_err.is_server_error_kind(ServerErrorKind::UnknownCollectionName)
         {
-            if let Some(ctx) = memdx_err.has_server_error_context() {
-                if let Some(parsed) = ServerError::parse_context(ctx) {
-                    return parsed.manifest_rev;
-                }
-            }
+            resolver
+                .invalidate_collection_id(scope_name, collection_name)
+                .await;
         }
     }
 
-    None
+    err
 }
