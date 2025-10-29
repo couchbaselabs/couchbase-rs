@@ -76,6 +76,17 @@ jobs:
         run: |
           cargo test --color=always --no-fail-fast -- --nocapture
 
+      - name: Run allocation tests
+        timeout-minutes: 40
+        env:
+          CBDC_ID: # from above
+          CBDC_CONNSTR: # from above
+          RCBDINOID: ${{ env.CBDC_ID }}
+          RCBCONNSTR: ${{ env.CBDC_CONNSTR }}
+          RCBSERVER_VERSION: ${{ matrix.server }}
+        run: |
+          cargo test --features dhat-heap --test allocations --color=always --no-fail-fast -- --nocapture
+
 #      - name: Collect couchbase logs
 #        timeout-minutes: 10
 #        if: failure()

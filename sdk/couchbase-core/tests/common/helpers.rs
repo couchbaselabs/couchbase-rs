@@ -306,3 +306,10 @@ where
         .await
         .unwrap()
 }
+
+pub async fn ensure_manifest(agent: &Agent, bucket_name: &str, manifest_uid: String) {
+    let ensure_opts =
+        &EnsureManifestOptions::new(bucket_name, u64::from_str_radix(&manifest_uid, 16).unwrap());
+
+    agent.ensure_manifest(ensure_opts).await.unwrap();
+}
