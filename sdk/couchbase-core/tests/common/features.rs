@@ -16,7 +16,7 @@
  *
  */
 
-use crate::common::node_version::NodeVersion;
+use crate::common::node_version::{NodeEdition, NodeVersion};
 use crate::common::test_agent::TestAgent;
 
 const SERVER_VERSION_720: NodeVersion = NodeVersion {
@@ -55,9 +55,10 @@ pub enum TestFeatureCode {
     SearchManagement,
     SearchManagementCollections,
     BucketManagement,
-    CollectionNoExpiry,
+    CollectionMaxExpiry,
     CollectionUpdates,
     HistoryRetention,
+    UserGroups,
 }
 
 impl TestAgent {
@@ -72,12 +73,21 @@ impl TestAgent {
             TestFeatureCode::SearchManagementCollections => {
                 !self.cluster_version.lower(&SERVER_VERSION_762)
             }
-            TestFeatureCode::CollectionNoExpiry => !self.cluster_version.lower(&SERVER_VERSION_762),
+            TestFeatureCode::CollectionMaxExpiry => {
+                self.cluster_version.edition != Some(NodeEdition::Community)
+                    && !self.cluster_version.lower(&SERVER_VERSION_762)
+            }
             TestFeatureCode::CollectionUpdates => {
                 !self.cluster_version.lower(&SERVER_VERSION_722)
                     && !self.cluster_version.equal(&SERVER_VERSION_722)
             }
-            TestFeatureCode::HistoryRetention => !self.cluster_version.lower(&SERVER_VERSION_720),
+            TestFeatureCode::HistoryRetention => {
+                self.cluster_version.edition != Some(NodeEdition::Community)
+                    && !self.cluster_version.lower(&SERVER_VERSION_720)
+            }
+            TestFeatureCode::UserGroups => {
+                self.cluster_version.edition != Some(NodeEdition::Community)
+            }
         }
     }
 }

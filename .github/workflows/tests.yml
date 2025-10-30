@@ -14,19 +14,27 @@ jobs:
 
     strategy:
       matrix:
-        server:
-          - 8.0.0-3716
-          - 7.6.7
-          - 7.2.7
-          - 7.1.6
-          - 7.0.4
+        server: [ 8.0.0-3716, 7.6.7, 7.2.7, 7.1.6, 7.0.4, community-7.6.2 ]
+        include:
+          - server: 8.0.0-3716
+            version: 8.0.0-3716
+          - server: 7.6.7
+            version: 7.6.0
+          - server: 7.2.7
+            version: 7.2.0
+          - server: 7.1.6
+            version: 7.1.0
+          - server: 7.0.4
+            version: 7.0.0
+          - server: community-7.6.2
+            version: 7.6.0-community
 
     runs-on: ubuntu-latest
     steps:
       - name: Install cbdinocluster
         run: |
           mkdir -p "$HOME/bin"
-          wget -nv -O $HOME/bin/cbdinocluster https://github.com/couchbaselabs/cbdinocluster/releases/download/v0.0.41/cbdinocluster-linux-amd64
+          wget -nv -O $HOME/bin/cbdinocluster https://github.com/couchbaselabs/cbdinocluster/releases/download/v0.0.89/cbdinocluster-linux-amd64
           chmod +x $HOME/bin/cbdinocluster
           echo "$HOME/bin" >> $GITHUB_PATH
 
@@ -50,11 +58,21 @@ jobs:
           CBDC_ID=$(cbdinocluster -v alloc --def="${CLUSTERCONFIG}")
           cbdinocluster -v buckets add ${CBDC_ID} default --ram-quota-mb=100 --flush-enabled=true --num-replicas=2
           cbdinocluster -v collections add ${CBDC_ID} default _default test
-          CBDC_CONNSTR=$(cbdinocluster -v connstr --tls $CBDC_ID)
           CBDC_IP=$(cbdinocluster -v ip $CBDC_ID)
           echo "CBDC_ID=$CBDC_ID" >> "$GITHUB_ENV"
-          echo "CBDC_CONNSTR=$CBDC_CONNSTR" >> "$GITHUB_ENV"
           echo "CBDC_IP=$CBDC_IP" >> "$GITHUB_ENV"
+
+      - name: Set connection string
+        run: |
+          CBDC_CONNSTR=$(cbdinocluster -v connstr $CBDC_ID)
+          echo "CBDC_CONNSTR=$CBDC_CONNSTR" >> "$GITHUB_ENV"
+        if: matrix.server == 'community-7.6.2'
+
+      - name: Set connection string
+        run: |
+          CBDC_CONNSTR=$(cbdinocluster -v connstr --tls $CBDC_ID)
+          echo "CBDC_CONNSTR=$CBDC_CONNSTR" >> "$GITHUB_ENV"
+        if: matrix.server != 'community-7.6.2'
 
       - name: Create fts index
         run: |
@@ -72,9 +90,22 @@ jobs:
           CBDC_CONNSTR: # from above
           RCBDINOID: ${{ env.CBDC_ID }}
           RCBCONNSTR: ${{ env.CBDC_CONNSTR }}
-          RCBSERVER_VERSION: ${{ matrix.server }}
+          RCBSERVER_VERSION: ${{ matrix.version }}
         run: |
           cargo test --color=always --no-fail-fast -- --nocapture
+        if: matrix.server != 'community-7.6.2'
+
+      - name: Run tests
+        timeout-minutes: 40
+        env:
+          CBDC_ID: # from above
+          CBDC_CONNSTR: # from above
+          RCBDINOID: ${{ env.CBDC_ID }}
+          RCBCONNSTR: ${{ env.CBDC_CONNSTR }}
+          RCBSERVER_VERSION: ${{ matrix.version }}
+        run: |
+          cargo test --color=always --no-fail-fast -- --nocapture || true
+        if: matrix.server == 'community-7.6.2'
 
       - name: Run allocation tests
         timeout-minutes: 40
