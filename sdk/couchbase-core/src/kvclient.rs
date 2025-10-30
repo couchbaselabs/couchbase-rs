@@ -248,7 +248,7 @@ where
             on_read_close_handler: Arc::new(move || {
                 // There's not much to do when the connection closes so just mark us as closed.
                 if closed_clone.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-                    != Ok(true)
+                    != Ok(false)
                 {
                     return Box::pin(async move {});
                 }
