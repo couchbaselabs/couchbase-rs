@@ -17,7 +17,7 @@
  */
 
 use crate::common::new_key;
-use crate::common::test_config::create_test_cluster;
+use crate::common::test_config::get_bucket;
 use couchbase::transcoding;
 use criterion::{criterion_group, criterion_main, Criterion};
 use std::time::Duration;
@@ -28,14 +28,11 @@ mod common;
 fn upsert(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
 
-    let collection = rt.block_on(async {
-        let cluster = create_test_cluster().await;
+    let (cluster, bucket) = get_bucket(&rt);
 
-        cluster
-            .bucket(cluster.default_bucket())
-            .scope(cluster.default_scope())
-            .collection(cluster.default_collection())
-    });
+    let collection = bucket
+        .scope(cluster.default_scope())
+        .collection(cluster.default_collection());
 
     let key = new_key();
 
@@ -49,14 +46,11 @@ fn upsert(c: &mut Criterion) {
 fn insert(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
 
-    let collection = rt.block_on(async {
-        let cluster = create_test_cluster().await;
+    let (cluster, bucket) = get_bucket(&rt);
 
-        cluster
-            .bucket(cluster.default_bucket())
-            .scope(cluster.default_scope())
-            .collection(cluster.default_collection())
-    });
+    let collection = bucket
+        .scope(cluster.default_scope())
+        .collection(cluster.default_collection());
 
     let key = new_key();
 
@@ -70,14 +64,11 @@ fn insert(c: &mut Criterion) {
 fn replace(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
 
-    let collection = rt.block_on(async {
-        let cluster = create_test_cluster().await;
+    let (cluster, bucket) = get_bucket(&rt);
 
-        cluster
-            .bucket(cluster.default_bucket())
-            .scope(cluster.default_scope())
-            .collection(cluster.default_collection())
-    });
+    let collection = bucket
+        .scope(cluster.default_scope())
+        .collection(cluster.default_collection());
 
     let key = new_key();
     rt.block_on(async { collection.insert(&key, "test", None).await.unwrap() });
@@ -95,14 +86,11 @@ fn replace(c: &mut Criterion) {
 fn remove(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
 
-    let collection = rt.block_on(async {
-        let cluster = create_test_cluster().await;
+    let (cluster, bucket) = get_bucket(&rt);
 
-        cluster
-            .bucket(cluster.default_bucket())
-            .scope(cluster.default_scope())
-            .collection(cluster.default_collection())
-    });
+    let collection = bucket
+        .scope(cluster.default_scope())
+        .collection(cluster.default_collection());
 
     let key = new_key();
     rt.block_on(async { collection.insert(&key, "test", None).await.unwrap() });
@@ -117,14 +105,11 @@ fn remove(c: &mut Criterion) {
 fn exists(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
 
-    let collection = rt.block_on(async {
-        let cluster = create_test_cluster().await;
+    let (cluster, bucket) = get_bucket(&rt);
 
-        cluster
-            .bucket(cluster.default_bucket())
-            .scope(cluster.default_scope())
-            .collection(cluster.default_collection())
-    });
+    let collection = bucket
+        .scope(cluster.default_scope())
+        .collection(cluster.default_collection());
 
     let key = new_key();
     rt.block_on(async { collection.insert(&key, "test", None).await.unwrap() });
@@ -139,14 +124,11 @@ fn exists(c: &mut Criterion) {
 fn get(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
 
-    let collection = rt.block_on(async {
-        let cluster = create_test_cluster().await;
+    let (cluster, bucket) = get_bucket(&rt);
 
-        cluster
-            .bucket(cluster.default_bucket())
-            .scope(cluster.default_scope())
-            .collection(cluster.default_collection())
-    });
+    let collection = bucket
+        .scope(cluster.default_scope())
+        .collection(cluster.default_collection());
 
     let key = new_key();
     rt.block_on(async { collection.insert(&key, "test", None).await.unwrap() });
@@ -161,14 +143,11 @@ fn get(c: &mut Criterion) {
 fn get_and_touch(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
 
-    let collection = rt.block_on(async {
-        let cluster = create_test_cluster().await;
+    let (cluster, bucket) = get_bucket(&rt);
 
-        cluster
-            .bucket(cluster.default_bucket())
-            .scope(cluster.default_scope())
-            .collection(cluster.default_collection())
-    });
+    let collection = bucket
+        .scope(cluster.default_scope())
+        .collection(cluster.default_collection());
 
     let key = new_key();
     rt.block_on(async { collection.insert(&key, "test", None).await.unwrap() });
@@ -186,14 +165,11 @@ fn get_and_touch(c: &mut Criterion) {
 fn get_and_lock(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
 
-    let collection = rt.block_on(async {
-        let cluster = create_test_cluster().await;
+    let (cluster, bucket) = get_bucket(&rt);
 
-        cluster
-            .bucket(cluster.default_bucket())
-            .scope(cluster.default_scope())
-            .collection(cluster.default_collection())
-    });
+    let collection = bucket
+        .scope(cluster.default_scope())
+        .collection(cluster.default_collection());
 
     let key = new_key();
     rt.block_on(async { collection.insert(&key, "test", None).await.unwrap() });
@@ -211,14 +187,11 @@ fn get_and_lock(c: &mut Criterion) {
 fn unlock(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
 
-    let collection = rt.block_on(async {
-        let cluster = create_test_cluster().await;
+    let (cluster, bucket) = get_bucket(&rt);
 
-        cluster
-            .bucket(cluster.default_bucket())
-            .scope(cluster.default_scope())
-            .collection(cluster.default_collection())
-    });
+    let collection = bucket
+        .scope(cluster.default_scope())
+        .collection(cluster.default_collection());
 
     let key = new_key();
     let lock_res = rt.block_on(async {
@@ -239,14 +212,11 @@ fn unlock(c: &mut Criterion) {
 fn touch(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
 
-    let collection = rt.block_on(async {
-        let cluster = create_test_cluster().await;
+    let (cluster, bucket) = get_bucket(&rt);
 
-        cluster
-            .bucket(cluster.default_bucket())
-            .scope(cluster.default_scope())
-            .collection(cluster.default_collection())
-    });
+    let collection = bucket
+        .scope(cluster.default_scope())
+        .collection(cluster.default_collection());
 
     let key = new_key();
     rt.block_on(async { collection.insert(&key, "test", None).await.unwrap() });
@@ -264,14 +234,11 @@ fn touch(c: &mut Criterion) {
 fn append(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
 
-    let collection = rt.block_on(async {
-        let cluster = create_test_cluster().await;
+    let (cluster, bucket) = get_bucket(&rt);
 
-        cluster
-            .bucket(cluster.default_bucket())
-            .scope(cluster.default_scope())
-            .collection(cluster.default_collection())
-    });
+    let collection = bucket
+        .scope(cluster.default_scope())
+        .collection(cluster.default_collection());
 
     let key = new_key();
     let (content, flags) = transcoding::raw_binary::encode("test".as_bytes()).unwrap();
@@ -296,14 +263,11 @@ fn append(c: &mut Criterion) {
 fn prepend(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
 
-    let collection = rt.block_on(async {
-        let cluster = create_test_cluster().await;
+    let (cluster, bucket) = get_bucket(&rt);
 
-        cluster
-            .bucket(cluster.default_bucket())
-            .scope(cluster.default_scope())
-            .collection(cluster.default_collection())
-    });
+    let collection = bucket
+        .scope(cluster.default_scope())
+        .collection(cluster.default_collection());
 
     let key = new_key();
     let (content, flags) = transcoding::raw_binary::encode("test".as_bytes()).unwrap();
@@ -328,14 +292,11 @@ fn prepend(c: &mut Criterion) {
 fn increment(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
 
-    let collection = rt.block_on(async {
-        let cluster = create_test_cluster().await;
+    let (cluster, bucket) = get_bucket(&rt);
 
-        cluster
-            .bucket(cluster.default_bucket())
-            .scope(cluster.default_scope())
-            .collection(cluster.default_collection())
-    });
+    let collection = bucket
+        .scope(cluster.default_scope())
+        .collection(cluster.default_collection());
 
     let key = new_key();
     rt.block_on(async { collection.insert(&key, 0, None).await.unwrap() });
@@ -350,14 +311,11 @@ fn increment(c: &mut Criterion) {
 fn decrement(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
 
-    let collection = rt.block_on(async {
-        let cluster = create_test_cluster().await;
+    let (cluster, bucket) = get_bucket(&rt);
 
-        cluster
-            .bucket(cluster.default_bucket())
-            .scope(cluster.default_scope())
-            .collection(cluster.default_collection())
-    });
+    let collection = bucket
+        .scope(cluster.default_scope())
+        .collection(cluster.default_collection());
 
     let key = new_key();
     rt.block_on(async { collection.insert(&key, 1, None).await.unwrap() });

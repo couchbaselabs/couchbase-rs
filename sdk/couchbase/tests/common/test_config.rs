@@ -27,6 +27,8 @@ use crate::common::node_version::NodeVersion;
 use crate::common::test_bucket::TestBucket;
 use crate::common::test_cluster::TestCluster;
 use couchbase::cluster::Cluster;
+use couchbase::options::diagnostic_options::WaitUntilReadyOptions;
+use couchbase::service_type::ServiceType;
 use couchbase_connstr::ResolvedConnSpec;
 use envconfig::Envconfig;
 use lazy_static::lazy_static;
@@ -158,6 +160,21 @@ pub async fn create_test_cluster() -> TestCluster {
         test_setup_config.clone(),
     )
     .await
+}
+
+pub fn get_bucket(rt: &Runtime) -> (TestCluster, TestBucket) {
+    rt.block_on(async {
+        let cluster = create_test_cluster().await;
+
+        cluster
+            .wait_until_ready(WaitUntilReadyOptions::new().service_types(vec![ServiceType::KV]))
+            .await
+            .unwrap();
+
+        let bucket = cluster.clone().bucket(cluster.default_bucket());
+
+        (cluster, bucket)
+    })
 }
 
 impl TestCluster {}
