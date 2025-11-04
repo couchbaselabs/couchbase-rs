@@ -1,0 +1,62 @@
+name: Benchmarking
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  benchmark_with_bencher:
+    name: Benchmark main with Bencher
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write
+
+    steps:
+      - name: Install cbdinocluster
+        run: |
+          mkdir -p "$HOME/bin"
+          wget -nv -O $HOME/bin/cbdinocluster https://github.com/couchbaselabs/cbdinocluster/releases/download/v0.0.41/cbdinocluster-linux-amd64
+          chmod +x $HOME/bin/cbdinocluster
+          echo "$HOME/bin" >> $GITHUB_PATH
+
+      - name: Initialize cbdinocluster
+        run: |
+          cbdinocluster -v init --auto
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Start couchbase cluster
+        env:
+          CLUSTERCONFIG: |
+            nodes:
+              - count: 3
+                version: ${{ matrix.server }}
+                services: [kv, n1ql, index, fts]
+            docker:
+              kv-memory: 2048
+              fts-memory: 2048
+        run: |
+          CBDC_ID=$(cbdinocluster -v alloc --def="${CLUSTERCONFIG}")
+          cbdinocluster -v buckets add ${CBDC_ID} default --ram-quota-mb=100 --flush-enabled=true --num-replicas=2
+          cbdinocluster -v collections add ${CBDC_ID} default _default test
+          CBDC_CONNSTR=$(cbdinocluster -v connstr --tls $CBDC_ID)
+          CBDC_IP=$(cbdinocluster -v ip $CBDC_ID)
+          echo "CBDC_ID=$CBDC_ID" >> "$GITHUB_ENV"
+          echo "CBDC_CONNSTR=$CBDC_CONNSTR" >> "$GITHUB_ENV"
+          echo "CBDC_IP=$CBDC_IP" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@v4
+      - uses: bencherdev/bencher@main
+
+      - name: Run benchmarks
+        env:
+          BENCHER_PROJECT: couchbase-rs
+          BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
+          CBDC_ID: # from above
+          CBDC_CONNSTR: # from above
+          RCBDINOID: ${{ env.CBDC_ID }}
+          RCBCONNSTR: ${{ env.CBDC_CONNSTR }}
+          RCBSERVER_VERSION: "8.0.0"
+        run: |
+          bencher run --project couchbase-rs --token '${{ secrets.BENCHER_API_TOKEN }}'  --branch main --testbed ubuntu-latest --threshold-measure latency --adapter json --github-actions '${{ secrets.GITHUB_TOKEN }}' --adapter rust_criterion "cargo bench"
