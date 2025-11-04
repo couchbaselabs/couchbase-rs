@@ -15,25 +15,11 @@
  *  * limitations under the License.
  *
  */
+use criterion::Criterion;
 
-use crate::common::test_config::get_bucket;
-use criterion::{criterion_group, criterion_main, Criterion};
-
-#[path = "../tests/common/mod.rs"]
-mod common;
-
-fn query(c: &mut Criterion) {
-    let rt = tokio::runtime::Runtime::new().unwrap();
-
-    let (cluster, bucket) = get_bucket(&rt);
-    let scope = bucket.scope(cluster.default_scope());
-
-    c.bench_function("query", |b| {
-        b.to_async(&rt).iter(|| async {
-            scope.query("SELECT 1=1", None).await.unwrap();
-        })
-    });
+pub fn configured_criterion() -> Criterion {
+    Criterion::default()
+        .sample_size(20000) // more than 100 samples
+        .measurement_time(std::time::Duration::from_secs(10)) // optional: longer time
+        .warm_up_time(std::time::Duration::from_secs(3)) // optional: warmup
 }
-
-criterion_group!(benches, query);
-criterion_main!(benches);
