@@ -75,6 +75,7 @@ pub(crate) struct KvClientPoolOptions {
     pub disable_decompression: bool,
     pub bootstrap_options: KvClientBootstrapOptions,
     pub endpoint_id: String,
+    pub on_demand_connect: bool,
 
     pub target: KvTarget,
     pub auth: Authenticator,
@@ -143,6 +144,7 @@ where
                 let babysitter = KvClientBabysitter::new(KvClientBabysitterOptions {
                     id: Uuid::new_v4().to_string(),
                     endpoint_id: opts.endpoint_id.clone(),
+                    on_demand_connect: opts.on_demand_connect,
 
                     connect_throttle_period: opts.connect_throttle_period,
                     disable_decompression: opts.disable_decompression,
