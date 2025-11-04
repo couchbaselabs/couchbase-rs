@@ -40,6 +40,7 @@ use std::error::Error as stdError;
 use std::future::Future;
 use std::mem::take;
 use std::ops::{Add, Sub};
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::select;
@@ -80,6 +81,7 @@ pub(crate) struct KvClientBabysitterClientConfig {
 pub(crate) struct KvClientBabysitterOptions<K: KvClient> {
     pub id: String,
 
+    pub on_demand_connect: bool,
     pub connect_throttle_period: Duration,
     pub disable_decompression: bool,
     pub bootstrap_opts: KvClientBootstrapOptions,
@@ -107,6 +109,7 @@ struct StdKvClientBabysitterState<K: KvClient> {
     connect_err: Option<ConnectionError>,
     client: Option<Arc<K>>,
     current_state: ConnectionState,
+    is_building: bool,
 }
 
 struct StdKvClientBabysitterClientState<K: KvClient> {
@@ -125,6 +128,7 @@ struct StaticKvClientOptions {
 struct ClientThreadOptions<K: KvClient> {
     id: String,
     endpoint_id: String,
+    on_demand_connect: bool,
 
     connect_throttle_period: Duration,
 
@@ -142,6 +146,8 @@ struct ClientThreadOptions<K: KvClient> {
 
 pub(crate) struct StdKvClientBabysitter<K: KvClient> {
     id: String,
+    endpoint_id: String,
+    on_demand_connect: bool,
 
     connect_throttle_period: Duration,
 
@@ -157,6 +163,19 @@ pub(crate) struct StdKvClientBabysitter<K: KvClient> {
 }
 
 impl<K: KvClient + 'static> StdKvClientBabysitter<K> {
+    fn maybe_begin_client(client_opts: Arc<ClientThreadOptions<K>>) {
+        {
+            let mut state = client_opts.slow_state.lock().unwrap();
+            if state.is_building {
+                return;
+            }
+
+            state.is_building = true;
+        }
+
+        Self::begin_client_build(client_opts);
+    }
+
     async fn maybe_throttle_on_error(
         babysitter_id: &str,
         throttle_period: Duration,
@@ -231,10 +250,12 @@ impl<K: KvClient + 'static> StdKvClientBabysitter<K> {
                     let state_clone = on_close_opts.slow_state.clone();
                     let fast_client_clone = on_close_opts.fast_client.clone();
                     let state_change_handler = on_close_opts.state_change_handler.clone();
+                    let on_demand_connect = on_close_opts.on_demand_connect;
 
                     Box::pin(async move {
                         {
                             let mut guard = state_clone.lock().unwrap();
+                            guard.is_building = false;
                             if let Some(cli) = &guard.client {
                                 if cli.id() != client_id {
                                     return;
@@ -250,7 +271,9 @@ impl<K: KvClient + 'static> StdKvClientBabysitter<K> {
 
                         state_change_handler(babysitter_id, None, None).await;
 
-                        Self::begin_client_build(opts_clone);
+                        if !on_demand_connect {
+                            Self::maybe_begin_client(opts_clone);
+                        }
                     })
                 }),
                 disable_decompression: client_opts.static_kv_client_options.disable_decompression,
@@ -309,6 +332,7 @@ impl<K: KvClient + 'static> StdKvClientBabysitter<K> {
 
                         {
                             let mut guard = state.lock().unwrap();
+                            guard.is_building = false;
                             guard.current_state = ConnectionState::Connected;
                             guard.client = Some(client.clone());
                         }
@@ -357,6 +381,7 @@ impl<K: KvClient + 'static> StdKvClientBabysitter<K> {
 
                         let mut guard = state.lock().unwrap();
 
+                        guard.is_building = false;
                         guard.current_state = ConnectionState::Disconnected;
                         guard.connect_err = Some(ConnectionError {
                             connect_error: e,
@@ -376,6 +401,8 @@ impl<K: KvClient + KvClientOps + 'static> KvClientBabysitter for StdKvClientBaby
         let (on_client_connected_tx, _) = watch::channel(None);
         let babysitter = StdKvClientBabysitter {
             id: opts.id,
+            endpoint_id: opts.endpoint_id.clone(),
+            on_demand_connect: opts.on_demand_connect,
             connect_throttle_period: opts.connect_throttle_period,
             state_change_handler: opts.state_change_handler,
             on_client_connected_tx,
@@ -398,21 +425,25 @@ impl<K: KvClient + KvClientOps + 'static> KvClientBabysitter for StdKvClientBaby
                 connect_err: None,
                 client: None,
                 current_state: ConnectionState::Disconnected,
+                is_building: false,
             })),
             shutdown_token: CancellationToken::new(),
         };
 
-        Self::begin_client_build(Arc::new(ClientThreadOptions {
-            id: babysitter.id.clone(),
-            endpoint_id: opts.endpoint_id,
-            connect_throttle_period: babysitter.connect_throttle_period,
-            static_kv_client_options: babysitter.kv_client_options.clone(),
-            state_change_handler: babysitter.state_change_handler.clone(),
-            on_client_connected_tx: babysitter.on_client_connected_tx.clone(),
-            fast_client: babysitter.fast_client.clone(),
-            slow_state: babysitter.slow_state.clone(),
-            shutdown_token: babysitter.shutdown_token.clone(),
-        }));
+        if !opts.on_demand_connect {
+            Self::maybe_begin_client(Arc::new(ClientThreadOptions {
+                id: babysitter.id.clone(),
+                endpoint_id: opts.endpoint_id,
+                on_demand_connect: opts.on_demand_connect,
+                connect_throttle_period: babysitter.connect_throttle_period,
+                static_kv_client_options: babysitter.kv_client_options.clone(),
+                state_change_handler: babysitter.state_change_handler.clone(),
+                on_client_connected_tx: babysitter.on_client_connected_tx.clone(),
+                fast_client: babysitter.fast_client.clone(),
+                slow_state: babysitter.slow_state.clone(),
+                shutdown_token: babysitter.shutdown_token.clone(),
+            }));
+        }
 
         babysitter
     }
@@ -433,6 +464,19 @@ impl<K: KvClient + KvClientOps + 'static> KvClientBabysitter for StdKvClientBaby
                 return Ok(client.clone());
             }
         }
+
+        Self::maybe_begin_client(Arc::new(ClientThreadOptions {
+            id: self.id.clone(),
+            endpoint_id: self.endpoint_id.clone(),
+            on_demand_connect: self.on_demand_connect,
+            connect_throttle_period: self.connect_throttle_period,
+            static_kv_client_options: self.kv_client_options.clone(),
+            state_change_handler: self.state_change_handler.clone(),
+            on_client_connected_tx: self.on_client_connected_tx.clone(),
+            fast_client: self.fast_client.clone(),
+            slow_state: self.slow_state.clone(),
+            shutdown_token: self.shutdown_token.clone(),
+        }));
 
         let mut rx = self.on_client_connected_tx.subscribe();
         loop {

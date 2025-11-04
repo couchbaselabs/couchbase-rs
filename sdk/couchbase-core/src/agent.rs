@@ -408,6 +408,7 @@ impl Agent {
         let conn_mgr = Arc::new(
             StdKvEndpointClientManager::new(KvEndpointClientManagerOptions {
                 on_close_handler: Arc::new(|_manager_id| {}),
+                on_demand_connect: opts.kv_config.on_demand_connect,
                 num_pool_connections,
                 connect_throttle_period: opts.kv_config.connect_throttle_timeout,
                 bootstrap_options: KvClientBootstrapOptions {

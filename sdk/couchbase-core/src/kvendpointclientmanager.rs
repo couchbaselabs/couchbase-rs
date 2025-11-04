@@ -69,6 +69,7 @@ pub(crate) type KvEndpointClientManagerCloseHandler = Arc<dyn Fn(String) + Send 
 pub(crate) struct KvEndpointClientManagerOptions {
     pub on_close_handler: KvEndpointClientManagerCloseHandler,
 
+    pub on_demand_connect: bool,
     pub num_pool_connections: usize,
     pub connect_throttle_period: Duration,
     pub disable_decompression: bool,
@@ -108,6 +109,7 @@ where
 
     on_close_handler: KvEndpointClientManagerCloseHandler,
 
+    on_demand_connect: bool,
     num_pool_connections: usize,
     connect_throttle_period: Duration,
     disable_decompression: bool,
@@ -140,6 +142,7 @@ where
         let mgr = StdKvEndpointClientManager {
             id: Uuid::new_v4().to_string(),
             on_close_handler: opts.on_close_handler,
+            on_demand_connect: opts.on_demand_connect,
             num_pool_connections: opts.num_pool_connections,
             connect_throttle_period: opts.connect_throttle_period,
             disable_decompression: opts.disable_decompression,
@@ -206,6 +209,7 @@ where
                 old_pool
             } else {
                 let pool = P::new(KvClientPoolOptions {
+                    on_demand_connect: self.on_demand_connect,
                     num_connections: self.num_pool_connections,
                     connect_throttle_period: self.connect_throttle_period,
                     disable_decompression: self.disable_decompression,
@@ -254,35 +258,12 @@ where
         Ok(())
     }
 
-    async fn endpoint_diagnostics(&self) -> Vec<EndpointDiagnostics> {
-        let state = self.fast_state.load();
-
-        let mut diags = Vec::with_capacity(state.client_pools.len());
-        for pool in state.client_pools.values() {
-            diags.extend(pool.endpoint_diagnostics().await);
-        }
-
-        diags
-    }
-
     async fn update_auth(&self, authenticator: Authenticator) {
         let state = self.slow_state.lock().await;
 
         for pool in state.client_pools.values() {
             pool.update_auth(authenticator.clone()).await;
         }
-    }
-
-    async fn get_client_per_endpoint(&self) -> error::Result<Vec<Arc<Self::Client>>> {
-        let state = self.fast_state.load();
-
-        let mut clients = Vec::with_capacity(state.client_pools.len());
-        for pool in state.client_pools.values() {
-            let client = pool.get_client().await?;
-            clients.push(client);
-        }
-
-        Ok(clients)
     }
 
     async fn ping_all_clients(
@@ -311,5 +292,28 @@ where
         }
 
         results
+    }
+
+    async fn endpoint_diagnostics(&self) -> Vec<EndpointDiagnostics> {
+        let state = self.fast_state.load();
+
+        let mut diags = Vec::with_capacity(state.client_pools.len());
+        for pool in state.client_pools.values() {
+            diags.extend(pool.endpoint_diagnostics().await);
+        }
+
+        diags
+    }
+
+    async fn get_client_per_endpoint(&self) -> error::Result<Vec<Arc<Self::Client>>> {
+        let state = self.fast_state.load();
+
+        let mut clients = Vec::with_capacity(state.client_pools.len());
+        for pool in state.client_pools.values() {
+            let client = pool.get_client().await?;
+            clients.push(client);
+        }
+
+        Ok(clients)
     }
 }

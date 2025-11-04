@@ -242,6 +242,7 @@ impl Default for ConfigPollerConfig {
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub struct KvConfig {
+    pub on_demand_connect: bool,
     pub enable_error_map: bool,
     pub enable_mutation_tokens: bool,
     pub enable_server_durations: bool,
@@ -253,6 +254,11 @@ pub struct KvConfig {
 impl KvConfig {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn on_demand_connect(mut self, on_demand_connect: bool) -> Self {
+        self.on_demand_connect = on_demand_connect;
+        self
     }
 
     pub fn enable_error_map(mut self, enable: bool) -> Self {
@@ -289,6 +295,7 @@ impl KvConfig {
 impl Default for KvConfig {
     fn default() -> Self {
         Self {
+            on_demand_connect: false,
             enable_error_map: true,
             enable_mutation_tokens: true,
             enable_server_durations: true,
