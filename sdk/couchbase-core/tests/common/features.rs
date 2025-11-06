@@ -69,6 +69,7 @@ pub enum TestFeatureCode {
     HistoryRetention,
     UserGroups,
     UsersMB69096,
+    PingRSCBC220,
 }
 
 impl TestAgent {
@@ -100,6 +101,9 @@ impl TestAgent {
             }
             TestFeatureCode::UsersMB69096 => {
                 !self.cluster_version.equal(&SERVER_VERSION_800_COMMUNITY)
+            }
+            TestFeatureCode::PingRSCBC220 => {
+                self.cluster_version.edition != Some(NodeEdition::Community)
             }
         }
     }
