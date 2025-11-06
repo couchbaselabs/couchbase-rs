@@ -17,6 +17,7 @@
  */
 
 use crate::common::default_agent_options::create_default_options;
+use crate::common::features::TestFeatureCode;
 use crate::common::test_config::{run_test, setup_test};
 use couchbase_core::agent::Agent;
 use couchbase_core::connection_state::ConnectionState;
@@ -35,6 +36,10 @@ mod common;
 #[test]
 fn test_ping() {
     run_test(async |mut agent| {
+        if !agent.supports_feature(&TestFeatureCode::PingRSCBC220) {
+            return;
+        }
+
         let opts = PingOptions::new()
             .kv_timeout(Duration::from_millis(1000))
             .query_timeout(Duration::from_millis(75000))
