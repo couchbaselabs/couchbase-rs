@@ -210,7 +210,7 @@ where
             return Ok(client);
         }
 
-        debug!("Client pool {} no client found in fast_map", self.id);
+        debug!("Client pool {} no client found in fast map", self.id);
 
         self.get_client_slow().await
     }
@@ -294,6 +294,8 @@ where
                 .babysitter
                 .clone()
         };
+
+        debug!("Client pool {} no client found in slow map", self.id);
 
         babysitter.get_client().await
     }

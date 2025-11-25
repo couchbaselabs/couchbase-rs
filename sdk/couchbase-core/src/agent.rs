@@ -78,6 +78,7 @@ use std::sync::{Arc, Weak};
 use std::time::Duration;
 
 use crate::componentconfigs::{AgentComponentConfigs, HttpClientConfig};
+use crate::httpx::request::{Auth, BasicAuth, BearerAuth};
 use crate::kvclient_babysitter::{KvTarget, StdKvClientBabysitter};
 use crate::kvendpointclientmanager::{
     KvEndpointClientManager, KvEndpointClientManagerOptions, StdKvEndpointClientManager,
@@ -314,17 +315,7 @@ impl Agent {
         let client_name = format!("couchbase-rs-core {build_version}");
         info!("Creating new agent {client_name}");
 
-        let auth_mechanisms = if opts.auth_mechanisms.is_empty() {
-            if opts.tls_config.is_some() {
-                vec![AuthMechanism::Plain]
-            } else {
-                vec![
-                    AuthMechanism::ScramSha512,
-                    AuthMechanism::ScramSha256,
-                    AuthMechanism::ScramSha1,
-                ]
-            }
-        } else {
+        let auth_mechanisms = if !opts.auth_mechanisms.is_empty() {
             if opts.tls_config.is_none() && opts.auth_mechanisms.contains(&AuthMechanism::Plain) {
                 warn!("PLAIN sends credentials in plaintext, this will cause credential leakage on the network");
             } else if opts.tls_config.is_some()
@@ -336,6 +327,8 @@ impl Agent {
             }
 
             opts.auth_mechanisms
+        } else {
+            vec![]
         };
 
         let mut state = AgentState {
@@ -672,12 +665,16 @@ impl Agent {
             for endpoint_config in http_configs.values() {
                 let endpoint = endpoint_config.endpoint.clone();
                 let host = get_host_port_from_uri(&endpoint)?;
-                let user_pass = match &endpoint_config.authenticator {
+                let auth = match &endpoint_config.authenticator {
                     Authenticator::PasswordAuthenticator(authenticator) => {
-                        authenticator.get_credentials(&ServiceType::MGMT, host)?
+                        let user_pass = authenticator.get_credentials(&ServiceType::MGMT, host)?;
+                        Auth::BasicAuth(BasicAuth::new(user_pass.username, user_pass.password))
                     }
-                    Authenticator::CertificateAuthenticator(authenticator) => {
-                        authenticator.get_credentials(&ServiceType::MGMT, host)?
+                    Authenticator::CertificateAuthenticator(_authenticator) => {
+                        Auth::BasicAuth(BasicAuth::new("".to_string(), "".to_string()))
+                    }
+                    Authenticator::JwtAuthenticator(authenticator) => {
+                        Auth::BearerAuth(BearerAuth::new(authenticator.get_token()))
                     }
                 };
 
@@ -685,8 +682,7 @@ impl Agent {
                     http_client.clone(),
                     endpoint,
                     endpoint_config.user_agent.clone(),
-                    user_pass.username,
-                    user_pass.password,
+                    auth,
                     endpoint_config.bucket_name.clone(),
                 )
                 .await
@@ -709,8 +705,7 @@ impl Agent {
         http_client: Arc<C>,
         endpoint: String,
         user_agent: String,
-        username: String,
-        password: String,
+        auth: Auth,
         bucket_name: Option<String>,
     ) -> Result<ParsedConfig> {
         debug!("Polling config from {}", &endpoint);
@@ -723,8 +718,7 @@ impl Agent {
                 http_client,
                 user_agent,
                 endpoint,
-                username,
-                password,
+                auth,
             }
             .get_terse_bucket_config(&GetTerseBucketConfigOptions {
                 bucket_name: &bucket_name,
@@ -739,8 +733,7 @@ impl Agent {
                 http_client,
                 user_agent,
                 endpoint,
-                username,
-                password,
+                auth,
             }
             .get_terse_cluster_config(&GetTerseClusterConfigOptions {
                 on_behalf_of_info: None,

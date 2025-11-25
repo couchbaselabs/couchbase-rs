@@ -25,7 +25,7 @@ mod common;
 #[test]
 #[should_panic]
 fn test_upsert() {
-    run_test(async |cluster| {
+    run_test(async |cluster, bucket| {
         let collection = cluster
             .bucket("idonotexistonthiscluster")
             .scope(cluster.default_scope())

@@ -78,8 +78,7 @@ impl<'a> EnsureIndexHelper<'a> {
             http_client: client,
             user_agent: self.user_agent.to_string(),
             endpoint: target.endpoint.to_string(),
-            username: target.username.to_string(),
-            password: target.password.to_string(),
+            auth: target.auth.clone(),
             vector_search_enabled: true,
         }
         .get_index(&GetIndexOptions {
@@ -122,8 +121,7 @@ impl<'a> EnsureIndexHelper<'a> {
             http_client: client,
             user_agent: self.user_agent.to_string(),
             endpoint: target.endpoint.to_string(),
-            username: target.username.to_string(),
-            password: target.password.to_string(),
+            auth: target.auth.clone(),
             vector_search_enabled: true,
         }
         .refresh_config(&RefreshConfigOptions::new())

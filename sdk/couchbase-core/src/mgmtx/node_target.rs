@@ -15,20 +15,16 @@
  *  * limitations under the License.
  *
  */
+use crate::httpx::request::Auth;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct NodeTarget {
     pub endpoint: String,
-    pub username: String,
-    pub password: String,
+    pub auth: Auth,
 }
 
 impl crate::httpcomponent::NodeTarget for NodeTarget {
-    fn new(endpoint: String, username: String, password: String) -> Self {
-        Self {
-            endpoint,
-            username,
-            password,
-        }
+    fn new(endpoint: String, auth: Auth) -> Self {
+        Self { endpoint, auth }
     }
 }

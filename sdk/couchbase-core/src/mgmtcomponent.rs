@@ -21,6 +21,7 @@ use crate::cbconfig::CollectionManifest;
 use crate::error::ErrorKind;
 use crate::httpcomponent::{HttpComponent, HttpComponentState};
 use crate::httpx::client::Client;
+use crate::httpx::request::Auth;
 use crate::mgmtx::bucket_helper::EnsureBucketHelper;
 use crate::mgmtx::bucket_settings::BucketDef;
 use crate::mgmtx::group_helper::EnsureGroupHelper;
@@ -110,17 +111,12 @@ impl<C: Client> MgmtComponent<C> {
             self.http_component
                 .orchestrate_endpoint(
                     None,
-                    async |client: Arc<C>,
-                           endpoint_id: String,
-                           endpoint: String,
-                           username: String,
-                           password: String| {
+                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
                         let res = match (mgmtx::mgmt::Management::<C> {
                             http_client: client,
                             user_agent: self.http_component.user_agent().to_string(),
                             endpoint: endpoint.clone(),
-                            username,
-                            password,
+                            auth,
                         }
                         .get_collection_manifest(&copts)
                         .await)
@@ -149,17 +145,12 @@ impl<C: Client> MgmtComponent<C> {
             self.http_component
                 .orchestrate_endpoint(
                     None,
-                    async |client: Arc<C>,
-                           endpoint_id: String,
-                           endpoint: String,
-                           username: String,
-                           password: String| {
+                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
                         let res = match (mgmtx::mgmt::Management::<C> {
                             http_client: client,
                             user_agent: self.http_component.user_agent().to_string(),
                             endpoint: endpoint.clone(),
-                            username,
-                            password,
+                            auth,
                         }
                         .create_scope(&copts)
                         .await)
@@ -188,17 +179,12 @@ impl<C: Client> MgmtComponent<C> {
             self.http_component
                 .orchestrate_endpoint(
                     None,
-                    async |client: Arc<C>,
-                           endpoint_id: String,
-                           endpoint: String,
-                           username: String,
-                           password: String| {
+                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
                         let res = match (mgmtx::mgmt::Management::<C> {
                             http_client: client,
                             user_agent: self.http_component.user_agent().to_string(),
                             endpoint: endpoint.clone(),
-                            username,
-                            password,
+                            auth,
                         }
                         .delete_scope(&copts)
                         .await)
@@ -227,17 +213,12 @@ impl<C: Client> MgmtComponent<C> {
             self.http_component
                 .orchestrate_endpoint(
                     None,
-                    async |client: Arc<C>,
-                           endpoint_id: String,
-                           endpoint: String,
-                           username: String,
-                           password: String| {
+                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
                         let res = match (mgmtx::mgmt::Management::<C> {
                             http_client: client,
                             user_agent: self.http_component.user_agent().to_string(),
                             endpoint: endpoint.clone(),
-                            username,
-                            password,
+                            auth,
                         }
                         .create_collection(&copts)
                         .await)
@@ -266,17 +247,12 @@ impl<C: Client> MgmtComponent<C> {
             self.http_component
                 .orchestrate_endpoint(
                     None,
-                    async |client: Arc<C>,
-                           endpoint_id: String,
-                           endpoint: String,
-                           username: String,
-                           password: String| {
+                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
                         let res = match (mgmtx::mgmt::Management::<C> {
                             http_client: client,
                             user_agent: self.http_component.user_agent().to_string(),
                             endpoint: endpoint.clone(),
-                            username,
-                            password,
+                            auth,
                         }
                         .delete_collection(&copts)
                         .await)
@@ -305,17 +281,12 @@ impl<C: Client> MgmtComponent<C> {
             self.http_component
                 .orchestrate_endpoint(
                     None,
-                    async |client: Arc<C>,
-                           endpoint_id: String,
-                           endpoint: String,
-                           username: String,
-                           password: String| {
+                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
                         let res = match (mgmtx::mgmt::Management::<C> {
                             http_client: client,
                             user_agent: self.http_component.user_agent().to_string(),
                             endpoint: endpoint.clone(),
-                            username,
-                            password,
+                            auth,
                         }
                         .update_collection(&copts)
                         .await)
@@ -344,17 +315,12 @@ impl<C: Client> MgmtComponent<C> {
             self.http_component
                 .orchestrate_endpoint(
                     None,
-                    async |client: Arc<C>,
-                           endpoint_id: String,
-                           endpoint: String,
-                           username: String,
-                           password: String| {
+                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
                         mgmtx::mgmt::Management::<C> {
                             http_client: client,
                             user_agent: self.http_component.user_agent().to_string(),
                             endpoint: endpoint.clone(),
-                            username,
-                            password,
+                            auth,
                         }
                         .get_all_buckets(&copts)
                         .await
@@ -375,17 +341,12 @@ impl<C: Client> MgmtComponent<C> {
             self.http_component
                 .orchestrate_endpoint(
                     None,
-                    async |client: Arc<C>,
-                           endpoint_id: String,
-                           endpoint: String,
-                           username: String,
-                           password: String| {
+                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
                         mgmtx::mgmt::Management::<C> {
                             http_client: client,
                             user_agent: self.http_component.user_agent().to_string(),
                             endpoint: endpoint.clone(),
-                            username,
-                            password,
+                            auth,
                         }
                         .get_bucket(&copts)
                         .await
@@ -406,17 +367,12 @@ impl<C: Client> MgmtComponent<C> {
             self.http_component
                 .orchestrate_endpoint(
                     None,
-                    async |client: Arc<C>,
-                           endpoint_id: String,
-                           endpoint: String,
-                           username: String,
-                           password: String| {
+                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
                         mgmtx::mgmt::Management::<C> {
                             http_client: client,
                             user_agent: self.http_component.user_agent().to_string(),
                             endpoint: endpoint.clone(),
-                            username,
-                            password,
+                            auth,
                         }
                         .create_bucket(&copts)
                         .await
@@ -437,17 +393,12 @@ impl<C: Client> MgmtComponent<C> {
             self.http_component
                 .orchestrate_endpoint(
                     None,
-                    async |client: Arc<C>,
-                           endpoint_id: String,
-                           endpoint: String,
-                           username: String,
-                           password: String| {
+                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
                         mgmtx::mgmt::Management::<C> {
                             http_client: client,
                             user_agent: self.http_component.user_agent().to_string(),
                             endpoint: endpoint.clone(),
-                            username,
-                            password,
+                            auth,
                         }
                         .update_bucket(&copts)
                         .await
@@ -468,17 +419,12 @@ impl<C: Client> MgmtComponent<C> {
             self.http_component
                 .orchestrate_endpoint(
                     None,
-                    async |client: Arc<C>,
-                           endpoint_id: String,
-                           endpoint: String,
-                           username: String,
-                           password: String| {
+                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
                         mgmtx::mgmt::Management::<C> {
                             http_client: client,
                             user_agent: self.http_component.user_agent().to_string(),
                             endpoint: endpoint.clone(),
-                            username,
-                            password,
+                            auth,
                         }
                         .delete_bucket(&copts)
                         .await
@@ -499,17 +445,12 @@ impl<C: Client> MgmtComponent<C> {
             self.http_component
                 .orchestrate_endpoint(
                     None,
-                    async |client: Arc<C>,
-                           endpoint_id: String,
-                           endpoint: String,
-                           username: String,
-                           password: String| {
+                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
                         mgmtx::mgmt::Management::<C> {
                             http_client: client,
                             user_agent: self.http_component.user_agent().to_string(),
                             endpoint: endpoint.clone(),
-                            username,
-                            password,
+                            auth,
                         }
                         .flush_bucket(&copts)
                         .await
@@ -580,17 +521,12 @@ impl<C: Client> MgmtComponent<C> {
             self.http_component
                 .orchestrate_endpoint(
                     None,
-                    async |client: Arc<C>,
-                           endpoint_id: String,
-                           endpoint: String,
-                           username: String,
-                           password: String| {
+                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
                         mgmtx::mgmt::Management::<C> {
                             http_client: client,
                             user_agent: self.http_component.user_agent().to_string(),
                             endpoint: endpoint.clone(),
-                            username,
-                            password,
+                            auth,
                         }
                         .get_user(&copts)
                         .await
@@ -613,17 +549,12 @@ impl<C: Client> MgmtComponent<C> {
             self.http_component
                 .orchestrate_endpoint(
                     None,
-                    async |client: Arc<C>,
-                           endpoint_id: String,
-                           endpoint: String,
-                           username: String,
-                           password: String| {
+                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
                         mgmtx::mgmt::Management::<C> {
                             http_client: client,
                             user_agent: self.http_component.user_agent().to_string(),
                             endpoint: endpoint.clone(),
-                            username,
-                            password,
+                            auth,
                         }
                         .get_all_users(&copts)
                         .await
@@ -643,17 +574,12 @@ impl<C: Client> MgmtComponent<C> {
             self.http_component
                 .orchestrate_endpoint(
                     None,
-                    async |client: Arc<C>,
-                           endpoint_id: String,
-                           endpoint: String,
-                           username: String,
-                           password: String| {
+                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
                         mgmtx::mgmt::Management::<C> {
                             http_client: client,
                             user_agent: self.http_component.user_agent().to_string(),
                             endpoint: endpoint.clone(),
-                            username,
-                            password,
+                            auth,
                         }
                         .upsert_user(&copts)
                         .await
@@ -673,17 +599,12 @@ impl<C: Client> MgmtComponent<C> {
             self.http_component
                 .orchestrate_endpoint(
                     None,
-                    async |client: Arc<C>,
-                           endpoint_id: String,
-                           endpoint: String,
-                           username: String,
-                           password: String| {
+                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
                         mgmtx::mgmt::Management::<C> {
                             http_client: client,
                             user_agent: self.http_component.user_agent().to_string(),
                             endpoint: endpoint.clone(),
-                            username,
-                            password,
+                            auth,
                         }
                         .delete_user(&copts)
                         .await
@@ -706,17 +627,12 @@ impl<C: Client> MgmtComponent<C> {
             self.http_component
                 .orchestrate_endpoint(
                     None,
-                    async |client: Arc<C>,
-                           endpoint_id: String,
-                           endpoint: String,
-                           username: String,
-                           password: String| {
+                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
                         mgmtx::mgmt::Management::<C> {
                             http_client: client,
                             user_agent: self.http_component.user_agent().to_string(),
                             endpoint: endpoint.clone(),
-                            username,
-                            password,
+                            auth,
                         }
                         .get_roles(&copts)
                         .await
@@ -736,17 +652,12 @@ impl<C: Client> MgmtComponent<C> {
             self.http_component
                 .orchestrate_endpoint(
                     None,
-                    async |client: Arc<C>,
-                           endpoint_id: String,
-                           endpoint: String,
-                           username: String,
-                           password: String| {
+                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
                         mgmtx::mgmt::Management::<C> {
                             http_client: client,
                             user_agent: self.http_component.user_agent().to_string(),
                             endpoint: endpoint.clone(),
-                            username,
-                            password,
+                            auth,
                         }
                         .get_group(&copts)
                         .await
@@ -769,17 +680,12 @@ impl<C: Client> MgmtComponent<C> {
             self.http_component
                 .orchestrate_endpoint(
                     None,
-                    async |client: Arc<C>,
-                           endpoint_id: String,
-                           endpoint: String,
-                           username: String,
-                           password: String| {
+                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
                         mgmtx::mgmt::Management::<C> {
                             http_client: client,
                             user_agent: self.http_component.user_agent().to_string(),
                             endpoint: endpoint.clone(),
-                            username,
-                            password,
+                            auth,
                         }
                         .get_all_groups(&copts)
                         .await
@@ -799,17 +705,12 @@ impl<C: Client> MgmtComponent<C> {
             self.http_component
                 .orchestrate_endpoint(
                     None,
-                    async |client: Arc<C>,
-                           endpoint_id: String,
-                           endpoint: String,
-                           username: String,
-                           password: String| {
+                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
                         mgmtx::mgmt::Management::<C> {
                             http_client: client,
                             user_agent: self.http_component.user_agent().to_string(),
                             endpoint: endpoint.clone(),
-                            username,
-                            password,
+                            auth,
                         }
                         .upsert_group(&copts)
                         .await
@@ -829,17 +730,12 @@ impl<C: Client> MgmtComponent<C> {
             self.http_component
                 .orchestrate_endpoint(
                     None,
-                    async |client: Arc<C>,
-                           endpoint_id: String,
-                           endpoint: String,
-                           username: String,
-                           password: String| {
+                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
                         mgmtx::mgmt::Management::<C> {
                             http_client: client,
                             user_agent: self.http_component.user_agent().to_string(),
                             endpoint: endpoint.clone(),
-                            username,
-                            password,
+                            auth,
                         }
                         .delete_group(&copts)
                         .await
@@ -859,17 +755,12 @@ impl<C: Client> MgmtComponent<C> {
             self.http_component
                 .orchestrate_endpoint(
                     None,
-                    async |client: Arc<C>,
-                           endpoint_id: String,
-                           endpoint: String,
-                           username: String,
-                           password: String| {
+                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
                         mgmtx::mgmt::Management::<C> {
                             http_client: client,
                             user_agent: self.http_component.user_agent().to_string(),
                             endpoint: endpoint.clone(),
-                            username,
-                            password,
+                            auth,
                         }
                         .change_password(&copts)
                         .await

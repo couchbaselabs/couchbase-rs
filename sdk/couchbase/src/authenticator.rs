@@ -16,7 +16,6 @@
  *
  */
 
-use crate::service_type::ServiceType;
 use std::fmt::{Debug, Display};
 
 #[cfg(feature = "native-tls")]
@@ -30,6 +29,7 @@ use tokio_rustls::rustls::pki_types::{CertificateDer, PrivateKeyDer};
 pub enum Authenticator {
     PasswordAuthenticator(PasswordAuthenticator),
     CertificateAuthenticator(CertificateAuthenticator),
+    JwtAuthenticator(JwtAuthenticator),
 }
 
 impl Debug for Authenticator {
@@ -41,6 +41,9 @@ impl Debug for Authenticator {
             Authenticator::CertificateAuthenticator(_) => {
                 write!(f, "CertificateAuthenticator")
             }
+            Authenticator::JwtAuthenticator(_) => {
+                write!(f, "JwtAuthenticator")
+            }
         }
     }
 }
@@ -50,14 +53,9 @@ impl Display for Authenticator {
         match self {
             Authenticator::PasswordAuthenticator(_) => write!(f, "PasswordAuthenticator"),
             Authenticator::CertificateAuthenticator(_) => write!(f, "CertificateAuthenticator"),
+            Authenticator::JwtAuthenticator(_) => write!(f, "JwtAuthenticator"),
         }
     }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct UserPassPair {
-    pub username: String,
-    pub password: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -72,17 +70,6 @@ impl PasswordAuthenticator {
             username: username.into(),
             password: password.into(),
         }
-    }
-
-    pub(crate) fn get_credentials(
-        &self,
-        _service_type: &ServiceType,
-        _host_port: String,
-    ) -> crate::error::Result<UserPassPair> {
-        Ok(UserPassPair {
-            username: self.username.clone(),
-            password: self.password.clone(),
-        })
     }
 }
 
@@ -106,6 +93,13 @@ impl From<Authenticator> for couchbase_core::authenticator::Authenticator {
             Authenticator::CertificateAuthenticator(_) => {
                 couchbase_core::authenticator::Authenticator::CertificateAuthenticator(
                     couchbase_core::authenticator::CertificateAuthenticator {},
+                )
+            }
+            Authenticator::JwtAuthenticator(jwt_auth) => {
+                couchbase_core::authenticator::Authenticator::JwtAuthenticator(
+                    couchbase_core::authenticator::JwtAuthenticator {
+                        token: jwt_auth.token,
+                    },
                 )
             }
         }
@@ -166,5 +160,18 @@ impl CertificateAuthenticator {
 impl From<CertificateAuthenticator> for Authenticator {
     fn from(value: CertificateAuthenticator) -> Self {
         Authenticator::CertificateAuthenticator(value)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Hash)]
+pub struct JwtAuthenticator {
+    pub token: String,
+}
+
+impl JwtAuthenticator {
+    pub fn new(token: impl Into<String>) -> Self {
+        Self {
+            token: token.into(),
+        }
     }
 }

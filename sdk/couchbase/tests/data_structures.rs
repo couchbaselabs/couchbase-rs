@@ -23,9 +23,8 @@ mod common;
 
 #[test]
 fn test_list() {
-    run_test(async |cluster| {
-        let collection = cluster
-            .bucket(cluster.default_bucket())
+    run_test(async |cluster, bucket| {
+        let collection = bucket
             .scope(cluster.default_scope())
             .collection(cluster.default_collection());
         let key = new_key();
@@ -60,9 +59,8 @@ fn test_list() {
 
 #[test]
 fn test_map() {
-    run_test(async |cluster| {
-        let collection = cluster
-            .bucket(cluster.default_bucket())
+    run_test(async |cluster, bucket| {
+        let collection = bucket
             .scope(cluster.default_scope())
             .collection(cluster.default_collection());
         let key = new_key();
@@ -115,9 +113,8 @@ fn test_map() {
 
 #[test]
 fn test_set() {
-    run_test(async |cluster| {
-        let collection = cluster
-            .bucket(cluster.default_bucket())
+    run_test(async |cluster, bucket| {
+        let collection = bucket
             .scope(cluster.default_scope())
             .collection(cluster.default_collection());
         let key = new_key();
@@ -156,9 +153,8 @@ fn test_set() {
 
 #[test]
 fn test_queue() {
-    run_test(async |cluster| {
-        let collection = cluster
-            .bucket(cluster.default_bucket())
+    run_test(async |cluster, bucket| {
+        let collection = bucket
             .scope(cluster.default_scope())
             .collection(cluster.default_collection());
         let key = new_key();

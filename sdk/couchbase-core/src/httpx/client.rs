@@ -172,6 +172,7 @@ impl Client for ReqwestClient {
                 Auth::BasicAuth(basic) => {
                     builder = builder.basic_auth(&basic.username, Some(&basic.password))
                 }
+                Auth::BearerAuth(bearer) => builder = builder.bearer_auth(&bearer.token),
                 Auth::OnBehalfOf(obo) => {
                     match &obo.password_or_domain {
                         OboPasswordOrDomain::Password(password) => {

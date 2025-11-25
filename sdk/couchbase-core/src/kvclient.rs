@@ -28,7 +28,7 @@ use crate::memdx::dispatcher::{
     Dispatcher, DispatcherOptions, OrphanResponseHandler, UnsolicitedPacketHandler,
 };
 use crate::memdx::hello_feature::HelloFeature;
-use crate::memdx::op_auth_saslauto::SASLAuthAutoOptions;
+use crate::memdx::op_auth_saslauto::{Credentials, SASLAuthAutoOptions};
 use crate::memdx::op_bootstrap::BootstrapOptions;
 use crate::memdx::packet::ResponsePacket;
 use crate::memdx::request::{GetErrorMapRequest, HelloRequest, SelectBucketRequest};
@@ -195,24 +195,43 @@ where
 
         let address = opts.address.address;
 
-        let creds = match opts.authenticator {
+        let credentials = match &opts.authenticator {
             Authenticator::PasswordAuthenticator(a) => {
-                Some(a.get_credentials(&ServiceType::MEMD, address.to_string())?)
+                let creds = a.get_credentials(&ServiceType::MEMD, address.to_string())?;
+                Some(Credentials::UserPass {
+                    username: creds.username,
+                    password: creds.password,
+                })
             }
             Authenticator::CertificateAuthenticator(_a) => None,
+            Authenticator::JwtAuthenticator(a) => {
+                Some(Credentials::JwtToken(a.get_token().to_string()))
+            }
         };
 
-        let bootstrap_auth = if let Some(creds) = creds {
-            Some(SASLAuthAutoOptions {
-                username: creds.username.clone(),
-                password: creds.password.clone(),
-                enabled_mechs: opts
-                    .bootstrap_options
-                    .auth_mechanisms
-                    .iter()
-                    .cloned()
+        let bootstrap_auth = if let Some(credentials) = credentials {
+            let enabled_mechs: Vec<memdx::auth_mechanism::AuthMechanism> =
+                if !opts.bootstrap_options.auth_mechanisms.is_empty() {
+                    opts.bootstrap_options
+                        .auth_mechanisms
+                        .iter()
+                        .cloned()
+                        .map(memdx::auth_mechanism::AuthMechanism::from)
+                        .collect()
+                } else {
+                    match opts.authenticator {
+                        Authenticator::PasswordAuthenticator(a) => a.get_auth_mechanisms(),
+                        Authenticator::JwtAuthenticator(a) => a.get_auth_mechanisms(),
+                        _ => vec![],
+                    }
+                    .into_iter()
                     .map(memdx::auth_mechanism::AuthMechanism::from)
-                    .collect(),
+                    .collect()
+                };
+
+            Some(SASLAuthAutoOptions {
+                credentials,
+                enabled_mechs,
             })
         } else {
             None

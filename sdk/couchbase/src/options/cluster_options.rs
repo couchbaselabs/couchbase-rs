@@ -427,7 +427,7 @@ impl TlsOptions {
                         ))
                     })?
             }
-            Authenticator::PasswordAuthenticator(_) => builder.with_no_client_auth(),
+            _ => builder.with_no_client_auth(),
         };
 
         Ok(Arc::new(config))
@@ -474,6 +474,7 @@ impl TlsOptions {
                 builder.identity(a.identity.clone());
             }
             Authenticator::PasswordAuthenticator(_) => {}
+            Authenticator::JwtAuthenticator(_) => {}
         };
 
         builder

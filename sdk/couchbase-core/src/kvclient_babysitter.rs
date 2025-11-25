@@ -163,17 +163,18 @@ pub(crate) struct StdKvClientBabysitter<K: KvClient> {
 }
 
 impl<K: KvClient + 'static> StdKvClientBabysitter<K> {
-    fn maybe_begin_client(client_opts: Arc<ClientThreadOptions<K>>) {
+    fn maybe_begin_client(client_opts: Arc<ClientThreadOptions<K>>) -> bool {
         {
             let mut state = client_opts.slow_state.lock().unwrap();
             if state.is_building {
-                return;
+                return false;
             }
 
             state.is_building = true;
         }
 
         Self::begin_client_build(client_opts);
+        true
     }
 
     async fn maybe_throttle_on_error(
@@ -348,8 +349,9 @@ impl<K: KvClient + 'static> StdKvClientBabysitter<K> {
                             .send(Some(client.clone()))
                         {
                             Ok(_) => {}
-                            Err(e) => {
-                                warn!("Client babysitter {} error sending new client notification: {}", &client_opts.id, e);
+                            Err(_e) => {
+                                // This only happens if there are no receivers, which is only possible
+                                // when called from new and is fine.
                             }
                         }
 
@@ -465,7 +467,11 @@ impl<K: KvClient + KvClientOps + 'static> KvClientBabysitter for StdKvClientBaby
             }
         }
 
-        Self::maybe_begin_client(Arc::new(ClientThreadOptions {
+        // We subscribe before possibly creating the new client just to be sure that we're
+        // listening for updates.
+        let mut rx = self.on_client_connected_tx.subscribe();
+
+        let is_building = Self::maybe_begin_client(Arc::new(ClientThreadOptions {
             id: self.id.clone(),
             endpoint_id: self.endpoint_id.clone(),
             on_demand_connect: self.on_demand_connect,
@@ -478,7 +484,15 @@ impl<K: KvClient + KvClientOps + 'static> KvClientBabysitter for StdKvClientBaby
             shutdown_token: self.shutdown_token.clone(),
         }));
 
-        let mut rx = self.on_client_connected_tx.subscribe();
+        if is_building {
+            debug!(
+                "Client babysitter {} starting to build new client",
+                &self.id
+            );
+        } else {
+            debug!("Client babysitter {} already building client", &self.id);
+        }
+
         loop {
             let changed = select! {
                 () = self.shutdown_token.cancelled() => {

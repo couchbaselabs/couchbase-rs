@@ -22,6 +22,7 @@ use crate::common::test_agent::TestAgent;
 use couchbase_connstr::ResolvedConnSpec;
 use couchbase_core::address::Address;
 use couchbase_core::agent::Agent;
+use couchbase_core::options::waituntilready::WaitUntilReadyOptions;
 use envconfig::Envconfig;
 use lazy_static::lazy_static;
 use log::LevelFilter;
@@ -48,7 +49,7 @@ pub struct EnvTestConfig {
     pub username: String,
     #[envconfig(from = "RCBPASSWORD", default = "password")]
     pub password: String,
-    #[envconfig(from = "RCBCONNSTR", default = "couchbase://192.168.107.132")]
+    #[envconfig(from = "RCBCONNSTR", default = "couchbase://192.168.107.128")]
     pub conn_string: String,
     #[envconfig(from = "RCBBUCKET", default = "default")]
     pub default_bucket: String,
@@ -134,6 +135,11 @@ where
         )
         .await
         .unwrap();
+
+        test_agent
+            .wait_until_ready(&WaitUntilReadyOptions::new())
+            .await
+            .unwrap();
 
         *config = Some(test_agent.clone());
         drop(config);

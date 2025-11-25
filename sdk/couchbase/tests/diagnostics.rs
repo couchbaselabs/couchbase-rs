@@ -27,7 +27,7 @@ mod common;
 
 #[test]
 fn test_cluster_ping() {
-    run_test(async |mut cluster| {
+    run_test(async |mut cluster, bucket| {
         let opts = PingOptions::new()
             .kv_timeout(Duration::from_millis(1000))
             .query_timeout(Duration::from_millis(75000))
@@ -41,8 +41,8 @@ fn test_cluster_ping() {
 
 #[test]
 fn test_bucket_ping() {
-    run_test(async |mut cluster| {
-        let bucket = cluster.bucket(cluster.default_bucket());
+    run_test(async |mut cluster, bucket| {
+        let bucket = bucket;
 
         bucket.wait_until_ready(None).await.unwrap();
 
@@ -59,7 +59,7 @@ fn test_bucket_ping() {
 
 #[test]
 fn test_cluster_wait_until_ready() {
-    run_test(async |_cluster| {
+    run_test(async |_cluster, _bucket| {
         let cluster = create_test_cluster().await;
 
         cluster.wait_until_ready(None).await.unwrap();
@@ -68,8 +68,8 @@ fn test_cluster_wait_until_ready() {
 
 #[test]
 fn test_bucket_wait_until_ready() {
-    run_test(async |cluster| {
-        let bucket = cluster.bucket(cluster.default_bucket());
+    run_test(async |cluster, bucket| {
+        let bucket = bucket;
 
         bucket.wait_until_ready(None).await.unwrap();
     });
@@ -77,7 +77,7 @@ fn test_bucket_wait_until_ready() {
 
 #[test]
 fn test_diagnostics() {
-    run_test(async |mut cluster| {
+    run_test(async |mut cluster, bucket| {
         cluster.wait_until_ready(None).await.unwrap();
 
         let report = cluster

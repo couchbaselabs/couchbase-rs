@@ -18,8 +18,6 @@
 
 use std::cmp::PartialEq;
 
-use tokio::time::Instant;
-
 use crate::memdx::auth_mechanism::AuthMechanism;
 use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::error::Error;
@@ -30,11 +28,41 @@ use crate::memdx::op_auth_saslbyname::{
 use crate::memdx::pendingop::{PendingOp, StandardPendingOp};
 use crate::memdx::request::SASLListMechsRequest;
 use crate::memdx::response::SASLListMechsResponse;
+use tokio::time::Instant;
+
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub enum Credentials {
+    UserPass { username: String, password: String },
+    JwtToken(String),
+}
+
+impl Credentials {
+    pub fn user_pass(&self) -> Result<(&str, &str)> {
+        match self {
+            Credentials::UserPass { username, password } => {
+                Ok((username.as_str(), password.as_str()))
+            }
+            _ => Err(Error::new_invalid_argument_error(
+                "credentials do not contain username/password",
+                None,
+            )),
+        }
+    }
+
+    pub fn jwt(&self) -> Result<&str> {
+        match self {
+            Credentials::JwtToken(token) => Ok(token.as_str()),
+            _ => Err(Error::new_invalid_argument_error(
+                "credentials do not contain jwt",
+                None,
+            )),
+        }
+    }
+}
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct SASLAuthAutoOptions {
-    pub username: String,
-    pub password: String,
+    pub credentials: Credentials,
 
     pub enabled_mechs: Vec<AuthMechanism>,
 }
@@ -88,8 +116,7 @@ impl OpsSASLAuthAuto {
                 encoder,
                 dispatcher,
                 SASLAuthByNameOptions {
-                    username: opts.username.clone(),
-                    password: opts.password.clone(),
+                    credentials: opts.credentials.clone(),
                     auth_mechanism: default_mech.clone(),
                     deadline,
                 },
@@ -129,8 +156,7 @@ impl OpsSASLAuthAuto {
                         encoder,
                         dispatcher,
                         SASLAuthByNameOptions {
-                            username: opts.username.clone(),
-                            password: opts.password.clone(),
+                            credentials: opts.credentials.clone(),
                             auth_mechanism: selected_mech.clone(),
                             deadline,
                         },

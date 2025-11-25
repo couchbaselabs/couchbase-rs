@@ -20,6 +20,7 @@ use crate::authenticator::Authenticator;
 use crate::error;
 use crate::error::ErrorKind;
 use crate::httpx::client::Client;
+use crate::httpx::request::{Auth, BasicAuth, BearerAuth};
 use crate::retrybesteffort::BackoffCalculator;
 use crate::service_type::ServiceType;
 use crate::util::get_host_port_from_uri;
@@ -44,10 +45,35 @@ pub(crate) struct HttpComponentState {
 }
 
 pub(crate) struct HttpEndpointProperties {
-    pub username: String,
-    pub password: String,
+    pub auth: Auth,
     pub endpoint: String,
     pub endpoint_id: Option<String>,
+}
+
+pub(crate) fn auth_from_authenticator(
+    authenticator: &Authenticator,
+    service_type: &ServiceType,
+    host: &str,
+) -> error::Result<Auth> {
+    match authenticator {
+        Authenticator::PasswordAuthenticator(authenticator) => {
+            let creds = authenticator.get_credentials(service_type, host.to_string())?;
+            Ok(Auth::BasicAuth(BasicAuth::new(
+                creds.username,
+                creds.password,
+            )))
+        }
+        Authenticator::CertificateAuthenticator(authenticator) => {
+            let creds = authenticator.get_credentials(service_type, host.to_string())?;
+            Ok(Auth::BasicAuth(BasicAuth::new(
+                creds.username,
+                creds.password,
+            )))
+        }
+        Authenticator::JwtAuthenticator(authenticator) => {
+            Ok(Auth::BearerAuth(BearerAuth::new(authenticator.get_token())))
+        }
+    }
 }
 
 impl<C: Client> HttpComponent<C> {
@@ -94,22 +120,14 @@ impl<C: Client> HttpComponent<C> {
         };
 
         let host = get_host_port_from_uri(found_endpoint)?;
-        let user_pass = match &state.authenticator {
-            Authenticator::PasswordAuthenticator(authenticator) => {
-                authenticator.get_credentials(&self.service_type, host)?
-            }
-            Authenticator::CertificateAuthenticator(a) => {
-                a.get_credentials(&self.service_type, host)?
-            }
-        };
+        let auth = auth_from_authenticator(&state.authenticator, &self.service_type, &host)?;
 
         Ok((
             self.client.clone(),
             HttpEndpointProperties {
                 endpoint_id: None,
                 endpoint: found_endpoint.clone(),
-                username: user_pass.username,
-                password: user_pass.password,
+                auth,
             },
         ))
     }
@@ -145,22 +163,14 @@ impl<C: Client> HttpComponent<C> {
         let endpoint = remaining_endpoints[endpoint_id];
 
         let host = get_host_port_from_uri(endpoint)?;
-        let user_pass = match &state.authenticator {
-            Authenticator::PasswordAuthenticator(authenticator) => {
-                authenticator.get_credentials(&self.service_type, host)?
-            }
-            Authenticator::CertificateAuthenticator(a) => {
-                a.get_credentials(&self.service_type, host)?
-            }
-        };
+        let auth = auth_from_authenticator(&state.authenticator, &self.service_type, &host)?;
 
         Ok(Some((
             self.client.clone(),
             HttpEndpointProperties {
                 endpoint_id: Some(endpoint_id.clone()),
                 endpoint: endpoint.clone(),
-                username: user_pass.username,
-                password: user_pass.password,
+                auth,
             },
         )))
     }
@@ -172,7 +182,7 @@ impl<C: Client> HttpComponent<C> {
     pub async fn orchestrate_endpoint<Resp, Fut>(
         &self,
         endpoint_id: Option<String>,
-        operation: impl Fn(Arc<C>, String, String, String, String) -> Fut + Send + Sync,
+        operation: impl Fn(Arc<C>, String, String, Auth) -> Fut + Send + Sync,
     ) -> error::Result<Resp>
     where
         C: Client,
@@ -186,8 +196,7 @@ impl<C: Client> HttpComponent<C> {
                 client,
                 endpoint_id,
                 endpoint_properties.endpoint,
-                endpoint_properties.username,
-                endpoint_properties.password,
+                endpoint_properties.auth,
             )
             .await;
         }
@@ -205,8 +214,7 @@ impl<C: Client> HttpComponent<C> {
             client,
             endpoint_properties.endpoint_id.unwrap_or_default(),
             endpoint_properties.endpoint,
-            endpoint_properties.username,
-            endpoint_properties.password,
+            endpoint_properties.auth,
         )
         .await
     }
@@ -231,21 +239,9 @@ impl<C: Client> HttpComponent<C> {
         let mut targets = Vec::with_capacity(remaining_endpoints.len());
         for (_ep_id, endpoint) in remaining_endpoints {
             let host = get_host_port_from_uri(endpoint)?;
+            let auth = auth_from_authenticator(&state.authenticator, &self.service_type, &host)?;
 
-            let user_pass = match &state.authenticator {
-                Authenticator::PasswordAuthenticator(authenticator) => {
-                    authenticator.get_credentials(&self.service_type, host)?
-                }
-                Authenticator::CertificateAuthenticator(a) => {
-                    a.get_credentials(&self.service_type, host)?
-                }
-            };
-
-            targets.push(T::new(
-                endpoint.clone(),
-                user_pass.username,
-                user_pass.password,
-            ));
+            targets.push(T::new(endpoint.clone(), auth));
         }
 
         Ok((self.client.clone(), targets))
@@ -289,5 +285,5 @@ impl HttpComponentState {
 }
 
 pub(crate) trait NodeTarget {
-    fn new(endpoint: String, username: String, password: String) -> Self;
+    fn new(endpoint: String, auth: Auth) -> Self;
 }

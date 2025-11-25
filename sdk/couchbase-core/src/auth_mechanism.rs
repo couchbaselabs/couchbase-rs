@@ -25,6 +25,7 @@ pub enum AuthMechanism {
     ScramSha1,
     ScramSha256,
     ScramSha512,
+    OAuthBearer,
 }
 
 impl From<AuthMechanism> for Vec<u8> {
@@ -34,6 +35,7 @@ impl From<AuthMechanism> for Vec<u8> {
             AuthMechanism::ScramSha1 => "SCRAM-SHA1",
             AuthMechanism::ScramSha256 => "SCRAM-SHA256",
             AuthMechanism::ScramSha512 => "SCRAM-SHA512",
+            AuthMechanism::OAuthBearer => "OAUTHBEARER",
         };
 
         txt.into()
@@ -49,6 +51,7 @@ impl TryFrom<&str> for AuthMechanism {
             "SCRAM-SHA1" => AuthMechanism::ScramSha1,
             "SCRAM-SHA256" => AuthMechanism::ScramSha256,
             "SCRAM-SHA512" => AuthMechanism::ScramSha512,
+            "OAUTHBEARER" => AuthMechanism::OAuthBearer,
             _ => {
                 return Err(Error::new_invalid_argument_error(
                     format!("unsupported auth mechanism {value}"),
@@ -68,6 +71,7 @@ impl From<AuthMechanism> for memdx::auth_mechanism::AuthMechanism {
             AuthMechanism::ScramSha1 => memdx::auth_mechanism::AuthMechanism::ScramSha1,
             AuthMechanism::ScramSha256 => memdx::auth_mechanism::AuthMechanism::ScramSha256,
             AuthMechanism::ScramSha512 => memdx::auth_mechanism::AuthMechanism::ScramSha512,
+            AuthMechanism::OAuthBearer => memdx::auth_mechanism::AuthMechanism::OAuthBearer,
         }
     }
 }

@@ -20,6 +20,7 @@ use crate::common::features::TestFeatureCode;
 use crate::common::test_config::{create_test_cluster, run_test};
 use crate::common::{new_key, try_times};
 use couchbase::error::ErrorKind;
+use serial_test::serial;
 use std::ops::Add;
 use std::time::Duration;
 
@@ -28,9 +29,10 @@ mod common;
 // Tests in this file use try_times as it takes some time for the drop chain to be realized,
 // but by the time that the operation runs a second time it should be completed.
 
+#[serial]
 #[test]
 fn test_collection_use_after_cluster_drop() {
-    run_test(async |cluster| {
+    run_test(async |cluster, _bucket| {
         if !cluster.supports_feature(&TestFeatureCode::RSCBC219DropChain) {
             return;
         }
@@ -38,8 +40,10 @@ fn test_collection_use_after_cluster_drop() {
         let collection = {
             let cluster = create_test_cluster().await;
 
-            cluster
-                .bucket(cluster.default_bucket())
+            let bucket = cluster.bucket(cluster.default_bucket());
+            bucket.wait_until_ready(None).await.unwrap();
+
+            bucket
                 .scope(cluster.default_scope())
                 .collection(cluster.default_collection())
         };
@@ -67,9 +71,10 @@ fn test_collection_use_after_cluster_drop() {
     })
 }
 
+#[serial]
 #[test]
 fn test_collection_level_mgr_use_after_cluster_drop() {
-    run_test(async |cluster| {
+    run_test(async |cluster, _bucket| {
         if !cluster.supports_feature(&TestFeatureCode::RSCBC219DropChain) {
             return;
         }
@@ -77,8 +82,9 @@ fn test_collection_level_mgr_use_after_cluster_drop() {
         let mgr = {
             let cluster = create_test_cluster().await;
 
-            let collection = cluster
-                .bucket(cluster.default_bucket())
+            let bucket = cluster.bucket(cluster.default_bucket());
+
+            let collection = bucket
                 .scope(cluster.default_scope())
                 .collection(cluster.default_collection());
 
@@ -106,19 +112,19 @@ fn test_collection_level_mgr_use_after_cluster_drop() {
     })
 }
 
+#[serial]
 #[test]
 fn test_scope_use_after_cluster_drop() {
-    run_test(async |cluster| {
+    run_test(async |cluster, _bucket| {
         if !cluster.supports_feature(&TestFeatureCode::RSCBC219DropChain) {
             return;
         }
 
         let scope = {
             let cluster = create_test_cluster().await;
+            let bucket = cluster.bucket(cluster.default_bucket());
 
-            cluster
-                .bucket(cluster.default_bucket())
-                .scope(cluster.default_scope())
+            bucket.scope(cluster.default_scope())
         };
 
         try_times(
@@ -142,9 +148,10 @@ fn test_scope_use_after_cluster_drop() {
     })
 }
 
+#[serial]
 #[test]
 fn test_scope_level_mgr_use_after_cluster_drop() {
-    run_test(async |cluster| {
+    run_test(async |cluster, _bucket| {
         if !cluster.supports_feature(&TestFeatureCode::RSCBC219DropChain) {
             return;
         }
@@ -152,9 +159,8 @@ fn test_scope_level_mgr_use_after_cluster_drop() {
         let mgr = {
             let cluster = create_test_cluster().await;
 
-            let scope = cluster
-                .bucket(cluster.default_bucket())
-                .scope(cluster.default_scope());
+            let bucket = cluster.bucket(cluster.default_bucket());
+            let scope = bucket.scope(cluster.default_scope());
 
             scope.search_indexes()
         };
@@ -180,16 +186,16 @@ fn test_scope_level_mgr_use_after_cluster_drop() {
     })
 }
 
+#[serial]
 #[test]
 fn test_bucket_level_mgr_use_after_cluster_drop() {
-    run_test(async |cluster| {
+    run_test(async |cluster, _bucket| {
         if !cluster.supports_feature(&TestFeatureCode::RSCBC219DropChain) {
             return;
         }
 
         let mgr = {
             let cluster = create_test_cluster().await;
-
             let bucket = cluster.bucket(cluster.default_bucket());
 
             bucket.collections()
@@ -216,9 +222,10 @@ fn test_bucket_level_mgr_use_after_cluster_drop() {
     })
 }
 
+#[serial]
 #[test]
 fn test_cluster_level_mgr_use_after_cluster_drop() {
-    run_test(async |cluster| {
+    run_test(async |cluster, _bucket| {
         if !cluster.supports_feature(&TestFeatureCode::RSCBC219DropChain) {
             return;
         }

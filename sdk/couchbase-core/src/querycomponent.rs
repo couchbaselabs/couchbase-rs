@@ -21,6 +21,7 @@ use crate::diagnosticscomponent::PingQueryReportOptions;
 use crate::error::ErrorKind;
 use crate::httpcomponent::{HttpComponent, HttpComponentState};
 use crate::httpx::client::Client;
+use crate::httpx::request::Auth;
 use crate::mgmtx::node_target::NodeTarget;
 use crate::options::query::{
     BuildDeferredIndexesOptions, CreateIndexOptions, CreatePrimaryIndexOptions, DropIndexOptions,
@@ -106,17 +107,12 @@ impl<C: Client + 'static> QueryComponent<C> {
             self.http_component
                 .orchestrate_endpoint(
                     endpoint.clone(),
-                    async |client: Arc<C>,
-                           endpoint_id: String,
-                           endpoint: String,
-                           username: String,
-                           password: String| {
+                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
                         let res = match (Query::<C> {
                             http_client: client,
                             user_agent: self.http_component.user_agent().to_string(),
                             endpoint: endpoint.clone(),
-                            username,
-                            password,
+                            auth,
                         }
                         .query(&copts)
                         .await)
@@ -152,18 +148,13 @@ impl<C: Client + 'static> QueryComponent<C> {
             self.http_component
                 .orchestrate_endpoint(
                     endpoint.clone(),
-                    async |client: Arc<C>,
-                           endpoint_id: String,
-                           endpoint: String,
-                           username: String,
-                           password: String| {
+                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
                         let res = match (PreparedQuery {
                             executor: Query::<C> {
                                 http_client: client,
                                 user_agent: self.http_component.user_agent().to_string(),
                                 endpoint: endpoint.clone(),
-                                username,
-                                password,
+                                auth,
                             },
                             cache: self.prepared_cache.clone(),
                         }
@@ -204,17 +195,12 @@ impl<C: Client + 'static> QueryComponent<C> {
             self.http_component
                 .orchestrate_endpoint(
                     endpoint.clone(),
-                    async |client: Arc<C>,
-                           endpoint_id: String,
-                           endpoint: String,
-                           username: String,
-                           password: String| {
+                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
                         let res = match (Query::<C> {
                             http_client: client,
                             user_agent: self.http_component.user_agent().to_string(),
                             endpoint: endpoint.clone(),
-                            username,
-                            password,
+                            auth,
                         }
                         .get_all_indexes(&copts)
                         .await)
@@ -439,8 +425,7 @@ impl<C: Client + 'static> QueryComponent<C> {
                 http_client: client.clone(),
                 user_agent,
                 endpoint: target.endpoint.clone(),
-                username: target.username,
-                password: target.password,
+                auth: target.auth.clone(),
             };
 
             let handle = self.ping_one(client, copts.clone());
@@ -472,8 +457,7 @@ impl<C: Client + 'static> QueryComponent<C> {
                 http_client: client.clone(),
                 user_agent,
                 endpoint: target.endpoint.clone(),
-                username: target.username,
-                password: target.password,
+                auth: target.auth.clone(),
             };
 
             let handle = self.create_one_report(client, timeout, copts.clone());
@@ -542,17 +526,12 @@ impl<C: Client + 'static> QueryComponent<C> {
             self.http_component
                 .orchestrate_endpoint(
                     endpoint.clone(),
-                    async |client: Arc<C>,
-                           endpoint_id: String,
-                           endpoint: String,
-                           username: String,
-                           password: String| {
+                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
                         operation(Query::<C> {
                             http_client: client,
                             user_agent: self.http_component.user_agent().to_string(),
                             endpoint: endpoint.clone(),
-                            username,
-                            password,
+                            auth,
                         })
                         .await
                     },

@@ -37,10 +37,8 @@ mod common;
 
 #[test]
 fn test_query_basic() {
-    run_test(async |cluster| {
-        let scope = cluster
-            .bucket(cluster.default_bucket())
-            .scope(cluster.default_scope());
+    run_test(async |cluster, bucket| {
+        let scope = bucket.scope(cluster.default_scope());
         let opts = QueryOptions::new().metrics(true);
         let mut res = scope.query("SELECT 1=1", opts).await.unwrap();
 
@@ -64,10 +62,8 @@ fn test_query_basic() {
 
 #[test]
 fn test_query_empty_result() {
-    run_test(async |cluster| {
-        let scope = cluster
-            .bucket(cluster.default_bucket())
-            .scope(cluster.default_scope());
+    run_test(async |cluster, bucket| {
+        let scope = bucket.scope(cluster.default_scope());
         let opts = QueryOptions::new().metrics(true);
         let mut res = scope
             .query("SELECT * FROM ARRAY_RANGE(0, 0) AS x", opts)
@@ -85,10 +81,8 @@ fn test_query_empty_result() {
 
 #[test]
 fn test_query_error() {
-    run_test(async |cluster| {
-        let scope = cluster
-            .bucket(cluster.default_bucket())
-            .scope(cluster.default_scope());
+    run_test(async |cluster, bucket| {
+        let scope = bucket.scope(cluster.default_scope());
         let opts = QueryOptions::new().metrics(true);
         let mut res = scope.query("SELEC 1=1", opts).await;
 
@@ -102,10 +96,8 @@ fn test_query_error() {
 
 #[test]
 fn test_query_raw_result() {
-    run_test(async |cluster| {
-        let scope = cluster
-            .bucket(cluster.default_bucket())
-            .scope(cluster.default_scope());
+    run_test(async |cluster, bucket| {
+        let scope = bucket.scope(cluster.default_scope());
         let opts = QueryOptions::new().metrics(true);
         let mut res = scope.query("SELECT 1=1", opts).await.unwrap();
 
@@ -130,10 +122,8 @@ fn test_query_raw_result() {
 
 #[test]
 fn test_prepared_query_basic() {
-    run_test(async |cluster| {
-        let scope = cluster
-            .bucket(cluster.default_bucket())
-            .scope(cluster.default_scope());
+    run_test(async |cluster, bucket| {
+        let scope = bucket.scope(cluster.default_scope());
         let opts = QueryOptions::new().metrics(true);
         let mut res = scope.query("SELECT 1=1", opts).await.unwrap();
 
@@ -157,7 +147,7 @@ fn test_prepared_query_basic() {
 
 #[test]
 fn test_query_basic_cluster() {
-    run_test(async |cluster| {
+    run_test(async |cluster, bucket| {
         let opts = QueryOptions::new().metrics(true);
         let mut res = cluster.query("SELECT 1=1", opts).await.unwrap();
 
@@ -181,15 +171,11 @@ fn test_query_basic_cluster() {
 
 #[test]
 fn test_query_indexes() {
-    run_test(async |cluster| {
-        let coll_manager = cluster.bucket(cluster.default_bucket()).collections();
+    run_test(async |cluster, bucket| {
+        let coll_manager = bucket.collections();
         let (scope, collection) = create_collection(&coll_manager).await;
 
-        let manager = cluster
-            .bucket(cluster.default_bucket())
-            .scope(&scope)
-            .collection(&collection)
-            .query_indexes();
+        let manager = bucket.scope(&scope).collection(&collection).query_indexes();
 
         let opts = CreatePrimaryQueryIndexOptions::new().ignore_if_exists(true);
 

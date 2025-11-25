@@ -35,7 +35,7 @@ mod common;
 
 #[test]
 fn test_get_all_roles() {
-    run_test(async |cluster| {
+    run_test(async |cluster, bucket| {
         let opts = GetRolesOptions::new();
         let mgr = cluster.users();
         let roles = mgr.get_roles(opts).await.unwrap();
@@ -49,7 +49,7 @@ fn test_get_all_roles() {
 
 #[test]
 fn test_delete_group() {
-    run_test(async |cluster| {
+    run_test(async |cluster, bucket| {
         if !cluster.supports_feature(&TestFeatureCode::UserGroups) {
             return;
         }
@@ -90,7 +90,7 @@ fn test_delete_group() {
 
 #[test]
 fn test_get_group() {
-    run_test(async |cluster| {
+    run_test(async |cluster, bucket| {
         if !cluster.supports_feature(&TestFeatureCode::UserGroups) {
             return;
         }
@@ -127,7 +127,7 @@ fn test_get_group() {
 
 #[test]
 fn test_get_all_groups() {
-    run_test(async |cluster| {
+    run_test(async |cluster, bucket| {
         if !cluster.supports_feature(&TestFeatureCode::UserGroups) {
             return;
         }
@@ -168,7 +168,7 @@ fn test_get_all_groups() {
 
 #[test]
 fn test_delete_user() {
-    run_test(async |cluster| {
+    run_test(async |cluster, bucket| {
         if !cluster.supports_feature(&TestFeatureCode::UsersMB69096) {
             return;
         }
@@ -227,7 +227,7 @@ fn test_delete_user() {
 
 #[test]
 fn test_get_user() {
-    run_test(async |cluster| {
+    run_test(async |cluster, bucket| {
         if !cluster.supports_feature(&TestFeatureCode::UsersMB69096) {
             return;
         }
@@ -261,7 +261,7 @@ fn test_get_user() {
 
 #[test]
 fn test_get_all_users() {
-    run_test(async |cluster| {
+    run_test(async |cluster, bucket| {
         if !cluster.supports_feature(&TestFeatureCode::UsersMB69096) {
             return;
         }

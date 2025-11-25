@@ -43,9 +43,8 @@ mod common;
 
 #[test]
 fn test_upsert() {
-    run_test(async |cluster| {
-        let collection = cluster
-            .bucket(cluster.default_bucket())
+    run_test(async |cluster, bucket| {
+        let collection = bucket
             .scope(cluster.default_scope())
             .collection(cluster.default_collection());
 
@@ -63,9 +62,8 @@ fn test_upsert() {
 
 #[test]
 fn test_upsert_operation_cancellation() {
-    run_test(async |cluster| {
-        let collection = cluster
-            .bucket(cluster.default_bucket())
+    run_test(async |cluster, bucket| {
+        let collection = bucket
             .scope(cluster.default_scope())
             .collection(cluster.default_collection());
 
@@ -89,9 +87,8 @@ fn test_upsert_operation_cancellation() {
 
 #[test]
 fn test_upsert_with_transcoder() {
-    run_test(async |cluster| {
-        let collection = cluster
-            .bucket(cluster.default_bucket())
+    run_test(async |cluster, bucket| {
+        let collection = bucket
             .scope(cluster.default_scope())
             .collection(cluster.default_collection());
 
@@ -115,9 +112,8 @@ fn test_upsert_with_transcoder() {
 
 #[test]
 fn test_upsert_with_custom_transcoder() {
-    run_test(async |cluster| {
-        let collection = cluster
-            .bucket(cluster.default_bucket())
+    run_test(async |cluster, bucket| {
+        let collection = bucket
             .scope(cluster.default_scope())
             .collection(cluster.default_collection());
 
@@ -148,9 +144,8 @@ fn test_upsert_with_custom_transcoder() {
 
 #[test]
 fn test_insert() {
-    run_test(async |cluster| {
-        let collection = cluster
-            .bucket(cluster.default_bucket())
+    run_test(async |cluster, bucket| {
+        let collection = bucket
             .scope(cluster.default_scope())
             .collection(cluster.default_collection());
 
@@ -168,9 +163,8 @@ fn test_insert() {
 
 #[test]
 fn test_replace() {
-    run_test(async |cluster| {
-        let collection = cluster
-            .bucket(cluster.default_bucket())
+    run_test(async |cluster, bucket| {
+        let collection = bucket
             .scope(cluster.default_scope())
             .collection(cluster.default_collection());
 
@@ -192,9 +186,8 @@ fn test_replace() {
 
 #[test]
 fn test_remove() {
-    run_test(async |cluster| {
-        let collection = cluster
-            .bucket(cluster.default_bucket())
+    run_test(async |cluster, bucket| {
+        let collection = bucket
             .scope(cluster.default_scope())
             .collection(cluster.default_collection());
 
@@ -211,9 +204,8 @@ fn test_remove() {
 
 #[test]
 fn test_exists() {
-    run_test(async |cluster| {
-        let collection = cluster
-            .bucket(cluster.default_bucket())
+    run_test(async |cluster, bucket| {
+        let collection = bucket
             .scope(cluster.default_scope())
             .collection(cluster.default_collection());
 
@@ -234,9 +226,8 @@ fn test_exists() {
 
 #[test]
 fn test_get_and_touch() {
-    run_test(async |cluster| {
-        let collection = cluster
-            .bucket(cluster.default_bucket())
+    run_test(async |cluster, bucket| {
+        let collection = bucket
             .scope(cluster.default_scope())
             .collection(cluster.default_collection());
 
@@ -257,9 +248,8 @@ fn test_get_and_touch() {
 
 #[test]
 fn test_get_and_lock() {
-    run_test(async |cluster| {
-        let collection = cluster
-            .bucket(cluster.default_bucket())
+    run_test(async |cluster, bucket| {
+        let collection = bucket
             .scope(cluster.default_scope())
             .collection(cluster.default_collection());
 
@@ -280,9 +270,8 @@ fn test_get_and_lock() {
 
 #[test]
 fn test_unlock() {
-    run_test(async |cluster| {
-        let collection = cluster
-            .bucket(cluster.default_bucket())
+    run_test(async |cluster, bucket| {
+        let collection = bucket
             .scope(cluster.default_scope())
             .collection(cluster.default_collection());
 
@@ -301,9 +290,8 @@ fn test_unlock() {
 
 #[test]
 fn test_touch() {
-    run_test(async |cluster| {
-        let collection = cluster
-            .bucket(cluster.default_bucket())
+    run_test(async |cluster, bucket| {
+        let collection = bucket
             .scope(cluster.default_scope())
             .collection(cluster.default_collection());
 
@@ -320,9 +308,8 @@ fn test_touch() {
 
 #[test]
 fn test_append() {
-    run_test(async |cluster| {
-        let collection = cluster
-            .bucket(cluster.default_bucket())
+    run_test(async |cluster, bucket| {
+        let collection = bucket
             .scope(cluster.default_scope())
             .collection(cluster.default_collection());
 
@@ -351,9 +338,8 @@ fn test_append() {
 
 #[test]
 fn test_prepend() {
-    run_test(async |cluster| {
-        let collection = cluster
-            .bucket(cluster.default_bucket())
+    run_test(async |cluster, bucket| {
+        let collection = bucket
             .scope(cluster.default_scope())
             .collection(cluster.default_collection());
         let key = new_key();
@@ -381,9 +367,8 @@ fn test_prepend() {
 
 #[test]
 fn test_increment() {
-    run_test(async |cluster| {
-        let collection = cluster
-            .bucket(cluster.default_bucket())
+    run_test(async |cluster, bucket| {
+        let collection = bucket
             .scope(cluster.default_scope())
             .collection(cluster.default_collection());
 
@@ -403,9 +388,8 @@ fn test_increment() {
 
 #[test]
 fn test_decrement() {
-    run_test(async |cluster| {
-        let collection = cluster
-            .bucket(cluster.default_bucket())
+    run_test(async |cluster, bucket| {
+        let collection = bucket
             .scope(cluster.default_scope())
             .collection(cluster.default_collection());
 
@@ -433,9 +417,8 @@ struct SubdocObject {
 
 #[test]
 fn test_lookup_in() {
-    run_test(async |cluster| {
-        let collection = cluster
-            .bucket(cluster.default_bucket())
+    run_test(async |cluster, bucket| {
+        let collection = bucket
             .scope(cluster.default_scope())
             .collection(cluster.default_collection());
 
@@ -478,9 +461,8 @@ fn test_lookup_in() {
 
 #[test]
 fn test_mutate_in() {
-    run_test(async |cluster| {
-        let collection = cluster
-            .bucket(cluster.default_bucket())
+    run_test(async |cluster, bucket| {
+        let collection = bucket
             .scope(cluster.default_scope())
             .collection(cluster.default_collection());
 
@@ -531,9 +513,8 @@ fn test_mutate_in() {
 
 #[test]
 fn get_with_expiry() {
-    run_test(async |cluster| {
-        let collection = cluster
-            .bucket(cluster.default_bucket())
+    run_test(async |cluster, bucket| {
+        let collection = bucket
             .scope(cluster.default_scope())
             .collection(cluster.default_collection());
 
@@ -572,9 +553,8 @@ fn get_with_expiry() {
 
 #[test]
 fn get_with_projections() {
-    run_test(async |cluster| {
-        let collection = cluster
-            .bucket(cluster.default_bucket())
+    run_test(async |cluster, bucket| {
+        let collection = bucket
             .scope(cluster.default_scope())
             .collection(cluster.default_collection());
 
