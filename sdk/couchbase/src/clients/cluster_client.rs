@@ -32,7 +32,7 @@ use crate::clients::user_mgmt_client::{
     CouchbaseUserMgmtClient, UserMgmtClient, UserMgmtClientBackend,
 };
 use crate::error;
-use crate::options::cluster_options::ClusterOptions;
+use crate::options::cluster_options::{ClusterOptions, TlsOptions};
 use couchbase_connstr::{parse, resolve, Address, SrvRecord};
 use couchbase_core::address;
 use couchbase_core::ondemand_agentmanager::OnDemandAgentManager;
@@ -210,6 +210,10 @@ impl CouchbaseClusterBackend {
             let tls_config = tls_options.try_into_tls_config(&opts.authenticator)?;
 
             Some(tls_config)
+        } else if use_ssl {
+            let tls_config = TlsOptions::new().try_into_tls_config(&opts.authenticator)?;
+
+            Some(tls_config)
         } else {
             None
         };
@@ -243,11 +247,6 @@ impl CouchbaseClusterBackend {
             return Err(error::Error::invalid_argument(
                 "tls_config",
                 "tls config provided but couchbase scheme used",
-            ));
-        } else if tls_config.is_none() && use_ssl {
-            return Err(error::Error::invalid_argument(
-                "tls_config",
-                "no TLS config provided but couchbases scheme used",
             ));
         }
 

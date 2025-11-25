@@ -46,8 +46,7 @@ pub struct Query<C: Client> {
     pub http_client: Arc<C>,
     pub user_agent: String,
     pub endpoint: String,
-    pub username: String,
-    pub password: String,
+    pub auth: Auth,
 }
 
 impl<C: Client> Query<C> {
@@ -65,10 +64,7 @@ impl<C: Client> Query<C> {
                 password_or_domain: obo.password_or_domain,
             })
         } else {
-            Auth::BasicAuth(BasicAuth {
-                username: self.username.clone(),
-                password: self.password.clone(),
-            })
+            self.auth.clone()
         };
 
         Request::new(method, format!("{}/{}", self.endpoint, path.into()))

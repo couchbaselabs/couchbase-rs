@@ -32,7 +32,7 @@ mod common;
 #[serial]
 #[test]
 fn test_create_bucket() {
-    run_test(async |cluster| {
+    run_test(async |cluster, bucket| {
         if !cluster.supports_feature(&TestFeatureCode::BucketManagement) {
             return;
         }
@@ -62,7 +62,7 @@ fn test_create_bucket() {
 #[serial]
 #[test]
 fn test_update_bucket() {
-    run_test(async |cluster| {
+    run_test(async |cluster, bucket| {
         if !cluster.supports_feature(&TestFeatureCode::BucketManagement) {
             return;
         }
@@ -105,7 +105,7 @@ fn test_update_bucket() {
 #[serial]
 #[test]
 fn test_delete_bucket() {
-    run_test(async |cluster| {
+    run_test(async |cluster, bucket| {
         if !cluster.supports_feature(&TestFeatureCode::BucketManagement) {
             return;
         }
@@ -129,7 +129,7 @@ fn test_delete_bucket() {
 #[serial]
 #[test]
 fn test_create_bucket_with_replica_number() {
-    run_test(async |cluster| {
+    run_test(async |cluster, bucket| {
         if !cluster.supports_feature(&TestFeatureCode::BucketManagement) {
             return;
         }
@@ -161,7 +161,7 @@ fn test_create_bucket_with_replica_number() {
 #[serial]
 #[test]
 fn test_create_bucket_with_eviction_policy() {
-    run_test(async |cluster| {
+    run_test(async |cluster, bucket| {
         if !cluster.supports_feature(&TestFeatureCode::BucketManagement) {
             return;
         }
@@ -193,7 +193,7 @@ fn test_create_bucket_with_eviction_policy() {
 #[serial]
 #[test]
 fn test_create_bucket_with_compression_mode() {
-    run_test(async |cluster| {
+    run_test(async |cluster, bucket| {
         if !cluster.supports_feature(&TestFeatureCode::BucketManagement)
             || !cluster.supports_feature(&TestFeatureCode::BucketManagementCompressionMode)
         {
@@ -227,7 +227,7 @@ fn test_create_bucket_with_compression_mode() {
 #[serial]
 #[test]
 fn test_create_bucket_with_durability_min_level() {
-    run_test(async |cluster| {
+    run_test(async |cluster, bucket| {
         if !cluster.supports_feature(&TestFeatureCode::BucketManagement) {
             return;
         }
@@ -262,7 +262,7 @@ fn test_create_bucket_with_durability_min_level() {
 #[serial]
 #[test]
 fn test_create_bucket_with_conflict_resolution_type() {
-    run_test(async |cluster| {
+    run_test(async |cluster, bucket| {
         if !cluster.supports_feature(&TestFeatureCode::BucketManagement)
             || !cluster.supports_feature(&TestFeatureCode::BucketManagementConflictResolutionType)
         {
@@ -299,7 +299,7 @@ fn test_create_bucket_with_conflict_resolution_type() {
 #[serial]
 #[test]
 fn test_create_bucket_with_history_retention() {
-    run_test(async |cluster| {
+    run_test(async |cluster, bucket| {
         if !cluster.supports_feature(&TestFeatureCode::BucketManagement)
             || !cluster.supports_feature(&TestFeatureCode::HistoryRetention)
         {

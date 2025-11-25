@@ -16,22 +16,22 @@
  *
  */
 
+use crate::memdx::auth_mechanism::AuthMechanism;
+use crate::memdx::dispatcher::Dispatcher;
+use crate::memdx::error::Result;
+use crate::memdx::op_auth_saslauto::Credentials;
+use crate::memdx::op_auth_sasloauthbearer::{OpsSASLOAuthBearer, SASLOAuthBearerOptions};
+use crate::memdx::op_auth_saslplain::{OpSASLPlainEncoder, OpsSASLAuthPlain, SASLAuthPlainOptions};
+use crate::memdx::op_auth_saslscram::{OpSASLScramEncoder, OpsSASLAuthScram, SASLAuthScramOptions};
+use crate::scram;
 use hmac::Hmac;
 use sha1::Sha1;
 use sha2::{Sha256, Sha512};
 use tokio::time::Instant;
 
-use crate::memdx::auth_mechanism::AuthMechanism;
-use crate::memdx::dispatcher::Dispatcher;
-use crate::memdx::error::Result;
-use crate::memdx::op_auth_saslplain::{OpSASLPlainEncoder, OpsSASLAuthPlain, SASLAuthPlainOptions};
-use crate::memdx::op_auth_saslscram::{OpSASLScramEncoder, OpsSASLAuthScram, SASLAuthScramOptions};
-use crate::scram;
-
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct SASLAuthByNameOptions {
-    pub username: String,
-    pub password: String,
+    pub credentials: Credentials,
 
     pub auth_mechanism: AuthMechanism,
 
@@ -56,32 +56,43 @@ impl OpsSASLAuthByName {
     {
         match opts.auth_mechanism {
             AuthMechanism::Plain => {
+                let (username, password) = opts.credentials.user_pass()?;
                 OpsSASLAuthPlain {}
                     .sasl_auth_plain(
                         encoder,
                         dispatcher,
-                        SASLAuthPlainOptions::new(opts.username, opts.password, opts.deadline),
+                        SASLAuthPlainOptions::new(
+                            username.to_string(),
+                            password.to_string(),
+                            opts.deadline,
+                        ),
                     )
                     .await
             }
             AuthMechanism::ScramSha1 => {
+                let (username, password) = opts.credentials.user_pass()?;
                 OpsSASLAuthScram {}
                     .sasl_auth_scram(
                         encoder,
                         dispatcher,
-                        scram::Client::<Hmac<Sha1>, Sha1>::new(opts.username, opts.password, None),
+                        scram::Client::<Hmac<Sha1>, Sha1>::new(
+                            username.to_string(),
+                            password.to_string(),
+                            None,
+                        ),
                         SASLAuthScramOptions::new(opts.deadline),
                     )
                     .await
             }
             AuthMechanism::ScramSha256 => {
+                let (username, password) = opts.credentials.user_pass()?;
                 OpsSASLAuthScram {}
                     .sasl_auth_scram(
                         encoder,
                         dispatcher,
                         scram::Client::<Hmac<Sha256>, Sha256>::new(
-                            opts.username,
-                            opts.password,
+                            username.to_string(),
+                            password.to_string(),
                             None,
                         ),
                         SASLAuthScramOptions::new(opts.deadline),
@@ -89,16 +100,27 @@ impl OpsSASLAuthByName {
                     .await
             }
             AuthMechanism::ScramSha512 => {
+                let (username, password) = opts.credentials.user_pass()?;
                 OpsSASLAuthScram {}
                     .sasl_auth_scram(
                         encoder,
                         dispatcher,
                         scram::Client::<Hmac<Sha512>, Sha512>::new(
-                            opts.username,
-                            opts.password,
+                            username.to_string(),
+                            password.to_string(),
                             None,
                         ),
                         SASLAuthScramOptions::new(opts.deadline),
+                    )
+                    .await
+            }
+            AuthMechanism::OAuthBearer => {
+                let token = opts.credentials.jwt()?;
+                OpsSASLOAuthBearer {}
+                    .sasl_auth_oauth_bearer(
+                        encoder,
+                        dispatcher,
+                        SASLOAuthBearerOptions::new(token.to_string(), opts.deadline),
                     )
                     .await
             }

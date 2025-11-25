@@ -94,7 +94,7 @@ impl OnDemandAgentManager {
             }
 
             debug!(
-                "Bucket name {} not in slow map, checking notif map",
+                "Bucket {} not in slow map, checking notif map",
                 &bucket_name
             );
             // If we don't have an agent then check the notif map to see if someone else is getting
@@ -105,13 +105,16 @@ impl OnDemandAgentManager {
                 drop(slow_map);
                 drop(notif_map);
 
-                debug!("Bucket name {} in notif map, awaiting update", &bucket_name);
+                debug!(
+                    "Bucket {} in notif map, awaiting notification",
+                    &bucket_name
+                );
                 notif.notified().await;
-                debug!("Bucket name {} received updated", &bucket_name);
+                debug!("Bucket {} received notification", &bucket_name);
                 return Ok(());
             };
 
-            debug!("Bucket name {} not in any map, creating new", &bucket_name);
+            debug!("Bucket {} not in any map, creating new", &bucket_name);
             let notif = Arc::new(Notify::new());
             notif_map.insert(bucket_name.clone(), notif.clone());
 

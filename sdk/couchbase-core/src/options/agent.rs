@@ -30,6 +30,8 @@ pub struct AgentOptions {
     pub seed_config: SeedConfig,
     pub authenticator: Authenticator,
 
+    // By default, the SDK will default to using the mechanisms provided by the
+    // Authenticator, but this can be overridden here.
     pub auth_mechanisms: Vec<AuthMechanism>,
     pub tls_config: Option<TlsConfig>,
     pub bucket_name: Option<String>,

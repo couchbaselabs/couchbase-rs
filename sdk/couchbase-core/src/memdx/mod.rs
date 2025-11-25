@@ -31,6 +31,7 @@ pub mod hello_feature;
 pub mod magic;
 pub mod op_auth_saslauto;
 pub mod op_auth_saslbyname;
+mod op_auth_sasloauthbearer;
 pub mod op_auth_saslplain;
 pub mod op_auth_saslscram;
 pub mod op_bootstrap;

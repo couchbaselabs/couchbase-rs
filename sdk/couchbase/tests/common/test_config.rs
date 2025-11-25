@@ -24,6 +24,7 @@ use std::sync::LazyLock;
 
 use crate::common::default_cluster_options;
 use crate::common::node_version::NodeVersion;
+use crate::common::test_bucket::TestBucket;
 use crate::common::test_cluster::TestCluster;
 use couchbase::cluster::Cluster;
 use couchbase_connstr::ResolvedConnSpec;
@@ -77,7 +78,7 @@ impl TestSetupConfig {
     }
 }
 
-static RUNTIME: LazyLock<Runtime> = LazyLock::new(|| {
+pub static RUNTIME: LazyLock<Runtime> = LazyLock::new(|| {
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -86,7 +87,7 @@ static RUNTIME: LazyLock<Runtime> = LazyLock::new(|| {
 
 pub fn run_test<T, Fut>(test: T)
 where
-    T: FnOnce(TestCluster) -> Fut,
+    T: FnOnce(TestCluster, TestBucket) -> Fut,
     Fut: Future<Output = ()>,
 {
     RUNTIME.block_on(async {
@@ -94,8 +95,10 @@ where
 
         if let Some(cluster) = config.deref() {
             let cluster = cluster.clone();
+            let bucket = cluster.bucket(cluster.default_bucket());
             drop(config);
-            test(cluster).await;
+
+            test(cluster, bucket).await;
             return;
         }
 
@@ -122,10 +125,16 @@ where
 
         let test_cluster = create_test_cluster().await;
 
+        test_cluster.wait_until_ready(None).await.unwrap();
+
+        let bucket = test_cluster.bucket(test_cluster.default_bucket());
+
+        bucket.wait_until_ready(None).await.unwrap();
+
         *config = Some(test_cluster.clone());
         drop(config);
 
-        test(test_cluster).await;
+        test(test_cluster, bucket).await;
     });
 }
 

@@ -93,10 +93,24 @@ impl BasicAuth {
     }
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub struct BearerAuth {
+    pub(crate) token: String,
+}
+
+impl BearerAuth {
+    pub fn new(token: impl Into<String>) -> Self {
+        Self {
+            token: token.into(),
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
 #[non_exhaustive]
 pub enum Auth {
     BasicAuth(BasicAuth),
+    BearerAuth(BearerAuth),
     OnBehalfOf(OnBehalfOfInfo),
 }
 

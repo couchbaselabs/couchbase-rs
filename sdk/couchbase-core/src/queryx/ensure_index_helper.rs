@@ -73,8 +73,7 @@ impl<'a> EnsureIndexHelper<'a> {
             http_client: client,
             user_agent: self.user_agent.to_string(),
             endpoint: target.endpoint.to_string(),
-            username: target.username.to_string(),
-            password: target.password.to_string(),
+            auth: target.auth.clone(),
         }
         .get_all_indexes(&GetAllIndexesOptions {
             bucket_name: self.bucket_name,

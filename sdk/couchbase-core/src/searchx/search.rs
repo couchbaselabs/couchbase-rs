@@ -17,7 +17,7 @@
  */
 
 use crate::httpx::client::Client;
-use crate::httpx::request::{Auth, BasicAuth, OnBehalfOfInfo, Request};
+use crate::httpx::request::{Auth, OnBehalfOfInfo, Request};
 use crate::httpx::response::Response;
 use crate::mgmtx::mgmt::parse_response_json;
 use crate::searchx::document_analysis::DocumentAnalysis;
@@ -44,8 +44,7 @@ pub struct Search<C: Client> {
     pub http_client: Arc<C>,
     pub user_agent: String,
     pub endpoint: String,
-    pub username: String,
-    pub password: String,
+    pub auth: Auth,
 
     pub vector_search_enabled: bool,
 }
@@ -66,10 +65,7 @@ impl<C: Client> Search<C> {
                 password_or_domain: obo.password_or_domain,
             })
         } else {
-            Auth::BasicAuth(BasicAuth {
-                username: self.username.clone(),
-                password: self.password.clone(),
-            })
+            self.auth.clone()
         };
 
         let mut req = Request::new(method, format!("{}/{}", self.endpoint, path.into()))

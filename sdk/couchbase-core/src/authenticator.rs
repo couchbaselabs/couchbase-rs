@@ -16,25 +16,26 @@
  *
  */
 
-use std::fmt::Debug;
-
+use crate::auth_mechanism::AuthMechanism;
 use crate::error::Result;
 use crate::service_type::ServiceType;
+use std::fmt::Debug;
 
 #[derive(Debug, Clone, PartialEq, Hash)]
 #[non_exhaustive]
 pub enum Authenticator {
     PasswordAuthenticator(PasswordAuthenticator),
     CertificateAuthenticator(CertificateAuthenticator),
+    JwtAuthenticator(JwtAuthenticator),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct UserPassPair {
     pub username: String,
     pub password: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct PasswordAuthenticator {
     pub username: String,
     pub password: String,
@@ -50,6 +51,14 @@ impl PasswordAuthenticator {
             username: self.username.clone(),
             password: self.password.clone(),
         })
+    }
+
+    pub fn get_auth_mechanisms(&self) -> Vec<AuthMechanism> {
+        vec![
+            AuthMechanism::ScramSha512,
+            AuthMechanism::ScramSha256,
+            AuthMechanism::ScramSha1,
+        ]
     }
 }
 
@@ -79,5 +88,26 @@ impl CertificateAuthenticator {
 impl From<CertificateAuthenticator> for Authenticator {
     fn from(value: CertificateAuthenticator) -> Self {
         Authenticator::CertificateAuthenticator(value)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Hash)]
+pub struct JwtAuthenticator {
+    pub token: String,
+}
+
+impl JwtAuthenticator {
+    pub fn get_token(&self) -> &str {
+        &self.token
+    }
+
+    pub fn get_auth_mechanisms(&self) -> Vec<AuthMechanism> {
+        vec![AuthMechanism::OAuthBearer]
+    }
+}
+
+impl From<JwtAuthenticator> for Authenticator {
+    fn from(value: JwtAuthenticator) -> Self {
+        Authenticator::JwtAuthenticator(value)
     }
 }

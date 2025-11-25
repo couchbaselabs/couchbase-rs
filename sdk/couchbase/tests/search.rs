@@ -46,7 +46,7 @@ mod common;
 
 #[test]
 fn test_search_basic() {
-    run_test(async |cluster| {
+    run_test(async |cluster, bucket| {
         if !cluster.supports_feature(&TestFeatureCode::SearchManagementCollections) {
             return;
         }
@@ -54,7 +54,7 @@ fn test_search_basic() {
         let scope_name = new_key();
         let collection_name = new_key();
 
-        let bucket = cluster.bucket(cluster.default_bucket());
+        let bucket = bucket;
         let collection_mgr = bucket.collections();
         collection_mgr
             .create_scope(&scope_name, None)
@@ -288,7 +288,7 @@ fn test_search_basic() {
 
 #[test]
 fn test_search_vector() {
-    run_test(async |cluster| {
+    run_test(async |cluster, bucket| {
         if !cluster.supports_feature(&TestFeatureCode::SearchManagementCollections)
             || !cluster.supports_feature(&TestFeatureCode::VectorSearch)
         {
@@ -298,7 +298,7 @@ fn test_search_vector() {
         let scope_name = new_key();
         let collection_name = new_key();
 
-        let bucket = cluster.bucket(cluster.default_bucket());
+        let bucket = bucket;
         let collection_mgr = bucket.collections();
         collection_mgr
             .create_scope(&scope_name, None)
