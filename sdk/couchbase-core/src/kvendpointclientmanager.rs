@@ -206,6 +206,8 @@ where
         for (endpoint, target) in endpoints.into_iter() {
             let old_pool = old_pools.remove(&endpoint);
             let pool = if let Some(old_pool) = old_pool {
+                old_pool.update_target(target).await;
+
                 old_pool
             } else {
                 let pool = P::new(KvClientPoolOptions {
@@ -259,7 +261,9 @@ where
     }
 
     async fn update_auth(&self, authenticator: Authenticator) {
-        let state = self.slow_state.lock().await;
+        let mut state = self.slow_state.lock().await;
+
+        state.auth = authenticator.clone();
 
         for pool in state.client_pools.values() {
             pool.update_auth(authenticator.clone()).await;

@@ -19,7 +19,6 @@ use crate::address::Address;
 use crate::authenticator::Authenticator;
 use crate::configmanager::ConfigManagerMemdConfig;
 use crate::diagnosticscomponent::DiagnosticsComponentConfig;
-use crate::httpx::client::ClientConfig;
 use crate::kvclient_babysitter::KvTarget;
 use crate::mgmtcomponent::MgmtComponentConfig;
 use crate::parsedconfig::{ParsedConfig, ParsedConfigFeature};
@@ -42,7 +41,6 @@ pub(crate) struct AgentComponentConfigs {
     pub search_config: SearchComponentConfig,
     pub mgmt_config: MgmtComponentConfig,
     pub diagnostics_config: DiagnosticsComponentConfig,
-    pub http_client_config: ClientConfig,
 }
 
 pub(crate) struct HttpClientConfig {
@@ -58,7 +56,6 @@ impl AgentComponentConfigs {
         tls_config: Option<TlsConfig>,
         bucket_name: Option<String>,
         authenticator: Authenticator,
-        http_client_config: HttpClientConfig,
     ) -> AgentComponentConfigs {
         let rev_id = config.rev_id;
         let network_info = config.addresses_group_for_network_type(network_type);
@@ -176,12 +173,6 @@ impl AgentComponentConfigs {
                 vector_search_enabled: config
                     .features
                     .contains(&ParsedConfigFeature::FtsVectorSearch),
-            },
-            http_client_config: ClientConfig {
-                tls_config,
-                idle_connection_timeout: http_client_config.idle_connection_timeout,
-                max_idle_connections_per_host: http_client_config.max_idle_connections_per_host,
-                tcp_keep_alive_time: http_client_config.tcp_keep_alive_time,
             },
             mgmt_config: MgmtComponentConfig {
                 endpoints: mgmt_endpoints,

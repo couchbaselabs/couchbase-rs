@@ -15,7 +15,6 @@
  *  * limitations under the License.
  *
  */
-
 use crate::clients::agent_provider::CouchbaseAgentProvider;
 use crate::clients::bucket_client::{
     BucketClient, BucketClientBackend, Couchbase2BucketClient, CouchbaseBucketClient,
@@ -36,7 +35,7 @@ use crate::options::cluster_options::{ClusterOptions, TlsOptions};
 use couchbase_connstr::{parse, resolve, Address, SrvRecord};
 use couchbase_core::address;
 use couchbase_core::ondemand_agentmanager::OnDemandAgentManager;
-use couchbase_core::options::agent::{CompressionConfig, SeedConfig};
+use couchbase_core::options::agent::{CompressionConfig, ReconfigureAgentOptions, SeedConfig};
 use couchbase_core::options::ondemand_agentmanager::OnDemandAgentManagerOptions;
 use couchbase_core::options::orphan_reporter::OrphanReporterConfig;
 use couchbase_core::orphan_reporter::OrphanReporter;
@@ -46,6 +45,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::authenticator::Authenticator;
 #[cfg(feature = "unstable-dns-options")]
 use std::mem::take;
 
@@ -186,11 +186,26 @@ impl ClusterClient {
             }
         }
     }
+
+    pub async fn set_authenticator(&self, authenticator: Authenticator) -> error::Result<()> {
+        match &self.backend {
+            ClusterClientBackend::CouchbaseClusterBackend(backend) => {
+                backend.set_authenticator(authenticator).await
+            }
+            ClusterClientBackend::Couchbase2ClusterBackend(_backend) => {
+                unimplemented!()
+            }
+        }
+    }
 }
 
 struct CouchbaseClusterBackend {
     agent_manager: Arc<OnDemandAgentManager>,
     default_retry_strategy: Arc<dyn RetryStrategy>,
+    // We keep a reference to these for calls to set_authenticator.
+    use_tls: bool,
+    original_tls_options: Option<TlsOptions>,
+    original_authenticator: Authenticator,
 }
 
 impl CouchbaseClusterBackend {
@@ -206,7 +221,7 @@ impl CouchbaseClusterBackend {
             ExponentialBackoffCalculator::default(),
         ));
 
-        let tls_config = if let Some(tls_options) = opts.tls_options {
+        let tls_config = if let Some(tls_options) = opts.tls_options.clone() {
             let tls_config = tls_options.try_into_tls_config(&opts.authenticator)?;
 
             Some(tls_config)
@@ -257,6 +272,7 @@ impl CouchbaseClusterBackend {
             None
         };
 
+        let original_authenticator = opts.authenticator.clone();
         let mut core_opts =
             OnDemandAgentManagerOptions::new(seed_config, opts.authenticator.into())
                 .tls_config(tls_config)
@@ -278,6 +294,9 @@ impl CouchbaseClusterBackend {
         Ok(Self {
             agent_manager: Arc::new(mgr),
             default_retry_strategy,
+            use_tls: use_ssl,
+            original_tls_options: opts.tls_options,
+            original_authenticator,
         })
     }
 
@@ -326,6 +345,35 @@ impl CouchbaseClusterBackend {
         let agent = self.agent_manager.get_cluster_agent();
 
         CouchbaseDiagnosticsClient::new(CouchbaseAgentProvider::with_agent(agent.clone()))
+    }
+
+    pub async fn set_authenticator(&self, authenticator: Authenticator) -> error::Result<()> {
+        if authenticator.to_string() != self.original_authenticator.to_string() {
+            return Err(error::Error::invalid_argument(
+                "authenticator",
+                "changing authenticator type is not supported",
+            ));
+        }
+
+        let tls_config = if let Some(tls_options) = self.original_tls_options.clone() {
+            let tls_config = tls_options.try_into_tls_config(&authenticator)?;
+
+            Some(tls_config)
+        } else if self.use_tls {
+            let tls_config = TlsOptions::new().try_into_tls_config(&authenticator)?;
+
+            Some(tls_config)
+        } else {
+            None
+        };
+
+        self.agent_manager
+            .reconfigure_agents(
+                ReconfigureAgentOptions::new(authenticator.into()).tls_config(tls_config),
+            )
+            .await;
+
+        Ok(())
     }
 
     fn merge_options(

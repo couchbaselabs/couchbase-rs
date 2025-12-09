@@ -60,7 +60,6 @@ pub(crate) struct MgmtComponent<C: Client> {
     retry_manager: Arc<RetryManager>,
 }
 
-#[derive(Debug)]
 pub(crate) struct MgmtComponentConfig {
     pub endpoints: HashMap<String, String>,
     pub authenticator: Authenticator,

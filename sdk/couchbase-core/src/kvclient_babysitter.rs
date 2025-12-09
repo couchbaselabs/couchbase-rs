@@ -67,6 +67,7 @@ pub(crate) trait KvClientBabysitter {
     fn get_client(&self) -> impl Future<Output = error::Result<Arc<Self::Client>>> + Send;
     fn endpoint_diagnostics(&self) -> EndpointDiagnostics;
     fn update_auth(&self, authenticator: Authenticator) -> impl Future<Output = ()> + Send;
+    fn update_target(&self, target: KvTarget) -> impl Future<Output = ()> + Send;
     // async fn update_selected_bucket(&self, bucket_name: String);
     fn close(&self) -> impl Future<Output = error::Result<()>> + Send;
 }
@@ -553,6 +554,11 @@ impl<K: KvClient + KvClientOps + 'static> KvClientBabysitter for StdKvClientBaby
     async fn update_auth(&self, authenticator: Authenticator) {
         let mut guard = self.slow_state.lock().unwrap();
         guard.desired_config.auth = authenticator;
+    }
+
+    async fn update_target(&self, target: KvTarget) {
+        let mut guard = self.slow_state.lock().unwrap();
+        guard.desired_config.target = target;
     }
 
     async fn close(&self) -> error::Result<()> {
