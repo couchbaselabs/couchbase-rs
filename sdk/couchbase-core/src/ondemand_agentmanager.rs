@@ -31,7 +31,8 @@ use crate::authenticator::Authenticator;
 use crate::error;
 use crate::error::ErrorKind;
 use crate::options::agent::{
-    AgentOptions, CompressionConfig, ConfigPollerConfig, HttpConfig, KvConfig, SeedConfig,
+    AgentOptions, CompressionConfig, ConfigPollerConfig, HttpConfig, KvConfig,
+    ReconfigureAgentOptions, SeedConfig,
 };
 use crate::options::ondemand_agentmanager::OnDemandAgentManagerOptions;
 use crate::tls_config::TlsConfig;
@@ -82,6 +83,16 @@ impl OnDemandAgentManager {
             }
 
             self.fast_map.store(Arc::new(fast_map));
+        }
+    }
+
+    pub async fn reconfigure_agents(&self, opts: ReconfigureAgentOptions) {
+        self.cluster_agent.reconfigure(opts.clone()).await;
+
+        let slow_map = self.slow_map.lock().await;
+        for (bucket_name, agent) in slow_map.iter() {
+            debug!("Reconfiguring agent for bucket {}", bucket_name);
+            agent.reconfigure(opts.clone()).await;
         }
     }
 

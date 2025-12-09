@@ -65,6 +65,7 @@ pub(crate) trait KvClientPool: Send + Sync {
     ) -> impl Future<Output = Vec<Result<PingResponse>>> + Send;
     fn endpoint_diagnostics(&self) -> impl Future<Output = Vec<EndpointDiagnostics>> + Send;
     fn update_auth(&self, authenticator: Authenticator) -> impl Future<Output = ()> + Send;
+    fn update_target(&self, target: KvTarget) -> impl Future<Output = ()> + Send;
     // async fn update_selected_bucket(&self, bucket_name: String);
     fn close(&self) -> impl Future<Output = Result<()>> + Send;
 }
@@ -259,6 +260,16 @@ where
             babysitter_entry
                 .babysitter
                 .update_auth(authenticator.clone())
+                .await;
+        }
+    }
+
+    async fn update_target(&self, target: KvTarget) {
+        let babysitters = self.babysitters.lock().await;
+        for babysitter_entry in babysitters.iter() {
+            babysitter_entry
+                .babysitter
+                .update_target(target.clone())
                 .await;
         }
     }

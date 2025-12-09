@@ -55,7 +55,6 @@ pub(crate) struct QueryComponent<C: Client> {
     prepared_cache: Arc<Mutex<PreparedStatementCache>>,
 }
 
-#[derive(Debug)]
 pub(crate) struct QueryComponentConfig {
     pub endpoints: HashMap<String, String>,
     pub authenticator: Authenticator,

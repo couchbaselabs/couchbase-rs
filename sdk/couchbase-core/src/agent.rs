@@ -49,7 +49,7 @@ use crate::mgmtcomponent::{MgmtComponent, MgmtComponentConfig, MgmtComponentOpti
 use crate::mgmtx::options::{GetTerseBucketConfigOptions, GetTerseClusterConfigOptions};
 use crate::networktypeheuristic::NetworkTypeHeuristic;
 use crate::nmvbhandler::{ConfigUpdater, StdNotMyVbucketConfigHandler};
-use crate::options::agent::AgentOptions;
+use crate::options::agent::{AgentOptions, ReconfigureAgentOptions};
 use crate::parsedconfig::{ParsedConfig, ParsedConfigBucketFeature, ParsedConfigFeature};
 use crate::querycomponent::{QueryComponent, QueryComponentConfig, QueryComponentOptions};
 use crate::retry::RetryManager;
@@ -67,16 +67,6 @@ use futures::executor::block_on;
 use log::{debug, error, info, warn};
 use uuid::Uuid;
 
-use std::cmp::Ordering;
-use std::collections::HashMap;
-use std::error::Error as StdError;
-use std::fmt::format;
-use std::io::Cursor;
-use std::net::ToSocketAddrs;
-use std::ops::{Add, Deref};
-use std::sync::{Arc, Weak};
-use std::time::Duration;
-
 use crate::componentconfigs::{AgentComponentConfigs, HttpClientConfig};
 use crate::httpx::request::{Auth, BasicAuth, BearerAuth};
 use crate::kvclient_babysitter::{KvTarget, StdKvClientBabysitter};
@@ -84,6 +74,16 @@ use crate::kvendpointclientmanager::{
     KvEndpointClientManager, KvEndpointClientManagerOptions, StdKvEndpointClientManager,
 };
 use crate::orphan_reporter::OrphanReporter;
+use arc_swap::ArcSwap;
+use std::cmp::Ordering;
+use std::collections::HashMap;
+use std::error::Error as StdError;
+use std::fmt::{format, Display};
+use std::io::Cursor;
+use std::net::ToSocketAddrs;
+use std::ops::{Add, Deref};
+use std::sync::{Arc, Weak};
+use std::time::Duration;
 use tokio::io::AsyncReadExt;
 use tokio::net;
 use tokio::runtime::{Handle, Runtime};
@@ -92,7 +92,7 @@ use tokio::sync::{broadcast, mpsc, Mutex};
 use tokio::task::JoinHandle;
 use tokio::time::{sleep, timeout, timeout_at, Instant};
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 struct AgentState {
     bucket: Option<String>,
     tls_config: Option<TlsConfig>,
@@ -113,6 +113,22 @@ struct AgentState {
     tcp_keep_alive_time: Duration,
 
     client_name: String,
+}
+
+impl Display for AgentState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{{ bucket: {:?}, network_type: {}, num_pool_connections: {}, latest_config_rev_id: {}, latest_config_rev_epoch: {}, authenticator: {} }}",
+            self.bucket,
+            self.network_type,
+            self.num_pool_connections,
+            self.latest_config.rev_id,
+            self.latest_config.rev_epoch,
+            self.authenticator,
+
+        )
+    }
 }
 
 type AgentClientManager = StdKvEndpointClientManager<
@@ -158,11 +174,6 @@ impl AgentInner {
             state.tls_config.clone(),
             state.bucket.clone(),
             state.authenticator.clone(),
-            HttpClientConfig {
-                idle_connection_timeout: state.http_idle_connection_timeout,
-                max_idle_connections_per_host: state.http_max_idle_connections_per_host,
-                tcp_keep_alive_time: state.tcp_keep_alive_time,
-            },
         )
     }
 
@@ -206,7 +217,7 @@ impl AgentInner {
     }
 
     async fn update_state_locked(&self, state: &mut AgentState) {
-        debug!("Agent updating state {:?}", state);
+        debug!("Agent updating state {}", state);
 
         let agent_component_configs = Self::gen_agent_component_configs_locked(state);
 
@@ -241,13 +252,6 @@ impl AgentInner {
             .await
         {
             error!("Failed to reconfigure connection manager; {e}");
-        }
-
-        if let Err(e) = self
-            .http_client
-            .reconfigure(agent_component_configs.http_client_config)
-        {
-            error!("Failed to reconfigure http client: {e}");
         }
 
         self.query.reconfigure(agent_component_configs.query_config);
@@ -290,6 +294,28 @@ impl AgentInner {
         }
 
         Err(ErrorKind::NoBucket.into())
+    }
+
+    pub async fn reconfigure(&self, opts: ReconfigureAgentOptions) {
+        let mut state = self.state.lock().await;
+        state.tls_config = opts.tls_config.clone();
+        state.authenticator = opts.authenticator.clone();
+
+        // We manually update tls for http as it requires rebuilding the client.
+        match self
+            .http_client
+            .update_tls(httpx::client::UpdateTlsOptions {
+                tls_config: opts.tls_config,
+            }) {
+            Ok(_) => {}
+            Err(e) => {
+                warn!("Failed to update TLS for HTTP client: {}", e);
+            }
+        };
+
+        self.conn_mgr.update_auth(opts.authenticator).await;
+
+        self.update_state_locked(&mut state).await;
     }
 }
 
@@ -542,6 +568,12 @@ impl Agent {
         );
 
         Ok(agent)
+    }
+
+    // reconfigure allows updating certain aspects of the agent at runtime.
+    // Note: toggling TLS on and off is not supported and will result in internal errors.
+    pub async fn reconfigure(&self, opts: ReconfigureAgentOptions) {
+        self.inner.reconfigure(opts).await
     }
 
     fn start_config_watcher(

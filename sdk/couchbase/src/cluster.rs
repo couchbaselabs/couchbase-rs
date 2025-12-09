@@ -16,6 +16,7 @@
  *
  */
 
+use crate::authenticator::Authenticator;
 use crate::bucket::Bucket;
 use crate::clients::bucket_mgmt_client::BucketMgmtClient;
 use crate::clients::cluster_client::ClusterClient;
@@ -100,5 +101,15 @@ impl Cluster {
         opts: impl Into<Option<WaitUntilReadyOptions>>,
     ) -> error::Result<()> {
         self.diagnostics_client.wait_until_ready(opts.into()).await
+    }
+
+    // Sets a new authenticator for the cluster.
+    // For KV the new Authenticator does not take effect until connections are re-established.
+    // For HTTP the behaviour depends on the Authenticator type.
+    // Authenticators which apply authentication per-request (such as PasswordAuthenticator) will take effect immediately
+    // but transport level Authenticators (such as CertificateAuthenticator) will not take effect until new connections
+    // are created.
+    pub async fn set_authenticator(&self, authenticator: Authenticator) -> error::Result<()> {
+        self.client.set_authenticator(authenticator).await
     }
 }

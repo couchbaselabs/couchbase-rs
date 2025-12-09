@@ -68,30 +68,63 @@ impl ClientConfig {
     }
 }
 
+#[derive(Clone, Debug, Default)]
+#[non_exhaustive]
+pub struct UpdateTlsOptions {
+    pub tls_config: Option<TlsConfig>,
+}
+
+impl UpdateTlsOptions {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn tls_config(mut self, tls_config: impl Into<Option<TlsConfig>>) -> Self {
+        self.tls_config = tls_config.into();
+        self
+    }
+}
+
 #[derive(Debug)]
 pub struct ReqwestClient {
     inner: ArcSwap<reqwest::Client>,
     client_id: String,
+
+    idle_connection_timeout: Duration,
+    max_idle_connections_per_host: Option<usize>,
+    tcp_keep_alive_time: Duration,
 }
 
 impl ReqwestClient {
     pub fn new(cfg: ClientConfig) -> HttpxResult<Self> {
+        let idle_connection_timeout = cfg.idle_connection_timeout;
+        let max_idle_connections_per_host = cfg.max_idle_connections_per_host;
+        let tcp_keep_alive_time = cfg.tcp_keep_alive_time;
+
         let inner = Self::new_client(cfg)?;
+
         Ok(Self {
             inner: ArcSwap::from_pointee(inner),
             client_id: Uuid::new_v4().to_string(),
+            idle_connection_timeout,
+            max_idle_connections_per_host,
+            tcp_keep_alive_time,
         })
     }
 
-    // TODO: once options are supported we need to check if they've changed before creating
-    // a new client provider.
-    pub fn reconfigure(&self, cfg: ClientConfig) -> HttpxResult<()> {
-        let new_inner = Self::new_client(cfg)?;
-        let old_inner = self.inner.swap(Arc::new(new_inner));
+    pub fn update_tls(&self, opts: UpdateTlsOptions) -> HttpxResult<()> {
+        let cfg = ClientConfig {
+            tls_config: opts.tls_config,
+            idle_connection_timeout: self.idle_connection_timeout,
+            max_idle_connections_per_host: self.max_idle_connections_per_host,
+            tcp_keep_alive_time: self.tcp_keep_alive_time,
+        };
 
-        // TODO: This will close any in flight requests, do we actually need to do this or will
-        // it get dropped once requests complete anyway?
-        drop(old_inner);
+        let new_client = Self::new_client(cfg)?;
+
+        self.inner.store(Arc::new(new_client));
+
+        debug!("Reconfigured HTTP Client {}", &self.client_id);
 
         Ok(())
     }

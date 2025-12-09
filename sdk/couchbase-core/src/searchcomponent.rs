@@ -64,7 +64,6 @@ pub(crate) struct SearchComponentState {
     pub vector_search_enabled: bool,
 }
 
-#[derive(Debug)]
 pub(crate) struct SearchComponentConfig {
     pub endpoints: HashMap<String, String>,
     pub authenticator: Authenticator,

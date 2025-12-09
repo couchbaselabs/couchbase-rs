@@ -19,14 +19,26 @@
 use crate::auth_mechanism::AuthMechanism;
 use crate::error::Result;
 use crate::service_type::ServiceType;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 
-#[derive(Debug, Clone, PartialEq, Hash)]
+#[derive(Clone, PartialEq, Hash)]
 #[non_exhaustive]
 pub enum Authenticator {
     PasswordAuthenticator(PasswordAuthenticator),
     CertificateAuthenticator(CertificateAuthenticator),
     JwtAuthenticator(JwtAuthenticator),
+}
+
+impl Display for Authenticator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Authenticator::PasswordAuthenticator(_) => write!(f, "PasswordAuthenticator"),
+            Authenticator::CertificateAuthenticator(_) => {
+                write!(f, "CertificateAuthenticator")
+            }
+            Authenticator::JwtAuthenticator(_) => write!(f, "JwtAuthenticator"),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -35,7 +47,7 @@ pub struct UserPassPair {
     pub password: String,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct PasswordAuthenticator {
     pub username: String,
     pub password: String,
@@ -69,7 +81,7 @@ impl From<PasswordAuthenticator> for Authenticator {
 }
 
 // CertificateAuthenticator expects the TlsConfig provided in AgentConfig to contain the certificate chain and private key.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct CertificateAuthenticator {}
 
 impl CertificateAuthenticator {
@@ -91,7 +103,7 @@ impl From<CertificateAuthenticator> for Authenticator {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Hash)]
+#[derive(Clone, PartialEq, Hash)]
 pub struct JwtAuthenticator {
     pub token: String,
 }

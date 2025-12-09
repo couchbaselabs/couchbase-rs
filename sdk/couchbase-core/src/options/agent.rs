@@ -339,3 +339,24 @@ impl Default for HttpConfig {
         }
     }
 }
+
+#[derive(Clone)]
+#[non_exhaustive]
+pub struct ReconfigureAgentOptions {
+    pub authenticator: Authenticator,
+    pub tls_config: Option<TlsConfig>,
+}
+
+impl ReconfigureAgentOptions {
+    pub fn new(authenticator: Authenticator) -> Self {
+        Self {
+            tls_config: None,
+            authenticator,
+        }
+    }
+
+    pub fn tls_config(mut self, tls_config: impl Into<Option<TlsConfig>>) -> Self {
+        self.tls_config = tls_config.into();
+        self
+    }
+}

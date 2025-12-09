@@ -74,10 +74,13 @@ impl Error {
         Self::new(ErrorKind::Message { msg: msg.into() })
     }
 
-    pub(crate) fn new_invalid_argument_error(msg: impl Into<String>, arg: Option<String>) -> Self {
+    pub(crate) fn new_invalid_argument_error(
+        msg: impl Into<String>,
+        arg: impl Into<Option<String>>,
+    ) -> Self {
         Self::new(ErrorKind::InvalidArgument {
             msg: msg.into(),
-            arg,
+            arg: arg.into(),
         })
     }
 
