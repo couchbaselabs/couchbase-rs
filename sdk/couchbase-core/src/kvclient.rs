@@ -220,7 +220,9 @@ where
                         .collect()
                 } else {
                     match opts.authenticator {
-                        Authenticator::PasswordAuthenticator(a) => a.get_auth_mechanisms(),
+                        Authenticator::PasswordAuthenticator(a) => {
+                            a.get_auth_mechanisms(opts.address.tls_config.is_some())
+                        }
                         Authenticator::JwtAuthenticator(a) => a.get_auth_mechanisms(),
                         _ => vec![],
                     }
