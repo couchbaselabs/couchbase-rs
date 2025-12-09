@@ -65,12 +65,16 @@ impl PasswordAuthenticator {
         })
     }
 
-    pub fn get_auth_mechanisms(&self) -> Vec<AuthMechanism> {
-        vec![
-            AuthMechanism::ScramSha512,
-            AuthMechanism::ScramSha256,
-            AuthMechanism::ScramSha1,
-        ]
+    pub fn get_auth_mechanisms(&self, tls_enabled: bool) -> Vec<AuthMechanism> {
+        if tls_enabled {
+            vec![AuthMechanism::Plain]
+        } else {
+            vec![
+                AuthMechanism::ScramSha512,
+                AuthMechanism::ScramSha256,
+                AuthMechanism::ScramSha1,
+            ]
+        }
     }
 }
 
