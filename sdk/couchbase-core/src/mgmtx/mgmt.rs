@@ -215,7 +215,7 @@ impl<C: Client> Management<C> {
         opts: &GetTerseClusterConfigOptions<'_>,
     ) -> error::Result<TerseConfig> {
         let method = Method::GET;
-        let path = "pools/default/nodeServicesStreaming".to_string();
+        let path = "pools/default/nodeServices".to_string();
 
         let resp = self
             .execute(
