@@ -16,6 +16,7 @@
  *
  */
 
+pub mod analytics;
 pub mod diagnostics;
 pub mod kv;
 pub mod pingreport;

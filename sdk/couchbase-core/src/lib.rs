@@ -23,6 +23,8 @@ extern crate lazy_static;
 pub mod address;
 pub mod agent;
 pub mod agent_ops;
+pub mod analyticscomponent;
+pub mod analyticsx;
 pub mod auth_mechanism;
 pub mod authenticator;
 pub mod cbconfig;

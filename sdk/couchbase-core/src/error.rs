@@ -16,6 +16,7 @@
  *
  */
 
+use crate::analyticsx::error::Error as AnalyticsError;
 use crate::httpx::error::Error as HttpError;
 use crate::memdx;
 use crate::mgmtx::error::Error as MgmtError;
@@ -118,6 +119,7 @@ impl Error {
 #[non_exhaustive]
 pub enum ErrorKind {
     Memdx(MemdxError),
+    Analytics(AnalyticsError),
     Query(QueryError),
     Search(SearchError),
     Http(HttpError),
@@ -191,6 +193,7 @@ impl Display for ErrorKind {
                 }
             }
             ErrorKind::Memdx(err) => write!(f, "{err}"),
+            ErrorKind::Analytics(err) => write!(f, "{err}"),
             ErrorKind::Query(err) => write!(f, "{err}"),
             ErrorKind::Search(err) => write!(f, "{err}"),
             ErrorKind::Http(err) => write!(f, "{err}"),
@@ -358,6 +361,12 @@ where
             kind: Arc::new(err.into()),
             retry_info: None,
         }
+    }
+}
+
+impl From<AnalyticsError> for Error {
+    fn from(value: AnalyticsError) -> Self {
+        Self::new(ErrorKind::Analytics(value))
     }
 }
 

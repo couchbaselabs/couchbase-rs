@@ -759,6 +759,7 @@ impl<'a> From<&DeleteUserOptions<'a>> for mgmtx::options::DeleteUserOptions<'a> 
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct GetRolesOptions<'a> {
+    pub permission: Option<&'a str>,
     pub on_behalf_of: Option<&'a OnBehalfOfInfo>,
     pub retry_strategy: Arc<dyn RetryStrategy>,
 }
@@ -772,9 +773,15 @@ impl Default for GetRolesOptions<'_> {
 impl<'a> GetRolesOptions<'a> {
     pub fn new() -> Self {
         Self {
+            permission: None,
             on_behalf_of: None,
             retry_strategy: DEFAULT_RETRY_STRATEGY.clone(),
         }
+    }
+
+    pub fn permission(mut self, permission: &'a str) -> Self {
+        self.permission = Some(permission);
+        self
     }
 
     pub fn on_behalf_of(mut self, on_behalf_of: &'a OnBehalfOfInfo) -> Self {
@@ -792,6 +799,7 @@ impl<'a> From<&GetRolesOptions<'a>> for mgmtx::options::GetRolesOptions<'a> {
     fn from(opts: &GetRolesOptions<'a>) -> Self {
         Self {
             on_behalf_of_info: opts.on_behalf_of,
+            permission: opts.permission,
         }
     }
 }
@@ -1029,5 +1037,241 @@ impl<'a> EnsureGroupOptions<'a> {
     pub fn on_behalf_of_info(mut self, on_behalf_of_info: &'a OnBehalfOfInfo) -> Self {
         self.on_behalf_of_info = Some(on_behalf_of_info);
         self
+    }
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct GetFullClusterConfigOptions<'a> {
+    pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+
+    pub retry_strategy: Arc<dyn RetryStrategy>,
+}
+
+impl<'a> Default for GetFullClusterConfigOptions<'a> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<'a> GetFullClusterConfigOptions<'a> {
+    pub fn new() -> Self {
+        Self {
+            on_behalf_of_info: None,
+            retry_strategy: DEFAULT_RETRY_STRATEGY.clone(),
+        }
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = retry_strategy;
+        self
+    }
+
+    pub fn on_behalf_of_info(mut self, on_behalf_of_info: &'a OnBehalfOfInfo) -> Self {
+        self.on_behalf_of_info = Some(on_behalf_of_info);
+        self
+    }
+}
+
+impl<'a> From<&GetFullClusterConfigOptions<'a>>
+    for mgmtx::options::GetFullClusterConfigOptions<'a>
+{
+    fn from(opts: &GetFullClusterConfigOptions<'a>) -> Self {
+        Self {
+            on_behalf_of_info: opts.on_behalf_of_info,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct GetFullBucketConfigOptions<'a> {
+    pub bucket_name: &'a str,
+    pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+
+    pub retry_strategy: Arc<dyn RetryStrategy>,
+}
+
+impl<'a> GetFullBucketConfigOptions<'a> {
+    pub fn new(bucket_name: &'a str) -> Self {
+        Self {
+            bucket_name,
+            on_behalf_of_info: None,
+            retry_strategy: DEFAULT_RETRY_STRATEGY.clone(),
+        }
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = retry_strategy;
+        self
+    }
+
+    pub fn on_behalf_of_info(mut self, on_behalf_of_info: &'a OnBehalfOfInfo) -> Self {
+        self.on_behalf_of_info = Some(on_behalf_of_info);
+        self
+    }
+}
+
+impl<'a> From<&GetFullBucketConfigOptions<'a>> for mgmtx::options::GetFullBucketConfigOptions<'a> {
+    fn from(opts: &GetFullBucketConfigOptions<'a>) -> Self {
+        Self {
+            bucket_name: opts.bucket_name,
+            on_behalf_of_info: opts.on_behalf_of_info,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct LoadSampleBucketOptions<'a> {
+    pub bucket_name: &'a str,
+    pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+
+    pub retry_strategy: Arc<dyn RetryStrategy>,
+}
+
+impl<'a> LoadSampleBucketOptions<'a> {
+    pub fn new(bucket_name: &'a str) -> Self {
+        Self {
+            bucket_name,
+            on_behalf_of_info: None,
+            retry_strategy: DEFAULT_RETRY_STRATEGY.clone(),
+        }
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = retry_strategy;
+        self
+    }
+
+    pub fn on_behalf_of_info(mut self, on_behalf_of_info: &'a OnBehalfOfInfo) -> Self {
+        self.on_behalf_of_info = Some(on_behalf_of_info);
+        self
+    }
+}
+
+impl<'a> From<&LoadSampleBucketOptions<'a>> for mgmtx::options::LoadSampleBucketOptions<'a> {
+    fn from(opts: &LoadSampleBucketOptions<'a>) -> Self {
+        Self {
+            bucket_name: opts.bucket_name,
+            on_behalf_of_info: opts.on_behalf_of_info,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct IndexStatusOptions<'a> {
+    pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+
+    pub retry_strategy: Arc<dyn RetryStrategy>,
+}
+
+impl<'a> Default for IndexStatusOptions<'a> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<'a> IndexStatusOptions<'a> {
+    pub fn new() -> Self {
+        Self {
+            on_behalf_of_info: None,
+            retry_strategy: DEFAULT_RETRY_STRATEGY.clone(),
+        }
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = retry_strategy;
+        self
+    }
+}
+
+impl<'a> From<&IndexStatusOptions<'a>> for mgmtx::options::IndexStatusOptions<'a> {
+    fn from(opts: &IndexStatusOptions<'a>) -> Self {
+        Self {
+            on_behalf_of_info: opts.on_behalf_of_info,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct GetAutoFailoverSettingsOptions<'a> {
+    pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+
+    pub retry_strategy: Arc<dyn RetryStrategy>,
+}
+
+impl<'a> Default for GetAutoFailoverSettingsOptions<'a> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<'a> GetAutoFailoverSettingsOptions<'a> {
+    pub fn new() -> Self {
+        Self {
+            on_behalf_of_info: None,
+            retry_strategy: DEFAULT_RETRY_STRATEGY.clone(),
+        }
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = retry_strategy;
+        self
+    }
+
+    pub fn on_behalf_of_info(mut self, on_behalf_of_info: &'a OnBehalfOfInfo) -> Self {
+        self.on_behalf_of_info = Some(on_behalf_of_info);
+        self
+    }
+}
+
+impl<'a> From<&GetAutoFailoverSettingsOptions<'a>>
+    for mgmtx::options::GetAutoFailoverSettingsOptions<'a>
+{
+    fn from(opts: &GetAutoFailoverSettingsOptions<'a>) -> Self {
+        Self {
+            on_behalf_of_info: opts.on_behalf_of_info,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct GetBucketStatsOptions<'a> {
+    pub bucket_name: &'a str,
+    pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+
+    pub retry_strategy: Arc<dyn RetryStrategy>,
+}
+
+impl<'a> GetBucketStatsOptions<'a> {
+    pub fn new(bucket_name: &'a str) -> Self {
+        Self {
+            bucket_name,
+            on_behalf_of_info: None,
+            retry_strategy: DEFAULT_RETRY_STRATEGY.clone(),
+        }
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = retry_strategy;
+        self
+    }
+
+    pub fn on_behalf_of_info(mut self, on_behalf_of_info: &'a OnBehalfOfInfo) -> Self {
+        self.on_behalf_of_info = Some(on_behalf_of_info);
+        self
+    }
+}
+
+impl<'a> From<&GetBucketStatsOptions<'a>> for mgmtx::options::GetBucketStatsOptions<'a> {
+    fn from(opts: &GetBucketStatsOptions<'a>) -> Self {
+        Self {
+            bucket_name: opts.bucket_name,
+            on_behalf_of_info: opts.on_behalf_of_info,
+        }
     }
 }

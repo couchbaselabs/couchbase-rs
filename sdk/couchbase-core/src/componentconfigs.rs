@@ -16,6 +16,7 @@
  *
  */
 use crate::address::Address;
+use crate::analyticscomponent::AnalyticsComponentConfig;
 use crate::authenticator::Authenticator;
 use crate::configmanager::ConfigManagerMemdConfig;
 use crate::diagnosticscomponent::DiagnosticsComponentConfig;
@@ -37,6 +38,7 @@ pub(crate) struct AgentComponentConfigs {
 
     pub config_manager_memd_config: ConfigManagerMemdConfig,
     pub vbucket_routing_info: VbucketRoutingInfo,
+    pub analytics_config: AnalyticsComponentConfig,
     pub query_config: QueryComponentConfig,
     pub search_config: SearchComponentConfig,
     pub mgmt_config: MgmtComponentConfig,
@@ -64,12 +66,14 @@ impl AgentComponentConfigs {
         let mut kv_data_node_ids = Vec::new();
         let mut kv_data_hosts: HashMap<String, Address> = HashMap::new();
         let mut mgmt_endpoints: HashMap<String, String> = HashMap::new();
+        let mut analytics_endpoints: HashMap<String, String> = HashMap::new();
         let mut query_endpoints: HashMap<String, String> = HashMap::new();
         let mut search_endpoints: HashMap<String, String> = HashMap::new();
 
         for node in network_info.nodes {
             let kv_ep_id = format!("kv{}", node.node_id);
             let mgmt_ep_id = format!("mgmt{}", node.node_id);
+            let analytics_ep_id = format!("analytics{}", node.node_id);
             let query_ep_id = format!("query{}", node.node_id);
             let search_ep_id = format!("search{}", node.node_id);
 
@@ -92,6 +96,10 @@ impl AgentComponentConfigs {
                 if let Some(p) = node.ssl_ports.mgmt {
                     mgmt_endpoints.insert(mgmt_ep_id, format!("https://{}:{}", node.hostname, p));
                 }
+                if let Some(p) = node.ssl_ports.analytics {
+                    analytics_endpoints
+                        .insert(analytics_ep_id, format!("https://{}:{}", node.hostname, p));
+                }
                 if let Some(p) = node.ssl_ports.query {
                     query_endpoints.insert(query_ep_id, format!("https://{}:{}", node.hostname, p));
                 }
@@ -111,6 +119,10 @@ impl AgentComponentConfigs {
                 }
                 if let Some(p) = node.non_ssl_ports.mgmt {
                     mgmt_endpoints.insert(mgmt_ep_id, format!("http://{}:{}", node.hostname, p));
+                }
+                if let Some(p) = node.non_ssl_ports.analytics {
+                    analytics_endpoints
+                        .insert(analytics_ep_id, format!("http://{}:{}", node.hostname, p));
                 }
                 if let Some(p) = node.non_ssl_ports.query {
                     query_endpoints.insert(query_ep_id, format!("http://{}:{}", node.hostname, p));
@@ -163,6 +175,10 @@ impl AgentComponentConfigs {
             },
 
             vbucket_routing_info,
+            analytics_config: AnalyticsComponentConfig {
+                endpoints: analytics_endpoints,
+                authenticator: authenticator.clone(),
+            },
             query_config: QueryComponentConfig {
                 endpoints: query_endpoints,
                 authenticator: authenticator.clone(),

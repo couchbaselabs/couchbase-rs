@@ -25,6 +25,7 @@ pub mod manifest_helper;
 pub mod mgmt;
 pub mod mgmt_bucket;
 pub mod mgmt_collection;
+pub mod mgmt_query;
 pub mod mgmt_user;
 pub mod node_target;
 pub mod options;

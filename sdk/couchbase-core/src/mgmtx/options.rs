@@ -85,7 +85,27 @@ pub struct GetTerseClusterConfigOptions<'a> {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[non_exhaustive]
+pub struct GetFullClusterConfigOptions<'a> {
+    pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct GetTerseBucketConfigOptions<'a> {
+    pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+    pub bucket_name: &'a str,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+#[non_exhaustive]
+pub struct GetFullBucketConfigOptions<'a> {
+    pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+    pub bucket_name: &'a str,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+#[non_exhaustive]
+pub struct LoadSampleBucketOptions<'a> {
     pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
     pub bucket_name: &'a str,
 }
@@ -179,6 +199,7 @@ pub struct DeleteUserOptions<'a> {
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[non_exhaustive]
 pub struct GetRolesOptions<'a> {
+    pub permission: Option<&'a str>,
     pub on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
 }
 
@@ -226,4 +247,68 @@ pub struct EnsureUserPollOptions<C: Client> {
 pub struct EnsureGroupPollOptions<C: Client> {
     pub client: Arc<C>,
     pub targets: Vec<NodeTarget>,
+}
+
+#[derive(Debug, Clone, Default)]
+#[non_exhaustive]
+pub struct IndexStatusOptions<'a> {
+    pub(crate) on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+}
+
+impl<'a> IndexStatusOptions<'a> {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn on_behalf_of_info(
+        mut self,
+        on_behalf_of: impl Into<Option<&'a OnBehalfOfInfo>>,
+    ) -> Self {
+        self.on_behalf_of_info = on_behalf_of.into();
+        self
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+#[non_exhaustive]
+pub struct GetAutoFailoverSettingsOptions<'a> {
+    pub(crate) on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+}
+
+impl<'a> GetAutoFailoverSettingsOptions<'a> {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn on_behalf_of_info(
+        mut self,
+        on_behalf_of: impl Into<Option<&'a OnBehalfOfInfo>>,
+    ) -> Self {
+        self.on_behalf_of_info = on_behalf_of.into();
+        self
+    }
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct GetBucketStatsOptions<'a> {
+    pub(crate) on_behalf_of_info: Option<&'a OnBehalfOfInfo>,
+    pub(crate) bucket_name: &'a str,
+}
+
+impl<'a> GetBucketStatsOptions<'a> {
+    pub fn new(bucket_name: &'a str) -> Self {
+        Self {
+            bucket_name,
+            on_behalf_of_info: None,
+        }
+    }
+
+    pub fn on_behalf_of_info(
+        mut self,
+        on_behalf_of: impl Into<Option<&'a OnBehalfOfInfo>>,
+    ) -> Self {
+        self.on_behalf_of_info = on_behalf_of.into();
+        self
+    }
 }

@@ -31,6 +31,7 @@ pub(crate) enum InnerServiceType {
     Query,
     Search,
     Eventing,
+    Analytics,
     Other(String),
 }
 
@@ -40,6 +41,7 @@ impl ServiceType {
     pub const QUERY: ServiceType = ServiceType(InnerServiceType::Query);
     pub const SEARCH: ServiceType = ServiceType(InnerServiceType::Search);
     pub const EVENTING: ServiceType = ServiceType(InnerServiceType::Eventing);
+    pub const ANALYTICS: ServiceType = ServiceType(InnerServiceType::Analytics);
 }
 
 impl Display for ServiceType {
@@ -50,6 +52,7 @@ impl Display for ServiceType {
             InnerServiceType::Query => "query",
             InnerServiceType::Search => "search",
             InnerServiceType::Eventing => "eventing",
+            InnerServiceType::Analytics => "analytics",
             InnerServiceType::Other(val) => return write!(f, "unknown({val})"),
         };
 

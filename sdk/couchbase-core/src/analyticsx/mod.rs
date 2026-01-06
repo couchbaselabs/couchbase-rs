@@ -16,15 +16,9 @@
  *
  */
 
-pub mod agent;
 pub mod analytics;
-pub mod crud;
-pub mod diagnostics;
-pub mod management;
-pub mod ondemand_agentmanager;
-pub mod orphan_reporter;
-pub mod ping;
-pub mod query;
-pub mod search;
-pub mod search_management;
-pub mod waituntilready;
+pub mod error;
+mod query_json;
+pub mod query_options;
+pub mod query_respreader;
+pub mod query_result;

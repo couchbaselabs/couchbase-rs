@@ -67,6 +67,7 @@ use futures::executor::block_on;
 use log::{debug, error, info, warn};
 use uuid::Uuid;
 
+use crate::analyticscomponent::{AnalyticsComponent, AnalyticsComponentOptions};
 use crate::componentconfigs::{AgentComponentConfigs, HttpClientConfig};
 use crate::httpx::request::{Auth, BasicAuth, BearerAuth};
 use crate::kvclient_babysitter::{KvTarget, StdKvClientBabysitter};
@@ -156,6 +157,7 @@ pub(crate) struct AgentInner {
         StdCompressor,
     >,
 
+    pub(crate) analytics: Arc<AnalyticsComponent<ReqwestClient>>,
     pub(crate) query: Arc<QueryComponent<ReqwestClient>>,
     pub(crate) search: Arc<SearchComponent<ReqwestClient>>,
     pub(crate) mgmt: MgmtComponent<ReqwestClient>,
@@ -254,6 +256,8 @@ impl AgentInner {
             error!("Failed to reconfigure connection manager; {e}");
         }
 
+        self.analytics
+            .reconfigure(agent_component_configs.analytics_config);
         self.query.reconfigure(agent_component_configs.query_config);
         self.search
             .reconfigure(agent_component_configs.search_config);
@@ -499,6 +503,15 @@ impl Agent {
             },
         );
 
+        let analytics = Arc::new(AnalyticsComponent::new(
+            retry_manager.clone(),
+            http_client.clone(),
+            agent_component_configs.analytics_config,
+            AnalyticsComponentOptions {
+                user_agent: client_name.clone(),
+            },
+        ));
+
         let query = Arc::new(QueryComponent::new(
             retry_manager.clone(),
             http_client.clone(),
@@ -539,6 +552,7 @@ impl Agent {
             err_map_component,
 
             mgmt,
+            analytics,
             query,
             search,
             diagnostics,

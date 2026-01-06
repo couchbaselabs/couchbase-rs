@@ -183,6 +183,8 @@ pub enum ServerErrorKind {
     BucketNotFound,
     FlushDisabled,
     ServerInvalidArg { arg: String, reason: String },
+    SampleAlreadyLoaded,
+    InvalidSampleBucket,
     BucketUuidMismatch,
     UserNotFound,
     GroupNotFound,
@@ -213,6 +215,8 @@ impl Display for ServerErrorKind {
             ServerErrorKind::OperationDelayed => {
                 write!(f, "operation was delayed, but will continue")
             }
+            ServerErrorKind::SampleAlreadyLoaded => write!(f, "sample already loaded"),
+            ServerErrorKind::InvalidSampleBucket => write!(f, "invalid sample bucket"),
             ServerErrorKind::Unknown => write!(f, "unknown error"),
         }
     }
