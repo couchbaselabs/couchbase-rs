@@ -32,6 +32,7 @@ pub enum BucketType {
 pub(crate) struct ParsedConfigNodePorts {
     pub kv: Option<u16>,
     pub mgmt: Option<u16>,
+    pub analytics: Option<u16>,
     pub query: Option<u16>,
     pub search: Option<u16>,
 }
@@ -40,6 +41,7 @@ pub(crate) struct ParsedConfigNodePorts {
 pub(crate) struct ParsedConfigNodeSSLPorts {
     pub kv: Option<u16>,
     pub mgmt: Option<u16>,
+    pub analytics: Option<u16>,
     pub query: Option<u16>,
     pub search: Option<u16>,
 }

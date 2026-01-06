@@ -176,7 +176,12 @@ impl<C: Client> Management<C> {
         opts: &GetRolesOptions<'_>,
     ) -> error::Result<Vec<RoleAndDescription>> {
         let method = Method::GET;
-        let path = "settings/rbac/roles".to_string();
+
+        let path = if let Some(p) = opts.permission {
+            format!("settings/rbac/roles?permission={}", urlencoding::encode(p))
+        } else {
+            "settings/rbac/roles".to_string()
+        };
 
         let resp = self
             .execute(

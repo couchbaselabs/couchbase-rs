@@ -16,18 +16,25 @@
  *
  */
 
-use crate::cbconfig::TerseConfig;
+use crate::cbconfig::{FullBucketConfig, FullClusterConfig, TerseConfig};
 use crate::httpx::client::Client;
 use crate::httpx::request::{Auth, OnBehalfOfInfo, Request};
 use crate::httpx::response::Response;
 use crate::mgmtx::error;
-use crate::mgmtx::options::{GetTerseBucketConfigOptions, GetTerseClusterConfigOptions};
+use crate::mgmtx::mgmt_query::IndexStatus;
+use crate::mgmtx::options::{
+    GetAutoFailoverSettingsOptions, GetBucketStatsOptions, GetFullBucketConfigOptions,
+    GetFullClusterConfigOptions, GetTerseBucketConfigOptions, GetTerseClusterConfigOptions,
+    IndexStatusOptions, LoadSampleBucketOptions,
+};
 use bytes::Bytes;
 use http::Method;
 use serde::de::DeserializeOwned;
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
+use serde_json::value::RawValue;
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Duration;
 
 lazy_static! {
     static ref FIELD_NAME_MAP: HashMap<String, String> = {
@@ -179,6 +186,10 @@ impl<C: Client> Management<C> {
                     arg: "historyEnabled".to_string(),
                     reason: body_str.to_string(),
                 }
+            } else if lower_body_str.contains("already loaded") {
+                error::ServerErrorKind::SampleAlreadyLoaded
+            } else if lower_body_str.contains("not a valid sample") {
+                error::ServerErrorKind::InvalidSampleBucket
             } else {
                 error::ServerErrorKind::Unknown
             }
@@ -237,6 +248,33 @@ impl<C: Client> Management<C> {
         parse_response_json(resp).await
     }
 
+    pub async fn get_full_cluster_config(
+        &self,
+        opts: &GetFullClusterConfigOptions<'_>,
+    ) -> error::Result<FullClusterConfig> {
+        let method = Method::GET;
+        let path = "pools/default".to_string();
+
+        let resp = self
+            .execute(
+                method.clone(),
+                &path,
+                "",
+                opts.on_behalf_of_info.cloned(),
+                None,
+                None,
+            )
+            .await?;
+
+        if resp.status() != 200 {
+            return Err(
+                Self::decode_common_error(method, path, "get_full_cluster_config", resp).await,
+            );
+        }
+
+        parse_response_json(resp).await
+    }
+
     pub async fn get_terse_bucket_config(
         &self,
         opts: &GetTerseBucketConfigOptions<'_>,
@@ -263,6 +301,145 @@ impl<C: Client> Management<C> {
 
         parse_response_json(resp).await
     }
+
+    pub async fn get_full_bucket_config(
+        &self,
+        opts: &GetFullBucketConfigOptions<'_>,
+    ) -> error::Result<FullBucketConfig> {
+        let method = Method::GET;
+        let path = format!("pools/default/buckets/{}", opts.bucket_name);
+
+        let resp = self
+            .execute(
+                method.clone(),
+                &path,
+                "",
+                opts.on_behalf_of_info.cloned(),
+                None,
+                None,
+            )
+            .await?;
+
+        if resp.status() != 200 {
+            return Err(
+                Self::decode_common_error(method, path, "get_full_bucket_config", resp).await,
+            );
+        }
+
+        parse_response_json(resp).await
+    }
+
+    pub async fn load_sample_bucket(
+        &self,
+        opts: &LoadSampleBucketOptions<'_>,
+    ) -> error::Result<()> {
+        let method = Method::POST;
+        let path = "sampleBuckets/install";
+        let body = Bytes::from(opts.bucket_name.to_string());
+
+        let resp = self
+            .execute(
+                method.clone(),
+                path,
+                "application/json",
+                opts.on_behalf_of_info.cloned(),
+                None,
+                Some(body),
+            )
+            .await?;
+
+        if resp.status() != 202 {
+            return Err(Self::decode_common_error(
+                method,
+                path.to_string(),
+                "load_sample_bucket",
+                resp,
+            )
+            .await);
+        }
+
+        Ok(())
+    }
+
+    pub async fn index_status(&self, opts: &IndexStatusOptions<'_>) -> error::Result<IndexStatus> {
+        let method = Method::GET;
+        let path = "indexStatus";
+
+        let resp = self
+            .execute(
+                method.clone(),
+                path,
+                "application/json",
+                opts.on_behalf_of_info.cloned(),
+                None,
+                None,
+            )
+            .await?;
+
+        if resp.status() != 200 {
+            return Err(
+                Self::decode_common_error(method, path.to_string(), "index_status", resp).await,
+            );
+        }
+
+        parse_response_json(resp).await
+    }
+
+    pub async fn get_auto_failover_settings(
+        &self,
+        opts: &GetAutoFailoverSettingsOptions<'_>,
+    ) -> error::Result<AutoFailoverSettings> {
+        let method = Method::GET;
+        let path = "settings/autoFailover";
+
+        let resp = self
+            .execute(
+                method.clone(),
+                path,
+                "",
+                opts.on_behalf_of_info.cloned(),
+                None,
+                None,
+            )
+            .await?;
+
+        if resp.status() != 200 {
+            return Err(Self::decode_common_error(
+                method,
+                path.to_string(),
+                "get_autofailover_settings",
+                resp,
+            )
+            .await);
+        }
+
+        parse_response_json(resp).await
+    }
+
+    pub async fn get_bucket_stats(
+        &self,
+        opts: &GetBucketStatsOptions<'_>,
+    ) -> error::Result<Box<RawValue>> {
+        let method = Method::GET;
+        let path = format!("pools/default/buckets/{}/stats", opts.bucket_name);
+
+        let resp = self
+            .execute(
+                method.clone(),
+                &path,
+                "",
+                opts.on_behalf_of_info.cloned(),
+                None,
+                None,
+            )
+            .await?;
+
+        if resp.status() != 200 {
+            return Err(Self::decode_common_error(method, path, "get_bucket_stats", resp).await);
+        }
+
+        parse_response_json(resp).await
+    }
 }
 
 pub(crate) async fn parse_response_json<T: DeserializeOwned>(resp: Response) -> error::Result<T> {
@@ -278,4 +455,45 @@ pub(crate) async fn parse_response_json<T: DeserializeOwned>(resp: Response) -> 
 #[derive(Deserialize)]
 struct ServerErrors {
     errors: HashMap<String, String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AutoFailoverSettings {
+    pub enabled: bool,
+    #[serde(deserialize_with = "deserialize_duration_secs")]
+    pub timeout: Duration,
+    pub count: usize,
+    #[serde(rename = "failoverOnDataDiskIssues")]
+    pub failover_on_data_disk_issues: FailoverOnDataDiskIssues,
+    #[serde(rename = "maxCount")]
+    pub max_count: usize,
+    pub can_abort_rebalance: bool,
+    #[serde(rename = "failoverPreserveDurabilityMajority")]
+    pub failover_preserve_durability_majority: Option<bool>,
+    #[serde(rename = "failoverOnDataDiskNonResponsiveness")]
+    pub failover_on_data_disk_non_responsiveness: Option<bool>,
+    #[serde(rename = "allowFailoverEphemeralNoReplicas")]
+    pub allow_failover_ephemeral_no_replicas: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct FailoverOnDataDiskIssues {
+    pub enabled: bool,
+    #[serde(rename = "timePeriod", deserialize_with = "deserialize_duration_secs")]
+    pub time_period: Duration,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct FailoverOnDataDiskNonResponsiveness {
+    pub enabled: bool,
+    #[serde(rename = "timePeriod", deserialize_with = "deserialize_duration_secs")]
+    pub time_period: Duration,
+}
+
+fn deserialize_duration_secs<'de, D>(deserializer: D) -> Result<Duration, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let secs: u64 = Deserialize::deserialize(deserializer)?;
+    Ok(Duration::from_secs(secs))
 }

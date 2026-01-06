@@ -15,17 +15,19 @@
  *  * limitations under the License.
  *
  */
-
 use crate::agent::Agent;
-use crate::cbconfig::CollectionManifest;
+use crate::cbconfig::{CollectionManifest, FullBucketConfig, FullClusterConfig};
 use crate::error::Result;
 use crate::features::BucketFeature;
 use crate::mgmtx::bucket_settings::BucketDef;
+use crate::mgmtx::mgmt::AutoFailoverSettings;
+use crate::mgmtx::mgmt_query::IndexStatus;
 use crate::mgmtx::responses::{
     CreateCollectionResponse, CreateScopeResponse, DeleteCollectionResponse, DeleteScopeResponse,
     UpdateCollectionResponse,
 };
 use crate::mgmtx::user::{Group, RoleAndDescription, UserAndMetadata};
+use crate::options::analytics::{AnalyticsOptions, GetPendingMutationsOptions};
 use crate::options::crud::{
     AddOptions, AppendOptions, DecrementOptions, DeleteOptions, GetAndLockOptions,
     GetAndTouchOptions, GetCollectionIdOptions, GetMetaOptions, GetOptions, IncrementOptions,
@@ -38,9 +40,10 @@ use crate::options::management::{
     DeleteBucketOptions, DeleteCollectionOptions, DeleteGroupOptions, DeleteScopeOptions,
     DeleteUserOptions, EnsureBucketOptions, EnsureGroupOptions, EnsureManifestOptions,
     EnsureUserOptions, FlushBucketOptions, GetAllBucketsOptions, GetAllGroupsOptions,
-    GetAllUsersOptions, GetBucketOptions, GetCollectionManifestOptions, GetGroupOptions,
-    GetRolesOptions, GetUserOptions, UpdateBucketOptions, UpdateCollectionOptions,
-    UpsertGroupOptions, UpsertUserOptions,
+    GetAllUsersOptions, GetAutoFailoverSettingsOptions, GetBucketOptions, GetBucketStatsOptions,
+    GetCollectionManifestOptions, GetFullBucketConfigOptions, GetFullClusterConfigOptions,
+    GetGroupOptions, GetRolesOptions, GetUserOptions, IndexStatusOptions, LoadSampleBucketOptions,
+    UpdateBucketOptions, UpdateCollectionOptions, UpsertGroupOptions, UpsertUserOptions,
 };
 use crate::options::ping::PingOptions;
 use crate::options::query::{
@@ -57,6 +60,7 @@ use crate::options::search_management::{
 };
 use crate::options::waituntilready::WaitUntilReadyOptions;
 use crate::queryx::index::Index;
+use crate::results::analytics::AnalyticsResultStream;
 use crate::results::diagnostics::DiagnosticsResult;
 use crate::results::kv::{
     AddResult, AppendResult, DecrementResult, DeleteResult, GetAndLockResult, GetAndTouchResult,
@@ -68,6 +72,8 @@ use crate::results::query::QueryResultStream;
 use crate::results::search::SearchResultStream;
 use crate::searchx;
 use crate::searchx::document_analysis::DocumentAnalysis;
+use serde_json::value::RawValue;
+use std::collections::HashMap;
 
 impl Agent {
     pub async fn bucket_features(&self) -> Result<Vec<BucketFeature>> {
@@ -391,5 +397,52 @@ impl Agent {
 
     pub async fn diagnostics(&self, opts: &DiagnosticsOptions) -> Result<DiagnosticsResult> {
         self.inner.diagnostics.diagnostics(opts).await
+    }
+
+    pub async fn analytics_query(&self, opts: AnalyticsOptions) -> Result<AnalyticsResultStream> {
+        self.inner.analytics.query(opts).await
+    }
+
+    pub async fn analytics_get_pending_mutations(
+        &self,
+        opts: &GetPendingMutationsOptions<'_>,
+    ) -> Result<HashMap<String, HashMap<String, i64>>> {
+        self.inner.analytics.get_pending_mutations(opts).await
+    }
+
+    pub async fn get_full_bucket_config(
+        &self,
+        opts: &GetFullBucketConfigOptions<'_>,
+    ) -> Result<FullBucketConfig> {
+        self.inner.mgmt.get_full_bucket_config(opts).await
+    }
+
+    pub async fn get_full_cluster_config(
+        &self,
+        opts: &GetFullClusterConfigOptions<'_>,
+    ) -> Result<FullClusterConfig> {
+        self.inner.mgmt.get_full_cluster_config(opts).await
+    }
+
+    pub async fn load_sample_bucket(&self, opts: &LoadSampleBucketOptions<'_>) -> Result<()> {
+        self.inner.mgmt.load_sample_bucket(opts).await
+    }
+
+    pub async fn index_status(&self, opts: &IndexStatusOptions<'_>) -> Result<IndexStatus> {
+        self.inner.mgmt.index_status(opts).await
+    }
+
+    pub async fn get_auto_failover_settings(
+        &self,
+        opts: &GetAutoFailoverSettingsOptions<'_>,
+    ) -> Result<AutoFailoverSettings> {
+        self.inner.mgmt.get_auto_failover_settings(opts).await
+    }
+
+    pub async fn get_bucket_stats(
+        &self,
+        opts: &GetBucketStatsOptions<'_>,
+    ) -> Result<Box<RawValue>> {
+        self.inner.mgmt.get_bucket_stats(opts).await
     }
 }

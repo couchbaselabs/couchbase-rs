@@ -15,16 +15,24 @@
  *  * limitations under the License.
  *
  */
+use serde::Deserialize;
 
-pub mod agent;
-pub mod analytics;
-pub mod crud;
-pub mod diagnostics;
-pub mod management;
-pub mod ondemand_agentmanager;
-pub mod orphan_reporter;
-pub mod ping;
-pub mod query;
-pub mod search;
-pub mod search_management;
-pub mod waituntilready;
+#[derive(Debug, Deserialize)]
+pub struct IndexStatusDefinition {
+    pub bucket: String,
+    pub definition: String,
+    pub collection: Option<String>,
+    pub scope: Option<String>,
+    #[serde(rename = "indexName")]
+    pub index_name: String,
+    pub status: String,
+    #[serde(rename = "storageMode")]
+    pub storage_mode: String,
+    #[serde(rename = "numReplica")]
+    pub replicas: u8,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct IndexStatus {
+    pub indexes: Vec<IndexStatusDefinition>,
+}

@@ -135,12 +135,14 @@ impl ConfigParser {
             non_ssl_ports: ParsedConfigNodePorts {
                 kv: ports.kv,
                 mgmt: ports.mgmt,
+                analytics: ports.cbas,
                 query: ports.n1ql,
                 search: ports.fts,
             },
             ssl_ports: ParsedConfigNodePorts {
                 kv: ports.kv_ssl,
                 mgmt: ports.mgmt_ssl,
+                analytics: ports.cbas_ssl,
                 query: ports.n1ql_ssl,
                 search: ports.fts_ssl,
             },
