@@ -23,7 +23,7 @@ use crate::management::collections::collection_settings::{
 };
 use crate::options::collection_mgmt_options::*;
 use crate::results::collections_mgmt_results::{CollectionSpec, ScopeSpec};
-use couchbase_core::retry::RetryStrategy;
+use crate::retry::RetryStrategy;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -173,13 +173,16 @@ impl CouchbaseCollectionsMgmtClient {
         opts: CreateScopeOptions,
     ) -> error::Result<()> {
         let agent = self.agent_provider.get_agent().await;
+        let retry = opts
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
         CouchbaseAgentProvider::upgrade_agent(agent)?
             .create_scope(
                 &couchbase_core::options::management::CreateScopeOptions::new(
                     &self.bucket_name,
                     scope_name.into().as_str(),
                 )
-                .retry_strategy(self.default_retry_strategy.clone()),
+                .retry_strategy(retry),
             )
             .await?;
 
@@ -192,13 +195,16 @@ impl CouchbaseCollectionsMgmtClient {
         opts: DropScopeOptions,
     ) -> error::Result<()> {
         let agent = self.agent_provider.get_agent().await;
+        let retry = opts
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
         CouchbaseAgentProvider::upgrade_agent(agent)?
             .delete_scope(
                 &couchbase_core::options::management::DeleteScopeOptions::new(
                     &self.bucket_name,
                     scope_name.into().as_str(),
                 )
-                .retry_strategy(self.default_retry_strategy.clone()),
+                .retry_strategy(retry),
             )
             .await?;
 
@@ -215,23 +221,26 @@ impl CouchbaseCollectionsMgmtClient {
         let agent = self.agent_provider.get_agent().await;
         let scope_name = scope_name.into();
         let collection_name = collection_name.into();
-        let mut opts = couchbase_core::options::management::CreateCollectionOptions::new(
+        let retry = opts
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
+        let mut core_opts = couchbase_core::options::management::CreateCollectionOptions::new(
             &self.bucket_name,
             scope_name.as_str(),
             collection_name.as_str(),
         )
-        .retry_strategy(self.default_retry_strategy.clone());
+        .retry_strategy(retry);
 
         if let Some(max_ttl) = settings.max_expiry {
-            opts = opts.max_ttl(max_ttl.into());
+            core_opts = core_opts.max_ttl(max_ttl.into());
         }
 
         if let Some(history_enabled) = settings.history {
-            opts = opts.history_enabled(history_enabled);
+            core_opts = core_opts.history_enabled(history_enabled);
         }
 
         CouchbaseAgentProvider::upgrade_agent(agent)?
-            .create_collection(&opts)
+            .create_collection(&core_opts)
             .await?;
 
         Ok(())
@@ -247,23 +256,26 @@ impl CouchbaseCollectionsMgmtClient {
         let agent = self.agent_provider.get_agent().await;
         let scope_name = scope_name.into();
         let collection_name = collection_name.into();
-        let mut opts = couchbase_core::options::management::UpdateCollectionOptions::new(
+        let retry = opts
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
+        let mut core_opts = couchbase_core::options::management::UpdateCollectionOptions::new(
             &self.bucket_name,
             scope_name.as_str(),
             collection_name.as_str(),
         )
-        .retry_strategy(self.default_retry_strategy.clone());
+        .retry_strategy(retry);
 
         if let Some(max_ttl) = settings.max_expiry {
-            opts = opts.max_ttl(max_ttl.into());
+            core_opts = core_opts.max_ttl(max_ttl.into());
         }
 
         if let Some(history_enabled) = settings.history {
-            opts = opts.history_enabled(history_enabled);
+            core_opts = core_opts.history_enabled(history_enabled);
         }
 
         CouchbaseAgentProvider::upgrade_agent(agent)?
-            .update_collection(&opts)
+            .update_collection(&core_opts)
             .await?;
 
         Ok(())
@@ -276,6 +288,9 @@ impl CouchbaseCollectionsMgmtClient {
         opts: DropCollectionOptions,
     ) -> error::Result<()> {
         let agent = self.agent_provider.get_agent().await;
+        let retry = opts
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
         CouchbaseAgentProvider::upgrade_agent(agent)?
             .delete_collection(
                 &couchbase_core::options::management::DeleteCollectionOptions::new(
@@ -283,7 +298,7 @@ impl CouchbaseCollectionsMgmtClient {
                     scope_name.into().as_str(),
                     collection_name.into().as_str(),
                 )
-                .retry_strategy(self.default_retry_strategy.clone()),
+                .retry_strategy(retry),
             )
             .await?;
 
@@ -292,12 +307,15 @@ impl CouchbaseCollectionsMgmtClient {
 
     pub async fn get_all_scopes(&self, opts: GetAllScopesOptions) -> error::Result<Vec<ScopeSpec>> {
         let agent = self.agent_provider.get_agent().await;
+        let retry = opts
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
         let manifest = CouchbaseAgentProvider::upgrade_agent(agent)?
             .get_collection_manifest(
                 &couchbase_core::options::management::GetCollectionManifestOptions::new(
                     &self.bucket_name,
                 )
-                .retry_strategy(self.default_retry_strategy.clone()),
+                .retry_strategy(retry),
             )
             .await?;
 

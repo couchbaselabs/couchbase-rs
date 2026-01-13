@@ -18,13 +18,13 @@
 use crate::analyticsx;
 use crate::analyticsx::query_options::{Format, PlanFormat, ScanConsistency};
 use crate::httpx::request::OnBehalfOfInfo;
-use crate::retry::RetryStrategy;
+use crate::retry::{RetryStrategy, DEFAULT_RETRY_STRATEGY};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct AnalyticsOptions {
     pub args: Option<Vec<Value>>,
@@ -50,7 +50,36 @@ pub struct AnalyticsOptions {
 
     pub on_behalf_of: Option<OnBehalfOfInfo>,
     pub endpoint: Option<String>,
-    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
+}
+
+impl Default for AnalyticsOptions {
+    fn default() -> Self {
+        Self {
+            args: None,
+            client_context_id: None,
+            format: None,
+            pretty: None,
+            query_context: None,
+            read_only: None,
+            scan_consistency: None,
+            scan_wait: None,
+            statement: None,
+            timeout: None,
+            named_args: None,
+            raw: None,
+            plan_format: None,
+            logical_plan: None,
+            optimized_logical_plan: None,
+            expression_tree: None,
+            rewritten_expression_tree: None,
+            job: None,
+            max_warnings: None,
+            on_behalf_of: None,
+            endpoint: None,
+            retry_strategy: DEFAULT_RETRY_STRATEGY.clone(),
+        }
+    }
 }
 
 impl AnalyticsOptions {
@@ -162,11 +191,8 @@ impl AnalyticsOptions {
         self
     }
 
-    pub fn retry_strategy(
-        mut self,
-        retry_strategy: impl Into<Option<Arc<dyn RetryStrategy>>>,
-    ) -> Self {
-        self.retry_strategy = retry_strategy.into();
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = retry_strategy;
         self
     }
 
@@ -203,13 +229,23 @@ impl From<AnalyticsOptions> for analyticsx::query_options::QueryOptions {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct GetPendingMutationsOptions<'a> {
     pub on_behalf_of: Option<&'a OnBehalfOfInfo>,
 
     pub endpoint: Option<String>,
-    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
+}
+
+impl Default for GetPendingMutationsOptions<'_> {
+    fn default() -> Self {
+        Self {
+            on_behalf_of: None,
+            endpoint: None,
+            retry_strategy: DEFAULT_RETRY_STRATEGY.clone(),
+        }
+    }
 }
 
 impl<'a> GetPendingMutationsOptions<'a> {
@@ -222,11 +258,8 @@ impl<'a> GetPendingMutationsOptions<'a> {
         self
     }
 
-    pub fn retry_strategy(
-        mut self,
-        retry_strategy: impl Into<Option<Arc<dyn RetryStrategy>>>,
-    ) -> Self {
-        self.retry_strategy = retry_strategy.into();
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = retry_strategy;
         self
     }
 

@@ -23,8 +23,10 @@ use crate::common::doc_generation::{
 use crate::common::new_key;
 use crate::common::test_config::run_test;
 use chrono::Utc;
+use couchbase::error::ErrorKind;
 use couchbase::options::kv_binary_options::{DecrementOptions, IncrementOptions};
 use couchbase::options::kv_options::{GetOptions, UpsertOptions};
+use couchbase::retry::{RetryAction, RetryReason, RetryRequest, RetryStrategy};
 use couchbase::subdoc::lookup_in_specs::{GetSpecOptions, LookupInSpec};
 use couchbase::subdoc::macros::{LookupInMacros, MutateInMacros};
 use couchbase::subdoc::mutate_in_specs::MutateInSpec;
@@ -34,8 +36,9 @@ use couchbase_core::memdx::subdoc::SubdocOp;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::ops::{Add, Deref};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::time::{timeout_at, Instant};
 
@@ -868,4 +871,96 @@ fn get_with_projections() {
             );
         }
     })
+}
+
+#[test]
+fn test_retry_locked_until_cancel() {
+    run_test(async |cluster, bucket| {
+        let collection = bucket
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection());
+
+        let key = new_key();
+
+        collection.insert(&key, "test", None).await.unwrap();
+
+        collection
+            .get_and_lock(&key, Duration::from_secs(10), None)
+            .await
+            .unwrap();
+
+        let res = timeout_at(
+            Instant::now().add(Duration::from_millis(2500)),
+            collection.deref().upsert(&key, "test", None),
+        )
+        .await;
+
+        assert!(res.is_err());
+    })
+}
+
+#[test]
+fn test_no_retry_locked_fail_fast() {
+    run_test(async |cluster, bucket| {
+        let collection = bucket
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection());
+
+        let key = new_key();
+
+        collection.insert(&key, "test", None).await.unwrap();
+
+        collection
+            .get_and_lock(&key, Duration::from_secs(10), None)
+            .await
+            .unwrap();
+
+        let strat = Arc::new(FailFastStrategy {
+            record: Mutex::new(FailFastStrategyRecord {
+                attempts: 0,
+                reasons: HashSet::new(),
+            }),
+        });
+        let res = timeout_at(
+            Instant::now().add(Duration::from_millis(2500)),
+            collection.deref().upsert(
+                &key,
+                "test",
+                UpsertOptions::new().retry_strategy(strat.clone()),
+            ),
+        )
+        .await
+        .unwrap();
+
+        assert!(res.is_err());
+        assert_eq!(&ErrorKind::DocumentLocked, res.err().unwrap().kind());
+
+        let guard = strat.record.lock().unwrap();
+        assert_eq!(1, guard.attempts);
+        assert_eq!(
+            &RetryReason::KvLocked,
+            guard.reasons.get(&RetryReason::KvLocked).unwrap()
+        );
+    })
+}
+
+#[derive(Debug)]
+struct FailFastStrategyRecord {
+    pub attempts: usize,
+    pub reasons: HashSet<RetryReason>,
+}
+
+#[derive(Debug)]
+struct FailFastStrategy {
+    pub record: Mutex<FailFastStrategyRecord>,
+}
+
+impl RetryStrategy for FailFastStrategy {
+    fn retry_after(&self, _info: &RetryRequest, reason: &RetryReason) -> Option<RetryAction> {
+        let mut guard = self.record.lock().unwrap();
+        guard.reasons.insert(*reason);
+        guard.attempts += 1;
+
+        None
+    }
 }

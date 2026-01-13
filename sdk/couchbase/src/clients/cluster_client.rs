@@ -32,6 +32,7 @@ use crate::clients::user_mgmt_client::{
 };
 use crate::error;
 use crate::options::cluster_options::{ClusterOptions, TlsOptions};
+use crate::retry::RetryStrategy;
 use couchbase_connstr::{parse, resolve, Address, SrvRecord};
 use couchbase_core::address;
 use couchbase_core::ondemand_agentmanager::OnDemandAgentManager;
@@ -39,8 +40,7 @@ use couchbase_core::options::agent::{CompressionConfig, ReconfigureAgentOptions,
 use couchbase_core::options::ondemand_agentmanager::OnDemandAgentManagerOptions;
 use couchbase_core::options::orphan_reporter::OrphanReporterConfig;
 use couchbase_core::orphan_reporter::OrphanReporter;
-use couchbase_core::retry::RetryStrategy;
-use couchbase_core::retrybesteffort::{BestEffortRetryStrategy, ExponentialBackoffCalculator};
+use couchbase_core::retrybesteffort::BestEffortRetryStrategy;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
@@ -217,9 +217,9 @@ impl CouchbaseClusterBackend {
         opts: ClusterOptions,
         extra_opts: HashMap<String, Vec<String>>,
     ) -> error::Result<CouchbaseClusterBackend> {
-        let default_retry_strategy = Arc::new(BestEffortRetryStrategy::new(
-            ExponentialBackoffCalculator::default(),
-        ));
+        let default_retry_strategy = opts
+            .default_retry_strategy
+            .unwrap_or_else(|| Arc::new(BestEffortRetryStrategy::default()));
 
         let tls_config = if let Some(tls_options) = opts.tls_options.clone() {
             let tls_config = tls_options.try_into_tls_config(&opts.authenticator)?;
@@ -329,7 +329,10 @@ impl CouchbaseClusterBackend {
     fn query_client(&self) -> CouchbaseQueryClient {
         let agent = self.agent_manager.get_cluster_agent();
 
-        CouchbaseQueryClient::new(CouchbaseAgentProvider::with_agent(agent.clone()))
+        CouchbaseQueryClient::new(
+            CouchbaseAgentProvider::with_agent(agent.clone()),
+            self.default_retry_strategy.clone(),
+        )
     }
 
     fn search_client(&self) -> CouchbaseSearchClient {
@@ -344,7 +347,10 @@ impl CouchbaseClusterBackend {
     fn diagnostics_client(&self) -> CouchbaseDiagnosticsClient {
         let agent = self.agent_manager.get_cluster_agent();
 
-        CouchbaseDiagnosticsClient::new(CouchbaseAgentProvider::with_agent(agent.clone()))
+        CouchbaseDiagnosticsClient::new(
+            CouchbaseAgentProvider::with_agent(agent.clone()),
+            self.default_retry_strategy.clone(),
+        )
     }
 
     pub async fn set_authenticator(&self, authenticator: Authenticator) -> error::Result<()> {

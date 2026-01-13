@@ -19,9 +19,7 @@
 use std::fmt::Debug;
 use std::time::Duration;
 
-use async_trait::async_trait;
-
-use crate::retry::{RetryAction, RetryInfo, RetryReason, RetryStrategy};
+use crate::retry::{RetryAction, RetryReason, RetryRequest, RetryStrategy};
 
 #[derive(Debug, Clone)]
 pub struct BestEffortRetryStrategy<Calc> {
@@ -43,12 +41,11 @@ impl Default for BestEffortRetryStrategy<ExponentialBackoffCalculator> {
     }
 }
 
-#[async_trait]
 impl<Calc> RetryStrategy for BestEffortRetryStrategy<Calc>
 where
     Calc: BackoffCalculator,
 {
-    async fn retry_after(&self, request: &RetryInfo, reason: &RetryReason) -> Option<RetryAction> {
+    fn retry_after(&self, request: &RetryRequest, reason: &RetryReason) -> Option<RetryAction> {
         if request.is_idempotent() || reason.allows_non_idempotent_retry() {
             Some(RetryAction::new(
                 self.backoff_calc.backoff(request.retry_attempts()),
@@ -117,17 +114,6 @@ impl Default for ExponentialBackoffCalculator {
             max: Duration::from_millis(1000),
             backoff_factor: 2.0,
         }
-    }
-}
-
-pub(crate) fn controlled_backoff(retry_attempts: u32) -> Duration {
-    match retry_attempts {
-        0 => Duration::from_millis(1),
-        1 => Duration::from_millis(10),
-        2 => Duration::from_millis(50),
-        3 => Duration::from_millis(100),
-        4 => Duration::from_millis(500),
-        _ => Duration::from_millis(1000),
     }
 }
 

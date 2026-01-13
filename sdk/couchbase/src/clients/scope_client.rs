@@ -31,7 +31,7 @@ use crate::clients::search_index_mgmt_client::{
     CouchbaseSearchIndexMgmtClient, SearchIndexKeyspace, SearchIndexMgmtClient,
     SearchIndexMgmtClientBackend,
 };
-use couchbase_core::retry::RetryStrategy;
+use crate::retry::RetryStrategy;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -162,6 +162,7 @@ impl CouchbaseScopeClient {
                 bucket_name: self.bucket_name().to_string(),
                 scope_name: self.name().to_string(),
             },
+            self.default_retry_strategy.clone(),
         )
     }
 

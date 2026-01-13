@@ -16,62 +16,101 @@
  *
  */
 
+use crate::retry::RetryStrategy;
+use std::sync::Arc;
+
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct GetAllScopesOptions {}
+pub struct GetAllScopesOptions {
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+}
 
 impl GetAllScopesOptions {
     pub fn new() -> Self {
         Default::default()
     }
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
+    }
 }
 
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct CreateScopeOptions {}
+pub struct CreateScopeOptions {
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+}
 
 impl CreateScopeOptions {
     pub fn new() -> Self {
         Default::default()
     }
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
+    }
 }
 
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct DropScopeOptions {}
+pub struct DropScopeOptions {
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+}
 
 impl DropScopeOptions {
     pub fn new() -> Self {
         Default::default()
     }
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
+    }
 }
 
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct CreateCollectionOptions {}
+pub struct CreateCollectionOptions {
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+}
 
 impl CreateCollectionOptions {
     pub fn new() -> Self {
         Default::default()
     }
-}
-
-#[derive(Default, Debug, Clone)]
-#[non_exhaustive]
-pub struct UpdateCollectionOptions {}
-
-impl UpdateCollectionOptions {
-    pub fn new() -> Self {
-        Default::default()
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
     }
 }
 
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct DropCollectionOptions {}
+pub struct UpdateCollectionOptions {
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+}
+
+impl UpdateCollectionOptions {
+    pub fn new() -> Self {
+        Default::default()
+    }
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
+    }
+}
+
+#[derive(Default, Debug, Clone)]
+#[non_exhaustive]
+pub struct DropCollectionOptions {
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+}
 
 impl DropCollectionOptions {
     pub fn new() -> Self {
         Default::default()
+    }
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
     }
 }

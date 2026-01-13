@@ -68,13 +68,15 @@ impl Bucket {
     }
 
     pub async fn ping(&self, opts: impl Into<Option<PingOptions>>) -> error::Result<PingReport> {
-        self.diagnostics_client.ping(opts.into()).await
+        let opts = opts.into().unwrap_or_default();
+        self.diagnostics_client.ping(opts).await
     }
 
     pub async fn wait_until_ready(
         &self,
         opts: impl Into<Option<WaitUntilReadyOptions>>,
     ) -> error::Result<()> {
-        self.diagnostics_client.wait_until_ready(opts.into()).await
+        let opts = opts.into().unwrap_or_default();
+        self.diagnostics_client.wait_until_ready(opts).await
     }
 }

@@ -16,42 +16,73 @@
  *
  */
 
+use crate::retry::RetryStrategy;
+use std::sync::Arc;
+
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct CouchbaseListOptions {}
+pub struct CouchbaseListOptions {
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+}
 
 impl CouchbaseListOptions {
     pub fn new() -> Self {
         Default::default()
     }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
+    }
 }
 
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct CouchbaseMapOptions {}
+pub struct CouchbaseMapOptions {
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+}
 
 impl CouchbaseMapOptions {
     pub fn new() -> Self {
         Default::default()
     }
-}
 
-#[derive(Default, Debug, Clone)]
-#[non_exhaustive]
-pub struct CouchbaseSetOptions {}
-
-impl CouchbaseSetOptions {
-    pub fn new() -> Self {
-        Default::default()
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
     }
 }
 
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct CouchbaseQueueOptions {}
+pub struct CouchbaseSetOptions {
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+}
+
+impl CouchbaseSetOptions {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
+    }
+}
+
+#[derive(Default, Debug, Clone)]
+#[non_exhaustive]
+pub struct CouchbaseQueueOptions {
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+}
 
 impl CouchbaseQueueOptions {
     pub fn new() -> Self {
         Default::default()
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
     }
 }

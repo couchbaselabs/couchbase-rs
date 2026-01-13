@@ -23,7 +23,7 @@ use crate::clients::query_index_mgmt_client::{
     CouchbaseQueryIndexMgmtClient, QueryIndexKeyspace, QueryIndexMgmtClient,
     QueryIndexMgmtClientBackend,
 };
-use couchbase_core::retry::RetryStrategy;
+use crate::retry::RetryStrategy;
 use std::sync::Arc;
 
 #[derive(Clone)]

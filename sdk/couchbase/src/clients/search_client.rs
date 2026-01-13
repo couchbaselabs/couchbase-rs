@@ -20,8 +20,8 @@ use crate::clients::agent_provider::CouchbaseAgentProvider;
 use crate::error;
 use crate::options::search_options::SearchOptions;
 use crate::results::search_results::SearchResult;
+use crate::retry::RetryStrategy;
 use crate::search::request::SearchRequest;
-use couchbase_core::retry::RetryStrategy;
 use couchbase_core::searchx;
 use couchbase_core::searchx::query_options::{
     Consistency, ConsistencyLevel, ConsistencyVectors, Control, KnnOperator, KnnQuery,
@@ -226,7 +226,10 @@ impl CouchbaseSearchClient {
             .bucket_name(bucket_name)
             .on_behalf_of(None)
             .endpoint(None)
-            .retry_strategy(self.default_retry_strategy.clone());
+            .retry_strategy(
+                opts.retry_strategy
+                    .unwrap_or_else(|| self.default_retry_strategy.clone()),
+            );
 
         let agent = self.agent_provider.get_agent().await;
         Ok(SearchResult::from(

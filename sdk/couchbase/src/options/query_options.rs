@@ -19,11 +19,12 @@
 use crate::error;
 use crate::error::Error;
 use crate::mutation_state::MutationState;
-use couchbase_core::options::query;
+use crate::retry::RetryStrategy;
 use couchbase_core::queryx;
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Duration;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -88,6 +89,7 @@ pub struct QueryOptions {
     pub scan_wait: Option<Duration>,
     pub server_timeout: Option<Duration>,
     pub use_replica: Option<ReplicaLevel>,
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl QueryOptions {
@@ -227,47 +229,9 @@ impl QueryOptions {
         self.use_replica = Some(use_replica);
         self
     }
-}
 
-impl TryFrom<QueryOptions> for query::QueryOptions {
-    type Error = error::Error;
-
-    fn try_from(opts: QueryOptions) -> Result<query::QueryOptions, Self::Error> {
-        let (mutation_state, scan_consistency) = match opts.scan_consistency {
-            Some(ScanConsistency::AtPlus(state)) => (
-                Some(state.into()),
-                Some(queryx::query_options::ScanConsistency::AtPlus),
-            ),
-            Some(ScanConsistency::NotBounded) => (
-                None,
-                Some(queryx::query_options::ScanConsistency::NotBounded),
-            ),
-            Some(ScanConsistency::RequestPlus) => (
-                None,
-                Some(queryx::query_options::ScanConsistency::RequestPlus),
-            ),
-            None => (None, None),
-        };
-
-        let mut builder = query::QueryOptions::new()
-            .args(opts.positional_parameters)
-            .client_context_id(opts.client_context_id)
-            .max_parallelism(opts.max_parallelism)
-            .metrics(opts.metrics.unwrap_or_default())
-            .pipeline_batch(opts.pipeline_batch)
-            .pipeline_cap(opts.pipeline_cap)
-            .preserve_expiry(opts.preserve_expiry)
-            .profile(opts.profile.map(|p| p.into()))
-            .read_only(opts.read_only)
-            .scan_cap(opts.scan_cap)
-            .scan_consistency(scan_consistency)
-            .scan_wait(opts.scan_wait)
-            .sparse_scan_vectors(mutation_state)
-            .timeout(opts.server_timeout)
-            .use_replica(opts.use_replica.map(|r| r.into()))
-            .named_args(opts.named_parameters)
-            .raw(opts.raw);
-
-        Ok(builder)
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
     }
 }

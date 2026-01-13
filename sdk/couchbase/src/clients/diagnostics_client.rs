@@ -15,11 +15,12 @@
  *  * limitations under the License.
  *
  */
-
 use crate::clients::agent_provider::CouchbaseAgentProvider;
 use crate::error;
 use crate::options::diagnostic_options::{DiagnosticsOptions, PingOptions, WaitUntilReadyOptions};
 use crate::results::diagnostics::{DiagnosticsResult, PingReport};
+use crate::retry::RetryStrategy;
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub(crate) struct DiagnosticsClient {
@@ -31,10 +32,7 @@ impl DiagnosticsClient {
         Self { backend }
     }
 
-    pub async fn diagnostics(
-        &self,
-        opts: Option<DiagnosticsOptions>,
-    ) -> error::Result<DiagnosticsResult> {
+    pub async fn diagnostics(&self, opts: DiagnosticsOptions) -> error::Result<DiagnosticsResult> {
         match &self.backend {
             DiagnosticsClientBackend::CouchbaseDiagnosticsClientBackend(backend) => {
                 backend.diagnostics(opts).await
@@ -45,7 +43,7 @@ impl DiagnosticsClient {
         }
     }
 
-    pub async fn ping(&self, opts: Option<PingOptions>) -> error::Result<PingReport> {
+    pub async fn ping(&self, opts: PingOptions) -> error::Result<PingReport> {
         match &self.backend {
             DiagnosticsClientBackend::CouchbaseDiagnosticsClientBackend(backend) => {
                 backend.ping(opts).await
@@ -56,7 +54,7 @@ impl DiagnosticsClient {
         }
     }
 
-    pub async fn wait_until_ready(&self, opts: Option<WaitUntilReadyOptions>) -> error::Result<()> {
+    pub async fn wait_until_ready(&self, opts: WaitUntilReadyOptions) -> error::Result<()> {
         match &self.backend {
             DiagnosticsClientBackend::CouchbaseDiagnosticsClientBackend(backend) => {
                 backend.wait_until_ready(opts).await
@@ -77,24 +75,24 @@ pub(crate) enum DiagnosticsClientBackend {
 #[derive(Clone)]
 pub(crate) struct CouchbaseDiagnosticsClient {
     agent_provider: CouchbaseAgentProvider,
+    default_retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl CouchbaseDiagnosticsClient {
-    pub fn new(agent_provider: CouchbaseAgentProvider) -> Self {
-        Self { agent_provider }
+    pub fn new(
+        agent_provider: CouchbaseAgentProvider,
+        default_retry_strategy: Arc<dyn RetryStrategy>,
+    ) -> Self {
+        Self {
+            agent_provider,
+            default_retry_strategy,
+        }
     }
 
-    async fn diagnostics(
-        &self,
-        opts: Option<DiagnosticsOptions>,
-    ) -> error::Result<DiagnosticsResult> {
+    async fn diagnostics(&self, _opts: DiagnosticsOptions) -> error::Result<DiagnosticsResult> {
         let agent = self.agent_provider.get_agent().await;
 
-        let core_opts = if let Some(opts) = opts {
-            couchbase_core::options::diagnostics::DiagnosticsOptions::from(opts)
-        } else {
-            couchbase_core::options::diagnostics::DiagnosticsOptions::new()
-        };
+        let core_opts = couchbase_core::options::diagnostics::DiagnosticsOptions::new();
 
         let report = CouchbaseAgentProvider::upgrade_agent(agent)?
             .diagnostics(&core_opts)
@@ -103,14 +101,25 @@ impl CouchbaseDiagnosticsClient {
         Ok(DiagnosticsResult::from(report))
     }
 
-    async fn ping(&self, opts: Option<PingOptions>) -> error::Result<PingReport> {
+    async fn ping(&self, opts: PingOptions) -> error::Result<PingReport> {
         let agent = self.agent_provider.get_agent().await;
 
-        let core_opts = if let Some(opts) = opts {
-            couchbase_core::options::ping::PingOptions::from(opts)
-        } else {
-            couchbase_core::options::ping::PingOptions::new()
-        };
+        let mut core_opts = couchbase_core::options::ping::PingOptions::new();
+
+        if let Some(service_types) = opts.service_types {
+            core_opts =
+                core_opts.service_types(service_types.into_iter().map(|s| s.into()).collect());
+        }
+
+        if let Some(timeout) = opts.kv_timeout {
+            core_opts = core_opts.kv_timeout(timeout);
+        }
+        if let Some(timeout) = opts.query_timeout {
+            core_opts = core_opts.query_timeout(timeout);
+        }
+        if let Some(timeout) = opts.search_timeout {
+            core_opts = core_opts.search_timeout(timeout);
+        }
 
         let report = CouchbaseAgentProvider::upgrade_agent(agent)?
             .ping(&core_opts)
@@ -119,14 +128,23 @@ impl CouchbaseDiagnosticsClient {
         Ok(PingReport::from(report))
     }
 
-    async fn wait_until_ready(&self, opts: Option<WaitUntilReadyOptions>) -> error::Result<()> {
+    async fn wait_until_ready(&self, opts: WaitUntilReadyOptions) -> error::Result<()> {
         let agent = self.agent_provider.get_agent().await;
 
-        let core_opts = if let Some(opts) = opts {
-            couchbase_core::options::waituntilready::WaitUntilReadyOptions::from(opts)
-        } else {
-            couchbase_core::options::waituntilready::WaitUntilReadyOptions::new()
-        };
+        let mut core_opts = couchbase_core::options::waituntilready::WaitUntilReadyOptions::new()
+            .retry_strategy(
+                opts.retry_strategy
+                    .unwrap_or_else(|| self.default_retry_strategy.clone()),
+            );
+
+        if let Some(state) = opts.desired_state {
+            core_opts = core_opts.desired_state(state.into());
+        }
+
+        if let Some(service_types) = opts.service_types {
+            core_opts =
+                core_opts.service_types(service_types.into_iter().map(|s| s.into()).collect());
+        }
 
         Ok(CouchbaseAgentProvider::upgrade_agent(agent)?
             .wait_until_ready(&core_opts)
@@ -142,18 +160,15 @@ impl Couchbase2DiagnosticsClient {
         unimplemented!()
     }
 
-    async fn diagnostics(
-        &self,
-        _opts: Option<DiagnosticsOptions>,
-    ) -> error::Result<DiagnosticsResult> {
+    async fn diagnostics(&self, _opts: DiagnosticsOptions) -> error::Result<DiagnosticsResult> {
         unimplemented!()
     }
 
-    async fn ping(&self, _opts: Option<PingOptions>) -> error::Result<PingReport> {
+    async fn ping(&self, _opts: PingOptions) -> error::Result<PingReport> {
         unimplemented!()
     }
 
-    async fn wait_until_ready(&self, _opts: Option<WaitUntilReadyOptions>) -> error::Result<()> {
+    async fn wait_until_ready(&self, _opts: WaitUntilReadyOptions) -> error::Result<()> {
         unimplemented!()
     }
 }

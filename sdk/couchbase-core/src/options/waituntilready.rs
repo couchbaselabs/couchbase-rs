@@ -17,8 +17,7 @@
  */
 
 use crate::httpx::request::OnBehalfOfInfo;
-use crate::retry::RetryStrategy;
-use crate::retrybesteffort::BestEffortRetryStrategy;
+use crate::retry::{RetryStrategy, DEFAULT_RETRY_STRATEGY};
 use crate::service_type::ServiceType;
 use std::sync::Arc;
 
@@ -51,7 +50,7 @@ impl WaitUntilReadyOptions {
         Self {
             desired_state: None,
             service_types: None,
-            retry_strategy: Arc::new(BestEffortRetryStrategy::default()),
+            retry_strategy: DEFAULT_RETRY_STRATEGY.clone(),
             on_behalf_of: None,
         }
     }

@@ -31,11 +31,11 @@ use crate::results::kv_results::{
     MutateInResultEntry, MutationResult, TouchResult,
 };
 use crate::results::projection::{build_from_full_doc, build_from_subdoc_entries};
+use crate::retry::RetryStrategy;
 use crate::subdoc::lookup_in_specs::{GetSpecOptions, LookupInSpec};
 use crate::subdoc::mutate_in_specs::MutateInSpec;
 use chrono::{DateTime, Utc};
 use couchbase_core::memdx::subdoc::{reorder_subdoc_ops, MutateInOp, SubdocDocFlag};
-use couchbase_core::retry::RetryStrategy;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -102,6 +102,10 @@ impl CouchbaseCoreKvClient {
         options: UpsertOptions,
     ) -> error::Result<MutationResult> {
         let agent = self.agent_provider.get_agent().await;
+        let retry = options
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
+
         let result = CouchbaseAgentProvider::upgrade_agent(agent)?
             .upsert(
                 couchbase_core::options::crud::UpsertOptions::new(
@@ -115,7 +119,7 @@ impl CouchbaseCoreKvClient {
                 .durability_level(parse_optional_durability_level_to_memdx(
                     options.durability_level,
                 ))
-                .retry_strategy(self.default_retry_strategy.clone())
+                .retry_strategy(retry)
                 .preserve_expiry(options.preserve_expiry),
             )
             .await?;
@@ -136,6 +140,9 @@ impl CouchbaseCoreKvClient {
         options: InsertOptions,
     ) -> error::Result<MutationResult> {
         let agent = self.agent_provider.get_agent().await;
+        let retry = options
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
         let result = CouchbaseAgentProvider::upgrade_agent(agent)?
             .add(
                 couchbase_core::options::crud::AddOptions::new(
@@ -149,7 +156,7 @@ impl CouchbaseCoreKvClient {
                 .durability_level(parse_optional_durability_level_to_memdx(
                     options.durability_level,
                 ))
-                .retry_strategy(self.default_retry_strategy.clone()),
+                .retry_strategy(retry),
             )
             .await?;
 
@@ -169,6 +176,9 @@ impl CouchbaseCoreKvClient {
         options: ReplaceOptions,
     ) -> error::Result<MutationResult> {
         let agent = self.agent_provider.get_agent().await;
+        let retry = options
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
         let result = CouchbaseAgentProvider::upgrade_agent(agent)?
             .replace(
                 couchbase_core::options::crud::ReplaceOptions::new(
@@ -182,7 +192,7 @@ impl CouchbaseCoreKvClient {
                 .durability_level(parse_optional_durability_level_to_memdx(
                     options.durability_level,
                 ))
-                .retry_strategy(self.default_retry_strategy.clone())
+                .retry_strategy(retry)
                 .preserve_expiry(options.preserve_expiry)
                 .cas(options.cas),
             )
@@ -198,6 +208,9 @@ impl CouchbaseCoreKvClient {
 
     pub async fn remove(&self, id: &str, options: RemoveOptions) -> error::Result<MutationResult> {
         let agent = self.agent_provider.get_agent().await;
+        let retry = options
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
         let result = CouchbaseAgentProvider::upgrade_agent(agent)?
             .delete(
                 couchbase_core::options::crud::DeleteOptions::new(
@@ -208,7 +221,7 @@ impl CouchbaseCoreKvClient {
                 .durability_level(parse_optional_durability_level_to_memdx(
                     options.durability_level,
                 ))
-                .retry_strategy(self.default_retry_strategy.clone())
+                .retry_strategy(retry)
                 .cas(options.cas),
             )
             .await?;
@@ -231,7 +244,9 @@ impl CouchbaseCoreKvClient {
 
     async fn get_direct(&self, id: &str, options: GetOptions) -> error::Result<GetResult> {
         let agent = self.agent_provider.get_agent().await;
-
+        let retry = options
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
         let res = CouchbaseAgentProvider::upgrade_agent(agent)?
             .get(
                 couchbase_core::options::crud::GetOptions::new(
@@ -239,7 +254,7 @@ impl CouchbaseCoreKvClient {
                     &self.scope_name,
                     &self.collection_name,
                 )
-                .retry_strategy(self.default_retry_strategy.clone()),
+                .retry_strategy(retry),
             )
             .await?;
 
@@ -332,8 +347,11 @@ impl CouchbaseCoreKvClient {
         })
     }
 
-    pub async fn exists(&self, id: &str, _options: ExistsOptions) -> error::Result<ExistsResult> {
+    pub async fn exists(&self, id: &str, options: ExistsOptions) -> error::Result<ExistsResult> {
         let agent = self.agent_provider.get_agent().await;
+        let retry = options
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
         let res = CouchbaseAgentProvider::upgrade_agent(agent)?
             .get_meta(
                 couchbase_core::options::crud::GetMetaOptions::new(
@@ -341,7 +359,7 @@ impl CouchbaseCoreKvClient {
                     &self.scope_name,
                     &self.collection_name,
                 )
-                .retry_strategy(self.default_retry_strategy.clone()),
+                .retry_strategy(retry),
             )
             .await?;
 
@@ -352,9 +370,12 @@ impl CouchbaseCoreKvClient {
         &self,
         id: &str,
         expiry: Duration,
-        _options: GetAndTouchOptions,
+        options: GetAndTouchOptions,
     ) -> error::Result<GetResult> {
         let agent = self.agent_provider.get_agent().await;
+        let retry = options
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
         let res = CouchbaseAgentProvider::upgrade_agent(agent)?
             .get_and_touch(
                 couchbase_core::options::crud::GetAndTouchOptions::new(
@@ -363,7 +384,7 @@ impl CouchbaseCoreKvClient {
                     &self.collection_name,
                     Self::expiry_to_seconds(expiry)?,
                 )
-                .retry_strategy(self.default_retry_strategy.clone()),
+                .retry_strategy(retry),
             )
             .await?;
 
@@ -374,9 +395,12 @@ impl CouchbaseCoreKvClient {
         &self,
         id: &str,
         lock_time: Duration,
-        _options: GetAndLockOptions,
+        options: GetAndLockOptions,
     ) -> error::Result<GetResult> {
         let agent = self.agent_provider.get_agent().await;
+        let retry = options
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
         let res = CouchbaseAgentProvider::upgrade_agent(agent)?
             .get_and_lock(
                 couchbase_core::options::crud::GetAndLockOptions::new(
@@ -385,15 +409,18 @@ impl CouchbaseCoreKvClient {
                     &self.collection_name,
                     lock_time.as_secs() as u32,
                 )
-                .retry_strategy(self.default_retry_strategy.clone()),
+                .retry_strategy(retry),
             )
             .await?;
 
         Ok(res.into())
     }
 
-    pub async fn unlock(&self, id: &str, cas: u64, _options: UnlockOptions) -> error::Result<()> {
+    pub async fn unlock(&self, id: &str, cas: u64, options: UnlockOptions) -> error::Result<()> {
         let agent = self.agent_provider.get_agent().await;
+        let retry = options
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
         CouchbaseAgentProvider::upgrade_agent(agent)?
             .unlock(
                 couchbase_core::options::crud::UnlockOptions::new(
@@ -402,7 +429,7 @@ impl CouchbaseCoreKvClient {
                     &self.collection_name,
                     cas,
                 )
-                .retry_strategy(self.default_retry_strategy.clone()),
+                .retry_strategy(retry),
             )
             .await?;
 
@@ -413,9 +440,12 @@ impl CouchbaseCoreKvClient {
         &self,
         id: &str,
         expiry: Duration,
-        _options: TouchOptions,
+        options: TouchOptions,
     ) -> error::Result<TouchResult> {
         let agent = self.agent_provider.get_agent().await;
+        let retry = options
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
         let result = CouchbaseAgentProvider::upgrade_agent(agent)?
             .touch(
                 couchbase_core::options::crud::TouchOptions::new(
@@ -424,7 +454,7 @@ impl CouchbaseCoreKvClient {
                     &self.collection_name,
                     Self::expiry_to_seconds(expiry)?,
                 )
-                .retry_strategy(self.default_retry_strategy.clone()),
+                .retry_strategy(retry),
             )
             .await?;
 
@@ -438,6 +468,9 @@ impl CouchbaseCoreKvClient {
         options: AppendOptions,
     ) -> error::Result<MutationResult> {
         let agent = self.agent_provider.get_agent().await;
+        let retry = options
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
         let result = CouchbaseAgentProvider::upgrade_agent(agent)?
             .append(
                 couchbase_core::options::crud::AppendOptions::new(
@@ -450,7 +483,7 @@ impl CouchbaseCoreKvClient {
                 .durability_level(parse_optional_durability_level_to_memdx(
                     options.durability_level,
                 ))
-                .retry_strategy(self.default_retry_strategy.clone()),
+                .retry_strategy(retry),
             )
             .await?;
 
@@ -469,6 +502,9 @@ impl CouchbaseCoreKvClient {
         options: PrependOptions,
     ) -> error::Result<MutationResult> {
         let agent = self.agent_provider.get_agent().await;
+        let retry = options
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
         let result = CouchbaseAgentProvider::upgrade_agent(agent)?
             .prepend(
                 couchbase_core::options::crud::PrependOptions::new(
@@ -481,7 +517,7 @@ impl CouchbaseCoreKvClient {
                     options.durability_level,
                 ))
                 .cas(options.cas)
-                .retry_strategy(self.default_retry_strategy.clone()),
+                .retry_strategy(retry),
             )
             .await?;
 
@@ -499,6 +535,9 @@ impl CouchbaseCoreKvClient {
         options: IncrementOptions,
     ) -> error::Result<CounterResult> {
         let agent = self.agent_provider.get_agent().await;
+        let retry = options
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
         let result = CouchbaseAgentProvider::upgrade_agent(agent)?
             .increment(
                 couchbase_core::options::crud::IncrementOptions::new(
@@ -510,7 +549,7 @@ impl CouchbaseCoreKvClient {
                 .durability_level(parse_optional_durability_level_to_memdx(
                     options.durability_level,
                 ))
-                .retry_strategy(self.default_retry_strategy.clone())
+                .retry_strategy(retry)
                 .expiry(options.expiry.map(Self::expiry_to_seconds).transpose()?)
                 .initial(options.initial),
             )
@@ -531,6 +570,9 @@ impl CouchbaseCoreKvClient {
         options: DecrementOptions,
     ) -> error::Result<CounterResult> {
         let agent = self.agent_provider.get_agent().await;
+        let retry = options
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
         let result = CouchbaseAgentProvider::upgrade_agent(agent)?
             .decrement(
                 couchbase_core::options::crud::DecrementOptions::new(
@@ -542,7 +584,7 @@ impl CouchbaseCoreKvClient {
                 .durability_level(parse_optional_durability_level_to_memdx(
                     options.durability_level,
                 ))
-                .retry_strategy(self.default_retry_strategy.clone())
+                .retry_strategy(retry)
                 .expiry(options.expiry.map(Self::expiry_to_seconds).transpose()?)
                 .initial(options.initial),
             )
@@ -565,7 +607,9 @@ impl CouchbaseCoreKvClient {
     ) -> error::Result<LookupInResult> {
         let agent = self.agent_provider.get_agent().await;
         let (ordered_specs, op_indexes) = reorder_subdoc_ops(specs);
-
+        let retry = options
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
         let result = CouchbaseAgentProvider::upgrade_agent(agent)?
             .lookup_in(
                 couchbase_core::options::crud::LookupInOptions::new(
@@ -585,7 +629,7 @@ impl CouchbaseCoreKvClient {
                     }
                     flags
                 })
-                .retry_strategy(self.default_retry_strategy.clone()),
+                .retry_strategy(retry),
             )
             .await?;
 
@@ -615,7 +659,9 @@ impl CouchbaseCoreKvClient {
     ) -> error::Result<MutateInResult> {
         let agent = self.agent_provider.get_agent().await;
         let (ordered_specs, op_indexes) = reorder_subdoc_ops(specs);
-
+        let retry = options
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
         let result = CouchbaseAgentProvider::upgrade_agent(agent)?
             .mutate_in(
                 couchbase_core::options::crud::MutateInOptions::new(
@@ -643,7 +689,7 @@ impl CouchbaseCoreKvClient {
                 .preserve_expiry(options.preserve_expiry)
                 .expiry(options.expiry.map(Self::expiry_to_seconds).transpose()?)
                 .cas(options.cas)
-                .retry_strategy(self.default_retry_strategy.clone()),
+                .retry_strategy(retry),
             )
             .await?;
 

@@ -89,18 +89,21 @@ impl Cluster {
         &self,
         opts: impl Into<Option<DiagnosticsOptions>>,
     ) -> error::Result<DiagnosticsResult> {
-        self.diagnostics_client.diagnostics(opts.into()).await
+        let opts = opts.into().unwrap_or_default();
+        self.diagnostics_client.diagnostics(opts).await
     }
 
     pub async fn ping(&self, opts: impl Into<Option<PingOptions>>) -> error::Result<PingReport> {
-        self.diagnostics_client.ping(opts.into()).await
+        let opts = opts.into().unwrap_or_default();
+        self.diagnostics_client.ping(opts).await
     }
 
     pub async fn wait_until_ready(
         &self,
         opts: impl Into<Option<WaitUntilReadyOptions>>,
     ) -> error::Result<()> {
-        self.diagnostics_client.wait_until_ready(opts.into()).await
+        let opts = opts.into().unwrap_or_default();
+        self.diagnostics_client.wait_until_ready(opts).await
     }
 
     // Sets a new authenticator for the cluster.

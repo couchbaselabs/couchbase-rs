@@ -16,122 +16,209 @@
  *
  */
 
+use crate::retry::RetryStrategy;
+use std::sync::Arc;
+
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct GetSearchIndexOptions {}
+pub struct GetSearchIndexOptions {
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+}
 
 impl GetSearchIndexOptions {
     pub fn new() -> Self {
         Self::default()
     }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
+    }
 }
 
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct GetAllSearchIndexesOptions {}
+pub struct GetAllSearchIndexesOptions {
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+}
 
 impl GetAllSearchIndexesOptions {
     pub fn new() -> Self {
         Self::default()
     }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
+    }
 }
 
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct UpsertSearchIndexOptions {}
+pub struct UpsertSearchIndexOptions {
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+}
 
 impl UpsertSearchIndexOptions {
     pub fn new() -> Self {
         Self::default()
     }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
+    }
 }
 
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct DropSearchIndexOptions {}
+pub struct DropSearchIndexOptions {
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+}
 
 impl DropSearchIndexOptions {
     pub fn new() -> Self {
         Self::default()
     }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
+    }
 }
 
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct AnalyzeDocumentOptions {}
+pub struct AnalyzeDocumentOptions {
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+}
 
 impl AnalyzeDocumentOptions {
     pub fn new() -> Self {
         Self::default()
     }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
+    }
 }
 
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct GetIndexedDocumentsCountOptions {}
+pub struct GetIndexedDocumentsCountOptions {
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+}
 
 impl GetIndexedDocumentsCountOptions {
     pub fn new() -> Self {
         Self::default()
     }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
+    }
 }
 
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct PauseIngestSearchIndexOptions {}
+pub struct PauseIngestSearchIndexOptions {
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+}
 
 impl PauseIngestSearchIndexOptions {
     pub fn new() -> Self {
         Self::default()
     }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
+    }
 }
 
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct ResumeIngestSearchIndexOptions {}
+pub struct ResumeIngestSearchIndexOptions {
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+}
 
 impl ResumeIngestSearchIndexOptions {
     pub fn new() -> Self {
         Self::default()
     }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
+    }
 }
 
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct AllowQueryingSearchIndexOptions {}
+pub struct AllowQueryingSearchIndexOptions {
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+}
 
 impl AllowQueryingSearchIndexOptions {
     pub fn new() -> Self {
         Self::default()
     }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
+    }
 }
 
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct DisallowQueryingSearchIndexOptions {}
+pub struct DisallowQueryingSearchIndexOptions {
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+}
 
 impl DisallowQueryingSearchIndexOptions {
     pub fn new() -> Self {
         Self::default()
     }
-}
 
-#[derive(Default, Debug, Clone)]
-#[non_exhaustive]
-pub struct FreezePlanSearchIndexOptions {}
-
-impl FreezePlanSearchIndexOptions {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
     }
 }
 
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct UnfreezePlanSearchIndexOptions {}
+pub struct FreezePlanSearchIndexOptions {
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+}
+
+impl FreezePlanSearchIndexOptions {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
+    }
+}
+
+#[derive(Default, Debug, Clone)]
+#[non_exhaustive]
+pub struct UnfreezePlanSearchIndexOptions {
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+}
 
 impl UnfreezePlanSearchIndexOptions {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
     }
 }

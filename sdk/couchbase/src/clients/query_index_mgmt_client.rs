@@ -24,7 +24,7 @@ use crate::options::query_index_mgmt_options::{
     WatchQueryIndexOptions,
 };
 use crate::results::query_index_mgmt_results::QueryIndex;
-use couchbase_core::retry::RetryStrategy;
+use crate::retry::RetryStrategy;
 use std::sync::Arc;
 
 pub(crate) struct QueryIndexMgmtClient {
@@ -174,13 +174,15 @@ impl CouchbaseQueryIndexMgmtClient {
         opts: Option<GetAllQueryIndexesOptions>,
     ) -> error::Result<Vec<QueryIndex>> {
         let opts = opts.unwrap_or_default();
+        let retry = opts
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
 
         let mut get_indexes_opts =
             couchbase_core::options::query::GetAllIndexesOptions::new(&self.keyspace.bucket_name)
                 .scope_name(&self.keyspace.scope_name)
                 .collection_name(&self.keyspace.collection_name);
-
-        get_indexes_opts = get_indexes_opts.retry_strategy(self.default_retry_strategy.clone());
+        get_indexes_opts = get_indexes_opts.retry_strategy(retry);
 
         let agent = self.agent_provider.get_agent().await;
 
@@ -198,9 +200,11 @@ impl CouchbaseQueryIndexMgmtClient {
         opts: Option<CreateQueryIndexOptions>,
     ) -> error::Result<()> {
         let opts = opts.unwrap_or_default();
+        let retry = opts
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
 
         let index_name = index_name.into();
-
         let fields: Vec<&str> = fields.iter().map(String::as_str).collect();
 
         let mut create_index_opts = couchbase_core::options::query::CreateIndexOptions::new(
@@ -220,7 +224,7 @@ impl CouchbaseQueryIndexMgmtClient {
         if let Some(num_replicas) = opts.num_replicas {
             create_index_opts = create_index_opts.num_replicas(num_replicas);
         }
-        create_index_opts = create_index_opts.retry_strategy(self.default_retry_strategy.clone());
+        create_index_opts = create_index_opts.retry_strategy(retry);
 
         let agent = self.agent_provider.get_agent().await;
 
@@ -235,6 +239,9 @@ impl CouchbaseQueryIndexMgmtClient {
         opts: Option<CreatePrimaryQueryIndexOptions>,
     ) -> error::Result<()> {
         let opts = opts.unwrap_or_default();
+        let retry = opts
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
 
         let mut create_index_opts = couchbase_core::options::query::CreatePrimaryIndexOptions::new(
             &self.keyspace.bucket_name,
@@ -254,7 +261,7 @@ impl CouchbaseQueryIndexMgmtClient {
         if let Some(index_name) = opts.index_name.as_deref() {
             create_index_opts = create_index_opts.index_name(index_name);
         }
-        create_index_opts = create_index_opts.retry_strategy(self.default_retry_strategy.clone());
+        create_index_opts = create_index_opts.retry_strategy(retry);
 
         let agent = self.agent_provider.get_agent().await;
 
@@ -271,6 +278,9 @@ impl CouchbaseQueryIndexMgmtClient {
         opts: Option<DropQueryIndexOptions>,
     ) -> error::Result<()> {
         let opts = opts.unwrap_or_default();
+        let retry = opts
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
 
         let mut drop_index_opts = couchbase_core::options::query::DropIndexOptions::new(
             &self.keyspace.bucket_name,
@@ -282,7 +292,7 @@ impl CouchbaseQueryIndexMgmtClient {
         if let Some(ignore) = opts.ignore_if_not_exists {
             drop_index_opts = drop_index_opts.ignore_if_not_exists(ignore);
         }
-        drop_index_opts = drop_index_opts.retry_strategy(self.default_retry_strategy.clone());
+        drop_index_opts = drop_index_opts.retry_strategy(retry);
 
         let agent = self.agent_provider.get_agent().await;
 
@@ -298,6 +308,9 @@ impl CouchbaseQueryIndexMgmtClient {
         opts: Option<DropPrimaryQueryIndexOptions>,
     ) -> error::Result<()> {
         let opts = opts.unwrap_or_default();
+        let retry = opts
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
 
         let mut drop_index_opts = couchbase_core::options::query::DropPrimaryIndexOptions::new(
             &self.keyspace.bucket_name,
@@ -311,7 +324,7 @@ impl CouchbaseQueryIndexMgmtClient {
         if let Some(index_name) = opts.index_name.as_deref() {
             drop_index_opts = drop_index_opts.index_name(index_name);
         }
-        drop_index_opts = drop_index_opts.retry_strategy(self.default_retry_strategy.clone());
+        drop_index_opts = drop_index_opts.retry_strategy(retry);
 
         let agent = self.agent_provider.get_agent().await;
 
@@ -328,6 +341,9 @@ impl CouchbaseQueryIndexMgmtClient {
         opts: Option<WatchQueryIndexOptions>,
     ) -> error::Result<()> {
         let opts = opts.unwrap_or_default();
+        let retry = opts
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
 
         let index_names_refs: Vec<&str> = index_names.iter().map(String::as_str).collect();
 
@@ -341,7 +357,7 @@ impl CouchbaseQueryIndexMgmtClient {
         if let Some(watch_primary) = opts.watch_primary {
             watch_indexes_opts = watch_indexes_opts.watch_primary(watch_primary);
         }
-        watch_indexes_opts = watch_indexes_opts.retry_strategy(self.default_retry_strategy.clone());
+        watch_indexes_opts = watch_indexes_opts.retry_strategy(retry);
 
         let agent = self.agent_provider.get_agent().await;
 
@@ -357,6 +373,9 @@ impl CouchbaseQueryIndexMgmtClient {
         opts: Option<BuildQueryIndexOptions>,
     ) -> error::Result<()> {
         let opts = opts.unwrap_or_default();
+        let retry = opts
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
 
         let mut build_indexes_opts =
             couchbase_core::options::query::BuildDeferredIndexesOptions::new(
@@ -365,7 +384,7 @@ impl CouchbaseQueryIndexMgmtClient {
             .scope_name(&self.keyspace.scope_name)
             .collection_name(&self.keyspace.collection_name);
 
-        build_indexes_opts = build_indexes_opts.retry_strategy(self.default_retry_strategy.clone());
+        build_indexes_opts = build_indexes_opts.retry_strategy(retry);
 
         let agent = self.agent_provider.get_agent().await;
 
