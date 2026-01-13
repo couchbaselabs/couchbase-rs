@@ -54,7 +54,9 @@ use crate::results::kv::{
     MutateInResult, PrependResult, ReplaceResult, SubDocResult, TouchResult, UnlockResult,
     UpsertResult,
 };
-use crate::retry::{error_to_retry_reason, orchestrate_retries, RetryInfo, RetryManager};
+use crate::retry::{
+    error_to_retry_reason, orchestrate_retries, RetryManager, RetryRequest, RetryStrategy,
+};
 use crate::vbucketrouter::{orchestrate_memd_routing, VbucketRouter};
 use futures::{FutureExt, TryFutureExt};
 use log::debug;
@@ -105,7 +107,8 @@ impl<
     pub(crate) async fn upsert(&self, opts: UpsertOptions<'_>) -> Result<UpsertResult> {
         self.orchestrate_simple_crud(
             opts.key,
-            RetryInfo::new("upsert", false, opts.retry_strategy),
+            opts.retry_strategy,
+            RetryRequest::new("upsert", false),
             opts.scope_name,
             opts.collection_name,
             async |collection_id, vbucket_id, client| {
@@ -168,7 +171,8 @@ impl<
     pub(crate) async fn get(&self, opts: GetOptions<'_>) -> Result<GetResult> {
         self.orchestrate_simple_crud(
             opts.key,
-            RetryInfo::new("get", true, opts.retry_strategy),
+            opts.retry_strategy,
+            RetryRequest::new("get", true),
             opts.scope_name,
             opts.collection_name,
             async |collection_id, vbucket_id, client| {
@@ -205,7 +209,8 @@ impl<
     pub(crate) async fn get_meta(&self, opts: GetMetaOptions<'_>) -> Result<GetMetaResult> {
         self.orchestrate_simple_crud(
             opts.key,
-            RetryInfo::new("get_meta", true, opts.retry_strategy),
+            opts.retry_strategy,
+            RetryRequest::new("get_meta", true),
             opts.scope_name,
             opts.collection_name,
             async |collection_id, vbucket_id, client| {
@@ -246,7 +251,8 @@ impl<
     pub async fn delete(&self, opts: DeleteOptions<'_>) -> Result<DeleteResult> {
         self.orchestrate_simple_crud(
             opts.key,
-            RetryInfo::new("delete", false, opts.retry_strategy),
+            opts.retry_strategy,
+            RetryRequest::new("delete", false),
             opts.scope_name,
             opts.collection_name,
             async |collection_id, vbucket_id, client| {
@@ -292,7 +298,8 @@ impl<
     pub async fn get_and_lock(&self, opts: GetAndLockOptions<'_>) -> Result<GetAndLockResult> {
         self.orchestrate_simple_crud(
             opts.key,
-            RetryInfo::new("get_and_lock", false, opts.retry_strategy),
+            opts.retry_strategy,
+            RetryRequest::new("get_and_lock", false),
             opts.scope_name,
             opts.collection_name,
             async |collection_id, vbucket_id, client| {
@@ -330,7 +337,8 @@ impl<
     pub async fn get_and_touch(&self, opts: GetAndTouchOptions<'_>) -> Result<GetAndTouchResult> {
         self.orchestrate_simple_crud(
             opts.key,
-            RetryInfo::new("get_and_touch", false, opts.retry_strategy),
+            opts.retry_strategy,
+            RetryRequest::new("get_and_touch", false),
             opts.scope_name,
             opts.collection_name,
             async |collection_id, vbucket_id, client| {
@@ -368,7 +376,8 @@ impl<
     pub async fn unlock(&self, opts: UnlockOptions<'_>) -> Result<UnlockResult> {
         self.orchestrate_simple_crud(
             opts.key,
-            RetryInfo::new("unlock", false, opts.retry_strategy),
+            opts.retry_strategy,
+            RetryRequest::new("unlock", false),
             opts.scope_name,
             opts.collection_name,
             async |collection_id, vbucket_id, client| {
@@ -403,7 +412,8 @@ impl<
     pub async fn touch(&self, opts: TouchOptions<'_>) -> Result<TouchResult> {
         self.orchestrate_simple_crud(
             opts.key,
-            RetryInfo::new("touch", false, opts.retry_strategy),
+            opts.retry_strategy,
+            RetryRequest::new("touch", false),
             opts.scope_name,
             opts.collection_name,
             async |collection_id, vbucket_id, client| {
@@ -436,7 +446,8 @@ impl<
     pub async fn add(&self, opts: AddOptions<'_>) -> Result<AddResult> {
         self.orchestrate_simple_crud(
             opts.key,
-            RetryInfo::new("add", false, opts.retry_strategy),
+            opts.retry_strategy,
+            RetryRequest::new("add", false),
             opts.scope_name,
             opts.collection_name,
             async |collection_id, vbucket_id, client| {
@@ -497,7 +508,8 @@ impl<
     pub async fn replace(&self, opts: ReplaceOptions<'_>) -> Result<ReplaceResult> {
         self.orchestrate_simple_crud(
             opts.key,
-            RetryInfo::new("replace", false, opts.retry_strategy),
+            opts.retry_strategy,
+            RetryRequest::new("replace", false),
             opts.scope_name,
             opts.collection_name,
             async |collection_id, vbucket_id, client| {
@@ -560,7 +572,8 @@ impl<
     pub async fn append(&self, opts: AppendOptions<'_>) -> Result<AppendResult> {
         self.orchestrate_simple_crud(
             opts.key,
-            RetryInfo::new("append", false, opts.retry_strategy),
+            opts.retry_strategy,
+            RetryRequest::new("append", false),
             opts.scope_name,
             opts.collection_name,
             async |collection_id, vbucket_id, client| {
@@ -620,7 +633,8 @@ impl<
     pub async fn prepend(&self, opts: PrependOptions<'_>) -> Result<PrependResult> {
         self.orchestrate_simple_crud(
             opts.key,
-            RetryInfo::new("prepend", false, opts.retry_strategy),
+            opts.retry_strategy,
+            RetryRequest::new("prepend", false),
             opts.scope_name,
             opts.collection_name,
             async |collection_id, vbucket_id, client| {
@@ -680,7 +694,8 @@ impl<
     pub async fn increment(&self, opts: IncrementOptions<'_>) -> Result<IncrementResult> {
         self.orchestrate_simple_crud(
             opts.key,
-            RetryInfo::new("increment", false, opts.retry_strategy),
+            opts.retry_strategy,
+            RetryRequest::new("increment", false),
             opts.scope_name,
             opts.collection_name,
             async |collection_id, vbucket_id, client| {
@@ -729,7 +744,8 @@ impl<
     pub async fn decrement(&self, opts: DecrementOptions<'_>) -> Result<DecrementResult> {
         self.orchestrate_simple_crud(
             opts.key,
-            RetryInfo::new("decrement", false, opts.retry_strategy),
+            opts.retry_strategy,
+            RetryRequest::new("decrement", false),
             opts.scope_name,
             opts.collection_name,
             async |collection_id, vbucket_id, client| {
@@ -778,7 +794,8 @@ impl<
     pub async fn lookup_in(&self, opts: LookupInOptions<'_>) -> Result<LookupInResult> {
         self.orchestrate_simple_crud(
             opts.key,
-            RetryInfo::new("lookup_in", true, opts.retry_strategy),
+            opts.retry_strategy,
+            RetryRequest::new("lookup_in", true),
             opts.scope_name,
             opts.collection_name,
             async |collection_id, vbucket_id, client| {
@@ -833,7 +850,8 @@ impl<
     pub async fn mutate_in(&self, opts: MutateInOptions<'_>) -> Result<MutateInResult> {
         self.orchestrate_simple_crud(
             opts.key,
-            RetryInfo::new("mutate_in", false, opts.retry_strategy),
+            opts.retry_strategy,
+            RetryRequest::new("mutate_in", false),
             opts.scope_name,
             opts.collection_name,
             async |collection_id, vbucket_id, client| {
@@ -904,7 +922,7 @@ impl<
         &self,
         opts: GetCollectionIdOptions<'_>,
     ) -> Result<GetCollectionIdResult> {
-        let mut retry_info = RetryInfo::new("get_collection_id", true, opts.retry_strategy);
+        let mut retry_info = RetryRequest::new("get_collection_id", true);
 
         loop {
             let mut err = match orchestrate_kv_client(self.conn_manager.clone(), async |client| {
@@ -945,7 +963,7 @@ impl<
             {
                 if let Some(duration) = self
                     .retry_manager
-                    .maybe_retry(&mut retry_info, reason)
+                    .maybe_retry(opts.retry_strategy.clone(), &mut retry_info, reason)
                     .await
                 {
                     debug!(
@@ -969,7 +987,8 @@ impl<
     pub(crate) async fn orchestrate_simple_crud<Fut, Resp>(
         &self,
         key: &[u8],
-        retry_info: RetryInfo,
+        retry_strategy: Arc<dyn RetryStrategy>,
+        retry_info: RetryRequest,
         scope_name: &str,
         collection_name: &str,
         operation: impl Fn(u32, u16, Arc<KvClientManagerClientType<M>>) -> Fut + Send + Sync,
@@ -978,33 +997,38 @@ impl<
         Fut: Future<Output = Result<Resp>> + Send,
         Resp: Send,
     {
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
-            orchestrate_memd_collection_id(
-                self.collections.clone(),
-                scope_name,
-                collection_name,
-                async |collection_id: u32| {
-                    orchestrate_memd_routing(
-                        self.router.clone(),
-                        self.nmvb_handler.clone(),
-                        key,
-                        0,
-                        async |endpoint: String, vb_id: u16| {
-                            orchestrate_endpoint_kv_client(
-                                self.conn_manager.clone(),
-                                &endpoint,
-                                async |client: Arc<KvClientManagerClientType<M>>| {
-                                    operation(collection_id, vb_id, client).await
-                                },
-                            )
-                            .await
-                        },
-                    )
-                    .await
-                },
-            )
-            .await
-        })
+        orchestrate_retries(
+            self.retry_manager.clone(),
+            retry_strategy,
+            retry_info,
+            async || {
+                orchestrate_memd_collection_id(
+                    self.collections.clone(),
+                    scope_name,
+                    collection_name,
+                    async |collection_id: u32| {
+                        orchestrate_memd_routing(
+                            self.router.clone(),
+                            self.nmvb_handler.clone(),
+                            key,
+                            0,
+                            async |endpoint: String, vb_id: u16| {
+                                orchestrate_endpoint_kv_client(
+                                    self.conn_manager.clone(),
+                                    &endpoint,
+                                    async |client: Arc<KvClientManagerClientType<M>>| {
+                                        operation(collection_id, vb_id, client).await
+                                    },
+                                )
+                                .await
+                            },
+                        )
+                        .await
+                    },
+                )
+                .await
+            },
+        )
         .await
     }
 

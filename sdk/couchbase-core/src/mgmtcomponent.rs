@@ -49,7 +49,7 @@ use crate::options::management::{
     GetGroupOptions, GetRolesOptions, GetUserOptions, IndexStatusOptions, LoadSampleBucketOptions,
     UpdateBucketOptions, UpdateCollectionOptions, UpsertGroupOptions, UpsertUserOptions,
 };
-use crate::retry::{orchestrate_retries, RetryInfo, RetryManager};
+use crate::retry::{orchestrate_retries, RetryManager, RetryRequest};
 use crate::retrybesteffort::ExponentialBackoffCalculator;
 use crate::service_type::ServiceType;
 use crate::{error, mgmtx};
@@ -102,37 +102,41 @@ impl<C: Client> MgmtComponent<C> {
         &self,
         opts: &GetCollectionManifestOptions<'_>,
     ) -> error::Result<CollectionManifest> {
-        let retry_info = RetryInfo::new(
-            "get_collection_manifest",
-            false,
-            opts.retry_strategy.clone(),
-        );
+        let retry_info = RetryRequest::new("get_collection_manifest", false);
 
         let copts = opts.into();
 
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
-            self.http_component
-                .orchestrate_endpoint(
-                    None,
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
-                        let res = match (mgmtx::mgmt::Management::<C> {
-                            http_client: client,
-                            user_agent: self.http_component.user_agent().to_string(),
-                            endpoint: endpoint.clone(),
-                            auth,
-                        }
-                        .get_collection_manifest(&copts)
-                        .await)
-                        {
-                            Ok(r) => r,
-                            Err(e) => return Err(ErrorKind::Mgmt(e).into()),
-                        };
+        orchestrate_retries(
+            self.retry_manager.clone(),
+            opts.retry_strategy.clone(),
+            retry_info,
+            async || {
+                self.http_component
+                    .orchestrate_endpoint(
+                        None,
+                        async |client: Arc<C>,
+                               endpoint_id: String,
+                               endpoint: String,
+                               auth: Auth| {
+                            let res = match (mgmtx::mgmt::Management::<C> {
+                                http_client: client,
+                                user_agent: self.http_component.user_agent().to_string(),
+                                endpoint: endpoint.clone(),
+                                auth,
+                            }
+                            .get_collection_manifest(&copts)
+                            .await)
+                            {
+                                Ok(r) => r,
+                                Err(e) => return Err(ErrorKind::Mgmt(e).into()),
+                            };
 
-                        Ok(res)
-                    },
-                )
-                .await
-        })
+                            Ok(res)
+                        },
+                    )
+                    .await
+            },
+        )
         .await
     }
 
@@ -140,33 +144,41 @@ impl<C: Client> MgmtComponent<C> {
         &self,
         opts: &CreateScopeOptions<'_>,
     ) -> error::Result<CreateScopeResponse> {
-        let retry_info = RetryInfo::new("create_scope", false, opts.retry_strategy.clone());
+        let retry_info = RetryRequest::new("create_scope", false);
 
         let copts = opts.into();
 
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
-            self.http_component
-                .orchestrate_endpoint(
-                    None,
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
-                        let res = match (mgmtx::mgmt::Management::<C> {
-                            http_client: client,
-                            user_agent: self.http_component.user_agent().to_string(),
-                            endpoint: endpoint.clone(),
-                            auth,
-                        }
-                        .create_scope(&copts)
-                        .await)
-                        {
-                            Ok(r) => r,
-                            Err(e) => return Err(ErrorKind::Mgmt(e).into()),
-                        };
+        orchestrate_retries(
+            self.retry_manager.clone(),
+            opts.retry_strategy.clone(),
+            retry_info,
+            async || {
+                self.http_component
+                    .orchestrate_endpoint(
+                        None,
+                        async |client: Arc<C>,
+                               endpoint_id: String,
+                               endpoint: String,
+                               auth: Auth| {
+                            let res = match (mgmtx::mgmt::Management::<C> {
+                                http_client: client,
+                                user_agent: self.http_component.user_agent().to_string(),
+                                endpoint: endpoint.clone(),
+                                auth,
+                            }
+                            .create_scope(&copts)
+                            .await)
+                            {
+                                Ok(r) => r,
+                                Err(e) => return Err(ErrorKind::Mgmt(e).into()),
+                            };
 
-                        Ok(res)
-                    },
-                )
-                .await
-        })
+                            Ok(res)
+                        },
+                    )
+                    .await
+            },
+        )
         .await
     }
 
@@ -174,33 +186,41 @@ impl<C: Client> MgmtComponent<C> {
         &self,
         opts: &DeleteScopeOptions<'_>,
     ) -> error::Result<DeleteScopeResponse> {
-        let retry_info = RetryInfo::new("delete_scope", false, opts.retry_strategy.clone());
+        let retry_info = RetryRequest::new("delete_scope", false);
 
         let copts = opts.into();
 
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
-            self.http_component
-                .orchestrate_endpoint(
-                    None,
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
-                        let res = match (mgmtx::mgmt::Management::<C> {
-                            http_client: client,
-                            user_agent: self.http_component.user_agent().to_string(),
-                            endpoint: endpoint.clone(),
-                            auth,
-                        }
-                        .delete_scope(&copts)
-                        .await)
-                        {
-                            Ok(r) => r,
-                            Err(e) => return Err(ErrorKind::Mgmt(e).into()),
-                        };
+        orchestrate_retries(
+            self.retry_manager.clone(),
+            opts.retry_strategy.clone(),
+            retry_info,
+            async || {
+                self.http_component
+                    .orchestrate_endpoint(
+                        None,
+                        async |client: Arc<C>,
+                               endpoint_id: String,
+                               endpoint: String,
+                               auth: Auth| {
+                            let res = match (mgmtx::mgmt::Management::<C> {
+                                http_client: client,
+                                user_agent: self.http_component.user_agent().to_string(),
+                                endpoint: endpoint.clone(),
+                                auth,
+                            }
+                            .delete_scope(&copts)
+                            .await)
+                            {
+                                Ok(r) => r,
+                                Err(e) => return Err(ErrorKind::Mgmt(e).into()),
+                            };
 
-                        Ok(res)
-                    },
-                )
-                .await
-        })
+                            Ok(res)
+                        },
+                    )
+                    .await
+            },
+        )
         .await
     }
 
@@ -208,33 +228,41 @@ impl<C: Client> MgmtComponent<C> {
         &self,
         opts: &CreateCollectionOptions<'_>,
     ) -> error::Result<CreateCollectionResponse> {
-        let retry_info = RetryInfo::new("create_collection", false, opts.retry_strategy.clone());
+        let retry_info = RetryRequest::new("create_collection", false);
 
         let copts = opts.into();
 
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
-            self.http_component
-                .orchestrate_endpoint(
-                    None,
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
-                        let res = match (mgmtx::mgmt::Management::<C> {
-                            http_client: client,
-                            user_agent: self.http_component.user_agent().to_string(),
-                            endpoint: endpoint.clone(),
-                            auth,
-                        }
-                        .create_collection(&copts)
-                        .await)
-                        {
-                            Ok(r) => r,
-                            Err(e) => return Err(ErrorKind::Mgmt(e).into()),
-                        };
+        orchestrate_retries(
+            self.retry_manager.clone(),
+            opts.retry_strategy.clone(),
+            retry_info,
+            async || {
+                self.http_component
+                    .orchestrate_endpoint(
+                        None,
+                        async |client: Arc<C>,
+                               endpoint_id: String,
+                               endpoint: String,
+                               auth: Auth| {
+                            let res = match (mgmtx::mgmt::Management::<C> {
+                                http_client: client,
+                                user_agent: self.http_component.user_agent().to_string(),
+                                endpoint: endpoint.clone(),
+                                auth,
+                            }
+                            .create_collection(&copts)
+                            .await)
+                            {
+                                Ok(r) => r,
+                                Err(e) => return Err(ErrorKind::Mgmt(e).into()),
+                            };
 
-                        Ok(res)
-                    },
-                )
-                .await
-        })
+                            Ok(res)
+                        },
+                    )
+                    .await
+            },
+        )
         .await
     }
 
@@ -242,33 +270,41 @@ impl<C: Client> MgmtComponent<C> {
         &self,
         opts: &DeleteCollectionOptions<'_>,
     ) -> error::Result<DeleteCollectionResponse> {
-        let retry_info = RetryInfo::new("delete_collection", false, opts.retry_strategy.clone());
+        let retry_info = RetryRequest::new("delete_collection", false);
 
         let copts = opts.into();
 
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
-            self.http_component
-                .orchestrate_endpoint(
-                    None,
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
-                        let res = match (mgmtx::mgmt::Management::<C> {
-                            http_client: client,
-                            user_agent: self.http_component.user_agent().to_string(),
-                            endpoint: endpoint.clone(),
-                            auth,
-                        }
-                        .delete_collection(&copts)
-                        .await)
-                        {
-                            Ok(r) => r,
-                            Err(e) => return Err(ErrorKind::Mgmt(e).into()),
-                        };
+        orchestrate_retries(
+            self.retry_manager.clone(),
+            opts.retry_strategy.clone(),
+            retry_info,
+            async || {
+                self.http_component
+                    .orchestrate_endpoint(
+                        None,
+                        async |client: Arc<C>,
+                               endpoint_id: String,
+                               endpoint: String,
+                               auth: Auth| {
+                            let res = match (mgmtx::mgmt::Management::<C> {
+                                http_client: client,
+                                user_agent: self.http_component.user_agent().to_string(),
+                                endpoint: endpoint.clone(),
+                                auth,
+                            }
+                            .delete_collection(&copts)
+                            .await)
+                            {
+                                Ok(r) => r,
+                                Err(e) => return Err(ErrorKind::Mgmt(e).into()),
+                            };
 
-                        Ok(res)
-                    },
-                )
-                .await
-        })
+                            Ok(res)
+                        },
+                    )
+                    .await
+            },
+        )
         .await
     }
 
@@ -276,33 +312,41 @@ impl<C: Client> MgmtComponent<C> {
         &self,
         opts: &UpdateCollectionOptions<'_>,
     ) -> error::Result<UpdateCollectionResponse> {
-        let retry_info = RetryInfo::new("update_collection", false, opts.retry_strategy.clone());
+        let retry_info = RetryRequest::new("update_collection", false);
 
         let copts = opts.into();
 
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
-            self.http_component
-                .orchestrate_endpoint(
-                    None,
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
-                        let res = match (mgmtx::mgmt::Management::<C> {
-                            http_client: client,
-                            user_agent: self.http_component.user_agent().to_string(),
-                            endpoint: endpoint.clone(),
-                            auth,
-                        }
-                        .update_collection(&copts)
-                        .await)
-                        {
-                            Ok(r) => r,
-                            Err(e) => return Err(ErrorKind::Mgmt(e).into()),
-                        };
+        orchestrate_retries(
+            self.retry_manager.clone(),
+            opts.retry_strategy.clone(),
+            retry_info,
+            async || {
+                self.http_component
+                    .orchestrate_endpoint(
+                        None,
+                        async |client: Arc<C>,
+                               endpoint_id: String,
+                               endpoint: String,
+                               auth: Auth| {
+                            let res = match (mgmtx::mgmt::Management::<C> {
+                                http_client: client,
+                                user_agent: self.http_component.user_agent().to_string(),
+                                endpoint: endpoint.clone(),
+                                auth,
+                            }
+                            .update_collection(&copts)
+                            .await)
+                            {
+                                Ok(r) => r,
+                                Err(e) => return Err(ErrorKind::Mgmt(e).into()),
+                            };
 
-                        Ok(res)
-                    },
-                )
-                .await
-        })
+                            Ok(res)
+                        },
+                    )
+                    .await
+            },
+        )
         .await
     }
 
@@ -310,158 +354,206 @@ impl<C: Client> MgmtComponent<C> {
         &self,
         opts: &GetAllBucketsOptions<'_>,
     ) -> error::Result<Vec<BucketDef>> {
-        let retry_info = RetryInfo::new("get_all_buckets", false, opts.retry_strategy.clone());
+        let retry_info = RetryRequest::new("get_all_buckets", false);
 
         let copts = opts.into();
 
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
-            self.http_component
-                .orchestrate_endpoint(
-                    None,
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
-                        mgmtx::mgmt::Management::<C> {
-                            http_client: client,
-                            user_agent: self.http_component.user_agent().to_string(),
-                            endpoint: endpoint.clone(),
-                            auth,
-                        }
-                        .get_all_buckets(&copts)
-                        .await
-                        .map_err(|e| ErrorKind::Mgmt(e).into())
-                    },
-                )
-                .await
-        })
+        orchestrate_retries(
+            self.retry_manager.clone(),
+            opts.retry_strategy.clone(),
+            retry_info,
+            async || {
+                self.http_component
+                    .orchestrate_endpoint(
+                        None,
+                        async |client: Arc<C>,
+                               endpoint_id: String,
+                               endpoint: String,
+                               auth: Auth| {
+                            mgmtx::mgmt::Management::<C> {
+                                http_client: client,
+                                user_agent: self.http_component.user_agent().to_string(),
+                                endpoint: endpoint.clone(),
+                                auth,
+                            }
+                            .get_all_buckets(&copts)
+                            .await
+                            .map_err(|e| ErrorKind::Mgmt(e).into())
+                        },
+                    )
+                    .await
+            },
+        )
         .await
     }
 
     pub async fn get_bucket(&self, opts: &GetBucketOptions<'_>) -> error::Result<BucketDef> {
-        let retry_info = RetryInfo::new("get_bucket", false, opts.retry_strategy.clone());
+        let retry_info = RetryRequest::new("get_bucket", false);
 
         let copts = opts.into();
 
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
-            self.http_component
-                .orchestrate_endpoint(
-                    None,
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
-                        mgmtx::mgmt::Management::<C> {
-                            http_client: client,
-                            user_agent: self.http_component.user_agent().to_string(),
-                            endpoint: endpoint.clone(),
-                            auth,
-                        }
-                        .get_bucket(&copts)
-                        .await
-                        .map_err(|e| ErrorKind::Mgmt(e).into())
-                    },
-                )
-                .await
-        })
+        orchestrate_retries(
+            self.retry_manager.clone(),
+            opts.retry_strategy.clone(),
+            retry_info,
+            async || {
+                self.http_component
+                    .orchestrate_endpoint(
+                        None,
+                        async |client: Arc<C>,
+                               endpoint_id: String,
+                               endpoint: String,
+                               auth: Auth| {
+                            mgmtx::mgmt::Management::<C> {
+                                http_client: client,
+                                user_agent: self.http_component.user_agent().to_string(),
+                                endpoint: endpoint.clone(),
+                                auth,
+                            }
+                            .get_bucket(&copts)
+                            .await
+                            .map_err(|e| ErrorKind::Mgmt(e).into())
+                        },
+                    )
+                    .await
+            },
+        )
         .await
     }
 
     pub async fn create_bucket(&self, opts: &CreateBucketOptions<'_>) -> error::Result<()> {
-        let retry_info = RetryInfo::new("create_bucket", false, opts.retry_strategy.clone());
+        let retry_info = RetryRequest::new("create_bucket", false);
 
         let copts = opts.into();
 
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
-            self.http_component
-                .orchestrate_endpoint(
-                    None,
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
-                        mgmtx::mgmt::Management::<C> {
-                            http_client: client,
-                            user_agent: self.http_component.user_agent().to_string(),
-                            endpoint: endpoint.clone(),
-                            auth,
-                        }
-                        .create_bucket(&copts)
-                        .await
-                        .map_err(|e| ErrorKind::Mgmt(e).into())
-                    },
-                )
-                .await
-        })
+        orchestrate_retries(
+            self.retry_manager.clone(),
+            opts.retry_strategy.clone(),
+            retry_info,
+            async || {
+                self.http_component
+                    .orchestrate_endpoint(
+                        None,
+                        async |client: Arc<C>,
+                               endpoint_id: String,
+                               endpoint: String,
+                               auth: Auth| {
+                            mgmtx::mgmt::Management::<C> {
+                                http_client: client,
+                                user_agent: self.http_component.user_agent().to_string(),
+                                endpoint: endpoint.clone(),
+                                auth,
+                            }
+                            .create_bucket(&copts)
+                            .await
+                            .map_err(|e| ErrorKind::Mgmt(e).into())
+                        },
+                    )
+                    .await
+            },
+        )
         .await
     }
 
     pub async fn update_bucket(&self, opts: &UpdateBucketOptions<'_>) -> error::Result<()> {
-        let retry_info = RetryInfo::new("update_bucket", false, opts.retry_strategy.clone());
+        let retry_info = RetryRequest::new("update_bucket", false);
 
         let copts = opts.into();
 
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
-            self.http_component
-                .orchestrate_endpoint(
-                    None,
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
-                        mgmtx::mgmt::Management::<C> {
-                            http_client: client,
-                            user_agent: self.http_component.user_agent().to_string(),
-                            endpoint: endpoint.clone(),
-                            auth,
-                        }
-                        .update_bucket(&copts)
-                        .await
-                        .map_err(|e| ErrorKind::Mgmt(e).into())
-                    },
-                )
-                .await
-        })
+        orchestrate_retries(
+            self.retry_manager.clone(),
+            opts.retry_strategy.clone(),
+            retry_info,
+            async || {
+                self.http_component
+                    .orchestrate_endpoint(
+                        None,
+                        async |client: Arc<C>,
+                               endpoint_id: String,
+                               endpoint: String,
+                               auth: Auth| {
+                            mgmtx::mgmt::Management::<C> {
+                                http_client: client,
+                                user_agent: self.http_component.user_agent().to_string(),
+                                endpoint: endpoint.clone(),
+                                auth,
+                            }
+                            .update_bucket(&copts)
+                            .await
+                            .map_err(|e| ErrorKind::Mgmt(e).into())
+                        },
+                    )
+                    .await
+            },
+        )
         .await
     }
 
     pub async fn delete_bucket(&self, opts: &DeleteBucketOptions<'_>) -> error::Result<()> {
-        let retry_info = RetryInfo::new("delete_bucket", false, opts.retry_strategy.clone());
+        let retry_info = RetryRequest::new("delete_bucket", false);
 
         let copts = opts.into();
 
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
-            self.http_component
-                .orchestrate_endpoint(
-                    None,
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
-                        mgmtx::mgmt::Management::<C> {
-                            http_client: client,
-                            user_agent: self.http_component.user_agent().to_string(),
-                            endpoint: endpoint.clone(),
-                            auth,
-                        }
-                        .delete_bucket(&copts)
-                        .await
-                        .map_err(|e| ErrorKind::Mgmt(e).into())
-                    },
-                )
-                .await
-        })
+        orchestrate_retries(
+            self.retry_manager.clone(),
+            opts.retry_strategy.clone(),
+            retry_info,
+            async || {
+                self.http_component
+                    .orchestrate_endpoint(
+                        None,
+                        async |client: Arc<C>,
+                               endpoint_id: String,
+                               endpoint: String,
+                               auth: Auth| {
+                            mgmtx::mgmt::Management::<C> {
+                                http_client: client,
+                                user_agent: self.http_component.user_agent().to_string(),
+                                endpoint: endpoint.clone(),
+                                auth,
+                            }
+                            .delete_bucket(&copts)
+                            .await
+                            .map_err(|e| ErrorKind::Mgmt(e).into())
+                        },
+                    )
+                    .await
+            },
+        )
         .await
     }
 
     pub async fn flush_bucket(&self, opts: &FlushBucketOptions<'_>) -> error::Result<()> {
-        let retry_info = RetryInfo::new("flush_bucket", false, opts.retry_strategy.clone());
+        let retry_info = RetryRequest::new("flush_bucket", false);
 
         let copts = opts.into();
 
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
-            self.http_component
-                .orchestrate_endpoint(
-                    None,
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
-                        mgmtx::mgmt::Management::<C> {
-                            http_client: client,
-                            user_agent: self.http_component.user_agent().to_string(),
-                            endpoint: endpoint.clone(),
-                            auth,
-                        }
-                        .flush_bucket(&copts)
-                        .await
-                        .map_err(|e| ErrorKind::Mgmt(e).into())
-                    },
-                )
-                .await
-        })
+        orchestrate_retries(
+            self.retry_manager.clone(),
+            opts.retry_strategy.clone(),
+            retry_info,
+            async || {
+                self.http_component
+                    .orchestrate_endpoint(
+                        None,
+                        async |client: Arc<C>,
+                               endpoint_id: String,
+                               endpoint: String,
+                               auth: Auth| {
+                            mgmtx::mgmt::Management::<C> {
+                                http_client: client,
+                                user_agent: self.http_component.user_agent().to_string(),
+                                endpoint: endpoint.clone(),
+                                auth,
+                            }
+                            .flush_bucket(&copts)
+                            .await
+                            .map_err(|e| ErrorKind::Mgmt(e).into())
+                        },
+                    )
+                    .await
+            },
+        )
         .await
     }
 
@@ -517,27 +609,35 @@ impl<C: Client> MgmtComponent<C> {
     }
 
     pub async fn get_user(&self, opts: &GetUserOptions<'_>) -> error::Result<UserAndMetadata> {
-        let retry_info = RetryInfo::new("get_user", false, opts.retry_strategy.clone());
+        let retry_info = RetryRequest::new("get_user", false);
         let copts = opts.into();
 
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
-            self.http_component
-                .orchestrate_endpoint(
-                    None,
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
-                        mgmtx::mgmt::Management::<C> {
-                            http_client: client,
-                            user_agent: self.http_component.user_agent().to_string(),
-                            endpoint: endpoint.clone(),
-                            auth,
-                        }
-                        .get_user(&copts)
-                        .await
-                        .map_err(|e| ErrorKind::Mgmt(e).into())
-                    },
-                )
-                .await
-        })
+        orchestrate_retries(
+            self.retry_manager.clone(),
+            opts.retry_strategy.clone(),
+            retry_info,
+            async || {
+                self.http_component
+                    .orchestrate_endpoint(
+                        None,
+                        async |client: Arc<C>,
+                               endpoint_id: String,
+                               endpoint: String,
+                               auth: Auth| {
+                            mgmtx::mgmt::Management::<C> {
+                                http_client: client,
+                                user_agent: self.http_component.user_agent().to_string(),
+                                endpoint: endpoint.clone(),
+                                auth,
+                            }
+                            .get_user(&copts)
+                            .await
+                            .map_err(|e| ErrorKind::Mgmt(e).into())
+                        },
+                    )
+                    .await
+            },
+        )
         .await
     }
 
@@ -545,77 +645,101 @@ impl<C: Client> MgmtComponent<C> {
         &self,
         opts: &GetAllUsersOptions<'_>,
     ) -> error::Result<Vec<UserAndMetadata>> {
-        let retry_info = RetryInfo::new("get_all_users", false, opts.retry_strategy.clone());
+        let retry_info = RetryRequest::new("get_all_users", false);
         let copts = opts.into();
 
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
-            self.http_component
-                .orchestrate_endpoint(
-                    None,
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
-                        mgmtx::mgmt::Management::<C> {
-                            http_client: client,
-                            user_agent: self.http_component.user_agent().to_string(),
-                            endpoint: endpoint.clone(),
-                            auth,
-                        }
-                        .get_all_users(&copts)
-                        .await
-                        .map_err(|e| ErrorKind::Mgmt(e).into())
-                    },
-                )
-                .await
-        })
+        orchestrate_retries(
+            self.retry_manager.clone(),
+            opts.retry_strategy.clone(),
+            retry_info,
+            async || {
+                self.http_component
+                    .orchestrate_endpoint(
+                        None,
+                        async |client: Arc<C>,
+                               endpoint_id: String,
+                               endpoint: String,
+                               auth: Auth| {
+                            mgmtx::mgmt::Management::<C> {
+                                http_client: client,
+                                user_agent: self.http_component.user_agent().to_string(),
+                                endpoint: endpoint.clone(),
+                                auth,
+                            }
+                            .get_all_users(&copts)
+                            .await
+                            .map_err(|e| ErrorKind::Mgmt(e).into())
+                        },
+                    )
+                    .await
+            },
+        )
         .await
     }
 
     pub async fn upsert_user(&self, opts: &UpsertUserOptions<'_>) -> error::Result<()> {
-        let retry_info = RetryInfo::new("upsert_user", false, opts.retry_strategy.clone());
+        let retry_info = RetryRequest::new("upsert_user", false);
         let copts = opts.into();
 
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
-            self.http_component
-                .orchestrate_endpoint(
-                    None,
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
-                        mgmtx::mgmt::Management::<C> {
-                            http_client: client,
-                            user_agent: self.http_component.user_agent().to_string(),
-                            endpoint: endpoint.clone(),
-                            auth,
-                        }
-                        .upsert_user(&copts)
-                        .await
-                        .map_err(|e| ErrorKind::Mgmt(e).into())
-                    },
-                )
-                .await
-        })
+        orchestrate_retries(
+            self.retry_manager.clone(),
+            opts.retry_strategy.clone(),
+            retry_info,
+            async || {
+                self.http_component
+                    .orchestrate_endpoint(
+                        None,
+                        async |client: Arc<C>,
+                               endpoint_id: String,
+                               endpoint: String,
+                               auth: Auth| {
+                            mgmtx::mgmt::Management::<C> {
+                                http_client: client,
+                                user_agent: self.http_component.user_agent().to_string(),
+                                endpoint: endpoint.clone(),
+                                auth,
+                            }
+                            .upsert_user(&copts)
+                            .await
+                            .map_err(|e| ErrorKind::Mgmt(e).into())
+                        },
+                    )
+                    .await
+            },
+        )
         .await
     }
 
     pub async fn delete_user(&self, opts: &DeleteUserOptions<'_>) -> error::Result<()> {
-        let retry_info = RetryInfo::new("delete_user", false, opts.retry_strategy.clone());
+        let retry_info = RetryRequest::new("delete_user", false);
         let copts = opts.into();
 
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
-            self.http_component
-                .orchestrate_endpoint(
-                    None,
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
-                        mgmtx::mgmt::Management::<C> {
-                            http_client: client,
-                            user_agent: self.http_component.user_agent().to_string(),
-                            endpoint: endpoint.clone(),
-                            auth,
-                        }
-                        .delete_user(&copts)
-                        .await
-                        .map_err(|e| ErrorKind::Mgmt(e).into())
-                    },
-                )
-                .await
-        })
+        orchestrate_retries(
+            self.retry_manager.clone(),
+            opts.retry_strategy.clone(),
+            retry_info,
+            async || {
+                self.http_component
+                    .orchestrate_endpoint(
+                        None,
+                        async |client: Arc<C>,
+                               endpoint_id: String,
+                               endpoint: String,
+                               auth: Auth| {
+                            mgmtx::mgmt::Management::<C> {
+                                http_client: client,
+                                user_agent: self.http_component.user_agent().to_string(),
+                                endpoint: endpoint.clone(),
+                                auth,
+                            }
+                            .delete_user(&copts)
+                            .await
+                            .map_err(|e| ErrorKind::Mgmt(e).into())
+                        },
+                    )
+                    .await
+            },
+        )
         .await
     }
 
@@ -623,52 +747,68 @@ impl<C: Client> MgmtComponent<C> {
         &self,
         opts: &GetRolesOptions<'_>,
     ) -> error::Result<Vec<RoleAndDescription>> {
-        let retry_info = RetryInfo::new("get_roles", false, opts.retry_strategy.clone());
+        let retry_info = RetryRequest::new("get_roles", false);
         let copts = opts.into();
 
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
-            self.http_component
-                .orchestrate_endpoint(
-                    None,
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
-                        mgmtx::mgmt::Management::<C> {
-                            http_client: client,
-                            user_agent: self.http_component.user_agent().to_string(),
-                            endpoint: endpoint.clone(),
-                            auth,
-                        }
-                        .get_roles(&copts)
-                        .await
-                        .map_err(|e| ErrorKind::Mgmt(e).into())
-                    },
-                )
-                .await
-        })
+        orchestrate_retries(
+            self.retry_manager.clone(),
+            opts.retry_strategy.clone(),
+            retry_info,
+            async || {
+                self.http_component
+                    .orchestrate_endpoint(
+                        None,
+                        async |client: Arc<C>,
+                               endpoint_id: String,
+                               endpoint: String,
+                               auth: Auth| {
+                            mgmtx::mgmt::Management::<C> {
+                                http_client: client,
+                                user_agent: self.http_component.user_agent().to_string(),
+                                endpoint: endpoint.clone(),
+                                auth,
+                            }
+                            .get_roles(&copts)
+                            .await
+                            .map_err(|e| ErrorKind::Mgmt(e).into())
+                        },
+                    )
+                    .await
+            },
+        )
         .await
     }
 
     pub async fn get_group(&self, opts: &GetGroupOptions<'_>) -> error::Result<Group> {
-        let retry_info = RetryInfo::new("get_group", false, opts.retry_strategy.clone());
+        let retry_info = RetryRequest::new("get_group", false);
         let copts = opts.into();
 
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
-            self.http_component
-                .orchestrate_endpoint(
-                    None,
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
-                        mgmtx::mgmt::Management::<C> {
-                            http_client: client,
-                            user_agent: self.http_component.user_agent().to_string(),
-                            endpoint: endpoint.clone(),
-                            auth,
-                        }
-                        .get_group(&copts)
-                        .await
-                        .map_err(|e| ErrorKind::Mgmt(e).into())
-                    },
-                )
-                .await
-        })
+        orchestrate_retries(
+            self.retry_manager.clone(),
+            opts.retry_strategy.clone(),
+            retry_info,
+            async || {
+                self.http_component
+                    .orchestrate_endpoint(
+                        None,
+                        async |client: Arc<C>,
+                               endpoint_id: String,
+                               endpoint: String,
+                               auth: Auth| {
+                            mgmtx::mgmt::Management::<C> {
+                                http_client: client,
+                                user_agent: self.http_component.user_agent().to_string(),
+                                endpoint: endpoint.clone(),
+                                auth,
+                            }
+                            .get_group(&copts)
+                            .await
+                            .map_err(|e| ErrorKind::Mgmt(e).into())
+                        },
+                    )
+                    .await
+            },
+        )
         .await
     }
 
@@ -676,102 +816,134 @@ impl<C: Client> MgmtComponent<C> {
         &self,
         opts: &GetAllGroupsOptions<'_>,
     ) -> error::Result<Vec<Group>> {
-        let retry_info = RetryInfo::new("get_all_groups", false, opts.retry_strategy.clone());
+        let retry_info = RetryRequest::new("get_all_groups", false);
         let copts = opts.into();
 
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
-            self.http_component
-                .orchestrate_endpoint(
-                    None,
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
-                        mgmtx::mgmt::Management::<C> {
-                            http_client: client,
-                            user_agent: self.http_component.user_agent().to_string(),
-                            endpoint: endpoint.clone(),
-                            auth,
-                        }
-                        .get_all_groups(&copts)
-                        .await
-                        .map_err(|e| ErrorKind::Mgmt(e).into())
-                    },
-                )
-                .await
-        })
+        orchestrate_retries(
+            self.retry_manager.clone(),
+            opts.retry_strategy.clone(),
+            retry_info,
+            async || {
+                self.http_component
+                    .orchestrate_endpoint(
+                        None,
+                        async |client: Arc<C>,
+                               endpoint_id: String,
+                               endpoint: String,
+                               auth: Auth| {
+                            mgmtx::mgmt::Management::<C> {
+                                http_client: client,
+                                user_agent: self.http_component.user_agent().to_string(),
+                                endpoint: endpoint.clone(),
+                                auth,
+                            }
+                            .get_all_groups(&copts)
+                            .await
+                            .map_err(|e| ErrorKind::Mgmt(e).into())
+                        },
+                    )
+                    .await
+            },
+        )
         .await
     }
 
     pub async fn upsert_group(&self, opts: &UpsertGroupOptions<'_>) -> error::Result<()> {
-        let retry_info = RetryInfo::new("upsert_group", false, opts.retry_strategy.clone());
+        let retry_info = RetryRequest::new("upsert_group", false);
         let copts = opts.into();
 
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
-            self.http_component
-                .orchestrate_endpoint(
-                    None,
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
-                        mgmtx::mgmt::Management::<C> {
-                            http_client: client,
-                            user_agent: self.http_component.user_agent().to_string(),
-                            endpoint: endpoint.clone(),
-                            auth,
-                        }
-                        .upsert_group(&copts)
-                        .await
-                        .map_err(|e| ErrorKind::Mgmt(e).into())
-                    },
-                )
-                .await
-        })
+        orchestrate_retries(
+            self.retry_manager.clone(),
+            opts.retry_strategy.clone(),
+            retry_info,
+            async || {
+                self.http_component
+                    .orchestrate_endpoint(
+                        None,
+                        async |client: Arc<C>,
+                               endpoint_id: String,
+                               endpoint: String,
+                               auth: Auth| {
+                            mgmtx::mgmt::Management::<C> {
+                                http_client: client,
+                                user_agent: self.http_component.user_agent().to_string(),
+                                endpoint: endpoint.clone(),
+                                auth,
+                            }
+                            .upsert_group(&copts)
+                            .await
+                            .map_err(|e| ErrorKind::Mgmt(e).into())
+                        },
+                    )
+                    .await
+            },
+        )
         .await
     }
 
     pub async fn delete_group(&self, opts: &DeleteGroupOptions<'_>) -> error::Result<()> {
-        let retry_info = RetryInfo::new("delete_group", false, opts.retry_strategy.clone());
+        let retry_info = RetryRequest::new("delete_group", false);
         let copts = opts.into();
 
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
-            self.http_component
-                .orchestrate_endpoint(
-                    None,
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
-                        mgmtx::mgmt::Management::<C> {
-                            http_client: client,
-                            user_agent: self.http_component.user_agent().to_string(),
-                            endpoint: endpoint.clone(),
-                            auth,
-                        }
-                        .delete_group(&copts)
-                        .await
-                        .map_err(|e| ErrorKind::Mgmt(e).into())
-                    },
-                )
-                .await
-        })
+        orchestrate_retries(
+            self.retry_manager.clone(),
+            opts.retry_strategy.clone(),
+            retry_info,
+            async || {
+                self.http_component
+                    .orchestrate_endpoint(
+                        None,
+                        async |client: Arc<C>,
+                               endpoint_id: String,
+                               endpoint: String,
+                               auth: Auth| {
+                            mgmtx::mgmt::Management::<C> {
+                                http_client: client,
+                                user_agent: self.http_component.user_agent().to_string(),
+                                endpoint: endpoint.clone(),
+                                auth,
+                            }
+                            .delete_group(&copts)
+                            .await
+                            .map_err(|e| ErrorKind::Mgmt(e).into())
+                        },
+                    )
+                    .await
+            },
+        )
         .await
     }
 
     pub async fn change_password(&self, opts: &ChangePasswordOptions<'_>) -> error::Result<()> {
-        let retry_info = RetryInfo::new("change_password", false, opts.retry_strategy.clone());
+        let retry_info = RetryRequest::new("change_password", false);
         let copts = opts.into();
 
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
-            self.http_component
-                .orchestrate_endpoint(
-                    None,
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
-                        mgmtx::mgmt::Management::<C> {
-                            http_client: client,
-                            user_agent: self.http_component.user_agent().to_string(),
-                            endpoint: endpoint.clone(),
-                            auth,
-                        }
-                        .change_password(&copts)
-                        .await
-                        .map_err(|e| ErrorKind::Mgmt(e).into())
-                    },
-                )
-                .await
-        })
+        orchestrate_retries(
+            self.retry_manager.clone(),
+            opts.retry_strategy.clone(),
+            retry_info,
+            async || {
+                self.http_component
+                    .orchestrate_endpoint(
+                        None,
+                        async |client: Arc<C>,
+                               endpoint_id: String,
+                               endpoint: String,
+                               auth: Auth| {
+                            mgmtx::mgmt::Management::<C> {
+                                http_client: client,
+                                user_agent: self.http_component.user_agent().to_string(),
+                                endpoint: endpoint.clone(),
+                                auth,
+                            }
+                            .change_password(&copts)
+                            .await
+                            .map_err(|e| ErrorKind::Mgmt(e).into())
+                        },
+                    )
+                    .await
+            },
+        )
         .await
     }
 
@@ -830,31 +1002,35 @@ impl<C: Client> MgmtComponent<C> {
         &self,
         opts: &GetFullClusterConfigOptions<'_>,
     ) -> error::Result<FullClusterConfig> {
-        let retry_info = RetryInfo::new(
-            "get_full_cluster_config",
-            false,
-            opts.retry_strategy.clone(),
-        );
+        let retry_info = RetryRequest::new("get_full_cluster_config", false);
         let copts = opts.into();
 
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
-            self.http_component
-                .orchestrate_endpoint(
-                    None,
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
-                        mgmtx::mgmt::Management::<C> {
-                            http_client: client,
-                            user_agent: self.http_component.user_agent().to_string(),
-                            endpoint: endpoint.clone(),
-                            auth,
-                        }
-                        .get_full_cluster_config(&copts)
-                        .await
-                        .map_err(|e| ErrorKind::Mgmt(e).into())
-                    },
-                )
-                .await
-        })
+        orchestrate_retries(
+            self.retry_manager.clone(),
+            opts.retry_strategy.clone(),
+            retry_info,
+            async || {
+                self.http_component
+                    .orchestrate_endpoint(
+                        None,
+                        async |client: Arc<C>,
+                               endpoint_id: String,
+                               endpoint: String,
+                               auth: Auth| {
+                            mgmtx::mgmt::Management::<C> {
+                                http_client: client,
+                                user_agent: self.http_component.user_agent().to_string(),
+                                endpoint: endpoint.clone(),
+                                auth,
+                            }
+                            .get_full_cluster_config(&copts)
+                            .await
+                            .map_err(|e| ErrorKind::Mgmt(e).into())
+                        },
+                    )
+                    .await
+            },
+        )
         .await
     }
 
@@ -862,28 +1038,35 @@ impl<C: Client> MgmtComponent<C> {
         &self,
         opts: &GetFullBucketConfigOptions<'_>,
     ) -> error::Result<FullBucketConfig> {
-        let retry_info =
-            RetryInfo::new("get_full_bucket_config", false, opts.retry_strategy.clone());
+        let retry_info = RetryRequest::new("get_full_bucket_config", false);
         let copts = opts.into();
 
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
-            self.http_component
-                .orchestrate_endpoint(
-                    None,
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
-                        mgmtx::mgmt::Management::<C> {
-                            http_client: client,
-                            user_agent: self.http_component.user_agent().to_string(),
-                            endpoint: endpoint.clone(),
-                            auth,
-                        }
-                        .get_full_bucket_config(&copts)
-                        .await
-                        .map_err(|e| ErrorKind::Mgmt(e).into())
-                    },
-                )
-                .await
-        })
+        orchestrate_retries(
+            self.retry_manager.clone(),
+            opts.retry_strategy.clone(),
+            retry_info,
+            async || {
+                self.http_component
+                    .orchestrate_endpoint(
+                        None,
+                        async |client: Arc<C>,
+                               endpoint_id: String,
+                               endpoint: String,
+                               auth: Auth| {
+                            mgmtx::mgmt::Management::<C> {
+                                http_client: client,
+                                user_agent: self.http_component.user_agent().to_string(),
+                                endpoint: endpoint.clone(),
+                                auth,
+                            }
+                            .get_full_bucket_config(&copts)
+                            .await
+                            .map_err(|e| ErrorKind::Mgmt(e).into())
+                        },
+                    )
+                    .await
+            },
+        )
         .await
     }
 
@@ -891,52 +1074,68 @@ impl<C: Client> MgmtComponent<C> {
         &self,
         opts: &LoadSampleBucketOptions<'_>,
     ) -> error::Result<()> {
-        let retry_info = RetryInfo::new("load_sample_bucket", false, opts.retry_strategy.clone());
+        let retry_info = RetryRequest::new("load_sample_bucket", false);
         let copts = opts.into();
 
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
-            self.http_component
-                .orchestrate_endpoint(
-                    None,
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
-                        mgmtx::mgmt::Management::<C> {
-                            http_client: client,
-                            user_agent: self.http_component.user_agent().to_string(),
-                            endpoint: endpoint.clone(),
-                            auth,
-                        }
-                        .load_sample_bucket(&copts)
-                        .await
-                        .map_err(|e| ErrorKind::Mgmt(e).into())
-                    },
-                )
-                .await
-        })
+        orchestrate_retries(
+            self.retry_manager.clone(),
+            opts.retry_strategy.clone(),
+            retry_info,
+            async || {
+                self.http_component
+                    .orchestrate_endpoint(
+                        None,
+                        async |client: Arc<C>,
+                               endpoint_id: String,
+                               endpoint: String,
+                               auth: Auth| {
+                            mgmtx::mgmt::Management::<C> {
+                                http_client: client,
+                                user_agent: self.http_component.user_agent().to_string(),
+                                endpoint: endpoint.clone(),
+                                auth,
+                            }
+                            .load_sample_bucket(&copts)
+                            .await
+                            .map_err(|e| ErrorKind::Mgmt(e).into())
+                        },
+                    )
+                    .await
+            },
+        )
         .await
     }
 
     pub async fn index_status(&self, opts: &IndexStatusOptions<'_>) -> error::Result<IndexStatus> {
-        let retry_info = RetryInfo::new("index_status", false, opts.retry_strategy.clone());
+        let retry_info = RetryRequest::new("index_status", false);
         let copts = opts.into();
 
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
-            self.http_component
-                .orchestrate_endpoint(
-                    None,
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
-                        mgmtx::mgmt::Management::<C> {
-                            http_client: client,
-                            user_agent: self.http_component.user_agent().to_string(),
-                            endpoint: endpoint.clone(),
-                            auth,
-                        }
-                        .index_status(&copts)
-                        .await
-                        .map_err(|e| ErrorKind::Mgmt(e).into())
-                    },
-                )
-                .await
-        })
+        orchestrate_retries(
+            self.retry_manager.clone(),
+            opts.retry_strategy.clone(),
+            retry_info,
+            async || {
+                self.http_component
+                    .orchestrate_endpoint(
+                        None,
+                        async |client: Arc<C>,
+                               endpoint_id: String,
+                               endpoint: String,
+                               auth: Auth| {
+                            mgmtx::mgmt::Management::<C> {
+                                http_client: client,
+                                user_agent: self.http_component.user_agent().to_string(),
+                                endpoint: endpoint.clone(),
+                                auth,
+                            }
+                            .index_status(&copts)
+                            .await
+                            .map_err(|e| ErrorKind::Mgmt(e).into())
+                        },
+                    )
+                    .await
+            },
+        )
         .await
     }
 
@@ -944,31 +1143,35 @@ impl<C: Client> MgmtComponent<C> {
         &self,
         opts: &GetAutoFailoverSettingsOptions<'_>,
     ) -> error::Result<AutoFailoverSettings> {
-        let retry_info = RetryInfo::new(
-            "get_auto_failover_settings",
-            false,
-            opts.retry_strategy.clone(),
-        );
+        let retry_info = RetryRequest::new("get_auto_failover_settings", false);
         let copts = opts.into();
 
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
-            self.http_component
-                .orchestrate_endpoint(
-                    None,
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
-                        mgmtx::mgmt::Management::<C> {
-                            http_client: client,
-                            user_agent: self.http_component.user_agent().to_string(),
-                            endpoint: endpoint.clone(),
-                            auth,
-                        }
-                        .get_auto_failover_settings(&copts)
-                        .await
-                        .map_err(|e| ErrorKind::Mgmt(e).into())
-                    },
-                )
-                .await
-        })
+        orchestrate_retries(
+            self.retry_manager.clone(),
+            opts.retry_strategy.clone(),
+            retry_info,
+            async || {
+                self.http_component
+                    .orchestrate_endpoint(
+                        None,
+                        async |client: Arc<C>,
+                               endpoint_id: String,
+                               endpoint: String,
+                               auth: Auth| {
+                            mgmtx::mgmt::Management::<C> {
+                                http_client: client,
+                                user_agent: self.http_component.user_agent().to_string(),
+                                endpoint: endpoint.clone(),
+                                auth,
+                            }
+                            .get_auto_failover_settings(&copts)
+                            .await
+                            .map_err(|e| ErrorKind::Mgmt(e).into())
+                        },
+                    )
+                    .await
+            },
+        )
         .await
     }
 
@@ -976,10 +1179,11 @@ impl<C: Client> MgmtComponent<C> {
         &self,
         opts: &GetBucketStatsOptions<'_>,
     ) -> error::Result<Box<RawValue>> {
-        let retry_info = RetryInfo::new("get_bucket_stats", false, opts.retry_strategy.clone());
+        let retry_info = RetryRequest::new("get_bucket_stats", false);
+        let retry = opts.retry_strategy.clone();
         let copts = opts.into();
 
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
+        orchestrate_retries(self.retry_manager.clone(), retry, retry_info, async || {
             self.http_component
                 .orchestrate_endpoint(
                     None,

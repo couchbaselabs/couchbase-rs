@@ -15,11 +15,14 @@
  *  * limitations under the License.
  *
  */
-
 use crate::clients::agent_provider::CouchbaseAgentProvider;
 use crate::error;
-use crate::options::query_options::QueryOptions;
+use crate::options::query_options::{QueryOptions, ScanConsistency};
 use crate::results::query_results::QueryResult;
+use crate::retry::RetryStrategy;
+use couchbase_core::options::query;
+use couchbase_core::queryx;
+use std::sync::Arc;
 use uuid::Uuid;
 
 pub(crate) struct QueryClient {
@@ -60,20 +63,30 @@ pub(crate) struct QueryKeyspace {
 pub(crate) struct CouchbaseQueryClient {
     agent_provider: CouchbaseAgentProvider,
     keyspace: Option<QueryKeyspace>,
+    default_retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl CouchbaseQueryClient {
-    pub fn new(agent_provider: CouchbaseAgentProvider) -> Self {
+    pub fn new(
+        agent_provider: CouchbaseAgentProvider,
+        default_retry_strategy: Arc<dyn RetryStrategy>,
+    ) -> Self {
         Self {
             agent_provider,
             keyspace: None,
+            default_retry_strategy,
         }
     }
 
-    pub fn with_keyspace(agent_provider: CouchbaseAgentProvider, keyspace: QueryKeyspace) -> Self {
+    pub fn with_keyspace(
+        agent_provider: CouchbaseAgentProvider,
+        keyspace: QueryKeyspace,
+        default_retry_strategy: Arc<dyn RetryStrategy>,
+    ) -> Self {
         Self {
             agent_provider,
             keyspace: Some(keyspace),
+            default_retry_strategy,
         }
     }
 
@@ -89,8 +102,45 @@ impl CouchbaseQueryClient {
 
         let ad_hoc = opts.ad_hoc.unwrap_or(true);
 
-        let mut query_opts = couchbase_core::options::query::QueryOptions::try_from(opts)?;
-        query_opts = query_opts.statement(statement);
+        let (mutation_state, scan_consistency) = match opts.scan_consistency {
+            Some(ScanConsistency::AtPlus(state)) => (
+                Some(state.into()),
+                Some(queryx::query_options::ScanConsistency::AtPlus),
+            ),
+            Some(ScanConsistency::NotBounded) => (
+                None,
+                Some(queryx::query_options::ScanConsistency::NotBounded),
+            ),
+            Some(ScanConsistency::RequestPlus) => (
+                None,
+                Some(queryx::query_options::ScanConsistency::RequestPlus),
+            ),
+            None => (None, None),
+        };
+
+        let mut query_opts = query::QueryOptions::new()
+            .args(opts.positional_parameters)
+            .client_context_id(opts.client_context_id)
+            .max_parallelism(opts.max_parallelism)
+            .metrics(opts.metrics.unwrap_or_default())
+            .pipeline_batch(opts.pipeline_batch)
+            .pipeline_cap(opts.pipeline_cap)
+            .preserve_expiry(opts.preserve_expiry)
+            .profile(opts.profile.map(|p| p.into()))
+            .read_only(opts.read_only)
+            .scan_cap(opts.scan_cap)
+            .scan_consistency(scan_consistency)
+            .scan_wait(opts.scan_wait)
+            .sparse_scan_vectors(mutation_state)
+            .timeout(opts.server_timeout)
+            .use_replica(opts.use_replica.map(|r| r.into()))
+            .named_args(opts.named_parameters)
+            .raw(opts.raw)
+            .statement(statement)
+            .retry_strategy(
+                opts.retry_strategy
+                    .unwrap_or_else(|| self.default_retry_strategy.clone()),
+            );
 
         if let Some(keyspace) = &self.keyspace {
             query_opts = query_opts.query_context(format!(

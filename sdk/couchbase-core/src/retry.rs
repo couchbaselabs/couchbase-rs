@@ -26,7 +26,6 @@ use crate::errmapcomponent::ErrMapComponent;
 use crate::error::{Error, ErrorKind};
 use crate::memdx::error::ErrorKind::{Cancelled, Dispatch, Resource, Server};
 use crate::memdx::error::{CancellationErrorKind, ServerError, ServerErrorKind};
-use crate::retrybesteffort::controlled_backoff;
 use crate::retryfailfast::FailFastRetryStrategy;
 use crate::{error, queryx, searchx};
 use async_trait::async_trait;
@@ -80,16 +79,12 @@ impl RetryReason {
     }
 
     pub fn always_retry(&self) -> bool {
-        match self {
-            RetryReason::KvInvalidVbucketMap => true,
-            RetryReason::KvNotMyVbucket => true,
-            RetryReason::KvTemporaryFailure => false,
-            RetryReason::KvCollectionOutdated => true,
-            RetryReason::KvErrorMapRetryIndicated => false,
-            RetryReason::KvLocked => false,
-            RetryReason::NotReady => false,
-            _ => false,
-        }
+        matches!(
+            self,
+            RetryReason::KvInvalidVbucketMap
+                | RetryReason::KvNotMyVbucket
+                | RetryReason::KvCollectionOutdated
+        )
     }
 }
 
@@ -119,40 +114,6 @@ impl Display for RetryReason {
     }
 }
 
-pub struct RetryManager {
-    err_map_component: Arc<ErrMapComponent>,
-}
-
-impl RetryManager {
-    pub fn new(err_map_component: Arc<ErrMapComponent>) -> Self {
-        Self { err_map_component }
-    }
-
-    pub async fn maybe_retry(
-        &self,
-        request: &mut RetryInfo,
-        reason: RetryReason,
-    ) -> Option<Duration> {
-        if reason.always_retry() {
-            request.add_retry_attempt(reason);
-            let backoff = controlled_backoff(request.retry_attempts);
-
-            return Some(backoff);
-        }
-
-        let strategy = request.retry_strategy();
-        let action = strategy.retry_after(request, &reason).await;
-
-        if let Some(a) = action {
-            request.add_retry_attempt(reason);
-
-            return Some(a.duration);
-        }
-
-        None
-    }
-}
-
 #[derive(Clone, Debug)]
 pub struct RetryAction {
     pub duration: Duration,
@@ -164,31 +125,24 @@ impl RetryAction {
     }
 }
 
-#[async_trait]
 pub trait RetryStrategy: Debug + Send + Sync {
-    async fn retry_after(&self, request: &RetryInfo, reason: &RetryReason) -> Option<RetryAction>;
+    fn retry_after(&self, request: &RetryRequest, reason: &RetryReason) -> Option<RetryAction>;
 }
 
 #[derive(Clone, Debug)]
-pub struct RetryInfo {
+pub struct RetryRequest {
     pub(crate) operation: &'static str,
-    pub(crate) is_idempotent: bool,
-    pub(crate) retry_strategy: Arc<dyn RetryStrategy>,
-    pub(crate) retry_attempts: u32,
-    pub(crate) retry_reasons: HashSet<RetryReason>,
+    pub is_idempotent: bool,
+    pub retry_attempts: u32,
+    pub retry_reasons: HashSet<RetryReason>,
     pub(crate) unique_id: Option<String>,
 }
 
-impl RetryInfo {
-    pub(crate) fn new(
-        operation: &'static str,
-        is_idempotent: bool,
-        retry_strategy: Arc<dyn RetryStrategy>,
-    ) -> Self {
+impl RetryRequest {
+    pub(crate) fn new(operation: &'static str, is_idempotent: bool) -> Self {
         Self {
             operation,
             is_idempotent,
-            retry_strategy,
             retry_attempts: 0,
             retry_reasons: Default::default(),
             unique_id: None,
@@ -204,10 +158,6 @@ impl RetryInfo {
         self.is_idempotent
     }
 
-    pub fn retry_strategy(&self) -> &Arc<dyn RetryStrategy> {
-        &self.retry_strategy
-    }
-
     pub fn retry_attempts(&self) -> u32 {
         self.retry_attempts
     }
@@ -217,7 +167,7 @@ impl RetryInfo {
     }
 }
 
-impl Display for RetryInfo {
+impl Display for RetryRequest {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -235,9 +185,44 @@ impl Display for RetryInfo {
     }
 }
 
+pub struct RetryManager {
+    err_map_component: Arc<ErrMapComponent>,
+}
+
+impl RetryManager {
+    pub fn new(err_map_component: Arc<ErrMapComponent>) -> Self {
+        Self { err_map_component }
+    }
+
+    pub async fn maybe_retry(
+        &self,
+        strategy: Arc<dyn RetryStrategy>,
+        request: &mut RetryRequest,
+        reason: RetryReason,
+    ) -> Option<Duration> {
+        if reason.always_retry() {
+            request.add_retry_attempt(reason);
+            let backoff = controlled_backoff(request.retry_attempts);
+
+            return Some(backoff);
+        }
+
+        let action = strategy.retry_after(request, &reason);
+
+        if let Some(a) = action {
+            request.add_retry_attempt(reason);
+
+            return Some(a.duration);
+        }
+
+        None
+    }
+}
+
 pub(crate) async fn orchestrate_retries<Fut, Resp>(
     rs: Arc<RetryManager>,
-    mut retry_info: RetryInfo,
+    strategy: Arc<dyn RetryStrategy>,
+    mut retry_info: RetryRequest,
     operation: impl Fn() -> Fut + Send + Sync,
 ) -> error::Result<Resp>
 where
@@ -253,7 +238,10 @@ where
         };
 
         if let Some(reason) = error_to_retry_reason(&rs, &mut retry_info, &err) {
-            if let Some(duration) = rs.maybe_retry(&mut retry_info, reason).await {
+            if let Some(duration) = rs
+                .maybe_retry(strategy.clone(), &mut retry_info, reason)
+                .await
+            {
                 debug!(
                     "Retrying {} after {:?} due to {}",
                     &retry_info, duration, reason
@@ -274,7 +262,7 @@ where
 
 pub(crate) fn error_to_retry_reason(
     rs: &Arc<RetryManager>,
-    retry_info: &mut RetryInfo,
+    retry_info: &mut RetryRequest,
     err: &Error,
 ) -> Option<RetryReason> {
     match err.kind() {
@@ -357,4 +345,15 @@ fn server_error_to_retry_reason(rs: &Arc<RetryManager>, e: &ServerError) -> Opti
     }
 
     None
+}
+
+pub(crate) fn controlled_backoff(retry_attempts: u32) -> Duration {
+    match retry_attempts {
+        0 => Duration::from_millis(1),
+        1 => Duration::from_millis(10),
+        2 => Duration::from_millis(50),
+        3 => Duration::from_millis(100),
+        4 => Duration::from_millis(500),
+        _ => Duration::from_millis(1000),
+    }
 }

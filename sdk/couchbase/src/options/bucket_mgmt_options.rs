@@ -16,62 +16,107 @@
  *
  */
 
+use crate::retry::RetryStrategy;
+use std::sync::Arc;
+
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct GetAllBucketsOptions {}
+pub struct GetAllBucketsOptions {
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+}
 
 impl GetAllBucketsOptions {
     pub fn new() -> Self {
         Default::default()
     }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
+    }
 }
 
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct GetBucketOptions {}
+pub struct GetBucketOptions {
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+}
 
 impl GetBucketOptions {
     pub fn new() -> Self {
         Default::default()
     }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
+    }
 }
 
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct CreateBucketOptions {}
+pub struct CreateBucketOptions {
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+}
 
 impl CreateBucketOptions {
     pub fn new() -> Self {
         Default::default()
     }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
+    }
 }
 
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct UpdateBucketOptions {}
+pub struct UpdateBucketOptions {
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+}
 
 impl UpdateBucketOptions {
     pub fn new() -> Self {
         Default::default()
     }
-}
 
-#[derive(Default, Debug, Clone)]
-#[non_exhaustive]
-pub struct DropBucketOptions {}
-
-impl DropBucketOptions {
-    pub fn new() -> Self {
-        Default::default()
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
     }
 }
 
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
-pub struct FlushBucketOptions {}
+pub struct DropBucketOptions {
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+}
+
+impl DropBucketOptions {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
+    }
+}
+
+#[derive(Default, Debug, Clone)]
+#[non_exhaustive]
+pub struct FlushBucketOptions {
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+}
 
 impl FlushBucketOptions {
     pub fn new() -> Self {
         Default::default()
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
     }
 }

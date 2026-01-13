@@ -35,7 +35,7 @@ use crate::queryx::query::Query;
 use crate::queryx::query_options::{EnsureIndexPollOptions, PingOptions};
 use crate::results::pingreport::{EndpointPingReport, PingState};
 use crate::results::query::QueryResultStream;
-use crate::retry::{orchestrate_retries, RetryInfo, RetryManager, DEFAULT_RETRY_STRATEGY};
+use crate::retry::{orchestrate_retries, RetryManager, RetryRequest, RetryStrategy};
 use crate::retrybesteffort::ExponentialBackoffCalculator;
 use crate::service_type::ServiceType;
 use crate::{error, httpx};
@@ -91,18 +91,13 @@ impl<C: Client + 'static> QueryComponent<C> {
     }
 
     pub async fn query(&self, opts: QueryOptions) -> error::Result<QueryResultStream> {
-        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
-            retry_strategy
-        } else {
-            DEFAULT_RETRY_STRATEGY.clone()
-        };
+        let retry_info = RetryRequest::new("query", opts.read_only.unwrap_or_default());
 
-        let retry_info = RetryInfo::new("query", opts.read_only.unwrap_or_default(), retry);
-
+        let retry = opts.retry_strategy.clone();
         let endpoint = opts.endpoint.clone();
         let copts = opts.into();
 
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
+        orchestrate_retries(self.retry_manager.clone(), retry, retry_info, async || {
             self.http_component
                 .orchestrate_endpoint(
                     endpoint.clone(),
@@ -132,18 +127,13 @@ impl<C: Client + 'static> QueryComponent<C> {
     }
 
     pub async fn prepared_query(&self, opts: QueryOptions) -> error::Result<QueryResultStream> {
-        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
-            retry_strategy
-        } else {
-            DEFAULT_RETRY_STRATEGY.clone()
-        };
-        let retry_info =
-            RetryInfo::new("prepared_query", opts.read_only.unwrap_or_default(), retry);
+        let retry_info = RetryRequest::new("prepared_query", opts.read_only.unwrap_or_default());
 
+        let retry = opts.retry_strategy.clone();
         let endpoint = opts.endpoint.clone();
         let copts = opts.into();
 
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
+        orchestrate_retries(self.retry_manager.clone(), retry, retry_info, async || {
             self.http_component
                 .orchestrate_endpoint(
                     endpoint.clone(),
@@ -179,18 +169,13 @@ impl<C: Client + 'static> QueryComponent<C> {
         &self,
         opts: &GetAllIndexesOptions<'_>,
     ) -> error::Result<Vec<Index>> {
-        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
-            retry_strategy
-        } else {
-            DEFAULT_RETRY_STRATEGY.clone()
-        };
+        let retry_info = RetryRequest::new("query_get_all_indexes", true);
 
-        let retry_info = RetryInfo::new("query_get_all_indexes", true, retry);
-
+        let retry = opts.retry_strategy.clone();
         let endpoint = opts.endpoint.clone();
         let copts = opts.into();
 
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
+        orchestrate_retries(self.retry_manager.clone(), retry, retry_info, async || {
             self.http_component
                 .orchestrate_endpoint(
                     endpoint.clone(),
@@ -222,18 +207,14 @@ impl<C: Client + 'static> QueryComponent<C> {
         &self,
         opts: &CreatePrimaryIndexOptions<'_>,
     ) -> error::Result<()> {
-        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
-            retry_strategy
-        } else {
-            DEFAULT_RETRY_STRATEGY.clone()
-        };
+        let retry_info = RetryRequest::new("query_create_primary_index", false);
 
-        let retry_info = RetryInfo::new("query_create_primary_index", false, retry);
-
+        let retry = opts.retry_strategy.clone();
         let endpoint = opts.endpoint.clone();
         let copts = opts.into();
 
         self.orchestrate_no_res_mgmt_call(
+            retry,
             retry_info,
             endpoint.map(|e| e.to_string()),
             async |query| {
@@ -247,18 +228,14 @@ impl<C: Client + 'static> QueryComponent<C> {
     }
 
     pub async fn create_index(&self, opts: &CreateIndexOptions<'_>) -> error::Result<()> {
-        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
-            retry_strategy
-        } else {
-            DEFAULT_RETRY_STRATEGY.clone()
-        };
+        let retry_info = RetryRequest::new("query_create_index", false);
 
-        let retry_info = RetryInfo::new("query_create_index", false, retry);
-
+        let retry = opts.retry_strategy.clone();
         let endpoint = opts.endpoint.clone();
         let copts = opts.into();
 
         self.orchestrate_no_res_mgmt_call(
+            retry,
             retry_info,
             endpoint.map(|e| e.to_string()),
             async |query| {
@@ -275,18 +252,14 @@ impl<C: Client + 'static> QueryComponent<C> {
         &self,
         opts: &DropPrimaryIndexOptions<'_>,
     ) -> error::Result<()> {
-        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
-            retry_strategy
-        } else {
-            DEFAULT_RETRY_STRATEGY.clone()
-        };
+        let retry_info = RetryRequest::new("query_drop_primary_index", false);
 
-        let retry_info = RetryInfo::new("query_drop_primary_index", false, retry);
-
+        let retry = opts.retry_strategy.clone();
         let endpoint = opts.endpoint.clone();
         let copts = opts.into();
 
         self.orchestrate_no_res_mgmt_call(
+            retry,
             retry_info,
             endpoint.map(|e| e.to_string()),
             async |query| {
@@ -300,18 +273,14 @@ impl<C: Client + 'static> QueryComponent<C> {
     }
 
     pub async fn drop_index(&self, opts: &DropIndexOptions<'_>) -> error::Result<()> {
-        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
-            retry_strategy
-        } else {
-            DEFAULT_RETRY_STRATEGY.clone()
-        };
+        let retry_info = RetryRequest::new("query_drop_index", false);
 
-        let retry_info = RetryInfo::new("query_drop_index", false, retry);
-
+        let retry = opts.retry_strategy.clone();
         let endpoint = opts.endpoint.clone();
         let copts = opts.into();
 
         self.orchestrate_no_res_mgmt_call(
+            retry,
             retry_info,
             endpoint.map(|e| e.to_string()),
             async |query| {
@@ -328,18 +297,14 @@ impl<C: Client + 'static> QueryComponent<C> {
         &self,
         opts: &BuildDeferredIndexesOptions<'_>,
     ) -> error::Result<()> {
-        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
-            retry_strategy
-        } else {
-            DEFAULT_RETRY_STRATEGY.clone()
-        };
+        let retry_info = RetryRequest::new("query_build_deferred_indexes", false);
 
-        let retry_info = RetryInfo::new("query_build_deferred_indexes", false, retry);
-
+        let retry = opts.retry_strategy.clone();
         let endpoint = opts.endpoint.clone();
         let copts = opts.into();
 
         self.orchestrate_no_res_mgmt_call(
+            retry,
             retry_info,
             endpoint.map(|e| e.to_string()),
             async |query| {
@@ -353,18 +318,14 @@ impl<C: Client + 'static> QueryComponent<C> {
     }
 
     pub async fn watch_indexes(&self, opts: &WatchIndexesOptions<'_>) -> error::Result<()> {
-        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
-            retry_strategy
-        } else {
-            DEFAULT_RETRY_STRATEGY.clone()
-        };
+        let retry_info = RetryRequest::new("query_watch_indexes", true);
 
-        let retry_info = RetryInfo::new("query_watch_indexes", true, retry);
-
+        let retry = opts.retry_strategy.clone();
         let endpoint = opts.endpoint.clone();
         let copts = opts.into();
 
         self.orchestrate_no_res_mgmt_call(
+            retry,
             retry_info,
             endpoint.map(|e| e.to_string()),
             async |query| {
@@ -513,7 +474,8 @@ impl<C: Client + 'static> QueryComponent<C> {
 
     async fn orchestrate_no_res_mgmt_call<Fut>(
         &self,
-        retry_info: RetryInfo,
+        retry_strategy: Arc<dyn RetryStrategy>,
+        retry_info: RetryRequest,
         endpoint: Option<String>,
         operation: impl Fn(Query<C>) -> Fut + Send + Sync,
     ) -> error::Result<()>
@@ -521,22 +483,30 @@ impl<C: Client + 'static> QueryComponent<C> {
         Fut: Future<Output = error::Result<()>> + Send,
         C: Client,
     {
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
-            self.http_component
-                .orchestrate_endpoint(
-                    endpoint.clone(),
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
-                        operation(Query::<C> {
-                            http_client: client,
-                            user_agent: self.http_component.user_agent().to_string(),
-                            endpoint: endpoint.clone(),
-                            auth,
-                        })
-                        .await
-                    },
-                )
-                .await
-        })
+        orchestrate_retries(
+            self.retry_manager.clone(),
+            retry_strategy,
+            retry_info,
+            async || {
+                self.http_component
+                    .orchestrate_endpoint(
+                        endpoint.clone(),
+                        async |client: Arc<C>,
+                               endpoint_id: String,
+                               endpoint: String,
+                               auth: Auth| {
+                            operation(Query::<C> {
+                                http_client: client,
+                                user_agent: self.http_component.user_agent().to_string(),
+                                endpoint: endpoint.clone(),
+                                auth,
+                            })
+                            .await
+                        },
+                    )
+                    .await
+            },
+        )
         .await
     }
 }

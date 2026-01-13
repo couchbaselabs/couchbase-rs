@@ -16,8 +16,10 @@
  *
  */
 
+use crate::retry::RetryStrategy;
 use crate::service_type::ServiceType;
 use std::fmt::Display;
+use std::sync::Arc;
 
 #[derive(Debug, Default, Clone)]
 #[non_exhaustive]
@@ -78,6 +80,7 @@ pub enum ClusterState {
 pub struct WaitUntilReadyOptions {
     pub desired_state: Option<ClusterState>,
     pub service_types: Option<Vec<ServiceType>>,
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl Default for WaitUntilReadyOptions {
@@ -91,6 +94,7 @@ impl WaitUntilReadyOptions {
         Self {
             desired_state: None,
             service_types: None,
+            retry_strategy: None,
         }
     }
 
@@ -103,24 +107,10 @@ impl WaitUntilReadyOptions {
         self.service_types = Some(service_types);
         self
     }
-}
 
-impl From<WaitUntilReadyOptions>
-    for couchbase_core::options::waituntilready::WaitUntilReadyOptions
-{
-    fn from(options: WaitUntilReadyOptions) -> Self {
-        let mut core_opts = Self::new();
-
-        if let Some(state) = options.desired_state {
-            core_opts = core_opts.desired_state(state.into());
-        }
-
-        if let Some(service_types) = options.service_types {
-            core_opts =
-                core_opts.service_types(service_types.into_iter().map(|s| s.into()).collect());
-        }
-
-        core_opts
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
     }
 }
 
@@ -133,34 +123,5 @@ impl From<ClusterState> for couchbase_core::options::waituntilready::ClusterStat
             }
             ClusterState::Offline => couchbase_core::options::waituntilready::ClusterState::Offline,
         }
-    }
-}
-
-impl From<DiagnosticsOptions> for couchbase_core::options::diagnostics::DiagnosticsOptions {
-    fn from(_options: DiagnosticsOptions) -> Self {
-        Self::new()
-    }
-}
-
-impl From<PingOptions> for couchbase_core::options::ping::PingOptions {
-    fn from(options: PingOptions) -> Self {
-        let mut core_opts = Self::new();
-
-        if let Some(service_types) = options.service_types {
-            core_opts =
-                core_opts.service_types(service_types.into_iter().map(|s| s.into()).collect());
-        }
-
-        if let Some(timeout) = options.kv_timeout {
-            core_opts = core_opts.kv_timeout(timeout);
-        }
-        if let Some(timeout) = options.query_timeout {
-            core_opts = core_opts.query_timeout(timeout);
-        }
-        if let Some(timeout) = options.search_timeout {
-            core_opts = core_opts.search_timeout(timeout);
-        }
-
-        core_opts
     }
 }

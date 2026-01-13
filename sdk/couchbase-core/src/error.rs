@@ -21,7 +21,7 @@ use crate::httpx::error::Error as HttpError;
 use crate::memdx;
 use crate::mgmtx::error::Error as MgmtError;
 use crate::queryx::error::Error as QueryError;
-use crate::retry::RetryInfo;
+use crate::retry::RetryRequest;
 use crate::searchx::error::Error as SearchError;
 use crate::service_type::ServiceType;
 use std::error::Error as StdError;
@@ -34,7 +34,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, Clone)]
 pub struct Error {
     kind: Arc<ErrorKind>,
-    retry_info: Option<RetryInfo>,
+    retry_info: Option<RetryRequest>,
 }
 
 impl Display for Error {
@@ -106,11 +106,11 @@ impl Error {
         }
     }
 
-    pub(crate) fn set_retry_info(&mut self, retry_info: RetryInfo) {
+    pub(crate) fn set_retry_info(&mut self, retry_info: RetryRequest) {
         self.retry_info = Some(retry_info);
     }
 
-    pub fn retry_info(&self) -> Option<&RetryInfo> {
+    pub fn retry_info(&self) -> Option<&RetryRequest> {
         self.retry_info.as_ref()
     }
 }

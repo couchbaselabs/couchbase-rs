@@ -25,7 +25,7 @@ use crate::httpx::client::Client;
 use crate::httpx::request::Auth;
 use crate::options::analytics::{AnalyticsOptions, GetPendingMutationsOptions};
 use crate::results::analytics::AnalyticsResultStream;
-use crate::retry::{orchestrate_retries, RetryInfo, RetryManager, DEFAULT_RETRY_STRATEGY};
+use crate::retry::{orchestrate_retries, RetryManager, RetryRequest};
 use crate::service_type::ServiceType;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -71,18 +71,13 @@ impl<C: Client + 'static> AnalyticsComponent<C> {
     }
 
     pub async fn query(&self, opts: AnalyticsOptions) -> error::Result<AnalyticsResultStream> {
-        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
-            retry_strategy
-        } else {
-            DEFAULT_RETRY_STRATEGY.clone()
-        };
+        let retry_info = RetryRequest::new("analytics", opts.read_only.unwrap_or_default());
 
-        let retry_info = RetryInfo::new("analytics", opts.read_only.unwrap_or_default(), retry);
-
+        let retry = opts.retry_strategy.clone();
         let endpoint = opts.endpoint.clone();
         let copts = opts.into();
 
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
+        orchestrate_retries(self.retry_manager.clone(), retry, retry_info, async || {
             self.http_component
                 .orchestrate_endpoint(
                     endpoint.clone(),
@@ -115,18 +110,13 @@ impl<C: Client + 'static> AnalyticsComponent<C> {
         &self,
         opts: &GetPendingMutationsOptions<'_>,
     ) -> error::Result<HashMap<String, HashMap<String, i64>>> {
-        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
-            retry_strategy
-        } else {
-            DEFAULT_RETRY_STRATEGY.clone()
-        };
+        let retry_info = RetryRequest::new("get_pending_mutations", true);
 
-        let retry_info = RetryInfo::new("get_pending_mutations", true, retry);
-
+        let retry = opts.retry_strategy.clone();
         let endpoint = opts.endpoint.clone();
         let copts = opts.into();
 
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
+        orchestrate_retries(self.retry_manager.clone(), retry, retry_info, async || {
             self.http_component
                 .orchestrate_endpoint(
                     endpoint.clone(),

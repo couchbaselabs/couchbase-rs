@@ -17,7 +17,7 @@
  */
 
 use crate::httpx::request::OnBehalfOfInfo;
-use crate::retry::RetryStrategy;
+use crate::retry::{RetryStrategy, DEFAULT_RETRY_STRATEGY};
 use crate::searchx;
 use crate::searchx::facets::Facet;
 use crate::searchx::queries::Query;
@@ -56,7 +56,7 @@ pub struct SearchOptions {
     pub on_behalf_of: Option<OnBehalfOfInfo>,
 
     pub endpoint: Option<String>,
-    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl SearchOptions {
@@ -85,7 +85,7 @@ impl SearchOptions {
             bucket_name: None,
             on_behalf_of: None,
             endpoint: None,
-            retry_strategy: None,
+            retry_strategy: DEFAULT_RETRY_STRATEGY.clone(),
         }
     }
 
@@ -194,11 +194,8 @@ impl SearchOptions {
         self
     }
 
-    pub fn retry_strategy(
-        mut self,
-        retry_strategy: impl Into<Option<Arc<dyn RetryStrategy>>>,
-    ) -> Self {
-        self.retry_strategy = retry_strategy.into();
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = retry_strategy;
         self
     }
 

@@ -25,9 +25,9 @@ use crate::httpx::request::OnBehalfOfInfo;
 use crate::queryx;
 pub use crate::queryx::ensure_index_helper::DesiredState;
 use crate::queryx::query_options::{FullScanVectors, SparseScanVectors};
-use crate::retry::RetryStrategy;
+use crate::retry::{RetryStrategy, DEFAULT_RETRY_STRATEGY};
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct QueryOptions {
     pub args: Option<Vec<Value>>,
@@ -79,7 +79,62 @@ pub struct QueryOptions {
 
     pub on_behalf_of: Option<OnBehalfOfInfo>,
     pub endpoint: Option<String>,
-    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
+}
+
+impl Default for QueryOptions {
+    fn default() -> Self {
+        Self {
+            args: None,
+            atr_collection: None,
+            auto_execute: None,
+            client_context_id: None,
+            compression: None,
+            controls: None,
+            creds: None,
+            durability_level: None,
+            encoded_plan: None,
+            encoding: None,
+            format: None,
+            kv_timeout: None,
+            max_parallelism: None,
+            memory_quota: None,
+            metrics: None,
+            namespace: None,
+            num_atrs: None,
+            pipeline_batch: None,
+            pipeline_cap: None,
+            prepared: None,
+            preserve_expiry: None,
+            pretty: None,
+            profile: None,
+            query_context: None,
+            read_only: None,
+            scan_cap: None,
+            scan_consistency: None,
+            sparse_scan_vector: None,
+            full_scan_vector: None,
+            sparse_scan_vectors: None,
+            full_scan_vectors: None,
+            scan_wait: None,
+            signature: None,
+            statement: None,
+            timeout: None,
+            tx_data: None,
+            tx_id: None,
+            tx_implicit: None,
+            tx_stmt_num: None,
+            tx_timeout: None,
+            use_cbo: None,
+            use_fts: None,
+            use_replica: None,
+            named_args: None,
+            raw: None,
+            on_behalf_of: None,
+            endpoint: None,
+            retry_strategy: DEFAULT_RETRY_STRATEGY.clone(),
+        }
+    }
 }
 
 impl QueryOptions {
@@ -350,11 +405,8 @@ impl QueryOptions {
         self
     }
 
-    pub fn retry_strategy(
-        mut self,
-        retry_strategy: impl Into<Option<Arc<dyn RetryStrategy>>>,
-    ) -> Self {
-        self.retry_strategy = retry_strategy.into();
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = retry_strategy;
         self
     }
 
@@ -427,7 +479,7 @@ pub struct GetAllIndexesOptions<'a> {
     pub collection_name: Option<&'a str>,
     pub on_behalf_of: Option<&'a OnBehalfOfInfo>,
     pub endpoint: Option<String>,
-    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> GetAllIndexesOptions<'a> {
@@ -438,7 +490,7 @@ impl<'a> GetAllIndexesOptions<'a> {
             collection_name: None,
             on_behalf_of: None,
             endpoint: None,
-            retry_strategy: None,
+            retry_strategy: DEFAULT_RETRY_STRATEGY.clone(),
         }
     }
 
@@ -463,7 +515,7 @@ impl<'a> GetAllIndexesOptions<'a> {
     }
 
     pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
-        self.retry_strategy = Some(retry_strategy);
+        self.retry_strategy = retry_strategy;
         self
     }
 }
@@ -491,7 +543,7 @@ pub struct CreatePrimaryIndexOptions<'a> {
     pub ignore_if_exists: Option<bool>,
     pub on_behalf_of: Option<&'a OnBehalfOfInfo>,
     pub endpoint: Option<String>,
-    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> CreatePrimaryIndexOptions<'a> {
@@ -506,7 +558,7 @@ impl<'a> CreatePrimaryIndexOptions<'a> {
             ignore_if_exists: None,
             on_behalf_of: None,
             endpoint: None,
-            retry_strategy: None,
+            retry_strategy: DEFAULT_RETRY_STRATEGY.clone(),
         }
     }
 
@@ -551,7 +603,7 @@ impl<'a> CreatePrimaryIndexOptions<'a> {
     }
 
     pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
-        self.retry_strategy = Some(retry_strategy);
+        self.retry_strategy = retry_strategy;
         self
     }
 }
@@ -586,7 +638,7 @@ pub struct CreateIndexOptions<'a> {
     pub ignore_if_exists: Option<bool>,
     pub on_behalf_of: Option<&'a OnBehalfOfInfo>,
     pub endpoint: Option<String>,
-    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> CreateIndexOptions<'a> {
@@ -602,7 +654,7 @@ impl<'a> CreateIndexOptions<'a> {
             ignore_if_exists: None,
             on_behalf_of: None,
             endpoint: None,
-            retry_strategy: None,
+            retry_strategy: DEFAULT_RETRY_STRATEGY.clone(),
         }
     }
 
@@ -642,7 +694,7 @@ impl<'a> CreateIndexOptions<'a> {
     }
 
     pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
-        self.retry_strategy = Some(retry_strategy);
+        self.retry_strategy = retry_strategy;
         self
     }
 }
@@ -673,7 +725,7 @@ pub struct DropPrimaryIndexOptions<'a> {
     pub ignore_if_not_exists: Option<bool>,
     pub on_behalf_of: Option<&'a OnBehalfOfInfo>,
     pub endpoint: Option<String>,
-    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> DropPrimaryIndexOptions<'a> {
@@ -686,7 +738,7 @@ impl<'a> DropPrimaryIndexOptions<'a> {
             ignore_if_not_exists: None,
             on_behalf_of: None,
             endpoint: None,
-            retry_strategy: None,
+            retry_strategy: DEFAULT_RETRY_STRATEGY.clone(),
         }
     }
 
@@ -721,7 +773,7 @@ impl<'a> DropPrimaryIndexOptions<'a> {
     }
 
     pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
-        self.retry_strategy = Some(retry_strategy);
+        self.retry_strategy = retry_strategy;
         self
     }
 }
@@ -749,7 +801,7 @@ pub struct DropIndexOptions<'a> {
     pub ignore_if_not_exists: Option<bool>,
     pub on_behalf_of: Option<&'a OnBehalfOfInfo>,
     pub endpoint: Option<String>,
-    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> DropIndexOptions<'a> {
@@ -762,7 +814,7 @@ impl<'a> DropIndexOptions<'a> {
             ignore_if_not_exists: None,
             on_behalf_of: None,
             endpoint: None,
-            retry_strategy: None,
+            retry_strategy: DEFAULT_RETRY_STRATEGY.clone(),
         }
     }
 
@@ -792,7 +844,7 @@ impl<'a> DropIndexOptions<'a> {
     }
 
     pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
-        self.retry_strategy = Some(retry_strategy);
+        self.retry_strategy = retry_strategy;
         self
     }
 }
@@ -818,7 +870,7 @@ pub struct BuildDeferredIndexesOptions<'a> {
     pub collection_name: Option<&'a str>,
     pub on_behalf_of: Option<&'a OnBehalfOfInfo>,
     pub endpoint: Option<String>,
-    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> BuildDeferredIndexesOptions<'a> {
@@ -829,7 +881,7 @@ impl<'a> BuildDeferredIndexesOptions<'a> {
             collection_name: None,
             on_behalf_of: None,
             endpoint: None,
-            retry_strategy: None,
+            retry_strategy: DEFAULT_RETRY_STRATEGY.clone(),
         }
     }
 
@@ -854,7 +906,7 @@ impl<'a> BuildDeferredIndexesOptions<'a> {
     }
 
     pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
-        self.retry_strategy = Some(retry_strategy);
+        self.retry_strategy = retry_strategy;
         self
     }
 }
@@ -882,7 +934,7 @@ pub struct WatchIndexesOptions<'a> {
     pub watch_primary: Option<bool>,
     pub on_behalf_of: Option<&'a OnBehalfOfInfo>,
     pub endpoint: Option<String>,
-    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
+    pub retry_strategy: Arc<dyn RetryStrategy>,
 }
 
 impl<'a> WatchIndexesOptions<'a> {
@@ -895,7 +947,7 @@ impl<'a> WatchIndexesOptions<'a> {
             watch_primary: None,
             on_behalf_of: None,
             endpoint: None,
-            retry_strategy: None,
+            retry_strategy: DEFAULT_RETRY_STRATEGY.clone(),
         }
     }
 
@@ -925,7 +977,7 @@ impl<'a> WatchIndexesOptions<'a> {
     }
 
     pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
-        self.retry_strategy = Some(retry_strategy);
+        self.retry_strategy = retry_strategy;
         self
     }
 }

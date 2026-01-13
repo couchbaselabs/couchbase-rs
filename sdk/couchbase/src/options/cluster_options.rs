@@ -56,6 +56,7 @@ pub struct ClusterOptions {
     #[cfg(feature = "unstable-dns-options")]
     pub dns_options: Option<DnsOptions>,
     pub orphan_reporter_options: OrphanReporterOptions,
+    pub default_retry_strategy: Option<Arc<dyn crate::retry::RetryStrategy>>,
 }
 
 impl Debug for ClusterOptions {
@@ -86,6 +87,7 @@ impl ClusterOptions {
             #[cfg(feature = "unstable-dns-options")]
             dns_options: None,
             orphan_reporter_options: OrphanReporterOptions::new(),
+            default_retry_strategy: None,
         }
     }
 
@@ -130,6 +132,14 @@ impl ClusterOptions {
         orphan_reporter_options: OrphanReporterOptions,
     ) -> Self {
         self.orphan_reporter_options = orphan_reporter_options;
+        self
+    }
+
+    pub fn default_retry_strategy(
+        mut self,
+        retry_strategy: Arc<dyn crate::retry::RetryStrategy>,
+    ) -> Self {
+        self.default_retry_strategy = Some(retry_strategy);
         self
     }
 }

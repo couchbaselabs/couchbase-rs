@@ -26,7 +26,7 @@ use crate::clients::diagnostics_client::{
 use crate::clients::scope_client::{
     Couchbase2ScopeClient, CouchbaseScopeClient, ScopeClient, ScopeClientBackend,
 };
-use couchbase_core::retry::RetryStrategy;
+use crate::retry::RetryStrategy;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -136,7 +136,10 @@ impl CouchbaseBucketClient {
     }
 
     pub fn diagnostics_client(&self) -> CouchbaseDiagnosticsClient {
-        CouchbaseDiagnosticsClient::new(self.agent_provider.clone())
+        CouchbaseDiagnosticsClient::new(
+            self.agent_provider.clone(),
+            self.default_retry_strategy.clone(),
+        )
     }
 }
 

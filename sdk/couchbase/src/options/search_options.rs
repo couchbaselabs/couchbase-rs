@@ -18,11 +18,13 @@
 
 use crate::error::Error;
 use crate::mutation_state::MutationState;
+use crate::retry::RetryStrategy;
 use crate::search::facets::Facet;
 use crate::search::sort::Sort;
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Duration;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -126,6 +128,7 @@ pub struct SearchOptions {
     pub include_locations: Option<bool>,
     pub disable_scoring: Option<bool>,
     pub server_timeout: Option<Duration>,
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl SearchOptions {
@@ -216,6 +219,11 @@ impl SearchOptions {
 
     pub fn server_timeout(mut self, server_timeout: Duration) -> Self {
         self.server_timeout = Some(server_timeout);
+        self
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
         self
     }
 }

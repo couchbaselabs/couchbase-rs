@@ -32,7 +32,7 @@ use crate::options::waituntilready::{ClusterState, WaitUntilReadyOptions};
 use crate::querycomponent::QueryComponent;
 use crate::results::diagnostics::{DiagnosticsResult, EndpointDiagnostics};
 use crate::results::pingreport::{EndpointPingReport, PingReport, PingState};
-use crate::retry::{RetryInfo, RetryManager, RetryReason};
+use crate::retry::{RetryManager, RetryReason, RetryRequest};
 use crate::retrybesteffort::{BestEffortRetryStrategy, ExponentialBackoffCalculator};
 use crate::searchcomponent::SearchComponent;
 use crate::service_type::ServiceType;
@@ -230,13 +230,7 @@ impl<C: Client + 'static, M: KvEndpointClientManager> DiagnosticsComponent<C, M>
             ));
         }
 
-        let mut retry_info = RetryInfo::new(
-            "wait_until_ready",
-            true,
-            Arc::new(BestEffortRetryStrategy::new(
-                ExponentialBackoffCalculator::default(),
-            )),
-        );
+        let mut retry_info = RetryRequest::new("wait_until_ready", true);
 
         let available_services = {
             let state = self.state.lock().unwrap();
@@ -288,7 +282,11 @@ impl<C: Client + 'static, M: KvEndpointClientManager> DiagnosticsComponent<C, M>
 
             let duration = self
                 .retry_manager
-                .maybe_retry(&mut retry_info, RetryReason::NotReady)
+                .maybe_retry(
+                    opts.retry_strategy.clone(),
+                    &mut retry_info,
+                    RetryReason::NotReady,
+                )
                 .await;
 
             if let Some(duration) = duration {

@@ -32,7 +32,7 @@ use crate::options::search_management::{
 };
 use crate::results::pingreport::{EndpointPingReport, PingState};
 use crate::results::search::SearchResultStream;
-use crate::retry::{orchestrate_retries, RetryInfo, RetryManager, DEFAULT_RETRY_STRATEGY};
+use crate::retry::{orchestrate_retries, RetryManager, RetryRequest, RetryStrategy};
 use crate::retrybesteffort::ExponentialBackoffCalculator;
 use crate::searchx::document_analysis::DocumentAnalysis;
 use crate::searchx::ensure_index_helper::EnsureIndexHelper;
@@ -119,18 +119,13 @@ impl<C: Client + 'static> SearchComponent<C> {
             }
             .into());
         }
-        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
-            retry_strategy
-        } else {
-            DEFAULT_RETRY_STRATEGY.clone()
-        };
+        let retry_info = RetryRequest::new("search_query", true);
 
-        let retry_info = RetryInfo::new("search_query", true, retry);
-
+        let retry = opts.retry_strategy.clone();
         let endpoint = opts.endpoint.clone();
         let copts = opts.into();
 
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
+        orchestrate_retries(self.retry_manager.clone(), retry, retry_info, async || {
             self.http_component
                 .orchestrate_endpoint(
                     endpoint.clone(),
@@ -162,17 +157,13 @@ impl<C: Client + 'static> SearchComponent<C> {
     }
 
     pub async fn get_index(&self, opts: &GetIndexOptions<'_>) -> error::Result<Index> {
-        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
-            retry_strategy
-        } else {
-            DEFAULT_RETRY_STRATEGY.clone()
-        };
-
-        let retry_info = RetryInfo::new("search_get_index", true, retry);
+        let retry_info = RetryRequest::new("search_get_index", true);
+        let retry = opts.retry_strategy.clone();
         let endpoint = opts.endpoint;
         let copts = opts.into();
 
         self.orchestrate_mgmt_call(
+            retry,
             retry_info,
             endpoint.map(|e| e.to_string()),
             async |search| {
@@ -189,17 +180,13 @@ impl<C: Client + 'static> SearchComponent<C> {
         &self,
         opts: &GetAllIndexesOptions<'_>,
     ) -> error::Result<Vec<Index>> {
-        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
-            retry_strategy
-        } else {
-            DEFAULT_RETRY_STRATEGY.clone()
-        };
-
-        let retry_info = RetryInfo::new("search_get_all_indexes", true, retry);
+        let retry_info = RetryRequest::new("search_get_all_indexes", true);
+        let retry = opts.retry_strategy.clone();
         let endpoint = opts.endpoint;
         let copts = opts.into();
 
         self.orchestrate_mgmt_call(
+            retry,
             retry_info,
             endpoint.map(|e| e.to_string()),
             async |search| {
@@ -213,17 +200,13 @@ impl<C: Client + 'static> SearchComponent<C> {
     }
 
     pub async fn upsert_index(&self, opts: &UpsertIndexOptions<'_>) -> error::Result<()> {
-        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
-            retry_strategy
-        } else {
-            DEFAULT_RETRY_STRATEGY.clone()
-        };
-
-        let retry_info = RetryInfo::new("search_upsert_index", true, retry);
+        let retry_info = RetryRequest::new("search_upsert_index", true);
+        let retry = opts.retry_strategy.clone();
         let endpoint = opts.endpoint;
         let copts = opts.into();
 
         self.orchestrate_no_res_mgmt_call(
+            retry,
             retry_info,
             endpoint.map(|e| e.to_string()),
             async |search| {
@@ -237,17 +220,13 @@ impl<C: Client + 'static> SearchComponent<C> {
     }
 
     pub async fn delete_index(&self, opts: &DeleteIndexOptions<'_>) -> error::Result<()> {
-        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
-            retry_strategy
-        } else {
-            DEFAULT_RETRY_STRATEGY.clone()
-        };
-
-        let retry_info = RetryInfo::new("search_delete_index", true, retry);
+        let retry_info = RetryRequest::new("search_delete_index", true);
+        let retry = opts.retry_strategy.clone();
         let endpoint = opts.endpoint;
         let copts = opts.into();
 
         self.orchestrate_no_res_mgmt_call(
+            retry,
             retry_info,
             endpoint.map(|e| e.to_string()),
             async |search| {
@@ -264,17 +243,13 @@ impl<C: Client + 'static> SearchComponent<C> {
         &self,
         opts: &AnalyzeDocumentOptions<'_>,
     ) -> error::Result<DocumentAnalysis> {
-        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
-            retry_strategy
-        } else {
-            DEFAULT_RETRY_STRATEGY.clone()
-        };
-
-        let retry_info = RetryInfo::new("search_analyze_document", true, retry);
+        let retry_info = RetryRequest::new("search_analyze_document", true);
+        let retry = opts.retry_strategy.clone();
         let endpoint = opts.endpoint;
         let copts = opts.into();
 
         self.orchestrate_mgmt_call(
+            retry,
             retry_info,
             endpoint.map(|e| e.to_string()),
             async |search| {
@@ -291,17 +266,13 @@ impl<C: Client + 'static> SearchComponent<C> {
         &self,
         opts: &GetIndexedDocumentsCountOptions<'_>,
     ) -> error::Result<u64> {
-        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
-            retry_strategy
-        } else {
-            DEFAULT_RETRY_STRATEGY.clone()
-        };
-
-        let retry_info = RetryInfo::new("search_get_indexed_documents_count", true, retry);
+        let retry_info = RetryRequest::new("search_get_indexed_documents_count", true);
+        let retry = opts.retry_strategy.clone();
         let endpoint = opts.endpoint;
         let copts = opts.into();
 
         self.orchestrate_mgmt_call(
+            retry,
             retry_info,
             endpoint.map(|e| e.to_string()),
             async |search| {
@@ -315,17 +286,13 @@ impl<C: Client + 'static> SearchComponent<C> {
     }
 
     pub async fn pause_ingest(&self, opts: &PauseIngestOptions<'_>) -> error::Result<()> {
-        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
-            retry_strategy
-        } else {
-            DEFAULT_RETRY_STRATEGY.clone()
-        };
-
-        let retry_info = RetryInfo::new("search_pause_ingest", true, retry);
+        let retry_info = RetryRequest::new("search_pause_ingest", true);
+        let retry = opts.retry_strategy.clone();
         let endpoint = opts.endpoint;
         let copts = opts.into();
 
         self.orchestrate_no_res_mgmt_call(
+            retry,
             retry_info,
             endpoint.map(|e| e.to_string()),
             async |search| {
@@ -339,17 +306,13 @@ impl<C: Client + 'static> SearchComponent<C> {
     }
 
     pub async fn resume_ingest(&self, opts: &ResumeIngestOptions<'_>) -> error::Result<()> {
-        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
-            retry_strategy
-        } else {
-            DEFAULT_RETRY_STRATEGY.clone()
-        };
-
-        let retry_info = RetryInfo::new("search_resume_ingest", true, retry);
+        let retry_info = RetryRequest::new("search_resume_ingest", true);
+        let retry = opts.retry_strategy.clone();
         let endpoint = opts.endpoint;
         let copts = opts.into();
 
         self.orchestrate_no_res_mgmt_call(
+            retry,
             retry_info,
             endpoint.map(|e| e.to_string()),
             async |search| {
@@ -363,17 +326,13 @@ impl<C: Client + 'static> SearchComponent<C> {
     }
 
     pub async fn allow_querying(&self, opts: &AllowQueryingOptions<'_>) -> error::Result<()> {
-        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
-            retry_strategy
-        } else {
-            DEFAULT_RETRY_STRATEGY.clone()
-        };
-
-        let retry_info = RetryInfo::new("search_allow_querying", true, retry);
+        let retry_info = RetryRequest::new("search_allow_querying", true);
+        let retry = opts.retry_strategy.clone();
         let endpoint = opts.endpoint;
         let copts = opts.into();
 
         self.orchestrate_no_res_mgmt_call(
+            retry,
             retry_info,
             endpoint.map(|e| e.to_string()),
             async |search| {
@@ -387,17 +346,13 @@ impl<C: Client + 'static> SearchComponent<C> {
     }
 
     pub async fn disallow_querying(&self, opts: &DisallowQueryingOptions<'_>) -> error::Result<()> {
-        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
-            retry_strategy
-        } else {
-            DEFAULT_RETRY_STRATEGY.clone()
-        };
-
-        let retry_info = RetryInfo::new("search_disallow_querying", true, retry);
+        let retry_info = RetryRequest::new("search_disallow_querying", true);
+        let retry = opts.retry_strategy.clone();
         let endpoint = opts.endpoint;
         let copts = opts.into();
 
         self.orchestrate_no_res_mgmt_call(
+            retry,
             retry_info,
             endpoint.map(|e| e.to_string()),
             async |search| {
@@ -411,17 +366,13 @@ impl<C: Client + 'static> SearchComponent<C> {
     }
 
     pub async fn freeze_plan(&self, opts: &FreezePlanOptions<'_>) -> error::Result<()> {
-        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
-            retry_strategy
-        } else {
-            DEFAULT_RETRY_STRATEGY.clone()
-        };
-
-        let retry_info = RetryInfo::new("search_freeze_plan", true, retry);
+        let retry_info = RetryRequest::new("search_freeze_plan", true);
+        let retry = opts.retry_strategy.clone();
         let endpoint = opts.endpoint;
         let copts = opts.into();
 
         self.orchestrate_no_res_mgmt_call(
+            retry,
             retry_info,
             endpoint.map(|e| e.to_string()),
             async |search| {
@@ -435,17 +386,13 @@ impl<C: Client + 'static> SearchComponent<C> {
     }
 
     pub async fn unfreeze_plan(&self, opts: &UnfreezePlanOptions<'_>) -> error::Result<()> {
-        let retry = if let Some(retry_strategy) = opts.retry_strategy.clone() {
-            retry_strategy
-        } else {
-            DEFAULT_RETRY_STRATEGY.clone()
-        };
-
-        let retry_info = RetryInfo::new("search_unfreeze_plan", true, retry);
+        let retry_info = RetryRequest::new("search_unfreeze_plan", true);
+        let retry = opts.retry_strategy.clone();
         let endpoint = opts.endpoint;
         let copts = opts.into();
 
         self.orchestrate_no_res_mgmt_call(
+            retry,
             retry_info,
             endpoint.map(|e| e.to_string()),
             async |search| {
@@ -595,7 +542,8 @@ impl<C: Client + 'static> SearchComponent<C> {
 
     async fn orchestrate_mgmt_call<Fut, Resp>(
         &self,
-        retry_info: RetryInfo,
+        retry_strategy: Arc<dyn RetryStrategy>,
+        retry_info: RetryRequest,
         endpoint: Option<String>,
         operation: impl Fn(Search<C>) -> Fut + Send + Sync,
     ) -> error::Result<Resp>
@@ -604,30 +552,39 @@ impl<C: Client + 'static> SearchComponent<C> {
         Fut: Future<Output = error::Result<Resp>> + Send,
         C: Client,
     {
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
-            self.http_component
-                .orchestrate_endpoint(
-                    endpoint.clone(),
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
-                        operation(Search::<C> {
-                            http_client: client,
-                            user_agent: self.http_component.user_agent().to_string(),
-                            endpoint: endpoint.clone(),
-                            auth,
+        orchestrate_retries(
+            self.retry_manager.clone(),
+            retry_strategy,
+            retry_info,
+            async || {
+                self.http_component
+                    .orchestrate_endpoint(
+                        endpoint.clone(),
+                        async |client: Arc<C>,
+                               endpoint_id: String,
+                               endpoint: String,
+                               auth: Auth| {
+                            operation(Search::<C> {
+                                http_client: client,
+                                user_agent: self.http_component.user_agent().to_string(),
+                                endpoint: endpoint.clone(),
+                                auth,
 
-                            vector_search_enabled: self.state.load().vector_search_enabled,
-                        })
-                        .await
-                    },
-                )
-                .await
-        })
+                                vector_search_enabled: self.state.load().vector_search_enabled,
+                            })
+                            .await
+                        },
+                    )
+                    .await
+            },
+        )
         .await
     }
 
     async fn orchestrate_no_res_mgmt_call<Fut>(
         &self,
-        retry_info: RetryInfo,
+        retry_strategy: Arc<dyn RetryStrategy>,
+        retry_info: RetryRequest,
         endpoint: Option<String>,
         operation: impl Fn(Search<C>) -> Fut + Send + Sync,
     ) -> error::Result<()>
@@ -635,24 +592,32 @@ impl<C: Client + 'static> SearchComponent<C> {
         Fut: Future<Output = error::Result<()>> + Send,
         C: Client,
     {
-        orchestrate_retries(self.retry_manager.clone(), retry_info, async || {
-            self.http_component
-                .orchestrate_endpoint(
-                    endpoint.clone(),
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
-                        operation(Search::<C> {
-                            http_client: client,
-                            user_agent: self.http_component.user_agent().to_string(),
-                            endpoint: endpoint.clone(),
-                            auth,
+        orchestrate_retries(
+            self.retry_manager.clone(),
+            retry_strategy,
+            retry_info,
+            async || {
+                self.http_component
+                    .orchestrate_endpoint(
+                        endpoint.clone(),
+                        async |client: Arc<C>,
+                               endpoint_id: String,
+                               endpoint: String,
+                               auth: Auth| {
+                            operation(Search::<C> {
+                                http_client: client,
+                                user_agent: self.http_component.user_agent().to_string(),
+                                endpoint: endpoint.clone(),
+                                auth,
 
-                            vector_search_enabled: self.state.load().vector_search_enabled,
-                        })
-                        .await
-                    },
-                )
-                .await
-        })
+                                vector_search_enabled: self.state.load().vector_search_enabled,
+                            })
+                            .await
+                        },
+                    )
+                    .await
+            },
+        )
         .await
     }
 }

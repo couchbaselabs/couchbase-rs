@@ -17,6 +17,8 @@
  */
 
 use crate::durability_level::DurabilityLevel;
+use crate::retry::RetryStrategy;
+use std::sync::Arc;
 use std::time::Duration;
 
 #[derive(Default, Debug, Clone)]
@@ -24,6 +26,7 @@ use std::time::Duration;
 pub struct AppendOptions {
     pub durability_level: Option<DurabilityLevel>,
     pub cas: Option<u64>,
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl AppendOptions {
@@ -40,6 +43,11 @@ impl AppendOptions {
         self.cas = Some(cas);
         self
     }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
+    }
 }
 
 #[derive(Default, Debug, Clone)]
@@ -47,6 +55,7 @@ impl AppendOptions {
 pub struct PrependOptions {
     pub durability_level: Option<DurabilityLevel>,
     pub cas: Option<u64>,
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl PrependOptions {
@@ -63,6 +72,11 @@ impl PrependOptions {
         self.cas = Some(cas);
         self
     }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
+    }
 }
 
 #[derive(Default, Debug, Clone)]
@@ -72,6 +86,7 @@ pub struct IncrementOptions {
     pub initial: Option<u64>,
     pub delta: Option<u64>,
     pub durability_level: Option<DurabilityLevel>,
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl IncrementOptions {
@@ -98,6 +113,11 @@ impl IncrementOptions {
         self.durability_level = Some(durability_level.into());
         self
     }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
+        self
+    }
 }
 
 #[derive(Default, Debug, Clone)]
@@ -107,6 +127,7 @@ pub struct DecrementOptions {
     pub initial: Option<u64>,
     pub delta: Option<u64>,
     pub durability_level: Option<DurabilityLevel>,
+    pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl DecrementOptions {
@@ -131,6 +152,11 @@ impl DecrementOptions {
 
     pub fn durability_level(mut self, durability_level: impl Into<DurabilityLevel>) -> Self {
         self.durability_level = Some(durability_level.into());
+        self
+    }
+
+    pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
+        self.retry_strategy = Some(retry_strategy);
         self
     }
 }

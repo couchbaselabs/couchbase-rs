@@ -25,8 +25,8 @@ use crate::options::search_index_mgmt_options::{
     GetIndexedDocumentsCountOptions, GetSearchIndexOptions, PauseIngestSearchIndexOptions,
     ResumeIngestSearchIndexOptions, UnfreezePlanSearchIndexOptions, UpsertSearchIndexOptions,
 };
+use crate::retry::RetryStrategy;
 use couchbase_core::options::search_management;
-use couchbase_core::retry::RetryStrategy;
 use serde_json::Value;
 use std::sync::Arc;
 
@@ -256,11 +256,14 @@ impl CouchbaseSearchIndexMgmtClient {
     ) -> error::Result<SearchIndex> {
         let opts = opts.unwrap_or_default();
         let agent = self.agent_provider.get_agent().await;
+        let retry = opts
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
 
         let get_opts = search_management::GetIndexOptions::new(&index_name)
             .bucket_name(&self.keyspace.bucket_name)
             .scope_name(&self.keyspace.scope_name)
-            .retry_strategy(self.default_retry_strategy.clone());
+            .retry_strategy(retry);
 
         let index = CouchbaseAgentProvider::upgrade_agent(agent)?
             .get_search_index(&get_opts)
@@ -273,13 +276,15 @@ impl CouchbaseSearchIndexMgmtClient {
         opts: Option<GetAllSearchIndexesOptions>,
     ) -> error::Result<Vec<SearchIndex>> {
         let opts = opts.unwrap_or_default();
-
         let agent = self.agent_provider.get_agent().await;
+        let retry = opts
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
 
         let get_all_opts = search_management::GetAllIndexesOptions::new()
             .bucket_name(&self.keyspace.bucket_name)
             .scope_name(&self.keyspace.scope_name)
-            .retry_strategy(self.default_retry_strategy.clone());
+            .retry_strategy(retry);
 
         let indexes = CouchbaseAgentProvider::upgrade_agent(agent)?
             .get_all_search_indexes(&get_all_opts)
@@ -295,12 +300,15 @@ impl CouchbaseSearchIndexMgmtClient {
     ) -> error::Result<()> {
         let opts = opts.unwrap_or_default();
         let agent = self.agent_provider.get_agent().await;
+        let retry = opts
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
 
         let index = &index.into();
         let upsert_opts = search_management::UpsertIndexOptions::new(index)
             .bucket_name(&self.keyspace.bucket_name)
             .scope_name(&self.keyspace.scope_name)
-            .retry_strategy(self.default_retry_strategy.clone());
+            .retry_strategy(retry);
 
         CouchbaseAgentProvider::upgrade_agent(agent)?
             .upsert_search_index(&upsert_opts)
@@ -315,11 +323,14 @@ impl CouchbaseSearchIndexMgmtClient {
     ) -> error::Result<()> {
         let opts = opts.unwrap_or_default();
         let agent = self.agent_provider.get_agent().await;
+        let retry = opts
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
 
         let delete_opts = search_management::DeleteIndexOptions::new(&index_name)
             .bucket_name(&self.keyspace.bucket_name)
             .scope_name(&self.keyspace.scope_name)
-            .retry_strategy(self.default_retry_strategy.clone());
+            .retry_strategy(retry);
 
         CouchbaseAgentProvider::upgrade_agent(agent)?
             .delete_search_index(&delete_opts)
@@ -335,6 +346,9 @@ impl CouchbaseSearchIndexMgmtClient {
     ) -> error::Result<Value> {
         let opts = opts.unwrap_or_default();
         let agent = self.agent_provider.get_agent().await;
+        let retry = opts
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
 
         let value =
             serde_json::to_vec(&document).map_err(error::Error::encoding_failure_from_serde)?;
@@ -342,7 +356,7 @@ impl CouchbaseSearchIndexMgmtClient {
         let analyze_opts = search_management::AnalyzeDocumentOptions::new(&index_name, &value)
             .bucket_name(&self.keyspace.bucket_name)
             .scope_name(&self.keyspace.scope_name)
-            .retry_strategy(self.default_retry_strategy.clone());
+            .retry_strategy(retry);
 
         let analysis = CouchbaseAgentProvider::upgrade_agent(agent)?
             .analyze_search_document(&analyze_opts)
@@ -361,11 +375,14 @@ impl CouchbaseSearchIndexMgmtClient {
     ) -> error::Result<u64> {
         let opts = opts.unwrap_or_default();
         let agent = self.agent_provider.get_agent().await;
+        let retry = opts
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
 
         let count_opts = search_management::GetIndexedDocumentsCountOptions::new(&index_name)
             .bucket_name(&self.keyspace.bucket_name)
             .scope_name(&self.keyspace.scope_name)
-            .retry_strategy(self.default_retry_strategy.clone());
+            .retry_strategy(retry);
 
         let count = CouchbaseAgentProvider::upgrade_agent(agent)?
             .get_search_indexed_documents_count(&count_opts)
@@ -380,11 +397,14 @@ impl CouchbaseSearchIndexMgmtClient {
     ) -> error::Result<()> {
         let opts = opts.unwrap_or_default();
         let agent = self.agent_provider.get_agent().await;
+        let retry = opts
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
 
         let pause_opts = search_management::PauseIngestOptions::new(&index_name)
             .bucket_name(&self.keyspace.bucket_name)
             .scope_name(&self.keyspace.scope_name)
-            .retry_strategy(self.default_retry_strategy.clone());
+            .retry_strategy(retry);
 
         CouchbaseAgentProvider::upgrade_agent(agent)?
             .pause_search_index_ingest(&pause_opts)
@@ -399,11 +419,14 @@ impl CouchbaseSearchIndexMgmtClient {
     ) -> error::Result<()> {
         let opts = opts.unwrap_or_default();
         let agent = self.agent_provider.get_agent().await;
+        let retry = opts
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
 
         let resume_opts = search_management::ResumeIngestOptions::new(&index_name)
             .bucket_name(&self.keyspace.bucket_name)
             .scope_name(&self.keyspace.scope_name)
-            .retry_strategy(self.default_retry_strategy.clone());
+            .retry_strategy(retry);
 
         CouchbaseAgentProvider::upgrade_agent(agent)?
             .resume_search_index_ingest(&resume_opts)
@@ -418,11 +441,14 @@ impl CouchbaseSearchIndexMgmtClient {
     ) -> error::Result<()> {
         let opts = opts.unwrap_or_default();
         let agent = self.agent_provider.get_agent().await;
+        let retry = opts
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
 
         let allow_opts = search_management::AllowQueryingOptions::new(&index_name)
             .bucket_name(&self.keyspace.bucket_name)
             .scope_name(&self.keyspace.scope_name)
-            .retry_strategy(self.default_retry_strategy.clone());
+            .retry_strategy(retry);
 
         CouchbaseAgentProvider::upgrade_agent(agent)?
             .allow_search_index_querying(&allow_opts)
@@ -437,11 +463,14 @@ impl CouchbaseSearchIndexMgmtClient {
     ) -> error::Result<()> {
         let opts = opts.unwrap_or_default();
         let agent = self.agent_provider.get_agent().await;
+        let retry = opts
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
 
         let disallow_opts = search_management::DisallowQueryingOptions::new(&index_name)
             .bucket_name(&self.keyspace.bucket_name)
             .scope_name(&self.keyspace.scope_name)
-            .retry_strategy(self.default_retry_strategy.clone());
+            .retry_strategy(retry);
 
         CouchbaseAgentProvider::upgrade_agent(agent)?
             .disallow_search_index_querying(&disallow_opts)
@@ -456,11 +485,14 @@ impl CouchbaseSearchIndexMgmtClient {
     ) -> error::Result<()> {
         let opts = opts.unwrap_or_default();
         let agent = self.agent_provider.get_agent().await;
+        let retry = opts
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
 
         let freeze_opts = search_management::FreezePlanOptions::new(&index_name)
             .bucket_name(&self.keyspace.bucket_name)
             .scope_name(&self.keyspace.scope_name)
-            .retry_strategy(self.default_retry_strategy.clone());
+            .retry_strategy(retry);
 
         CouchbaseAgentProvider::upgrade_agent(agent)?
             .freeze_search_index_plan(&freeze_opts)
@@ -475,11 +507,14 @@ impl CouchbaseSearchIndexMgmtClient {
     ) -> error::Result<()> {
         let opts = opts.unwrap_or_default();
         let agent = self.agent_provider.get_agent().await;
+        let retry = opts
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
 
         let unfreeze_opts = search_management::UnfreezePlanOptions::new(&index_name)
             .bucket_name(&self.keyspace.bucket_name)
             .scope_name(&self.keyspace.scope_name)
-            .retry_strategy(self.default_retry_strategy.clone());
+            .retry_strategy(retry);
 
         CouchbaseAgentProvider::upgrade_agent(agent)?
             .unfreeze_search_index_plan(&unfreeze_opts)

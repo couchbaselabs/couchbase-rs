@@ -23,8 +23,8 @@ use crate::options::bucket_mgmt_options::{
     CreateBucketOptions, DropBucketOptions, FlushBucketOptions, GetAllBucketsOptions,
     GetBucketOptions, UpdateBucketOptions,
 };
+use crate::retry::RetryStrategy;
 use couchbase_core::mgmtx;
-use couchbase_core::retry::RetryStrategy;
 use std::sync::Arc;
 
 pub(crate) struct BucketMgmtClient {
@@ -153,8 +153,10 @@ impl CouchbaseBucketMgmtClient {
         opts: GetAllBucketsOptions,
     ) -> error::Result<Vec<BucketSettings>> {
         let agent = self.agent_provider.get_agent().await;
-        let opts = couchbase_core::options::management::GetAllBucketsOptions::new()
-            .retry_strategy(self.default_retry_strategy.clone());
+        let opts = couchbase_core::options::management::GetAllBucketsOptions::new().retry_strategy(
+            opts.retry_strategy
+                .unwrap_or_else(|| self.default_retry_strategy.clone()),
+        );
 
         let buckets = CouchbaseAgentProvider::upgrade_agent(agent)?
             .get_all_buckets(&opts)
@@ -169,8 +171,11 @@ impl CouchbaseBucketMgmtClient {
         opts: GetBucketOptions,
     ) -> error::Result<BucketSettings> {
         let agent = self.agent_provider.get_agent().await;
+        let retry = opts
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
         let opts = couchbase_core::options::management::GetBucketOptions::new(&bucket_name)
-            .retry_strategy(self.default_retry_strategy.clone());
+            .retry_strategy(retry);
 
         let bucket = CouchbaseAgentProvider::upgrade_agent(agent)?
             .get_bucket(&opts)
@@ -252,11 +257,14 @@ impl CouchbaseBucketMgmtClient {
             core_settings = core_settings.num_vbuckets(num_vbuckets);
         }
 
+        let retry = opts
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
         let opts = couchbase_core::options::management::CreateBucketOptions::new(
             &settings.name,
             &core_settings,
         )
-        .retry_strategy(self.default_retry_strategy.clone());
+        .retry_strategy(retry);
 
         CouchbaseAgentProvider::upgrade_agent(agent)?
             .create_bucket(&opts)
@@ -334,11 +342,14 @@ impl CouchbaseBucketMgmtClient {
             core_settings = core_settings.num_vbuckets(num_vbuckets);
         }
 
+        let retry = opts
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
         let opts = couchbase_core::options::management::UpdateBucketOptions::new(
             &settings.name,
             &core_settings,
         )
-        .retry_strategy(self.default_retry_strategy.clone());
+        .retry_strategy(retry);
 
         CouchbaseAgentProvider::upgrade_agent(agent)?
             .update_bucket(&opts)
@@ -353,8 +364,11 @@ impl CouchbaseBucketMgmtClient {
         opts: DropBucketOptions,
     ) -> error::Result<()> {
         let agent = self.agent_provider.get_agent().await;
+        let retry = opts
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
         let opts = couchbase_core::options::management::DeleteBucketOptions::new(&bucket_name)
-            .retry_strategy(self.default_retry_strategy.clone());
+            .retry_strategy(retry);
 
         CouchbaseAgentProvider::upgrade_agent(agent)?
             .delete_bucket(&opts)
@@ -369,8 +383,12 @@ impl CouchbaseBucketMgmtClient {
         opts: FlushBucketOptions,
     ) -> error::Result<()> {
         let agent = self.agent_provider.get_agent().await;
+        let retry = opts
+            .retry_strategy
+            .unwrap_or_else(|| self.default_retry_strategy.clone());
         let opts = couchbase_core::options::management::FlushBucketOptions::new(&bucket_name)
-            .retry_strategy(self.default_retry_strategy.clone());
+            .retry_strategy(retry);
+
         CouchbaseAgentProvider::upgrade_agent(agent)?
             .flush_bucket(&opts)
             .await?;
