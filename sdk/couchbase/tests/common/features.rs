@@ -72,7 +72,6 @@ pub enum TestFeatureCode {
     VectorSearch,
     UserGroups,
     UsersMB69096,
-    RSCBC219DropChain,
 }
 
 impl TestCluster {
@@ -113,9 +112,6 @@ impl TestCluster {
             }
             TestFeatureCode::UsersMB69096 => {
                 !self.cluster_version.equal(&SERVER_VERSION_800_COMMUNITY)
-            }
-            TestFeatureCode::RSCBC219DropChain => {
-                self.cluster_version.edition != Some(NodeEdition::Community)
             }
         }
     }

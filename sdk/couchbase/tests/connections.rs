@@ -16,7 +16,6 @@
  *
  */
 
-use crate::common::features::TestFeatureCode;
 use crate::common::test_config::{create_test_cluster, run_test};
 use crate::common::{new_key, try_times};
 use couchbase::error::ErrorKind;
@@ -33,10 +32,6 @@ mod common;
 #[test]
 fn test_collection_use_after_cluster_drop() {
     run_test(async |cluster, _bucket| {
-        if !cluster.supports_feature(&TestFeatureCode::RSCBC219DropChain) {
-            return;
-        }
-
         let collection = {
             let cluster = create_test_cluster().await;
 
@@ -75,10 +70,6 @@ fn test_collection_use_after_cluster_drop() {
 #[test]
 fn test_collection_level_mgr_use_after_cluster_drop() {
     run_test(async |cluster, _bucket| {
-        if !cluster.supports_feature(&TestFeatureCode::RSCBC219DropChain) {
-            return;
-        }
-
         let mgr = {
             let cluster = create_test_cluster().await;
 
@@ -116,10 +107,6 @@ fn test_collection_level_mgr_use_after_cluster_drop() {
 #[test]
 fn test_scope_use_after_cluster_drop() {
     run_test(async |cluster, _bucket| {
-        if !cluster.supports_feature(&TestFeatureCode::RSCBC219DropChain) {
-            return;
-        }
-
         let scope = {
             let cluster = create_test_cluster().await;
             let bucket = cluster.bucket(cluster.default_bucket());
@@ -152,10 +139,6 @@ fn test_scope_use_after_cluster_drop() {
 #[test]
 fn test_scope_level_mgr_use_after_cluster_drop() {
     run_test(async |cluster, _bucket| {
-        if !cluster.supports_feature(&TestFeatureCode::RSCBC219DropChain) {
-            return;
-        }
-
         let mgr = {
             let cluster = create_test_cluster().await;
 
@@ -190,10 +173,6 @@ fn test_scope_level_mgr_use_after_cluster_drop() {
 #[test]
 fn test_bucket_level_mgr_use_after_cluster_drop() {
     run_test(async |cluster, _bucket| {
-        if !cluster.supports_feature(&TestFeatureCode::RSCBC219DropChain) {
-            return;
-        }
-
         let mgr = {
             let cluster = create_test_cluster().await;
             let bucket = cluster.bucket(cluster.default_bucket());
@@ -226,10 +205,6 @@ fn test_bucket_level_mgr_use_after_cluster_drop() {
 #[test]
 fn test_cluster_level_mgr_use_after_cluster_drop() {
     run_test(async |cluster, _bucket| {
-        if !cluster.supports_feature(&TestFeatureCode::RSCBC219DropChain) {
-            return;
-        }
-
         let mgr = {
             let cluster = create_test_cluster().await;
 
