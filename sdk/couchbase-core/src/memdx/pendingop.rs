@@ -16,7 +16,6 @@
  *
  */
 
-use futures::executor::block_on;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -24,7 +23,7 @@ use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc::Receiver;
 use tokio::time::{timeout_at, Instant};
 
-use crate::memdx::client::OpaqueMap;
+use crate::memdx::client::{OpaqueMap, SenderContext};
 use crate::memdx::client_response::ClientResponse;
 use crate::memdx::error::CancellationErrorKind;
 use crate::memdx::error::{Error, Result};
@@ -35,10 +34,6 @@ pub trait PendingOp<T> {
     where
         T: TryFromClientResponse;
     fn cancel(&mut self, e: CancellationErrorKind) -> impl Future<Output = ()>;
-}
-
-pub(crate) trait OpCanceller {
-    fn cancel_handler(&mut self, opaque: u32);
 }
 
 pub struct ClientPendingOp {
@@ -82,16 +77,7 @@ impl ClientPendingOp {
     }
 
     pub async fn cancel(&mut self, e: CancellationErrorKind) {
-        if self.completed.load(Ordering::SeqCst) {
-            return;
-        }
-
-        let context = {
-            let requests: Arc<Mutex<OpaqueMap>> = Arc::clone(&self.opaque_map);
-            let mut map = requests.lock().unwrap();
-
-            map.remove(&self.opaque)
-        };
+        let context = self.cancel_op();
 
         if let Some(context) = context {
             let sender = &context.sender;
@@ -102,11 +88,24 @@ impl ClientPendingOp {
                 .unwrap();
         }
     }
+
+    fn cancel_op(&mut self) -> Option<SenderContext> {
+        if self.completed.load(Ordering::SeqCst) {
+            return None;
+        }
+
+        let requests: Arc<Mutex<OpaqueMap>> = Arc::clone(&self.opaque_map);
+        let mut map = requests.lock().unwrap();
+
+        map.remove(&self.opaque)
+    }
 }
 
 impl Drop for ClientPendingOp {
     fn drop(&mut self) {
-        block_on(self.cancel(CancellationErrorKind::RequestCancelled));
+        // We don't need to send a cancellation error on the sender here, we own the receiver
+        // and if we've been dropped then the receiver is gone with us.
+        self.cancel_op();
     }
 }
 
