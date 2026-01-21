@@ -16,7 +16,7 @@
  *
  */
 
-use crate::common::test_config::create_test_cluster;
+use crate::common::test_config::get_bucket;
 use criterion::{criterion_group, criterion_main, Criterion};
 
 #[path = "../tests/common/mod.rs"]
@@ -25,10 +25,8 @@ mod common;
 fn query(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
 
-    let cluster = rt.block_on(async { create_test_cluster().await });
-    let scope = cluster
-        .bucket(cluster.default_bucket())
-        .scope(cluster.default_scope());
+    let (cluster, bucket) = get_bucket(&rt);
+    let scope = bucket.scope(cluster.default_scope());
 
     c.bench_function("query", |b| {
         b.to_async(&rt).iter(|| async {
