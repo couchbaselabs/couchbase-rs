@@ -16,6 +16,7 @@
  *
  */
 
+use crate::httpx;
 use http::StatusCode;
 use std::error::Error as StdError;
 use std::fmt::{Display, Formatter};
@@ -80,10 +81,11 @@ impl Error {
         }
     }
 
-    pub(crate) fn new_http_error(endpoint: impl Into<String>) -> Self {
+    pub(crate) fn new_http_error(error: httpx::error::Error, endpoint: impl Into<String>) -> Self {
         Self {
             inner: ErrorImpl {
                 kind: Box::new(ErrorKind::Http {
+                    error,
                     endpoint: endpoint.into(),
                 }),
             },
@@ -120,6 +122,7 @@ pub enum ErrorKind {
     Server(ServerError),
     #[non_exhaustive]
     Http {
+        error: httpx::error::Error,
         endpoint: String,
     },
     #[non_exhaustive]
@@ -145,7 +148,9 @@ impl Display for ErrorKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             ErrorKind::Server(e) => write!(f, "{e}"),
-            ErrorKind::Http { endpoint } => write!(f, "http error for endpoint {endpoint}"),
+            ErrorKind::Http { error, endpoint } => {
+                write!(f, "http error {error}: endpoint {endpoint}")
+            }
             ErrorKind::Message { msg, endpoint } => {
                 if let Some(endpoint) = endpoint {
                     write!(f, "message error for endpoint {endpoint}: {msg}")

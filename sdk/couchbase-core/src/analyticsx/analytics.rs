@@ -138,7 +138,8 @@ impl<C: Client> Query<C> {
             Ok(r) => r,
             Err(e) => {
                 return Err(Error::new_http_error(
-                    format!("{}: {}", &self.endpoint, e),
+                    e,
+                    self.endpoint.to_string(),
                     statement,
                     client_context_id,
                 ));
@@ -165,7 +166,8 @@ impl<C: Client> Query<C> {
             Ok(r) => r,
             Err(e) => {
                 return Err(Error::new_http_error(
-                    format!("{}: {}", &self.endpoint, e),
+                    e,
+                    self.endpoint.to_string(),
                     None,
                     None,
                 ));
@@ -187,7 +189,7 @@ impl<C: Client> Query<C> {
         let pending = serde_json::from_slice(
             &res.bytes()
                 .await
-                .map_err(|e| Error::new_http_error(self.endpoint.clone(), None, None))?,
+                .map_err(|e| Error::new_http_error(e, self.endpoint.clone(), None, None))?,
         )
         .map_err(|e| {
             Error::new_message_error(
@@ -215,7 +217,8 @@ impl<C: Client> Query<C> {
             Ok(r) => r,
             Err(e) => {
                 return Err(Error::new_http_error(
-                    format!("{}: {}", &self.endpoint, e),
+                    e,
+                    self.endpoint.to_string(),
                     None,
                     None,
                 ));

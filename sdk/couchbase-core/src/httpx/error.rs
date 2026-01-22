@@ -59,6 +59,14 @@ impl Error {
         }
     }
 
+    pub(crate) fn new_request_error(msg: impl Into<String>) -> Self {
+        Self {
+            inner: Box::new(ErrorImpl {
+                kind: ErrorKind::SendRequest(msg.into()),
+            }),
+        }
+    }
+
     pub fn is_connection_error(&self) -> bool {
         matches!(self.inner.kind, ErrorKind::Connection { .. })
     }
@@ -86,6 +94,7 @@ pub enum ErrorKind {
     },
     Decoding(String),
     Message(String),
+    SendRequest(String),
 }
 
 impl Display for ErrorKind {
@@ -94,6 +103,7 @@ impl Display for ErrorKind {
             Self::Connection { msg } => write!(f, "connection error {msg}"),
             Self::Decoding(msg) => write!(f, "decoding error: {msg}"),
             Self::Message(msg) => write!(f, "{msg}"),
+            Self::SendRequest(msg) => write!(f, "send request failed error: {msg}"),
         }
     }
 }

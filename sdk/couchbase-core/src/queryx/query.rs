@@ -150,7 +150,8 @@ impl<C: Client> Query<C> {
             Ok(r) => r,
             Err(e) => {
                 return Err(Error::new_http_error(
-                    format!("{}: {}", &self.endpoint, e),
+                    e,
+                    self.endpoint.to_string(),
                     statement,
                     client_context_id,
                 ));
@@ -547,7 +548,8 @@ impl<C: Client> Query<C> {
             Ok(r) => r,
             Err(e) => {
                 return Err(Error::new_http_error(
-                    format!("{}: {}", &self.endpoint, e),
+                    e,
+                    self.endpoint.to_string(),
                     None,
                     None,
                 ));

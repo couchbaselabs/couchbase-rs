@@ -72,7 +72,8 @@ impl Stream for QueryRespReader {
                 Poll::Ready(None)
             }
             Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(Error::new_http_error(
-                format!("{}: {}", &this.endpoint, e),
+                e,
+                this.endpoint.to_string(),
                 Some(this.statement.clone()),
                 this.client_context_id.clone(),
             )))),
@@ -99,7 +100,8 @@ impl QueryRespReader {
                 Err(e) => {
                     debug!("Failed to read response body on error {}", &e);
                     return Err(Error::new_http_error(
-                        format!("{endpoint}: {e}"),
+                        e,
+                        endpoint,
                         statement,
                         client_context_id,
                     ));
@@ -146,7 +148,8 @@ impl QueryRespReader {
         // the stream to advance the streamer to the rows.
         streamer.read_prelude().await.map_err(|e| {
             Error::new_http_error(
-                format!("{endpoint}: {e}"),
+                e,
+                endpoint.clone(),
                 statement.to_string(),
                 client_context_id.to_string(),
             )
@@ -159,7 +162,8 @@ impl QueryRespReader {
                 Ok(epilog) => Some(epilog),
                 Err(e) => {
                     return Err(Error::new_http_error(
-                        format!("{endpoint}: {e}"),
+                        e,
+                        endpoint.clone(),
                         statement,
                         client_context_id,
                     ));

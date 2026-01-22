@@ -249,6 +249,8 @@ impl Client for ReqwestClient {
 
                 if err.is_connect() {
                     Err(Error::new_connection_error(err.to_string()))
+                } else if err.is_request() {
+                    Err(Error::new_request_error(err.to_string()))
                 } else {
                     Err(Error::new_message_error(err.to_string()))
                 }

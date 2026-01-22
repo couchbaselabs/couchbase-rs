@@ -108,7 +108,7 @@ impl<C: Client> Management<C> {
         self.http_client
             .execute(req)
             .await
-            .map_err(|e| error::Error::new_message_error(format!("could not execute request: {e}")))
+            .map_err(error::Error::from)
     }
 
     pub(crate) async fn decode_common_error(

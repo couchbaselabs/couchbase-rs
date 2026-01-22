@@ -27,7 +27,7 @@ use crate::error::{Error, ErrorKind};
 use crate::memdx::error::ErrorKind::{Cancelled, Dispatch, Resource, Server};
 use crate::memdx::error::{CancellationErrorKind, ServerError, ServerErrorKind};
 use crate::retryfailfast::FailFastRetryStrategy;
-use crate::{error, queryx, searchx};
+use crate::{analyticsx, error, httpx, mgmtx, queryx, searchx};
 use async_trait::async_trait;
 use log::{debug, info};
 use tokio::time::sleep;
@@ -54,6 +54,7 @@ pub enum RetryReason {
     QueryPreparedStatementFailure,
     QueryIndexNotFound,
     SearchTooManyRequests,
+    HttpSendRequestFailed,
     NotReady,
 }
 
@@ -74,6 +75,7 @@ impl RetryReason {
                 | RetryReason::QueryPreparedStatementFailure
                 | RetryReason::QueryIndexNotFound
                 | RetryReason::SearchTooManyRequests
+                | RetryReason::HttpSendRequestFailed
                 | RetryReason::NotReady
         )
     }
@@ -110,6 +112,7 @@ impl Display for RetryReason {
             RetryReason::QueryIndexNotFound => write!(f, "QUERY_INDEX_NOT_FOUND"),
             RetryReason::SearchTooManyRequests => write!(f, "SEARCH_TOO_MANY_REQUESTS"),
             RetryReason::NotReady => write!(f, "NOT_READY"),
+            RetryReason::HttpSendRequestFailed => write!(f, "HTTP_SEND_REQUEST_FAILED"),
         }
     }
 }
@@ -287,23 +290,47 @@ pub(crate) fn error_to_retry_reason(
         ErrorKind::ServiceNotAvailable { .. } => {
             return Some(RetryReason::ServiceNotAvailable);
         }
-        ErrorKind::Query(e) => {
-            if let queryx::error::ErrorKind::Server(e) = e.kind() {
-                match e.kind() {
-                    queryx::error::ServerErrorKind::PreparedStatementFailure => {
-                        return Some(RetryReason::QueryPreparedStatementFailure);
-                    }
-                    queryx::error::ServerErrorKind::IndexNotFound => {
-                        return Some(RetryReason::QueryIndexNotFound);
-                    }
-                    _ => {}
+        ErrorKind::Query(e) => match e.kind() {
+            queryx::error::ErrorKind::Server(e) => match e.kind() {
+                queryx::error::ServerErrorKind::PreparedStatementFailure => {
+                    return Some(RetryReason::QueryPreparedStatementFailure);
+                }
+                queryx::error::ServerErrorKind::IndexNotFound => {
+                    return Some(RetryReason::QueryIndexNotFound);
+                }
+                _ => {}
+            },
+            queryx::error::ErrorKind::Http { error, .. } => {
+                if let httpx::error::ErrorKind::SendRequest(_) = error.kind() {
+                    return Some(RetryReason::HttpSendRequestFailed);
+                }
+            }
+            _ => {}
+        },
+        ErrorKind::Search(e) => match e.kind() {
+            searchx::error::ErrorKind::Server(e) => {
+                if e.status_code() == 429 {
+                    return Some(RetryReason::SearchTooManyRequests);
+                }
+            }
+            searchx::error::ErrorKind::Http { error, .. } => {
+                if let httpx::error::ErrorKind::SendRequest(_) = error.kind() {
+                    return Some(RetryReason::HttpSendRequestFailed);
+                }
+            }
+            _ => {}
+        },
+        ErrorKind::Analytics(e) => {
+            if let analyticsx::error::ErrorKind::Http { error, .. } = e.kind() {
+                if let httpx::error::ErrorKind::SendRequest(_) = error.kind() {
+                    return Some(RetryReason::HttpSendRequestFailed);
                 }
             }
         }
-        ErrorKind::Search(e) => {
-            if let searchx::error::ErrorKind::Server(e) = e.kind() {
-                if e.status_code() == 429 {
-                    return Some(RetryReason::SearchTooManyRequests);
+        ErrorKind::Mgmt(e) => {
+            if let mgmtx::error::ErrorKind::Http(error) = e.kind() {
+                if let httpx::error::ErrorKind::SendRequest(_) = error.kind() {
+                    return Some(RetryReason::HttpSendRequestFailed);
                 }
             }
         }
