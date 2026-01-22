@@ -16,6 +16,7 @@
  *
  */
 
+use crate::httpx;
 use http::{Method, StatusCode};
 use std::error::Error as StdError;
 use std::fmt::{Display, Formatter};
@@ -85,6 +86,7 @@ pub enum ErrorKind {
         arg: Option<String>,
     },
     Message(String),
+    Http(httpx::error::Error),
 }
 
 impl Display for ErrorKind {
@@ -100,6 +102,7 @@ impl Display for ErrorKind {
                 }
             }
             ErrorKind::Message(msg) => write!(f, "{msg}"),
+            ErrorKind::Http(e) => write!(f, "http error: {e}"),
         }
     }
 }
@@ -302,6 +305,16 @@ impl From<ResourceError> for Error {
         Self {
             inner: Box::new(ErrorImpl {
                 kind: ErrorKind::Resource(value),
+            }),
+        }
+    }
+}
+
+impl From<httpx::error::Error> for Error {
+    fn from(value: httpx::error::Error) -> Self {
+        Self {
+            inner: Box::new(ErrorImpl {
+                kind: ErrorKind::Http(value),
             }),
         }
     }

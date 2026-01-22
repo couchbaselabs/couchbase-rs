@@ -136,7 +136,7 @@ impl<C: Client> Search<C> {
                 Some(Bytes::from(body)),
             )
             .await
-            .map_err(|e| error::Error::new_http_error(format!("{}: {}", &self.endpoint, e)))?;
+            .map_err(|e| error::Error::new_http_error(e, self.endpoint.to_string()))?;
 
         SearchRespReader::new(res, &opts.index_name, &self.endpoint).await
     }
@@ -162,7 +162,7 @@ impl<C: Client> Search<C> {
                 Some(Bytes::from(body)),
             )
             .await
-            .map_err(|e| error::Error::new_http_error(format!("{}: {}", &self.endpoint, e)))?;
+            .map_err(|e| error::Error::new_http_error(e, self.endpoint.to_string()))?;
 
         if res.status() != 200 {
             return Err(
@@ -190,7 +190,7 @@ impl<C: Client> Search<C> {
                 None,
             )
             .await
-            .map_err(|e| error::Error::new_http_error(format!("{}: {}", &self.endpoint, e)))?;
+            .map_err(|e| error::Error::new_http_error(e, self.endpoint.to_string()))?;
 
         if res.status() != 200 {
             return Err(decode_response_error(
@@ -218,7 +218,7 @@ impl<C: Client> Search<C> {
                 None,
             )
             .await
-            .map_err(|e| error::Error::new_http_error(format!("{}: {}", &self.endpoint, e)))?;
+            .map_err(|e| error::Error::new_http_error(e, self.endpoint.to_string()))?;
 
         if res.status() != 200 {
             return Err(decode_response_error(
@@ -256,7 +256,7 @@ impl<C: Client> Search<C> {
                 None,
             )
             .await
-            .map_err(|e| error::Error::new_http_error(format!("{}: {}", &self.endpoint, e)))?;
+            .map_err(|e| error::Error::new_http_error(e, self.endpoint.to_string()))?;
 
         if res.status() != 200 {
             return Err(decode_response_error(res, "".to_string(), self.endpoint.clone()).await);
@@ -295,7 +295,7 @@ impl<C: Client> Search<C> {
                 Some(body),
             )
             .await
-            .map_err(|e| error::Error::new_http_error(format!("{}: {}", &self.endpoint, e)))?;
+            .map_err(|e| error::Error::new_http_error(e, self.endpoint.to_string()))?;
 
         if res.status() != 200 {
             return Err(decode_response_error(
@@ -346,7 +346,7 @@ impl<C: Client> Search<C> {
                 None,
             )
             .await
-            .map_err(|e| error::Error::new_http_error(format!("{}: {}", &self.endpoint, e)))?;
+            .map_err(|e| error::Error::new_http_error(e, self.endpoint.to_string()))?;
 
         if res.status() != 200 {
             return Err(decode_response_error(
@@ -447,7 +447,7 @@ impl<C: Client> Search<C> {
         {
             Ok(r) => r,
             Err(e) => {
-                return Err(Error::new_http_error(format!("{}: {}", &self.endpoint, e)));
+                return Err(Error::new_http_error(e, self.endpoint.to_string()));
             }
         };
 
@@ -503,7 +503,7 @@ impl<C: Client> Search<C> {
                 None,
             )
             .await
-            .map_err(|e| error::Error::new_http_error(format!("{}: {}", &self.endpoint, e)))?;
+            .map_err(|e| error::Error::new_http_error(e, self.endpoint.to_string()))?;
 
         if res.status() != 200 {
             return Err(
@@ -528,7 +528,7 @@ impl<C: Client> Search<C> {
                 None,
             )
             .await
-            .map_err(|e| error::Error::new_http_error(format!("{}: {}", &self.endpoint, e)))?;
+            .map_err(|e| error::Error::new_http_error(e, self.endpoint.to_string()))?;
 
         if res.status() != 200 {
             return Err(decode_response_error(res, "".to_string(), self.endpoint.clone()).await);
@@ -569,14 +569,14 @@ pub(crate) async fn decode_response_error(
     let body = match response.bytes().await {
         Ok(b) => b,
         Err(e) => {
-            return error::Error::new_http_error(format!("{endpoint}: {e}"));
+            return Error::new_http_error(e, endpoint);
         }
     };
 
     let body_str = match String::from_utf8(body.to_vec()) {
         Ok(s) => s.to_lowercase(),
         Err(e) => {
-            return error::Error::new_message_error(
+            return Error::new_message_error(
                 format!("could not parse error response: {e}"),
                 endpoint,
             );
