@@ -23,8 +23,9 @@ use crate::kvclient::{
     KvClient, KvClientBootstrapOptions, KvClientOptions, OnKvClientCloseHandler,
     UnsolicitedPacketSender,
 };
-use crate::kvclient_ops::KvClientOps;
+use crate::kvclient_ops::{KvClientOps, ReconfigureAuthenticatorRequest};
 use crate::memdx::dispatcher::OrphanResponseHandler;
+use crate::memdx::op_auth_saslauto::Credentials;
 use crate::memdx::op_bootstrap::BootstrapOptions;
 use crate::memdx::packet::ResponsePacket;
 use crate::orphan_reporter::OrphanContext;
@@ -395,6 +396,45 @@ impl<K: KvClient + 'static> StdKvClientBabysitter<K> {
             }
         });
     }
+
+    async fn get_client_for_reauth(
+        fast_client: Arc<ArcSwap<StdKvClientBabysitterClientState<K>>>,
+        slow_state: Arc<Mutex<StdKvClientBabysitterState<K>>>,
+        on_client_connected_tx: watch::Sender<Option<Arc<K>>>,
+        shutdown_token: CancellationToken,
+    ) -> error::Result<Arc<K>> {
+        let state = fast_client.load();
+        if let Some(client) = &state.client {
+            return Ok(client.clone());
+        }
+
+        {
+            let guard = slow_state.lock().unwrap();
+            if let Some(client) = &guard.client {
+                return Ok(client.clone());
+            }
+        }
+
+        let mut rx = on_client_connected_tx.subscribe();
+
+        loop {
+            let changed = select! {
+                () = shutdown_token.cancelled() => {
+                    return Err(Error::new_message_error("babysitter shutdown"))
+                },
+                (res) = rx.changed() => res
+            };
+
+            match changed {
+                Ok(_) => {
+                    if let Some(client) = rx.borrow_and_update().clone() {
+                        return Ok(client);
+                    }
+                }
+                Err(e) => {}
+            }
+        }
+    }
 }
 
 impl<K: KvClient + KvClientOps + 'static> KvClientBabysitter for StdKvClientBabysitter<K> {
@@ -552,8 +592,43 @@ impl<K: KvClient + KvClientOps + 'static> KvClientBabysitter for StdKvClientBaby
     }
 
     async fn update_auth(&self, authenticator: Authenticator) {
-        let mut guard = self.slow_state.lock().unwrap();
-        guard.desired_config.auth = authenticator;
+        {
+            let mut guard = self.slow_state.lock().unwrap();
+            guard.desired_config.auth = authenticator.clone();
+        }
+
+        if let Authenticator::JwtAuthenticator(jwt) = authenticator {
+            // We will attempt to reauth the existing client, if we're bootstrapping already
+            // then we don't know at what point that's already at so we'll always reauth that
+            // new client.
+            let fast_client = self.fast_client.clone();
+            let slow_state_clone = self.slow_state.clone();
+            let mut tx = self.on_client_connected_tx.clone();
+            let shutdown = self.shutdown_token.clone();
+
+            tokio::spawn(async move {
+                if let Ok(client) = StdKvClientBabysitter::get_client_for_reauth(
+                    fast_client,
+                    slow_state_clone,
+                    tx.clone(),
+                    shutdown,
+                )
+                .await
+                {
+                    if let Err(e) = client
+                        .reconfigure_authenticator(ReconfigureAuthenticatorRequest {
+                            credentials: Credentials::JwtToken(jwt.token),
+                        })
+                        .await
+                    {
+                        warn!("Error during reauth in babysitter {}: {}", client.id(), e);
+                        if let Err(e) = client.close().await {
+                            warn!("Error during close after failed reauth in babysitter {}", e);
+                        }
+                    }
+                }
+            });
+        }
     }
 
     async fn update_target(&self, target: KvTarget) {
