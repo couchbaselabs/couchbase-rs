@@ -132,7 +132,7 @@ pub(crate) struct StdKvClient<D: Dispatcher> {
 
     pub(crate) last_activity_timestamp_micros: AtomicI64,
 
-    id: String,
+    pub(crate) id: String,
 }
 
 impl<D> StdKvClient<D>
@@ -496,7 +496,7 @@ where
         if self
             .closed
             .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-            != Ok(true)
+            != Ok(false)
         {
             return;
         }
