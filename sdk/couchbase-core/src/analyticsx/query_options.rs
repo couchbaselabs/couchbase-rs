@@ -204,11 +204,8 @@ impl Serialize for QueryOptions {
 
         macro_rules! serialize_duration_if_not_none {
             ($field:expr, $name:expr) => {
-                if !$field.is_none() {
-                    map.serialize_entry(
-                        $name,
-                        &durations::duration_to_golang_string(&$field.unwrap()),
-                    )?;
+                if let Some(f) = $field {
+                    map.serialize_entry($name, &durations::duration_to_golang_string(&f))?;
                 }
             };
         }

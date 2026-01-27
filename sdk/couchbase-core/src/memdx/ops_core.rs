@@ -67,6 +67,8 @@ impl OpsCore {
             ServerErrorKind::TmpFail
         } else if status == Status::NoBucket {
             ServerErrorKind::NoBucket
+        } else if status == Status::AuthStale {
+            ServerErrorKind::AuthStale
         } else if status == Status::InvalidArgs {
             return Error::new_invalid_argument_error(
                 "the server rejected the request because one or more arguments were invalid",

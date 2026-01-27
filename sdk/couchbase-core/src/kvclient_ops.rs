@@ -40,6 +40,7 @@ use crate::memdx::response::{
     TouchResponse, UnlockResponse,
 };
 use chrono::Utc;
+use log::info;
 use std::future::Future;
 use std::sync::atomic::Ordering;
 
@@ -117,7 +118,7 @@ where
             .handle_dispatch_side_result(self.ops_crud().set(self.client(), req).await)
             .await?;
 
-        let res = self.handle_response_side_result(op.recv().await)?;
+        let res = self.handle_response_side_result(op.recv().await).await?;
         Ok(res)
     }
 
@@ -127,7 +128,7 @@ where
             .handle_dispatch_side_result(self.ops_crud().get(self.client(), req).await)
             .await?;
 
-        let res = self.handle_response_side_result(op.recv().await)?;
+        let res = self.handle_response_side_result(op.recv().await).await?;
         Ok(res)
     }
 
@@ -137,7 +138,7 @@ where
             .handle_dispatch_side_result(self.ops_crud().get_meta(self.client(), req).await)
             .await?;
 
-        let res = self.handle_response_side_result(op.recv().await)?;
+        let res = self.handle_response_side_result(op.recv().await).await?;
         Ok(res)
     }
 
@@ -147,7 +148,7 @@ where
             .handle_dispatch_side_result(self.ops_crud().delete(self.client(), req).await)
             .await?;
 
-        let res = self.handle_response_side_result(op.recv().await)?;
+        let res = self.handle_response_side_result(op.recv().await).await?;
         Ok(res)
     }
 
@@ -157,7 +158,7 @@ where
             .handle_dispatch_side_result(self.ops_crud().get_and_lock(self.client(), req).await)
             .await?;
 
-        let res = self.handle_response_side_result(op.recv().await)?;
+        let res = self.handle_response_side_result(op.recv().await).await?;
         Ok(res)
     }
 
@@ -167,7 +168,7 @@ where
             .handle_dispatch_side_result(self.ops_crud().get_and_touch(self.client(), req).await)
             .await?;
 
-        let res = self.handle_response_side_result(op.recv().await)?;
+        let res = self.handle_response_side_result(op.recv().await).await?;
         Ok(res)
     }
 
@@ -177,7 +178,7 @@ where
             .handle_dispatch_side_result(self.ops_crud().unlock(self.client(), req).await)
             .await?;
 
-        let res = self.handle_response_side_result(op.recv().await)?;
+        let res = self.handle_response_side_result(op.recv().await).await?;
         Ok(res)
     }
 
@@ -187,7 +188,7 @@ where
             .handle_dispatch_side_result(self.ops_crud().touch(self.client(), req).await)
             .await?;
 
-        let res = self.handle_response_side_result(op.recv().await)?;
+        let res = self.handle_response_side_result(op.recv().await).await?;
         Ok(res)
     }
 
@@ -197,7 +198,7 @@ where
             .handle_dispatch_side_result(self.ops_crud().add(self.client(), req).await)
             .await?;
 
-        let res = self.handle_response_side_result(op.recv().await)?;
+        let res = self.handle_response_side_result(op.recv().await).await?;
         Ok(res)
     }
 
@@ -207,7 +208,7 @@ where
             .handle_dispatch_side_result(self.ops_crud().replace(self.client(), req).await)
             .await?;
 
-        let res = self.handle_response_side_result(op.recv().await)?;
+        let res = self.handle_response_side_result(op.recv().await).await?;
         Ok(res)
     }
 
@@ -217,7 +218,7 @@ where
             .handle_dispatch_side_result(self.ops_crud().append(self.client(), req).await)
             .await?;
 
-        let res = self.handle_response_side_result(op.recv().await)?;
+        let res = self.handle_response_side_result(op.recv().await).await?;
         Ok(res)
     }
 
@@ -227,7 +228,7 @@ where
             .handle_dispatch_side_result(self.ops_crud().prepend(self.client(), req).await)
             .await?;
 
-        let res = self.handle_response_side_result(op.recv().await)?;
+        let res = self.handle_response_side_result(op.recv().await).await?;
         Ok(res)
     }
 
@@ -237,7 +238,7 @@ where
             .handle_dispatch_side_result(self.ops_crud().increment(self.client(), req).await)
             .await?;
 
-        let res = self.handle_response_side_result(op.recv().await)?;
+        let res = self.handle_response_side_result(op.recv().await).await?;
         Ok(res)
     }
 
@@ -247,7 +248,7 @@ where
             .handle_dispatch_side_result(self.ops_crud().decrement(self.client(), req).await)
             .await?;
 
-        let res = self.handle_response_side_result(op.recv().await)?;
+        let res = self.handle_response_side_result(op.recv().await).await?;
         Ok(res)
     }
 
@@ -257,7 +258,7 @@ where
             .handle_dispatch_side_result(self.ops_crud().lookup_in(self.client(), req).await)
             .await?;
 
-        let res = self.handle_response_side_result(op.recv().await)?;
+        let res = self.handle_response_side_result(op.recv().await).await?;
         Ok(res)
     }
 
@@ -267,7 +268,7 @@ where
             .handle_dispatch_side_result(self.ops_crud().mutate_in(self.client(), req).await)
             .await?;
 
-        let res = self.handle_response_side_result(op.recv().await)?;
+        let res = self.handle_response_side_result(op.recv().await).await?;
         Ok(res)
     }
 
@@ -280,7 +281,7 @@ where
             .handle_dispatch_side_result(OpsCore {}.get_cluster_config(self.client(), req).await)
             .await?;
 
-        let res = self.handle_response_side_result(op.recv().await)?;
+        let res = self.handle_response_side_result(op.recv().await).await?;
         Ok(res)
     }
 
@@ -293,7 +294,7 @@ where
             .handle_dispatch_side_result(OpsUtil {}.get_collection_id(self.client(), req).await)
             .await?;
 
-        let res = self.handle_response_side_result(op.recv().await)?;
+        let res = self.handle_response_side_result(op.recv().await).await?;
         Ok(res)
     }
 
@@ -303,7 +304,7 @@ where
             .handle_dispatch_side_result(OpsUtil {}.ping(self.client(), req).await)
             .await?;
 
-        let res = self.handle_response_side_result(op.recv().await)?;
+        let res = self.handle_response_side_result(op.recv().await).await?;
         Ok(res)
     }
 }
@@ -322,6 +323,7 @@ where
             Ok(v) => Ok(v),
             Err(e) => {
                 if let memdx::error::ErrorKind::Dispatch { .. } = e.kind() {
+                    info!("Client {} closing due to dispatch error", &self.id);
                     self.mark_closed().await;
                 }
 
@@ -332,12 +334,20 @@ where
         }
     }
 
-    fn handle_response_side_result<T>(&self, result: memdx::error::Result<T>) -> KvResult<T> {
+    async fn handle_response_side_result<T>(&self, result: memdx::error::Result<T>) -> KvResult<T> {
         match result {
             Ok(v) => Ok(v),
-            Err(e) => Err(MemdxError::new(e)
-                .with_dispatched_to(self.remote_addr().to_string())
-                .with_dispatched_from(self.local_addr().to_string())),
+            Err(e) => {
+                if let memdx::error::ErrorKind::Server(se) = e.kind() {
+                    if se.kind() == &memdx::error::ServerErrorKind::AuthStale {
+                        info!("Client {} closing due to auth stale status", &self.id);
+                        self.mark_closed().await;
+                    }
+                }
+                Err(MemdxError::new(e)
+                    .with_dispatched_to(self.remote_addr().to_string())
+                    .with_dispatched_from(self.local_addr().to_string()))
+            }
         }
     }
 
@@ -357,7 +367,7 @@ where
             .handle_dispatch_side_result(OpsCore {}.select_bucket(self.client(), req).await)
             .await?;
 
-        let res = self.handle_response_side_result(op.recv().await)?;
+        let res = self.handle_response_side_result(op.recv().await).await?;
         Ok(res)
     }
 
