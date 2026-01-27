@@ -16,11 +16,15 @@
  *
  */
 
+use crate::authenticator::Authenticator;
 use crate::error::MemdxError;
 use crate::kvclient::{KvClient, StdKvClient};
 use crate::memdx;
 use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::hello_feature::HelloFeature;
+use crate::memdx::op_auth_saslauto::Credentials;
+use crate::memdx::op_auth_saslbyname::{OpsSASLAuthByName, SASLAuthByNameOptions};
+use crate::memdx::op_auth_sasloauthbearer::{OpsSASLOAuthBearer, SASLOAuthBearerOptions};
 use crate::memdx::op_bootstrap::{BootstrapOptions, OpBootstrap, OpBootstrapEncoder};
 use crate::memdx::ops_core::OpsCore;
 use crate::memdx::ops_crud::OpsCrud;
@@ -42,7 +46,15 @@ use crate::memdx::response::{
 use chrono::Utc;
 use log::info;
 use std::future::Future;
+use std::ops::Add;
 use std::sync::atomic::Ordering;
+use std::time::Duration;
+use tokio::time::Instant;
+
+#[derive(Debug, Clone)]
+pub(crate) struct ReconfigureAuthenticatorRequest {
+    pub credentials: Credentials,
+}
 
 pub(crate) type KvResult<T> = Result<T, MemdxError>;
 
@@ -102,6 +114,10 @@ pub(crate) trait KvClientOps: Sized + Send + Sync {
         req: GetCollectionIdRequest,
     ) -> impl Future<Output = KvResult<GetCollectionIdResponse>> + Send;
     fn ping(&self, req: PingRequest) -> impl Future<Output = KvResult<PingResponse>> + Send;
+    fn reconfigure_authenticator(
+        &self,
+        req: ReconfigureAuthenticatorRequest,
+    ) -> impl Future<Output = KvResult<()>> + Send;
 }
 
 impl<D> KvClientOps for StdKvClient<D>
@@ -306,6 +322,33 @@ where
 
         let res = self.handle_response_side_result(op.recv().await).await?;
         Ok(res)
+    }
+
+    async fn reconfigure_authenticator(
+        &self,
+        req: ReconfigureAuthenticatorRequest,
+    ) -> KvResult<()> {
+        let token = match req.credentials {
+            Credentials::UserPass { .. } => {
+                unreachable!("UserPass should not be used with reconfigure_authenticator")
+            }
+            Credentials::JwtToken(token) => token,
+        };
+
+        self.update_last_activity();
+        OpsSASLOAuthBearer {}
+            .sasl_auth_oauth_bearer(
+                &OpsCore {},
+                self.client(),
+                SASLOAuthBearerOptions {
+                    token,
+                    deadline: Instant::now().add(Duration::from_millis(2500)),
+                },
+            )
+            .await
+            .map_err(MemdxError::new)?;
+
+        Ok(())
     }
 }
 
