@@ -48,6 +48,8 @@ impl Cluster {
         conn_str: impl AsRef<str>,
         opts: ClusterOptions,
     ) -> error::Result<Cluster> {
+        info!("SDK Version: {}", env!("CARGO_PKG_VERSION"));
+        info!("Cluster Options {opts}");
         let client = Arc::new(ClusterClient::connect(conn_str, opts).await?);
 
         let query_client = Arc::new(client.query_client());
