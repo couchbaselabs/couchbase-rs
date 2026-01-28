@@ -112,8 +112,6 @@ struct AgentState {
     http_idle_connection_timeout: Duration,
     http_max_idle_connections_per_host: Option<usize>,
     tcp_keep_alive_time: Duration,
-
-    client_name: String,
 }
 
 impl Display for AgentState {
@@ -166,6 +164,7 @@ pub(crate) struct AgentInner {
 
 pub struct Agent {
     pub(crate) inner: Arc<AgentInner>,
+    client_name: String,
 }
 
 impl AgentInner {
@@ -367,7 +366,6 @@ impl Agent {
             num_pool_connections: opts.kv_config.num_connections,
             latest_config: ParsedConfig::default(),
             network_type: "".to_string(),
-            client_name: client_name.clone(),
             tls_config: opts.tls_config,
             auth_mechanisms: auth_mechanisms.clone(),
             disable_error_map: !opts.kv_config.enable_error_map,
@@ -395,9 +393,13 @@ impl Agent {
 
         let first_kv_client_configs =
             Self::gen_first_kv_client_configs(&opts.seed_config.memd_addrs, &state);
-        let first_http_client_configs =
-            Self::gen_first_http_endpoints(&opts.seed_config.http_addrs, &state);
+        let first_http_client_configs = Self::gen_first_http_endpoints(
+            client_name.clone(),
+            &opts.seed_config.http_addrs,
+            &state,
+        );
         let first_config = Self::get_first_config(
+            client_name.clone(),
             first_kv_client_configs,
             &state,
             first_http_client_configs,
@@ -574,12 +576,12 @@ impl Agent {
 
         Self::start_config_watcher(Arc::downgrade(&inner), cfg_manager);
 
-        let agent = Agent { inner };
+        let agent = Agent {
+            inner,
+            client_name: client_name.clone(),
+        };
 
-        debug!(
-            "Agent created, {} strong references",
-            Arc::strong_count(&agent.inner)
-        );
+        info!("Agent {client_name} created");
 
         Ok(agent)
     }
@@ -624,6 +626,7 @@ impl Agent {
     }
 
     async fn get_first_config<C: httpx::client::Client>(
+        client_name: String,
         kv_targets: HashMap<String, KvTarget>,
         state: &AgentState,
         http_configs: HashMap<String, FirstHttpConfig>,
@@ -642,7 +645,7 @@ impl Agent {
                         authenticator: state.authenticator.clone(),
                         selected_bucket: state.bucket.clone(),
                         bootstrap_options: KvClientBootstrapOptions {
-                            client_name: state.client_name.clone(),
+                            client_name: client_name.clone(),
                             disable_error_map: state.disable_error_map,
                             disable_mutation_tokens: true,
                             disable_server_durations: true,
@@ -656,11 +659,7 @@ impl Agent {
                         endpoint_id: "".to_string(),
                         unsolicited_packet_tx: None,
                         orphan_handler: None,
-                        on_close: Arc::new(|id| {
-                            Box::pin(async move {
-                                debug!("Bootstrap client {id} closed");
-                            })
-                        }),
+                        on_close_tx: None,
                         disable_decompression: false,
                         id: Uuid::new_v4().to_string(),
                     }),
@@ -811,6 +810,7 @@ impl Agent {
     }
 
     fn gen_first_http_endpoints(
+        client_name: String,
         mgmt_addrs: &Vec<Address>,
         state: &AgentState,
     ) -> HashMap<String, FirstHttpConfig> {
@@ -825,7 +825,7 @@ impl Agent {
             let config = FirstHttpConfig {
                 endpoint: format!("{base}://{addr}"),
                 tls: state.tls_config.clone(),
-                user_agent: state.client_name.clone(),
+                user_agent: client_name.clone(),
                 authenticator: state.authenticator.clone(),
                 bucket_name: state.bucket.clone(),
             };
@@ -863,4 +863,14 @@ struct FirstHttpConfig {
     pub user_agent: String,
     pub authenticator: Authenticator,
     pub bucket_name: Option<String>,
+}
+
+impl Drop for Agent {
+    fn drop(&mut self) {
+        debug!(
+            "Dropping agent {}, {} strong references remain",
+            self.client_name,
+            Arc::strong_count(&self.inner)
+        );
+    }
 }

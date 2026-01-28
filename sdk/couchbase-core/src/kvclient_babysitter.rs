@@ -32,7 +32,7 @@ use crate::orphan_reporter::OrphanContext;
 use crate::results::diagnostics::EndpointDiagnostics;
 use crate::service_type::ServiceType;
 use crate::tls_config::TlsConfig;
-use crate::{authenticator, error};
+use crate::{authenticator, error, kvclient};
 use arc_swap::ArcSwap;
 use chrono::Utc;
 use futures_core::future::BoxFuture;
@@ -45,8 +45,8 @@ use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::select;
-use tokio::sync::mpsc::Sender;
-use tokio::sync::{watch, MutexGuard};
+use tokio::sync::mpsc::{Sender, UnboundedReceiver, UnboundedSender};
+use tokio::sync::{mpsc, oneshot, watch, MutexGuard};
 use tokio::time::{sleep, Instant};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
@@ -57,8 +57,7 @@ pub(crate) struct KvTarget {
     pub tls_config: Option<TlsConfig>,
 }
 
-pub(crate) type KvClientStateChangeHandler<K> =
-    Arc<dyn Fn(String, Option<Arc<K>>, Option<Error>) -> BoxFuture<'static, ()> + Send + Sync>;
+pub(crate) type KvClientStateChangeHandler<K> = UnboundedSender<(String, Option<Arc<K>>)>;
 
 pub(crate) trait KvClientBabysitter {
     type Client: KvClient + KvClientOps + Send + Sync;
@@ -154,12 +153,12 @@ pub(crate) struct StdKvClientBabysitter<K: KvClient> {
     connect_throttle_period: Duration,
 
     state_change_handler: KvClientStateChangeHandler<K>,
-    on_client_connected_tx: watch::Sender<Option<Arc<K>>>,
 
     kv_client_options: StaticKvClientOptions,
 
     fast_client: Arc<ArcSwap<StdKvClientBabysitterClientState<K>>>,
     slow_state: Arc<Mutex<StdKvClientBabysitterState<K>>>,
+    on_client_connected_tx: watch::Sender<Option<Arc<K>>>,
 
     shutdown_token: CancellationToken,
 }
@@ -190,7 +189,7 @@ impl<K: KvClient + 'static> StdKvClientBabysitter<K> {
             if elapsed < throttle_period {
                 let to_sleep = throttle_period.sub(elapsed);
                 debug!(
-                    "Client pool {} throttling new connection attempt for {:?}",
+                    "Client babysitter {} throttling new connection attempt for {:?}",
                     &babysitter_id, to_sleep
                 );
                 return select! {
@@ -224,65 +223,76 @@ impl<K: KvClient + 'static> StdKvClientBabysitter<K> {
         let state = client_opts.slow_state.clone();
         let client_id = Uuid::new_v4().to_string();
 
-        let opts = {
-            let desired_config = {
-                let guard = state.lock().unwrap();
+        let desired_config = {
+            let guard = state.lock().unwrap();
 
-                guard.desired_config.clone()
+            guard.desired_config.clone()
+        };
+
+        let on_close_opts = client_opts.clone();
+        let (on_close_tx, mut on_close_rx) = mpsc::channel(1);
+
+        let opts = KvClientOptions {
+            address: desired_config.target.clone(),
+            authenticator: desired_config.auth.clone(),
+            selected_bucket: desired_config.selected_bucket.clone(),
+            bootstrap_options: client_opts
+                .static_kv_client_options
+                .bootstrap_options
+                .clone(),
+            endpoint_id: client_opts.endpoint_id.clone(),
+            unsolicited_packet_tx: client_opts
+                .static_kv_client_options
+                .unsolicited_packet_tx
+                .clone(),
+            orphan_handler: client_opts.static_kv_client_options.orphan_handler.clone(),
+            on_close_tx: Some(on_close_tx),
+            disable_decompression: client_opts.static_kv_client_options.disable_decompression,
+            id: client_id.clone(),
+        };
+
+        tokio::spawn(async move {
+            select! {
+                _ = on_close_opts.shutdown_token.cancelled() => {
+                    debug!("Client babysitter {} shutdown during on_close wait", &on_close_opts.id);
+                    return;
+                }
+                _ = on_close_rx.recv() => {
+                    debug!("Client babysitter {} detected client {} closed", &on_close_opts.id, &client_id);
+                }
             };
 
-            let on_close_opts = client_opts.clone();
+            {
+                let mut guard = on_close_opts.slow_state.lock().unwrap();
+                guard.is_building = false;
+                if let Some(cli) = &guard.client {
+                    if cli.id() != client_id {
+                        return;
+                    }
+                } else {
+                    return;
+                }
 
-            KvClientOptions {
-                address: desired_config.target.clone(),
-                authenticator: desired_config.auth.clone(),
-                selected_bucket: desired_config.selected_bucket.clone(),
-                bootstrap_options: client_opts
-                    .static_kv_client_options
-                    .bootstrap_options
-                    .clone(),
-                endpoint_id: client_opts.endpoint_id.clone(),
-                unsolicited_packet_tx: client_opts
-                    .static_kv_client_options
-                    .unsolicited_packet_tx
-                    .clone(),
-                orphan_handler: client_opts.static_kv_client_options.orphan_handler.clone(),
-                on_close: Arc::new(move |client_id| {
-                    let babysitter_id = on_close_opts.id.clone();
-                    let opts_clone = on_close_opts.clone();
-                    let state_clone = on_close_opts.slow_state.clone();
-                    let fast_client_clone = on_close_opts.fast_client.clone();
-                    let state_change_handler = on_close_opts.state_change_handler.clone();
-                    let on_demand_connect = on_close_opts.on_demand_connect;
-
-                    Box::pin(async move {
-                        {
-                            let mut guard = state_clone.lock().unwrap();
-                            guard.is_building = false;
-                            if let Some(cli) = &guard.client {
-                                if cli.id() != client_id {
-                                    return;
-                                }
-                            } else {
-                                return;
-                            }
-
-                            guard.client = None;
-                            fast_client_clone
-                                .store(Arc::new(StdKvClientBabysitterClientState { client: None }));
-                        }
-
-                        state_change_handler(babysitter_id, None, None).await;
-
-                        if !on_demand_connect {
-                            Self::maybe_begin_client(opts_clone);
-                        }
-                    })
-                }),
-                disable_decompression: client_opts.static_kv_client_options.disable_decompression,
-                id: client_id.clone(),
+                guard.client = None;
+                on_close_opts
+                    .fast_client
+                    .store(Arc::new(StdKvClientBabysitterClientState { client: None }));
             }
-        };
+
+            if let Err(e) = on_close_opts
+                .state_change_handler
+                .send((on_close_opts.id.clone(), None))
+            {
+                debug!(
+                    "Client babysitter {} failed to notify of closed client {}: {}",
+                    &on_close_opts.id, &client_id, e
+                );
+            }
+
+            if !on_close_opts.on_demand_connect {
+                Self::maybe_begin_client(on_close_opts.clone());
+            }
+        });
 
         tokio::spawn(async move {
             loop {
@@ -357,12 +367,15 @@ impl<K: KvClient + 'static> StdKvClientBabysitter<K> {
                             }
                         }
 
-                        (client_opts.state_change_handler)(
-                            client_opts.id.clone(),
-                            Some(client),
-                            None,
-                        )
-                        .await;
+                        if let Err(e) = client_opts
+                            .state_change_handler
+                            .send((client_opts.id.clone(), Some(client)))
+                        {
+                            debug!(
+                                "Client babysitter {} failed to notify of new client {}",
+                                &client_opts.id, e
+                            );
+                        }
 
                         return;
                     }
@@ -381,7 +394,7 @@ impl<K: KvClient + 'static> StdKvClientBabysitter<K> {
                         if let Some(source) = e.source() {
                             msg = format!("{msg} - {source}");
                         }
-                        debug!("{msg}");
+                        info!("{msg}");
 
                         let mut guard = state.lock().unwrap();
 
@@ -420,7 +433,7 @@ impl<K: KvClient + 'static> StdKvClientBabysitter<K> {
         loop {
             let changed = select! {
                 () = shutdown_token.cancelled() => {
-                    return Err(Error::new_message_error("babysitter shutdown"))
+                    return Err(Error::new_message_error("client babysitter shutdown"))
                 },
                 (res) = rx.changed() => res
             };
@@ -537,7 +550,7 @@ impl<K: KvClient + KvClientOps + 'static> KvClientBabysitter for StdKvClientBaby
         loop {
             let changed = select! {
                 () = self.shutdown_token.cancelled() => {
-                    return Err(Error::new_message_error("babysitter shutdown"))
+                    return Err(Error::new_message_error("client babysitter shutdown"))
                 },
                 (res) = rx.changed() => res
             };
@@ -653,8 +666,15 @@ impl<K: KvClient + KvClientOps + 'static> KvClientBabysitter for StdKvClientBaby
             client.close().await?;
         }
 
-        (self.state_change_handler)(self.id.clone(), None, None);
+        self.state_change_handler.send((self.id.clone(), None));
 
         Ok(())
+    }
+}
+
+impl<K: KvClient> Drop for StdKvClientBabysitter<K> {
+    fn drop(&mut self) {
+        self.shutdown_token.cancel();
+        info!("Dropping StdKvClientBabysitter {}", self.id);
     }
 }

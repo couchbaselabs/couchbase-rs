@@ -46,7 +46,7 @@ use futures::executor::block_on;
 use futures::future::join_all;
 use log::{debug, error, info, warn};
 use tokio::select;
-use tokio::sync::mpsc::Sender;
+use tokio::sync::mpsc::{Sender, UnboundedReceiver};
 use tokio::sync::{broadcast, Mutex, MutexGuard, Notify};
 use tokio::time::{sleep, Instant};
 use tokio_util::sync::CancellationToken;
@@ -100,11 +100,22 @@ where
     client: Option<Arc<K>>,
 }
 
+impl<B, K> Drop for KvClientPoolEntry<B, K>
+where
+    B: KvClientBabysitter,
+    K: KvClient + KvClientOps,
+{
+    fn drop(&mut self) {
+        debug!("Dropping KvClientPoolEntry");
+    }
+}
+
 pub(crate) struct StdKvClientPool<B, K>
 where
     B: KvClientBabysitter,
     K: KvClient + KvClientOps,
 {
+    shutdown_token: CancellationToken,
     id: String,
 
     client_idx: AtomicUsize,
@@ -122,7 +133,7 @@ where
 
     async fn new(opts: KvClientPoolOptions) -> Self {
         let id = Uuid::new_v4().to_string();
-        debug!(
+        info!(
             "Creating new client pool {} for {} - {:?}",
             &id, &opts.target.address, &opts.selected_bucket
         );
@@ -134,14 +145,11 @@ where
         let babysitters: Arc<Mutex<Vec<KvClientPoolEntry<B, K>>>> =
             Arc::new(Mutex::new(Vec::with_capacity(opts.num_connections)));
 
-        let babysitters_clone = babysitters.clone();
-        let fast_map_clone = fast_map.clone();
+        let (state_change_tx, mut state_change_rx) = tokio::sync::mpsc::unbounded_channel();
 
         {
             let mut babysitters_guard = babysitters.lock().await;
             for idx in 0..opts.num_connections {
-                let babysitters_clone = babysitters_clone.clone();
-                let fast_map_clone = fast_map_clone.clone();
                 let babysitter = KvClientBabysitter::new(KvClientBabysitterOptions {
                     id: Uuid::new_v4().to_string(),
                     endpoint_id: opts.endpoint_id.clone(),
@@ -150,29 +158,7 @@ where
                     connect_throttle_period: opts.connect_throttle_period,
                     disable_decompression: opts.disable_decompression,
                     bootstrap_opts: opts.bootstrap_options.clone(),
-                    state_change_handler: Arc::new(move |babysitter_id, client, error| {
-                        let babysitters_clone = babysitters_clone.clone();
-                        let fast_map_clone = fast_map_clone.clone();
-                        Box::pin(async move {
-                            let mut guard = babysitters_clone.lock().await;
-
-                            let entry = guard
-                                .iter_mut()
-                                .find(|entry| entry.babysitter.id() == babysitter_id);
-                            if let Some(entry) = entry {
-                                entry.client = client;
-                            }
-
-                            let mut clients = vec![];
-                            for entry in guard.iter() {
-                                if let Some(client) = &entry.client {
-                                    clients.push(client.clone());
-                                }
-                            }
-
-                            fast_map_clone.store(Arc::new(KvClientPoolFastMap { clients }));
-                        })
-                    }),
+                    state_change_handler: state_change_tx.clone(),
                     unsolicited_packet_tx: opts.unsolicited_packet_tx.clone(),
                     orphan_handler: opts.orphan_handler.clone(),
                     target: opts.target.clone(),
@@ -190,11 +176,51 @@ where
             }
         }
 
+        let shutdown_token = CancellationToken::new();
+
+        let babysitters_clone = babysitters.clone();
+        let fast_map_clone = fast_map.clone();
+        let shutdown_token_clone = shutdown_token.clone();
+        let id_clone = id.clone();
+        tokio::spawn(async move {
+            loop {
+                let (babysitter_id, client) = select! {
+                    Some((babysitter_id, client)) = state_change_rx.recv() => {
+                        debug!("Client pool {} received state change for babysitter {}, has client: {}", &id_clone, &babysitter_id, client.is_some());
+                        (babysitter_id, client)
+                    },
+                    _ = shutdown_token_clone.cancelled() => {
+                        debug!("Client pool {} state change handler shutting down", &id_clone);
+                        return;
+                    }
+                };
+
+                let mut guard = babysitters_clone.lock().await;
+
+                let entry = guard
+                    .iter_mut()
+                    .find(|entry| entry.babysitter.id() == babysitter_id);
+                if let Some(entry) = entry {
+                    entry.client = client;
+                }
+
+                let mut clients = vec![];
+                for entry in guard.iter() {
+                    if let Some(client) = &entry.client {
+                        clients.push(client.clone());
+                    }
+                }
+
+                fast_map_clone.store(Arc::new(KvClientPoolFastMap { clients }));
+            }
+        });
+
         StdKvClientPool {
             id,
             client_idx: Default::default(),
             fast_map,
             babysitters,
+            shutdown_token,
         }
     }
 
@@ -277,6 +303,8 @@ where
     async fn close(&self) -> Result<()> {
         info!("Closing pool {}", self.id);
 
+        self.shutdown_token.cancel();
+
         self.fast_map
             .swap(Arc::new(KvClientPoolFastMap { clients: vec![] }));
 
@@ -309,5 +337,16 @@ where
         debug!("Client pool {} no client found in slow map", self.id);
 
         babysitter.get_client().await
+    }
+}
+
+impl<B, K> Drop for StdKvClientPool<B, K>
+where
+    B: KvClientBabysitter,
+    K: KvClient + KvClientOps,
+{
+    fn drop(&mut self) {
+        self.shutdown_token.cancel();
+        info!("Dropping StdKvClientPool {}", self.id,);
     }
 }

@@ -367,7 +367,7 @@ where
             Err(e) => {
                 if let memdx::error::ErrorKind::Dispatch { .. } = e.kind() {
                     info!("Client {} closing due to dispatch error", &self.id);
-                    self.mark_closed().await;
+                    let _ = self.close().await;
                 }
 
                 Err(MemdxError::new(e)
@@ -384,7 +384,7 @@ where
                 if let memdx::error::ErrorKind::Server(se) = e.kind() {
                     if se.kind() == &memdx::error::ServerErrorKind::AuthStale {
                         info!("Client {} closing due to auth stale status", &self.id);
-                        self.mark_closed().await;
+                        let _ = self.close().await;
                     }
                 }
                 Err(MemdxError::new(e)

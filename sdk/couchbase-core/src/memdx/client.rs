@@ -19,7 +19,7 @@
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{SinkExt, TryFutureExt};
-use log::{debug, error, trace, warn};
+use log::{debug, error, info, trace, warn};
 use snap::raw::Decoder;
 use std::backtrace::Backtrace;
 use std::cell::RefCell;
@@ -157,7 +157,9 @@ impl Client {
 
         Self::drain_opaque_map(opaque_map).await;
 
-        on_read_loop_close().await;
+        if on_read_loop_close.send(()).is_err() {
+            error!("{} failed to notify read loop closure", &client_id);
+        }
 
         debug!("{client_id} read loop shut down");
     }
@@ -313,7 +315,7 @@ impl Dispatcher for Client {
                     client_id: read_uuid,
                     unsolicited_packet_handler: opts.unsolicited_packet_handler,
                     orphan_handler: opts.orphan_handler,
-                    on_read_close_handler: opts.on_read_close_handler,
+                    on_read_close_handler: opts.on_read_close_tx,
                     on_close_cancel: cancel_child,
                     disable_decompression: opts.disable_decompression,
                     local_addr,
@@ -392,7 +394,7 @@ impl Dispatcher for Client {
             return Ok(());
         }
 
-        debug!("Client {} closing", self.client_id);
+        info!("Closing client {}", self.client_id);
 
         let mut close_err = None;
         let mut writer = self.writer.lock().await;
@@ -415,6 +417,6 @@ impl Dispatcher for Client {
 
 impl Drop for Client {
     fn drop(&mut self) {
-        debug!("Client {} exiting", self.client_id);
+        info!("Dropping client {}", self.client_id);
     }
 }
