@@ -20,7 +20,7 @@ use crate::authenticator::Authenticator;
 use crate::capella_ca::CAPELLA_CERT;
 use crate::error;
 use log::debug;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::io::Cursor;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -166,6 +166,20 @@ impl From<CompressionMode> for couchbase_core::options::agent::CompressionMode {
     }
 }
 
+impl Display for CompressionMode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        match self {
+            CompressionMode::Enabled {
+                min_size,
+                min_ratio,
+            } => {
+                write!(f, "{{ min_size: {min_size}, min_ratio: {min_ratio} }}")
+            }
+            CompressionMode::Disabled => write!(f, "disabled"),
+        }
+    }
+}
+
 #[derive(Default, Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub struct PollerOptions {
@@ -191,6 +205,16 @@ impl From<PollerOptions> for couchbase_core::options::agent::ConfigPollerConfig 
         }
 
         core_opts
+    }
+}
+
+impl Display for PollerOptions {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(
+            f,
+            "{{ config_poll_interval: {:?} }}",
+            self.config_poll_interval
+        )
     }
 }
 
@@ -229,6 +253,16 @@ impl From<HttpOptions> for couchbase_core::options::agent::HttpConfig {
         }
 
         core_opts
+    }
+}
+
+impl Display for HttpOptions {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(
+            f,
+            "{{ max_idle_connections_per_host: {:?}, idle_connection_timeout: {:?} }}",
+            self.max_idle_connections_per_host, self.idle_connection_timeout
+        )
     }
 }
 
@@ -298,6 +332,20 @@ impl From<KvOptions> for couchbase_core::options::agent::KvConfig {
         }
 
         core_opts
+    }
+}
+
+impl Display for KvOptions {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(
+            f,
+            "{{ enable_mutation_tokens: {:?}, enable_server_durations: {:?}, num_connections: {:?}, connect_timeout: {:?}, connect_throttle_timeout: {:?} }}",
+            self.enable_mutation_tokens,
+            self.enable_server_durations,
+            self.num_connections,
+            self.connect_timeout,
+            self.connect_throttle_timeout
+        )
     }
 }
 
@@ -492,6 +540,21 @@ impl TlsOptions {
             .map_err(|e| error::Error::other_failure(format!("failed to build client config: {e}")))
     }
 }
+
+#[cfg(all(feature = "rustls-tls", not(feature = "native-tls")))]
+impl Display for TlsOptions {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "rustls-tls")
+    }
+}
+
+#[cfg(feature = "native-tls")]
+impl Display for TlsOptions {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "native-tls")
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 #[cfg(feature = "unstable-dns-options")]
@@ -552,6 +615,16 @@ impl OrphanReporterOptions {
     }
 }
 
+impl Display for OrphanReporterOptions {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(
+            f,
+            "{{ enabled: {:?}, reporter_interval: {:?}, sample_size: {:?} }}",
+            self.enabled, self.reporter_interval, self.sample_size
+        )
+    }
+}
+
 impl From<OrphanReporterOptions>
     for couchbase_core::options::orphan_reporter::OrphanReporterConfig
 {
@@ -568,5 +641,22 @@ impl From<OrphanReporterOptions>
         }
 
         core_opts
+    }
+}
+
+impl Display for ClusterOptions {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(
+            f,
+            "{{ authenticator: {}, compression_mode: {:?}, tls_options: {}, tcp_keep_alive_time: {:?}, poller_options: {}, http_options: {}, kv_options: {}, orphan_reporter_options: {} }}",
+            self.authenticator,
+            self.compression_mode,
+            if let Some(tls) = &self.tls_options {tls.to_string()} else {"none".to_string()},
+            self.tcp_keep_alive_time,
+            self.poller_options,
+            self.http_options,
+            self.kv_options,
+            self.orphan_reporter_options
+        )
     }
 }

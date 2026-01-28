@@ -164,7 +164,8 @@ pub(crate) struct AgentInner {
 
 pub struct Agent {
     pub(crate) inner: Arc<AgentInner>,
-    client_name: String,
+    user_agent: String,
+    id: String,
 }
 
 impl AgentInner {
@@ -341,8 +342,13 @@ impl ConfigUpdater for AgentInner {
 impl Agent {
     pub async fn new(opts: AgentOptions) -> Result<Self> {
         let build_version = env!("CARGO_PKG_VERSION");
-        let client_name = format!("couchbase-rs-core {build_version}");
-        info!("Creating new agent {client_name}");
+        let user_agent = format!("cb-rust/{build_version}");
+        let agent_id = Uuid::new_v4().to_string();
+        info!(
+            "Core SDK Version: {} - Agent ID: {}",
+            &user_agent, &agent_id
+        );
+        info!("Agent Options {opts}");
 
         let auth_mechanisms = if !opts.auth_mechanisms.is_empty() {
             if opts.tls_config.is_none() && opts.auth_mechanisms.contains(&AuthMechanism::Plain) {
@@ -394,12 +400,12 @@ impl Agent {
         let first_kv_client_configs =
             Self::gen_first_kv_client_configs(&opts.seed_config.memd_addrs, &state);
         let first_http_client_configs = Self::gen_first_http_endpoints(
-            client_name.clone(),
+            user_agent.clone(),
             &opts.seed_config.http_addrs,
             &state,
         );
         let first_config = Self::get_first_config(
-            client_name.clone(),
+            user_agent.clone(),
             first_kv_client_configs,
             &state,
             first_http_client_configs,
@@ -437,7 +443,7 @@ impl Agent {
                 num_pool_connections,
                 connect_throttle_period: opts.kv_config.connect_throttle_timeout,
                 bootstrap_options: KvClientBootstrapOptions {
-                    client_name: client_name.clone(),
+                    client_name: user_agent.clone(),
                     disable_error_map: state.disable_error_map,
                     disable_mutation_tokens: state.disable_mutation_tokens,
                     disable_server_durations: state.disable_server_durations,
@@ -501,7 +507,7 @@ impl Agent {
             http_client.clone(),
             agent_component_configs.mgmt_config,
             MgmtComponentOptions {
-                user_agent: client_name.clone(),
+                user_agent: user_agent.clone(),
             },
         );
 
@@ -510,7 +516,7 @@ impl Agent {
             http_client.clone(),
             agent_component_configs.analytics_config,
             AnalyticsComponentOptions {
-                user_agent: client_name.clone(),
+                user_agent: user_agent.clone(),
             },
         ));
 
@@ -519,7 +525,7 @@ impl Agent {
             http_client.clone(),
             agent_component_configs.query_config,
             QueryComponentOptions {
-                user_agent: client_name.clone(),
+                user_agent: user_agent.clone(),
             },
         ));
 
@@ -528,7 +534,7 @@ impl Agent {
             http_client.clone(),
             agent_component_configs.search_config,
             SearchComponentOptions {
-                user_agent: client_name.clone(),
+                user_agent: user_agent.clone(),
             },
         ));
 
@@ -578,10 +584,11 @@ impl Agent {
 
         let agent = Agent {
             inner,
-            client_name: client_name.clone(),
+            user_agent,
+            id: agent_id.clone(),
         };
 
-        info!("Agent {client_name} created");
+        info!("Agent {agent_id} created");
 
         Ok(agent)
     }
@@ -869,7 +876,7 @@ impl Drop for Agent {
     fn drop(&mut self) {
         debug!(
             "Dropping agent {}, {} strong references remain",
-            self.client_name,
+            self.id,
             Arc::strong_count(&self.inner)
         );
     }

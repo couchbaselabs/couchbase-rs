@@ -21,7 +21,7 @@ use crate::auth_mechanism::AuthMechanism;
 use crate::authenticator::Authenticator;
 use crate::memdx::dispatcher::OrphanResponseHandler;
 use crate::tls_config::TlsConfig;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use std::time::Duration;
 
 #[derive(Clone)]
@@ -209,6 +209,20 @@ impl Default for CompressionMode {
     }
 }
 
+impl Display for CompressionMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CompressionMode::Enabled {
+                min_size,
+                min_ratio,
+            } => {
+                write!(f, "{{ min_size: {}, min_ratio: {} }}", min_size, min_ratio)
+            }
+            CompressionMode::Disabled => write!(f, "disabled"),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub struct ConfigPollerConfig {
@@ -358,5 +372,89 @@ impl ReconfigureAgentOptions {
     pub fn tls_config(mut self, tls_config: impl Into<Option<TlsConfig>>) -> Self {
         self.tls_config = tls_config.into();
         self
+    }
+}
+
+impl Display for SeedConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{{ http_addrs: {:?}, memd_addrs: {:?} }}",
+            self.http_addrs, self.memd_addrs
+        )
+    }
+}
+
+impl Display for CompressionConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{{ disable_decompression: {}, mode: {} }}",
+            self.disable_decompression, self.mode
+        )
+    }
+}
+
+impl Display for ConfigPollerConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{{ poll_interval: {:?}, fetch_timeout: {:?} }}",
+            self.poll_interval, self.fetch_timeout
+        )
+    }
+}
+
+impl Display for KvConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{{ on_demand_connect: {}, enable_error_map: {}, enable_mutation_tokens: {}, enable_server_durations: {}, num_connections: {}, connect_timeout: {:?}, connect_throttle_timeout: {:?} }}",
+            self.on_demand_connect,
+            self.enable_error_map,
+            self.enable_mutation_tokens,
+            self.enable_server_durations,
+            self.num_connections,
+            self.connect_timeout,
+            self.connect_throttle_timeout
+        )
+    }
+}
+
+impl Display for HttpConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{{ max_idle_connections_per_host: {:?}, idle_connection_timeout: {:?} }}",
+            self.max_idle_connections_per_host, self.idle_connection_timeout
+        )
+    }
+}
+
+impl Display for AgentOptions {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let tls_config = if cfg!(feature = "rustls-tls") {
+            "rustls-tls"
+        } else if cfg!(feature = "native-tls") {
+            "native-tls"
+        } else {
+            "none"
+        };
+
+        write!(
+            f,
+            "{{ seed_config: {}, auth_mechanisms: {:?}, tls_config: {}, bucket_name: {:?}, network: {:?}, compression_config: {}, config_poller_config: {}, kv_config: {}, http_config: {}, tcp_keep_alive_time: {:?}, orphan_response_handler: {} }}",
+            self.seed_config,
+            self.auth_mechanisms,
+            tls_config,
+            self.bucket_name.clone(),
+            self.network.clone(),
+            self.compression_config,
+            self.config_poller_config,
+            self.kv_config,
+            self.http_config,
+            self.tcp_keep_alive_time,
+            if self.orphan_response_handler.is_some() { "Some" } else { "None" }
+        )
     }
 }
