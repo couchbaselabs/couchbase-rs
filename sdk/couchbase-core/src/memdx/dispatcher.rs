@@ -18,25 +18,25 @@
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
-use futures::future::BoxFuture;
-
 use crate::memdx::client::ResponseContext;
 use crate::memdx::connection::ConnectionType;
 use crate::memdx::error::Result;
 use crate::memdx::packet::{RequestPacket, ResponsePacket};
 use crate::memdx::pendingop::ClientPendingOp;
 use crate::orphan_reporter::OrphanContext;
+use async_trait::async_trait;
+use futures::future::BoxFuture;
+use tokio::sync::oneshot;
 
 pub type UnsolicitedPacketHandler =
     Arc<dyn Fn(ResponsePacket) -> BoxFuture<'static, ()> + Send + Sync>;
 pub type OrphanResponseHandler = Arc<dyn Fn(ResponsePacket, OrphanContext) + Send + Sync>;
-pub type OnReadLoopCloseHandler = Arc<dyn Fn() -> BoxFuture<'static, ()> + Send + Sync>;
+pub type OnReadLoopCloseHandler = oneshot::Sender<()>;
 
 pub struct DispatcherOptions {
     pub unsolicited_packet_handler: UnsolicitedPacketHandler,
     pub orphan_handler: Option<OrphanResponseHandler>,
-    pub on_read_close_handler: OnReadLoopCloseHandler,
+    pub on_read_close_tx: OnReadLoopCloseHandler,
     pub disable_decompression: bool,
     pub id: String,
 }

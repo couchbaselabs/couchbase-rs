@@ -31,6 +31,7 @@ use crate::options::diagnostic_options::{DiagnosticsOptions, PingOptions, WaitUn
 use crate::options::query_options::QueryOptions;
 use crate::results::diagnostics::{DiagnosticsResult, PingReport};
 use crate::results::query_results::QueryResult;
+use log::info;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -114,5 +115,11 @@ impl Cluster {
     // are created.
     pub async fn set_authenticator(&self, authenticator: Authenticator) -> error::Result<()> {
         self.client.set_authenticator(authenticator).await
+    }
+}
+
+impl Drop for Cluster {
+    fn drop(&mut self) {
+        info!("Dropping Cluster");
     }
 }

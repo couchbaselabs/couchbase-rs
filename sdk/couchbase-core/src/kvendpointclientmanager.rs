@@ -28,7 +28,7 @@ use crate::results::diagnostics::EndpointDiagnostics;
 use arc_swap::ArcSwap;
 use futures::future::join_all;
 use futures::AsyncWriteExt;
-use log::{debug, error};
+use log::{debug, error, info, trace};
 use std::collections::HashMap;
 use std::future::Future;
 use std::marker::PhantomData;
@@ -282,7 +282,7 @@ where
 
             let handle = async move {
                 let pool_id = pool.id();
-                debug!("Pinging pool {pool_id}");
+                trace!("Pinging pool {pool_id}");
                 (endpoint, pool.ping_all_clients(req).await)
             };
 
@@ -319,5 +319,15 @@ where
         }
 
         Ok(clients)
+    }
+}
+
+impl<P, K> Drop for StdKvEndpointClientManager<P, K>
+where
+    P: KvClientPool<Client = K>,
+    K: KvClient,
+{
+    fn drop(&mut self) {
+        info!("Dropping StdKvEndpointClientManager {}", self.id);
     }
 }

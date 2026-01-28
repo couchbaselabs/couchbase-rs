@@ -47,8 +47,10 @@ use std::sync::atomic::Ordering::SeqCst;
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicPtr, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{mpsc, Mutex};
+use tokio::select;
+use tokio::sync::{mpsc, oneshot, Mutex};
 use tokio::time::Instant;
+use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 #[derive(Clone)]
@@ -85,13 +87,12 @@ pub(crate) struct KvClientOptions {
 
     pub unsolicited_packet_tx: Option<UnsolicitedPacketSender>,
     pub orphan_handler: Option<OrphanResponseHandler>,
-    pub on_close: OnKvClientCloseHandler,
+    pub on_close_tx: Option<OnKvClientCloseHandler>,
     pub disable_decompression: bool,
     pub id: String,
 }
 
-pub(crate) type OnKvClientCloseHandler =
-    Arc<dyn Fn(String) -> BoxFuture<'static, ()> + Send + Sync>;
+pub(crate) type OnKvClientCloseHandler = mpsc::Sender<()>;
 
 pub(crate) type OnErrMapFetchedHandler = Arc<dyn Fn(&[u8]) + Send + Sync>;
 
@@ -124,7 +125,8 @@ pub(crate) struct StdKvClient<D: Dispatcher> {
 
     cli: D,
     closed: Arc<AtomicBool>,
-    on_close: OnKvClientCloseHandler,
+    on_close_tx: Option<OnKvClientCloseHandler>,
+    client_close_handle: tokio::task::JoinHandle<()>,
 
     supported_features: Vec<HelloFeature>,
 
@@ -257,41 +259,33 @@ where
 
         let client_id = Uuid::new_v4().to_string();
 
-        debug!(
+        info!(
             "Kvclient {} assigning client id {} for {}",
             &id, &client_id, &address
         );
 
+        let (on_read_close_tx, mut on_read_close_rx) = oneshot::channel::<()>();
+
         let unsolicited_packet_tx = opts.unsolicited_packet_tx.clone();
-        let on_close = opts.on_close.clone();
         let endpoint_id = opts.endpoint_id.clone();
+        let unsolicited_client_id = client_id.clone();
         let memdx_client_opts = DispatcherOptions {
-            on_read_close_handler: Arc::new(move || {
-                // There's not much to do when the connection closes so just mark us as closed.
-                if closed_clone.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-                    != Ok(false)
-                {
-                    return Box::pin(async move {});
-                }
-
-                let on_close = on_close.clone();
-                let read_id = read_id.clone();
-
-                Box::pin(async move {
-                    on_close(read_id).await;
-                })
-            }),
+            on_read_close_tx,
             orphan_handler: opts.orphan_handler,
             unsolicited_packet_handler: Arc::new(move |p| {
                 let unsolicited_packet_tx = unsolicited_packet_tx.clone();
                 let endpoint_id = endpoint_id.clone();
+                let unsolicited_client_id = unsolicited_client_id.clone();
                 Box::pin(async move {
                     if let Some(sender) = unsolicited_packet_tx {
                         if let Err(e) = sender.send(UnsolicitedPacket {
                             packet: p,
                             endpoint_id,
                         }) {
-                            warn!("Failed to send unsolicited packet {e:?}");
+                            warn!(
+                                "Failed to send unsolicited packet {e} on {}",
+                                unsolicited_client_id.clone()
+                            );
                         };
                     }
                 })
@@ -345,6 +339,26 @@ where
 
         let mut cli = D::new(conn, memdx_client_opts);
 
+        let on_close = opts.on_close_tx.clone();
+        let close_handle = tokio::spawn(async move {
+            let _ = on_read_close_rx.await;
+
+            // There's not much to do when the connection closes so just mark us as closed.
+            if closed_clone.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+                != Ok(true)
+            {
+                // If we've been dropped (i.e. we didn't get here via close()) then don't try to
+                // call the on_close handler as it will have been dropped too.
+                return;
+            }
+
+            if let Some(on_close) = on_close {
+                if let Err(e) = on_close.send(()).await {
+                    debug!("Failed to send on_close for kvclient {}: {}", &read_id, e);
+                }
+            }
+        });
+
         let mut kv_cli = StdKvClient {
             remote_addr,
             local_addr,
@@ -352,11 +366,12 @@ where
             endpoint_id: opts.endpoint_id,
             cli,
             closed,
-            on_close: opts.on_close,
+            on_close_tx: opts.on_close_tx,
             supported_features: vec![],
             selected_bucket: std::sync::Mutex::new(None),
             id: id.clone(),
             last_activity_timestamp_micros: AtomicI64::new(Utc::now().timestamp_micros()),
+            client_close_handle: close_handle,
         };
 
         if should_bootstrap {
@@ -457,19 +472,17 @@ where
         if self
             .closed
             .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-            != Ok(true)
+            != Ok(false)
         {
             return Ok(());
         }
 
-        info!("Closing kvclient {}", self.id);
+        info!("Kvclient {} closing", self.id);
 
         self.cli
             .close()
             .await
             .map_err(|e| Error::new_contextual_memdx_error(MemdxError::new(e)))?;
-
-        (self.on_close)(self.id.clone()).await;
 
         Ok(())
     }
@@ -488,26 +501,11 @@ where
     }
 }
 
-impl<D> StdKvClient<D>
+impl<D> Drop for StdKvClient<D>
 where
     D: Dispatcher,
 {
-    pub(crate) async fn mark_closed(&self) {
-        if self
-            .closed
-            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-            != Ok(false)
-        {
-            return;
-        }
-
-        if let Err(e) = self.cli.close().await {
-            debug!(
-                "Failed to close connection for kvclient {}: {}",
-                &self.id, e
-            );
-        }
-
-        (self.on_close)(self.id.clone()).await;
+    fn drop(&mut self) {
+        info!("Dropping kvclient {}", self.id);
     }
 }

@@ -22,7 +22,7 @@ use std::time::Duration;
 
 use arc_swap::ArcSwap;
 use futures::executor::block_on;
-use log::debug;
+use log::{debug, info};
 use tokio::sync::{Mutex, Notify};
 
 use crate::agent::Agent;
@@ -149,5 +149,11 @@ impl OnDemandAgentManager {
         notif.notify_waiters();
 
         Ok(())
+    }
+}
+
+impl Drop for OnDemandAgentManager {
+    fn drop(&mut self) {
+        info!("Dropping OnDemandAgentManager");
     }
 }
