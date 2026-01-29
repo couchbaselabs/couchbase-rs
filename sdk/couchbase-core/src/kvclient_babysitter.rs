@@ -610,6 +610,7 @@ impl<K: KvClient + KvClientOps + 'static> KvClientBabysitter for StdKvClientBaby
             guard.desired_config.auth = authenticator.clone();
         }
 
+        #[cfg(feature = "unstable-jwt")]
         if let Authenticator::JwtAuthenticator(jwt) = authenticator {
             // We will attempt to reauth the existing client, if we're bootstrapping already
             // then we don't know at what point that's already at so we'll always reauth that

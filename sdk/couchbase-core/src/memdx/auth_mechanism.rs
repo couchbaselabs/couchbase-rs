@@ -25,6 +25,7 @@ pub enum AuthMechanism {
     ScramSha1,
     ScramSha256,
     ScramSha512,
+    #[cfg(feature = "unstable-jwt")]
     OAuthBearer,
 }
 
@@ -35,6 +36,7 @@ impl From<AuthMechanism> for Vec<u8> {
             AuthMechanism::ScramSha1 => "SCRAM-SHA1",
             AuthMechanism::ScramSha256 => "SCRAM-SHA256",
             AuthMechanism::ScramSha512 => "SCRAM-SHA512",
+            #[cfg(feature = "unstable-jwt")]
             AuthMechanism::OAuthBearer => "OAUTHBEARER",
         };
 
@@ -51,6 +53,7 @@ impl TryFrom<&str> for AuthMechanism {
             "SCRAM-SHA1" => AuthMechanism::ScramSha1,
             "SCRAM-SHA256" => AuthMechanism::ScramSha256,
             "SCRAM-SHA512" => AuthMechanism::ScramSha512,
+            #[cfg(feature = "unstable-jwt")]
             "OAUTHBEARER" => AuthMechanism::OAuthBearer,
             _ => {
                 return Err(Error::new_protocol_error(format!(

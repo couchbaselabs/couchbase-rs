@@ -725,6 +725,7 @@ impl Agent {
                     Authenticator::CertificateAuthenticator(_authenticator) => {
                         Auth::BasicAuth(BasicAuth::new("".to_string(), "".to_string()))
                     }
+                    #[cfg(feature = "unstable-jwt")]
                     Authenticator::JwtAuthenticator(authenticator) => {
                         Auth::BearerAuth(BearerAuth::new(authenticator.get_token()))
                     }
