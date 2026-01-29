@@ -16,10 +16,12 @@
  *
  */
 use crate::common::test_config::{create_test_cluster, run_test};
+#[cfg(feature = "unstable-jwt")]
 use couchbase::authenticator::{Authenticator, JwtAuthenticator};
 
 mod common;
 
+#[cfg(feature = "unstable-jwt")]
 #[test]
 fn test_set_authenticator_different_type() {
     run_test(async |_cluster, _bucket| {

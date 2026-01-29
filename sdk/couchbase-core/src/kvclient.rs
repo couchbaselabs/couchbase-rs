@@ -206,6 +206,7 @@ where
                 })
             }
             Authenticator::CertificateAuthenticator(_a) => None,
+            #[cfg(feature = "unstable-jwt")]
             Authenticator::JwtAuthenticator(a) => {
                 Some(Credentials::JwtToken(a.get_token().to_string()))
             }
@@ -225,6 +226,7 @@ where
                         Authenticator::PasswordAuthenticator(a) => {
                             a.get_auth_mechanisms(opts.address.tls_config.is_some())
                         }
+                        #[cfg(feature = "unstable-jwt")]
                         Authenticator::JwtAuthenticator(a) => a.get_auth_mechanisms(),
                         _ => vec![],
                     }

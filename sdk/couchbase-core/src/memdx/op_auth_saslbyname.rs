@@ -20,6 +20,7 @@ use crate::memdx::auth_mechanism::AuthMechanism;
 use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::error::Result;
 use crate::memdx::op_auth_saslauto::Credentials;
+#[cfg(feature = "unstable-jwt")]
 use crate::memdx::op_auth_sasloauthbearer::{OpsSASLOAuthBearer, SASLOAuthBearerOptions};
 use crate::memdx::op_auth_saslplain::{OpSASLPlainEncoder, OpsSASLAuthPlain, SASLAuthPlainOptions};
 use crate::memdx::op_auth_saslscram::{OpSASLScramEncoder, OpsSASLAuthScram, SASLAuthScramOptions};
@@ -114,6 +115,7 @@ impl OpsSASLAuthByName {
                     )
                     .await
             }
+            #[cfg(feature = "unstable-jwt")]
             AuthMechanism::OAuthBearer => {
                 let token = opts.credentials.jwt()?;
                 OpsSASLOAuthBearer {}
