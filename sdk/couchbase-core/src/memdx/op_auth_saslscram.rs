@@ -25,9 +25,9 @@ use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::error::Error;
 use crate::memdx::error::Result;
 use crate::memdx::op_auth_saslplain::OpSASLPlainEncoder;
-use crate::memdx::pendingop::{run_op_future_with_deadline, StandardPendingOp};
+use crate::memdx::pendingop::{run_bootstrap_op_future_with_deadline, ClientPendingOp};
 use crate::memdx::request::{SASLAuthRequest, SASLStepRequest};
-use crate::memdx::response::SASLStepResponse;
+use crate::memdx::response::{SASLAuthResponse, SASLStepResponse};
 use crate::scram::Client;
 
 pub trait OpSASLScramEncoder: OpSASLPlainEncoder {
@@ -35,7 +35,7 @@ pub trait OpSASLScramEncoder: OpSASLPlainEncoder {
         &self,
         dispatcher: &D,
         request: SASLStepRequest,
-    ) -> impl std::future::Future<Output = Result<StandardPendingOp<SASLStepResponse>>>
+    ) -> impl std::future::Future<Output = Result<ClientPendingOp>>
     where
         D: Dispatcher;
 }
@@ -78,8 +78,13 @@ impl OpsSASLAuthScram {
             auth_mechanism: AuthMechanism::ScramSha512,
         };
 
-        let resp =
-            run_op_future_with_deadline(opts.deadline, encoder.sasl_auth(dispatcher, req)).await?;
+        let resp = run_bootstrap_op_future_with_deadline(
+            opts.deadline,
+            encoder.sasl_auth(dispatcher, req),
+        )
+        .await?;
+
+        let resp = SASLAuthResponse::new(resp)?;
 
         if !resp.needs_more_steps {
             return Ok(());
@@ -94,8 +99,13 @@ impl OpsSASLAuthScram {
             auth_mechanism: AuthMechanism::ScramSha512,
         };
 
-        let resp =
-            run_op_future_with_deadline(opts.deadline, encoder.sasl_step(dispatcher, req)).await?;
+        let resp = run_bootstrap_op_future_with_deadline(
+            opts.deadline,
+            encoder.sasl_step(dispatcher, req),
+        )
+        .await?;
+
+        let resp = SASLStepResponse::new(resp)?;
 
         if resp.needs_more_steps {
             return Err(Error::new_protocol_error(

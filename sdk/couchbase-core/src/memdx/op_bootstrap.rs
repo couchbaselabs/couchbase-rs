@@ -25,7 +25,7 @@ use crate::memdx::error::CancellationErrorKind;
 use crate::memdx::error::Result;
 use crate::memdx::op_auth_saslauto::{OpSASLAutoEncoder, OpsSASLAuthAuto, SASLAuthAutoOptions};
 use crate::memdx::op_auth_saslplain::OpSASLPlainEncoder;
-use crate::memdx::pendingop::{run_op_future_with_deadline, PendingOp, StandardPendingOp};
+use crate::memdx::pendingop::{run_bootstrap_op_future_with_deadline, ClientPendingOp};
 use crate::memdx::request::{
     GetClusterConfigRequest, GetErrorMapRequest, HelloRequest, SASLAuthRequest,
     SASLListMechsRequest, SASLStepRequest, SelectBucketRequest,
@@ -40,7 +40,7 @@ pub trait OpBootstrapEncoder {
         &self,
         dispatcher: &D,
         request: HelloRequest,
-    ) -> impl std::future::Future<Output = Result<StandardPendingOp<HelloResponse>>>
+    ) -> impl std::future::Future<Output = Result<ClientPendingOp>>
     where
         D: Dispatcher;
 
@@ -48,7 +48,7 @@ pub trait OpBootstrapEncoder {
         &self,
         dispatcher: &D,
         request: GetErrorMapRequest,
-    ) -> impl std::future::Future<Output = Result<StandardPendingOp<GetErrorMapResponse>>>
+    ) -> impl std::future::Future<Output = Result<ClientPendingOp>>
     where
         D: Dispatcher;
 
@@ -56,7 +56,7 @@ pub trait OpBootstrapEncoder {
         &self,
         dispatcher: &D,
         request: SelectBucketRequest,
-    ) -> impl std::future::Future<Output = Result<StandardPendingOp<SelectBucketResponse>>>
+    ) -> impl std::future::Future<Output = Result<ClientPendingOp>>
     where
         D: Dispatcher;
 
@@ -64,7 +64,7 @@ pub trait OpBootstrapEncoder {
         &self,
         dispatcher: &D,
         request: GetClusterConfigRequest,
-    ) -> impl std::future::Future<Output = Result<StandardPendingOp<GetClusterConfigResponse>>>
+    ) -> impl std::future::Future<Output = Result<ClientPendingOp>>
     where
         D: Dispatcher;
 }
@@ -100,26 +100,28 @@ impl OpBootstrap {
         };
 
         if let Some(req) = opts.hello {
-            result.hello =
-                match run_op_future_with_deadline(opts.deadline, encoder.hello(dispatcher, req))
-                    .await
-                {
-                    Ok(r) => Some(r),
-                    Err(e) => {
-                        warn!("Hello failed {e}");
-                        None
-                    }
-                };
+            result.hello = match run_bootstrap_op_future_with_deadline(
+                opts.deadline,
+                encoder.hello(dispatcher, req),
+            )
+            .await
+            {
+                Ok(r) => Some(HelloResponse::new(r)?),
+                Err(e) => {
+                    warn!("Hello failed {e}");
+                    None
+                }
+            };
         };
 
         if let Some(req) = opts.get_error_map {
-            result.error_map = match run_op_future_with_deadline(
+            result.error_map = match run_bootstrap_op_future_with_deadline(
                 opts.deadline,
                 encoder.get_error_map(dispatcher, req),
             )
             .await
             {
-                Ok(r) => Some(r),
+                Ok(r) => Some(GetErrorMapResponse::new(r)?),
                 Err(e) => {
                     warn!("Get error map failed {e}");
                     None
@@ -141,8 +143,11 @@ impl OpBootstrap {
         }
 
         if let Some(req) = opts.select_bucket {
-            match run_op_future_with_deadline(opts.deadline, encoder.select_bucket(dispatcher, req))
-                .await
+            match run_bootstrap_op_future_with_deadline(
+                opts.deadline,
+                encoder.select_bucket(dispatcher, req),
+            )
+            .await
             {
                 Ok(r) => Some(r),
                 Err(e) => {
@@ -153,13 +158,13 @@ impl OpBootstrap {
         }
 
         if let Some(req) = opts.get_cluster_config {
-            result.cluster_config = match run_op_future_with_deadline(
+            result.cluster_config = match run_bootstrap_op_future_with_deadline(
                 opts.deadline,
                 encoder.get_cluster_config(dispatcher, req),
             )
             .await
             {
-                Ok(r) => Some(r),
+                Ok(r) => Some(GetClusterConfigResponse::new(r)?),
                 Err(e) => {
                     warn!("Get cluster config failed {e}");
                     None

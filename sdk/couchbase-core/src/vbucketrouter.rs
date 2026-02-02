@@ -20,7 +20,6 @@ use crate::cbconfig::TerseConfig;
 use crate::error::ErrorKind;
 use crate::error::Result;
 use crate::memdx::error::ServerErrorKind;
-use crate::memdx::response::TryFromClientResponse;
 use crate::nmvbhandler::NotMyVbucketConfigHandler;
 use crate::vbucketmap::VbucketMap;
 use arc_swap::{ArcSwap, Guard};

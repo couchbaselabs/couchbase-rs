@@ -22,7 +22,7 @@ use crate::memdx::auth_mechanism::AuthMechanism;
 use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::error;
 use crate::memdx::error::Result;
-use crate::memdx::pendingop::{run_op_future_with_deadline, StandardPendingOp};
+use crate::memdx::pendingop::{run_bootstrap_op_future_with_deadline, ClientPendingOp};
 use crate::memdx::request::SASLAuthRequest;
 use crate::memdx::response::SASLAuthResponse;
 
@@ -31,7 +31,7 @@ pub trait OpSASLPlainEncoder {
         &self,
         dispatcher: &D,
         req: SASLAuthRequest,
-    ) -> impl std::future::Future<Output = Result<StandardPendingOp<SASLAuthResponse>>>
+    ) -> impl std::future::Future<Output = Result<ClientPendingOp>>
     where
         D: Dispatcher;
 }
@@ -78,8 +78,13 @@ impl OpsSASLAuthPlain {
             auth_mechanism: AuthMechanism::Plain,
         };
 
-        let resp =
-            run_op_future_with_deadline(opts.deadline, encoder.sasl_auth(dispatcher, req)).await?;
+        let resp = run_bootstrap_op_future_with_deadline(
+            opts.deadline,
+            encoder.sasl_auth(dispatcher, req),
+        )
+        .await?;
+
+        let resp = SASLAuthResponse::new(resp)?;
 
         if resp.needs_more_steps {
             return Err(error::Error::new_protocol_error(

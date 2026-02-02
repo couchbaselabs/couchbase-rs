@@ -25,7 +25,7 @@ use crate::memdx::error::Result;
 use crate::memdx::op_auth_saslbyname::{
     OpSASLAuthByNameEncoder, OpsSASLAuthByName, SASLAuthByNameOptions,
 };
-use crate::memdx::pendingop::{PendingOp, StandardPendingOp};
+use crate::memdx::pendingop::ClientPendingOp;
 use crate::memdx::request::SASLListMechsRequest;
 use crate::memdx::response::SASLListMechsResponse;
 use tokio::time::Instant;
@@ -80,7 +80,7 @@ pub trait OpSASLAutoEncoder: OpSASLAuthByNameEncoder {
         &self,
         dispatcher: &D,
         request: SASLListMechsRequest,
-    ) -> impl std::future::Future<Output = Result<StandardPendingOp<SASLListMechsResponse>>>
+    ) -> impl std::future::Future<Output = Result<ClientPendingOp>>
     where
         D: Dispatcher;
 }
@@ -110,7 +110,8 @@ impl OpsSASLAuthAuto {
         let mut op = encoder
             .sasl_list_mechs(dispatcher, SASLListMechsRequest {})
             .await?;
-        let server_mechs = op.recv().await?.available_mechs;
+        let packet = op.recv().await?;
+        let server_mechs = SASLListMechsResponse::new(packet)?.available_mechs;
 
         // This unwrap is safe, we know it can't be None;
         let default_mech = opts.enabled_mechs.first().unwrap();

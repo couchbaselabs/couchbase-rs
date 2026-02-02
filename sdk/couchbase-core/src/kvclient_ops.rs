@@ -30,7 +30,8 @@ use crate::memdx::op_bootstrap::{BootstrapOptions, OpBootstrap, OpBootstrapEncod
 use crate::memdx::ops_core::OpsCore;
 use crate::memdx::ops_crud::OpsCrud;
 use crate::memdx::ops_util::OpsUtil;
-use crate::memdx::pendingop::PendingOp;
+use crate::memdx::packet::ResponsePacket;
+use crate::memdx::pendingop::ClientPendingOp;
 use crate::memdx::request::{
     AddRequest, AppendRequest, DecrementRequest, DeleteRequest, GetAndLockRequest,
     GetAndTouchRequest, GetClusterConfigRequest, GetCollectionIdRequest, GetMetaRequest,
@@ -44,6 +45,7 @@ use crate::memdx::response::{
     PingResponse, PrependResponse, ReplaceResponse, SelectBucketResponse, SetResponse,
     TouchResponse, UnlockResponse,
 };
+use crate::memdx::subdoc::SubdocDocFlag;
 use chrono::Utc;
 use log::info;
 use std::future::Future;
@@ -137,7 +139,7 @@ where
             .await?;
 
         let res = self.handle_response_side_result(op.recv().await).await?;
-        Ok(res)
+        self.convert_memdx_result(SetResponse::new(res))
     }
 
     async fn get(&self, req: GetRequest<'_>) -> KvResult<GetResponse> {
@@ -147,7 +149,7 @@ where
             .await?;
 
         let res = self.handle_response_side_result(op.recv().await).await?;
-        Ok(res)
+        self.convert_memdx_result(GetResponse::new(res))
     }
 
     async fn get_meta(&self, req: GetMetaRequest<'_>) -> KvResult<GetMetaResponse> {
@@ -157,7 +159,7 @@ where
             .await?;
 
         let res = self.handle_response_side_result(op.recv().await).await?;
-        Ok(res)
+        self.convert_memdx_result(GetMetaResponse::new(res))
     }
 
     async fn delete(&self, req: DeleteRequest<'_>) -> KvResult<DeleteResponse> {
@@ -167,7 +169,7 @@ where
             .await?;
 
         let res = self.handle_response_side_result(op.recv().await).await?;
-        Ok(res)
+        self.convert_memdx_result(DeleteResponse::new(res))
     }
 
     async fn get_and_lock(&self, req: GetAndLockRequest<'_>) -> KvResult<GetAndLockResponse> {
@@ -177,7 +179,7 @@ where
             .await?;
 
         let res = self.handle_response_side_result(op.recv().await).await?;
-        Ok(res)
+        self.convert_memdx_result(GetAndLockResponse::new(res))
     }
 
     async fn get_and_touch(&self, req: GetAndTouchRequest<'_>) -> KvResult<GetAndTouchResponse> {
@@ -187,7 +189,7 @@ where
             .await?;
 
         let res = self.handle_response_side_result(op.recv().await).await?;
-        Ok(res)
+        self.convert_memdx_result(GetAndTouchResponse::new(res))
     }
 
     async fn unlock(&self, req: UnlockRequest<'_>) -> KvResult<UnlockResponse> {
@@ -197,7 +199,7 @@ where
             .await?;
 
         let res = self.handle_response_side_result(op.recv().await).await?;
-        Ok(res)
+        self.convert_memdx_result(UnlockResponse::new(res))
     }
 
     async fn touch(&self, req: TouchRequest<'_>) -> KvResult<TouchResponse> {
@@ -207,7 +209,7 @@ where
             .await?;
 
         let res = self.handle_response_side_result(op.recv().await).await?;
-        Ok(res)
+        self.convert_memdx_result(TouchResponse::new(res))
     }
 
     async fn add(&self, req: AddRequest<'_>) -> KvResult<AddResponse> {
@@ -217,7 +219,7 @@ where
             .await?;
 
         let res = self.handle_response_side_result(op.recv().await).await?;
-        Ok(res)
+        self.convert_memdx_result(AddResponse::new(res))
     }
 
     async fn replace(&self, req: ReplaceRequest<'_>) -> KvResult<ReplaceResponse> {
@@ -227,7 +229,7 @@ where
             .await?;
 
         let res = self.handle_response_side_result(op.recv().await).await?;
-        Ok(res)
+        self.convert_memdx_result(ReplaceResponse::new(res))
     }
 
     async fn append(&self, req: AppendRequest<'_>) -> KvResult<AppendResponse> {
@@ -237,7 +239,7 @@ where
             .await?;
 
         let res = self.handle_response_side_result(op.recv().await).await?;
-        Ok(res)
+        self.convert_memdx_result(AppendResponse::new(res))
     }
 
     async fn prepend(&self, req: PrependRequest<'_>) -> KvResult<PrependResponse> {
@@ -247,7 +249,7 @@ where
             .await?;
 
         let res = self.handle_response_side_result(op.recv().await).await?;
-        Ok(res)
+        self.convert_memdx_result(PrependResponse::new(res))
     }
 
     async fn increment(&self, req: IncrementRequest<'_>) -> KvResult<IncrementResponse> {
@@ -257,7 +259,7 @@ where
             .await?;
 
         let res = self.handle_response_side_result(op.recv().await).await?;
-        Ok(res)
+        self.convert_memdx_result(IncrementResponse::new(res))
     }
 
     async fn decrement(&self, req: DecrementRequest<'_>) -> KvResult<DecrementResponse> {
@@ -267,27 +269,30 @@ where
             .await?;
 
         let res = self.handle_response_side_result(op.recv().await).await?;
-        Ok(res)
+        self.convert_memdx_result(DecrementResponse::new(res))
     }
 
     async fn lookup_in(&self, req: LookupInRequest<'_>) -> KvResult<LookupInResponse> {
         self.update_last_activity();
+        let op_count = req.ops.len();
         let mut op = self
             .handle_dispatch_side_result(self.ops_crud().lookup_in(self.client(), req).await)
             .await?;
 
         let res = self.handle_response_side_result(op.recv().await).await?;
-        Ok(res)
+        self.convert_memdx_result(LookupInResponse::new(res, op_count))
     }
 
     async fn mutate_in(&self, req: MutateInRequest<'_>) -> KvResult<MutateInResponse> {
         self.update_last_activity();
+        let op_count = req.ops.len();
+        let is_insert = req.flags.contains(SubdocDocFlag::AddDoc);
         let mut op = self
             .handle_dispatch_side_result(self.ops_crud().mutate_in(self.client(), req).await)
             .await?;
 
         let res = self.handle_response_side_result(op.recv().await).await?;
-        Ok(res)
+        self.convert_memdx_result(MutateInResponse::new(res, is_insert, op_count))
     }
 
     async fn get_cluster_config(
@@ -300,7 +305,7 @@ where
             .await?;
 
         let res = self.handle_response_side_result(op.recv().await).await?;
-        Ok(res)
+        self.convert_memdx_result(GetClusterConfigResponse::new(res))
     }
 
     async fn get_collection_id(
@@ -308,12 +313,18 @@ where
         req: GetCollectionIdRequest<'_>,
     ) -> KvResult<GetCollectionIdResponse> {
         self.update_last_activity();
+        let collection_name = req.collection_name.to_string();
+        let scope_name = req.scope_name.to_string();
         let mut op = self
             .handle_dispatch_side_result(OpsUtil {}.get_collection_id(self.client(), req).await)
             .await?;
 
         let res = self.handle_response_side_result(op.recv().await).await?;
-        Ok(res)
+        self.convert_memdx_result(GetCollectionIdResponse::new(
+            res,
+            &scope_name,
+            &collection_name,
+        ))
     }
 
     async fn ping(&self, req: PingRequest<'_>) -> KvResult<PingResponse> {
@@ -323,7 +334,7 @@ where
             .await?;
 
         let res = self.handle_response_side_result(op.recv().await).await?;
-        Ok(res)
+        self.convert_memdx_result(PingResponse::new(res))
     }
 
     #[cfg(feature = "unstable-jwt")]
@@ -380,7 +391,10 @@ where
         }
     }
 
-    async fn handle_response_side_result<T>(&self, result: memdx::error::Result<T>) -> KvResult<T> {
+    async fn handle_response_side_result(
+        &self,
+        result: memdx::error::Result<ResponsePacket>,
+    ) -> KvResult<ResponsePacket> {
         match result {
             Ok(v) => Ok(v),
             Err(e) => {
@@ -414,7 +428,17 @@ where
             .await?;
 
         let res = self.handle_response_side_result(op.recv().await).await?;
-        Ok(res)
+
+        self.convert_memdx_result(SelectBucketResponse::new(res))
+    }
+
+    fn convert_memdx_result<T>(&self, result: memdx::error::Result<T>) -> KvResult<T> {
+        match result {
+            Ok(v) => Ok(v),
+            Err(e) => Err(MemdxError::new(e)
+                .with_dispatched_to(self.remote_addr().to_string())
+                .with_dispatched_from(self.local_addr().to_string())),
+        }
     }
 
     fn ops_crud(&self) -> OpsCrud {

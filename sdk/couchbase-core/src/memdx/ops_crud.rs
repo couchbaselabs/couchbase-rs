@@ -16,7 +16,6 @@
  *
  */
 
-use crate::memdx::client::ResponseContext;
 use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::durability_level::DurabilityLevel;
 use crate::memdx::error::Result;
@@ -27,19 +26,13 @@ use crate::memdx::magic::Magic;
 use crate::memdx::opcode::OpCode;
 use crate::memdx::ops_core::OpsCore;
 use crate::memdx::packet::{RequestPacket, ResponsePacket};
-use crate::memdx::pendingop::StandardPendingOp;
+use crate::memdx::pendingop::ClientPendingOp;
 use crate::memdx::request::{
     AddRequest, AppendRequest, DecrementRequest, DeleteRequest, GetAndLockRequest,
     GetAndTouchRequest, GetMetaRequest, GetRequest, IncrementRequest, LookupInRequest,
     MutateInRequest, PrependRequest, ReplaceRequest, SetRequest, TouchRequest, UnlockRequest,
 };
-use crate::memdx::response::{
-    AddResponse, AppendResponse, DecrementResponse, DeleteResponse, GetAndLockResponse,
-    GetAndTouchResponse, GetMetaResponse, GetResponse, IncrementResponse, LookupInResponse,
-    MutateInResponse, PrependResponse, ReplaceResponse, SetResponse, TouchResponse, UnlockResponse,
-};
 use crate::memdx::status::Status;
-use crate::memdx::subdoc::SubdocRequestInfo;
 use bitflags::Flags;
 use byteorder::{BigEndian, ByteOrder};
 use std::time::Duration;
@@ -56,11 +49,7 @@ pub struct OpsCrud {
 }
 
 impl OpsCrud {
-    pub async fn set<D>(
-        &self,
-        dispatcher: &D,
-        request: SetRequest<'_>,
-    ) -> Result<StandardPendingOp<SetResponse>>
+    pub async fn set<D>(&self, dispatcher: &D, request: SetRequest<'_>) -> Result<ClientPendingOp>
     where
         D: Dispatcher,
     {
@@ -99,16 +88,10 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, false, None).await?;
-
-        Ok(StandardPendingOp::new(pending_op))
+        dispatcher.dispatch(packet, false).await
     }
 
-    pub async fn get<D>(
-        &self,
-        dispatcher: &D,
-        request: GetRequest<'_>,
-    ) -> Result<StandardPendingOp<GetResponse>>
+    pub async fn get<D>(&self, dispatcher: &D, request: GetRequest<'_>) -> Result<ClientPendingOp>
     where
         D: Dispatcher,
     {
@@ -138,16 +121,14 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, false, None).await?;
-
-        Ok(StandardPendingOp::new(pending_op))
+        dispatcher.dispatch(packet, false).await
     }
 
     pub async fn get_meta<D>(
         &self,
         dispatcher: &D,
         request: GetMetaRequest<'_>,
-    ) -> Result<StandardPendingOp<GetMetaResponse>>
+    ) -> Result<ClientPendingOp>
     where
         D: Dispatcher,
     {
@@ -181,16 +162,14 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, false, None).await?;
-
-        Ok(StandardPendingOp::new(pending_op))
+        dispatcher.dispatch(packet, false).await
     }
 
     pub async fn delete<D>(
         &self,
         dispatcher: &D,
         request: DeleteRequest<'_>,
-    ) -> Result<StandardPendingOp<DeleteResponse>>
+    ) -> Result<ClientPendingOp>
     where
         D: Dispatcher,
     {
@@ -225,16 +204,14 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, false, None).await?;
-
-        Ok(StandardPendingOp::new(pending_op))
+        dispatcher.dispatch(packet, false).await
     }
 
     pub async fn get_and_lock<D>(
         &self,
         dispatcher: &D,
         request: GetAndLockRequest<'_>,
-    ) -> Result<StandardPendingOp<GetAndLockResponse>>
+    ) -> Result<ClientPendingOp>
     where
         D: Dispatcher,
     {
@@ -267,16 +244,14 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, false, None).await?;
-
-        Ok(StandardPendingOp::new(pending_op))
+        dispatcher.dispatch(packet, false).await
     }
 
     pub async fn get_and_touch<D>(
         &self,
         dispatcher: &D,
         request: GetAndTouchRequest<'_>,
-    ) -> Result<StandardPendingOp<GetAndTouchResponse>>
+    ) -> Result<ClientPendingOp>
     where
         D: Dispatcher,
     {
@@ -309,16 +284,14 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, false, None).await?;
-
-        Ok(StandardPendingOp::new(pending_op))
+        dispatcher.dispatch(packet, false).await
     }
 
     pub async fn unlock<D>(
         &self,
         dispatcher: &D,
         request: UnlockRequest<'_>,
-    ) -> Result<StandardPendingOp<UnlockResponse>>
+    ) -> Result<ClientPendingOp>
     where
         D: Dispatcher,
     {
@@ -348,16 +321,14 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, false, None).await?;
-
-        Ok(StandardPendingOp::new(pending_op))
+        dispatcher.dispatch(packet, false).await
     }
 
     pub async fn touch<D>(
         &self,
         dispatcher: &D,
         request: TouchRequest<'_>,
-    ) -> Result<StandardPendingOp<TouchResponse>>
+    ) -> Result<ClientPendingOp>
     where
         D: Dispatcher,
     {
@@ -390,16 +361,10 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, false, None).await?;
-
-        Ok(StandardPendingOp::new(pending_op))
+        dispatcher.dispatch(packet, false).await
     }
 
-    pub async fn add<D>(
-        &self,
-        dispatcher: &D,
-        request: AddRequest<'_>,
-    ) -> Result<StandardPendingOp<AddResponse>>
+    pub async fn add<D>(&self, dispatcher: &D, request: AddRequest<'_>) -> Result<ClientPendingOp>
     where
         D: Dispatcher,
     {
@@ -438,16 +403,14 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, false, None).await?;
-
-        Ok(StandardPendingOp::new(pending_op))
+        dispatcher.dispatch(packet, false).await
     }
 
     pub async fn replace<D>(
         &self,
         dispatcher: &D,
         request: ReplaceRequest<'_>,
-    ) -> Result<StandardPendingOp<ReplaceResponse>>
+    ) -> Result<ClientPendingOp>
     where
         D: Dispatcher,
     {
@@ -493,16 +456,14 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, false, None).await?;
-
-        Ok(StandardPendingOp::new(pending_op))
+        dispatcher.dispatch(packet, false).await
     }
 
     pub async fn append<D>(
         &self,
         dispatcher: &D,
         request: AppendRequest<'_>,
-    ) -> Result<StandardPendingOp<AppendResponse>>
+    ) -> Result<ClientPendingOp>
     where
         D: Dispatcher,
     {
@@ -537,27 +498,14 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher
-            .dispatch(
-                packet,
-                false,
-                Some(ResponseContext {
-                    cas: request.cas,
-                    subdoc_info: None,
-                    scope_name: None,
-                    collection_name: None,
-                }),
-            )
-            .await?;
-
-        Ok(StandardPendingOp::new(pending_op))
+        dispatcher.dispatch(packet, false).await
     }
 
     pub async fn prepend<D>(
         &self,
         dispatcher: &D,
         request: PrependRequest<'_>,
-    ) -> Result<StandardPendingOp<PrependResponse>>
+    ) -> Result<ClientPendingOp>
     where
         D: Dispatcher,
     {
@@ -592,20 +540,7 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher
-            .dispatch(
-                packet,
-                false,
-                Some(ResponseContext {
-                    cas: request.cas,
-                    subdoc_info: None,
-                    scope_name: None,
-                    collection_name: None,
-                }),
-            )
-            .await?;
-
-        Ok(StandardPendingOp::new(pending_op))
+        dispatcher.dispatch(packet, false).await
     }
 
     fn encode_counter_values(
@@ -628,7 +563,7 @@ impl OpsCrud {
         &self,
         dispatcher: &D,
         request: IncrementRequest<'_>,
-    ) -> Result<StandardPendingOp<IncrementResponse>>
+    ) -> Result<ClientPendingOp>
     where
         D: Dispatcher,
     {
@@ -671,16 +606,14 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, false, None).await?;
-
-        Ok(StandardPendingOp::new(pending_op))
+        dispatcher.dispatch(packet, false).await
     }
 
     pub async fn decrement<D>(
         &self,
         dispatcher: &D,
         request: DecrementRequest<'_>,
-    ) -> Result<StandardPendingOp<DecrementResponse>>
+    ) -> Result<ClientPendingOp>
     where
         D: Dispatcher,
     {
@@ -723,16 +656,14 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let pending_op = dispatcher.dispatch(packet, false, None).await?;
-
-        Ok(StandardPendingOp::new(pending_op))
+        dispatcher.dispatch(packet, false).await
     }
 
     pub async fn lookup_in<D>(
         &self,
         dispatcher: &D,
         request: LookupInRequest<'_>,
-    ) -> Result<StandardPendingOp<LookupInResponse>>
+    ) -> Result<ClientPendingOp>
     where
         D: Dispatcher,
     {
@@ -794,28 +725,14 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let response_context = ResponseContext {
-            cas: packet.cas,
-            subdoc_info: Some(SubdocRequestInfo {
-                flags: request.flags,
-                op_count: request.ops.len() as u8,
-            }),
-            scope_name: None,
-            collection_name: None,
-        };
-
-        let pending_op = dispatcher
-            .dispatch(packet, false, Some(response_context))
-            .await?;
-
-        Ok(StandardPendingOp::new(pending_op))
+        dispatcher.dispatch(packet, false).await
     }
 
     pub async fn mutate_in<D>(
         &self,
         dispatcher: &D,
         request: MutateInRequest<'_>,
-    ) -> Result<StandardPendingOp<MutateInResponse>>
+    ) -> Result<ClientPendingOp>
     where
         D: Dispatcher,
     {
@@ -905,21 +822,7 @@ impl OpsCrud {
             opaque: None,
         };
 
-        let response_context = ResponseContext {
-            cas: request.cas,
-            subdoc_info: Some(SubdocRequestInfo {
-                flags: request.flags,
-                op_count: request.ops.len() as u8,
-            }),
-            scope_name: None,
-            collection_name: None,
-        };
-
-        let pending_op = dispatcher
-            .dispatch(packet, false, Some(response_context))
-            .await?;
-
-        Ok(StandardPendingOp::new(pending_op))
+        dispatcher.dispatch(packet, false).await
     }
 
     fn encode_collection_and_key<'a>(

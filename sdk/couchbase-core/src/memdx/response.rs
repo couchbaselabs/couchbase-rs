@@ -20,7 +20,6 @@ use std::io::{Cursor, Read};
 use std::time::Duration;
 
 use crate::memdx::auth_mechanism::AuthMechanism;
-use crate::memdx::client_response::ClientResponse;
 use crate::memdx::error::{
     Error, ResourceError, ServerError, ServerErrorKind, SubdocError, SubdocErrorKind,
 };
@@ -28,30 +27,26 @@ use crate::memdx::extframe::decode_res_ext_frames;
 use crate::memdx::hello_feature::HelloFeature;
 use crate::memdx::ops_core::OpsCore;
 use crate::memdx::ops_crud::OpsCrud;
+use crate::memdx::packet::ResponsePacket;
 use crate::memdx::status::Status;
-use crate::memdx::subdoc::{SubDocResult, SubdocDocFlag};
+use crate::memdx::subdoc::SubDocResult;
 use byteorder::{BigEndian, ReadBytesExt};
 use tokio_io::Buf;
-
-pub trait TryFromClientResponse: Sized {
-    fn try_from(resp: ClientResponse) -> Result<Self, Error>;
-}
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct HelloResponse {
     pub enabled_features: Vec<HelloFeature>,
 }
 
-impl TryFromClientResponse for HelloResponse {
-    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
-        let packet = resp.packet();
-        let status = packet.status;
+impl HelloResponse {
+    pub fn new(resp: ResponsePacket) -> Result<Self, Error> {
+        let status = resp.status;
         if status != Status::Success {
-            return Err(OpsCore::decode_error(&packet));
+            return Err(OpsCore::decode_error(&resp));
         }
 
         let mut features: Vec<HelloFeature> = Vec::new();
-        if let Some(value) = &packet.value {
+        if let Some(value) = &resp.value {
             if value.len() % 2 != 0 {
                 return Err(Error::new_protocol_error("invalid hello features length"));
             }
@@ -74,15 +69,14 @@ pub struct GetErrorMapResponse {
     pub error_map: Vec<u8>,
 }
 
-impl TryFromClientResponse for GetErrorMapResponse {
-    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
-        let packet = resp.packet();
-        let status = packet.status;
+impl GetErrorMapResponse {
+    pub fn new(resp: ResponsePacket) -> Result<Self, Error> {
+        let status = resp.status;
         if status != Status::Success {
-            return Err(OpsCore::decode_error(&packet));
+            return Err(OpsCore::decode_error(&resp));
         }
 
-        let value = packet.value.unwrap_or_default();
+        let value = resp.value.unwrap_or_default();
         let response = GetErrorMapResponse { error_map: value };
 
         Ok(response)
@@ -92,21 +86,20 @@ impl TryFromClientResponse for GetErrorMapResponse {
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct SelectBucketResponse {}
 
-impl TryFromClientResponse for SelectBucketResponse {
-    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
-        let packet = resp.packet();
-        let status = packet.status;
+impl SelectBucketResponse {
+    pub fn new(resp: ResponsePacket) -> Result<Self, Error> {
+        let status = resp.status;
         if status != Status::Success {
             if status == Status::AccessError || status == Status::KeyNotFound {
                 return Err(ServerError::new(
                     ServerErrorKind::UnknownBucketName,
-                    packet.op_code,
+                    resp.op_code,
                     status,
-                    packet.opaque,
+                    resp.opaque,
                 )
                 .into());
             }
-            return Err(OpsCore::decode_error(&packet));
+            return Err(OpsCore::decode_error(&resp));
         }
 
         Ok(SelectBucketResponse {})
@@ -119,24 +112,23 @@ pub struct SASLAuthResponse {
     pub payload: Vec<u8>,
 }
 
-impl TryFromClientResponse for SASLAuthResponse {
-    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
-        let packet = resp.packet();
-        let status = packet.status;
+impl SASLAuthResponse {
+    pub fn new(resp: ResponsePacket) -> Result<Self, Error> {
+        let status = resp.status;
         if status == Status::AuthContinue {
             return Ok(SASLAuthResponse {
                 needs_more_steps: true,
-                payload: packet.value.unwrap_or_default(),
+                payload: resp.value.unwrap_or_default(),
             });
         }
 
         if status != Status::Success {
-            return Err(OpsCore::decode_error(&packet));
+            return Err(OpsCore::decode_error(&resp));
         }
 
         Ok(SASLAuthResponse {
             needs_more_steps: false,
-            payload: packet.value.unwrap_or_default(),
+            payload: resp.value.unwrap_or_default(),
         })
     }
 }
@@ -147,17 +139,16 @@ pub struct SASLStepResponse {
     pub payload: Vec<u8>,
 }
 
-impl TryFromClientResponse for SASLStepResponse {
-    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
-        let packet = resp.packet();
-        let status = packet.status;
+impl SASLStepResponse {
+    pub fn new(resp: ResponsePacket) -> Result<Self, Error> {
+        let status = resp.status;
         if status != Status::Success {
-            return Err(OpsCore::decode_error(&packet));
+            return Err(OpsCore::decode_error(&resp));
         }
 
         Ok(SASLStepResponse {
             needs_more_steps: false,
-            payload: packet.value.unwrap_or_default(),
+            payload: resp.value.unwrap_or_default(),
         })
     }
 }
@@ -167,10 +158,9 @@ pub struct SASLListMechsResponse {
     pub available_mechs: Vec<AuthMechanism>,
 }
 
-impl TryFromClientResponse for SASLListMechsResponse {
-    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
-        let packet = resp.packet();
-        let status = packet.status;
+impl SASLListMechsResponse {
+    pub fn new(resp: ResponsePacket) -> Result<Self, Error> {
+        let status = resp.status;
         if status != Status::Success {
             if status == Status::KeyNotFound {
                 // KeyNotFound appears here when the bucket was initialized by ns_server, but
@@ -179,16 +169,16 @@ impl TryFromClientResponse for SASLListMechsResponse {
                 // SelectBucket will have failed if this was anything but a transient issue.
                 return Err(ServerError::new(
                     ServerErrorKind::ConfigNotSet,
-                    packet.op_code,
+                    resp.op_code,
                     status,
-                    packet.opaque,
+                    resp.opaque,
                 )
                 .into());
             }
-            return Err(OpsCore::decode_error(&packet));
+            return Err(OpsCore::decode_error(&resp));
         }
 
-        let value = packet.value.unwrap_or_default();
+        let value = resp.value.unwrap_or_default();
         let mechs_list_string = match String::from_utf8(value) {
             Ok(v) => v,
             Err(e) => {
@@ -215,16 +205,15 @@ pub struct GetClusterConfigResponse {
     pub config: Vec<u8>,
 }
 
-impl TryFromClientResponse for GetClusterConfigResponse {
-    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
-        let packet = resp.packet();
-        let status = packet.status;
+impl GetClusterConfigResponse {
+    pub fn new(resp: ResponsePacket) -> Result<Self, Error> {
+        let status = resp.status;
         if status != Status::Success {
-            return Err(OpsCore::decode_error(&packet));
+            return Err(OpsCore::decode_error(&resp));
         }
 
         Ok(GetClusterConfigResponse {
-            config: packet.value.clone().unwrap_or_default(),
+            config: resp.value.clone().unwrap_or_default(),
         })
     }
 }
@@ -265,10 +254,9 @@ pub struct SetResponse {
     pub server_duration: Option<Duration>,
 }
 
-impl TryFromClientResponse for SetResponse {
-    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
-        let packet = resp.packet();
-        let status = packet.status;
+impl SetResponse {
+    pub fn new(resp: ResponsePacket) -> Result<Self, Error> {
+        let status = resp.status;
 
         let kind = if status == Status::TooBig {
             Some(ServerErrorKind::TooBig)
@@ -279,27 +267,27 @@ impl TryFromClientResponse for SetResponse {
         } else if status == Status::Success {
             None
         } else {
-            return Err(OpsCrud::decode_common_mutation_error(&packet));
+            return Err(OpsCrud::decode_common_mutation_error(&resp));
         };
 
         if let Some(kind) = kind {
-            return Err(ServerError::new(kind, packet.op_code, status, packet.opaque).into());
+            return Err(ServerError::new(kind, resp.op_code, status, resp.opaque).into());
         }
 
-        let mutation_token = if let Some(extras) = &packet.extras {
+        let mutation_token = if let Some(extras) = &resp.extras {
             Some(MutationToken::try_from(extras)?)
         } else {
             None
         };
 
-        let server_duration = if let Some(f) = &packet.framing_extras {
+        let server_duration = if let Some(f) = &resp.framing_extras {
             decode_res_ext_frames(f)?
         } else {
             None
         };
 
         Ok(SetResponse {
-            cas: packet.cas.unwrap_or_default(),
+            cas: resp.cas.unwrap_or_default(),
             mutation_token,
             server_duration,
         })
@@ -327,38 +315,37 @@ pub struct GetResponse {
     pub server_duration: Option<Duration>,
 }
 
-impl TryFromClientResponse for GetResponse {
-    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
-        let packet = resp.packet();
-        let status = packet.status;
+impl GetResponse {
+    pub fn new(resp: ResponsePacket) -> Result<Self, Error> {
+        let status = resp.status;
 
         if status == Status::KeyNotFound {
             return Err(ServerError::new(
                 ServerErrorKind::KeyNotFound,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
+                resp.op_code,
+                resp.status,
+                resp.opaque,
             )
             .into());
         } else if status != Status::Success {
-            return Err(OpsCrud::decode_common_error(&packet));
+            return Err(OpsCrud::decode_common_error(&resp));
         }
 
-        let flags = parse_flags(&packet.extras)?;
+        let flags = parse_flags(&resp.extras)?;
 
-        let server_duration = if let Some(f) = &packet.framing_extras {
+        let server_duration = if let Some(f) = &resp.framing_extras {
             decode_res_ext_frames(f)?
         } else {
             None
         };
 
-        let value = packet.value.unwrap_or_default();
+        let value = resp.value.unwrap_or_default();
 
         Ok(GetResponse {
-            cas: packet.cas.unwrap_or_default(),
+            cas: resp.cas.unwrap_or_default(),
             flags,
             value,
-            datatype: packet.datatype,
+            datatype: resp.datatype,
             server_duration,
         })
     }
@@ -376,32 +363,31 @@ pub struct GetMetaResponse {
     pub deleted: bool,
 }
 
-impl TryFromClientResponse for GetMetaResponse {
-    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
-        let packet = resp.packet();
-        let status = packet.status;
+impl GetMetaResponse {
+    pub fn new(resp: ResponsePacket) -> Result<Self, Error> {
+        let status = resp.status;
 
         if status == Status::KeyNotFound {
             return Err(ServerError::new(
                 ServerErrorKind::KeyNotFound,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
+                resp.op_code,
+                resp.status,
+                resp.opaque,
             )
             .into());
         } else if status != Status::Success {
-            return Err(OpsCrud::decode_common_error(&packet));
+            return Err(OpsCrud::decode_common_error(&resp));
         }
 
-        let server_duration = if let Some(f) = &packet.framing_extras {
+        let server_duration = if let Some(f) = &resp.framing_extras {
             decode_res_ext_frames(f)?
         } else {
             None
         };
 
-        let value = packet.value.unwrap_or_default();
+        let value = resp.value.unwrap_or_default();
 
-        if let Some(extras) = &packet.extras {
+        if let Some(extras) = &resp.extras {
             if extras.len() != 21 {
                 return Err(Error::new_protocol_error("bad extras length"));
             }
@@ -414,7 +400,7 @@ impl TryFromClientResponse for GetMetaResponse {
             let datatype = extras.read_u8()?;
 
             Ok(GetMetaResponse {
-                cas: packet.cas.unwrap_or_default(),
+                cas: resp.cas.unwrap_or_default(),
                 flags,
                 value,
                 datatype,
@@ -436,10 +422,9 @@ pub struct DeleteResponse {
     pub server_duration: Option<Duration>,
 }
 
-impl TryFromClientResponse for DeleteResponse {
-    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
-        let packet = resp.packet();
-        let status = packet.status;
+impl DeleteResponse {
+    pub fn new(resp: ResponsePacket) -> Result<Self, Error> {
+        let status = resp.status;
 
         let kind = if status == Status::KeyNotFound {
             Some(ServerErrorKind::KeyNotFound)
@@ -450,27 +435,27 @@ impl TryFromClientResponse for DeleteResponse {
         } else if status == Status::Success {
             None
         } else {
-            return Err(OpsCrud::decode_common_mutation_error(&packet));
+            return Err(OpsCrud::decode_common_mutation_error(&resp));
         };
 
         if let Some(kind) = kind {
-            return Err(ServerError::new(kind, packet.op_code, status, packet.opaque).into());
+            return Err(ServerError::new(kind, resp.op_code, status, resp.opaque).into());
         }
 
-        let mutation_token = if let Some(extras) = &packet.extras {
+        let mutation_token = if let Some(extras) = &resp.extras {
             Some(MutationToken::try_from(extras)?)
         } else {
             None
         };
 
-        let server_duration = if let Some(f) = &packet.framing_extras {
+        let server_duration = if let Some(f) = &resp.framing_extras {
             decode_res_ext_frames(f)?
         } else {
             None
         };
 
         Ok(DeleteResponse {
-            cas: packet.cas.unwrap_or_default(),
+            cas: resp.cas.unwrap_or_default(),
             mutation_token,
             server_duration,
         })
@@ -486,46 +471,45 @@ pub struct GetAndLockResponse {
     pub server_duration: Option<Duration>,
 }
 
-impl TryFromClientResponse for GetAndLockResponse {
-    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
-        let packet = resp.packet();
-        let status = packet.status;
+impl GetAndLockResponse {
+    pub fn new(resp: ResponsePacket) -> Result<Self, Error> {
+        let status = resp.status;
 
         if status == Status::KeyNotFound {
             return Err(ServerError::new(
                 ServerErrorKind::KeyNotFound,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
+                resp.op_code,
+                resp.status,
+                resp.opaque,
             )
             .into());
         } else if status == Status::Locked {
             return Err(ServerError::new(
                 ServerErrorKind::Locked,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
+                resp.op_code,
+                resp.status,
+                resp.opaque,
             )
             .into());
         } else if status != Status::Success {
-            return Err(OpsCrud::decode_common_error(&packet));
+            return Err(OpsCrud::decode_common_error(&resp));
         }
 
-        let flags = parse_flags(&packet.extras)?;
+        let flags = parse_flags(&resp.extras)?;
 
-        let server_duration = if let Some(f) = &packet.framing_extras {
+        let server_duration = if let Some(f) = &resp.framing_extras {
             decode_res_ext_frames(f)?
         } else {
             None
         };
 
-        let value = packet.value.unwrap_or_default();
+        let value = resp.value.unwrap_or_default();
 
         Ok(GetAndLockResponse {
-            cas: packet.cas.unwrap_or_default(),
+            cas: resp.cas.unwrap_or_default(),
             flags,
             value,
-            datatype: packet.datatype,
+            datatype: resp.datatype,
             server_duration,
         })
     }
@@ -540,46 +524,45 @@ pub struct GetAndTouchResponse {
     pub server_duration: Option<Duration>,
 }
 
-impl TryFromClientResponse for GetAndTouchResponse {
-    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
-        let packet = resp.packet();
-        let status = packet.status;
+impl GetAndTouchResponse {
+    pub fn new(resp: ResponsePacket) -> Result<Self, Error> {
+        let status = resp.status;
 
         if status == Status::KeyNotFound {
             return Err(ServerError::new(
                 ServerErrorKind::KeyNotFound,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
+                resp.op_code,
+                resp.status,
+                resp.opaque,
             )
             .into());
         } else if status == Status::Locked {
             return Err(ServerError::new(
                 ServerErrorKind::Locked,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
+                resp.op_code,
+                resp.status,
+                resp.opaque,
             )
             .into());
         } else if status != Status::Success {
-            return Err(OpsCrud::decode_common_error(&packet));
+            return Err(OpsCrud::decode_common_error(&resp));
         }
 
-        let flags = parse_flags(&packet.extras)?;
+        let flags = parse_flags(&resp.extras)?;
 
-        let server_duration = if let Some(f) = &packet.framing_extras {
+        let server_duration = if let Some(f) = &resp.framing_extras {
             decode_res_ext_frames(f)?
         } else {
             None
         };
 
-        let value = packet.value.unwrap_or_default();
+        let value = resp.value.unwrap_or_default();
 
         Ok(GetAndTouchResponse {
-            cas: packet.cas.unwrap_or_default(),
+            cas: resp.cas.unwrap_or_default(),
             flags,
             value,
-            datatype: packet.datatype,
+            datatype: resp.datatype,
             server_duration,
         })
     }
@@ -590,40 +573,39 @@ pub struct UnlockResponse {
     pub server_duration: Option<Duration>,
 }
 
-impl TryFromClientResponse for UnlockResponse {
-    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
-        let packet = resp.packet();
-        let status = packet.status;
+impl UnlockResponse {
+    pub fn new(resp: ResponsePacket) -> Result<Self, Error> {
+        let status = resp.status;
 
         if status == Status::KeyNotFound {
             return Err(ServerError::new(
                 ServerErrorKind::KeyNotFound,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
+                resp.op_code,
+                resp.status,
+                resp.opaque,
             )
             .into());
         } else if status == Status::Locked {
             return Err(ServerError::new(
                 ServerErrorKind::CasMismatch,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
+                resp.op_code,
+                resp.status,
+                resp.opaque,
             )
             .into());
         } else if status == Status::NotLocked {
             return Err(ServerError::new(
                 ServerErrorKind::NotLocked,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
+                resp.op_code,
+                resp.status,
+                resp.opaque,
             )
             .into());
         } else if status != Status::Success {
-            return Err(OpsCrud::decode_common_error(&packet));
+            return Err(OpsCrud::decode_common_error(&resp));
         }
 
-        let server_duration = if let Some(f) = &packet.framing_extras {
+        let server_duration = if let Some(f) = &resp.framing_extras {
             decode_res_ext_frames(f)?
         } else {
             None
@@ -639,45 +621,44 @@ pub struct TouchResponse {
     pub server_duration: Option<Duration>,
 }
 
-impl TryFromClientResponse for TouchResponse {
-    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
-        let packet = resp.packet();
-        let status = packet.status;
+impl TouchResponse {
+    pub fn new(resp: ResponsePacket) -> Result<Self, Error> {
+        let status = resp.status;
 
         if status == Status::KeyNotFound {
             return Err(ServerError::new(
                 ServerErrorKind::KeyNotFound,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
+                resp.op_code,
+                resp.status,
+                resp.opaque,
             )
             .into());
         } else if status == Status::Locked {
             return Err(ServerError::new(
                 ServerErrorKind::Locked,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
+                resp.op_code,
+                resp.status,
+                resp.opaque,
             )
             .into());
         } else if status != Status::Success {
-            return Err(OpsCrud::decode_common_error(&packet));
+            return Err(OpsCrud::decode_common_error(&resp));
         }
 
-        if let Some(extras) = &packet.extras {
+        if let Some(extras) = &resp.extras {
             if !extras.is_empty() {
                 return Err(Error::new_protocol_error("bad extras length"));
             }
         }
 
-        let server_duration = if let Some(f) = &packet.framing_extras {
+        let server_duration = if let Some(f) = &resp.framing_extras {
             decode_res_ext_frames(f)?
         } else {
             None
         };
 
         Ok(TouchResponse {
-            cas: packet.cas.unwrap_or_default(),
+            cas: resp.cas.unwrap_or_default(),
             server_duration,
         })
     }
@@ -690,10 +671,9 @@ pub struct AddResponse {
     pub server_duration: Option<Duration>,
 }
 
-impl TryFromClientResponse for AddResponse {
-    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
-        let packet = resp.packet();
-        let status = packet.status;
+impl AddResponse {
+    pub fn new(resp: ResponsePacket) -> Result<Self, Error> {
+        let status = resp.status;
 
         let kind = if status == Status::TooBig {
             Some(ServerErrorKind::TooBig)
@@ -704,27 +684,27 @@ impl TryFromClientResponse for AddResponse {
         } else if status == Status::Success {
             None
         } else {
-            return Err(OpsCrud::decode_common_mutation_error(&packet));
+            return Err(OpsCrud::decode_common_mutation_error(&resp));
         };
 
         if let Some(kind) = kind {
-            return Err(ServerError::new(kind, packet.op_code, status, packet.opaque).into());
+            return Err(ServerError::new(kind, resp.op_code, status, resp.opaque).into());
         }
 
-        let mutation_token = if let Some(extras) = &packet.extras {
+        let mutation_token = if let Some(extras) = &resp.extras {
             Some(MutationToken::try_from(extras)?)
         } else {
             None
         };
 
-        let server_duration = if let Some(f) = &packet.framing_extras {
+        let server_duration = if let Some(f) = &resp.framing_extras {
             decode_res_ext_frames(f)?
         } else {
             None
         };
 
         Ok(AddResponse {
-            cas: packet.cas.unwrap_or_default(),
+            cas: resp.cas.unwrap_or_default(),
             mutation_token,
             server_duration,
         })
@@ -738,10 +718,9 @@ pub struct ReplaceResponse {
     pub server_duration: Option<Duration>,
 }
 
-impl TryFromClientResponse for ReplaceResponse {
-    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
-        let packet = resp.packet();
-        let status = packet.status;
+impl ReplaceResponse {
+    pub fn new(resp: ResponsePacket) -> Result<Self, Error> {
+        let status = resp.status;
 
         let kind = if status == Status::TooBig {
             Some(ServerErrorKind::TooBig)
@@ -754,27 +733,27 @@ impl TryFromClientResponse for ReplaceResponse {
         } else if status == Status::Success {
             None
         } else {
-            return Err(OpsCrud::decode_common_mutation_error(&packet));
+            return Err(OpsCrud::decode_common_mutation_error(&resp));
         };
 
         if let Some(kind) = kind {
-            return Err(ServerError::new(kind, packet.op_code, status, packet.opaque).into());
+            return Err(ServerError::new(kind, resp.op_code, status, resp.opaque).into());
         }
 
-        let mutation_token = if let Some(extras) = &packet.extras {
+        let mutation_token = if let Some(extras) = &resp.extras {
             Some(MutationToken::try_from(extras)?)
         } else {
             None
         };
 
-        let server_duration = if let Some(f) = &packet.framing_extras {
+        let server_duration = if let Some(f) = &resp.framing_extras {
             decode_res_ext_frames(f)?
         } else {
             None
         };
 
         Ok(ReplaceResponse {
-            cas: packet.cas.unwrap_or_default(),
+            cas: resp.cas.unwrap_or_default(),
             mutation_token,
             server_duration,
         })
@@ -788,14 +767,9 @@ pub struct AppendResponse {
     pub server_duration: Option<Duration>,
 }
 
-impl TryFromClientResponse for AppendResponse {
-    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
-        let cas = resp
-            .response_context()
-            .expect("response did not have a response context")
-            .cas;
-        let packet = resp.packet();
-        let status = packet.status;
+impl AppendResponse {
+    pub fn new(resp: ResponsePacket) -> Result<Self, Error> {
+        let status = resp.status;
 
         let kind = if status == Status::TooBig {
             Some(ServerErrorKind::TooBig)
@@ -803,34 +777,32 @@ impl TryFromClientResponse for AppendResponse {
             Some(ServerErrorKind::NotStored)
         } else if status == Status::Locked {
             Some(ServerErrorKind::Locked)
-        } else if status == Status::KeyExists && cas.is_some() {
-            // KeyExists without a request cas would be an odd error to receive so we don't
-            // handle that case.
+        } else if status == Status::KeyExists {
             Some(ServerErrorKind::CasMismatch)
         } else if status == Status::Success {
             None
         } else {
-            return Err(OpsCrud::decode_common_mutation_error(&packet));
+            return Err(OpsCrud::decode_common_mutation_error(&resp));
         };
 
         if let Some(kind) = kind {
-            return Err(ServerError::new(kind, packet.op_code, status, packet.opaque).into());
+            return Err(ServerError::new(kind, resp.op_code, status, resp.opaque).into());
         }
 
-        let mutation_token = if let Some(extras) = &packet.extras {
+        let mutation_token = if let Some(extras) = &resp.extras {
             Some(MutationToken::try_from(extras)?)
         } else {
             None
         };
 
-        let server_duration = if let Some(f) = &packet.framing_extras {
+        let server_duration = if let Some(f) = &resp.framing_extras {
             decode_res_ext_frames(f)?
         } else {
             None
         };
 
         Ok(AppendResponse {
-            cas: packet.cas.unwrap_or_default(),
+            cas: resp.cas.unwrap_or_default(),
             mutation_token,
             server_duration,
         })
@@ -844,14 +816,9 @@ pub struct PrependResponse {
     pub server_duration: Option<Duration>,
 }
 
-impl TryFromClientResponse for PrependResponse {
-    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
-        let cas = resp
-            .response_context()
-            .expect("response did not have a response context")
-            .cas;
-        let packet = resp.packet();
-        let status = packet.status;
+impl PrependResponse {
+    pub fn new(resp: ResponsePacket) -> Result<Self, Error> {
+        let status = resp.status;
 
         let kind = if status == Status::TooBig {
             Some(ServerErrorKind::TooBig)
@@ -859,34 +826,32 @@ impl TryFromClientResponse for PrependResponse {
             Some(ServerErrorKind::NotStored)
         } else if status == Status::Locked {
             Some(ServerErrorKind::Locked)
-        } else if status == Status::KeyExists && cas.is_some() {
-            // KeyExists without a request cas would be an odd error to receive so we don't
-            // handle that case.
+        } else if status == Status::KeyExists {
             Some(ServerErrorKind::CasMismatch)
         } else if status == Status::Success {
             None
         } else {
-            return Err(OpsCrud::decode_common_mutation_error(&packet));
+            return Err(OpsCrud::decode_common_mutation_error(&resp));
         };
 
         if let Some(kind) = kind {
-            return Err(ServerError::new(kind, packet.op_code, status, packet.opaque).into());
+            return Err(ServerError::new(kind, resp.op_code, status, resp.opaque).into());
         }
 
-        let mutation_token = if let Some(extras) = &packet.extras {
+        let mutation_token = if let Some(extras) = &resp.extras {
             Some(MutationToken::try_from(extras)?)
         } else {
             None
         };
 
-        let server_duration = if let Some(f) = &packet.framing_extras {
+        let server_duration = if let Some(f) = &resp.framing_extras {
             decode_res_ext_frames(f)?
         } else {
             None
         };
 
         Ok(PrependResponse {
-            cas: packet.cas.unwrap_or_default(),
+            cas: resp.cas.unwrap_or_default(),
             mutation_token,
             server_duration,
         })
@@ -901,10 +866,9 @@ pub struct IncrementResponse {
     pub server_duration: Option<Duration>,
 }
 
-impl TryFromClientResponse for IncrementResponse {
-    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
-        let packet = resp.packet();
-        let status = packet.status;
+impl IncrementResponse {
+    pub fn new(resp: ResponsePacket) -> Result<Self, Error> {
+        let status = resp.status;
 
         let kind = if status == Status::KeyNotFound {
             Some(ServerErrorKind::KeyNotFound)
@@ -915,14 +879,14 @@ impl TryFromClientResponse for IncrementResponse {
         } else if status == Status::Success {
             None
         } else {
-            return Err(OpsCrud::decode_common_mutation_error(&packet));
+            return Err(OpsCrud::decode_common_mutation_error(&resp));
         };
 
         if let Some(kind) = kind {
-            return Err(ServerError::new(kind, packet.op_code, status, packet.opaque).into());
+            return Err(ServerError::new(kind, resp.op_code, status, resp.opaque).into());
         }
 
-        let value = if let Some(val) = &packet.value {
+        let value = if let Some(val) = &resp.value {
             if val.len() != 8 {
                 return Err(Error::new_protocol_error(
                     "bad counter value length in response",
@@ -934,20 +898,20 @@ impl TryFromClientResponse for IncrementResponse {
             0
         };
 
-        let mutation_token = if let Some(extras) = &packet.extras {
+        let mutation_token = if let Some(extras) = &resp.extras {
             Some(MutationToken::try_from(extras)?)
         } else {
             None
         };
 
-        let server_duration = if let Some(f) = &packet.framing_extras {
+        let server_duration = if let Some(f) = &resp.framing_extras {
             decode_res_ext_frames(f)?
         } else {
             None
         };
 
         Ok(IncrementResponse {
-            cas: packet.cas.unwrap_or_default(),
+            cas: resp.cas.unwrap_or_default(),
             value,
             mutation_token,
             server_duration,
@@ -963,10 +927,9 @@ pub struct DecrementResponse {
     pub server_duration: Option<Duration>,
 }
 
-impl TryFromClientResponse for DecrementResponse {
-    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
-        let packet = resp.packet();
-        let status = packet.status;
+impl DecrementResponse {
+    pub fn new(resp: ResponsePacket) -> Result<Self, Error> {
+        let status = resp.status;
 
         let kind = if status == Status::KeyNotFound {
             Some(ServerErrorKind::KeyNotFound)
@@ -977,14 +940,14 @@ impl TryFromClientResponse for DecrementResponse {
         } else if status == Status::Success {
             None
         } else {
-            return Err(OpsCrud::decode_common_mutation_error(&packet));
+            return Err(OpsCrud::decode_common_mutation_error(&resp));
         };
 
         if let Some(kind) = kind {
-            return Err(ServerError::new(kind, packet.op_code, status, packet.opaque).into());
+            return Err(ServerError::new(kind, resp.op_code, status, resp.opaque).into());
         }
 
-        let value = if let Some(val) = &packet.value {
+        let value = if let Some(val) = &resp.value {
             if val.len() != 8 {
                 return Err(Error::new_protocol_error(
                     "bad counter value length in response",
@@ -996,20 +959,20 @@ impl TryFromClientResponse for DecrementResponse {
             0
         };
 
-        let mutation_token = if let Some(extras) = &packet.extras {
+        let mutation_token = if let Some(extras) = &resp.extras {
             Some(MutationToken::try_from(extras)?)
         } else {
             None
         };
 
-        let server_duration = if let Some(f) = &packet.framing_extras {
+        let server_duration = if let Some(f) = &resp.framing_extras {
             decode_res_ext_frames(f)?
         } else {
             None
         };
 
         Ok(DecrementResponse {
-            cas: packet.cas.unwrap_or_default(),
+            cas: resp.cas.unwrap_or_default(),
             value,
             mutation_token,
             server_duration,
@@ -1024,31 +987,25 @@ pub struct LookupInResponse {
     pub server_duration: Option<Duration>,
 }
 
-impl TryFromClientResponse for LookupInResponse {
-    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
-        let subdoc_info = resp
-            .response_context()
-            .expect("response did not have a response context")
-            .subdoc_info
-            .expect("missing subdoc info in response context");
-        let packet = resp.packet();
-        let cas = packet.cas;
-        let status = packet.status;
+impl LookupInResponse {
+    pub fn new(resp: ResponsePacket, op_count: usize) -> Result<Self, Error> {
+        let cas = resp.cas;
+        let status = resp.status;
 
         if status == Status::KeyNotFound {
             return Err(ServerError::new(
                 ServerErrorKind::KeyNotFound,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
+                resp.op_code,
+                resp.status,
+                resp.opaque,
             )
             .into());
         } else if status == Status::Locked {
             return Err(ServerError::new(
                 ServerErrorKind::Locked,
-                packet.op_code,
-                packet.status,
-                packet.opaque,
+                resp.op_code,
+                resp.status,
+                resp.opaque,
             )
             .into());
         } else if status == Status::SubDocInvalidCombo {
@@ -1056,9 +1013,9 @@ impl TryFromClientResponse for LookupInResponse {
                 ServerErrorKind::Subdoc {
                     error: SubdocError::new(SubdocErrorKind::InvalidCombo, None),
                 },
-                packet.op_code,
-                packet.status,
-                packet.opaque,
+                resp.op_code,
+                resp.status,
+                resp.opaque,
             )
             .into());
         } else if status == Status::SubDocInvalidXattrOrder {
@@ -1066,9 +1023,9 @@ impl TryFromClientResponse for LookupInResponse {
                 ServerErrorKind::Subdoc {
                     error: SubdocError::new(SubdocErrorKind::InvalidXattrOrder, None),
                 },
-                packet.op_code,
-                packet.status,
-                packet.opaque,
+                resp.op_code,
+                resp.status,
+                resp.opaque,
             )
             .into());
         } else if status == Status::SubDocXattrInvalidKeyCombo {
@@ -1076,9 +1033,9 @@ impl TryFromClientResponse for LookupInResponse {
                 ServerErrorKind::Subdoc {
                     error: SubdocError::new(SubdocErrorKind::XattrInvalidKeyCombo, None),
                 },
-                packet.op_code,
-                packet.status,
-                packet.opaque,
+                resp.op_code,
+                resp.status,
+                resp.opaque,
             )
             .into());
         } else if status == Status::SubDocXattrInvalidFlagCombo {
@@ -1086,9 +1043,9 @@ impl TryFromClientResponse for LookupInResponse {
                 ServerErrorKind::Subdoc {
                     error: SubdocError::new(SubdocErrorKind::XattrInvalidFlagCombo, None),
                 },
-                packet.op_code,
-                packet.status,
-                packet.opaque,
+                resp.op_code,
+                resp.status,
+                resp.opaque,
             )
             .into());
         }
@@ -1100,13 +1057,13 @@ impl TryFromClientResponse for LookupInResponse {
             doc_is_deleted = true;
             // still considered a success
         } else if status != Status::Success && status != Status::SubDocMultiPathFailure {
-            return Err(OpsCrud::decode_common_error(&packet));
+            return Err(OpsCrud::decode_common_error(&resp));
         }
 
-        let mut results: Vec<SubDocResult> = Vec::with_capacity(subdoc_info.op_count as usize);
+        let mut results: Vec<SubDocResult> = Vec::with_capacity(op_count);
         let mut op_index = 0;
 
-        let value = packet
+        let value = resp
             .value
             .as_ref()
             .ok_or_else(|| Error::new_protocol_error("missing value"))?;
@@ -1150,9 +1107,9 @@ impl TryFromClientResponse for LookupInResponse {
                     ServerErrorKind::Subdoc {
                         error: SubdocError::new(kind, op_index),
                     },
-                    packet.op_code,
-                    packet.status,
-                    packet.opaque,
+                    resp.op_code,
+                    resp.status,
+                    resp.opaque,
                 )
                 .into()
             });
@@ -1161,7 +1118,7 @@ impl TryFromClientResponse for LookupInResponse {
             op_index += 1;
         }
 
-        let server_duration = if let Some(f) = &packet.framing_extras {
+        let server_duration = if let Some(f) = &resp.framing_extras {
             decode_res_ext_frames(f)?
         } else {
             None
@@ -1184,17 +1141,10 @@ pub struct MutateInResponse {
     pub server_duration: Option<Duration>,
 }
 
-impl TryFromClientResponse for MutateInResponse {
-    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
-        let subdoc_info = resp
-            .response_context()
-            .expect("response did not have a response context")
-            .subdoc_info
-            .expect("missing subdoc info in response context");
-
-        let packet = resp.packet();
-        let cas = packet.cas;
-        let status = packet.status;
+impl MutateInResponse {
+    pub fn new(resp: ResponsePacket, is_insert: bool, op_count: usize) -> Result<Self, Error> {
+        let cas = resp.cas;
+        let status = resp.status;
 
         let kind = if status == Status::KeyNotFound {
             Some(ServerErrorKind::KeyNotFound)
@@ -1243,13 +1193,13 @@ impl TryFromClientResponse for MutateInResponse {
                 error: SubdocError::new(SubdocErrorKind::DeletedDocumentCantHaveValue, None),
             })
         } else if status == Status::NotStored {
-            if subdoc_info.flags.contains(SubdocDocFlag::AddDoc) {
+            if is_insert {
                 Some(ServerErrorKind::KeyExists)
             } else {
                 Some(ServerErrorKind::NotStored)
             }
         } else if status == Status::SubDocMultiPathFailure {
-            if let Some(value) = &packet.value {
+            if let Some(value) = &resp.value {
                 if value.len() != 3 {
                     return Err(Error::new_protocol_error("bad value length"));
                 }
@@ -1286,7 +1236,7 @@ impl TryFromClientResponse for MutateInResponse {
         };
 
         if let Some(kind) = kind {
-            return Err(ServerError::new(kind, packet.op_code, status, packet.opaque).into());
+            return Err(ServerError::new(kind, resp.op_code, status, resp.opaque).into());
         }
 
         let mut doc_is_deleted = false;
@@ -1294,12 +1244,12 @@ impl TryFromClientResponse for MutateInResponse {
             doc_is_deleted = true;
             // still considered a success
         } else if status != Status::Success && status != Status::SubDocMultiPathFailure {
-            return Err(OpsCrud::decode_common_mutation_error(&packet));
+            return Err(OpsCrud::decode_common_mutation_error(&resp));
         }
 
-        let mut results: Vec<SubDocResult> = Vec::with_capacity(subdoc_info.op_count as usize);
+        let mut results: Vec<SubDocResult> = Vec::with_capacity(op_count);
 
-        if let Some(value) = &packet.value {
+        if let Some(value) = &resp.value {
             let mut cursor = Cursor::new(value);
 
             while cursor.position() < cursor.get_ref().len() as u64 {
@@ -1339,8 +1289,8 @@ impl TryFromClientResponse for MutateInResponse {
             }
         }
 
-        if results.len() < subdoc_info.op_count as usize {
-            for _ in results.len()..subdoc_info.op_count as usize {
+        if results.len() < op_count {
+            for _ in results.len()..op_count {
                 results.push(SubDocResult {
                     err: None,
                     value: None,
@@ -1348,7 +1298,7 @@ impl TryFromClientResponse for MutateInResponse {
             }
         }
 
-        let mutation_token = if let Some(extras) = &packet.extras {
+        let mutation_token = if let Some(extras) = &resp.extras {
             if extras.len() != 16 {
                 return Err(Error::new_protocol_error("bad extras length"));
             }
@@ -1362,7 +1312,7 @@ impl TryFromClientResponse for MutateInResponse {
             None
         };
 
-        let server_duration = if let Some(f) = &packet.framing_extras {
+        let server_duration = if let Some(f) = &resp.framing_extras {
             decode_res_ext_frames(f)?
         } else {
             None
@@ -1384,30 +1334,21 @@ pub struct GetCollectionIdResponse {
     pub collection_id: u32,
 }
 
-impl TryFromClientResponse for GetCollectionIdResponse {
-    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
-        let (scope_name, collection_name) = {
-            let context = resp
-                .response_context()
-                .expect("response did not have a response context");
-            let scope_name = context.scope_name.clone().expect("missing scope name");
-            let collection_name = context
-                .collection_name
-                .clone()
-                .expect("missing collection name");
-
-            (scope_name, collection_name)
-        };
-        let packet = resp.packet();
-        let status = packet.status;
+impl GetCollectionIdResponse {
+    pub fn new(
+        resp: ResponsePacket,
+        scope_name: &str,
+        collection_name: &str,
+    ) -> Result<Self, Error> {
+        let status = resp.status;
 
         if status == Status::ScopeUnknown {
             return Err(ResourceError::new(
                 ServerError::new(
                     ServerErrorKind::UnknownScopeName,
-                    packet.op_code,
-                    packet.status,
-                    packet.opaque,
+                    resp.op_code,
+                    resp.status,
+                    resp.opaque,
                 ),
                 scope_name,
                 collection_name,
@@ -1417,19 +1358,19 @@ impl TryFromClientResponse for GetCollectionIdResponse {
             return Err(ResourceError::new(
                 ServerError::new(
                     ServerErrorKind::UnknownCollectionName,
-                    packet.op_code,
-                    packet.status,
-                    packet.opaque,
+                    resp.op_code,
+                    resp.status,
+                    resp.opaque,
                 ),
                 scope_name,
                 collection_name,
             )
             .into());
         } else if status != Status::Success {
-            return Err(OpsCore::decode_error(&packet));
+            return Err(OpsCore::decode_error(&resp));
         }
 
-        let extras = if let Some(extras) = &packet.extras {
+        let extras = if let Some(extras) = &resp.extras {
             if extras.len() != 12 {
                 return Err(Error::new_protocol_error("invalid extras length"));
             }
@@ -1452,13 +1393,12 @@ impl TryFromClientResponse for GetCollectionIdResponse {
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct PingResponse {}
 
-impl TryFromClientResponse for PingResponse {
-    fn try_from(resp: ClientResponse) -> Result<Self, Error> {
-        let packet = resp.packet();
-        let status = packet.status;
+impl PingResponse {
+    pub fn new(resp: ResponsePacket) -> Result<Self, Error> {
+        let status = resp.status;
 
         if status != Status::Success {
-            return Err(OpsCore::decode_error(&packet));
+            return Err(OpsCore::decode_error(&resp));
         }
 
         Ok(PingResponse {})

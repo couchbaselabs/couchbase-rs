@@ -16,15 +16,13 @@
  *
  */
 
-use crate::memdx::client::ResponseContext;
 use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::error::Result;
 use crate::memdx::magic::Magic;
 use crate::memdx::opcode::OpCode;
 use crate::memdx::packet::RequestPacket;
-use crate::memdx::pendingop::StandardPendingOp;
+use crate::memdx::pendingop::ClientPendingOp;
 use crate::memdx::request::{GetCollectionIdRequest, PingRequest};
-use crate::memdx::response::{GetCollectionIdResponse, PingResponse};
 
 pub struct OpsUtil {}
 
@@ -33,13 +31,13 @@ impl OpsUtil {
         &self,
         dispatcher: &D,
         request: GetCollectionIdRequest<'_>,
-    ) -> Result<StandardPendingOp<GetCollectionIdResponse>>
+    ) -> Result<ClientPendingOp>
     where
         D: Dispatcher,
     {
         let full_name = format!("{}.{}", &request.scope_name, &request.collection_name);
 
-        let op = dispatcher
+        dispatcher
             .dispatch(
                 RequestPacket {
                     magic: Magic::Req,
@@ -54,27 +52,19 @@ impl OpsUtil {
                     opaque: None,
                 },
                 false,
-                Some(ResponseContext {
-                    cas: None,
-                    subdoc_info: None,
-                    scope_name: Some(request.scope_name.to_string()),
-                    collection_name: Some(request.collection_name.to_string()),
-                }),
             )
-            .await?;
-
-        Ok(StandardPendingOp::new(op))
+            .await
     }
 
     pub async fn ping<D>(
         &self,
         dispatcher: &D,
         _request: PingRequest<'_>,
-    ) -> Result<StandardPendingOp<PingResponse>>
+    ) -> Result<ClientPendingOp>
     where
         D: Dispatcher,
     {
-        let op = dispatcher
+        dispatcher
             .dispatch(
                 RequestPacket {
                     magic: Magic::Req,
@@ -89,10 +79,7 @@ impl OpsUtil {
                     opaque: None,
                 },
                 false,
-                None,
             )
-            .await?;
-
-        Ok(StandardPendingOp::new(op))
+            .await
     }
 }

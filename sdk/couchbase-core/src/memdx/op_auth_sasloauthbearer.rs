@@ -19,8 +19,9 @@ use crate::memdx::auth_mechanism::AuthMechanism;
 use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::error;
 use crate::memdx::op_auth_saslplain::OpSASLPlainEncoder;
-use crate::memdx::pendingop::run_op_future_with_deadline;
+use crate::memdx::pendingop::run_bootstrap_op_future_with_deadline;
 use crate::memdx::request::SASLAuthRequest;
+use crate::memdx::response::SASLAuthResponse;
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct SASLOAuthBearerOptions {
@@ -61,9 +62,13 @@ impl OpsSASLOAuthBearer {
             auth_mechanism: AuthMechanism::OAuthBearer,
         };
 
-        let resp =
-            run_op_future_with_deadline(options.deadline, encoder.sasl_auth(dispatcher, req))
-                .await?;
+        let resp = run_bootstrap_op_future_with_deadline(
+            options.deadline,
+            encoder.sasl_auth(dispatcher, req),
+        )
+        .await?;
+
+        let resp = SASLAuthResponse::new(resp)?;
 
         if resp.needs_more_steps {
             return Err(error::Error::new_protocol_error(

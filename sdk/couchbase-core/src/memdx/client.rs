@@ -42,7 +42,6 @@ use tokio_util::codec::{FramedRead, FramedWrite};
 use tokio_util::sync::{CancellationToken, DropGuard};
 use uuid::Uuid;
 
-use crate::memdx::client_response::ClientResponse;
 use crate::memdx::codec::KeyValueCodec;
 use crate::memdx::connection::{ConnectionType, Stream};
 use crate::memdx::datatype::DataTypeFlag;
@@ -60,7 +59,7 @@ use crate::memdx::pendingop::ClientPendingOp;
 use crate::memdx::subdoc::SubdocRequestInfo;
 use crate::orphan_reporter::OrphanContext;
 
-pub(crate) type ResponseSender = Sender<error::Result<ClientResponse>>;
+pub(crate) type ResponseSender = Sender<error::Result<ResponsePacket>>;
 pub(crate) type OpaqueMap = HashMap<u32, SenderContext>;
 
 #[derive(Debug, Clone)]
@@ -75,7 +74,6 @@ pub struct ResponseContext {
 pub(crate) struct SenderContext {
     pub sender: ResponseSender,
     pub is_persistent: bool,
-    pub context: Option<ResponseContext>,
 }
 
 struct ReadLoopOptions {
@@ -241,8 +239,7 @@ impl Client {
                                             }
                                         }
 
-                                        let resp = ClientResponse::new(packet, context.context);
-                                        match sender.send(Ok(resp)).await {
+                                        match sender.send(Ok(packet)).await {
                                             Ok(_) => {}
                                             Err(e) => {
                                                 debug!("Sending response to caller failed: {e}");
@@ -345,14 +342,12 @@ impl Dispatcher for Client {
         &self,
         mut packet: RequestPacket<'a>,
         is_persistent: bool,
-        response_context: Option<ResponseContext>,
     ) -> error::Result<ClientPendingOp> {
         let (response_tx, response_rx) = mpsc::channel(1);
 
         let opaque = self.register_handler(SenderContext {
             sender: response_tx,
             is_persistent,
-            context: response_context,
         });
         packet.opaque = Some(opaque);
         let op_code = packet.op_code;

@@ -18,7 +18,6 @@
 
 use std::sync::Arc;
 
-use crate::memdx::client::ResponseContext;
 use crate::memdx::connection::ConnectionType;
 use crate::memdx::error::Result;
 use crate::memdx::packet::{RequestPacket, ResponsePacket};
@@ -48,7 +47,6 @@ pub trait Dispatcher: Send + Sync {
         &self,
         packet: RequestPacket<'a>,
         is_persistent: bool,
-        response_context: Option<ResponseContext>,
     ) -> Result<ClientPendingOp>;
     async fn close(&self) -> Result<()>;
 }

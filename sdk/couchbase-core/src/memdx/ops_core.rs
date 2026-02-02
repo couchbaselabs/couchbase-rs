@@ -27,14 +27,10 @@ use crate::memdx::op_auth_saslscram::OpSASLScramEncoder;
 use crate::memdx::op_bootstrap::OpBootstrapEncoder;
 use crate::memdx::opcode::OpCode;
 use crate::memdx::packet::{RequestPacket, ResponsePacket};
-use crate::memdx::pendingop::StandardPendingOp;
+use crate::memdx::pendingop::ClientPendingOp;
 use crate::memdx::request::{
     GetClusterConfigRequest, GetErrorMapRequest, HelloRequest, SASLAuthRequest,
     SASLListMechsRequest, SASLStepRequest, SelectBucketRequest,
-};
-use crate::memdx::response::{
-    GetClusterConfigResponse, GetErrorMapResponse, HelloResponse, SASLAuthResponse,
-    SASLListMechsResponse, SASLStepResponse, SelectBucketResponse,
 };
 use crate::memdx::status::Status;
 use byteorder::ByteOrder;
@@ -87,11 +83,7 @@ impl OpsCore {
 }
 
 impl OpBootstrapEncoder for OpsCore {
-    async fn hello<D>(
-        &self,
-        dispatcher: &D,
-        request: HelloRequest,
-    ) -> Result<StandardPendingOp<HelloResponse>>
+    async fn hello<D>(&self, dispatcher: &D, request: HelloRequest) -> Result<ClientPendingOp>
     where
         D: Dispatcher,
     {
@@ -102,7 +94,7 @@ impl OpBootstrapEncoder for OpsCore {
             features.extend_from_slice(&bytes);
         }
 
-        let op = dispatcher
+        dispatcher
             .dispatch(
                 RequestPacket {
                     magic: Magic::Req,
@@ -117,24 +109,21 @@ impl OpBootstrapEncoder for OpsCore {
                     opaque: None,
                 },
                 false,
-                None,
             )
-            .await?;
-
-        Ok(StandardPendingOp::new(op))
+            .await
     }
 
     async fn get_error_map<D>(
         &self,
         dispatcher: &D,
         request: GetErrorMapRequest,
-    ) -> Result<StandardPendingOp<GetErrorMapResponse>>
+    ) -> Result<ClientPendingOp>
     where
         D: Dispatcher,
     {
         let version = request.version.to_be_bytes();
 
-        let op = dispatcher
+        dispatcher
             .dispatch(
                 RequestPacket {
                     magic: Magic::Req,
@@ -149,24 +138,21 @@ impl OpBootstrapEncoder for OpsCore {
                     opaque: None,
                 },
                 false,
-                None,
             )
-            .await?;
-
-        Ok(StandardPendingOp::new(op))
+            .await
     }
 
     async fn select_bucket<D>(
         &self,
         dispatcher: &D,
         request: SelectBucketRequest,
-    ) -> Result<StandardPendingOp<SelectBucketResponse>>
+    ) -> Result<ClientPendingOp>
     where
         D: Dispatcher,
     {
         let key = request.bucket_name.into_bytes();
 
-        let op = dispatcher
+        dispatcher
             .dispatch(
                 RequestPacket {
                     magic: Magic::Req,
@@ -181,18 +167,15 @@ impl OpBootstrapEncoder for OpsCore {
                     opaque: None,
                 },
                 false,
-                None,
             )
-            .await?;
-
-        Ok(StandardPendingOp::new(op))
+            .await
     }
 
     async fn get_cluster_config<D>(
         &self,
         dispatcher: &D,
         request: GetClusterConfigRequest,
-    ) -> Result<StandardPendingOp<GetClusterConfigResponse>>
+    ) -> Result<ClientPendingOp>
     where
         D: Dispatcher,
     {
@@ -206,7 +189,7 @@ impl OpBootstrapEncoder for OpsCore {
             None
         };
 
-        let op = dispatcher
+        dispatcher
             .dispatch(
                 RequestPacket {
                     magic: Magic::Req,
@@ -221,11 +204,8 @@ impl OpBootstrapEncoder for OpsCore {
                     opaque: None,
                 },
                 false,
-                None,
             )
-            .await?;
-
-        Ok(StandardPendingOp::new(op))
+            .await
     }
 }
 
@@ -234,7 +214,7 @@ impl OpSASLPlainEncoder for OpsCore {
         &self,
         dispatcher: &D,
         request: SASLAuthRequest,
-    ) -> Result<StandardPendingOp<SASLAuthResponse>>
+    ) -> Result<ClientPendingOp>
     where
         D: Dispatcher,
     {
@@ -242,7 +222,7 @@ impl OpSASLPlainEncoder for OpsCore {
         value.extend_from_slice(request.payload.as_slice());
         let key: Vec<u8> = request.auth_mechanism.into();
 
-        let op = dispatcher
+        dispatcher
             .dispatch(
                 RequestPacket {
                     magic: Magic::Req,
@@ -257,11 +237,8 @@ impl OpSASLPlainEncoder for OpsCore {
                     opaque: None,
                 },
                 false,
-                None,
             )
-            .await?;
-
-        Ok(StandardPendingOp::new(op))
+            .await
     }
 }
 
@@ -272,11 +249,11 @@ impl OpSASLAutoEncoder for OpsCore {
         &self,
         dispatcher: &D,
         _request: SASLListMechsRequest,
-    ) -> Result<StandardPendingOp<SASLListMechsResponse>>
+    ) -> Result<ClientPendingOp>
     where
         D: Dispatcher,
     {
-        let op = dispatcher
+        dispatcher
             .dispatch(
                 RequestPacket {
                     magic: Magic::Req,
@@ -291,11 +268,8 @@ impl OpSASLAutoEncoder for OpsCore {
                     opaque: None,
                 },
                 false,
-                None,
             )
-            .await?;
-
-        Ok(StandardPendingOp::new(op))
+            .await
     }
 }
 
@@ -304,7 +278,7 @@ impl OpSASLScramEncoder for OpsCore {
         &self,
         dispatcher: &D,
         request: SASLStepRequest,
-    ) -> Result<StandardPendingOp<SASLStepResponse>>
+    ) -> Result<ClientPendingOp>
     where
         D: Dispatcher,
     {
@@ -312,7 +286,7 @@ impl OpSASLScramEncoder for OpsCore {
         value.extend_from_slice(request.payload.as_slice());
         let key: Vec<u8> = request.auth_mechanism.into();
 
-        let op = dispatcher
+        dispatcher
             .dispatch(
                 RequestPacket {
                     magic: Magic::Req,
@@ -327,10 +301,7 @@ impl OpSASLScramEncoder for OpsCore {
                     opaque: None,
                 },
                 false,
-                None,
             )
-            .await?;
-
-        Ok(StandardPendingOp::new(op))
+            .await
     }
 }

@@ -17,28 +17,19 @@
  */
 
 use std::future::Future;
-use std::marker::PhantomData;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc::Receiver;
 use tokio::time::{timeout_at, Instant};
 
 use crate::memdx::client::{OpaqueMap, SenderContext};
-use crate::memdx::client_response::ClientResponse;
 use crate::memdx::error::CancellationErrorKind;
 use crate::memdx::error::{Error, Result};
-use crate::memdx::response::TryFromClientResponse;
-
-pub trait PendingOp<T> {
-    fn recv(&mut self) -> impl Future<Output = Result<T>>
-    where
-        T: TryFromClientResponse;
-    fn cancel(&mut self, e: CancellationErrorKind) -> impl Future<Output = ()>;
-}
+use crate::memdx::packet::ResponsePacket;
 
 pub struct ClientPendingOp {
     opaque: u32,
-    response_receiver: Receiver<Result<ClientResponse>>,
+    response_receiver: Receiver<Result<ResponsePacket>>,
     opaque_map: Arc<Mutex<OpaqueMap>>,
 
     is_persistent: bool,
@@ -49,7 +40,7 @@ impl ClientPendingOp {
     pub(crate) fn new(
         opaque: u32,
         opaque_map: Arc<Mutex<OpaqueMap>>,
-        response_receiver: Receiver<Result<ClientResponse>>,
+        response_receiver: Receiver<Result<ResponsePacket>>,
         is_persistent: bool,
     ) -> Self {
         ClientPendingOp {
@@ -61,7 +52,7 @@ impl ClientPendingOp {
         }
     }
 
-    pub async fn recv(&mut self) -> Result<ClientResponse> {
+    pub async fn recv(&mut self) -> Result<ResponsePacket> {
         match self.response_receiver.recv().await {
             Some(r) => {
                 if !self.is_persistent {
@@ -76,7 +67,7 @@ impl ClientPendingOp {
         }
     }
 
-    pub async fn cancel(&mut self, e: CancellationErrorKind) {
+    pub async fn cancel(&mut self, e: CancellationErrorKind) -> bool {
         let context = self.cancel_op();
 
         if let Some(context) = context {
@@ -86,6 +77,10 @@ impl ClientPendingOp {
                 .send(Err(Error::new_cancelled_error(e)))
                 .await
                 .unwrap();
+
+            true
+        } else {
+            false
         }
     }
 
@@ -109,37 +104,12 @@ impl Drop for ClientPendingOp {
     }
 }
 
-pub struct StandardPendingOp<TryFromClientResponse> {
-    wrapped: ClientPendingOp,
-    _target: PhantomData<TryFromClientResponse>,
-}
-
-impl<T: TryFromClientResponse> StandardPendingOp<T> {
-    pub(crate) fn new(op: ClientPendingOp) -> Self {
-        Self {
-            wrapped: op,
-            _target: PhantomData,
-        }
-    }
-}
-
-impl<T: TryFromClientResponse> PendingOp<T> for StandardPendingOp<T> {
-    async fn recv(&mut self) -> Result<T> {
-        let packet = self.wrapped.recv().await?;
-
-        T::try_from(packet)
-    }
-
-    async fn cancel(&mut self, e: CancellationErrorKind) {
-        self.wrapped.cancel(e).await;
-    }
-}
-
-pub(super) async fn run_op_future_with_deadline<F, T, O>(deadline: Instant, fut: F) -> Result<T>
+pub(super) async fn run_bootstrap_op_future_with_deadline<F>(
+    deadline: Instant,
+    fut: F,
+) -> Result<ResponsePacket>
 where
-    O: PendingOp<T>,
-    F: Future<Output = Result<O>>,
-    T: TryFromClientResponse,
+    F: Future<Output = Result<ClientPendingOp>>,
 {
     let mut op = match timeout_at(deadline, fut).await {
         Ok(op) => op?,
@@ -151,7 +121,10 @@ where
     match timeout_at(deadline, op.recv()).await {
         Ok(res) => res,
         Err(_e) => {
-            op.cancel(CancellationErrorKind::Timeout).await;
+            if op.cancel(CancellationErrorKind::Timeout).await {
+                return Err(Error::new_cancelled_error(CancellationErrorKind::Timeout));
+            };
+
             op.recv().await
         }
     }
