@@ -44,7 +44,6 @@ serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.145", features = ["raw_value"] }
 
 tokio = { version = "1.47", features = ["full"] }
-tokio-io = { version = "0.2.0-alpha.6", features = ["util"] }
 tokio-native-tls = { version = "0.3", optional = true }
 tokio-stream = "0.1.17"
 tokio-util = { version = "0.7", features = ["codec"] }
