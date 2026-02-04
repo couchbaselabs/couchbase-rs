@@ -25,7 +25,7 @@ use crate::memdx::error::Result;
 use crate::memdx::op_auth_saslbyname::{
     OpSASLAuthByNameEncoder, OpsSASLAuthByName, SASLAuthByNameOptions,
 };
-use crate::memdx::pendingop::{PendingOp, StandardPendingOp};
+use crate::memdx::pendingop::StandardPendingOp;
 use crate::memdx::request::SASLListMechsRequest;
 use crate::memdx::response::SASLListMechsResponse;
 use tokio::time::Instant;

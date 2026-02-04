@@ -25,7 +25,7 @@ use crate::memdx::error::CancellationErrorKind;
 use crate::memdx::error::Result;
 use crate::memdx::op_auth_saslauto::{OpSASLAutoEncoder, OpsSASLAuthAuto, SASLAuthAutoOptions};
 use crate::memdx::op_auth_saslplain::OpSASLPlainEncoder;
-use crate::memdx::pendingop::{run_op_future_with_deadline, PendingOp, StandardPendingOp};
+use crate::memdx::pendingop::{run_op_future_with_deadline, StandardPendingOp};
 use crate::memdx::request::{
     GetClusterConfigRequest, GetErrorMapRequest, HelloRequest, SASLAuthRequest,
     SASLListMechsRequest, SASLStepRequest, SelectBucketRequest,
