@@ -29,13 +29,6 @@ use crate::memdx::error::CancellationErrorKind;
 use crate::memdx::error::{Error, Result};
 use crate::memdx::response::TryFromClientResponse;
 
-pub trait PendingOp<T> {
-    fn recv(&mut self) -> impl Future<Output = Result<T>>
-    where
-        T: TryFromClientResponse;
-    fn cancel(&mut self, e: CancellationErrorKind) -> impl Future<Output = ()>;
-}
-
 pub struct ClientPendingOp {
     opaque: u32,
     response_receiver: Receiver<Result<ClientResponse>>,
@@ -76,7 +69,7 @@ impl ClientPendingOp {
         }
     }
 
-    pub async fn cancel(&mut self, e: CancellationErrorKind) {
+    pub async fn cancel(&mut self, e: CancellationErrorKind) -> bool {
         let context = self.cancel_op();
 
         if let Some(context) = context {
@@ -86,6 +79,10 @@ impl ClientPendingOp {
                 .send(Err(Error::new_cancelled_error(e)))
                 .await
                 .unwrap();
+
+            true
+        } else {
+            false
         }
     }
 
@@ -123,22 +120,21 @@ impl<T: TryFromClientResponse> StandardPendingOp<T> {
     }
 }
 
-impl<T: TryFromClientResponse> PendingOp<T> for StandardPendingOp<T> {
-    async fn recv(&mut self) -> Result<T> {
+impl<T: TryFromClientResponse> StandardPendingOp<T> {
+    pub async fn recv(&mut self) -> Result<T> {
         let packet = self.wrapped.recv().await?;
 
         T::try_from(packet)
     }
 
-    async fn cancel(&mut self, e: CancellationErrorKind) {
-        self.wrapped.cancel(e).await;
+    pub async fn cancel(&mut self, e: CancellationErrorKind) -> bool {
+        self.wrapped.cancel(e).await
     }
 }
 
-pub(super) async fn run_op_future_with_deadline<F, T, O>(deadline: Instant, fut: F) -> Result<T>
+pub(super) async fn run_op_future_with_deadline<F, T>(deadline: Instant, fut: F) -> Result<T>
 where
-    O: PendingOp<T>,
-    F: Future<Output = Result<O>>,
+    F: Future<Output = Result<StandardPendingOp<T>>>,
     T: TryFromClientResponse,
 {
     let mut op = match timeout_at(deadline, fut).await {
@@ -151,7 +147,10 @@ where
     match timeout_at(deadline, op.recv()).await {
         Ok(res) => res,
         Err(_e) => {
-            op.cancel(CancellationErrorKind::Timeout).await;
+            if op.cancel(CancellationErrorKind::Timeout).await {
+                return Err(Error::new_cancelled_error(CancellationErrorKind::Timeout));
+            };
+
             op.recv().await
         }
     }

@@ -29,7 +29,6 @@ use crate::memdx::op_bootstrap::{BootstrapOptions, OpBootstrap, OpBootstrapEncod
 use crate::memdx::ops_core::OpsCore;
 use crate::memdx::ops_crud::OpsCrud;
 use crate::memdx::ops_util::OpsUtil;
-use crate::memdx::pendingop::PendingOp;
 use crate::memdx::request::{
     AddRequest, AppendRequest, DecrementRequest, DeleteRequest, GetAndLockRequest,
     GetAndTouchRequest, GetClusterConfigRequest, GetCollectionIdRequest, GetMetaRequest,
