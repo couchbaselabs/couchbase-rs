@@ -31,7 +31,7 @@ use crate::memdx::ops_crud::OpsCrud;
 use crate::memdx::status::Status;
 use crate::memdx::subdoc::{SubDocResult, SubdocDocFlag};
 use byteorder::{BigEndian, ReadBytesExt};
-use tokio_io::Buf;
+use bytes::Buf;
 
 pub trait TryFromClientResponse: Sized {
     fn try_from(resp: ClientResponse) -> Result<Self, Error>;
