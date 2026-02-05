@@ -17,6 +17,7 @@
  */
 use crate::agent::Agent;
 use crate::cbconfig::{CollectionManifest, FullBucketConfig, FullClusterConfig};
+use crate::clusterlabels::ClusterLabels;
 use crate::error::Result;
 use crate::features::BucketFeature;
 use crate::mgmtx::bucket_settings::BucketDef;
@@ -78,6 +79,10 @@ use std::collections::HashMap;
 impl Agent {
     pub async fn bucket_features(&self) -> Result<Vec<BucketFeature>> {
         self.inner.bucket_features().await
+    }
+
+    pub fn cluster_labels(&self) -> Option<ClusterLabels> {
+        self.inner.tracing.get_cluster_labels()
     }
 
     pub async fn upsert(&self, opts: UpsertOptions<'_>) -> Result<UpsertResult> {

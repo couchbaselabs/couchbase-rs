@@ -25,6 +25,8 @@ use crate::mgmtx::options::{
     CreateBucketOptions, DeleteBucketOptions, FlushBucketOptions, GetAllBucketsOptions,
     GetBucketOptions, UpdateBucketOptions,
 };
+use crate::tracingcomponent::{BeginDispatchFields, EndDispatchFields};
+use crate::util::get_host_port_tuple_from_uri;
 use bytes::Bytes;
 use http::Method;
 
@@ -37,16 +39,23 @@ impl<C: Client> Management<C> {
         let path = "pools/default/buckets".to_string();
 
         let resp = self
-            .execute(
-                method.clone(),
-                &path,
-                "",
-                opts.on_behalf_of_info.cloned(),
-                None,
-                None,
+            .tracing
+            .orchestrate_dispatch_span(
+                BeginDispatchFields::from_strings(
+                    get_host_port_tuple_from_uri(&self.endpoint).unwrap_or_default(),
+                    None,
+                ),
+                self.execute(
+                    method.clone(),
+                    &path,
+                    "",
+                    opts.on_behalf_of_info.cloned(),
+                    None,
+                    None,
+                ),
+                |_| EndDispatchFields::new(None, None),
             )
             .await?;
-
         if resp.status() != 200 {
             return Err(Self::decode_common_error(method, path, "get_all_buckets", resp).await);
         }
@@ -65,13 +74,21 @@ impl<C: Client> Management<C> {
         let path = format!("pools/default/buckets/{}", opts.bucket_name).to_string();
 
         let resp = self
-            .execute(
-                method.clone(),
-                &path,
-                "",
-                opts.on_behalf_of_info.cloned(),
-                None,
-                None,
+            .tracing
+            .orchestrate_dispatch_span(
+                BeginDispatchFields::from_strings(
+                    get_host_port_tuple_from_uri(&self.endpoint).unwrap_or_default(),
+                    None,
+                ),
+                self.execute(
+                    method.clone(),
+                    &path,
+                    "",
+                    opts.on_behalf_of_info.cloned(),
+                    None,
+                    None,
+                ),
+                |_| EndDispatchFields::new(None, None),
             )
             .await?;
 
@@ -98,13 +115,21 @@ impl<C: Client> Management<C> {
         };
 
         let resp = self
-            .execute(
-                method.clone(),
-                &path,
-                "application/x-www-form-urlencoded",
-                opts.on_behalf_of_info.cloned(),
-                None,
-                Some(body),
+            .tracing
+            .orchestrate_dispatch_span(
+                BeginDispatchFields::from_strings(
+                    get_host_port_tuple_from_uri(&self.endpoint).unwrap_or_default(),
+                    None,
+                ),
+                self.execute(
+                    method.clone(),
+                    &path,
+                    "application/x-www-form-urlencoded",
+                    opts.on_behalf_of_info.cloned(),
+                    None,
+                    Some(body),
+                ),
+                |_| EndDispatchFields::new(None, None),
             )
             .await?;
 
@@ -128,13 +153,21 @@ impl<C: Client> Management<C> {
         };
 
         let resp = self
-            .execute(
-                method.clone(),
-                &path,
-                "application/x-www-form-urlencoded",
-                opts.on_behalf_of_info.cloned(),
-                None,
-                Some(body),
+            .tracing
+            .orchestrate_dispatch_span(
+                BeginDispatchFields::from_strings(
+                    get_host_port_tuple_from_uri(&self.endpoint).unwrap_or_default(),
+                    None,
+                ),
+                self.execute(
+                    method.clone(),
+                    &path,
+                    "application/x-www-form-urlencoded",
+                    opts.on_behalf_of_info.cloned(),
+                    None,
+                    Some(body),
+                ),
+                |_| EndDispatchFields::new(None, None),
             )
             .await?;
 
@@ -150,13 +183,21 @@ impl<C: Client> Management<C> {
         let path = format!("pools/default/buckets/{}", opts.bucket_name).to_string();
 
         let resp = self
-            .execute(
-                method.clone(),
-                &path,
-                "",
-                opts.on_behalf_of_info.cloned(),
-                None,
-                None,
+            .tracing
+            .orchestrate_dispatch_span(
+                BeginDispatchFields::from_strings(
+                    get_host_port_tuple_from_uri(&self.endpoint).unwrap_or_default(),
+                    None,
+                ),
+                self.execute(
+                    method.clone(),
+                    &path,
+                    "",
+                    opts.on_behalf_of_info.cloned(),
+                    None,
+                    None,
+                ),
+                |_| EndDispatchFields::new(None, None),
             )
             .await?;
 
@@ -188,13 +229,21 @@ impl<C: Client> Management<C> {
         .to_string();
 
         let resp = self
-            .execute(
-                method.clone(),
-                &path,
-                "",
-                opts.on_behalf_of_info.cloned(),
-                None,
-                None,
+            .tracing
+            .orchestrate_dispatch_span(
+                BeginDispatchFields::from_strings(
+                    get_host_port_tuple_from_uri(&self.endpoint).unwrap_or_default(),
+                    None,
+                ),
+                self.execute(
+                    method.clone(),
+                    &path,
+                    "",
+                    opts.on_behalf_of_info.cloned(),
+                    None,
+                    None,
+                ),
+                |_| EndDispatchFields::new(None, None),
             )
             .await?;
 

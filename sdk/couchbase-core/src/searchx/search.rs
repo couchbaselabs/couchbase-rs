@@ -34,10 +34,16 @@ use crate::searchx::mgmt_options::{
 use crate::searchx::query_options::QueryOptions;
 use crate::searchx::search_json::{DocumentAnalysisJson, IndexedDocumentsJson};
 use crate::searchx::search_respreader::SearchRespReader;
+use crate::tracingcomponent::{
+    BeginDispatchFields, EndDispatchFields, TracingComponent, SERVICE_VALUE_SEARCH,
+    SPAN_ATTRIB_DB_SYSTEM_VALUE, SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
+};
+use crate::util::get_host_port_tuple_from_uri;
 use bytes::Bytes;
 use http::{Method, StatusCode};
 use std::collections::HashMap;
 use std::sync::Arc;
+use tracing::{instrument, Level, Span};
 
 #[derive(Debug)]
 pub struct Search<C: Client> {
@@ -47,6 +53,7 @@ pub struct Search<C: Client> {
     pub auth: Auth,
 
     pub vector_search_enabled: bool,
+    pub(crate) tracing: Arc<TracingComponent>,
 }
 
 impl<C: Client> Search<C> {
@@ -127,13 +134,21 @@ impl<C: Client> Search<C> {
         })?;
 
         let res = self
-            .execute(
-                Method::POST,
-                req_uri,
-                "application/json",
-                on_behalf_of,
-                None,
-                Some(Bytes::from(body)),
+            .tracing
+            .orchestrate_dispatch_span(
+                BeginDispatchFields::from_strings(
+                    get_host_port_tuple_from_uri(&self.endpoint).unwrap_or_default(),
+                    None,
+                ),
+                self.execute(
+                    Method::POST,
+                    req_uri,
+                    "application/json",
+                    on_behalf_of,
+                    None,
+                    Some(Bytes::from(body)),
+                ),
+                |_| EndDispatchFields::new(None, None),
             )
             .await
             .map_err(|e| error::Error::new_http_error(e, self.endpoint.to_string()))?;
@@ -435,13 +450,21 @@ impl<C: Client> Search<C> {
 
     pub async fn ping(&self, opts: &PingOptions<'_>) -> error::Result<()> {
         let res = match self
-            .execute(
-                Method::GET,
-                "/api/ping",
-                "",
-                opts.on_behalf_of.cloned(),
-                None,
-                None,
+            .tracing
+            .orchestrate_dispatch_span(
+                BeginDispatchFields::from_strings(
+                    get_host_port_tuple_from_uri(&self.endpoint).unwrap_or_default(),
+                    None,
+                ),
+                self.execute(
+                    Method::GET,
+                    "/api/ping",
+                    "",
+                    opts.on_behalf_of.cloned(),
+                    None,
+                    None,
+                ),
+                |_| EndDispatchFields::new(None, None),
             )
             .await
         {

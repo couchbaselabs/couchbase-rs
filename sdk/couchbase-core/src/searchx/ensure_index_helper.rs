@@ -80,6 +80,7 @@ impl<'a> EnsureIndexHelper<'a> {
             endpoint: target.endpoint.to_string(),
             auth: target.auth.clone(),
             vector_search_enabled: true,
+            tracing: Default::default(),
         }
         .get_index(&GetIndexOptions {
             bucket_name: self.bucket_name,
@@ -123,6 +124,7 @@ impl<'a> EnsureIndexHelper<'a> {
             endpoint: target.endpoint.to_string(),
             auth: target.auth.clone(),
             vector_search_enabled: true,
+            tracing: Default::default(),
         }
         .refresh_config(&RefreshConfigOptions::new())
         .await;

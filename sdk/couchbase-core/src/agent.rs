@@ -75,6 +75,7 @@ use crate::kvendpointclientmanager::{
     KvEndpointClientManager, KvEndpointClientManagerOptions, StdKvEndpointClientManager,
 };
 use crate::orphan_reporter::OrphanReporter;
+use crate::tracingcomponent::{TracingComponent, TracingComponentConfig};
 use arc_swap::ArcSwap;
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -160,6 +161,7 @@ pub(crate) struct AgentInner {
     pub(crate) search: Arc<SearchComponent<ReqwestClient>>,
     pub(crate) mgmt: MgmtComponent<ReqwestClient>,
     pub(crate) diagnostics: DiagnosticsComponent<ReqwestClient, AgentClientManager>,
+    pub(crate) tracing: Arc<TracingComponent>,
 }
 
 pub struct Agent {
@@ -264,6 +266,8 @@ impl AgentInner {
         self.mgmt.reconfigure(agent_component_configs.mgmt_config);
         self.diagnostics
             .reconfigure(agent_component_configs.diagnostics_config);
+        self.tracing
+            .reconfigure(agent_component_configs.tracing_config);
     }
 
     pub async fn bucket_features(&self) -> Result<Vec<BucketFeature>> {
@@ -430,6 +434,10 @@ impl Agent {
 
         let agent_component_configs = AgentInner::gen_agent_component_configs_locked(&state);
 
+        let tracing = Arc::new(TracingComponent::new(
+            agent_component_configs.tracing_config,
+        ));
+
         let err_map_component_conn_mgr = err_map_component.clone();
 
         let num_pool_connections = state.num_pool_connections;
@@ -460,6 +468,7 @@ impl Agent {
                 authenticator: opts.authenticator,
                 disable_decompression: opts.compression_config.disable_decompression,
                 selected_bucket: opts.bucket_name,
+                tracing: tracing.clone(),
             })
             .await?,
         );
@@ -505,6 +514,7 @@ impl Agent {
         let mgmt = MgmtComponent::new(
             retry_manager.clone(),
             http_client.clone(),
+            tracing.clone(),
             agent_component_configs.mgmt_config,
             MgmtComponentOptions {
                 user_agent: user_agent.clone(),
@@ -523,6 +533,7 @@ impl Agent {
         let query = Arc::new(QueryComponent::new(
             retry_manager.clone(),
             http_client.clone(),
+            tracing.clone(),
             agent_component_configs.query_config,
             QueryComponentOptions {
                 user_agent: user_agent.clone(),
@@ -532,6 +543,7 @@ impl Agent {
         let search = Arc::new(SearchComponent::new(
             retry_manager.clone(),
             http_client.clone(),
+            tracing.clone(),
             agent_component_configs.search_config,
             SearchComponentOptions {
                 user_agent: user_agent.clone(),
@@ -564,6 +576,7 @@ impl Agent {
             query,
             search,
             diagnostics,
+            tracing,
         });
 
         let inner_clone = Arc::downgrade(&inner);
@@ -669,6 +682,7 @@ impl Agent {
                         on_close_tx: None,
                         disable_decompression: false,
                         id: Uuid::new_v4().to_string(),
+                        tracing: Default::default(),
                     }),
                 )
                 .await;
@@ -771,6 +785,7 @@ impl Agent {
                 user_agent,
                 endpoint,
                 auth,
+                tracing: Default::default(),
             }
             .get_terse_bucket_config(&GetTerseBucketConfigOptions {
                 bucket_name: &bucket_name,
@@ -786,6 +801,7 @@ impl Agent {
                 user_agent,
                 endpoint,
                 auth,
+                tracing: Default::default(),
             }
             .get_terse_cluster_config(&GetTerseClusterConfigOptions {
                 on_behalf_of_info: None,

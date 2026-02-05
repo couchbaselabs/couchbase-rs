@@ -16,10 +16,10 @@
  *
  */
 
+use crate::clusterlabels::ClusterLabels;
+use crate::vbucketmap::VbucketMap;
 use std::cmp::Ordering;
 use std::collections::HashMap;
-
-use crate::vbucketmap::VbucketMap;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[non_exhaustive]
@@ -133,6 +133,8 @@ pub(crate) struct ParsedConfig {
     pub nodes: Vec<ParsedConfigNode>,
 
     pub features: Vec<ParsedConfigFeature>,
+
+    pub cluster_labels: Option<ClusterLabels>,
 }
 
 impl Default for ParsedConfig {
@@ -144,6 +146,7 @@ impl Default for ParsedConfig {
             bucket: None,
             nodes: vec![],
             features: vec![],
+            cluster_labels: None,
         }
     }
 }

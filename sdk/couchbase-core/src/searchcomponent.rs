@@ -40,6 +40,7 @@ use crate::searchx::index::Index;
 use crate::searchx::mgmt_options::{EnsureIndexPollOptions, PingOptions};
 use crate::searchx::search::Search;
 use crate::service_type::ServiceType;
+use crate::tracingcomponent::TracingComponent;
 use crate::{error, httpx};
 use arc_swap::ArcSwap;
 use futures::future::join_all;
@@ -53,6 +54,7 @@ use tokio::select;
 
 pub(crate) struct SearchComponent<C: Client> {
     http_component: HttpComponent<C>,
+    tracing: Arc<TracingComponent>,
 
     retry_manager: Arc<RetryManager>,
 
@@ -80,6 +82,7 @@ impl<C: Client + 'static> SearchComponent<C> {
     pub fn new(
         retry_manager: Arc<RetryManager>,
         http_client: Arc<C>,
+        tracing: Arc<TracingComponent>,
         config: SearchComponentConfig,
         opts: SearchComponentOptions,
     ) -> Self {
@@ -90,6 +93,7 @@ impl<C: Client + 'static> SearchComponent<C> {
                 http_client,
                 HttpComponentState::new(config.endpoints, config.authenticator),
             ),
+            tracing,
             retry_manager,
             state: ArcSwap::new(Arc::new(SearchComponentState {
                 vector_search_enabled: config.vector_search_enabled,
@@ -137,6 +141,7 @@ impl<C: Client + 'static> SearchComponent<C> {
                             auth,
 
                             vector_search_enabled: self.state.load().vector_search_enabled,
+                            tracing: self.tracing.clone(),
                         }
                         .query(&copts)
                         .await)
@@ -453,6 +458,7 @@ impl<C: Client + 'static> SearchComponent<C> {
                 endpoint: target.endpoint.clone(),
                 auth: target.auth.clone(),
                 vector_search_enabled: false,
+                tracing: self.tracing.clone(),
             };
 
             let handle = self.ping_one(client, copts.clone());
@@ -487,6 +493,7 @@ impl<C: Client + 'static> SearchComponent<C> {
                 auth: target.auth.clone(),
 
                 vector_search_enabled: self.state.load().vector_search_enabled,
+                tracing: self.tracing.clone(),
             };
 
             let handle = self.create_one_report(client, timeout, copts.clone());
@@ -571,6 +578,7 @@ impl<C: Client + 'static> SearchComponent<C> {
                                 auth,
 
                                 vector_search_enabled: self.state.load().vector_search_enabled,
+                                tracing: self.tracing.clone(),
                             })
                             .await
                         },
@@ -611,6 +619,7 @@ impl<C: Client + 'static> SearchComponent<C> {
                                 auth,
 
                                 vector_search_enabled: self.state.load().vector_search_enabled,
+                                tracing: self.tracing.clone(),
                             })
                             .await
                         },

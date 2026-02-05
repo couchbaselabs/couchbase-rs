@@ -74,6 +74,7 @@ impl<'a> EnsureIndexHelper<'a> {
             user_agent: self.user_agent.to_string(),
             endpoint: target.endpoint.to_string(),
             auth: target.auth.clone(),
+            tracing: Default::default(),
         }
         .get_all_indexes(&GetAllIndexesOptions {
             bucket_name: self.bucket_name,
