@@ -345,10 +345,8 @@ where
 
             // There's not much to do when the connection closes so just mark us as closed.
             if closed_clone.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-                != Ok(true)
+                != Ok(false)
             {
-                // If we've been dropped (i.e. we didn't get here via close()) then don't try to
-                // call the on_close handler as it will have been dropped too.
                 return;
             }
 
@@ -506,6 +504,9 @@ where
     D: Dispatcher,
 {
     fn drop(&mut self) {
+        // This basically just prevents the client read close handler from attempting to
+        // signal upstream that we've closed.
+        self.closed.store(true, Ordering::SeqCst);
         info!("Dropping kvclient {}", self.id);
     }
 }
