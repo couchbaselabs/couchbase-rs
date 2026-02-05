@@ -26,7 +26,7 @@ use std::fmt::{Debug, Display};
 pub enum Authenticator {
     PasswordAuthenticator(PasswordAuthenticator),
     CertificateAuthenticator(CertificateAuthenticator),
-    #[cfg(feature = "unstable-jwt")]
+    /// **Stability: Uncommitted** This API may change in the future.
     JwtAuthenticator(JwtAuthenticator),
 }
 
@@ -37,7 +37,6 @@ impl Display for Authenticator {
             Authenticator::CertificateAuthenticator(_) => {
                 write!(f, "CertificateAuthenticator")
             }
-            #[cfg(feature = "unstable-jwt")]
             Authenticator::JwtAuthenticator(_) => write!(f, "JwtAuthenticator"),
         }
     }
@@ -109,13 +108,16 @@ impl From<CertificateAuthenticator> for Authenticator {
     }
 }
 
-#[cfg(feature = "unstable-jwt")]
+/// JwtAuthenticator uses a JWT token to authenticate with the server.
+///
+/// **Stability: Uncommitted**
+///
+/// This API may change in the future.
 #[derive(Clone, PartialEq, Hash)]
 pub struct JwtAuthenticator {
     pub token: String,
 }
 
-#[cfg(feature = "unstable-jwt")]
 impl JwtAuthenticator {
     pub fn get_token(&self) -> &str {
         &self.token
@@ -126,7 +128,6 @@ impl JwtAuthenticator {
     }
 }
 
-#[cfg(feature = "unstable-jwt")]
 impl From<JwtAuthenticator> for Authenticator {
     fn from(value: JwtAuthenticator) -> Self {
         Authenticator::JwtAuthenticator(value)

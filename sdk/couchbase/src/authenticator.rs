@@ -29,7 +29,7 @@ use tokio_rustls::rustls::pki_types::{CertificateDer, PrivateKeyDer};
 pub enum Authenticator {
     PasswordAuthenticator(PasswordAuthenticator),
     CertificateAuthenticator(CertificateAuthenticator),
-    #[cfg(feature = "unstable-jwt")]
+    /// **Stability: Uncommitted** This API may change in the future.
     JwtAuthenticator(JwtAuthenticator),
 }
 
@@ -42,7 +42,6 @@ impl Debug for Authenticator {
             Authenticator::CertificateAuthenticator(_) => {
                 write!(f, "CertificateAuthenticator")
             }
-            #[cfg(feature = "unstable-jwt")]
             Authenticator::JwtAuthenticator(_) => {
                 write!(f, "JwtAuthenticator")
             }
@@ -55,7 +54,6 @@ impl Display for Authenticator {
         match self {
             Authenticator::PasswordAuthenticator(_) => write!(f, "PasswordAuthenticator"),
             Authenticator::CertificateAuthenticator(_) => write!(f, "CertificateAuthenticator"),
-            #[cfg(feature = "unstable-jwt")]
             Authenticator::JwtAuthenticator(_) => write!(f, "JwtAuthenticator"),
         }
     }
@@ -98,7 +96,6 @@ impl From<Authenticator> for couchbase_core::authenticator::Authenticator {
                     couchbase_core::authenticator::CertificateAuthenticator {},
                 )
             }
-            #[cfg(feature = "unstable-jwt")]
             Authenticator::JwtAuthenticator(jwt_auth) => {
                 couchbase_core::authenticator::Authenticator::JwtAuthenticator(
                     couchbase_core::authenticator::JwtAuthenticator {
@@ -167,13 +164,16 @@ impl From<CertificateAuthenticator> for Authenticator {
     }
 }
 
-#[cfg(feature = "unstable-jwt")]
+/// JwtAuthenticator uses a JWT token to authenticate with the server.
+///
+/// **Stability: Uncommitted**
+///
+/// This API may change in the future.
 #[derive(Debug, Clone, PartialEq, Hash)]
 pub struct JwtAuthenticator {
     pub token: String,
 }
 
-#[cfg(feature = "unstable-jwt")]
 impl JwtAuthenticator {
     pub fn new(token: impl Into<String>) -> Self {
         Self {

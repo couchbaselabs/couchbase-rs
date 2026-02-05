@@ -24,7 +24,6 @@ use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::hello_feature::HelloFeature;
 use crate::memdx::op_auth_saslauto::Credentials;
 use crate::memdx::op_auth_saslbyname::{OpsSASLAuthByName, SASLAuthByNameOptions};
-#[cfg(feature = "unstable-jwt")]
 use crate::memdx::op_auth_sasloauthbearer::{OpsSASLOAuthBearer, SASLOAuthBearerOptions};
 use crate::memdx::op_bootstrap::{BootstrapOptions, OpBootstrap, OpBootstrapEncoder};
 use crate::memdx::ops_core::OpsCore;
@@ -115,7 +114,6 @@ pub(crate) trait KvClientOps: Sized + Send + Sync {
         req: GetCollectionIdRequest,
     ) -> impl Future<Output = KvResult<GetCollectionIdResponse>> + Send;
     fn ping(&self, req: PingRequest) -> impl Future<Output = KvResult<PingResponse>> + Send;
-    #[cfg(feature = "unstable-jwt")]
     fn reconfigure_authenticator(
         &self,
         req: ReconfigureAuthenticatorRequest,
@@ -326,7 +324,6 @@ where
         Ok(res)
     }
 
-    #[cfg(feature = "unstable-jwt")]
     async fn reconfigure_authenticator(
         &self,
         req: ReconfigureAuthenticatorRequest,

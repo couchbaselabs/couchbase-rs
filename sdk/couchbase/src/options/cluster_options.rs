@@ -532,7 +532,6 @@ impl TlsOptions {
                 builder.identity(a.identity.clone());
             }
             Authenticator::PasswordAuthenticator(_) => {}
-            #[cfg(feature = "unstable-jwt")]
             Authenticator::JwtAuthenticator(_) => {}
         };
 
