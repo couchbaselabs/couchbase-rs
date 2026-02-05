@@ -70,7 +70,6 @@ pub(crate) fn auth_from_authenticator(
                 creds.password,
             )))
         }
-        #[cfg(feature = "unstable-jwt")]
         Authenticator::JwtAuthenticator(authenticator) => {
             Ok(Auth::BearerAuth(BearerAuth::new(authenticator.get_token())))
         }

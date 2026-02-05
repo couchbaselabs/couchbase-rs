@@ -67,10 +67,6 @@ default-tls = ["rustls-tls"]
 rustls-tls = ["reqwest/rustls-tls", "dep:tokio-rustls"]
 native-tls = ["reqwest/native-tls", "dep:tokio-native-tls"]
 
-# Uncommitted: This API may change in the future.
-# Enables JWT authentication support.
-unstable-jwt = []
-
 [lints.rust]
 # This is temporary whilst we build out the root modules.
 unused = "allow"

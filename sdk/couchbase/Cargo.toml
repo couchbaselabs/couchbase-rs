@@ -58,10 +58,6 @@ unstable-dns-options = []
 # Allows explicit construction of the Error type e.g. for mocking purposes.
 unstable-error-construction = []
 
-# Uncommitted: This API may change in the future.
-# Enables JWT authentication support.
-unstable-jwt = ["couchbase-core/unstable-jwt"]
-
 internal = []
 
 [lints.rust]

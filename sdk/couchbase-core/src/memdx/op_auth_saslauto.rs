@@ -32,11 +32,7 @@ use tokio::time::Instant;
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum Credentials {
-    UserPass {
-        username: String,
-        password: String,
-    },
-    #[cfg(feature = "unstable-jwt")]
+    UserPass { username: String, password: String },
     JwtToken(String),
 }
 
@@ -53,7 +49,6 @@ impl Credentials {
         }
     }
 
-    #[cfg(feature = "unstable-jwt")]
     pub fn jwt(&self) -> Result<&str> {
         match self {
             Credentials::JwtToken(token) => Ok(token.as_str()),
