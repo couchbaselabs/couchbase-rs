@@ -17,6 +17,7 @@
  */
 
 use crate::clients::agent_provider::CouchbaseAgentProvider;
+use crate::clients::tracing_client::{CouchbaseTracingClient, TracingClient, TracingClientBackend};
 use crate::error;
 use crate::options::search_options::SearchOptions;
 use crate::results::search_results::SearchResult;
@@ -51,6 +52,15 @@ impl SearchClient {
             SearchClientBackend::Couchbase2SearchClientBackend(backend) => {
                 backend.search(index_name, request, opts).await
             }
+        }
+    }
+
+    pub fn tracing_client(&self) -> TracingClient {
+        match &self.backend {
+            SearchClientBackend::CouchbaseSearchClientBackend(backend) => TracingClient::new(
+                TracingClientBackend::CouchbaseTracingClientBackend(backend.tracing_client()),
+            ),
+            SearchClientBackend::Couchbase2SearchClientBackend(_) => unimplemented!(),
         }
     }
 }
@@ -237,6 +247,10 @@ impl CouchbaseSearchClient {
                 .search(core_opts)
                 .await?,
         ))
+    }
+
+    pub fn tracing_client(&self) -> CouchbaseTracingClient {
+        CouchbaseTracingClient::new(self.agent_provider.clone())
     }
 }
 

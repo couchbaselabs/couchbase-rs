@@ -16,6 +16,7 @@
  *
  */
 use crate::clients::agent_provider::CouchbaseAgentProvider;
+use crate::clients::tracing_client::{CouchbaseTracingClient, TracingClient, TracingClientBackend};
 use crate::error;
 use crate::options::diagnostic_options::{DiagnosticsOptions, PingOptions, WaitUntilReadyOptions};
 use crate::results::diagnostics::{DiagnosticsResult, PingReport};
@@ -61,6 +62,19 @@ impl DiagnosticsClient {
             }
             DiagnosticsClientBackend::Couchbase2DiagnosticsClientBackend(backend) => {
                 backend.wait_until_ready(opts).await
+            }
+        }
+    }
+
+    pub fn tracing_client(&self) -> TracingClient {
+        match &self.backend {
+            DiagnosticsClientBackend::CouchbaseDiagnosticsClientBackend(backend) => {
+                TracingClient::new(TracingClientBackend::CouchbaseTracingClientBackend(
+                    backend.tracing_client(),
+                ))
+            }
+            DiagnosticsClientBackend::Couchbase2DiagnosticsClientBackend(backend) => {
+                unimplemented!()
             }
         }
     }
@@ -149,6 +163,10 @@ impl CouchbaseDiagnosticsClient {
         Ok(CouchbaseAgentProvider::upgrade_agent(agent)?
             .wait_until_ready(&core_opts)
             .await?)
+    }
+
+    pub fn tracing_client(&self) -> CouchbaseTracingClient {
+        CouchbaseTracingClient::new(self.agent_provider.clone())
     }
 }
 
