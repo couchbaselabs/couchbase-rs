@@ -16,6 +16,7 @@
  *
  */
 use crate::clients::agent_provider::CouchbaseAgentProvider;
+use crate::clients::tracing_client::{CouchbaseTracingClient, TracingClient, TracingClientBackend};
 use crate::error;
 use crate::options::query_options::{QueryOptions, ScanConsistency};
 use crate::results::query_results::QueryResult;
@@ -45,6 +46,17 @@ impl QueryClient {
             }
             QueryClientBackend::Couchbase2QueryClientBackend(backend) => {
                 backend.query(statement, opts).await
+            }
+        }
+    }
+
+    pub fn tracing_client(&self) -> TracingClient {
+        match &self.backend {
+            QueryClientBackend::CouchbaseQueryClientBackend(backend) => TracingClient::new(
+                TracingClientBackend::CouchbaseTracingClientBackend(backend.tracing_client()),
+            ),
+            QueryClientBackend::Couchbase2QueryClientBackend(backend) => {
+                unimplemented!()
             }
         }
     }
@@ -164,6 +176,10 @@ impl CouchbaseQueryClient {
                     .await?,
             ))
         }
+    }
+
+    pub fn tracing_client(&self) -> CouchbaseTracingClient {
+        CouchbaseTracingClient::new(self.agent_provider.clone())
     }
 }
 

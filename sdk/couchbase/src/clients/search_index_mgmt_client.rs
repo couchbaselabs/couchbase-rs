@@ -17,6 +17,7 @@
  */
 
 use crate::clients::agent_provider::CouchbaseAgentProvider;
+use crate::clients::tracing_client::{CouchbaseTracingClient, TracingClient, TracingClientBackend};
 use crate::error;
 use crate::management::search::index::SearchIndex;
 use crate::options::search_index_mgmt_options::{
@@ -218,6 +219,41 @@ impl SearchIndexMgmtClient {
             }
         }
     }
+
+    pub fn tracing_client(&self) -> TracingClient {
+        match &self.backend {
+            SearchIndexMgmtClientBackend::CouchbaseSearchIndexMgmtClientBackend(backend) => {
+                TracingClient::new(TracingClientBackend::CouchbaseTracingClientBackend(
+                    backend.tracing_client(),
+                ))
+            }
+            SearchIndexMgmtClientBackend::Couchbase2SearchIndexMgmtClientBackend(_) => {
+                unimplemented!()
+            }
+        }
+    }
+
+    pub fn bucket_name(&self) -> &str {
+        match &self.backend {
+            SearchIndexMgmtClientBackend::CouchbaseSearchIndexMgmtClientBackend(backend) => {
+                backend.bucket_name()
+            }
+            SearchIndexMgmtClientBackend::Couchbase2SearchIndexMgmtClientBackend(_) => {
+                unimplemented!()
+            }
+        }
+    }
+
+    pub fn scope_name(&self) -> &str {
+        match &self.backend {
+            SearchIndexMgmtClientBackend::CouchbaseSearchIndexMgmtClientBackend(backend) => {
+                backend.scope_name()
+            }
+            SearchIndexMgmtClientBackend::Couchbase2SearchIndexMgmtClientBackend(_) => {
+                unimplemented!()
+            }
+        }
+    }
 }
 
 pub(crate) enum SearchIndexMgmtClientBackend {
@@ -228,6 +264,16 @@ pub(crate) enum SearchIndexMgmtClientBackend {
 pub(crate) struct SearchIndexKeyspace {
     pub bucket_name: String,
     pub scope_name: String,
+}
+
+impl SearchIndexKeyspace {
+    pub(crate) fn bucket_name(&self) -> &str {
+        self.bucket_name.as_str()
+    }
+
+    pub(crate) fn scope_name(&self) -> &str {
+        self.scope_name.as_str()
+    }
 }
 
 pub(crate) struct CouchbaseSearchIndexMgmtClient {
@@ -520,6 +566,18 @@ impl CouchbaseSearchIndexMgmtClient {
             .unfreeze_search_index_plan(&unfreeze_opts)
             .await?;
         Ok(())
+    }
+
+    fn tracing_client(&self) -> CouchbaseTracingClient {
+        CouchbaseTracingClient::new(self.agent_provider.clone())
+    }
+
+    fn bucket_name(&self) -> &str {
+        self.keyspace.bucket_name()
+    }
+
+    fn scope_name(&self) -> &str {
+        self.keyspace.scope_name()
     }
 }
 

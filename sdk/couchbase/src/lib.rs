@@ -40,4 +40,6 @@ pub mod scope;
 pub mod search;
 pub mod service_type;
 pub mod subdoc;
+mod threshold_log_tracer;
+pub mod tracing;
 pub mod transcoding;

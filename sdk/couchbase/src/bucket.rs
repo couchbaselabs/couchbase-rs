@@ -15,7 +15,6 @@
  *  * limitations under the License.
  *
  */
-
 use crate::clients::bucket_client::BucketClient;
 use crate::clients::collections_mgmt_client::CollectionsMgmtClient;
 use crate::clients::diagnostics_client::DiagnosticsClient;
@@ -25,6 +24,8 @@ use crate::management::collections::collection_manager::CollectionManager;
 use crate::options::diagnostic_options::{PingOptions, WaitUntilReadyOptions};
 use crate::results::diagnostics::PingReport;
 use crate::scope::Scope;
+use crate::tracing::{SPAN_ATTRIB_DB_SYSTEM_VALUE, SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE};
+use tracing::{instrument, Level};
 
 #[derive(Clone)]
 pub struct Bucket {
@@ -68,11 +69,51 @@ impl Bucket {
     }
 
     pub async fn ping(&self, opts: impl Into<Option<PingOptions>>) -> error::Result<PingReport> {
+        self.ping_internal(opts).await
+    }
+
+    pub async fn wait_until_ready(
+        &self,
+        opts: impl Into<Option<WaitUntilReadyOptions>>,
+    ) -> error::Result<()> {
+        self.wait_until_ready_internal(opts).await
+    }
+
+    #[instrument(
+    skip_all,
+    level = Level::TRACE,
+    name = "ping",
+    fields(
+    otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
+    db.operation.name = "ping",
+    db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
+    db.namespace = self.name(),
+    couchbase.retries = 0,
+    couchbase.cluster.name,
+    couchbase.cluster.uuid,
+    ))]
+    async fn ping_internal(
+        &self,
+        opts: impl Into<Option<PingOptions>>,
+    ) -> error::Result<PingReport> {
         let opts = opts.into().unwrap_or_default();
         self.diagnostics_client.ping(opts).await
     }
 
-    pub async fn wait_until_ready(
+    #[instrument(
+    skip_all,
+    level = Level::TRACE,
+    name = "wait_until_ready",
+    fields(
+    otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
+    db.operation.name = "wait_until_ready",
+    db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
+    db.namespace = self.name(),
+    couchbase.retries = 0,
+    couchbase.cluster.name,
+    couchbase.cluster.uuid,
+    ))]
+    async fn wait_until_ready_internal(
         &self,
         opts: impl Into<Option<WaitUntilReadyOptions>>,
     ) -> error::Result<()> {
