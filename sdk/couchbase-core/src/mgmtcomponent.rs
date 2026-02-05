@@ -52,6 +52,7 @@ use crate::options::management::{
 use crate::retry::{orchestrate_retries, RetryManager, RetryRequest};
 use crate::retrybesteffort::ExponentialBackoffCalculator;
 use crate::service_type::ServiceType;
+use crate::tracingcomponent::TracingComponent;
 use crate::{error, mgmtx};
 use serde_json::value::RawValue;
 use std::collections::HashMap;
@@ -60,6 +61,7 @@ use std::time::Duration;
 
 pub(crate) struct MgmtComponent<C: Client> {
     http_component: HttpComponent<C>,
+    tracing: Arc<TracingComponent>,
 
     retry_manager: Arc<RetryManager>,
 }
@@ -77,6 +79,7 @@ impl<C: Client> MgmtComponent<C> {
     pub fn new(
         retry_manager: Arc<RetryManager>,
         http_client: Arc<C>,
+        tracing: Arc<TracingComponent>,
         config: MgmtComponentConfig,
         opts: MgmtComponentOptions,
     ) -> Self {
@@ -87,6 +90,7 @@ impl<C: Client> MgmtComponent<C> {
                 http_client,
                 HttpComponentState::new(config.endpoints, config.authenticator),
             ),
+            tracing,
             retry_manager,
         }
     }
@@ -123,6 +127,7 @@ impl<C: Client> MgmtComponent<C> {
                                 user_agent: self.http_component.user_agent().to_string(),
                                 endpoint: endpoint.clone(),
                                 auth,
+                                tracing: self.tracing.clone(),
                             }
                             .get_collection_manifest(&copts)
                             .await)
@@ -165,6 +170,7 @@ impl<C: Client> MgmtComponent<C> {
                                 user_agent: self.http_component.user_agent().to_string(),
                                 endpoint: endpoint.clone(),
                                 auth,
+                                tracing: self.tracing.clone(),
                             }
                             .create_scope(&copts)
                             .await)
@@ -207,6 +213,7 @@ impl<C: Client> MgmtComponent<C> {
                                 user_agent: self.http_component.user_agent().to_string(),
                                 endpoint: endpoint.clone(),
                                 auth,
+                                tracing: self.tracing.clone(),
                             }
                             .delete_scope(&copts)
                             .await)
@@ -249,6 +256,7 @@ impl<C: Client> MgmtComponent<C> {
                                 user_agent: self.http_component.user_agent().to_string(),
                                 endpoint: endpoint.clone(),
                                 auth,
+                                tracing: self.tracing.clone(),
                             }
                             .create_collection(&copts)
                             .await)
@@ -291,6 +299,7 @@ impl<C: Client> MgmtComponent<C> {
                                 user_agent: self.http_component.user_agent().to_string(),
                                 endpoint: endpoint.clone(),
                                 auth,
+                                tracing: self.tracing.clone(),
                             }
                             .delete_collection(&copts)
                             .await)
@@ -333,6 +342,7 @@ impl<C: Client> MgmtComponent<C> {
                                 user_agent: self.http_component.user_agent().to_string(),
                                 endpoint: endpoint.clone(),
                                 auth,
+                                tracing: self.tracing.clone(),
                             }
                             .update_collection(&copts)
                             .await)
@@ -375,6 +385,7 @@ impl<C: Client> MgmtComponent<C> {
                                 user_agent: self.http_component.user_agent().to_string(),
                                 endpoint: endpoint.clone(),
                                 auth,
+                                tracing: self.tracing.clone(),
                             }
                             .get_all_buckets(&copts)
                             .await
@@ -409,6 +420,7 @@ impl<C: Client> MgmtComponent<C> {
                                 user_agent: self.http_component.user_agent().to_string(),
                                 endpoint: endpoint.clone(),
                                 auth,
+                                tracing: self.tracing.clone(),
                             }
                             .get_bucket(&copts)
                             .await
@@ -443,6 +455,7 @@ impl<C: Client> MgmtComponent<C> {
                                 user_agent: self.http_component.user_agent().to_string(),
                                 endpoint: endpoint.clone(),
                                 auth,
+                                tracing: self.tracing.clone(),
                             }
                             .create_bucket(&copts)
                             .await
@@ -477,6 +490,7 @@ impl<C: Client> MgmtComponent<C> {
                                 user_agent: self.http_component.user_agent().to_string(),
                                 endpoint: endpoint.clone(),
                                 auth,
+                                tracing: self.tracing.clone(),
                             }
                             .update_bucket(&copts)
                             .await
@@ -511,6 +525,7 @@ impl<C: Client> MgmtComponent<C> {
                                 user_agent: self.http_component.user_agent().to_string(),
                                 endpoint: endpoint.clone(),
                                 auth,
+                                tracing: self.tracing.clone(),
                             }
                             .delete_bucket(&copts)
                             .await
@@ -545,6 +560,7 @@ impl<C: Client> MgmtComponent<C> {
                                 user_agent: self.http_component.user_agent().to_string(),
                                 endpoint: endpoint.clone(),
                                 auth,
+                                tracing: self.tracing.clone(),
                             }
                             .flush_bucket(&copts)
                             .await
@@ -629,6 +645,7 @@ impl<C: Client> MgmtComponent<C> {
                                 user_agent: self.http_component.user_agent().to_string(),
                                 endpoint: endpoint.clone(),
                                 auth,
+                                tracing: self.tracing.clone(),
                             }
                             .get_user(&copts)
                             .await
@@ -665,6 +682,7 @@ impl<C: Client> MgmtComponent<C> {
                                 user_agent: self.http_component.user_agent().to_string(),
                                 endpoint: endpoint.clone(),
                                 auth,
+                                tracing: self.tracing.clone(),
                             }
                             .get_all_users(&copts)
                             .await
@@ -698,6 +716,7 @@ impl<C: Client> MgmtComponent<C> {
                                 user_agent: self.http_component.user_agent().to_string(),
                                 endpoint: endpoint.clone(),
                                 auth,
+                                tracing: self.tracing.clone(),
                             }
                             .upsert_user(&copts)
                             .await
@@ -731,6 +750,7 @@ impl<C: Client> MgmtComponent<C> {
                                 user_agent: self.http_component.user_agent().to_string(),
                                 endpoint: endpoint.clone(),
                                 auth,
+                                tracing: self.tracing.clone(),
                             }
                             .delete_user(&copts)
                             .await
@@ -767,6 +787,7 @@ impl<C: Client> MgmtComponent<C> {
                                 user_agent: self.http_component.user_agent().to_string(),
                                 endpoint: endpoint.clone(),
                                 auth,
+                                tracing: self.tracing.clone(),
                             }
                             .get_roles(&copts)
                             .await
@@ -800,6 +821,7 @@ impl<C: Client> MgmtComponent<C> {
                                 user_agent: self.http_component.user_agent().to_string(),
                                 endpoint: endpoint.clone(),
                                 auth,
+                                tracing: self.tracing.clone(),
                             }
                             .get_group(&copts)
                             .await
@@ -836,6 +858,7 @@ impl<C: Client> MgmtComponent<C> {
                                 user_agent: self.http_component.user_agent().to_string(),
                                 endpoint: endpoint.clone(),
                                 auth,
+                                tracing: self.tracing.clone(),
                             }
                             .get_all_groups(&copts)
                             .await
@@ -869,6 +892,7 @@ impl<C: Client> MgmtComponent<C> {
                                 user_agent: self.http_component.user_agent().to_string(),
                                 endpoint: endpoint.clone(),
                                 auth,
+                                tracing: self.tracing.clone(),
                             }
                             .upsert_group(&copts)
                             .await
@@ -902,6 +926,7 @@ impl<C: Client> MgmtComponent<C> {
                                 user_agent: self.http_component.user_agent().to_string(),
                                 endpoint: endpoint.clone(),
                                 auth,
+                                tracing: self.tracing.clone(),
                             }
                             .delete_group(&copts)
                             .await
@@ -935,6 +960,7 @@ impl<C: Client> MgmtComponent<C> {
                                 user_agent: self.http_component.user_agent().to_string(),
                                 endpoint: endpoint.clone(),
                                 auth,
+                                tracing: self.tracing.clone(),
                             }
                             .change_password(&copts)
                             .await
@@ -1022,6 +1048,7 @@ impl<C: Client> MgmtComponent<C> {
                                 user_agent: self.http_component.user_agent().to_string(),
                                 endpoint: endpoint.clone(),
                                 auth,
+                                tracing: Default::default(),
                             }
                             .get_full_cluster_config(&copts)
                             .await
@@ -1058,6 +1085,7 @@ impl<C: Client> MgmtComponent<C> {
                                 user_agent: self.http_component.user_agent().to_string(),
                                 endpoint: endpoint.clone(),
                                 auth,
+                                tracing: Default::default(),
                             }
                             .get_full_bucket_config(&copts)
                             .await
@@ -1094,6 +1122,7 @@ impl<C: Client> MgmtComponent<C> {
                                 user_agent: self.http_component.user_agent().to_string(),
                                 endpoint: endpoint.clone(),
                                 auth,
+                                tracing: Default::default(),
                             }
                             .load_sample_bucket(&copts)
                             .await
@@ -1127,6 +1156,7 @@ impl<C: Client> MgmtComponent<C> {
                                 user_agent: self.http_component.user_agent().to_string(),
                                 endpoint: endpoint.clone(),
                                 auth,
+                                tracing: Default::default(),
                             }
                             .index_status(&copts)
                             .await
@@ -1163,6 +1193,7 @@ impl<C: Client> MgmtComponent<C> {
                                 user_agent: self.http_component.user_agent().to_string(),
                                 endpoint: endpoint.clone(),
                                 auth,
+                                tracing: Default::default(),
                             }
                             .get_auto_failover_settings(&copts)
                             .await
@@ -1193,6 +1224,7 @@ impl<C: Client> MgmtComponent<C> {
                             user_agent: self.http_component.user_agent().to_string(),
                             endpoint: endpoint.clone(),
                             auth,
+                            tracing: Default::default(),
                         }
                         .get_bucket_stats(&copts)
                         .await

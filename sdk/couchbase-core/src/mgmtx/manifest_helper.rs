@@ -61,6 +61,7 @@ impl<'a> EnsureManifestHelper<'a> {
             user_agent: self.user_agent.to_string(),
             endpoint: target.endpoint.to_string(),
             auth: target.auth.clone(),
+            tracing: Default::default(),
         }
         .get_collection_manifest(&GetCollectionManifestOptions {
             on_behalf_of_info: self.on_behalf_of_info,

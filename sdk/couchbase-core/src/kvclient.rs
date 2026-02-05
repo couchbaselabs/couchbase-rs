@@ -34,6 +34,7 @@ use crate::memdx::packet::ResponsePacket;
 use crate::memdx::request::{GetErrorMapRequest, HelloRequest, SelectBucketRequest};
 use crate::service_type::ServiceType;
 use crate::tls_config::TlsConfig;
+use crate::tracingcomponent::TracingComponent;
 use crate::util::hostname_from_addr_str;
 use crate::{error, memdx};
 use arc_swap::ArcSwap;
@@ -90,6 +91,7 @@ pub(crate) struct KvClientOptions {
     pub on_close_tx: Option<OnKvClientCloseHandler>,
     pub disable_decompression: bool,
     pub id: String,
+    pub tracing: Arc<TracingComponent>,
 }
 
 pub(crate) type OnKvClientCloseHandler = mpsc::Sender<()>;
@@ -135,6 +137,8 @@ pub(crate) struct StdKvClient<D: Dispatcher> {
     pub(crate) last_activity_timestamp_micros: AtomicI64,
 
     pub(crate) id: String,
+
+    pub(crate) tracing: Arc<TracingComponent>,
 }
 
 impl<D> StdKvClient<D>
@@ -370,6 +374,7 @@ where
             id: id.clone(),
             last_activity_timestamp_micros: AtomicI64::new(Utc::now().timestamp_micros()),
             client_close_handle: close_handle,
+            tracing: opts.tracing,
         };
 
         if should_bootstrap {

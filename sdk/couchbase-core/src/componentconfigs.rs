@@ -18,6 +18,7 @@
 use crate::address::Address;
 use crate::analyticscomponent::AnalyticsComponentConfig;
 use crate::authenticator::Authenticator;
+use crate::clusterlabels::ClusterLabels;
 use crate::configmanager::ConfigManagerMemdConfig;
 use crate::diagnosticscomponent::DiagnosticsComponentConfig;
 use crate::kvclient_babysitter::KvTarget;
@@ -27,6 +28,7 @@ use crate::querycomponent::QueryComponentConfig;
 use crate::searchcomponent::SearchComponentConfig;
 use crate::service_type::ServiceType;
 use crate::tls_config::TlsConfig;
+use crate::tracingcomponent::TracingComponentConfig;
 use crate::vbucketrouter::VbucketRoutingInfo;
 use std::collections::HashMap;
 use std::time::Duration;
@@ -43,6 +45,7 @@ pub(crate) struct AgentComponentConfigs {
     pub search_config: SearchComponentConfig,
     pub mgmt_config: MgmtComponentConfig,
     pub diagnostics_config: DiagnosticsComponentConfig,
+    pub tracing_config: TracingComponentConfig,
 }
 
 pub(crate) struct HttpClientConfig {
@@ -166,6 +169,14 @@ impl AgentComponentConfigs {
             available_services.push(ServiceType::SEARCH)
         }
 
+        let cluster_labels = config
+            .cluster_labels
+            .as_ref()
+            .map(|cluster_labels| ClusterLabels {
+                cluster_uuid: cluster_labels.cluster_uuid.clone(),
+                cluster_name: cluster_labels.cluster_name.clone(),
+            });
+
         AgentComponentConfigs {
             kv_targets,
             auth: authenticator.clone(),
@@ -199,6 +210,7 @@ impl AgentComponentConfigs {
                 services: available_services,
                 rev_id,
             },
+            tracing_config: TracingComponentConfig { cluster_labels },
         }
     }
 }
