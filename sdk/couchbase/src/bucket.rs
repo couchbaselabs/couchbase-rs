@@ -18,14 +18,16 @@
 use crate::clients::bucket_client::BucketClient;
 use crate::clients::collections_mgmt_client::CollectionsMgmtClient;
 use crate::clients::diagnostics_client::DiagnosticsClient;
-use crate::clients::tracing_client::{Keyspace, TracingClient};
+use crate::clients::tracing_client::TracingClient;
 use crate::collection::Collection;
 use crate::error;
 use crate::management::collections::collection_manager::CollectionManager;
 use crate::options::diagnostic_options::{PingOptions, WaitUntilReadyOptions};
 use crate::results::diagnostics::PingReport;
 use crate::scope::Scope;
-use crate::tracing::{SPAN_ATTRIB_DB_SYSTEM_VALUE, SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE};
+use crate::tracing::{
+    Keyspace, SpanBuilder, SPAN_ATTRIB_DB_SYSTEM_VALUE, SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
+};
 use tracing::{instrument, Level};
 
 #[derive(Clone)]
@@ -88,55 +90,33 @@ impl Bucket {
         self.wait_until_ready_internal(opts).await
     }
 
-    #[instrument(
-    skip_all,
-    level = Level::TRACE,
-    name = "ping",
-    fields(
-    otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-    db.operation.name = "ping",
-    db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-    db.namespace = self.name(),
-    couchbase.retries = 0,
-    couchbase.cluster.name,
-    couchbase.cluster.uuid,
-    ))]
     async fn ping_internal(
         &self,
         opts: impl Into<Option<PingOptions>>,
     ) -> error::Result<PingReport> {
         self.tracing_client
-            .execute_metered_operation("ping", None, &self.keyspace, async move {
-                self.tracing_client.record_generic_fields().await;
-                let opts = opts.into().unwrap_or_default();
-                self.diagnostics_client.ping(opts).await
-            })
+            .execute_observable_operation(
+                None,
+                &self.keyspace,
+                create_span!("ping"),
+                self.diagnostics_client
+                    .ping(opts.into().unwrap_or_default()),
+            )
             .await
     }
 
-    #[instrument(
-    skip_all,
-    level = Level::TRACE,
-    name = "wait_until_ready",
-    fields(
-    otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-    db.operation.name = "wait_until_ready",
-    db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-    db.namespace = self.name(),
-    couchbase.retries = 0,
-    couchbase.cluster.name,
-    couchbase.cluster.uuid,
-    ))]
     async fn wait_until_ready_internal(
         &self,
         opts: impl Into<Option<WaitUntilReadyOptions>>,
     ) -> error::Result<()> {
         self.tracing_client
-            .execute_metered_operation("wait_until_ready", None, &self.keyspace, async move {
-                self.tracing_client.record_generic_fields().await;
-                let opts = opts.into().unwrap_or_default();
-                self.diagnostics_client.wait_until_ready(opts).await
-            })
+            .execute_observable_operation(
+                None,
+                &self.keyspace,
+                create_span!("wait_until_ready"),
+                self.diagnostics_client
+                    .wait_until_ready(opts.into().unwrap_or_default()),
+            )
             .await
     }
 }

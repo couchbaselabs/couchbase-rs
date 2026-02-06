@@ -24,11 +24,11 @@ use crate::options::query_index_mgmt_options::{
     WatchQueryIndexOptions,
 };
 use crate::results::query_index_mgmt_results::QueryIndex;
+use crate::tracing::SpanBuilder;
 use crate::tracing::{
     SERVICE_VALUE_QUERY, SPAN_ATTRIB_DB_SYSTEM_VALUE, SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
 };
 use std::sync::Arc;
-use tracing::{instrument, Level};
 
 #[derive(Clone)]
 pub struct QueryIndexManager {
@@ -89,56 +89,21 @@ impl QueryIndexManager {
         self.build_deferred_indexes_internal(opts).await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "manager_query_get_all_indexes",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "manager_query_get_all_indexes",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.client.bucket_name(),
-        couchbase.scope.name = self.client.scope_name(),
-        couchbase.collection.name = self.client.collection_name(),
-        couchbase.service = SERVICE_VALUE_QUERY,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn get_all_indexes_internal(
         &self,
         opts: impl Into<Option<GetAllQueryIndexesOptions>>,
     ) -> error::Result<Vec<QueryIndex>> {
         self.client
             .tracing_client()
-            .execute_metered_operation(
-                "manager_query_get_all_indexes",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_QUERY),
                 &self.client.keyspace(),
-                async move {
-                    self.client.tracing_client().record_generic_fields().await;
-                    self.client.get_all_indexes(opts.into()).await
-                },
+                create_span!("manager_query_get_all_indexes"),
+                self.client.get_all_indexes(opts.into()),
             )
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "manager_query_create_index",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "manager_query_create_index",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.client.bucket_name(),
-        couchbase.scope.name = self.client.scope_name(),
-        couchbase.collection.name = self.client.collection_name(),
-        couchbase.service = SERVICE_VALUE_QUERY,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn create_index_internal(
         &self,
         index_name: impl Into<String>,
@@ -147,70 +112,31 @@ impl QueryIndexManager {
     ) -> error::Result<()> {
         self.client
             .tracing_client()
-            .execute_metered_operation(
-                "manager_query_create_index",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_QUERY),
                 &self.client.keyspace(),
-                async move {
-                    self.client.tracing_client().record_generic_fields().await;
-                    self.client
-                        .create_index(index_name.into(), fields.into(), opts.into())
-                        .await
-                },
+                create_span!("manager_query_create_index"),
+                self.client
+                    .create_index(index_name.into(), fields.into(), opts.into()),
             )
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "manager_query_create_primary_index",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "manager_query_create_primary_index",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.client.bucket_name(),
-        couchbase.scope.name = self.client.scope_name(),
-        couchbase.collection.name = self.client.collection_name(),
-        couchbase.service = SERVICE_VALUE_QUERY,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn create_primary_index_internal(
         &self,
         opts: impl Into<Option<CreatePrimaryQueryIndexOptions>>,
     ) -> error::Result<()> {
         self.client
             .tracing_client()
-            .execute_metered_operation(
-                "manager_query_create_primary_index",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_QUERY),
                 &self.client.keyspace(),
-                async move {
-                    self.client.tracing_client().record_generic_fields().await;
-                    self.client.create_primary_index(opts.into()).await
-                },
+                create_span!("manager_query_create_primary_index"),
+                self.client.create_primary_index(opts.into()),
             )
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "manager_query_drop_index",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "manager_query_drop_index",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.client.bucket_name(),
-        couchbase.scope.name = self.client.scope_name(),
-        couchbase.collection.name = self.client.collection_name(),
-        couchbase.service = SERVICE_VALUE_QUERY,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn drop_index_internal(
         &self,
         index_name: impl Into<String>,
@@ -218,68 +144,30 @@ impl QueryIndexManager {
     ) -> error::Result<()> {
         self.client
             .tracing_client()
-            .execute_metered_operation(
-                "manager_query_drop_index",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_QUERY),
                 &self.client.keyspace(),
-                async move {
-                    self.client.tracing_client().record_generic_fields().await;
-                    self.client.drop_index(index_name.into(), opts.into()).await
-                },
+                create_span!("manager_query_drop_index"),
+                self.client.drop_index(index_name.into(), opts.into()),
             )
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "manager_query_drop_primary_index",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "manager_query_drop_primary_index",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.client.bucket_name(),
-        couchbase.scope.name = self.client.scope_name(),
-        couchbase.collection.name = self.client.collection_name(),
-        couchbase.service = SERVICE_VALUE_QUERY,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn drop_primary_index_internal(
         &self,
         opts: impl Into<Option<DropPrimaryQueryIndexOptions>>,
     ) -> error::Result<()> {
         self.client
             .tracing_client()
-            .execute_metered_operation(
-                "manager_query_drop_primary_index",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_QUERY),
                 &self.client.keyspace(),
-                async move {
-                    self.client.tracing_client().record_generic_fields().await;
-                    self.client.drop_primary_index(opts.into()).await
-                },
+                create_span!("manager_query_drop_primary_index"),
+                self.client.drop_primary_index(opts.into()),
             )
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "manager_query_watch_indexes",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "manager_query_watch_indexes",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.client.bucket_name(),
-        couchbase.scope.name = self.client.scope_name(),
-        couchbase.collection.name = self.client.collection_name(),
-        couchbase.service = SERVICE_VALUE_QUERY,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn watch_indexes_internal(
         &self,
         index_names: impl Into<Vec<String>>,
@@ -287,50 +175,26 @@ impl QueryIndexManager {
     ) -> error::Result<()> {
         self.client
             .tracing_client()
-            .execute_metered_operation(
-                "manager_query_watch_indexes",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_QUERY),
                 &self.client.keyspace(),
-                async move {
-                    self.client.tracing_client().record_generic_fields().await;
-                    self.client
-                        .watch_indexes(index_names.into(), opts.into())
-                        .await
-                },
+                create_span!("manager_query_watch_indexes"),
+                self.client.watch_indexes(index_names.into(), opts.into()),
             )
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "manager_query_build_deferred_indexes",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "manager_query_build_deferred_indexes",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.client.bucket_name(),
-        couchbase.scope.name = self.client.scope_name(),
-        couchbase.collection.name = self.client.collection_name(),
-        couchbase.service = SERVICE_VALUE_QUERY,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn build_deferred_indexes_internal(
         &self,
         opts: impl Into<Option<BuildQueryIndexOptions>>,
     ) -> error::Result<()> {
         self.client
             .tracing_client()
-            .execute_metered_operation(
-                "manager_query_build_deferred_indexes",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_QUERY),
                 &self.client.keyspace(),
-                async move {
-                    self.client.tracing_client().record_generic_fields().await;
-                    self.client.build_deferred_indexes(opts.into()).await
-                },
+                create_span!("manager_query_build_deferred_indexes"),
+                self.client.build_deferred_indexes(opts.into()),
             )
             .await
     }

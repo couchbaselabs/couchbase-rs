@@ -17,9 +17,7 @@
  */
 
 use crate::clients::agent_provider::CouchbaseAgentProvider;
-use crate::clients::tracing_client::{
-    CouchbaseTracingClient, Keyspace, TracingClient, TracingClientBackend,
-};
+use crate::clients::tracing_client::{CouchbaseTracingClient, TracingClient, TracingClientBackend};
 use crate::error;
 use crate::management::search::index::SearchIndex;
 use crate::options::search_index_mgmt_options::{
@@ -29,6 +27,7 @@ use crate::options::search_index_mgmt_options::{
     ResumeIngestSearchIndexOptions, UnfreezePlanSearchIndexOptions, UpsertSearchIndexOptions,
 };
 use crate::retry::RetryStrategy;
+use crate::tracing::Keyspace;
 use couchbase_core::options::search_management;
 use serde_json::Value;
 use std::sync::Arc;

@@ -2,16 +2,16 @@ use crate::clients::agent_provider::CouchbaseAgentProvider;
 use crate::durability_level::DurabilityLevel;
 use crate::error;
 use crate::tracing::{
-    SPAN_ATTRIB_CLUSTER_NAME_KEY, SPAN_ATTRIB_CLUSTER_UUID_KEY, SPAN_ATTRIB_DB_DURABILITY,
-    SPAN_ATTRIB_DB_SYSTEM_VALUE, SPAN_ATTRIB_OPERATION_KEY, SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-    SPAN_NAME_REQUEST_ENCODING,
+    Keyspace, SpanBuilder, SPAN_ATTRIB_CLUSTER_NAME_KEY, SPAN_ATTRIB_CLUSTER_UUID_KEY,
+    SPAN_ATTRIB_DB_DURABILITY, SPAN_ATTRIB_DB_SYSTEM_VALUE, SPAN_ATTRIB_OPERATION_KEY,
+    SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE, SPAN_NAME_REQUEST_ENCODING,
 };
 use couchbase_core::clusterlabels::ClusterLabels;
 use couchbase_core::tracingcomponent::SERVICE_VALUE_KV;
 use std::future::Future;
 use std::sync::Arc;
 use std::time::Instant;
-use tracing::{trace_span, Level, Span};
+use tracing::{trace_span, Instrument, Level, Span};
 
 macro_rules! record_operation_metric_event {
     (
@@ -113,38 +113,11 @@ impl TracingClient {
         Self { backend }
     }
 
-    pub async fn create_request_encoding_span(&self) -> Span {
-        match &self.backend {
-            TracingClientBackend::CouchbaseTracingClientBackend(client) => {
-                client.create_request_encoding_span().await
-            }
-            TracingClientBackend::Couchbase2TracingClientBackend(_) => unimplemented!(),
-        }
-    }
-
-    pub async fn record_kv_fields(&self, durability: &Option<DurabilityLevel>) {
-        match &self.backend {
-            TracingClientBackend::CouchbaseTracingClientBackend(client) => {
-                client.record_kv_fields(durability).await
-            }
-            TracingClientBackend::Couchbase2TracingClientBackend(_) => unimplemented!(),
-        }
-    }
-
-    pub async fn record_generic_fields(&self) {
-        match &self.backend {
-            TracingClientBackend::CouchbaseTracingClientBackend(client) => {
-                client.record_generic_fields().await
-            }
-            TracingClientBackend::Couchbase2TracingClientBackend(_) => unimplemented!(),
-        }
-    }
-
-    pub async fn execute_metered_operation<Fut, T>(
+    pub async fn execute_observable_operation<Fut, T>(
         &self,
-        operation_name: &'static str,
         service: Option<&'static str>,
         keyspace: &Keyspace,
+        span: SpanBuilder,
         fut: Fut,
     ) -> crate::error::Result<T>
     where
@@ -153,8 +126,20 @@ impl TracingClient {
         match &self.backend {
             TracingClientBackend::CouchbaseTracingClientBackend(client) => {
                 client
-                    .execute_metered_operation(operation_name, service, keyspace, fut)
+                    .execute_observable_operation(service, keyspace, span, fut)
                     .await
+            }
+            TracingClientBackend::Couchbase2TracingClientBackend(_) => unimplemented!(),
+        }
+    }
+
+    pub async fn with_request_encoding_span<T>(
+        &self,
+        f: impl FnOnce() -> crate::error::Result<T>,
+    ) -> crate::error::Result<T> {
+        match &self.backend {
+            TracingClientBackend::CouchbaseTracingClientBackend(client) => {
+                client.with_request_encoding_span(f).await
             }
             TracingClientBackend::Couchbase2TracingClientBackend(_) => unimplemented!(),
         }
@@ -183,7 +168,10 @@ impl CouchbaseTracingClient {
         Ok(CouchbaseAgentProvider::upgrade_agent(agent)?.cluster_labels())
     }
 
-    async fn create_request_encoding_span(&self) -> Span {
+    async fn with_request_encoding_span<T>(
+        &self,
+        f: impl FnOnce() -> crate::error::Result<T>,
+    ) -> crate::error::Result<T> {
         let span = trace_span!(
             SPAN_NAME_REQUEST_ENCODING,
             otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
@@ -191,85 +179,55 @@ impl CouchbaseTracingClient {
             couchbase.cluster.uuid = tracing::field::Empty,
             couchbase.cluster.name = tracing::field::Empty,
         );
-
-        self.record_cluster_labels(&span).await;
-        span
-    }
-
-    async fn record_kv_fields(&self, durability: &Option<DurabilityLevel>) {
-        let span = Span::current();
-        self.record_cluster_labels(&span).await;
-        self.record_durability(&span, durability);
-    }
-
-    async fn record_generic_fields(&self) {
-        let span = Span::current();
-        self.record_cluster_labels(&span).await;
-    }
-
-    async fn record_cluster_labels(&self, span: &Span) {
         let cluster_labels = self.get_cluster_labels().await.unwrap_or_default();
+        let span = SpanBuilder::new(SPAN_NAME_REQUEST_ENCODING, span)
+            .with_cluster_labels(&cluster_labels)
+            .build();
 
-        if let Some(cluster_labels) = cluster_labels {
-            if let Some(cluster_uuid) = cluster_labels.cluster_uuid {
-                span.record(SPAN_ATTRIB_CLUSTER_UUID_KEY, cluster_uuid.as_str());
-            }
-            if let Some(cluster_name) = cluster_labels.cluster_name {
-                span.record(SPAN_ATTRIB_CLUSTER_NAME_KEY, cluster_name.as_str());
-            }
-        }
+        span.in_scope(f)
     }
 
-    fn record_durability(&self, span: &Span, durability_level: &Option<DurabilityLevel>) {
-        let durability = match durability_level {
-            Some(level) if *level == DurabilityLevel::MAJORITY => Some("majority"),
-            Some(level) if *level == DurabilityLevel::MAJORITY_AND_PERSIST_ACTIVE => {
-                Some("majority_and_persist_active")
-            }
-            Some(level) if *level == DurabilityLevel::PERSIST_TO_MAJORITY => {
-                Some("persist_majority")
-            }
-            _ => None,
-        };
-
-        if let Some(durability) = durability {
-            span.record(SPAN_ATTRIB_DB_DURABILITY, durability);
-        }
-    }
-
-    async fn execute_metered_operation<Fut, T>(
+    async fn execute_observable_operation<Fut, T>(
         &self,
-        operation_name: &'static str,
         service: Option<&'static str>,
         keyspace: &Keyspace,
+        mut span: SpanBuilder,
         fut: Fut,
     ) -> crate::error::Result<T>
     where
         Fut: Future<Output = crate::error::Result<T>>,
     {
-        let start = std::time::Instant::now();
-        let result = fut.await;
-        self.record_metrics(
+        let operation_name = span.name();
+        let cluster_labels = self.get_cluster_labels().await.unwrap_or_default();
+        let span = span
+            .with_cluster_labels(&cluster_labels)
+            .with_service(service)
+            .with_keyspace(keyspace)
+            .build();
+
+        let start = Instant::now();
+        let result = fut.instrument(span).await;
+        Self::record_metrics(
             operation_name,
             service,
             keyspace,
+            cluster_labels,
             start,
             result.as_ref().err(),
-        )
-        .await;
+        );
+
         result
     }
 
-    async fn record_metrics(
-        &self,
+    fn record_metrics(
         operation_name: &str,
         service: Option<&str>,
         keyspace: &Keyspace,
+        cluster_labels: Option<ClusterLabels>,
         start: Instant,
         error: Option<&error::Error>,
     ) {
         let duration = start.elapsed().as_secs_f64();
-        let cluster_labels = self.get_cluster_labels().await.unwrap_or_default();
 
         let cluster_name = cluster_labels
             .as_ref()
@@ -391,21 +349,4 @@ impl Couchbase2TracingClient {
     async fn get_cluster_labels(&self) -> Option<ClusterLabels> {
         unimplemented!()
     }
-}
-
-#[derive(Clone, Debug)]
-pub(crate) enum Keyspace {
-    Cluster,
-    Bucket {
-        bucket: String,
-    },
-    Scope {
-        bucket: String,
-        scope: String,
-    },
-    Collection {
-        bucket: String,
-        scope: String,
-        collection: String,
-    },
 }

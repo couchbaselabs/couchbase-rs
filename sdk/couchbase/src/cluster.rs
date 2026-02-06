@@ -22,7 +22,7 @@ use crate::clients::bucket_mgmt_client::BucketMgmtClient;
 use crate::clients::cluster_client::ClusterClient;
 use crate::clients::diagnostics_client::DiagnosticsClient;
 use crate::clients::query_client::QueryClient;
-use crate::clients::tracing_client::{Keyspace, TracingClient};
+use crate::clients::tracing_client::TracingClient;
 use crate::clients::user_mgmt_client::UserMgmtClient;
 use crate::error;
 use crate::management::buckets::bucket_manager::BucketManager;
@@ -33,7 +33,8 @@ use crate::options::query_options::QueryOptions;
 use crate::results::diagnostics::{DiagnosticsResult, PingReport};
 use crate::results::query_results::QueryResult;
 use crate::tracing::{
-    SERVICE_VALUE_QUERY, SPAN_ATTRIB_DB_SYSTEM_VALUE, SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
+    Keyspace, SpanBuilder, SERVICE_VALUE_QUERY, SPAN_ATTRIB_DB_SYSTEM_VALUE,
+    SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
 };
 use log::info;
 use std::sync::Arc;
@@ -125,110 +126,65 @@ impl Cluster {
         self.client.set_authenticator(authenticator).await
     }
 
-    #[instrument(
-    skip_all,
-    level = Level::TRACE,
-    name = "query",
-    fields(
-    otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-    db.operation.name = "query",
-    db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-    db.query.text = statement,
-    couchbase.service = SERVICE_VALUE_QUERY,
-    couchbase.retries = 0,
-    couchbase.cluster.name,
-    couchbase.cluster.uuid,
-    ))]
     async fn query_internal(
         &self,
         statement: String,
         opts: impl Into<Option<QueryOptions>>,
     ) -> error::Result<QueryResult> {
+        let span = create_span!("query").with_statement(&statement);
+
         self.tracing_client
-            .execute_metered_operation(
-                "query",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_QUERY),
                 &Keyspace::Cluster,
-                async move {
-                    self.tracing_client.record_generic_fields().await;
-                    self.query_client.query(statement, opts.into()).await
-                },
+                span,
+                self.query_client.query(statement, opts.into()),
             )
             .await
     }
 
-    #[instrument(
-    skip_all,
-    level = Level::TRACE,
-    name = "ping",
-    fields(
-    otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-    db.operation.name = "ping",
-    db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-    couchbase.retries = 0,
-    couchbase.cluster.name,
-    couchbase.cluster.uuid,
-    ))]
     async fn ping_internal(
         &self,
         opts: impl Into<Option<PingOptions>>,
     ) -> error::Result<PingReport> {
         self.tracing_client
-            .execute_metered_operation("ping", None, &Keyspace::Cluster, async move {
-                self.tracing_client.record_generic_fields().await;
-                let opts = opts.into().unwrap_or_default();
-                self.diagnostics_client.ping(opts).await
-            })
+            .execute_observable_operation(
+                None,
+                &Keyspace::Cluster,
+                create_span!("ping"),
+                self.diagnostics_client
+                    .ping(opts.into().unwrap_or_default()),
+            )
             .await
     }
 
-    #[instrument(
-    skip_all,
-    level = Level::TRACE,
-    name = "diagnostics",
-    fields(
-    otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-    db.operation.name = "diagnostics",
-    db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-    couchbase.retries = 0,
-    couchbase.cluster.name,
-    couchbase.cluster.uuid,
-    ))]
     async fn diagnostics_internal(
         &self,
         opts: impl Into<Option<DiagnosticsOptions>>,
     ) -> error::Result<DiagnosticsResult> {
         self.tracing_client
-            .execute_metered_operation("diagnostics", None, &Keyspace::Cluster, async move {
-                self.tracing_client.record_generic_fields().await;
-                let opts = opts.into().unwrap_or_default();
-                self.diagnostics_client.diagnostics(opts).await
-            })
+            .execute_observable_operation(
+                None,
+                &Keyspace::Cluster,
+                create_span!("diagnostics"),
+                self.diagnostics_client
+                    .diagnostics(opts.into().unwrap_or_default()),
+            )
             .await
     }
 
-    #[instrument(
-    skip_all,
-    level = Level::TRACE,
-    name = "wait_until_ready",
-    fields(
-    otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-    db.operation.name = "wait_until_ready",
-    db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-    couchbase.retries = 0,
-    couchbase.cluster.name,
-    couchbase.cluster.uuid,
-    ))]
     async fn wait_until_ready_internal(
         &self,
         opts: impl Into<Option<WaitUntilReadyOptions>>,
     ) -> error::Result<()> {
         self.tracing_client
-            .execute_metered_operation("wait_untiL_ready", None, &Keyspace::Cluster, async move {
-                self.tracing_client.record_generic_fields().await;
-                let opts = opts.into().unwrap_or_default();
-                self.diagnostics_client.wait_until_ready(opts).await
-            })
+            .execute_observable_operation(
+                None,
+                &Keyspace::Cluster,
+                create_span!("wait_until_ready"),
+                self.diagnostics_client
+                    .wait_until_ready(opts.into().unwrap_or_default()),
+            )
             .await
     }
 }

@@ -24,12 +24,11 @@ use crate::options::kv_options::{MutateInOptions, StoreSemantics};
 use crate::subdoc::lookup_in_specs::LookupInSpec;
 use crate::subdoc::mutate_in_specs::MutateInSpec;
 use crate::tracing::{
-    SERVICE_VALUE_KV, SPAN_ATTRIB_DB_SYSTEM_VALUE, SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
+    SpanBuilder, SERVICE_VALUE_KV, SPAN_ATTRIB_DB_SYSTEM_VALUE, SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
 };
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::collections::HashMap;
-use tracing::{instrument, Level};
 
 #[derive(Clone)]
 pub struct CouchbaseList<'a> {
@@ -124,33 +123,16 @@ impl CouchbaseList<'_> {
         self.clear_internal().await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "list_iter",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "list_iter",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.collection.bucket_name(),
-        couchbase.scope.name = self.collection.scope_name(),
-        couchbase.collection.name = self.collection.name(),
-        couchbase.service = SERVICE_VALUE_KV,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn iter_internal<T: DeserializeOwned>(
         &self,
     ) -> crate::error::Result<impl Iterator<Item = T>> {
         self.collection
             .tracing_client
-            .execute_metered_operation(
-                "list_iter",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
+                create_span!("list_iter"),
                 async move {
-                    self.collection.tracing_client.record_generic_fields().await;
                     let res = self.collection.get(&self.id, None).await?;
                     let list_contents: Vec<T> = res.content_as()?;
 
@@ -160,31 +142,14 @@ impl CouchbaseList<'_> {
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "list_get",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "list_get",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.collection.bucket_name(),
-        couchbase.scope.name = self.collection.scope_name(),
-        couchbase.collection.name = self.collection.name(),
-        couchbase.service = SERVICE_VALUE_KV,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn get_internal<V: DeserializeOwned>(&self, index: usize) -> crate::error::Result<V> {
         self.collection
             .tracing_client
-            .execute_metered_operation(
-                "list_get",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
+                create_span!("list_get"),
                 async move {
-                    self.collection.tracing_client.record_generic_fields().await;
                     let res = self
                         .collection
                         .lookup_in(
@@ -200,31 +165,14 @@ impl CouchbaseList<'_> {
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "list_remove",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "list_remove",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.collection.bucket_name(),
-        couchbase.scope.name = self.collection.scope_name(),
-        couchbase.collection.name = self.collection.name(),
-        couchbase.service = SERVICE_VALUE_KV,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn remove_internal(&self, index: usize) -> crate::error::Result<()> {
         self.collection
             .tracing_client
-            .execute_metered_operation(
-                "list_remove",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
+                create_span!("list_remove"),
                 async move {
-                    self.collection.tracing_client.record_generic_fields().await;
                     self.collection
                         .mutate_in(
                             &self.id,
@@ -239,31 +187,14 @@ impl CouchbaseList<'_> {
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "list_append",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "list_append",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.collection.bucket_name(),
-        couchbase.scope.name = self.collection.scope_name(),
-        couchbase.collection.name = self.collection.name(),
-        couchbase.service = SERVICE_VALUE_KV,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn append_internal<V: Serialize>(&self, value: V) -> crate::error::Result<()> {
         self.collection
             .tracing_client
-            .execute_metered_operation(
-                "list_append",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
+                create_span!("list_append"),
                 async move {
-                    self.collection.tracing_client.record_generic_fields().await;
                     self.collection
                         .mutate_in(
                             &self.id,
@@ -278,31 +209,14 @@ impl CouchbaseList<'_> {
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "list_prepend",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "list_prepend",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.collection.bucket_name(),
-        couchbase.scope.name = self.collection.scope_name(),
-        couchbase.collection.name = self.collection.name(),
-        couchbase.service = SERVICE_VALUE_KV,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn prepend_internal<V: Serialize>(&self, value: V) -> crate::error::Result<()> {
         self.collection
             .tracing_client
-            .execute_metered_operation(
-                "list_prepend",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
+                create_span!("list_prepend"),
                 async move {
-                    self.collection.tracing_client.record_generic_fields().await;
                     self.collection
                         .mutate_in(
                             &self.id,
@@ -317,34 +231,17 @@ impl CouchbaseList<'_> {
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "list_position",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "list_position",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.collection.bucket_name(),
-        couchbase.scope.name = self.collection.scope_name(),
-        couchbase.collection.name = self.collection.name(),
-        couchbase.service = SERVICE_VALUE_KV,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn position_internal<V: PartialEq + DeserializeOwned>(
         &self,
         value: V,
     ) -> crate::error::Result<isize> {
         self.collection
             .tracing_client
-            .execute_metered_operation(
-                "list_position",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
+                create_span!("list_position"),
                 async move {
-                    self.collection.tracing_client.record_generic_fields().await;
                     let get_res = self.collection.get(&self.id, None).await?;
 
                     let list_contents: Vec<V> = get_res.content_as()?;
@@ -360,31 +257,14 @@ impl CouchbaseList<'_> {
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "list_len",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "list_len",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.collection.bucket_name(),
-        couchbase.scope.name = self.collection.scope_name(),
-        couchbase.collection.name = self.collection.name(),
-        couchbase.service = SERVICE_VALUE_KV,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn len_internal(&self) -> crate::error::Result<usize> {
         self.collection
             .tracing_client
-            .execute_metered_operation(
-                "list_len",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
+                create_span!("list_len"),
                 async move {
-                    self.collection.tracing_client.record_generic_fields().await;
                     let res = self
                         .collection
                         .lookup_in(&self.id, &[LookupInSpec::count("", None)], None)
@@ -396,31 +276,14 @@ impl CouchbaseList<'_> {
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "list_clear",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "list_clear",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.collection.bucket_name(),
-        couchbase.scope.name = self.collection.scope_name(),
-        couchbase.collection.name = self.collection.name(),
-        couchbase.service = SERVICE_VALUE_KV,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn clear_internal(&self) -> crate::error::Result<()> {
         self.collection
             .tracing_client
-            .execute_metered_operation(
-                "list_clear",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
+                create_span!("list_clear"),
                 async move {
-                    self.collection.tracing_client.record_generic_fields().await;
                     self.collection.remove(&self.id, None).await?;
                     Ok(())
                 },
@@ -479,33 +342,16 @@ impl CouchbaseMap<'_> {
         self.clear_internal().await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "map_iter",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "map_iter",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.collection.bucket_name(),
-        couchbase.scope.name = self.collection.scope_name(),
-        couchbase.collection.name = self.collection.name(),
-        couchbase.service = SERVICE_VALUE_KV,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn iter_internal<T: DeserializeOwned>(
         &self,
     ) -> crate::error::Result<impl Iterator<Item = (String, T)>> {
         self.collection
             .tracing_client
-            .execute_metered_operation(
-                "map_iter",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
+                create_span!("map_iter"),
                 async move {
-                    self.collection.tracing_client.record_generic_fields().await;
                     let res = self.collection.get(&self.id, None).await?;
                     let list_contents: HashMap<String, T> = res.content_as()?;
 
@@ -515,34 +361,17 @@ impl CouchbaseMap<'_> {
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "map_get",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "map_get",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.collection.bucket_name(),
-        couchbase.scope.name = self.collection.scope_name(),
-        couchbase.collection.name = self.collection.name(),
-        couchbase.service = SERVICE_VALUE_KV,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn get_internal<V: DeserializeOwned>(
         &self,
         id: impl Into<String>,
     ) -> crate::error::Result<V> {
         self.collection
             .tracing_client
-            .execute_metered_operation(
-                "map_get",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
+                create_span!("map_get"),
                 async move {
-                    self.collection.tracing_client.record_generic_fields().await;
                     let res = self
                         .collection
                         .lookup_in(&self.id, &[LookupInSpec::get(id, None)], None)
@@ -554,22 +383,6 @@ impl CouchbaseMap<'_> {
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "map_insert",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "map_insert",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.collection.bucket_name(),
-        couchbase.scope.name = self.collection.scope_name(),
-        couchbase.collection.name = self.collection.name(),
-        couchbase.service = SERVICE_VALUE_KV,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn insert_internal<V: Serialize>(
         &self,
         id: impl Into<String>,
@@ -577,12 +390,11 @@ impl CouchbaseMap<'_> {
     ) -> crate::error::Result<()> {
         self.collection
             .tracing_client
-            .execute_metered_operation(
-                "map_insert",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
+                create_span!("map_insert"),
                 async move {
-                    self.collection.tracing_client.record_generic_fields().await;
                     self.collection
                         .mutate_in(
                             &self.id,
@@ -597,31 +409,14 @@ impl CouchbaseMap<'_> {
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "map_remove",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "map_remove",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.collection.bucket_name(),
-        couchbase.scope.name = self.collection.scope_name(),
-        couchbase.collection.name = self.collection.name(),
-        couchbase.service = SERVICE_VALUE_KV,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn remove_internal(&self, id: impl Into<String>) -> crate::error::Result<()> {
         self.collection
             .tracing_client
-            .execute_metered_operation(
-                "map_remove",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
+                create_span!("map_remove"),
                 async move {
-                    self.collection.tracing_client.record_generic_fields().await;
                     self.collection
                         .mutate_in(&self.id, &[MutateInSpec::remove(id, None)], None)
                         .await?;
@@ -632,31 +427,14 @@ impl CouchbaseMap<'_> {
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "map_contains_key",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "map_contains_key",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.collection.bucket_name(),
-        couchbase.scope.name = self.collection.scope_name(),
-        couchbase.collection.name = self.collection.name(),
-        couchbase.service = SERVICE_VALUE_KV,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn contains_key_internal(&self, id: impl Into<String>) -> crate::error::Result<bool> {
         self.collection
             .tracing_client
-            .execute_metered_operation(
-                "map_contains_key",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
+                create_span!("map_contains_key"),
                 async move {
-                    self.collection.tracing_client.record_generic_fields().await;
                     let res = self
                         .collection
                         .lookup_in(&self.id, &[LookupInSpec::exists(id, None)], None)
@@ -668,31 +446,14 @@ impl CouchbaseMap<'_> {
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "map_len",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "map_len",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.collection.bucket_name(),
-        couchbase.scope.name = self.collection.scope_name(),
-        couchbase.collection.name = self.collection.name(),
-        couchbase.service = SERVICE_VALUE_KV,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn len_internal(&self) -> crate::error::Result<usize> {
         self.collection
             .tracing_client
-            .execute_metered_operation(
-                "map_len",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
+                create_span!("map_len"),
                 async move {
-                    self.collection.tracing_client.record_generic_fields().await;
                     let res = self
                         .collection
                         .lookup_in(&self.id, &[LookupInSpec::count("", None)], None)
@@ -704,31 +465,14 @@ impl CouchbaseMap<'_> {
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "map_keys",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "map_keys",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.collection.bucket_name(),
-        couchbase.scope.name = self.collection.scope_name(),
-        couchbase.collection.name = self.collection.name(),
-        couchbase.service = SERVICE_VALUE_KV,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn keys_internal(&self) -> crate::error::Result<Vec<String>> {
         self.collection
             .tracing_client
-            .execute_metered_operation(
-                "map_keys",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
+                create_span!("map_keys"),
                 async move {
-                    self.collection.tracing_client.record_generic_fields().await;
                     let res = self.collection.get(&self.id, None).await?;
 
                     let map_contents: HashMap<String, serde_json::Value> = res.content_as()?;
@@ -738,31 +482,14 @@ impl CouchbaseMap<'_> {
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "map_values",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "map_values",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.collection.bucket_name(),
-        couchbase.scope.name = self.collection.scope_name(),
-        couchbase.collection.name = self.collection.name(),
-        couchbase.service = SERVICE_VALUE_KV,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn values_internal<T: DeserializeOwned>(&self) -> crate::error::Result<Vec<T>> {
         self.collection
             .tracing_client
-            .execute_metered_operation(
-                "map_values",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
+                create_span!("map_values"),
                 async move {
-                    self.collection.tracing_client.record_generic_fields().await;
                     let res = self.collection.get(&self.id, None).await?;
 
                     let map_contents: HashMap<String, T> = res.content_as()?;
@@ -772,31 +499,14 @@ impl CouchbaseMap<'_> {
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "map_clear",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "map_clear",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.collection.bucket_name(),
-        couchbase.scope.name = self.collection.scope_name(),
-        couchbase.collection.name = self.collection.name(),
-        couchbase.service = SERVICE_VALUE_KV,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn clear_internal(&self) -> crate::error::Result<()> {
         self.collection
             .tracing_client
-            .execute_metered_operation(
-                "map_clear",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
+                create_span!("map_clear"),
                 async move {
-                    self.collection.tracing_client.record_generic_fields().await;
                     self.collection.remove(&self.id, None).await?;
                     Ok(())
                 },
@@ -847,33 +557,16 @@ impl CouchbaseSet<'_> {
         self.clear_internal().await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "set_iter",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "set_iter",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.collection.bucket_name(),
-        couchbase.scope.name = self.collection.scope_name(),
-        couchbase.collection.name = self.collection.name(),
-        couchbase.service = SERVICE_VALUE_KV,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn iter_internal<T: DeserializeOwned>(
         &self,
     ) -> crate::error::Result<impl Iterator<Item = T>> {
         self.collection
             .tracing_client
-            .execute_metered_operation(
-                "set_iter",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
+                create_span!("set_iter"),
                 async move {
-                    self.collection.tracing_client.record_generic_fields().await;
                     let res = self.collection.get(&self.id, None).await?;
                     let list_contents: Vec<T> = res.content_as()?;
 
@@ -883,31 +576,14 @@ impl CouchbaseSet<'_> {
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "set_insert",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "set_insert",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.collection.bucket_name(),
-        couchbase.scope.name = self.collection.scope_name(),
-        couchbase.collection.name = self.collection.name(),
-        couchbase.service = SERVICE_VALUE_KV,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn insert_internal<V: Serialize>(&self, value: V) -> crate::error::Result<(bool)> {
         self.collection
             .tracing_client
-            .execute_metered_operation(
-                "set_insert",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
+                create_span!("set_insert"),
                 async move {
-                    self.collection.tracing_client.record_generic_fields().await;
                     let res = self
                         .collection
                         .mutate_in(
@@ -930,34 +606,17 @@ impl CouchbaseSet<'_> {
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "set_remove",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "set_remove",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.collection.bucket_name(),
-        couchbase.scope.name = self.collection.scope_name(),
-        couchbase.collection.name = self.collection.name(),
-        couchbase.service = SERVICE_VALUE_KV,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn remove_internal<T: DeserializeOwned + PartialEq>(
         &self,
         value: T,
     ) -> crate::error::Result<()> {
         self.collection
             .tracing_client
-            .execute_metered_operation(
-                "set_remove",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
+                create_span!("set_remove"),
                 async move {
-                    self.collection.tracing_client.record_generic_fields().await;
                     for _ in 0..16 {
                         let items = self.collection.get(&self.id, None).await?;
                         let cas = items.cas();
@@ -998,31 +657,14 @@ impl CouchbaseSet<'_> {
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "set_values",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "set_values",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.collection.bucket_name(),
-        couchbase.scope.name = self.collection.scope_name(),
-        couchbase.collection.name = self.collection.name(),
-        couchbase.service = SERVICE_VALUE_KV,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn values_internal<T: DeserializeOwned>(&self) -> crate::error::Result<Vec<T>> {
         self.collection
             .tracing_client
-            .execute_metered_operation(
-                "set_values",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
+                create_span!("set_values"),
                 async move {
-                    self.collection.tracing_client.record_generic_fields().await;
                     let res = self.collection.get(&self.id, None).await?;
 
                     let set_contents: Vec<T> = res.content_as()?;
@@ -1032,34 +674,17 @@ impl CouchbaseSet<'_> {
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "set_contains",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "set_contains",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.collection.bucket_name(),
-        couchbase.scope.name = self.collection.scope_name(),
-        couchbase.collection.name = self.collection.name(),
-        couchbase.service = SERVICE_VALUE_KV,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn contains_internal<T: PartialEq + DeserializeOwned>(
         &self,
         value: T,
     ) -> crate::error::Result<bool> {
         self.collection
             .tracing_client
-            .execute_metered_operation(
-                "set_contains",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
+                create_span!("set_contains"),
                 async move {
-                    self.collection.tracing_client.record_generic_fields().await;
                     let res = self.collection.get(&self.id, None).await?;
 
                     let set_contents: Vec<T> = res.content_as()?;
@@ -1075,31 +700,14 @@ impl CouchbaseSet<'_> {
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "set_len",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "set_len",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.collection.bucket_name(),
-        couchbase.scope.name = self.collection.scope_name(),
-        couchbase.collection.name = self.collection.name(),
-        couchbase.service = SERVICE_VALUE_KV,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn len_internal(&self) -> crate::error::Result<usize> {
         self.collection
             .tracing_client
-            .execute_metered_operation(
-                "set_len",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
+                create_span!("set_len"),
                 async move {
-                    self.collection.tracing_client.record_generic_fields().await;
                     let res = self
                         .collection
                         .lookup_in(&self.id, &[LookupInSpec::count("", None)], None)
@@ -1111,31 +719,14 @@ impl CouchbaseSet<'_> {
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "set_clear",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "set_clear",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.collection.bucket_name(),
-        couchbase.scope.name = self.collection.scope_name(),
-        couchbase.collection.name = self.collection.name(),
-        couchbase.service = SERVICE_VALUE_KV,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn clear_internal(&self) -> crate::error::Result<()> {
         self.collection
             .tracing_client
-            .execute_metered_operation(
-                "set_clear",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
+                create_span!("set_clear"),
                 async move {
-                    self.collection.tracing_client.record_generic_fields().await;
                     self.collection.remove(&self.id, None).await?;
                     Ok(())
                 },
@@ -1172,33 +763,16 @@ impl CouchbaseQueue<'_> {
         self.clear_internal().await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "queue_iter",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "queue_iter",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.collection.bucket_name(),
-        couchbase.scope.name = self.collection.scope_name(),
-        couchbase.collection.name = self.collection.name(),
-        couchbase.service = SERVICE_VALUE_KV,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn iter_internal<T: DeserializeOwned>(
         &self,
     ) -> crate::error::Result<impl Iterator<Item = T>> {
         self.collection
             .tracing_client
-            .execute_metered_operation(
-                "queue_iter",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
+                create_span!("queue_iter"),
                 async move {
-                    self.collection.tracing_client.record_generic_fields().await;
                     let res = self.collection.get(&self.id, None).await?;
 
                     let mut list_contents: Vec<T> = res.content_as()?;
@@ -1210,31 +784,14 @@ impl CouchbaseQueue<'_> {
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "queue_push",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "queue_push",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.collection.bucket_name(),
-        couchbase.scope.name = self.collection.scope_name(),
-        couchbase.collection.name = self.collection.name(),
-        couchbase.service = SERVICE_VALUE_KV,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn push_internal<V: Serialize>(&self, value: V) -> crate::error::Result<()> {
         self.collection
             .tracing_client
-            .execute_metered_operation(
-                "queue_push",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
+                create_span!("queue_push"),
                 async move {
-                    self.collection.tracing_client.record_generic_fields().await;
                     self.collection
                         .mutate_in(
                             &self.id,
@@ -1249,31 +806,14 @@ impl CouchbaseQueue<'_> {
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "queue_pop",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "queue_pop",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.collection.bucket_name(),
-        couchbase.scope.name = self.collection.scope_name(),
-        couchbase.collection.name = self.collection.name(),
-        couchbase.service = SERVICE_VALUE_KV,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn pop_internal<T: DeserializeOwned>(&self) -> crate::error::Result<T> {
         self.collection
             .tracing_client
-            .execute_metered_operation(
-                "queue_pop",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
+                create_span!("queue_pop"),
                 async move {
-                    self.collection.tracing_client.record_generic_fields().await;
                     for _ in 0..16 {
                         let res = self
                             .collection
@@ -1308,31 +848,14 @@ impl CouchbaseQueue<'_> {
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "queue_len",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "queue_len",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.collection.bucket_name(),
-        couchbase.scope.name = self.collection.scope_name(),
-        couchbase.collection.name = self.collection.name(),
-        couchbase.service = SERVICE_VALUE_KV,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn len_internal(&self) -> crate::error::Result<usize> {
         self.collection
             .tracing_client
-            .execute_metered_operation(
-                "queue_len",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
+                create_span!("queue_len"),
                 async move {
-                    self.collection.tracing_client.record_generic_fields().await;
                     let res = self
                         .collection
                         .lookup_in(&self.id, &[LookupInSpec::count("", None)], None)
@@ -1344,31 +867,14 @@ impl CouchbaseQueue<'_> {
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "queue_clear",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "queue_clear",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.collection.bucket_name(),
-        couchbase.scope.name = self.collection.scope_name(),
-        couchbase.collection.name = self.collection.name(),
-        couchbase.service = SERVICE_VALUE_KV,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn clear_internal(&self) -> crate::error::Result<()> {
         self.collection
             .tracing_client
-            .execute_metered_operation(
-                "queue_clear",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
+                create_span!("queue_clear"),
                 async move {
-                    self.collection.tracing_client.record_generic_fields().await;
                     self.collection.remove(&self.id, None).await?;
                     Ok(())
                 },

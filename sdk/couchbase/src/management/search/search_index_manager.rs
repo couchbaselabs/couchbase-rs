@@ -26,11 +26,11 @@ use crate::options::search_index_mgmt_options::{
     ResumeIngestSearchIndexOptions, UnfreezePlanSearchIndexOptions, UpsertSearchIndexOptions,
 };
 use crate::tracing::{
-    SERVICE_VALUE_SEARCH, SPAN_ATTRIB_DB_SYSTEM_VALUE, SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
+    SpanBuilder, SERVICE_VALUE_SEARCH, SPAN_ATTRIB_DB_SYSTEM_VALUE,
+    SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
 };
 use serde_json::Value;
 use std::sync::Arc;
-use tracing::{instrument, Level};
 
 #[derive(Clone)]
 pub struct SearchIndexManager {
@@ -136,21 +136,6 @@ impl SearchIndexManager {
         self.unfreeze_plan_internal(index_name, opts).await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "manager_search_get_index",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "manager_search_get_index",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.client.bucket_name(),
-        couchbase.scope.name = self.client.scope_name(),
-        couchbase.service = SERVICE_VALUE_SEARCH,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn get_index_internal(
         &self,
         index_name: impl Into<String>,
@@ -158,66 +143,30 @@ impl SearchIndexManager {
     ) -> error::Result<SearchIndex> {
         self.client
             .tracing_client()
-            .execute_metered_operation(
-                "manager_search_get_index",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_SEARCH),
                 &self.client.keyspace(),
-                async move {
-                    self.client.tracing_client().record_generic_fields().await;
-                    self.client.get_index(index_name.into(), opts.into()).await
-                },
+                create_span!("manager_search_get_index"),
+                self.client.get_index(index_name.into(), opts.into()),
             )
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "manager_search_get_all_indexes",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "manager_search_get_all_indexes",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.client.bucket_name(),
-        couchbase.scope.name = self.client.scope_name(),
-        couchbase.service = SERVICE_VALUE_SEARCH,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn get_all_indexes_internal(
         &self,
         opts: impl Into<Option<GetAllSearchIndexesOptions>>,
     ) -> error::Result<Vec<SearchIndex>> {
         self.client
             .tracing_client()
-            .execute_metered_operation(
-                "manager_search_get_all_indexes",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_SEARCH),
                 &self.client.keyspace(),
-                async move {
-                    self.client.tracing_client().record_generic_fields().await;
-                    self.client.get_all_indexes(opts.into()).await
-                },
+                create_span!("manager_search_get_all_indexes"),
+                self.client.get_all_indexes(opts.into()),
             )
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "manager_search_upsert_index",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "manager_search_upsert_index",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.client.bucket_name(),
-        couchbase.scope.name = self.client.scope_name(),
-        couchbase.service = SERVICE_VALUE_SEARCH,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn upsert_index_internal(
         &self,
         index: SearchIndex,
@@ -225,33 +174,15 @@ impl SearchIndexManager {
     ) -> error::Result<()> {
         self.client
             .tracing_client()
-            .execute_metered_operation(
-                "manager_search_upsert_index",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_SEARCH),
                 &self.client.keyspace(),
-                async move {
-                    self.client.tracing_client().record_generic_fields().await;
-                    self.client.upsert_index(index, opts.into()).await
-                },
+                create_span!("manager_search_upsert_index"),
+                self.client.upsert_index(index, opts.into()),
             )
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "manager_search_drop_index",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "manager_search_drop_index",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.client.bucket_name(),
-        couchbase.scope.name = self.client.scope_name(),
-        couchbase.service = SERVICE_VALUE_SEARCH,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn drop_index_internal(
         &self,
         index_name: impl Into<String>,
@@ -259,33 +190,15 @@ impl SearchIndexManager {
     ) -> error::Result<()> {
         self.client
             .tracing_client()
-            .execute_metered_operation(
-                "manager_search_drop_index",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_SEARCH),
                 &self.client.keyspace(),
-                async move {
-                    self.client.tracing_client().record_generic_fields().await;
-                    self.client.drop_index(index_name.into(), opts.into()).await
-                },
+                create_span!("manager_search_drop_index"),
+                self.client.drop_index(index_name.into(), opts.into()),
             )
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "manager_search_analyze_document",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "manager_search_analyze_document",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.client.bucket_name(),
-        couchbase.scope.name = self.client.scope_name(),
-        couchbase.service = SERVICE_VALUE_SEARCH,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn analyze_document_internal(
         &self,
         index_name: impl Into<String>,
@@ -294,35 +207,16 @@ impl SearchIndexManager {
     ) -> error::Result<Value> {
         self.client
             .tracing_client()
-            .execute_metered_operation(
-                "manager_search_analyze_document",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_SEARCH),
                 &self.client.keyspace(),
-                async move {
-                    self.client.tracing_client().record_generic_fields().await;
-                    self.client
-                        .analyze_document(index_name.into(), document, opts.into())
-                        .await
-                },
+                create_span!("manager_search_analyze_document"),
+                self.client
+                    .analyze_document(index_name.into(), document, opts.into()),
             )
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "manager_search_get_indexed_documents_count",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "manager_search_get_indexed_documents_count",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.client.bucket_name(),
-        couchbase.scope.name = self.client.scope_name(),
-        couchbase.service = SERVICE_VALUE_SEARCH,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn get_indexed_documents_count_internal(
         &self,
         index_name: impl Into<String>,
@@ -330,35 +224,16 @@ impl SearchIndexManager {
     ) -> error::Result<u64> {
         self.client
             .tracing_client()
-            .execute_metered_operation(
-                "manager_search_get_indexed_documents_count",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_SEARCH),
                 &self.client.keyspace(),
-                async move {
-                    self.client.tracing_client().record_generic_fields().await;
-                    self.client
-                        .get_indexed_documents_count(index_name.into(), opts.into())
-                        .await
-                },
+                create_span!("manager_search_get_indexed_documents_count"),
+                self.client
+                    .get_indexed_documents_count(index_name.into(), opts.into()),
             )
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "manager_search_pause_ingest",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "manager_search_pause_ingest",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.client.bucket_name(),
-        couchbase.scope.name = self.client.scope_name(),
-        couchbase.service = SERVICE_VALUE_SEARCH,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn pause_ingest_internal(
         &self,
         index_name: impl Into<String>,
@@ -366,35 +241,15 @@ impl SearchIndexManager {
     ) -> error::Result<()> {
         self.client
             .tracing_client()
-            .execute_metered_operation(
-                "manager_search_pause_ingest",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_SEARCH),
                 &self.client.keyspace(),
-                async move {
-                    self.client.tracing_client().record_generic_fields().await;
-                    self.client
-                        .pause_ingest(index_name.into(), opts.into())
-                        .await
-                },
+                create_span!("manager_search_pause_ingest"),
+                self.client.pause_ingest(index_name.into(), opts.into()),
             )
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "manager_search_resume_ingest",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "manager_search_resume_ingest",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.client.bucket_name(),
-        couchbase.scope.name = self.client.scope_name(),
-        couchbase.service = SERVICE_VALUE_SEARCH,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn resume_ingest_internal(
         &self,
         index_name: impl Into<String>,
@@ -402,35 +257,15 @@ impl SearchIndexManager {
     ) -> error::Result<()> {
         self.client
             .tracing_client()
-            .execute_metered_operation(
-                "manager_search_resume_ingest",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_SEARCH),
                 &self.client.keyspace(),
-                async move {
-                    self.client.tracing_client().record_generic_fields().await;
-                    self.client
-                        .resume_ingest(index_name.into(), opts.into())
-                        .await
-                },
+                create_span!("manager_search_resume_ingest"),
+                self.client.resume_ingest(index_name.into(), opts.into()),
             )
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "manager_search_allow_querying",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "manager_search_allow_querying",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.client.bucket_name(),
-        couchbase.scope.name = self.client.scope_name(),
-        couchbase.service = SERVICE_VALUE_SEARCH,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn allow_querying_internal(
         &self,
         index_name: impl Into<String>,
@@ -438,35 +273,15 @@ impl SearchIndexManager {
     ) -> error::Result<()> {
         self.client
             .tracing_client()
-            .execute_metered_operation(
-                "manager_search_allow_querying",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_SEARCH),
                 &self.client.keyspace(),
-                async move {
-                    self.client.tracing_client().record_generic_fields().await;
-                    self.client
-                        .allow_querying(index_name.into(), opts.into())
-                        .await
-                },
+                create_span!("manager_search_allow_querying"),
+                self.client.allow_querying(index_name.into(), opts.into()),
             )
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "manager_search_disallow_querying",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "manager_search_disallow_querying",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.client.bucket_name(),
-        couchbase.scope.name = self.client.scope_name(),
-        couchbase.service = SERVICE_VALUE_SEARCH,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn disallow_querying_internal(
         &self,
         index_name: impl Into<String>,
@@ -474,35 +289,16 @@ impl SearchIndexManager {
     ) -> error::Result<()> {
         self.client
             .tracing_client()
-            .execute_metered_operation(
-                "manager_search_disallow_querying",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_SEARCH),
                 &self.client.keyspace(),
-                async move {
-                    self.client.tracing_client().record_generic_fields().await;
-                    self.client
-                        .disallow_querying(index_name.into(), opts.into())
-                        .await
-                },
+                create_span!("manager_search_disallow_querying"),
+                self.client
+                    .disallow_querying(index_name.into(), opts.into()),
             )
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "manager_search_freeze_plan",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "manager_search_freeze_plan",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.client.bucket_name(),
-        couchbase.scope.name = self.client.scope_name(),
-        couchbase.service = SERVICE_VALUE_SEARCH,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn freeze_plan_internal(
         &self,
         index_name: impl Into<String>,
@@ -510,35 +306,15 @@ impl SearchIndexManager {
     ) -> error::Result<()> {
         self.client
             .tracing_client()
-            .execute_metered_operation(
-                "manager_search_freeze_plan",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_SEARCH),
                 &self.client.keyspace(),
-                async move {
-                    self.client.tracing_client().record_generic_fields().await;
-                    self.client
-                        .freeze_plan(index_name.into(), opts.into())
-                        .await
-                },
+                create_span!("manager_search_freeze_plan"),
+                self.client.freeze_plan(index_name.into(), opts.into()),
             )
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "manager_search_unfreeze_plan",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "manager_search_unfreeze_plan",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.client.bucket_name(),
-        couchbase.scope.name = self.client.scope_name(),
-        couchbase.service = SERVICE_VALUE_SEARCH,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn unfreeze_plan_internal(
         &self,
         index_name: impl Into<String>,
@@ -546,16 +322,11 @@ impl SearchIndexManager {
     ) -> error::Result<()> {
         self.client
             .tracing_client()
-            .execute_metered_operation(
-                "manager_search_unfreeze_plan",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_SEARCH),
                 &self.client.keyspace(),
-                async move {
-                    self.client.tracing_client().record_generic_fields().await;
-                    self.client
-                        .unfreeze_plan(index_name.into(), opts.into())
-                        .await
-                },
+                create_span!("manager_search_unfreeze_plan"),
+                self.client.unfreeze_plan(index_name.into(), opts.into()),
             )
             .await
     }

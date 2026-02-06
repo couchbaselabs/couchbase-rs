@@ -18,8 +18,9 @@
 use crate::clients::collection_client::CollectionClient;
 use crate::clients::core_kv_client::CoreKvClient;
 use crate::clients::query_index_mgmt_client::QueryIndexMgmtClient;
-use crate::clients::tracing_client::{Keyspace, TracingClient};
+use crate::clients::tracing_client::TracingClient;
 use crate::management::query::query_index_manager::QueryIndexManager;
+use crate::tracing::Keyspace;
 use std::sync::Arc;
 
 #[derive(Clone)]

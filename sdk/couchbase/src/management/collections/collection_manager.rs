@@ -17,7 +17,6 @@
  */
 
 use crate::clients::collections_mgmt_client::CollectionsMgmtClient;
-use crate::clients::tracing_client::Keyspace;
 use crate::error;
 pub use crate::management::collections::collection_settings::{
     CreateCollectionSettings, UpdateCollectionSettings,
@@ -25,9 +24,9 @@ pub use crate::management::collections::collection_settings::{
 use crate::options::collection_mgmt_options::*;
 use crate::results::collections_mgmt_results::ScopeSpec;
 use crate::tracing::{
-    SERVICE_VALUE_MANAGEMENT, SPAN_ATTRIB_DB_SYSTEM_VALUE, SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
+    Keyspace, SpanBuilder, SERVICE_VALUE_MANAGEMENT, SPAN_ATTRIB_DB_SYSTEM_VALUE,
+    SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
 };
-use tracing::{instrument, Level};
 
 #[derive(Clone)]
 pub struct CollectionManager {
@@ -90,21 +89,6 @@ impl CollectionManager {
         self.get_all_scopes_internal(opts).await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "manager_collections_create_scope",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "manager_collections_create_scope",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.client.bucket_name(),
-        couchbase.service = SERVICE_VALUE_MANAGEMENT,
-        couchbase.scope.name = scope_name,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn create_scope_internal(
         &self,
         scope_name: String,
@@ -114,37 +98,19 @@ impl CollectionManager {
             bucket: self.client.bucket_name().to_string(),
             scope: scope_name.clone(),
         };
+
         self.client
             .tracing_client()
-            .execute_metered_operation(
-                "manager_collections_create_scope",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &keyspace,
-                async move {
-                    self.client.tracing_client().record_generic_fields().await;
-                    self.client
-                        .create_scope(scope_name, opts.into().unwrap_or_default())
-                        .await
-                },
+                create_span!("manager_collections_create_scope"),
+                self.client
+                    .create_scope(scope_name, opts.into().unwrap_or_default()),
             )
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "manager_collections_drop_scope",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "manager_collections_drop_scope",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.client.bucket_name(),
-        couchbase.scope.name = scope_name,
-        couchbase.service = SERVICE_VALUE_MANAGEMENT,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn drop_scope_internal(
         &self,
         scope_name: String,
@@ -154,38 +120,19 @@ impl CollectionManager {
             bucket: self.client.bucket_name().to_string(),
             scope: scope_name.clone(),
         };
+
         self.client
             .tracing_client()
-            .execute_metered_operation(
-                "manager_collections_drop_scope",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &keyspace,
-                async move {
-                    self.client.tracing_client().record_generic_fields().await;
-                    self.client
-                        .drop_scope(scope_name, opts.into().unwrap_or_default())
-                        .await
-                },
+                create_span!("manager_collections_drop_scope"),
+                self.client
+                    .drop_scope(scope_name, opts.into().unwrap_or_default()),
             )
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "manager_collections_create_collection",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "manager_collections_create_collection",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.client.bucket_name(),
-        couchbase.scope.name = scope_name,
-        couchbase.collection.name = collection_name,
-        couchbase.service = SERVICE_VALUE_MANAGEMENT,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn create_collection_internal(
         &self,
         scope_name: String,
@@ -198,43 +145,23 @@ impl CollectionManager {
             scope: scope_name.clone(),
             collection: collection_name.clone(),
         };
+
         self.client
             .tracing_client()
-            .execute_metered_operation(
-                "manager_collections_create_collection",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &keyspace,
-                async move {
-                    self.client.tracing_client().record_generic_fields().await;
-                    self.client
-                        .create_collection(
-                            scope_name,
-                            collection_name,
-                            settings.into().unwrap_or_default(),
-                            opts.into().unwrap_or_default(),
-                        )
-                        .await
-                },
+                create_span!("manager_collections_create_collection"),
+                self.client.create_collection(
+                    scope_name,
+                    collection_name,
+                    settings.into().unwrap_or_default(),
+                    opts.into().unwrap_or_default(),
+                ),
             )
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "manager_collections_update_collection",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "manager_collections_update_collection",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        couchbase.service = SERVICE_VALUE_MANAGEMENT,
-        db.namespace = self.client.bucket_name(),
-        couchbase.scope.name = scope_name,
-        couchbase.collection.name = collection_name,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn update_collection_internal(
         &self,
         scope_name: String,
@@ -247,43 +174,23 @@ impl CollectionManager {
             scope: scope_name.clone(),
             collection: collection_name.clone(),
         };
+
         self.client
             .tracing_client()
-            .execute_metered_operation(
-                "manager_collections_update_collection",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &keyspace,
-                async move {
-                    self.client.tracing_client().record_generic_fields().await;
-                    self.client
-                        .update_collection(
-                            scope_name,
-                            collection_name,
-                            settings.into(),
-                            opts.into().unwrap_or_default(),
-                        )
-                        .await
-                },
+                create_span!("manager_collections_update_collection"),
+                self.client.update_collection(
+                    scope_name,
+                    collection_name,
+                    settings.into(),
+                    opts.into().unwrap_or_default(),
+                ),
             )
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "manager_collections_drop_collection",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "manager_collections_drop_collection",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.client.bucket_name(),
-        couchbase.scope.name = scope_name,
-        couchbase.collection.name = collection_name,
-        couchbase.service = SERVICE_VALUE_MANAGEMENT,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn drop_collection_internal(
         &self,
         scope_name: String,
@@ -298,56 +205,34 @@ impl CollectionManager {
 
         self.client
             .tracing_client()
-            .execute_metered_operation(
-                "manager_collections_drop_collection",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &keyspace,
-                async move {
-                    self.client.tracing_client().record_generic_fields().await;
-                    self.client
-                        .drop_collection(
-                            scope_name,
-                            collection_name,
-                            opts.into().unwrap_or_default(),
-                        )
-                        .await
-                },
+                create_span!("manager_collections_drop_collection"),
+                self.client.drop_collection(
+                    scope_name,
+                    collection_name,
+                    opts.into().unwrap_or_default(),
+                ),
             )
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "manager_collections_get_all_scopes",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "manager_collections_get_all_scopes",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.client.bucket_name(),
-        couchbase.service = SERVICE_VALUE_MANAGEMENT,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn get_all_scopes_internal(
         &self,
         opts: impl Into<Option<GetAllScopesOptions>>,
     ) -> error::Result<Vec<ScopeSpec>> {
+        let keyspace = Keyspace::Bucket {
+            bucket: self.client.bucket_name().to_string(),
+        };
+
         self.client
             .tracing_client()
-            .execute_metered_operation(
-                "manager_collections_get_all_scopes",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_MANAGEMENT),
-                &Keyspace::Bucket {
-                    bucket: self.client.bucket_name().to_string(),
-                },
-                async move {
-                    self.client.tracing_client().record_generic_fields().await;
-                    self.client
-                        .get_all_scopes(opts.into().unwrap_or_default())
-                        .await
-                },
+                &keyspace,
+                create_span!("manager_collections_get_all_scopes"),
+                self.client.get_all_scopes(opts.into().unwrap_or_default()),
             )
             .await
     }

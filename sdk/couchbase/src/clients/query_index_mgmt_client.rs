@@ -17,9 +17,7 @@
  */
 
 use crate::clients::agent_provider::CouchbaseAgentProvider;
-use crate::clients::tracing_client::{
-    CouchbaseTracingClient, Keyspace, TracingClient, TracingClientBackend,
-};
+use crate::clients::tracing_client::{CouchbaseTracingClient, TracingClient, TracingClientBackend};
 use crate::error;
 use crate::options::query_index_mgmt_options::{
     BuildQueryIndexOptions, CreatePrimaryQueryIndexOptions, CreateQueryIndexOptions,
@@ -28,6 +26,7 @@ use crate::options::query_index_mgmt_options::{
 };
 use crate::results::query_index_mgmt_results::QueryIndex;
 use crate::retry::RetryStrategy;
+use crate::tracing::Keyspace;
 use std::sync::Arc;
 
 pub(crate) struct QueryIndexMgmtClient {
