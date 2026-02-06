@@ -109,8 +109,18 @@ impl QueryIndexManager {
         &self,
         opts: impl Into<Option<GetAllQueryIndexesOptions>>,
     ) -> error::Result<Vec<QueryIndex>> {
-        self.client.tracing_client().record_generic_fields().await;
-        self.client.get_all_indexes(opts.into()).await
+        self.client
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_query_get_all_indexes",
+                Some(SERVICE_VALUE_QUERY),
+                &self.client.keyspace(),
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client.get_all_indexes(opts.into()).await
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -135,9 +145,19 @@ impl QueryIndexManager {
         fields: impl Into<Vec<String>>,
         opts: impl Into<Option<CreateQueryIndexOptions>>,
     ) -> error::Result<()> {
-        self.client.tracing_client().record_generic_fields().await;
         self.client
-            .create_index(index_name.into(), fields.into(), opts.into())
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_query_create_index",
+                Some(SERVICE_VALUE_QUERY),
+                &self.client.keyspace(),
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client
+                        .create_index(index_name.into(), fields.into(), opts.into())
+                        .await
+                },
+            )
             .await
     }
 
@@ -161,8 +181,18 @@ impl QueryIndexManager {
         &self,
         opts: impl Into<Option<CreatePrimaryQueryIndexOptions>>,
     ) -> error::Result<()> {
-        self.client.tracing_client().record_generic_fields().await;
-        self.client.create_primary_index(opts.into()).await
+        self.client
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_query_create_primary_index",
+                Some(SERVICE_VALUE_QUERY),
+                &self.client.keyspace(),
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client.create_primary_index(opts.into()).await
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -186,8 +216,18 @@ impl QueryIndexManager {
         index_name: impl Into<String>,
         opts: impl Into<Option<DropQueryIndexOptions>>,
     ) -> error::Result<()> {
-        self.client.tracing_client().record_generic_fields().await;
-        self.client.drop_index(index_name.into(), opts.into()).await
+        self.client
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_query_drop_index",
+                Some(SERVICE_VALUE_QUERY),
+                &self.client.keyspace(),
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client.drop_index(index_name.into(), opts.into()).await
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -210,8 +250,18 @@ impl QueryIndexManager {
         &self,
         opts: impl Into<Option<DropPrimaryQueryIndexOptions>>,
     ) -> error::Result<()> {
-        self.client.tracing_client().record_generic_fields().await;
-        self.client.drop_primary_index(opts.into()).await
+        self.client
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_query_drop_primary_index",
+                Some(SERVICE_VALUE_QUERY),
+                &self.client.keyspace(),
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client.drop_primary_index(opts.into()).await
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -235,9 +285,19 @@ impl QueryIndexManager {
         index_names: impl Into<Vec<String>>,
         opts: impl Into<Option<WatchQueryIndexOptions>>,
     ) -> error::Result<()> {
-        self.client.tracing_client().record_generic_fields().await;
         self.client
-            .watch_indexes(index_names.into(), opts.into())
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_query_watch_indexes",
+                Some(SERVICE_VALUE_QUERY),
+                &self.client.keyspace(),
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client
+                        .watch_indexes(index_names.into(), opts.into())
+                        .await
+                },
+            )
             .await
     }
 
@@ -261,7 +321,17 @@ impl QueryIndexManager {
         &self,
         opts: impl Into<Option<BuildQueryIndexOptions>>,
     ) -> error::Result<()> {
-        self.client.tracing_client().record_generic_fields().await;
-        self.client.build_deferred_indexes(opts.into()).await
+        self.client
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_query_build_deferred_indexes",
+                Some(SERVICE_VALUE_QUERY),
+                &self.client.keyspace(),
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client.build_deferred_indexes(opts.into()).await
+                },
+            )
+            .await
     }
 }

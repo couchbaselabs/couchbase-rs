@@ -15,11 +15,10 @@
  *  * limitations under the License.
  *
  */
-
 use crate::clients::collection_client::CollectionClient;
 use crate::clients::core_kv_client::CoreKvClient;
 use crate::clients::query_index_mgmt_client::QueryIndexMgmtClient;
-use crate::clients::tracing_client::TracingClient;
+use crate::clients::tracing_client::{Keyspace, TracingClient};
 use crate::management::query::query_index_manager::QueryIndexManager;
 use std::sync::Arc;
 
@@ -29,6 +28,7 @@ pub struct Collection {
     pub(crate) core_kv_client: CoreKvClient,
     pub(crate) query_index_management_client: Arc<QueryIndexMgmtClient>,
     pub(crate) tracing_client: Arc<TracingClient>,
+    pub(crate) keyspace: Keyspace,
 }
 
 impl Collection {
@@ -36,11 +36,17 @@ impl Collection {
         let core_kv_client = client.core_kv_client();
         let query_index_management_client = Arc::new(client.query_index_management_client());
         let tracing_client = Arc::new(client.tracing_client());
+        let keyspace = Keyspace::Collection {
+            bucket: client.bucket_name().to_string(),
+            scope: client.scope_name().to_string(),
+            collection: client.name().to_string(),
+        };
         Self {
             client,
             core_kv_client,
             query_index_management_client,
             tracing_client,
+            keyspace,
         }
     }
 
@@ -57,7 +63,11 @@ impl Collection {
     }
 
     pub fn binary(&self) -> BinaryCollection {
-        BinaryCollection::new(self.core_kv_client.clone(), self.tracing_client.clone())
+        BinaryCollection::new(
+            self.core_kv_client.clone(),
+            self.tracing_client.clone(),
+            self.keyspace.clone(),
+        )
     }
 
     pub fn query_indexes(&self) -> QueryIndexManager {
@@ -71,13 +81,19 @@ impl Collection {
 pub struct BinaryCollection {
     pub(crate) core_kv_client: CoreKvClient,
     pub(crate) tracing_client: Arc<TracingClient>,
+    pub(crate) keyspace: Keyspace,
 }
 
 impl BinaryCollection {
-    pub(crate) fn new(core_kv_client: CoreKvClient, tracing_client: Arc<TracingClient>) -> Self {
+    pub(crate) fn new(
+        core_kv_client: CoreKvClient,
+        tracing_client: Arc<TracingClient>,
+        keyspace: Keyspace,
+    ) -> Self {
         Self {
             core_kv_client,
             tracing_client,
+            keyspace,
         }
     }
 }

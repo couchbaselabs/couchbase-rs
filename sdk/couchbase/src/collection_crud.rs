@@ -188,17 +188,27 @@ impl Collection {
         value: V,
         options: impl Into<Option<UpsertOptions>>,
     ) -> crate::error::Result<MutationResult> {
-        let options = options.into().unwrap_or_default();
         self.tracing_client
-            .record_kv_fields(&options.durability_level)
-            .await;
+            .execute_metered_operation(
+                "upsert",
+                Some(SERVICE_VALUE_KV),
+                &self.keyspace,
+                async move {
+                    let options = options.into().unwrap_or_default();
+                    self.tracing_client
+                        .record_kv_fields(&options.durability_level)
+                        .await;
 
-        let encoding_span = self.tracing_client.create_request_encoding_span().await;
-        let (value, flags) = encoding_span.in_scope(|| transcoding::json::encode(value))?;
-        drop(encoding_span);
+                    let encoding_span = self.tracing_client.create_request_encoding_span().await;
+                    let (value, flags) =
+                        encoding_span.in_scope(|| transcoding::json::encode(value))?;
+                    drop(encoding_span);
 
-        self.core_kv_client
-            .upsert(id.as_ref(), &value, flags, options)
+                    self.core_kv_client
+                        .upsert(id.as_ref(), &value, flags, options)
+                        .await
+                },
+            )
             .await
     }
 
@@ -226,13 +236,22 @@ impl Collection {
         flags: u32,
         options: impl Into<Option<UpsertOptions>>,
     ) -> crate::error::Result<MutationResult> {
-        let options = options.into().unwrap_or_default();
         self.tracing_client
-            .record_kv_fields(&options.durability_level)
-            .await;
+            .execute_metered_operation(
+                "upsert",
+                Some(SERVICE_VALUE_KV),
+                &self.keyspace,
+                async move {
+                    let options = options.into().unwrap_or_default();
+                    self.tracing_client
+                        .record_kv_fields(&options.durability_level)
+                        .await;
 
-        self.core_kv_client
-            .upsert(id.as_ref(), value, flags, options)
+                    self.core_kv_client
+                        .upsert(id.as_ref(), value, flags, options)
+                        .await
+                },
+            )
             .await
     }
 
@@ -259,17 +278,27 @@ impl Collection {
         value: V,
         options: impl Into<Option<InsertOptions>>,
     ) -> crate::error::Result<MutationResult> {
-        let options = options.into().unwrap_or_default();
         self.tracing_client
-            .record_kv_fields(&options.durability_level)
-            .await;
+            .execute_metered_operation(
+                "insert",
+                Some(SERVICE_VALUE_KV),
+                &self.keyspace,
+                async move {
+                    let options = options.into().unwrap_or_default();
+                    self.tracing_client
+                        .record_kv_fields(&options.durability_level)
+                        .await;
 
-        let encoding_span = self.tracing_client.create_request_encoding_span().await;
-        let (value, flags) = encoding_span.in_scope(|| transcoding::json::encode(value))?;
-        drop(encoding_span);
+                    let encoding_span = self.tracing_client.create_request_encoding_span().await;
+                    let (value, flags) =
+                        encoding_span.in_scope(|| transcoding::json::encode(value))?;
+                    drop(encoding_span);
 
-        self.core_kv_client
-            .insert(id.as_ref(), &value, flags, options)
+                    self.core_kv_client
+                        .insert(id.as_ref(), &value, flags, options)
+                        .await
+                },
+            )
             .await
     }
 
@@ -297,13 +326,22 @@ impl Collection {
         flags: u32,
         options: impl Into<Option<InsertOptions>>,
     ) -> crate::error::Result<MutationResult> {
-        let options = options.into().unwrap_or_default();
         self.tracing_client
-            .record_kv_fields(&options.durability_level)
-            .await;
+            .execute_metered_operation(
+                "insert",
+                Some(SERVICE_VALUE_KV),
+                &self.keyspace,
+                async move {
+                    let options = options.into().unwrap_or_default();
+                    self.tracing_client
+                        .record_kv_fields(&options.durability_level)
+                        .await;
 
-        self.core_kv_client
-            .insert(id.as_ref(), value, flags, options)
+                    self.core_kv_client
+                        .insert(id.as_ref(), value, flags, options)
+                        .await
+                },
+            )
             .await
     }
 
@@ -330,17 +368,27 @@ impl Collection {
         value: V,
         options: impl Into<Option<ReplaceOptions>>,
     ) -> crate::error::Result<MutationResult> {
-        let options = options.into().unwrap_or_default();
         self.tracing_client
-            .record_kv_fields(&options.durability_level)
-            .await;
+            .execute_metered_operation(
+                "replace",
+                Some(SERVICE_VALUE_KV),
+                &self.keyspace,
+                async move {
+                    let options = options.into().unwrap_or_default();
+                    self.tracing_client
+                        .record_kv_fields(&options.durability_level)
+                        .await;
 
-        let encoding_span = self.tracing_client.create_request_encoding_span().await;
-        let (value, flags) = encoding_span.in_scope(|| transcoding::json::encode(value))?;
-        drop(encoding_span);
+                    let encoding_span = self.tracing_client.create_request_encoding_span().await;
+                    let (value, flags) =
+                        encoding_span.in_scope(|| transcoding::json::encode(value))?;
+                    drop(encoding_span);
 
-        self.core_kv_client
-            .replace(id.as_ref(), &value, flags, options)
+                    self.core_kv_client
+                        .replace(id.as_ref(), &value, flags, options)
+                        .await
+                },
+            )
             .await
     }
 
@@ -368,13 +416,22 @@ impl Collection {
         flags: u32,
         options: impl Into<Option<ReplaceOptions>>,
     ) -> crate::error::Result<MutationResult> {
-        let options = options.into().unwrap_or_default();
         self.tracing_client
-            .record_kv_fields(&options.durability_level)
-            .await;
+            .execute_metered_operation(
+                "replace",
+                Some(SERVICE_VALUE_KV),
+                &self.keyspace,
+                async move {
+                    let options = options.into().unwrap_or_default();
+                    self.tracing_client
+                        .record_kv_fields(&options.durability_level)
+                        .await;
 
-        self.core_kv_client
-            .replace(id.as_ref(), value, flags, options)
+                    self.core_kv_client
+                        .replace(id.as_ref(), value, flags, options)
+                        .await
+                },
+            )
             .await
     }
 
@@ -399,10 +456,14 @@ impl Collection {
         id: impl AsRef<str>,
         options: impl Into<Option<GetOptions>>,
     ) -> crate::error::Result<GetResult> {
-        let options = options.into().unwrap_or_default();
-        self.tracing_client.record_generic_fields().await;
+        self.tracing_client
+            .execute_metered_operation("get", Some(SERVICE_VALUE_KV), &self.keyspace, async move {
+                let options = options.into().unwrap_or_default();
+                self.tracing_client.record_generic_fields().await;
 
-        self.core_kv_client.get(id.as_ref(), options).await
+                self.core_kv_client.get(id.as_ref(), options).await
+            })
+            .await
     }
 
     #[instrument(
@@ -426,10 +487,19 @@ impl Collection {
         id: impl AsRef<str>,
         options: impl Into<Option<ExistsOptions>>,
     ) -> crate::error::Result<ExistsResult> {
-        let options = options.into().unwrap_or_default();
-        self.tracing_client.record_generic_fields().await;
+        self.tracing_client
+            .execute_metered_operation(
+                "exists",
+                Some(SERVICE_VALUE_KV),
+                &self.keyspace,
+                async move {
+                    let options = options.into().unwrap_or_default();
+                    self.tracing_client.record_generic_fields().await;
 
-        self.core_kv_client.exists(id.as_ref(), options).await
+                    self.core_kv_client.exists(id.as_ref(), options).await
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -454,11 +524,20 @@ impl Collection {
         expiry: Duration,
         options: impl Into<Option<GetAndTouchOptions>>,
     ) -> crate::error::Result<GetResult> {
-        let options = options.into().unwrap_or_default();
-        self.tracing_client.record_generic_fields().await;
+        self.tracing_client
+            .execute_metered_operation(
+                "get_and_touch",
+                Some(SERVICE_VALUE_KV),
+                &self.keyspace,
+                async move {
+                    let options = options.into().unwrap_or_default();
+                    self.tracing_client.record_generic_fields().await;
 
-        self.core_kv_client
-            .get_and_touch(id.as_ref(), expiry, options)
+                    self.core_kv_client
+                        .get_and_touch(id.as_ref(), expiry, options)
+                        .await
+                },
+            )
             .await
     }
 
@@ -484,11 +563,20 @@ impl Collection {
         lock_time: Duration,
         options: impl Into<Option<GetAndLockOptions>>,
     ) -> crate::error::Result<GetResult> {
-        let options = options.into().unwrap_or_default();
-        self.tracing_client.record_generic_fields().await;
+        self.tracing_client
+            .execute_metered_operation(
+                "get_and_lock",
+                Some(SERVICE_VALUE_KV),
+                &self.keyspace,
+                async move {
+                    let options = options.into().unwrap_or_default();
+                    self.tracing_client.record_generic_fields().await;
 
-        self.core_kv_client
-            .get_and_lock(id.as_ref(), lock_time, options)
+                    self.core_kv_client
+                        .get_and_lock(id.as_ref(), lock_time, options)
+                        .await
+                },
+            )
             .await
     }
 
@@ -514,11 +602,20 @@ impl Collection {
         specs: &[LookupInSpec],
         options: impl Into<Option<LookupInOptions>>,
     ) -> crate::error::Result<LookupInResult> {
-        let options = options.into().unwrap_or_default();
-        self.tracing_client.record_generic_fields().await;
+        self.tracing_client
+            .execute_metered_operation(
+                "lookup_in",
+                Some(SERVICE_VALUE_KV),
+                &self.keyspace,
+                async move {
+                    let options = options.into().unwrap_or_default();
+                    self.tracing_client.record_generic_fields().await;
 
-        self.core_kv_client
-            .lookup_in(id.as_ref(), specs, options)
+                    self.core_kv_client
+                        .lookup_in(id.as_ref(), specs, options)
+                        .await
+                },
+            )
             .await
     }
 
@@ -544,10 +641,19 @@ impl Collection {
         cas: u64,
         options: impl Into<Option<UnlockOptions>>,
     ) -> crate::error::Result<()> {
-        let options = options.into().unwrap_or_default();
-        self.tracing_client.record_generic_fields().await;
+        self.tracing_client
+            .execute_metered_operation(
+                "unlock",
+                Some(SERVICE_VALUE_KV),
+                &self.keyspace,
+                async move {
+                    let options = options.into().unwrap_or_default();
+                    self.tracing_client.record_generic_fields().await;
 
-        self.core_kv_client.unlock(id.as_ref(), cas, options).await
+                    self.core_kv_client.unlock(id.as_ref(), cas, options).await
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -572,11 +678,20 @@ impl Collection {
         expiry: Duration,
         options: impl Into<Option<TouchOptions>>,
     ) -> crate::error::Result<TouchResult> {
-        let options = options.into().unwrap_or_default();
-        self.tracing_client.record_generic_fields().await;
+        self.tracing_client
+            .execute_metered_operation(
+                "touch",
+                Some(SERVICE_VALUE_KV),
+                &self.keyspace,
+                async move {
+                    let options = options.into().unwrap_or_default();
+                    self.tracing_client.record_generic_fields().await;
 
-        self.core_kv_client
-            .touch(id.as_ref(), expiry, options)
+                    self.core_kv_client
+                        .touch(id.as_ref(), expiry, options)
+                        .await
+                },
+            )
             .await
     }
 
@@ -602,11 +717,20 @@ impl Collection {
         specs: &[MutateInSpec],
         options: impl Into<Option<MutateInOptions>>,
     ) -> crate::error::Result<MutateInResult> {
-        let options = options.into().unwrap_or_default();
-        self.tracing_client.record_generic_fields().await;
+        self.tracing_client
+            .execute_metered_operation(
+                "mutate_in",
+                Some(SERVICE_VALUE_KV),
+                &self.keyspace,
+                async move {
+                    let options = options.into().unwrap_or_default();
+                    self.tracing_client.record_generic_fields().await;
 
-        self.core_kv_client
-            .mutate_in(id.as_ref(), specs, options)
+                    self.core_kv_client
+                        .mutate_in(id.as_ref(), specs, options)
+                        .await
+                },
+            )
             .await
     }
 
@@ -631,9 +755,18 @@ impl Collection {
         id: impl AsRef<str>,
         options: impl Into<Option<RemoveOptions>>,
     ) -> crate::error::Result<MutationResult> {
-        let options = options.into().unwrap_or_default();
-        self.tracing_client.record_generic_fields().await;
+        self.tracing_client
+            .execute_metered_operation(
+                "remove",
+                Some(SERVICE_VALUE_KV),
+                &self.keyspace,
+                async move {
+                    let options = options.into().unwrap_or_default();
+                    self.tracing_client.record_generic_fields().await;
 
-        self.core_kv_client.remove(id.as_ref(), options).await
+                    self.core_kv_client.remove(id.as_ref(), options).await
+                },
+            )
+            .await
     }
 }

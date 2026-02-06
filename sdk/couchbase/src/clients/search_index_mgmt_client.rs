@@ -17,7 +17,9 @@
  */
 
 use crate::clients::agent_provider::CouchbaseAgentProvider;
-use crate::clients::tracing_client::{CouchbaseTracingClient, TracingClient, TracingClientBackend};
+use crate::clients::tracing_client::{
+    CouchbaseTracingClient, Keyspace, TracingClient, TracingClientBackend,
+};
 use crate::error;
 use crate::management::search::index::SearchIndex;
 use crate::options::search_index_mgmt_options::{
@@ -254,6 +256,17 @@ impl SearchIndexMgmtClient {
             }
         }
     }
+
+    pub fn keyspace(&self) -> Keyspace {
+        match &self.backend {
+            SearchIndexMgmtClientBackend::CouchbaseSearchIndexMgmtClientBackend(backend) => {
+                backend.keyspace.clone().into()
+            }
+            SearchIndexMgmtClientBackend::Couchbase2SearchIndexMgmtClientBackend(_) => {
+                unimplemented!()
+            }
+        }
+    }
 }
 
 pub(crate) enum SearchIndexMgmtClientBackend {
@@ -261,6 +274,7 @@ pub(crate) enum SearchIndexMgmtClientBackend {
     Couchbase2SearchIndexMgmtClientBackend(Couchbase2SearchIndexMgmtClient),
 }
 
+#[derive(Clone, Debug)]
 pub(crate) struct SearchIndexKeyspace {
     pub bucket_name: String,
     pub scope_name: String,
@@ -273,6 +287,15 @@ impl SearchIndexKeyspace {
 
     pub(crate) fn scope_name(&self) -> &str {
         self.scope_name.as_str()
+    }
+}
+
+impl From<SearchIndexKeyspace> for Keyspace {
+    fn from(keyspace: SearchIndexKeyspace) -> Self {
+        Keyspace::Scope {
+            bucket: keyspace.bucket_name,
+            scope: keyspace.scope_name,
+        }
     }
 }
 
