@@ -34,6 +34,7 @@ tokio-native-tls = { version = "0.3", optional = true }
 tokio-rustls = { version = "0.26.4", optional = true }
 tracing = "0.1.44"
 tracing-subscriber = "0.3.22"
+hdrhistogram = "7.5.4"
 
 [dev-dependencies]
 chrono = "0.4"
