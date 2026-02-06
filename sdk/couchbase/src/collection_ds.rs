@@ -143,11 +143,21 @@ impl CouchbaseList<'_> {
     async fn iter_internal<T: DeserializeOwned>(
         &self,
     ) -> crate::error::Result<impl Iterator<Item = T>> {
-        self.collection.tracing_client.record_generic_fields().await;
-        let res = self.collection.get(&self.id, None).await?;
-        let list_contents: Vec<T> = res.content_as()?;
+        self.collection
+            .tracing_client
+            .execute_metered_operation(
+                "list_iter",
+                Some(SERVICE_VALUE_KV),
+                &self.collection.keyspace,
+                async move {
+                    self.collection.tracing_client.record_generic_fields().await;
+                    let res = self.collection.get(&self.id, None).await?;
+                    let list_contents: Vec<T> = res.content_as()?;
 
-        Ok(list_contents.into_iter())
+                    Ok(list_contents.into_iter())
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -167,17 +177,27 @@ impl CouchbaseList<'_> {
         couchbase.cluster.uuid,
         ))]
     async fn get_internal<V: DeserializeOwned>(&self, index: usize) -> crate::error::Result<V> {
-        self.collection.tracing_client.record_generic_fields().await;
-        let res = self
-            .collection
-            .lookup_in(
-                &self.id,
-                &[LookupInSpec::get(format!("[{index}]"), None)],
-                None,
-            )
-            .await?;
+        self.collection
+            .tracing_client
+            .execute_metered_operation(
+                "list_get",
+                Some(SERVICE_VALUE_KV),
+                &self.collection.keyspace,
+                async move {
+                    self.collection.tracing_client.record_generic_fields().await;
+                    let res = self
+                        .collection
+                        .lookup_in(
+                            &self.id,
+                            &[LookupInSpec::get(format!("[{index}]"), None)],
+                            None,
+                        )
+                        .await?;
 
-        res.content_as(0)
+                    res.content_as(0)
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -197,16 +217,26 @@ impl CouchbaseList<'_> {
         couchbase.cluster.uuid,
         ))]
     async fn remove_internal(&self, index: usize) -> crate::error::Result<()> {
-        self.collection.tracing_client.record_generic_fields().await;
         self.collection
-            .mutate_in(
-                &self.id,
-                &[MutateInSpec::remove(format!("[{index}]"), None)],
-                None,
-            )
-            .await?;
+            .tracing_client
+            .execute_metered_operation(
+                "list_remove",
+                Some(SERVICE_VALUE_KV),
+                &self.collection.keyspace,
+                async move {
+                    self.collection.tracing_client.record_generic_fields().await;
+                    self.collection
+                        .mutate_in(
+                            &self.id,
+                            &[MutateInSpec::remove(format!("[{index}]"), None)],
+                            None,
+                        )
+                        .await?;
 
-        Ok(())
+                    Ok(())
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -226,16 +256,26 @@ impl CouchbaseList<'_> {
         couchbase.cluster.uuid,
         ))]
     async fn append_internal<V: Serialize>(&self, value: V) -> crate::error::Result<()> {
-        self.collection.tracing_client.record_generic_fields().await;
         self.collection
-            .mutate_in(
-                &self.id,
-                &[MutateInSpec::array_append("", &[value], None)?],
-                MutateInOptions::new().store_semantics(StoreSemantics::Upsert),
-            )
-            .await?;
+            .tracing_client
+            .execute_metered_operation(
+                "list_append",
+                Some(SERVICE_VALUE_KV),
+                &self.collection.keyspace,
+                async move {
+                    self.collection.tracing_client.record_generic_fields().await;
+                    self.collection
+                        .mutate_in(
+                            &self.id,
+                            &[MutateInSpec::array_append("", &[value], None)?],
+                            MutateInOptions::new().store_semantics(StoreSemantics::Upsert),
+                        )
+                        .await?;
 
-        Ok(())
+                    Ok(())
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -255,16 +295,26 @@ impl CouchbaseList<'_> {
         couchbase.cluster.uuid,
         ))]
     async fn prepend_internal<V: Serialize>(&self, value: V) -> crate::error::Result<()> {
-        self.collection.tracing_client.record_generic_fields().await;
         self.collection
-            .mutate_in(
-                &self.id,
-                &[MutateInSpec::array_prepend("", &[value], None)?],
-                MutateInOptions::new().store_semantics(StoreSemantics::Upsert),
-            )
-            .await?;
+            .tracing_client
+            .execute_metered_operation(
+                "list_prepend",
+                Some(SERVICE_VALUE_KV),
+                &self.collection.keyspace,
+                async move {
+                    self.collection.tracing_client.record_generic_fields().await;
+                    self.collection
+                        .mutate_in(
+                            &self.id,
+                            &[MutateInSpec::array_prepend("", &[value], None)?],
+                            MutateInOptions::new().store_semantics(StoreSemantics::Upsert),
+                        )
+                        .await?;
 
-        Ok(())
+                    Ok(())
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -287,17 +337,27 @@ impl CouchbaseList<'_> {
         &self,
         value: V,
     ) -> crate::error::Result<isize> {
-        self.collection.tracing_client.record_generic_fields().await;
-        let get_res = self.collection.get(&self.id, None).await?;
+        self.collection
+            .tracing_client
+            .execute_metered_operation(
+                "list_position",
+                Some(SERVICE_VALUE_KV),
+                &self.collection.keyspace,
+                async move {
+                    self.collection.tracing_client.record_generic_fields().await;
+                    let get_res = self.collection.get(&self.id, None).await?;
 
-        let list_contents: Vec<V> = get_res.content_as()?;
-        for (i, item) in list_contents.iter().enumerate() {
-            if *item == value {
-                return Ok(i as isize);
-            }
-        }
+                    let list_contents: Vec<V> = get_res.content_as()?;
+                    for (i, item) in list_contents.iter().enumerate() {
+                        if *item == value {
+                            return Ok(i as isize);
+                        }
+                    }
 
-        Ok(-1)
+                    Ok(-1)
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -317,13 +377,23 @@ impl CouchbaseList<'_> {
         couchbase.cluster.uuid,
         ))]
     async fn len_internal(&self) -> crate::error::Result<usize> {
-        self.collection.tracing_client.record_generic_fields().await;
-        let res = self
-            .collection
-            .lookup_in(&self.id, &[LookupInSpec::count("", None)], None)
-            .await?;
+        self.collection
+            .tracing_client
+            .execute_metered_operation(
+                "list_len",
+                Some(SERVICE_VALUE_KV),
+                &self.collection.keyspace,
+                async move {
+                    self.collection.tracing_client.record_generic_fields().await;
+                    let res = self
+                        .collection
+                        .lookup_in(&self.id, &[LookupInSpec::count("", None)], None)
+                        .await?;
 
-        res.content_as(0)
+                    res.content_as(0)
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -343,9 +413,19 @@ impl CouchbaseList<'_> {
         couchbase.cluster.uuid,
         ))]
     async fn clear_internal(&self) -> crate::error::Result<()> {
-        self.collection.tracing_client.record_generic_fields().await;
-        self.collection.remove(&self.id, None).await?;
-        Ok(())
+        self.collection
+            .tracing_client
+            .execute_metered_operation(
+                "list_clear",
+                Some(SERVICE_VALUE_KV),
+                &self.collection.keyspace,
+                async move {
+                    self.collection.tracing_client.record_generic_fields().await;
+                    self.collection.remove(&self.id, None).await?;
+                    Ok(())
+                },
+            )
+            .await
     }
 }
 
@@ -418,11 +498,21 @@ impl CouchbaseMap<'_> {
     async fn iter_internal<T: DeserializeOwned>(
         &self,
     ) -> crate::error::Result<impl Iterator<Item = (String, T)>> {
-        self.collection.tracing_client.record_generic_fields().await;
-        let res = self.collection.get(&self.id, None).await?;
-        let list_contents: HashMap<String, T> = res.content_as()?;
+        self.collection
+            .tracing_client
+            .execute_metered_operation(
+                "map_iter",
+                Some(SERVICE_VALUE_KV),
+                &self.collection.keyspace,
+                async move {
+                    self.collection.tracing_client.record_generic_fields().await;
+                    let res = self.collection.get(&self.id, None).await?;
+                    let list_contents: HashMap<String, T> = res.content_as()?;
 
-        Ok(list_contents.into_iter())
+                    Ok(list_contents.into_iter())
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -445,13 +535,23 @@ impl CouchbaseMap<'_> {
         &self,
         id: impl Into<String>,
     ) -> crate::error::Result<V> {
-        self.collection.tracing_client.record_generic_fields().await;
-        let res = self
-            .collection
-            .lookup_in(&self.id, &[LookupInSpec::get(id, None)], None)
-            .await?;
+        self.collection
+            .tracing_client
+            .execute_metered_operation(
+                "map_get",
+                Some(SERVICE_VALUE_KV),
+                &self.collection.keyspace,
+                async move {
+                    self.collection.tracing_client.record_generic_fields().await;
+                    let res = self
+                        .collection
+                        .lookup_in(&self.id, &[LookupInSpec::get(id, None)], None)
+                        .await?;
 
-        res.content_as(0)
+                    res.content_as(0)
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -475,16 +575,26 @@ impl CouchbaseMap<'_> {
         id: impl Into<String>,
         value: V,
     ) -> crate::error::Result<()> {
-        self.collection.tracing_client.record_generic_fields().await;
         self.collection
-            .mutate_in(
-                &self.id,
-                &[MutateInSpec::upsert(id, value, None)?],
-                MutateInOptions::new().store_semantics(StoreSemantics::Upsert),
-            )
-            .await?;
+            .tracing_client
+            .execute_metered_operation(
+                "map_insert",
+                Some(SERVICE_VALUE_KV),
+                &self.collection.keyspace,
+                async move {
+                    self.collection.tracing_client.record_generic_fields().await;
+                    self.collection
+                        .mutate_in(
+                            &self.id,
+                            &[MutateInSpec::upsert(id, value, None)?],
+                            MutateInOptions::new().store_semantics(StoreSemantics::Upsert),
+                        )
+                        .await?;
 
-        Ok(())
+                    Ok(())
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -504,12 +614,22 @@ impl CouchbaseMap<'_> {
         couchbase.cluster.uuid,
         ))]
     async fn remove_internal(&self, id: impl Into<String>) -> crate::error::Result<()> {
-        self.collection.tracing_client.record_generic_fields().await;
         self.collection
-            .mutate_in(&self.id, &[MutateInSpec::remove(id, None)], None)
-            .await?;
+            .tracing_client
+            .execute_metered_operation(
+                "map_remove",
+                Some(SERVICE_VALUE_KV),
+                &self.collection.keyspace,
+                async move {
+                    self.collection.tracing_client.record_generic_fields().await;
+                    self.collection
+                        .mutate_in(&self.id, &[MutateInSpec::remove(id, None)], None)
+                        .await?;
 
-        Ok(())
+                    Ok(())
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -529,13 +649,23 @@ impl CouchbaseMap<'_> {
         couchbase.cluster.uuid,
         ))]
     async fn contains_key_internal(&self, id: impl Into<String>) -> crate::error::Result<bool> {
-        self.collection.tracing_client.record_generic_fields().await;
-        let res = self
-            .collection
-            .lookup_in(&self.id, &[LookupInSpec::exists(id, None)], None)
-            .await?;
+        self.collection
+            .tracing_client
+            .execute_metered_operation(
+                "map_contains_key",
+                Some(SERVICE_VALUE_KV),
+                &self.collection.keyspace,
+                async move {
+                    self.collection.tracing_client.record_generic_fields().await;
+                    let res = self
+                        .collection
+                        .lookup_in(&self.id, &[LookupInSpec::exists(id, None)], None)
+                        .await?;
 
-        res.exists(0)
+                    res.exists(0)
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -555,13 +685,23 @@ impl CouchbaseMap<'_> {
         couchbase.cluster.uuid,
         ))]
     async fn len_internal(&self) -> crate::error::Result<usize> {
-        self.collection.tracing_client.record_generic_fields().await;
-        let res = self
-            .collection
-            .lookup_in(&self.id, &[LookupInSpec::count("", None)], None)
-            .await?;
+        self.collection
+            .tracing_client
+            .execute_metered_operation(
+                "map_len",
+                Some(SERVICE_VALUE_KV),
+                &self.collection.keyspace,
+                async move {
+                    self.collection.tracing_client.record_generic_fields().await;
+                    let res = self
+                        .collection
+                        .lookup_in(&self.id, &[LookupInSpec::count("", None)], None)
+                        .await?;
 
-        res.content_as(0)
+                    res.content_as(0)
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -581,11 +721,21 @@ impl CouchbaseMap<'_> {
         couchbase.cluster.uuid,
         ))]
     async fn keys_internal(&self) -> crate::error::Result<Vec<String>> {
-        self.collection.tracing_client.record_generic_fields().await;
-        let res = self.collection.get(&self.id, None).await?;
+        self.collection
+            .tracing_client
+            .execute_metered_operation(
+                "map_keys",
+                Some(SERVICE_VALUE_KV),
+                &self.collection.keyspace,
+                async move {
+                    self.collection.tracing_client.record_generic_fields().await;
+                    let res = self.collection.get(&self.id, None).await?;
 
-        let map_contents: HashMap<String, serde_json::Value> = res.content_as()?;
-        Ok(map_contents.keys().cloned().collect())
+                    let map_contents: HashMap<String, serde_json::Value> = res.content_as()?;
+                    Ok(map_contents.keys().cloned().collect())
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -605,11 +755,21 @@ impl CouchbaseMap<'_> {
         couchbase.cluster.uuid,
         ))]
     async fn values_internal<T: DeserializeOwned>(&self) -> crate::error::Result<Vec<T>> {
-        self.collection.tracing_client.record_generic_fields().await;
-        let res = self.collection.get(&self.id, None).await?;
+        self.collection
+            .tracing_client
+            .execute_metered_operation(
+                "map_values",
+                Some(SERVICE_VALUE_KV),
+                &self.collection.keyspace,
+                async move {
+                    self.collection.tracing_client.record_generic_fields().await;
+                    let res = self.collection.get(&self.id, None).await?;
 
-        let map_contents: HashMap<String, T> = res.content_as()?;
-        Ok(map_contents.into_values().collect())
+                    let map_contents: HashMap<String, T> = res.content_as()?;
+                    Ok(map_contents.into_values().collect())
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -629,9 +789,19 @@ impl CouchbaseMap<'_> {
         couchbase.cluster.uuid,
         ))]
     async fn clear_internal(&self) -> crate::error::Result<()> {
-        self.collection.tracing_client.record_generic_fields().await;
-        self.collection.remove(&self.id, None).await?;
-        Ok(())
+        self.collection
+            .tracing_client
+            .execute_metered_operation(
+                "map_clear",
+                Some(SERVICE_VALUE_KV),
+                &self.collection.keyspace,
+                async move {
+                    self.collection.tracing_client.record_generic_fields().await;
+                    self.collection.remove(&self.id, None).await?;
+                    Ok(())
+                },
+            )
+            .await
     }
 }
 
@@ -696,11 +866,21 @@ impl CouchbaseSet<'_> {
     async fn iter_internal<T: DeserializeOwned>(
         &self,
     ) -> crate::error::Result<impl Iterator<Item = T>> {
-        self.collection.tracing_client.record_generic_fields().await;
-        let res = self.collection.get(&self.id, None).await?;
-        let list_contents: Vec<T> = res.content_as()?;
+        self.collection
+            .tracing_client
+            .execute_metered_operation(
+                "set_iter",
+                Some(SERVICE_VALUE_KV),
+                &self.collection.keyspace,
+                async move {
+                    self.collection.tracing_client.record_generic_fields().await;
+                    let res = self.collection.get(&self.id, None).await?;
+                    let list_contents: Vec<T> = res.content_as()?;
 
-        Ok(list_contents.into_iter())
+                    Ok(list_contents.into_iter())
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -720,24 +900,34 @@ impl CouchbaseSet<'_> {
         couchbase.cluster.uuid,
         ))]
     async fn insert_internal<V: Serialize>(&self, value: V) -> crate::error::Result<(bool)> {
-        self.collection.tracing_client.record_generic_fields().await;
-        let res = self
-            .collection
-            .mutate_in(
-                &self.id,
-                &[MutateInSpec::array_add_unique("", value, None)?],
-                MutateInOptions::new().store_semantics(StoreSemantics::Upsert),
+        self.collection
+            .tracing_client
+            .execute_metered_operation(
+                "set_insert",
+                Some(SERVICE_VALUE_KV),
+                &self.collection.keyspace,
+                async move {
+                    self.collection.tracing_client.record_generic_fields().await;
+                    let res = self
+                        .collection
+                        .mutate_in(
+                            &self.id,
+                            &[MutateInSpec::array_add_unique("", value, None)?],
+                            MutateInOptions::new().store_semantics(StoreSemantics::Upsert),
+                        )
+                        .await;
+
+                    if let Err(e) = res {
+                        return match e.kind() {
+                            crate::error::ErrorKind::PathExists => Ok(false),
+                            _ => Err(e),
+                        };
+                    }
+
+                    Ok(true)
+                },
             )
-            .await;
-
-        if let Err(e) = res {
-            return match e.kind() {
-                crate::error::ErrorKind::PathExists => Ok(false),
-                _ => Err(e),
-            };
-        }
-
-        Ok(true)
+            .await
     }
 
     #[instrument(
@@ -760,42 +950,52 @@ impl CouchbaseSet<'_> {
         &self,
         value: T,
     ) -> crate::error::Result<()> {
-        self.collection.tracing_client.record_generic_fields().await;
-        for _ in 0..16 {
-            let items = self.collection.get(&self.id, None).await?;
-            let cas = items.cas();
+        self.collection
+            .tracing_client
+            .execute_metered_operation(
+                "set_remove",
+                Some(SERVICE_VALUE_KV),
+                &self.collection.keyspace,
+                async move {
+                    self.collection.tracing_client.record_generic_fields().await;
+                    for _ in 0..16 {
+                        let items = self.collection.get(&self.id, None).await?;
+                        let cas = items.cas();
 
-            let set_contents: Vec<T> = items.content_as()?;
+                        let set_contents: Vec<T> = items.content_as()?;
 
-            let mut index_to_remove: Option<usize> = None;
-            for (i, item) in set_contents.iter().enumerate() {
-                if *item == value {
-                    index_to_remove = Some(i);
-                }
-            }
-            if let Some(index) = index_to_remove {
-                let res = self
-                    .collection
-                    .mutate_in(
-                        &self.id,
-                        &[MutateInSpec::remove(format!("[{index}]"), None)],
-                        MutateInOptions::new().cas(cas),
-                    )
-                    .await;
-                if let Err(e) = res {
-                    match e.kind() {
-                        crate::error::ErrorKind::DocumentExists => continue,
-                        crate::error::ErrorKind::CasMismatch => continue,
-                        _ => return Err(e),
-                    };
-                }
-            }
-            return Ok(());
-        }
+                        let mut index_to_remove: Option<usize> = None;
+                        for (i, item) in set_contents.iter().enumerate() {
+                            if *item == value {
+                                index_to_remove = Some(i);
+                            }
+                        }
+                        if let Some(index) = index_to_remove {
+                            let res = self
+                                .collection
+                                .mutate_in(
+                                    &self.id,
+                                    &[MutateInSpec::remove(format!("[{index}]"), None)],
+                                    MutateInOptions::new().cas(cas),
+                                )
+                                .await;
+                            if let Err(e) = res {
+                                match e.kind() {
+                                    crate::error::ErrorKind::DocumentExists => continue,
+                                    crate::error::ErrorKind::CasMismatch => continue,
+                                    _ => return Err(e),
+                                };
+                            }
+                        }
+                        return Ok(());
+                    }
 
-        Err(crate::error::Error::other_failure(
-            "failed to perform operation after 16 retries",
-        ))
+                    Err(crate::error::Error::other_failure(
+                        "failed to perform operation after 16 retries",
+                    ))
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -815,11 +1015,21 @@ impl CouchbaseSet<'_> {
         couchbase.cluster.uuid,
         ))]
     async fn values_internal<T: DeserializeOwned>(&self) -> crate::error::Result<Vec<T>> {
-        self.collection.tracing_client.record_generic_fields().await;
-        let res = self.collection.get(&self.id, None).await?;
+        self.collection
+            .tracing_client
+            .execute_metered_operation(
+                "set_values",
+                Some(SERVICE_VALUE_KV),
+                &self.collection.keyspace,
+                async move {
+                    self.collection.tracing_client.record_generic_fields().await;
+                    let res = self.collection.get(&self.id, None).await?;
 
-        let set_contents: Vec<T> = res.content_as()?;
-        Ok(set_contents)
+                    let set_contents: Vec<T> = res.content_as()?;
+                    Ok(set_contents)
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -842,17 +1052,27 @@ impl CouchbaseSet<'_> {
         &self,
         value: T,
     ) -> crate::error::Result<bool> {
-        self.collection.tracing_client.record_generic_fields().await;
-        let res = self.collection.get(&self.id, None).await?;
+        self.collection
+            .tracing_client
+            .execute_metered_operation(
+                "set_contains",
+                Some(SERVICE_VALUE_KV),
+                &self.collection.keyspace,
+                async move {
+                    self.collection.tracing_client.record_generic_fields().await;
+                    let res = self.collection.get(&self.id, None).await?;
 
-        let set_contents: Vec<T> = res.content_as()?;
+                    let set_contents: Vec<T> = res.content_as()?;
 
-        for item in set_contents {
-            if item == value {
-                return Ok(true);
-            }
-        }
-        Ok(false)
+                    for item in set_contents {
+                        if item == value {
+                            return Ok(true);
+                        }
+                    }
+                    Ok(false)
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -872,13 +1092,23 @@ impl CouchbaseSet<'_> {
         couchbase.cluster.uuid,
         ))]
     async fn len_internal(&self) -> crate::error::Result<usize> {
-        self.collection.tracing_client.record_generic_fields().await;
-        let res = self
-            .collection
-            .lookup_in(&self.id, &[LookupInSpec::count("", None)], None)
-            .await?;
+        self.collection
+            .tracing_client
+            .execute_metered_operation(
+                "set_len",
+                Some(SERVICE_VALUE_KV),
+                &self.collection.keyspace,
+                async move {
+                    self.collection.tracing_client.record_generic_fields().await;
+                    let res = self
+                        .collection
+                        .lookup_in(&self.id, &[LookupInSpec::count("", None)], None)
+                        .await?;
 
-        res.content_as(0)
+                    res.content_as(0)
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -898,9 +1128,19 @@ impl CouchbaseSet<'_> {
         couchbase.cluster.uuid,
         ))]
     async fn clear_internal(&self) -> crate::error::Result<()> {
-        self.collection.tracing_client.record_generic_fields().await;
-        self.collection.remove(&self.id, None).await?;
-        Ok(())
+        self.collection
+            .tracing_client
+            .execute_metered_operation(
+                "set_clear",
+                Some(SERVICE_VALUE_KV),
+                &self.collection.keyspace,
+                async move {
+                    self.collection.tracing_client.record_generic_fields().await;
+                    self.collection.remove(&self.id, None).await?;
+                    Ok(())
+                },
+            )
+            .await
     }
 }
 
@@ -951,13 +1191,23 @@ impl CouchbaseQueue<'_> {
     async fn iter_internal<T: DeserializeOwned>(
         &self,
     ) -> crate::error::Result<impl Iterator<Item = T>> {
-        self.collection.tracing_client.record_generic_fields().await;
-        let res = self.collection.get(&self.id, None).await?;
+        self.collection
+            .tracing_client
+            .execute_metered_operation(
+                "queue_iter",
+                Some(SERVICE_VALUE_KV),
+                &self.collection.keyspace,
+                async move {
+                    self.collection.tracing_client.record_generic_fields().await;
+                    let res = self.collection.get(&self.id, None).await?;
 
-        let mut list_contents: Vec<T> = res.content_as()?;
-        list_contents.reverse();
+                    let mut list_contents: Vec<T> = res.content_as()?;
+                    list_contents.reverse();
 
-        Ok(list_contents.into_iter())
+                    Ok(list_contents.into_iter())
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -977,16 +1227,26 @@ impl CouchbaseQueue<'_> {
         couchbase.cluster.uuid,
         ))]
     async fn push_internal<V: Serialize>(&self, value: V) -> crate::error::Result<()> {
-        self.collection.tracing_client.record_generic_fields().await;
         self.collection
-            .mutate_in(
-                &self.id,
-                &[MutateInSpec::array_prepend("", &[value], None)?],
-                MutateInOptions::new().store_semantics(StoreSemantics::Upsert),
-            )
-            .await?;
+            .tracing_client
+            .execute_metered_operation(
+                "queue_push",
+                Some(SERVICE_VALUE_KV),
+                &self.collection.keyspace,
+                async move {
+                    self.collection.tracing_client.record_generic_fields().await;
+                    self.collection
+                        .mutate_in(
+                            &self.id,
+                            &[MutateInSpec::array_prepend("", &[value], None)?],
+                            MutateInOptions::new().store_semantics(StoreSemantics::Upsert),
+                        )
+                        .await?;
 
-        Ok(())
+                    Ok(())
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -1006,36 +1266,46 @@ impl CouchbaseQueue<'_> {
         couchbase.cluster.uuid,
         ))]
     async fn pop_internal<T: DeserializeOwned>(&self) -> crate::error::Result<T> {
-        self.collection.tracing_client.record_generic_fields().await;
-        for _ in 0..16 {
-            let res = self
-                .collection
-                .lookup_in(&self.id, &[LookupInSpec::get("[-1]", None)], None)
-                .await?;
-            let cas = res.cas();
-            let value: T = res.content_as(0)?;
+        self.collection
+            .tracing_client
+            .execute_metered_operation(
+                "queue_pop",
+                Some(SERVICE_VALUE_KV),
+                &self.collection.keyspace,
+                async move {
+                    self.collection.tracing_client.record_generic_fields().await;
+                    for _ in 0..16 {
+                        let res = self
+                            .collection
+                            .lookup_in(&self.id, &[LookupInSpec::get("[-1]", None)], None)
+                            .await?;
+                        let cas = res.cas();
+                        let value: T = res.content_as(0)?;
 
-            let res = self
-                .collection
-                .mutate_in(
-                    &self.id,
-                    &[MutateInSpec::remove("[-1]", None)],
-                    MutateInOptions::new().cas(cas),
-                )
-                .await;
-            if let Err(e) = res {
-                match e.kind() {
-                    crate::error::ErrorKind::DocumentExists => continue,
-                    crate::error::ErrorKind::CasMismatch => continue,
-                    _ => return Err(e),
-                };
-            }
-            return Ok(value);
-        }
+                        let res = self
+                            .collection
+                            .mutate_in(
+                                &self.id,
+                                &[MutateInSpec::remove("[-1]", None)],
+                                MutateInOptions::new().cas(cas),
+                            )
+                            .await;
+                        if let Err(e) = res {
+                            match e.kind() {
+                                crate::error::ErrorKind::DocumentExists => continue,
+                                crate::error::ErrorKind::CasMismatch => continue,
+                                _ => return Err(e),
+                            };
+                        }
+                        return Ok(value);
+                    }
 
-        Err(crate::error::Error::other_failure(
-            "failed to perform operation after 16 retries",
-        ))
+                    Err(crate::error::Error::other_failure(
+                        "failed to perform operation after 16 retries",
+                    ))
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -1055,13 +1325,23 @@ impl CouchbaseQueue<'_> {
         couchbase.cluster.uuid,
         ))]
     async fn len_internal(&self) -> crate::error::Result<usize> {
-        self.collection.tracing_client.record_generic_fields().await;
-        let res = self
-            .collection
-            .lookup_in(&self.id, &[LookupInSpec::count("", None)], None)
-            .await?;
+        self.collection
+            .tracing_client
+            .execute_metered_operation(
+                "queue_len",
+                Some(SERVICE_VALUE_KV),
+                &self.collection.keyspace,
+                async move {
+                    self.collection.tracing_client.record_generic_fields().await;
+                    let res = self
+                        .collection
+                        .lookup_in(&self.id, &[LookupInSpec::count("", None)], None)
+                        .await?;
 
-        res.content_as(0)
+                    res.content_as(0)
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -1081,8 +1361,18 @@ impl CouchbaseQueue<'_> {
         couchbase.cluster.uuid,
         ))]
     async fn clear_internal(&self) -> crate::error::Result<()> {
-        self.collection.tracing_client.record_generic_fields().await;
-        self.collection.remove(&self.id, None).await?;
-        Ok(())
+        self.collection
+            .tracing_client
+            .execute_metered_operation(
+                "queue_clear",
+                Some(SERVICE_VALUE_KV),
+                &self.collection.keyspace,
+                async move {
+                    self.collection.tracing_client.record_generic_fields().await;
+                    self.collection.remove(&self.id, None).await?;
+                    Ok(())
+                },
+            )
+            .await
     }
 }

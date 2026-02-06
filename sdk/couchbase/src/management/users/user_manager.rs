@@ -16,6 +16,7 @@
  *
  */
 
+use crate::clients::tracing_client::Keyspace;
 use crate::clients::user_mgmt_client::UserMgmtClient;
 use crate::error;
 use crate::management::users::user::{Group, RoleAndDescription, User, UserAndMetadata};
@@ -134,9 +135,19 @@ impl UserManager {
         &self,
         opts: impl Into<Option<GetAllUsersOptions>>,
     ) -> error::Result<Vec<UserAndMetadata>> {
-        self.client.tracing_client().record_generic_fields().await;
         self.client
-            .get_all_users(opts.into().unwrap_or_default())
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_users_get_all_users",
+                Some(SERVICE_VALUE_MANAGEMENT),
+                &Keyspace::Cluster,
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client
+                        .get_all_users(opts.into().unwrap_or_default())
+                        .await
+                },
+            )
             .await
     }
 
@@ -158,9 +169,19 @@ impl UserManager {
         username: impl Into<String>,
         opts: impl Into<Option<GetUserOptions>>,
     ) -> error::Result<UserAndMetadata> {
-        self.client.tracing_client().record_generic_fields().await;
         self.client
-            .get_user(username.into(), opts.into().unwrap_or_default())
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_users_get_user",
+                Some(SERVICE_VALUE_MANAGEMENT),
+                &Keyspace::Cluster,
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client
+                        .get_user(username.into(), opts.into().unwrap_or_default())
+                        .await
+                },
+            )
             .await
     }
 
@@ -182,9 +203,19 @@ impl UserManager {
         settings: User,
         opts: impl Into<Option<UpsertUserOptions>>,
     ) -> error::Result<()> {
-        self.client.tracing_client().record_generic_fields().await;
         self.client
-            .upsert_user(settings, opts.into().unwrap_or_default())
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_users_upsert_user",
+                Some(SERVICE_VALUE_MANAGEMENT),
+                &Keyspace::Cluster,
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client
+                        .upsert_user(settings, opts.into().unwrap_or_default())
+                        .await
+                },
+            )
             .await
     }
 
@@ -206,9 +237,19 @@ impl UserManager {
         username: impl Into<String>,
         opts: impl Into<Option<DropUserOptions>>,
     ) -> error::Result<()> {
-        self.client.tracing_client().record_generic_fields().await;
         self.client
-            .drop_user(username.into(), opts.into().unwrap_or_default())
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_users_drop_user",
+                Some(SERVICE_VALUE_MANAGEMENT),
+                &Keyspace::Cluster,
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client
+                        .drop_user(username.into(), opts.into().unwrap_or_default())
+                        .await
+                },
+            )
             .await
     }
 
@@ -229,8 +270,18 @@ impl UserManager {
         &self,
         opts: impl Into<Option<GetRolesOptions>>,
     ) -> error::Result<Vec<RoleAndDescription>> {
-        self.client.tracing_client().record_generic_fields().await;
-        self.client.get_roles(opts.into().unwrap_or_default()).await
+        self.client
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_users_get_roles",
+                Some(SERVICE_VALUE_MANAGEMENT),
+                &Keyspace::Cluster,
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client.get_roles(opts.into().unwrap_or_default()).await
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -251,9 +302,19 @@ impl UserManager {
         group_name: impl Into<String>,
         opts: impl Into<Option<GetGroupOptions>>,
     ) -> error::Result<Group> {
-        self.client.tracing_client().record_generic_fields().await;
         self.client
-            .get_group(group_name.into(), opts.into().unwrap_or_default())
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_users_get_group",
+                Some(SERVICE_VALUE_MANAGEMENT),
+                &Keyspace::Cluster,
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client
+                        .get_group(group_name.into(), opts.into().unwrap_or_default())
+                        .await
+                },
+            )
             .await
     }
 
@@ -274,9 +335,19 @@ impl UserManager {
         &self,
         opts: impl Into<Option<GetAllGroupsOptions>>,
     ) -> error::Result<Vec<Group>> {
-        self.client.tracing_client().record_generic_fields().await;
         self.client
-            .get_all_groups(opts.into().unwrap_or_default())
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_users_get_all_groups",
+                Some(SERVICE_VALUE_MANAGEMENT),
+                &Keyspace::Cluster,
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client
+                        .get_all_groups(opts.into().unwrap_or_default())
+                        .await
+                },
+            )
             .await
     }
 
@@ -298,9 +369,19 @@ impl UserManager {
         group: Group,
         opts: impl Into<Option<UpsertGroupOptions>>,
     ) -> error::Result<()> {
-        self.client.tracing_client().record_generic_fields().await;
         self.client
-            .upsert_group(group, opts.into().unwrap_or_default())
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_users_upsert_group",
+                Some(SERVICE_VALUE_MANAGEMENT),
+                &Keyspace::Cluster,
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client
+                        .upsert_group(group, opts.into().unwrap_or_default())
+                        .await
+                },
+            )
             .await
     }
 
@@ -322,9 +403,19 @@ impl UserManager {
         group_name: impl Into<String>,
         opts: impl Into<Option<DropGroupOptions>>,
     ) -> error::Result<()> {
-        self.client.tracing_client().record_generic_fields().await;
         self.client
-            .drop_group(group_name.into(), opts.into().unwrap_or_default())
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_users_drop_group",
+                Some(SERVICE_VALUE_MANAGEMENT),
+                &Keyspace::Cluster,
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client
+                        .drop_group(group_name.into(), opts.into().unwrap_or_default())
+                        .await
+                },
+            )
             .await
     }
 
@@ -346,9 +437,19 @@ impl UserManager {
         password: impl Into<String>,
         opts: impl Into<Option<ChangePasswordOptions>>,
     ) -> error::Result<()> {
-        self.client.tracing_client().record_generic_fields().await;
         self.client
-            .change_password(password.into(), opts.into().unwrap_or_default())
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_users_change_password",
+                Some(SERVICE_VALUE_MANAGEMENT),
+                &Keyspace::Cluster,
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client
+                        .change_password(password.into(), opts.into().unwrap_or_default())
+                        .await
+                },
+            )
             .await
     }
 }

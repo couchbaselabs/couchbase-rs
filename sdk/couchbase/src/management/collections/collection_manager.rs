@@ -17,6 +17,7 @@
  */
 
 use crate::clients::collections_mgmt_client::CollectionsMgmtClient;
+use crate::clients::tracing_client::Keyspace;
 use crate::error;
 pub use crate::management::collections::collection_settings::{
     CreateCollectionSettings, UpdateCollectionSettings,
@@ -109,9 +110,23 @@ impl CollectionManager {
         scope_name: String,
         opts: impl Into<Option<CreateScopeOptions>>,
     ) -> error::Result<()> {
-        self.client.tracing_client().record_generic_fields().await;
+        let keyspace = Keyspace::Scope {
+            bucket: self.client.bucket_name().to_string(),
+            scope: scope_name.clone(),
+        };
         self.client
-            .create_scope(scope_name, opts.into().unwrap_or_default())
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_collections_create_scope",
+                Some(SERVICE_VALUE_MANAGEMENT),
+                &keyspace,
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client
+                        .create_scope(scope_name, opts.into().unwrap_or_default())
+                        .await
+                },
+            )
             .await
     }
 
@@ -135,9 +150,23 @@ impl CollectionManager {
         scope_name: String,
         opts: impl Into<Option<DropScopeOptions>>,
     ) -> error::Result<()> {
-        self.client.tracing_client().record_generic_fields().await;
+        let keyspace = Keyspace::Scope {
+            bucket: self.client.bucket_name().to_string(),
+            scope: scope_name.clone(),
+        };
         self.client
-            .drop_scope(scope_name, opts.into().unwrap_or_default())
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_collections_drop_scope",
+                Some(SERVICE_VALUE_MANAGEMENT),
+                &keyspace,
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client
+                        .drop_scope(scope_name, opts.into().unwrap_or_default())
+                        .await
+                },
+            )
             .await
     }
 
@@ -164,13 +193,28 @@ impl CollectionManager {
         settings: impl Into<Option<CreateCollectionSettings>>,
         opts: impl Into<Option<CreateCollectionOptions>>,
     ) -> error::Result<()> {
-        self.client.tracing_client().record_generic_fields().await;
+        let keyspace = Keyspace::Collection {
+            bucket: self.client.bucket_name().to_string(),
+            scope: scope_name.clone(),
+            collection: collection_name.clone(),
+        };
         self.client
-            .create_collection(
-                scope_name,
-                collection_name,
-                settings.into().unwrap_or_default(),
-                opts.into().unwrap_or_default(),
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_collections_create_collection",
+                Some(SERVICE_VALUE_MANAGEMENT),
+                &keyspace,
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client
+                        .create_collection(
+                            scope_name,
+                            collection_name,
+                            settings.into().unwrap_or_default(),
+                            opts.into().unwrap_or_default(),
+                        )
+                        .await
+                },
             )
             .await
     }
@@ -198,13 +242,28 @@ impl CollectionManager {
         settings: impl Into<UpdateCollectionSettings>,
         opts: impl Into<Option<UpdateCollectionOptions>>,
     ) -> error::Result<()> {
-        self.client.tracing_client().record_generic_fields().await;
+        let keyspace = Keyspace::Collection {
+            bucket: self.client.bucket_name().to_string(),
+            scope: scope_name.clone(),
+            collection: collection_name.clone(),
+        };
         self.client
-            .update_collection(
-                scope_name,
-                collection_name,
-                settings.into(),
-                opts.into().unwrap_or_default(),
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_collections_update_collection",
+                Some(SERVICE_VALUE_MANAGEMENT),
+                &keyspace,
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client
+                        .update_collection(
+                            scope_name,
+                            collection_name,
+                            settings.into(),
+                            opts.into().unwrap_or_default(),
+                        )
+                        .await
+                },
             )
             .await
     }
@@ -231,9 +290,29 @@ impl CollectionManager {
         collection_name: String,
         opts: impl Into<Option<DropCollectionOptions>>,
     ) -> error::Result<()> {
-        self.client.tracing_client().record_generic_fields().await;
+        let keyspace = Keyspace::Collection {
+            bucket: self.client.bucket_name().to_string(),
+            scope: scope_name.clone(),
+            collection: collection_name.clone(),
+        };
+
         self.client
-            .drop_collection(scope_name, collection_name, opts.into().unwrap_or_default())
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_collections_drop_collection",
+                Some(SERVICE_VALUE_MANAGEMENT),
+                &keyspace,
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client
+                        .drop_collection(
+                            scope_name,
+                            collection_name,
+                            opts.into().unwrap_or_default(),
+                        )
+                        .await
+                },
+            )
             .await
     }
 
@@ -255,9 +334,21 @@ impl CollectionManager {
         &self,
         opts: impl Into<Option<GetAllScopesOptions>>,
     ) -> error::Result<Vec<ScopeSpec>> {
-        self.client.tracing_client().record_generic_fields().await;
         self.client
-            .get_all_scopes(opts.into().unwrap_or_default())
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_collections_get_all_scopes",
+                Some(SERVICE_VALUE_MANAGEMENT),
+                &Keyspace::Bucket {
+                    bucket: self.client.bucket_name().to_string(),
+                },
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client
+                        .get_all_scopes(opts.into().unwrap_or_default())
+                        .await
+                },
+            )
             .await
     }
 }

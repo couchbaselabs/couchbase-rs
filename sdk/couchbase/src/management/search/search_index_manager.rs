@@ -156,8 +156,18 @@ impl SearchIndexManager {
         index_name: impl Into<String>,
         opts: impl Into<Option<GetSearchIndexOptions>>,
     ) -> error::Result<SearchIndex> {
-        self.client.tracing_client().record_generic_fields().await;
-        self.client.get_index(index_name.into(), opts.into()).await
+        self.client
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_search_get_index",
+                Some(SERVICE_VALUE_SEARCH),
+                &self.client.keyspace(),
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client.get_index(index_name.into(), opts.into()).await
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -179,8 +189,18 @@ impl SearchIndexManager {
         &self,
         opts: impl Into<Option<GetAllSearchIndexesOptions>>,
     ) -> error::Result<Vec<SearchIndex>> {
-        self.client.tracing_client().record_generic_fields().await;
-        self.client.get_all_indexes(opts.into()).await
+        self.client
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_search_get_all_indexes",
+                Some(SERVICE_VALUE_SEARCH),
+                &self.client.keyspace(),
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client.get_all_indexes(opts.into()).await
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -203,8 +223,18 @@ impl SearchIndexManager {
         index: SearchIndex,
         opts: impl Into<Option<UpsertSearchIndexOptions>>,
     ) -> error::Result<()> {
-        self.client.tracing_client().record_generic_fields().await;
-        self.client.upsert_index(index, opts.into()).await
+        self.client
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_search_upsert_index",
+                Some(SERVICE_VALUE_SEARCH),
+                &self.client.keyspace(),
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client.upsert_index(index, opts.into()).await
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -227,8 +257,18 @@ impl SearchIndexManager {
         index_name: impl Into<String>,
         opts: impl Into<Option<DropSearchIndexOptions>>,
     ) -> error::Result<()> {
-        self.client.tracing_client().record_generic_fields().await;
-        self.client.drop_index(index_name.into(), opts.into()).await
+        self.client
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_search_drop_index",
+                Some(SERVICE_VALUE_SEARCH),
+                &self.client.keyspace(),
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client.drop_index(index_name.into(), opts.into()).await
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -252,9 +292,19 @@ impl SearchIndexManager {
         document: Value,
         opts: impl Into<Option<AnalyzeDocumentOptions>>,
     ) -> error::Result<Value> {
-        self.client.tracing_client().record_generic_fields().await;
         self.client
-            .analyze_document(index_name.into(), document, opts.into())
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_search_analyze_document",
+                Some(SERVICE_VALUE_SEARCH),
+                &self.client.keyspace(),
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client
+                        .analyze_document(index_name.into(), document, opts.into())
+                        .await
+                },
+            )
             .await
     }
 
@@ -278,9 +328,19 @@ impl SearchIndexManager {
         index_name: impl Into<String>,
         opts: impl Into<Option<GetIndexedDocumentsCountOptions>>,
     ) -> error::Result<u64> {
-        self.client.tracing_client().record_generic_fields().await;
         self.client
-            .get_indexed_documents_count(index_name.into(), opts.into())
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_search_get_indexed_documents_count",
+                Some(SERVICE_VALUE_SEARCH),
+                &self.client.keyspace(),
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client
+                        .get_indexed_documents_count(index_name.into(), opts.into())
+                        .await
+                },
+            )
             .await
     }
 
@@ -304,9 +364,19 @@ impl SearchIndexManager {
         index_name: impl Into<String>,
         opts: impl Into<Option<PauseIngestSearchIndexOptions>>,
     ) -> error::Result<()> {
-        self.client.tracing_client().record_generic_fields().await;
         self.client
-            .pause_ingest(index_name.into(), opts.into())
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_search_pause_ingest",
+                Some(SERVICE_VALUE_SEARCH),
+                &self.client.keyspace(),
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client
+                        .pause_ingest(index_name.into(), opts.into())
+                        .await
+                },
+            )
             .await
     }
 
@@ -330,9 +400,19 @@ impl SearchIndexManager {
         index_name: impl Into<String>,
         opts: impl Into<Option<ResumeIngestSearchIndexOptions>>,
     ) -> error::Result<()> {
-        self.client.tracing_client().record_generic_fields().await;
         self.client
-            .resume_ingest(index_name.into(), opts.into())
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_search_resume_ingest",
+                Some(SERVICE_VALUE_SEARCH),
+                &self.client.keyspace(),
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client
+                        .resume_ingest(index_name.into(), opts.into())
+                        .await
+                },
+            )
             .await
     }
 
@@ -356,9 +436,19 @@ impl SearchIndexManager {
         index_name: impl Into<String>,
         opts: impl Into<Option<AllowQueryingSearchIndexOptions>>,
     ) -> error::Result<()> {
-        self.client.tracing_client().record_generic_fields().await;
         self.client
-            .allow_querying(index_name.into(), opts.into())
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_search_allow_querying",
+                Some(SERVICE_VALUE_SEARCH),
+                &self.client.keyspace(),
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client
+                        .allow_querying(index_name.into(), opts.into())
+                        .await
+                },
+            )
             .await
     }
 
@@ -382,9 +472,19 @@ impl SearchIndexManager {
         index_name: impl Into<String>,
         opts: impl Into<Option<DisallowQueryingSearchIndexOptions>>,
     ) -> error::Result<()> {
-        self.client.tracing_client().record_generic_fields().await;
         self.client
-            .disallow_querying(index_name.into(), opts.into())
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_search_disallow_querying",
+                Some(SERVICE_VALUE_SEARCH),
+                &self.client.keyspace(),
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client
+                        .disallow_querying(index_name.into(), opts.into())
+                        .await
+                },
+            )
             .await
     }
 
@@ -408,9 +508,19 @@ impl SearchIndexManager {
         index_name: impl Into<String>,
         opts: impl Into<Option<FreezePlanSearchIndexOptions>>,
     ) -> error::Result<()> {
-        self.client.tracing_client().record_generic_fields().await;
         self.client
-            .freeze_plan(index_name.into(), opts.into())
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_search_freeze_plan",
+                Some(SERVICE_VALUE_SEARCH),
+                &self.client.keyspace(),
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client
+                        .freeze_plan(index_name.into(), opts.into())
+                        .await
+                },
+            )
             .await
     }
 
@@ -434,9 +544,19 @@ impl SearchIndexManager {
         index_name: impl Into<String>,
         opts: impl Into<Option<UnfreezePlanSearchIndexOptions>>,
     ) -> error::Result<()> {
-        self.client.tracing_client().record_generic_fields().await;
         self.client
-            .unfreeze_plan(index_name.into(), opts.into())
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_search_unfreeze_plan",
+                Some(SERVICE_VALUE_SEARCH),
+                &self.client.keyspace(),
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client
+                        .unfreeze_plan(index_name.into(), opts.into())
+                        .await
+                },
+            )
             .await
     }
 }

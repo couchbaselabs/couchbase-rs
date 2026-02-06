@@ -17,6 +17,7 @@
  */
 
 use crate::clients::bucket_mgmt_client::BucketMgmtClient;
+use crate::clients::tracing_client::Keyspace;
 use crate::error;
 use crate::management::buckets::bucket_settings::BucketSettings;
 use crate::options::bucket_mgmt_options::*;
@@ -100,9 +101,19 @@ impl BucketManager {
         &self,
         opts: impl Into<Option<GetAllBucketsOptions>>,
     ) -> error::Result<Vec<BucketSettings>> {
-        self.client.tracing_client().record_generic_fields().await;
         self.client
-            .get_all_buckets(opts.into().unwrap_or(GetAllBucketsOptions::default()))
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_buckets_get_all_buckets",
+                Some(SERVICE_VALUE_MANAGEMENT),
+                &Keyspace::Cluster,
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client
+                        .get_all_buckets(opts.into().unwrap_or(GetAllBucketsOptions::default()))
+                        .await
+                },
+            )
             .await
     }
 
@@ -125,11 +136,23 @@ impl BucketManager {
         bucket_name: String,
         opts: impl Into<Option<GetBucketOptions>>,
     ) -> error::Result<BucketSettings> {
-        self.client.tracing_client().record_generic_fields().await;
         self.client
-            .get_bucket(
-                bucket_name,
-                opts.into().unwrap_or(GetBucketOptions::default()),
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_buckets_get_bucket",
+                Some(SERVICE_VALUE_MANAGEMENT),
+                &Keyspace::Bucket {
+                    bucket: bucket_name.clone(),
+                },
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client
+                        .get_bucket(
+                            bucket_name,
+                            opts.into().unwrap_or(GetBucketOptions::default()),
+                        )
+                        .await
+                },
             )
             .await
     }
@@ -153,11 +176,23 @@ impl BucketManager {
         settings: BucketSettings,
         opts: impl Into<Option<CreateBucketOptions>>,
     ) -> error::Result<()> {
-        self.client.tracing_client().record_generic_fields().await;
         self.client
-            .create_bucket(
-                settings,
-                opts.into().unwrap_or(CreateBucketOptions::default()),
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_buckets_create_bucket",
+                Some(SERVICE_VALUE_MANAGEMENT),
+                &Keyspace::Bucket {
+                    bucket: settings.name.clone(),
+                },
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client
+                        .create_bucket(
+                            settings,
+                            opts.into().unwrap_or(CreateBucketOptions::default()),
+                        )
+                        .await
+                },
             )
             .await
     }
@@ -181,11 +216,23 @@ impl BucketManager {
         settings: BucketSettings,
         opts: impl Into<Option<UpdateBucketOptions>>,
     ) -> error::Result<()> {
-        self.client.tracing_client().record_generic_fields().await;
         self.client
-            .update_bucket(
-                settings,
-                opts.into().unwrap_or(UpdateBucketOptions::default()),
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_buckets_update_bucket",
+                Some(SERVICE_VALUE_MANAGEMENT),
+                &Keyspace::Bucket {
+                    bucket: settings.name.clone(),
+                },
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client
+                        .update_bucket(
+                            settings,
+                            opts.into().unwrap_or(UpdateBucketOptions::default()),
+                        )
+                        .await
+                },
             )
             .await
     }
@@ -209,11 +256,23 @@ impl BucketManager {
         bucket_name: String,
         opts: impl Into<Option<DropBucketOptions>>,
     ) -> error::Result<()> {
-        self.client.tracing_client().record_generic_fields().await;
         self.client
-            .drop_bucket(
-                bucket_name,
-                opts.into().unwrap_or(DropBucketOptions::default()),
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_buckets_drop_bucket",
+                Some(SERVICE_VALUE_MANAGEMENT),
+                &Keyspace::Bucket {
+                    bucket: bucket_name.clone(),
+                },
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client
+                        .drop_bucket(
+                            bucket_name,
+                            opts.into().unwrap_or(DropBucketOptions::default()),
+                        )
+                        .await
+                },
             )
             .await
     }
@@ -237,11 +296,23 @@ impl BucketManager {
         bucket_name: String,
         opts: impl Into<Option<FlushBucketOptions>>,
     ) -> error::Result<()> {
-        self.client.tracing_client().record_generic_fields().await;
         self.client
-            .flush_bucket(
-                bucket_name,
-                opts.into().unwrap_or(FlushBucketOptions::default()),
+            .tracing_client()
+            .execute_metered_operation(
+                "manager_buckets_flush_bucket",
+                Some(SERVICE_VALUE_MANAGEMENT),
+                &Keyspace::Bucket {
+                    bucket: bucket_name.clone(),
+                },
+                async move {
+                    self.client.tracing_client().record_generic_fields().await;
+                    self.client
+                        .flush_bucket(
+                            bucket_name,
+                            opts.into().unwrap_or(FlushBucketOptions::default()),
+                        )
+                        .await
+                },
             )
             .await
     }

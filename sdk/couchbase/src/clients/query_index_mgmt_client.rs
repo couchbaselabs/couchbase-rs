@@ -17,7 +17,9 @@
  */
 
 use crate::clients::agent_provider::CouchbaseAgentProvider;
-use crate::clients::tracing_client::{CouchbaseTracingClient, TracingClient, TracingClientBackend};
+use crate::clients::tracing_client::{
+    CouchbaseTracingClient, Keyspace, TracingClient, TracingClientBackend,
+};
 use crate::error;
 use crate::options::query_index_mgmt_options::{
     BuildQueryIndexOptions, CreatePrimaryQueryIndexOptions, CreateQueryIndexOptions,
@@ -186,6 +188,17 @@ impl QueryIndexMgmtClient {
             }
         }
     }
+
+    pub fn keyspace(&self) -> Keyspace {
+        match &self.backend {
+            QueryIndexMgmtClientBackend::CouchbaseQueryIndexMgmtClientBackend(backend) => {
+                backend.keyspace.clone().into()
+            }
+            QueryIndexMgmtClientBackend::Couchbase2QueryIndexMgmtClientBackend(_) => {
+                unimplemented!()
+            }
+        }
+    }
 }
 
 pub(crate) enum QueryIndexMgmtClientBackend {
@@ -193,6 +206,7 @@ pub(crate) enum QueryIndexMgmtClientBackend {
     Couchbase2QueryIndexMgmtClientBackend(Couchbase2QueryIndexMgmtClient),
 }
 
+#[derive(Clone, Debug)]
 pub(crate) struct QueryIndexKeyspace {
     pub bucket_name: String,
     pub scope_name: String,
@@ -210,6 +224,16 @@ impl QueryIndexKeyspace {
 
     pub(crate) fn collection_name(&self) -> &str {
         self.collection_name.as_str()
+    }
+}
+
+impl From<QueryIndexKeyspace> for Keyspace {
+    fn from(keyspace: QueryIndexKeyspace) -> Self {
+        Keyspace::Collection {
+            bucket: keyspace.bucket_name,
+            scope: keyspace.scope_name,
+            collection: keyspace.collection_name,
+        }
     }
 }
 

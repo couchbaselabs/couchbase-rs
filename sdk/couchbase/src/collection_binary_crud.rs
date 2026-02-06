@@ -83,13 +83,22 @@ impl BinaryCollection {
         value: &[u8],
         options: impl Into<Option<AppendOptions>>,
     ) -> crate::error::Result<MutationResult> {
-        let options = options.into().unwrap_or_default();
         self.tracing_client
-            .record_kv_fields(&options.durability_level)
-            .await;
+            .execute_metered_operation(
+                "append",
+                Some(SERVICE_VALUE_KV),
+                &self.keyspace,
+                async move {
+                    let options = options.into().unwrap_or_default();
+                    self.tracing_client
+                        .record_kv_fields(&options.durability_level)
+                        .await;
 
-        self.core_kv_client
-            .append(id.as_ref(), value, options)
+                    self.core_kv_client
+                        .append(id.as_ref(), value, options)
+                        .await
+                },
+            )
             .await
     }
 
@@ -116,13 +125,22 @@ impl BinaryCollection {
         value: &[u8],
         options: impl Into<Option<PrependOptions>>,
     ) -> crate::error::Result<MutationResult> {
-        let options = options.into().unwrap_or_default();
         self.tracing_client
-            .record_kv_fields(&options.durability_level)
-            .await;
+            .execute_metered_operation(
+                "prepend",
+                Some(SERVICE_VALUE_KV),
+                &self.keyspace,
+                async move {
+                    let options = options.into().unwrap_or_default();
+                    self.tracing_client
+                        .record_kv_fields(&options.durability_level)
+                        .await;
 
-        self.core_kv_client
-            .prepend(id.as_ref(), value, options)
+                    self.core_kv_client
+                        .prepend(id.as_ref(), value, options)
+                        .await
+                },
+            )
             .await
     }
 
@@ -148,12 +166,21 @@ impl BinaryCollection {
         id: impl AsRef<str>,
         options: impl Into<Option<IncrementOptions>>,
     ) -> crate::error::Result<CounterResult> {
-        let options = options.into().unwrap_or_default();
         self.tracing_client
-            .record_kv_fields(&options.durability_level)
-            .await;
+            .execute_metered_operation(
+                "increment",
+                Some(SERVICE_VALUE_KV),
+                &self.keyspace,
+                async move {
+                    let options = options.into().unwrap_or_default();
+                    self.tracing_client
+                        .record_kv_fields(&options.durability_level)
+                        .await;
 
-        self.core_kv_client.increment(id.as_ref(), options).await
+                    self.core_kv_client.increment(id.as_ref(), options).await
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -178,11 +205,20 @@ impl BinaryCollection {
         id: impl AsRef<str>,
         options: impl Into<Option<DecrementOptions>>,
     ) -> crate::error::Result<CounterResult> {
-        let options = options.into().unwrap_or_default();
         self.tracing_client
-            .record_kv_fields(&options.durability_level)
-            .await;
+            .execute_metered_operation(
+                "decrement",
+                Some(SERVICE_VALUE_KV),
+                &self.keyspace,
+                async move {
+                    let options = options.into().unwrap_or_default();
+                    self.tracing_client
+                        .record_kv_fields(&options.durability_level)
+                        .await;
 
-        self.core_kv_client.decrement(id.as_ref(), options).await
+                    self.core_kv_client.decrement(id.as_ref(), options).await
+                },
+            )
+            .await
     }
 }

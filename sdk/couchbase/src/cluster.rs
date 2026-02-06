@@ -22,7 +22,7 @@ use crate::clients::bucket_mgmt_client::BucketMgmtClient;
 use crate::clients::cluster_client::ClusterClient;
 use crate::clients::diagnostics_client::DiagnosticsClient;
 use crate::clients::query_client::QueryClient;
-use crate::clients::tracing_client::TracingClient;
+use crate::clients::tracing_client::{Keyspace, TracingClient};
 use crate::clients::user_mgmt_client::UserMgmtClient;
 use crate::error;
 use crate::management::buckets::bucket_manager::BucketManager;
@@ -144,8 +144,17 @@ impl Cluster {
         statement: String,
         opts: impl Into<Option<QueryOptions>>,
     ) -> error::Result<QueryResult> {
-        self.tracing_client.record_generic_fields().await;
-        self.query_client.query(statement, opts.into()).await
+        self.tracing_client
+            .execute_metered_operation(
+                "query",
+                Some(SERVICE_VALUE_QUERY),
+                &Keyspace::Cluster,
+                async move {
+                    self.tracing_client.record_generic_fields().await;
+                    self.query_client.query(statement, opts.into()).await
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -164,9 +173,13 @@ impl Cluster {
         &self,
         opts: impl Into<Option<PingOptions>>,
     ) -> error::Result<PingReport> {
-        self.tracing_client.record_generic_fields().await;
-        let opts = opts.into().unwrap_or_default();
-        self.diagnostics_client.ping(opts).await
+        self.tracing_client
+            .execute_metered_operation("ping", None, &Keyspace::Cluster, async move {
+                self.tracing_client.record_generic_fields().await;
+                let opts = opts.into().unwrap_or_default();
+                self.diagnostics_client.ping(opts).await
+            })
+            .await
     }
 
     #[instrument(
@@ -185,9 +198,13 @@ impl Cluster {
         &self,
         opts: impl Into<Option<DiagnosticsOptions>>,
     ) -> error::Result<DiagnosticsResult> {
-        self.tracing_client.record_generic_fields().await;
-        let opts = opts.into().unwrap_or_default();
-        self.diagnostics_client.diagnostics(opts).await
+        self.tracing_client
+            .execute_metered_operation("diagnostics", None, &Keyspace::Cluster, async move {
+                self.tracing_client.record_generic_fields().await;
+                let opts = opts.into().unwrap_or_default();
+                self.diagnostics_client.diagnostics(opts).await
+            })
+            .await
     }
 
     #[instrument(
@@ -206,9 +223,13 @@ impl Cluster {
         &self,
         opts: impl Into<Option<WaitUntilReadyOptions>>,
     ) -> error::Result<()> {
-        self.tracing_client.record_generic_fields().await;
-        let opts = opts.into().unwrap_or_default();
-        self.diagnostics_client.wait_until_ready(opts).await
+        self.tracing_client
+            .execute_metered_operation("wait_untiL_ready", None, &Keyspace::Cluster, async move {
+                self.tracing_client.record_generic_fields().await;
+                let opts = opts.into().unwrap_or_default();
+                self.diagnostics_client.wait_until_ready(opts).await
+            })
+            .await
     }
 }
 

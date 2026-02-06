@@ -20,7 +20,7 @@ use crate::clients::query_client::QueryClient;
 use crate::clients::scope_client::ScopeClient;
 use crate::clients::search_client::SearchClient;
 use crate::clients::search_index_mgmt_client::SearchIndexMgmtClient;
-use crate::clients::tracing_client::TracingClient;
+use crate::clients::tracing_client::{Keyspace, TracingClient};
 use crate::collection::Collection;
 use crate::error;
 use crate::management::search::search_index_manager::SearchIndexManager;
@@ -43,6 +43,7 @@ pub struct Scope {
     search_client: Arc<SearchClient>,
     search_index_client: Arc<SearchIndexMgmtClient>,
     tracing_client: TracingClient,
+    keyspace: Keyspace,
 }
 
 impl Scope {
@@ -51,6 +52,10 @@ impl Scope {
         let search_client = Arc::new(client.search_client());
         let search_index_client = Arc::new(client.search_index_management_client());
         let tracing_client = client.tracing_client();
+        let keyspace = Keyspace::Scope {
+            bucket: client.bucket_name().to_string(),
+            scope: client.name().to_string(),
+        };
 
         Self {
             client,
@@ -58,6 +63,7 @@ impl Scope {
             search_client,
             search_index_client,
             tracing_client,
+            keyspace,
         }
     }
 
@@ -75,6 +81,15 @@ impl Scope {
         opts: impl Into<Option<QueryOptions>>,
     ) -> error::Result<QueryResult> {
         self.query_internal(statement.into(), opts).await
+    }
+
+    pub async fn search(
+        &self,
+        index_name: impl Into<String>,
+        request: SearchRequest,
+        opts: impl Into<Option<SearchOptions>>,
+    ) -> error::Result<SearchResult> {
+        self.search_internal(index_name.into(), request, opts).await
     }
 
     #[instrument(
@@ -98,17 +113,17 @@ impl Scope {
         statement: String,
         opts: impl Into<Option<QueryOptions>>,
     ) -> error::Result<QueryResult> {
-        self.tracing_client.record_generic_fields().await;
-        self.query_client.query(statement, opts.into()).await
-    }
-
-    pub async fn search(
-        &self,
-        index_name: impl Into<String>,
-        request: SearchRequest,
-        opts: impl Into<Option<SearchOptions>>,
-    ) -> error::Result<SearchResult> {
-        self.search_internal(index_name.into(), request, opts).await
+        self.tracing_client
+            .execute_metered_operation(
+                "query",
+                Some(SERVICE_VALUE_QUERY),
+                &self.keyspace,
+                async move {
+                    self.tracing_client.record_generic_fields().await;
+                    self.query_client.query(statement, opts.into()).await
+                },
+            )
+            .await
     }
 
     #[instrument(
@@ -132,9 +147,18 @@ impl Scope {
         request: SearchRequest,
         opts: impl Into<Option<SearchOptions>>,
     ) -> error::Result<SearchResult> {
-        self.tracing_client.record_generic_fields().await;
-        self.search_client
-            .search(index_name, request, opts.into())
+        self.tracing_client
+            .execute_metered_operation(
+                "search",
+                Some(SERVICE_VALUE_SEARCH),
+                &self.keyspace,
+                async move {
+                    self.tracing_client.record_generic_fields().await;
+                    self.search_client
+                        .search(index_name, request, opts.into())
+                        .await
+                },
+            )
             .await
     }
 
