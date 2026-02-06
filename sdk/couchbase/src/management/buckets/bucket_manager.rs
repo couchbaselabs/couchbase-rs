@@ -17,15 +17,15 @@
  */
 
 use crate::clients::bucket_mgmt_client::BucketMgmtClient;
-use crate::clients::tracing_client::Keyspace;
 use crate::error;
 use crate::management::buckets::bucket_settings::BucketSettings;
 use crate::options::bucket_mgmt_options::*;
+use crate::tracing::Keyspace;
+use crate::tracing::SpanBuilder;
 use crate::tracing::{
     SERVICE_VALUE_MANAGEMENT, SPAN_ATTRIB_DB_SYSTEM_VALUE, SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
 };
 use std::sync::Arc;
-use tracing::{instrument, Level};
 
 #[derive(Clone)]
 pub struct BucketManager {
@@ -84,235 +84,122 @@ impl BucketManager {
         self.flush_bucket_internal(bucket_name.into(), opts).await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "manager_buckets_get_all_buckets",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "manager_buckets_get_all_buckets",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        couchbase.service = SERVICE_VALUE_MANAGEMENT,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn get_all_buckets_internal(
         &self,
         opts: impl Into<Option<GetAllBucketsOptions>>,
     ) -> error::Result<Vec<BucketSettings>> {
         self.client
             .tracing_client()
-            .execute_metered_operation(
-                "manager_buckets_get_all_buckets",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &Keyspace::Cluster,
-                async move {
-                    self.client.tracing_client().record_generic_fields().await;
-                    self.client
-                        .get_all_buckets(opts.into().unwrap_or(GetAllBucketsOptions::default()))
-                        .await
-                },
+                create_span!("manager_buckets_get_all_buckets"),
+                self.client.get_all_buckets(opts.into().unwrap_or_default()),
             )
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "manager_buckets_get_bucket",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "manager_buckets_get_bucket",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = bucket_name,
-        couchbase.service = SERVICE_VALUE_MANAGEMENT,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn get_bucket_internal(
         &self,
         bucket_name: String,
         opts: impl Into<Option<GetBucketOptions>>,
     ) -> error::Result<BucketSettings> {
+        let keyspace = Keyspace::Bucket {
+            bucket: bucket_name.clone(),
+        };
+
         self.client
             .tracing_client()
-            .execute_metered_operation(
-                "manager_buckets_get_bucket",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_MANAGEMENT),
-                &Keyspace::Bucket {
-                    bucket: bucket_name.clone(),
-                },
-                async move {
-                    self.client.tracing_client().record_generic_fields().await;
-                    self.client
-                        .get_bucket(
-                            bucket_name,
-                            opts.into().unwrap_or(GetBucketOptions::default()),
-                        )
-                        .await
-                },
+                &keyspace,
+                create_span!("manager_buckets_get_bucket"),
+                self.client
+                    .get_bucket(bucket_name, opts.into().unwrap_or_default()),
             )
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "manager_buckets_create_bucket",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "manager_buckets_create_bucket",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = settings.name,
-        couchbase.service = SERVICE_VALUE_MANAGEMENT,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn create_bucket_internal(
         &self,
         settings: BucketSettings,
         opts: impl Into<Option<CreateBucketOptions>>,
     ) -> error::Result<()> {
+        let keyspace = Keyspace::Bucket {
+            bucket: settings.name.clone(),
+        };
+
         self.client
             .tracing_client()
-            .execute_metered_operation(
-                "manager_buckets_create_bucket",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_MANAGEMENT),
-                &Keyspace::Bucket {
-                    bucket: settings.name.clone(),
-                },
-                async move {
-                    self.client.tracing_client().record_generic_fields().await;
-                    self.client
-                        .create_bucket(
-                            settings,
-                            opts.into().unwrap_or(CreateBucketOptions::default()),
-                        )
-                        .await
-                },
+                &keyspace,
+                create_span!("manager_buckets_create_bucket"),
+                self.client
+                    .create_bucket(settings, opts.into().unwrap_or_default()),
             )
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "manager_buckets_update_bucket",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "manager_buckets_update_bucket",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = settings.name,
-        couchbase.service = SERVICE_VALUE_MANAGEMENT,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn update_bucket_internal(
         &self,
         settings: BucketSettings,
         opts: impl Into<Option<UpdateBucketOptions>>,
     ) -> error::Result<()> {
+        let keyspace = Keyspace::Bucket {
+            bucket: settings.name.clone(),
+        };
+
         self.client
             .tracing_client()
-            .execute_metered_operation(
-                "manager_buckets_update_bucket",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_MANAGEMENT),
-                &Keyspace::Bucket {
-                    bucket: settings.name.clone(),
-                },
-                async move {
-                    self.client.tracing_client().record_generic_fields().await;
-                    self.client
-                        .update_bucket(
-                            settings,
-                            opts.into().unwrap_or(UpdateBucketOptions::default()),
-                        )
-                        .await
-                },
+                &keyspace,
+                create_span!("manager_buckets_update_bucket"),
+                self.client
+                    .update_bucket(settings, opts.into().unwrap_or_default()),
             )
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "manager_buckets_drop_bucket",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "manager_buckets_drop_bucket",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = bucket_name,
-        couchbase.service = SERVICE_VALUE_MANAGEMENT,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn drop_bucket_internal(
         &self,
         bucket_name: String,
         opts: impl Into<Option<DropBucketOptions>>,
     ) -> error::Result<()> {
+        let keyspace = Keyspace::Bucket {
+            bucket: bucket_name.clone(),
+        };
+
         self.client
             .tracing_client()
-            .execute_metered_operation(
-                "manager_buckets_drop_bucket",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_MANAGEMENT),
-                &Keyspace::Bucket {
-                    bucket: bucket_name.clone(),
-                },
-                async move {
-                    self.client.tracing_client().record_generic_fields().await;
-                    self.client
-                        .drop_bucket(
-                            bucket_name,
-                            opts.into().unwrap_or(DropBucketOptions::default()),
-                        )
-                        .await
-                },
+                &keyspace,
+                create_span!("manager_buckets_drop_bucket"),
+                self.client
+                    .drop_bucket(bucket_name, opts.into().unwrap_or_default()),
             )
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "manager_buckets_flush_bucket",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "manager_buckets_flush_bucket",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = bucket_name,
-        couchbase.service = SERVICE_VALUE_MANAGEMENT,
-        couchbase.retries = 0,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn flush_bucket_internal(
         &self,
         bucket_name: String,
         opts: impl Into<Option<FlushBucketOptions>>,
     ) -> error::Result<()> {
+        let keyspace = Keyspace::Bucket {
+            bucket: bucket_name.clone(),
+        };
+
         self.client
             .tracing_client()
-            .execute_metered_operation(
-                "manager_buckets_flush_bucket",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_MANAGEMENT),
-                &Keyspace::Bucket {
-                    bucket: bucket_name.clone(),
-                },
-                async move {
-                    self.client.tracing_client().record_generic_fields().await;
-                    self.client
-                        .flush_bucket(
-                            bucket_name,
-                            opts.into().unwrap_or(FlushBucketOptions::default()),
-                        )
-                        .await
-                },
+                &keyspace,
+                create_span!("manager_buckets_flush_bucket"),
+                self.client
+                    .flush_bucket(bucket_name, opts.into().unwrap_or_default()),
             )
             .await
     }

@@ -20,7 +20,7 @@ use crate::clients::query_client::QueryClient;
 use crate::clients::scope_client::ScopeClient;
 use crate::clients::search_client::SearchClient;
 use crate::clients::search_index_mgmt_client::SearchIndexMgmtClient;
-use crate::clients::tracing_client::{Keyspace, TracingClient};
+use crate::clients::tracing_client::TracingClient;
 use crate::collection::Collection;
 use crate::error;
 use crate::management::search::search_index_manager::SearchIndexManager;
@@ -30,7 +30,7 @@ use crate::results::query_results::QueryResult;
 use crate::results::search_results::SearchResult;
 use crate::search::request::SearchRequest;
 use crate::tracing::{
-    SERVICE_VALUE_QUERY, SERVICE_VALUE_SEARCH, SPAN_ATTRIB_DB_SYSTEM_VALUE,
+    Keyspace, SpanBuilder, SERVICE_VALUE_QUERY, SERVICE_VALUE_SEARCH, SPAN_ATTRIB_DB_SYSTEM_VALUE,
     SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
 };
 use std::sync::Arc;
@@ -92,55 +92,23 @@ impl Scope {
         self.search_internal(index_name.into(), request, opts).await
     }
 
-    #[instrument(
-    skip_all,
-    level = Level::TRACE,
-    name = "query",
-    fields(
-    otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-    db.operation.name = "query",
-    db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-    db.query.text = statement,
-    db.namespace = self.client.bucket_name(),
-    couchbase.scope.name = self.name(),
-    couchbase.service = SERVICE_VALUE_QUERY,
-    couchbase.retries = 0,
-    couchbase.cluster.name,
-    couchbase.cluster.uuid,
-    ))]
     async fn query_internal(
         &self,
         statement: String,
         opts: impl Into<Option<QueryOptions>>,
     ) -> error::Result<QueryResult> {
+        let span = create_span!("query").with_statement(&statement);
+
         self.tracing_client
-            .execute_metered_operation(
-                "query",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_QUERY),
                 &self.keyspace,
-                async move {
-                    self.tracing_client.record_generic_fields().await;
-                    self.query_client.query(statement, opts.into()).await
-                },
+                span,
+                self.query_client.query(statement, opts.into()),
             )
             .await
     }
 
-    #[instrument(
-    skip_all,
-    level = Level::TRACE,
-    name = "search",
-    fields(
-    otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-    db.operation.name = "search",
-    db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-    db.namespace = self.client.bucket_name(),
-    couchbase.scope.name = self.name(),
-    couchbase.service = SERVICE_VALUE_SEARCH,
-    couchbase.retries = 0,
-    couchbase.cluster.name,
-    couchbase.cluster.uuid,
-    ))]
     async fn search_internal(
         &self,
         index_name: String,
@@ -148,16 +116,11 @@ impl Scope {
         opts: impl Into<Option<SearchOptions>>,
     ) -> error::Result<SearchResult> {
         self.tracing_client
-            .execute_metered_operation(
-                "search",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_SEARCH),
                 &self.keyspace,
-                async move {
-                    self.tracing_client.record_generic_fields().await;
-                    self.search_client
-                        .search(index_name, request, opts.into())
-                        .await
-                },
+                create_span!("search"),
+                self.search_client.search(index_name, request, opts.into()),
             )
             .await
     }

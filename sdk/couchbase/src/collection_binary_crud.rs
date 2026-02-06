@@ -20,10 +20,10 @@ use crate::collection::BinaryCollection;
 use crate::options::kv_binary_options::*;
 use crate::results::kv_binary_results::CounterResult;
 use crate::results::kv_results::MutationResult;
+use crate::tracing::SpanBuilder;
 use crate::tracing::{
     SERVICE_VALUE_KV, SPAN_ATTRIB_DB_SYSTEM_VALUE, SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
 };
-use tracing::{instrument, Level};
 
 impl BinaryCollection {
     pub async fn append(
@@ -60,164 +60,76 @@ impl BinaryCollection {
         self.decrement_internal(id, options).await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "append",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "append",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.core_kv_client.bucket_name(),
-        couchbase.scope.name = self.core_kv_client.scope_name(),
-        couchbase.collection.name = self.core_kv_client.collection_name(),
-        couchbase.service = SERVICE_VALUE_KV,
-        couchbase.retries = 0,
-        couchbase.durability,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn append_internal(
         &self,
         id: impl AsRef<str>,
         value: &[u8],
         options: impl Into<Option<AppendOptions>>,
     ) -> crate::error::Result<MutationResult> {
+        let options = options.into().unwrap_or_default();
+        let span = create_span!("append").with_durability(&options.durability_level);
+
         self.tracing_client
-            .execute_metered_operation(
-                "append",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_KV),
                 &self.keyspace,
-                async move {
-                    let options = options.into().unwrap_or_default();
-                    self.tracing_client
-                        .record_kv_fields(&options.durability_level)
-                        .await;
-
-                    self.core_kv_client
-                        .append(id.as_ref(), value, options)
-                        .await
-                },
+                span,
+                self.core_kv_client.append(id.as_ref(), value, options),
             )
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "prepend",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "prepend",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.core_kv_client.bucket_name(),
-        couchbase.scope.name = self.core_kv_client.scope_name(),
-        couchbase.collection.name = self.core_kv_client.collection_name(),
-        couchbase.service = SERVICE_VALUE_KV,
-        couchbase.retries = 0,
-        couchbase.durability,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn prepend_internal(
         &self,
         id: impl AsRef<str>,
         value: &[u8],
         options: impl Into<Option<PrependOptions>>,
     ) -> crate::error::Result<MutationResult> {
+        let options = options.into().unwrap_or_default();
+        let span = create_span!("prepend").with_durability(&options.durability_level);
+
         self.tracing_client
-            .execute_metered_operation(
-                "prepend",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_KV),
                 &self.keyspace,
-                async move {
-                    let options = options.into().unwrap_or_default();
-                    self.tracing_client
-                        .record_kv_fields(&options.durability_level)
-                        .await;
-
-                    self.core_kv_client
-                        .prepend(id.as_ref(), value, options)
-                        .await
-                },
+                span,
+                self.core_kv_client.prepend(id.as_ref(), value, options),
             )
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "increment",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "increment",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.core_kv_client.bucket_name(),
-        couchbase.scope.name = self.core_kv_client.scope_name(),
-        couchbase.collection.name = self.core_kv_client.collection_name(),
-        couchbase.service = SERVICE_VALUE_KV,
-        couchbase.retries = 0,
-        couchbase.durability,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn increment_internal(
         &self,
         id: impl AsRef<str>,
         options: impl Into<Option<IncrementOptions>>,
     ) -> crate::error::Result<CounterResult> {
+        let options = options.into().unwrap_or_default();
+        let span = create_span!("increment").with_durability(&options.durability_level);
+
         self.tracing_client
-            .execute_metered_operation(
-                "increment",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_KV),
                 &self.keyspace,
-                async move {
-                    let options = options.into().unwrap_or_default();
-                    self.tracing_client
-                        .record_kv_fields(&options.durability_level)
-                        .await;
-
-                    self.core_kv_client.increment(id.as_ref(), options).await
-                },
+                span,
+                self.core_kv_client.increment(id.as_ref(), options),
             )
             .await
     }
 
-    #[instrument(
-        skip_all,
-        level = Level::TRACE,
-        name = "decrement",
-        fields(
-        otel.kind = SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
-        db.operation.name = "decrement",
-        db.system.name = SPAN_ATTRIB_DB_SYSTEM_VALUE,
-        db.namespace = self.core_kv_client.bucket_name(),
-        couchbase.scope.name = self.core_kv_client.scope_name(),
-        couchbase.collection.name = self.core_kv_client.collection_name(),
-        couchbase.service = SERVICE_VALUE_KV,
-        couchbase.retries = 0,
-        couchbase.durability,
-        couchbase.cluster.name,
-        couchbase.cluster.uuid,
-        ))]
     async fn decrement_internal(
         &self,
         id: impl AsRef<str>,
         options: impl Into<Option<DecrementOptions>>,
     ) -> crate::error::Result<CounterResult> {
+        let options = options.into().unwrap_or_default();
+        let span = create_span!("decrement").with_durability(&options.durability_level);
+
         self.tracing_client
-            .execute_metered_operation(
-                "decrement",
+            .execute_observable_operation(
                 Some(SERVICE_VALUE_KV),
                 &self.keyspace,
-                async move {
-                    let options = options.into().unwrap_or_default();
-                    self.tracing_client
-                        .record_kv_fields(&options.durability_level)
-                        .await;
-
-                    self.core_kv_client.decrement(id.as_ref(), options).await
-                },
+                span,
+                self.core_kv_client.decrement(id.as_ref(), options),
             )
             .await
     }
