@@ -16,12 +16,16 @@
  *
  */
 
-use crate::common::consistency_utils::{verify_collection_created, verify_scope_created};
+use crate::common::consistency_utils::{
+    verify_bucket_deleted, verify_collection_created, verify_scope_created,
+};
 use crate::common::doc_generation::{import_color_sample, import_sample_beer_dataset};
 use crate::common::features::TestFeatureCode;
-use crate::common::test_config::run_test;
-use crate::common::{new_key, try_until};
+use crate::common::test_config::{create_test_cluster, run_test};
+use crate::common::{generate_string_value, new_key, try_until};
 use chrono::DateTime;
+use couchbase::management::buckets::bucket_manager::BucketManager;
+use couchbase::management::buckets::bucket_settings::BucketSettings;
 use couchbase::management::collections::collection_settings::CreateCollectionSettings;
 use couchbase::management::search::index::SearchIndex;
 use couchbase::options::search_options::SearchOptions;
@@ -34,10 +38,11 @@ use couchbase::search::queries::{MatchQuery, Query, TermQuery};
 use couchbase::search::request::SearchRequest;
 use couchbase::search::sort::{Sort, SortId};
 use couchbase::search::vector::{VectorQuery, VectorSearch};
+use futures::executor::block_on;
 use futures::StreamExt;
 use log::{error, warn};
 use std::collections::HashMap;
-use std::ops::Add;
+use std::ops::{Add, Deref};
 use std::time::Duration;
 use tokio::time;
 use tokio::time::{timeout_at, Instant};
@@ -46,15 +51,23 @@ mod common;
 
 #[test]
 fn test_search_basic() {
-    run_test(async |cluster, bucket| {
+    run_test(async |cluster, _bucket| {
         if !cluster.supports_feature(&TestFeatureCode::SearchManagementCollections) {
             return;
         }
 
+        let cluster = create_test_cluster().await;
+        let bucket_name = generate_string_value(10);
+        let bucket_mgr = cluster.buckets();
+        bucket_mgr
+            .create_bucket(BucketSettings::new(&bucket_name).ram_quota_mb(600), None)
+            .await
+            .unwrap();
+
         let scope_name = new_key();
         let collection_name = new_key();
 
-        let bucket = bucket;
+        let bucket = cluster.bucket(&bucket_name);
         let collection_mgr = bucket.collections();
         collection_mgr
             .create_scope(&scope_name, None)
@@ -82,7 +95,7 @@ fn test_search_basic() {
             "tests/testdata/basic_scoped_search_index.json",
             &scope,
             &index_name,
-            cluster.default_bucket(),
+            &bucket_name,
             &scope_name,
             &collection_name,
         )
@@ -283,6 +296,9 @@ fn test_search_basic() {
             }
             _ => panic!("unexpected facet type"),
         }
+
+        bucket_mgr.drop_bucket(&bucket_name, None).await.unwrap();
+        verify_bucket_deleted(&bucket_mgr, &bucket_name).await;
     })
 }
 
