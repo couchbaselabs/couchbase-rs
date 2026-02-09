@@ -19,7 +19,8 @@
 use std::collections::HashMap;
 
 use crate::cbconfig::{TerseConfig, TerseExtNodePorts, VBucketServerMap};
-use crate::error::Result;
+use crate::error;
+use crate::error::{ErrorKind, Result};
 use crate::parsedconfig::{
     BucketType, ParsedConfig, ParsedConfigBucket, ParsedConfigBucketFeature, ParsedConfigFeature,
     ParsedConfigNode, ParsedConfigNodeAddresses, ParsedConfigNodePorts,
@@ -154,7 +155,7 @@ impl ConfigParser {
     ) -> Result<Option<VbucketMap>> {
         if let Some(vbucket_server_map) = vbucket_server_map {
             if vbucket_server_map.vbucket_map.is_empty() {
-                return Ok(None);
+                return Err(error::Error::from(ErrorKind::NoVbucketMap));
             }
 
             return Ok(Some(VbucketMap::new(

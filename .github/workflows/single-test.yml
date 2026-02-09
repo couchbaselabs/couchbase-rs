@@ -1,0 +1,80 @@
+name: Run Named Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      test-name:
+        description: 'Name of the test to run (e.g. "test_basic_kv_ops")'
+        required: true
+        default: 'test_basic_kv_ops'
+      server-version:
+        description: 'Couchbase Server version to test against (e.g. "8.0.0")'
+        required: true
+        default: '8.0.0'
+
+jobs:
+  test:
+    name: Run Named Test
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install cbdinocluster
+        run: |
+          mkdir -p "$HOME/bin"
+          wget -nv -O $HOME/bin/cbdinocluster https://github.com/couchbaselabs/cbdinocluster/releases/download/v0.0.89/cbdinocluster-linux-amd64
+          chmod +x $HOME/bin/cbdinocluster
+          echo "$HOME/bin" >> $GITHUB_PATH
+
+      - name: Initialize cbdinocluster
+        run: |
+          cbdinocluster -v init --auto
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Start couchbase cluster
+        env:
+          CLUSTERCONFIG: |
+            nodes:
+              - count: 3
+                version: ${{ github.event.inputs.server-version }}
+                services: [kv, n1ql, index, fts]
+            docker:
+              kv-memory: 2048
+              fts-memory: 2048
+        run: |
+          CBDC_ID=$(cbdinocluster -v alloc --def="${CLUSTERCONFIG}")
+          cbdinocluster -v buckets add ${CBDC_ID} default --ram-quota-mb=100 --flush-enabled=true --num-replicas=2
+          cbdinocluster -v collections add ${CBDC_ID} default _default test
+          CBDC_IP=$(cbdinocluster -v ip $CBDC_ID)
+          echo "CBDC_ID=$CBDC_ID" >> "$GITHUB_ENV"
+          echo "CBDC_IP=$CBDC_IP" >> "$GITHUB_ENV"
+
+      - name: Set connection string
+        run: |
+          if [[ "${{ matrix.server }}" == community* ]]; then
+            CBDC_CONNSTR=$(cbdinocluster -v connstr $CBDC_ID)
+          else 
+            CBDC_CONNSTR=$(cbdinocluster -v connstr --tls $CBDC_ID)
+          fi
+          
+          echo "CBDC_CONNSTR=$CBDC_CONNSTR" >> "$GITHUB_ENV"
+
+      - name: Create fts index
+        run: |
+          curl -XPUT -H "Content-Type: application/json" -u Administrator:password http://${{ env.CBDC_IP }}:8094/api/index/basic_search_index -d '{"type": "fulltext-index","name": "basic_search_index","sourceType": "gocbcore","sourceName": "default","planParams": {"maxPartitionsPerPIndex": 1024,"indexPartitions": 1},"params": {"doc_config": {"docid_prefix_delim": "","docid_regexp": "","mode": "type_field","type_field": "type"},"mapping": {"analysis": {},"default_analyzer": "standard","default_datetime_parser": "dateTimeOptional","default_field": "_all","default_mapping": {"dynamic": true,"enabled": true},"default_type": "_default","docvalues_dynamic": true,"index_dynamic": true,"store_dynamic": true,"type_field": "_type"},"store": {"indexType": "scorch","segmentVersion": 15}},"sourceParams": {}}' 
+
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain and cache
+        uses: actions-rust-lang/setup-rust-toolchain@v1.4.3
+
+      - name: Run tests
+        timeout-minutes: 40
+        env:
+          CBDC_ID: # from above
+          CBDC_CONNSTR: # from above
+          RCBDINOID: ${{ env.CBDC_ID }}
+          RCBCONNSTR: ${{ env.CBDC_CONNSTR }}
+          RCBSERVER_VERSION: ${{ github.event.inputs.server-version }}
+        run: |
+          cargo test ${{ github.event.inputs.test-name }} --color=always --no-fail-fast  -- --nocapture --exact
