@@ -58,6 +58,5 @@ jobs:
           RCBDINOID: ${{ env.CBDC_ID }}
           RCBCONNSTR: ${{ env.CBDC_CONNSTR }}
           RCBSERVER_VERSION: "8.0.0"
-        run: |
-          bencher run --project couchbase-rs --token '${{ secrets.BENCHER_API_TOKEN }}' --branch main --testbed ubuntu-latest --threshold-measure latency --github-actions '${{ secrets.GITHUB_TOKEN }}' --adapter rust_criterion "cargo bench"
-          bencher run --project couchbase-rs --token '${{ secrets.BENCHER_API_TOKEN }}' --branch "${{ github.event.pull_request.head.ref }}-$unique" --start-point "${{ github.event.pull_request.base.ref }}" --threshold-measure latency  --threshold-test percentage --threshold-upper-boundary 0.15 --start-point-hash '${{ github.event.pull_request.base.sha }}' --start-point-clone-thresholds --start-point-reset --testbed ubuntu-latest --err --github-actions '${{ secrets.GITHUB_TOKEN }}'  --adapter rust_criterion  cargo bench
+        run:
+          bencher run --project couchbase-rs --token '${{ secrets.BENCHER_API_TOKEN }}' --branch main --testbed ubuntu-latest --threshold-measure latency  --threshold-test percentage --threshold-upper-boundary 0.15 --github-actions '${{ secrets.GITHUB_TOKEN }}' --adapter rust_criterion "cargo bench"
