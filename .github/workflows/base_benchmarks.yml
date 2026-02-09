@@ -31,7 +31,7 @@ jobs:
           CLUSTERCONFIG: |
             nodes:
               - count: 3
-                version: ${{ matrix.server }}
+                version: 8.0.0
                 services: [kv, n1ql, index, fts]
             docker:
               kv-memory: 2048
