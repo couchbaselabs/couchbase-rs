@@ -48,9 +48,9 @@ fn upsert() {
         let upsert_opts = UpsertOptions::new(key_clone.as_slice(), "", "", value_clone.as_slice())
             .retry_strategy(Arc::new(FailFastRetryStrategy::default()));
         let expected_allocs: u64 = if agent.test_setup_config.use_ssl {
-            17
+            13
         } else {
-            15
+            11
         };
 
         ensure_agent_ready(&agent).await;
@@ -96,9 +96,9 @@ fn upsert_against_new_collection() {
         .retry_strategy(Arc::new(FailFastRetryStrategy::default()));
 
         let expected_allocs: u64 = if agent.test_setup_config.use_ssl {
-            19
+            15
         } else {
-            17
+            13
         };
 
         ensure_agent_ready(&agent).await;
@@ -125,9 +125,9 @@ fn add() {
         let add_opts = AddOptions::new(key_clone.as_slice(), "", "", value_clone.as_slice())
             .retry_strategy(Arc::new(FailFastRetryStrategy::default()));
         let expected_allocs: u64 = if agent.test_setup_config.use_ssl {
-            17
+            13
         } else {
-            15
+            11
         };
 
         ensure_agent_ready(&agent).await;
@@ -152,9 +152,9 @@ fn replace() {
         let opts = ReplaceOptions::new(key_clone.as_slice(), "", "", value_clone.as_slice())
             .retry_strategy(Arc::new(FailFastRetryStrategy::default()));
         let expected_allocs: u64 = if agent.test_setup_config.use_ssl {
-            17
+            13
         } else {
-            15
+            11
         };
 
         ensure_agent_ready(&agent).await;
@@ -181,9 +181,9 @@ fn get() {
             .retry_strategy(Arc::new(FailFastRetryStrategy::default()));
 
         let expected_allocs: u64 = if agent.test_setup_config.use_ssl {
-            18
+            14
         } else {
-            16
+            12
         };
 
         ensure_agent_ready(&agent).await;

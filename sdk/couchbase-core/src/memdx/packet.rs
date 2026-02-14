@@ -18,6 +18,8 @@
 
 use std::fmt::Debug;
 
+use bytes::Bytes;
+
 use crate::memdx::magic::Magic;
 use crate::memdx::opcode::OpCode;
 use crate::memdx::status::Status;
@@ -31,10 +33,10 @@ pub struct ResponsePacket {
     pub opaque: u32,
     pub vbucket_id: Option<u16>,
     pub cas: Option<u64>,
-    pub extras: Option<Vec<u8>>,
-    pub key: Option<Vec<u8>>,
-    pub value: Option<Vec<u8>>,
-    pub framing_extras: Option<Vec<u8>>,
+    pub extras: Option<Bytes>,
+    pub key: Option<Bytes>,
+    pub value: Option<Bytes>,
+    pub framing_extras: Option<Bytes>,
 }
 
 impl ResponsePacket {

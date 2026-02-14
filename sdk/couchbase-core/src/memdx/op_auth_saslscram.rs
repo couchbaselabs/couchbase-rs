@@ -86,7 +86,7 @@ impl OpsSASLAuthScram {
         }
 
         let payload = client
-            .step2(resp.payload.as_slice())
+            .step2(&resp.payload)
             .map_err(|e| Error::new_protocol_error("failed to perform second sasl step").with(e))?;
 
         let req = SASLStepRequest {

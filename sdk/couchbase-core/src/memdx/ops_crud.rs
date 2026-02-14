@@ -1046,7 +1046,7 @@ impl OpsCrud {
 
         let mut err = ServerError::new(kind, resp.op_code, resp.status, resp.opaque);
         if let Some(value) = &resp.value {
-            err = err.with_context(value.clone());
+            err = err.with_context(value.to_vec());
         }
 
         Err(err.into())
@@ -1071,7 +1071,7 @@ impl OpsCrud {
 
         let mut err = ServerError::new(kind, resp.op_code, resp.status, resp.opaque);
         if let Some(value) = &resp.value {
-            err = err.with_context(value.clone());
+            err = err.with_context(value.to_vec());
         }
 
         Err(err.into())

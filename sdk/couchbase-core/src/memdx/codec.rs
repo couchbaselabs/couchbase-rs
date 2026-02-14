@@ -95,26 +95,20 @@ impl Decoder for KeyValueCodec {
         let mut packet = ResponsePacket::new(magic, opcode, datatype, status, opaque);
         packet.cas = Some(cas);
 
-        let mut payload_pos = 0;
-
         if flexible_extras_len > 0 {
-            packet.framing_extras =
-                Some(slice[payload_pos..(payload_pos + flexible_extras_len)].to_vec());
-            payload_pos += flexible_extras_len;
+            packet.framing_extras = Some(slice.split_to(flexible_extras_len).freeze());
         }
 
         if extras_len > 0 {
-            packet.extras = Some(slice[payload_pos..(payload_pos + extras_len)].to_vec());
-            payload_pos += extras_len;
+            packet.extras = Some(slice.split_to(extras_len).freeze());
         };
 
         if key_len > 0 {
-            packet.key = Some(slice[payload_pos..(payload_pos + key_len)].to_vec());
-            payload_pos += key_len;
+            packet.key = Some(slice.split_to(key_len).freeze());
         };
 
         if body_len > 0 {
-            packet.value = Some(slice[payload_pos..].to_vec());
+            packet.value = Some(slice.freeze());
         };
 
         Ok(Some(packet))

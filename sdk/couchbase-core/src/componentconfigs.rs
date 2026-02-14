@@ -29,6 +29,7 @@ use crate::service_type::ServiceType;
 use crate::tls_config::TlsConfig;
 use crate::vbucketrouter::VbucketRoutingInfo;
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Duration;
 
 pub(crate) struct AgentComponentConfigs {
@@ -63,7 +64,7 @@ impl AgentComponentConfigs {
         let network_info = config.addresses_group_for_network_type(network_type);
 
         let mut gcccp_node_ids = Vec::new();
-        let mut kv_data_node_ids = Vec::new();
+        let mut kv_data_node_ids: Vec<Arc<str>> = Vec::new();
         let mut kv_data_hosts: HashMap<String, Address> = HashMap::new();
         let mut mgmt_endpoints: HashMap<String, String> = HashMap::new();
         let mut analytics_endpoints: HashMap<String, String> = HashMap::new();
@@ -80,7 +81,7 @@ impl AgentComponentConfigs {
             gcccp_node_ids.push(kv_ep_id.clone());
 
             if node.has_data {
-                kv_data_node_ids.push(kv_ep_id.clone());
+                kv_data_node_ids.push(Arc::from(kv_ep_id.as_str()));
             }
 
             if tls_config.is_some() {

@@ -195,7 +195,7 @@ impl<
                         Error::new_contextual_memdx_error(e)
                     })
                     .map_ok(|resp| GetResult {
-                        value: resp.value,
+                        value: resp.value.to_vec(),
                         datatype: resp.datatype,
                         cas: resp.cas,
                         flags: resp.flags,
@@ -233,7 +233,7 @@ impl<
                         Error::new_contextual_memdx_error(e)
                     })
                     .map_ok(|resp| GetMetaResult {
-                        value: resp.value,
+                        value: resp.value.to_vec(),
                         datatype: resp.datatype,
                         server_duration: resp.server_duration,
                         expiry: resp.expiry,
@@ -323,7 +323,7 @@ impl<
                         Error::new_contextual_memdx_error(e)
                     })
                     .map_ok(|resp| GetAndLockResult {
-                        value: resp.value,
+                        value: resp.value.to_vec(),
                         datatype: resp.datatype,
                         cas: resp.cas,
                         flags: resp.flags,
@@ -362,7 +362,7 @@ impl<
                         Error::new_contextual_memdx_error(e)
                     })
                     .map_ok(|resp| GetAndTouchResult {
-                        value: resp.value,
+                        value: resp.value.to_vec(),
                         datatype: resp.datatype,
                         cas: resp.cas,
                         flags: resp.flags,
@@ -1012,7 +1012,7 @@ impl<
                             self.nmvb_handler.clone(),
                             key,
                             0,
-                            async |endpoint: String, vb_id: u16| {
+                            async |endpoint: Arc<str>, vb_id: u16| {
                                 orchestrate_endpoint_kv_client(
                                     self.conn_manager.clone(),
                                     &endpoint,
