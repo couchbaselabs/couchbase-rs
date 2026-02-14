@@ -230,7 +230,7 @@ impl Client {
                                                     };
 
                                                 packet.datatype &= !u8::from(DataTypeFlag::Compressed);
-                                                packet.value = Some(new_value);
+                                                packet.value = Some(Bytes::from(new_value));
                                             }
                                         }
 

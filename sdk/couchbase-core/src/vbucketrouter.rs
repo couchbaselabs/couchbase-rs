@@ -30,14 +30,14 @@ use std::sync::Arc;
 
 pub(crate) trait VbucketRouter: Send + Sync {
     fn update_vbucket_info(&self, info: VbucketRoutingInfo);
-    fn dispatch_by_key(&self, key: &[u8], vbucket_server_idx: u32) -> Result<(String, u16)>;
-    fn dispatch_to_vbucket(&self, vb_id: u16) -> Result<String>;
+    fn dispatch_by_key(&self, key: &[u8], vbucket_server_idx: u32) -> Result<(Arc<str>, u16)>;
+    fn dispatch_to_vbucket(&self, vb_id: u16) -> Result<Arc<str>>;
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct VbucketRoutingInfo {
     pub vbucket_info: Option<VbucketMap>,
-    pub server_list: Vec<String>,
+    pub server_list: Vec<Arc<str>>,
     pub bucket_selected: bool,
 }
 
@@ -69,7 +69,7 @@ impl VbucketRouter for StdVbucketRouter {
         self.routing_info.store(Arc::new(info));
     }
 
-    fn dispatch_by_key(&self, key: &[u8], vbucket_server_idx: u32) -> Result<(String, u16)> {
+    fn dispatch_by_key(&self, key: &[u8], vbucket_server_idx: u32) -> Result<(Arc<str>, u16)> {
         let info = self.routing_info.load();
         if !info.bucket_selected {
             return Err(ErrorKind::NoBucket.into());
@@ -90,7 +90,7 @@ impl VbucketRouter for StdVbucketRouter {
         .into())
     }
 
-    fn dispatch_to_vbucket(&self, vb_id: u16) -> Result<String> {
+    fn dispatch_to_vbucket(&self, vb_id: u16) -> Result<Arc<str>> {
         let info = self.routing_info.load();
         if !info.bucket_selected {
             return Err(ErrorKind::NoBucket.into());
@@ -115,7 +115,7 @@ pub(crate) async fn orchestrate_memd_routing<V, Resp, Fut>(
     nmvb_handler: Arc<impl NotMyVbucketConfigHandler>,
     key: &[u8],
     vb_server_idx: u32,
-    mut operation: impl Fn(String, u16) -> Fut,
+    mut operation: impl Fn(Arc<str>, u16) -> Fut,
 ) -> Result<Resp>
 where
     V: VbucketRouter,
@@ -173,6 +173,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use crate::cbconfig::TerseConfig;
     use crate::vbucketmap::VbucketMap;
     use crate::vbucketrouter::{
@@ -196,7 +198,7 @@ mod tests {
                 )
                 .unwrap(),
             ),
-            server_list: vec!["endpoint1".to_string(), "endpoint2".to_string()],
+            server_list: vec![Arc::from("endpoint1"), Arc::from("endpoint2")],
             bucket_selected: true,
         };
 
@@ -204,17 +206,17 @@ mod tests {
 
         let (endpoint, vb_id) = dispatcher.dispatch_by_key(b"key1", 0).unwrap();
 
-        assert_eq!("endpoint2", endpoint);
+        assert_eq!("endpoint2", &*endpoint);
         assert_eq!(1, vb_id);
 
         let (endpoint, vb_id) = dispatcher.dispatch_by_key(b"key2", 0).unwrap();
 
-        assert_eq!("endpoint1", endpoint);
+        assert_eq!("endpoint1", &*endpoint);
         assert_eq!(3, vb_id);
 
         let (endpoint, vb_id) = dispatcher.dispatch_by_key(b"key2", 1).unwrap();
 
-        assert_eq!("endpoint2", endpoint);
+        assert_eq!("endpoint2", &*endpoint);
         assert_eq!(3, vb_id);
     }
 }

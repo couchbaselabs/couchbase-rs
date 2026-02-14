@@ -77,7 +77,7 @@ async fn orphan_reporter_emits_entries() {
             couchbase_core::memdx::status::Status::Success,
             i as u32,
         );
-        pkt.framing_extras = Some(make_server_duration_frame(*micros));
+        pkt.framing_extras = Some(make_server_duration_frame(*micros).into());
         handle(pkt, ctx.clone());
     }
 

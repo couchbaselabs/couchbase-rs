@@ -19,6 +19,8 @@
 use std::io::{Cursor, Read};
 use std::time::Duration;
 
+use bytes::Bytes;
+
 use crate::memdx::auth_mechanism::AuthMechanism;
 use crate::memdx::client_response::ClientResponse;
 use crate::memdx::error::{
@@ -71,7 +73,7 @@ impl TryFromClientResponse for HelloResponse {
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct GetErrorMapResponse {
-    pub error_map: Vec<u8>,
+    pub error_map: Bytes,
 }
 
 impl TryFromClientResponse for GetErrorMapResponse {
@@ -116,7 +118,7 @@ impl TryFromClientResponse for SelectBucketResponse {
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct SASLAuthResponse {
     pub needs_more_steps: bool,
-    pub payload: Vec<u8>,
+    pub payload: Bytes,
 }
 
 impl TryFromClientResponse for SASLAuthResponse {
@@ -144,7 +146,7 @@ impl TryFromClientResponse for SASLAuthResponse {
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct SASLStepResponse {
     pub needs_more_steps: bool,
-    pub payload: Vec<u8>,
+    pub payload: Bytes,
 }
 
 impl TryFromClientResponse for SASLStepResponse {
@@ -189,7 +191,7 @@ impl TryFromClientResponse for SASLListMechsResponse {
         }
 
         let value = packet.value.unwrap_or_default();
-        let mechs_list_string = match String::from_utf8(value) {
+        let mechs_list_string = match String::from_utf8(value.to_vec()) {
             Ok(v) => v,
             Err(e) => {
                 return Err(Error::new_protocol_error(
@@ -212,7 +214,7 @@ impl TryFromClientResponse for SASLListMechsResponse {
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct GetClusterConfigResponse {
-    pub config: Vec<u8>,
+    pub config: Bytes,
 }
 
 impl TryFromClientResponse for GetClusterConfigResponse {
@@ -224,7 +226,7 @@ impl TryFromClientResponse for GetClusterConfigResponse {
         }
 
         Ok(GetClusterConfigResponse {
-            config: packet.value.clone().unwrap_or_default(),
+            config: packet.value.unwrap_or_default(),
         })
     }
 }
@@ -242,10 +244,10 @@ pub struct MutationToken {
     pub seqno: u64,
 }
 
-impl TryFrom<&Vec<u8>> for MutationToken {
+impl TryFrom<&[u8]> for MutationToken {
     type Error = Error;
 
-    fn try_from(value: &Vec<u8>) -> Result<Self, Self::Error> {
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         if value.len() != 16 {
             return Err(Error::new_protocol_error("bad extras length"));
         }
@@ -287,7 +289,7 @@ impl TryFromClientResponse for SetResponse {
         }
 
         let mutation_token = if let Some(extras) = &packet.extras {
-            Some(MutationToken::try_from(extras)?)
+            Some(MutationToken::try_from(extras.as_ref())?)
         } else {
             None
         };
@@ -306,13 +308,13 @@ impl TryFromClientResponse for SetResponse {
     }
 }
 
-fn parse_flags(extras: &Option<Vec<u8>>) -> Result<u32, Error> {
+fn parse_flags(extras: &Option<Bytes>) -> Result<u32, Error> {
     if let Some(extras) = &extras {
         if extras.len() != 4 {
             return Err(Error::new_protocol_error("bad extras length reading flags"));
         }
 
-        Ok(u32::from_be_bytes(extras.as_slice().try_into().unwrap()))
+        Ok(u32::from_be_bytes(extras[..].try_into().unwrap()))
     } else {
         Err(Error::new_protocol_error("no extras in response"))
     }
@@ -322,7 +324,7 @@ fn parse_flags(extras: &Option<Vec<u8>>) -> Result<u32, Error> {
 pub struct GetResponse {
     pub cas: u64,
     pub flags: u32,
-    pub value: Vec<u8>,
+    pub value: Bytes,
     pub datatype: u8,
     pub server_duration: Option<Duration>,
 }
@@ -368,7 +370,7 @@ impl TryFromClientResponse for GetResponse {
 pub struct GetMetaResponse {
     pub cas: u64,
     pub flags: u32,
-    pub value: Vec<u8>,
+    pub value: Bytes,
     pub datatype: u8,
     pub server_duration: Option<Duration>,
     pub expiry: u32,
@@ -458,7 +460,7 @@ impl TryFromClientResponse for DeleteResponse {
         }
 
         let mutation_token = if let Some(extras) = &packet.extras {
-            Some(MutationToken::try_from(extras)?)
+            Some(MutationToken::try_from(extras.as_ref())?)
         } else {
             None
         };
@@ -481,7 +483,7 @@ impl TryFromClientResponse for DeleteResponse {
 pub struct GetAndLockResponse {
     pub cas: u64,
     pub flags: u32,
-    pub value: Vec<u8>,
+    pub value: Bytes,
     pub datatype: u8,
     pub server_duration: Option<Duration>,
 }
@@ -535,7 +537,7 @@ impl TryFromClientResponse for GetAndLockResponse {
 pub struct GetAndTouchResponse {
     pub cas: u64,
     pub flags: u32,
-    pub value: Vec<u8>,
+    pub value: Bytes,
     pub datatype: u8,
     pub server_duration: Option<Duration>,
 }
@@ -712,7 +714,7 @@ impl TryFromClientResponse for AddResponse {
         }
 
         let mutation_token = if let Some(extras) = &packet.extras {
-            Some(MutationToken::try_from(extras)?)
+            Some(MutationToken::try_from(extras.as_ref())?)
         } else {
             None
         };
@@ -762,7 +764,7 @@ impl TryFromClientResponse for ReplaceResponse {
         }
 
         let mutation_token = if let Some(extras) = &packet.extras {
-            Some(MutationToken::try_from(extras)?)
+            Some(MutationToken::try_from(extras.as_ref())?)
         } else {
             None
         };
@@ -818,7 +820,7 @@ impl TryFromClientResponse for AppendResponse {
         }
 
         let mutation_token = if let Some(extras) = &packet.extras {
-            Some(MutationToken::try_from(extras)?)
+            Some(MutationToken::try_from(extras.as_ref())?)
         } else {
             None
         };
@@ -874,7 +876,7 @@ impl TryFromClientResponse for PrependResponse {
         }
 
         let mutation_token = if let Some(extras) = &packet.extras {
-            Some(MutationToken::try_from(extras)?)
+            Some(MutationToken::try_from(extras.as_ref())?)
         } else {
             None
         };
@@ -929,13 +931,13 @@ impl TryFromClientResponse for IncrementResponse {
                 ));
             }
 
-            u64::from_be_bytes(val.as_slice().try_into().unwrap())
+            u64::from_be_bytes(val[..].try_into().unwrap())
         } else {
             0
         };
 
         let mutation_token = if let Some(extras) = &packet.extras {
-            Some(MutationToken::try_from(extras)?)
+            Some(MutationToken::try_from(extras.as_ref())?)
         } else {
             None
         };
@@ -991,13 +993,13 @@ impl TryFromClientResponse for DecrementResponse {
                 ));
             }
 
-            u64::from_be_bytes(val.as_slice().try_into().unwrap())
+            u64::from_be_bytes(val[..].try_into().unwrap())
         } else {
             0
         };
 
         let mutation_token = if let Some(extras) = &packet.extras {
-            Some(MutationToken::try_from(extras)?)
+            Some(MutationToken::try_from(extras.as_ref())?)
         } else {
             None
         };

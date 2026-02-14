@@ -700,10 +700,9 @@ impl Agent {
 
                 client.close().await?;
 
-                let config: TerseConfig =
-                    serde_json::from_slice(raw_config.as_slice()).map_err(|e| {
-                        Error::new_message_error(format!("failed to deserialize config: {e}"))
-                    })?;
+                let config: TerseConfig = serde_json::from_slice(&raw_config).map_err(|e| {
+                    Error::new_message_error(format!("failed to deserialize config: {e}"))
+                })?;
 
                 match ConfigParser::parse_terse_config(config, host.host.as_str()) {
                     Ok(c) => {
