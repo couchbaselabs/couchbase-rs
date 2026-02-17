@@ -132,35 +132,33 @@ impl CouchbaseList<'_> {
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
                 create_span!("list_iter"),
-                async move {
+                Box::pin(async move {
                     let res = self.collection.get(&self.id, None).await?;
                     let list_contents: Vec<T> = res.content_as()?;
 
                     Ok(list_contents.into_iter())
-                },
+                }),
             )
             .await
     }
 
     async fn get_internal<V: DeserializeOwned>(&self, index: usize) -> crate::error::Result<V> {
+        let collection = self.collection;
+        let id = &self.id;
+
         self.collection
             .tracing_client
             .execute_observable_operation(
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
                 create_span!("list_get"),
-                async move {
-                    let res = self
-                        .collection
-                        .lookup_in(
-                            &self.id,
-                            &[LookupInSpec::get(format!("[{index}]"), None)],
-                            None,
-                        )
+                Box::pin(async move {
+                    let res = collection
+                        .lookup_in(id, &[LookupInSpec::get(format!("[{index}]"), None)], None)
                         .await?;
 
                     res.content_as(0)
-                },
+                }),
             )
             .await
     }
@@ -172,7 +170,7 @@ impl CouchbaseList<'_> {
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
                 create_span!("list_remove"),
-                async move {
+                Box::pin(async move {
                     self.collection
                         .mutate_in(
                             &self.id,
@@ -182,7 +180,7 @@ impl CouchbaseList<'_> {
                         .await?;
 
                     Ok(())
-                },
+                }),
             )
             .await
     }
@@ -194,7 +192,7 @@ impl CouchbaseList<'_> {
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
                 create_span!("list_append"),
-                async move {
+                Box::pin(async move {
                     self.collection
                         .mutate_in(
                             &self.id,
@@ -204,7 +202,7 @@ impl CouchbaseList<'_> {
                         .await?;
 
                     Ok(())
-                },
+                }),
             )
             .await
     }
@@ -216,7 +214,7 @@ impl CouchbaseList<'_> {
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
                 create_span!("list_prepend"),
-                async move {
+                Box::pin(async move {
                     self.collection
                         .mutate_in(
                             &self.id,
@@ -226,7 +224,7 @@ impl CouchbaseList<'_> {
                         .await?;
 
                     Ok(())
-                },
+                }),
             )
             .await
     }
@@ -241,7 +239,7 @@ impl CouchbaseList<'_> {
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
                 create_span!("list_position"),
-                async move {
+                Box::pin(async move {
                     let get_res = self.collection.get(&self.id, None).await?;
 
                     let list_contents: Vec<V> = get_res.content_as()?;
@@ -252,7 +250,7 @@ impl CouchbaseList<'_> {
                     }
 
                     Ok(-1)
-                },
+                }),
             )
             .await
     }
@@ -264,14 +262,14 @@ impl CouchbaseList<'_> {
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
                 create_span!("list_len"),
-                async move {
+                Box::pin(async move {
                     let res = self
                         .collection
                         .lookup_in(&self.id, &[LookupInSpec::count("", None)], None)
                         .await?;
 
                     res.content_as(0)
-                },
+                }),
             )
             .await
     }
@@ -283,10 +281,10 @@ impl CouchbaseList<'_> {
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
                 create_span!("list_clear"),
-                async move {
+                Box::pin(async move {
                     self.collection.remove(&self.id, None).await?;
                     Ok(())
-                },
+                }),
             )
             .await
     }
@@ -351,12 +349,12 @@ impl CouchbaseMap<'_> {
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
                 create_span!("map_iter"),
-                async move {
+                Box::pin(async move {
                     let res = self.collection.get(&self.id, None).await?;
                     let list_contents: HashMap<String, T> = res.content_as()?;
 
                     Ok(list_contents.into_iter())
-                },
+                }),
             )
             .await
     }
@@ -371,14 +369,14 @@ impl CouchbaseMap<'_> {
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
                 create_span!("map_get"),
-                async move {
+                Box::pin(async move {
                     let res = self
                         .collection
                         .lookup_in(&self.id, &[LookupInSpec::get(id, None)], None)
                         .await?;
 
                     res.content_as(0)
-                },
+                }),
             )
             .await
     }
@@ -394,7 +392,7 @@ impl CouchbaseMap<'_> {
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
                 create_span!("map_insert"),
-                async move {
+                Box::pin(async move {
                     self.collection
                         .mutate_in(
                             &self.id,
@@ -404,7 +402,7 @@ impl CouchbaseMap<'_> {
                         .await?;
 
                     Ok(())
-                },
+                }),
             )
             .await
     }
@@ -416,13 +414,13 @@ impl CouchbaseMap<'_> {
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
                 create_span!("map_remove"),
-                async move {
+                Box::pin(async move {
                     self.collection
                         .mutate_in(&self.id, &[MutateInSpec::remove(id, None)], None)
                         .await?;
 
                     Ok(())
-                },
+                }),
             )
             .await
     }
@@ -434,14 +432,14 @@ impl CouchbaseMap<'_> {
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
                 create_span!("map_contains_key"),
-                async move {
+                Box::pin(async move {
                     let res = self
                         .collection
                         .lookup_in(&self.id, &[LookupInSpec::exists(id, None)], None)
                         .await?;
 
                     res.exists(0)
-                },
+                }),
             )
             .await
     }
@@ -453,14 +451,14 @@ impl CouchbaseMap<'_> {
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
                 create_span!("map_len"),
-                async move {
+                Box::pin(async move {
                     let res = self
                         .collection
                         .lookup_in(&self.id, &[LookupInSpec::count("", None)], None)
                         .await?;
 
                     res.content_as(0)
-                },
+                }),
             )
             .await
     }
@@ -472,12 +470,12 @@ impl CouchbaseMap<'_> {
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
                 create_span!("map_keys"),
-                async move {
+                Box::pin(async move {
                     let res = self.collection.get(&self.id, None).await?;
 
                     let map_contents: HashMap<String, serde_json::Value> = res.content_as()?;
                     Ok(map_contents.keys().cloned().collect())
-                },
+                }),
             )
             .await
     }
@@ -489,12 +487,12 @@ impl CouchbaseMap<'_> {
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
                 create_span!("map_values"),
-                async move {
+                Box::pin(async move {
                     let res = self.collection.get(&self.id, None).await?;
 
                     let map_contents: HashMap<String, T> = res.content_as()?;
                     Ok(map_contents.into_values().collect())
-                },
+                }),
             )
             .await
     }
@@ -506,10 +504,10 @@ impl CouchbaseMap<'_> {
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
                 create_span!("map_clear"),
-                async move {
+                Box::pin(async move {
                     self.collection.remove(&self.id, None).await?;
                     Ok(())
-                },
+                }),
             )
             .await
     }
@@ -566,12 +564,12 @@ impl CouchbaseSet<'_> {
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
                 create_span!("set_iter"),
-                async move {
+                Box::pin(async move {
                     let res = self.collection.get(&self.id, None).await?;
                     let list_contents: Vec<T> = res.content_as()?;
 
                     Ok(list_contents.into_iter())
-                },
+                }),
             )
             .await
     }
@@ -583,7 +581,7 @@ impl CouchbaseSet<'_> {
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
                 create_span!("set_insert"),
-                async move {
+                Box::pin(async move {
                     let res = self
                         .collection
                         .mutate_in(
@@ -601,7 +599,7 @@ impl CouchbaseSet<'_> {
                     }
 
                     Ok(true)
-                },
+                }),
             )
             .await
     }
@@ -616,7 +614,7 @@ impl CouchbaseSet<'_> {
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
                 create_span!("set_remove"),
-                async move {
+                Box::pin(async move {
                     for _ in 0..16 {
                         let items = self.collection.get(&self.id, None).await?;
                         let cas = items.cas();
@@ -652,7 +650,7 @@ impl CouchbaseSet<'_> {
                     Err(crate::error::Error::other_failure(
                         "failed to perform operation after 16 retries",
                     ))
-                },
+                }),
             )
             .await
     }
@@ -664,12 +662,12 @@ impl CouchbaseSet<'_> {
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
                 create_span!("set_values"),
-                async move {
+                Box::pin(async move {
                     let res = self.collection.get(&self.id, None).await?;
 
                     let set_contents: Vec<T> = res.content_as()?;
                     Ok(set_contents)
-                },
+                }),
             )
             .await
     }
@@ -684,7 +682,7 @@ impl CouchbaseSet<'_> {
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
                 create_span!("set_contains"),
-                async move {
+                Box::pin(async move {
                     let res = self.collection.get(&self.id, None).await?;
 
                     let set_contents: Vec<T> = res.content_as()?;
@@ -695,7 +693,7 @@ impl CouchbaseSet<'_> {
                         }
                     }
                     Ok(false)
-                },
+                }),
             )
             .await
     }
@@ -707,14 +705,14 @@ impl CouchbaseSet<'_> {
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
                 create_span!("set_len"),
-                async move {
+                Box::pin(async move {
                     let res = self
                         .collection
                         .lookup_in(&self.id, &[LookupInSpec::count("", None)], None)
                         .await?;
 
                     res.content_as(0)
-                },
+                }),
             )
             .await
     }
@@ -726,10 +724,10 @@ impl CouchbaseSet<'_> {
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
                 create_span!("set_clear"),
-                async move {
+                Box::pin(async move {
                     self.collection.remove(&self.id, None).await?;
                     Ok(())
-                },
+                }),
             )
             .await
     }
@@ -772,14 +770,14 @@ impl CouchbaseQueue<'_> {
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
                 create_span!("queue_iter"),
-                async move {
+                Box::pin(async move {
                     let res = self.collection.get(&self.id, None).await?;
 
                     let mut list_contents: Vec<T> = res.content_as()?;
                     list_contents.reverse();
 
                     Ok(list_contents.into_iter())
-                },
+                }),
             )
             .await
     }
@@ -791,7 +789,7 @@ impl CouchbaseQueue<'_> {
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
                 create_span!("queue_push"),
-                async move {
+                Box::pin(async move {
                     self.collection
                         .mutate_in(
                             &self.id,
@@ -801,7 +799,7 @@ impl CouchbaseQueue<'_> {
                         .await?;
 
                     Ok(())
-                },
+                }),
             )
             .await
     }
@@ -813,7 +811,7 @@ impl CouchbaseQueue<'_> {
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
                 create_span!("queue_pop"),
-                async move {
+                Box::pin(async move {
                     for _ in 0..16 {
                         let res = self
                             .collection
@@ -843,7 +841,7 @@ impl CouchbaseQueue<'_> {
                     Err(crate::error::Error::other_failure(
                         "failed to perform operation after 16 retries",
                     ))
-                },
+                }),
             )
             .await
     }
@@ -855,14 +853,14 @@ impl CouchbaseQueue<'_> {
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
                 create_span!("queue_len"),
-                async move {
+                Box::pin(async move {
                     let res = self
                         .collection
                         .lookup_in(&self.id, &[LookupInSpec::count("", None)], None)
                         .await?;
 
                     res.content_as(0)
-                },
+                }),
             )
             .await
     }
@@ -874,10 +872,10 @@ impl CouchbaseQueue<'_> {
                 Some(SERVICE_VALUE_KV),
                 &self.collection.keyspace,
                 create_span!("queue_clear"),
-                async move {
+                Box::pin(async move {
                     self.collection.remove(&self.id, None).await?;
                     Ok(())
-                },
+                }),
             )
             .await
     }
