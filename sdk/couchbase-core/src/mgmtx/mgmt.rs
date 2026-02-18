@@ -58,6 +58,7 @@ pub struct Management<C: Client> {
     pub http_client: Arc<C>,
     pub user_agent: String,
     pub endpoint: String,
+    pub canonical_endpoint: String,
     pub auth: Auth,
     pub(crate) tracing: Arc<TracingComponent>,
 }

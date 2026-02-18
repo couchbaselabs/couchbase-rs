@@ -20,11 +20,16 @@ use crate::httpx::request::Auth;
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct NodeTarget {
     pub endpoint: String,
+    pub canonical_endpoint: String,
     pub auth: Auth,
 }
 
 impl crate::httpcomponent::NodeTarget for NodeTarget {
-    fn new(endpoint: String, auth: Auth) -> Self {
-        Self { endpoint, auth }
+    fn new(endpoint: String, canonical_endpoint: String, auth: Auth) -> Self {
+        Self {
+            endpoint,
+            canonical_endpoint,
+            auth,
+        }
     }
 }

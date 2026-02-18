@@ -432,7 +432,17 @@ where
         let result = self
             .tracing
             .orchestrate_dispatch_span(
-                BeginDispatchFields::from_addrs(self.remote_addr(), self.id().to_string()),
+                BeginDispatchFields::new(
+                    (
+                        self.remote_addr().ip().to_string(),
+                        self.remote_addr().port().to_string(),
+                    ),
+                    (
+                        self.canonical_addr().host,
+                        self.canonical_addr().port.to_string(),
+                    ),
+                    Some(self.id().to_string()),
+                ),
                 op_fn(req),
                 |res| match res {
                     Ok((resp, opaque)) => EndDispatchFields::new(

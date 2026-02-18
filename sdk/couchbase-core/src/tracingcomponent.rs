@@ -247,6 +247,8 @@ impl TracingComponent {
             couchbase.local_id = fields.client_id,
             network.peer.address = fields.peer_addr.0,
             network.peer.port = fields.peer_addr.1,
+            server.address = fields.canonical_addr.0,
+            server.port = fields.canonical_addr.1,
             couchbase.operation_id = tracing::field::Empty,
         );
 
@@ -348,20 +350,19 @@ pub fn end_dispatch_span(span: Span, fields: EndDispatchFields) {
 pub(crate) struct BeginDispatchFields {
     pub peer_addr: (String, String),
     pub client_id: Option<String>,
+    pub canonical_addr: (String, String),
 }
 
 impl BeginDispatchFields {
-    pub fn from_strings(peer_addr: (String, String), client_id: Option<String>) -> Self {
+    pub fn new(
+        peer_addr: (String, String),
+        canonical_addr: (String, String),
+        client_id: Option<String>,
+    ) -> Self {
         Self {
             peer_addr,
             client_id,
-        }
-    }
-
-    pub fn from_addrs(remote_addr: SocketAddr, client_id: String) -> Self {
-        Self {
-            peer_addr: (remote_addr.ip().to_string(), remote_addr.port().to_string()),
-            client_id: Some(client_id),
+            canonical_addr,
         }
     }
 }

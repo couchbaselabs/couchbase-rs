@@ -55,6 +55,7 @@ use uuid::Uuid;
 #[derive(Clone, Debug)]
 pub(crate) struct KvTarget {
     pub address: Address,
+    pub canonical_address: Address,
     pub tls_config: Option<TlsConfig>,
 }
 

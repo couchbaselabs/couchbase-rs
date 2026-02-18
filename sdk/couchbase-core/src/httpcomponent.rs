@@ -17,6 +17,7 @@
  */
 
 use crate::authenticator::Authenticator;
+use crate::componentconfigs::NetworkAndCanonicalEndpoint;
 use crate::error;
 use crate::error::ErrorKind;
 use crate::httpx::client::Client;
@@ -40,13 +41,14 @@ pub(crate) struct HttpComponent<C: Client> {
 }
 
 pub(crate) struct HttpComponentState {
-    endpoints: HashMap<String, String>,
+    endpoints: HashMap<String, NetworkAndCanonicalEndpoint>,
     authenticator: Authenticator,
 }
 
 pub(crate) struct HttpEndpointProperties {
     pub auth: Auth,
     pub endpoint: String,
+    pub canonical_endpoint: String,
     pub endpoint_id: Option<String>,
 }
 
@@ -119,14 +121,15 @@ impl<C: Client> HttpComponent<C> {
             .into());
         };
 
-        let host = get_host_port_from_uri(found_endpoint)?;
+        let host = get_host_port_from_uri(&found_endpoint.network_endpoint)?;
         let auth = auth_from_authenticator(&state.authenticator, &self.service_type, &host)?;
 
         Ok((
             self.client.clone(),
             HttpEndpointProperties {
                 endpoint_id: None,
-                endpoint: found_endpoint.clone(),
+                endpoint: found_endpoint.network_endpoint.clone(),
+                canonical_endpoint: found_endpoint.canonical_endpoint.clone(),
                 auth,
             },
         ))
@@ -162,14 +165,15 @@ impl<C: Client> HttpComponent<C> {
         let endpoint_id = endpoint_ids[endpoint_idx];
         let endpoint = remaining_endpoints[endpoint_id];
 
-        let host = get_host_port_from_uri(endpoint)?;
+        let host = get_host_port_from_uri(&endpoint.network_endpoint)?;
         let auth = auth_from_authenticator(&state.authenticator, &self.service_type, &host)?;
 
         Ok(Some((
             self.client.clone(),
             HttpEndpointProperties {
                 endpoint_id: Some(endpoint_id.clone()),
-                endpoint: endpoint.clone(),
+                endpoint: endpoint.network_endpoint.clone(),
+                canonical_endpoint: endpoint.canonical_endpoint.clone(),
                 auth,
             },
         )))
@@ -182,7 +186,7 @@ impl<C: Client> HttpComponent<C> {
     pub async fn orchestrate_endpoint<Resp, Fut>(
         &self,
         endpoint_id: Option<String>,
-        operation: impl Fn(Arc<C>, String, String, Auth) -> Fut + Send + Sync,
+        operation: impl Fn(Arc<C>, String, String, String, Auth) -> Fut + Send + Sync,
     ) -> error::Result<Resp>
     where
         C: Client,
@@ -196,6 +200,7 @@ impl<C: Client> HttpComponent<C> {
                 client,
                 endpoint_id,
                 endpoint_properties.endpoint,
+                endpoint_properties.canonical_endpoint,
                 endpoint_properties.auth,
             )
             .await;
@@ -214,6 +219,7 @@ impl<C: Client> HttpComponent<C> {
             client,
             endpoint_properties.endpoint_id.unwrap_or_default(),
             endpoint_properties.endpoint,
+            endpoint_properties.canonical_endpoint,
             endpoint_properties.auth,
         )
         .await
@@ -238,10 +244,14 @@ impl<C: Client> HttpComponent<C> {
 
         let mut targets = Vec::with_capacity(remaining_endpoints.len());
         for (_ep_id, endpoint) in remaining_endpoints {
-            let host = get_host_port_from_uri(endpoint)?;
+            let host = get_host_port_from_uri(&endpoint.network_endpoint)?;
             let auth = auth_from_authenticator(&state.authenticator, &self.service_type, &host)?;
 
-            targets.push(T::new(endpoint.clone(), auth));
+            targets.push(T::new(
+                endpoint.network_endpoint.clone(),
+                endpoint.canonical_endpoint.clone(),
+                auth,
+            ));
         }
 
         Ok((self.client.clone(), targets))
@@ -276,7 +286,10 @@ impl<C: Client> HttpComponent<C> {
 }
 
 impl HttpComponentState {
-    pub fn new(endpoints: HashMap<String, String>, authenticator: Authenticator) -> Self {
+    pub fn new(
+        endpoints: HashMap<String, NetworkAndCanonicalEndpoint>,
+        authenticator: Authenticator,
+    ) -> Self {
         Self {
             endpoints,
             authenticator,
@@ -285,5 +298,5 @@ impl HttpComponentState {
 }
 
 pub(crate) trait NodeTarget {
-    fn new(endpoint: String, auth: Auth) -> Self;
+    fn new(endpoint: String, canonical_endpoint: String, auth: Auth) -> Self;
 }

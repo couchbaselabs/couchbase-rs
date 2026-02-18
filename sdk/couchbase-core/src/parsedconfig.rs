@@ -73,6 +73,15 @@ pub(crate) struct NetworkConfigNode {
     pub has_data: bool,
     pub non_ssl_ports: ParsedConfigNodePorts,
     pub ssl_ports: ParsedConfigNodePorts,
+
+    pub canonical_node_info: CanonicalNodeInfo,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub(crate) struct CanonicalNodeInfo {
+    pub hostname: String,
+    pub non_ssl_ports: ParsedConfigNodePorts,
+    pub ssl_ports: ParsedConfigNodePorts,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -168,6 +177,12 @@ impl ParsedConfig {
                 node.addresses.non_ssl_ports.mgmt.unwrap()
             );
 
+            let canonical_node_info = CanonicalNodeInfo {
+                hostname: node.addresses.hostname.clone(),
+                non_ssl_ports: node.addresses.non_ssl_ports.clone(),
+                ssl_ports: node.addresses.ssl_ports.clone(),
+            };
+
             let node_info = if network_type == "default" {
                 NetworkConfigNode {
                     node_id,
@@ -175,6 +190,7 @@ impl ParsedConfig {
                     has_data: node.has_data,
                     non_ssl_ports: node.addresses.non_ssl_ports.clone(),
                     ssl_ports: node.addresses.ssl_ports.clone(),
+                    canonical_node_info,
                 }
             } else if let Some(alt_info) = node.alt_addresses.get(network_type) {
                 NetworkConfigNode {
@@ -183,6 +199,7 @@ impl ParsedConfig {
                     has_data: node.has_data,
                     non_ssl_ports: alt_info.non_ssl_ports.clone(),
                     ssl_ports: alt_info.ssl_ports.clone(),
+                    canonical_node_info,
                 }
             } else {
                 NetworkConfigNode {
@@ -191,6 +208,7 @@ impl ParsedConfig {
                     has_data: node.has_data,
                     non_ssl_ports: ParsedConfigNodePorts::default(),
                     ssl_ports: ParsedConfigNodePorts::default(),
+                    canonical_node_info,
                 }
             };
 

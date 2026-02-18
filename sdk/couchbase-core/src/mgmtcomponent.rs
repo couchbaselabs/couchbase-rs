@@ -18,6 +18,7 @@
 
 use crate::authenticator::Authenticator;
 use crate::cbconfig::{CollectionManifest, FullBucketConfig, FullClusterConfig};
+use crate::componentconfigs::NetworkAndCanonicalEndpoint;
 use crate::error::ErrorKind;
 use crate::httpcomponent::{HttpComponent, HttpComponentState};
 use crate::httpx::client::Client;
@@ -67,7 +68,7 @@ pub(crate) struct MgmtComponent<C: Client> {
 }
 
 pub(crate) struct MgmtComponentConfig {
-    pub endpoints: HashMap<String, String>,
+    pub endpoints: HashMap<String, NetworkAndCanonicalEndpoint>,
     pub authenticator: Authenticator,
 }
 
@@ -121,11 +122,13 @@ impl<C: Client> MgmtComponent<C> {
                         async |client: Arc<C>,
                                endpoint_id: String,
                                endpoint: String,
+                               canonical_endpoint: String,
                                auth: Auth| {
                             let res = match (mgmtx::mgmt::Management::<C> {
                                 http_client: client,
                                 user_agent: self.http_component.user_agent().to_string(),
-                                endpoint: endpoint.clone(),
+                                endpoint,
+                                canonical_endpoint,
                                 auth,
                                 tracing: self.tracing.clone(),
                             }
@@ -164,11 +167,13 @@ impl<C: Client> MgmtComponent<C> {
                         async |client: Arc<C>,
                                endpoint_id: String,
                                endpoint: String,
+                               canonical_endpoint: String,
                                auth: Auth| {
                             let res = match (mgmtx::mgmt::Management::<C> {
                                 http_client: client,
                                 user_agent: self.http_component.user_agent().to_string(),
-                                endpoint: endpoint.clone(),
+                                endpoint,
+                                canonical_endpoint,
                                 auth,
                                 tracing: self.tracing.clone(),
                             }
@@ -207,11 +212,13 @@ impl<C: Client> MgmtComponent<C> {
                         async |client: Arc<C>,
                                endpoint_id: String,
                                endpoint: String,
+                               canonical_endpoint: String,
                                auth: Auth| {
                             let res = match (mgmtx::mgmt::Management::<C> {
                                 http_client: client,
                                 user_agent: self.http_component.user_agent().to_string(),
-                                endpoint: endpoint.clone(),
+                                endpoint,
+                                canonical_endpoint,
                                 auth,
                                 tracing: self.tracing.clone(),
                             }
@@ -250,11 +257,13 @@ impl<C: Client> MgmtComponent<C> {
                         async |client: Arc<C>,
                                endpoint_id: String,
                                endpoint: String,
+                               canonical_endpoint: String,
                                auth: Auth| {
                             let res = match (mgmtx::mgmt::Management::<C> {
                                 http_client: client,
                                 user_agent: self.http_component.user_agent().to_string(),
-                                endpoint: endpoint.clone(),
+                                endpoint,
+                                canonical_endpoint,
                                 auth,
                                 tracing: self.tracing.clone(),
                             }
@@ -293,11 +302,13 @@ impl<C: Client> MgmtComponent<C> {
                         async |client: Arc<C>,
                                endpoint_id: String,
                                endpoint: String,
+                               canonical_endpoint: String,
                                auth: Auth| {
                             let res = match (mgmtx::mgmt::Management::<C> {
                                 http_client: client,
                                 user_agent: self.http_component.user_agent().to_string(),
-                                endpoint: endpoint.clone(),
+                                endpoint,
+                                canonical_endpoint,
                                 auth,
                                 tracing: self.tracing.clone(),
                             }
@@ -336,11 +347,13 @@ impl<C: Client> MgmtComponent<C> {
                         async |client: Arc<C>,
                                endpoint_id: String,
                                endpoint: String,
+                               canonical_endpoint: String,
                                auth: Auth| {
                             let res = match (mgmtx::mgmt::Management::<C> {
                                 http_client: client,
                                 user_agent: self.http_component.user_agent().to_string(),
-                                endpoint: endpoint.clone(),
+                                endpoint,
+                                canonical_endpoint,
                                 auth,
                                 tracing: self.tracing.clone(),
                             }
@@ -379,11 +392,13 @@ impl<C: Client> MgmtComponent<C> {
                         async |client: Arc<C>,
                                endpoint_id: String,
                                endpoint: String,
+                               canonical_endpoint: String,
                                auth: Auth| {
                             mgmtx::mgmt::Management::<C> {
                                 http_client: client,
                                 user_agent: self.http_component.user_agent().to_string(),
-                                endpoint: endpoint.clone(),
+                                endpoint,
+                                canonical_endpoint,
                                 auth,
                                 tracing: self.tracing.clone(),
                             }
@@ -414,11 +429,13 @@ impl<C: Client> MgmtComponent<C> {
                         async |client: Arc<C>,
                                endpoint_id: String,
                                endpoint: String,
+                               canonical_endpoint: String,
                                auth: Auth| {
                             mgmtx::mgmt::Management::<C> {
                                 http_client: client,
                                 user_agent: self.http_component.user_agent().to_string(),
-                                endpoint: endpoint.clone(),
+                                endpoint,
+                                canonical_endpoint,
                                 auth,
                                 tracing: self.tracing.clone(),
                             }
@@ -449,11 +466,13 @@ impl<C: Client> MgmtComponent<C> {
                         async |client: Arc<C>,
                                endpoint_id: String,
                                endpoint: String,
+                               canonical_endpoint: String,
                                auth: Auth| {
                             mgmtx::mgmt::Management::<C> {
                                 http_client: client,
                                 user_agent: self.http_component.user_agent().to_string(),
-                                endpoint: endpoint.clone(),
+                                endpoint,
+                                canonical_endpoint,
                                 auth,
                                 tracing: self.tracing.clone(),
                             }
@@ -484,11 +503,13 @@ impl<C: Client> MgmtComponent<C> {
                         async |client: Arc<C>,
                                endpoint_id: String,
                                endpoint: String,
+                               canonical_endpoint: String,
                                auth: Auth| {
                             mgmtx::mgmt::Management::<C> {
                                 http_client: client,
                                 user_agent: self.http_component.user_agent().to_string(),
-                                endpoint: endpoint.clone(),
+                                endpoint,
+                                canonical_endpoint,
                                 auth,
                                 tracing: self.tracing.clone(),
                             }
@@ -519,11 +540,13 @@ impl<C: Client> MgmtComponent<C> {
                         async |client: Arc<C>,
                                endpoint_id: String,
                                endpoint: String,
+                               canonical_endpoint: String,
                                auth: Auth| {
                             mgmtx::mgmt::Management::<C> {
                                 http_client: client,
                                 user_agent: self.http_component.user_agent().to_string(),
-                                endpoint: endpoint.clone(),
+                                endpoint,
+                                canonical_endpoint,
                                 auth,
                                 tracing: self.tracing.clone(),
                             }
@@ -554,11 +577,13 @@ impl<C: Client> MgmtComponent<C> {
                         async |client: Arc<C>,
                                endpoint_id: String,
                                endpoint: String,
+                               canonical_endpoint: String,
                                auth: Auth| {
                             mgmtx::mgmt::Management::<C> {
                                 http_client: client,
                                 user_agent: self.http_component.user_agent().to_string(),
-                                endpoint: endpoint.clone(),
+                                endpoint,
+                                canonical_endpoint,
                                 auth,
                                 tracing: self.tracing.clone(),
                             }
@@ -639,11 +664,13 @@ impl<C: Client> MgmtComponent<C> {
                         async |client: Arc<C>,
                                endpoint_id: String,
                                endpoint: String,
+                               canonical_endpoint: String,
                                auth: Auth| {
                             mgmtx::mgmt::Management::<C> {
                                 http_client: client,
                                 user_agent: self.http_component.user_agent().to_string(),
-                                endpoint: endpoint.clone(),
+                                endpoint,
+                                canonical_endpoint,
                                 auth,
                                 tracing: self.tracing.clone(),
                             }
@@ -676,11 +703,13 @@ impl<C: Client> MgmtComponent<C> {
                         async |client: Arc<C>,
                                endpoint_id: String,
                                endpoint: String,
+                               canonical_endpoint: String,
                                auth: Auth| {
                             mgmtx::mgmt::Management::<C> {
                                 http_client: client,
                                 user_agent: self.http_component.user_agent().to_string(),
-                                endpoint: endpoint.clone(),
+                                endpoint,
+                                canonical_endpoint,
                                 auth,
                                 tracing: self.tracing.clone(),
                             }
@@ -710,11 +739,13 @@ impl<C: Client> MgmtComponent<C> {
                         async |client: Arc<C>,
                                endpoint_id: String,
                                endpoint: String,
+                               canonical_endpoint: String,
                                auth: Auth| {
                             mgmtx::mgmt::Management::<C> {
                                 http_client: client,
                                 user_agent: self.http_component.user_agent().to_string(),
-                                endpoint: endpoint.clone(),
+                                endpoint,
+                                canonical_endpoint,
                                 auth,
                                 tracing: self.tracing.clone(),
                             }
@@ -744,11 +775,13 @@ impl<C: Client> MgmtComponent<C> {
                         async |client: Arc<C>,
                                endpoint_id: String,
                                endpoint: String,
+                               canonical_endpoint: String,
                                auth: Auth| {
                             mgmtx::mgmt::Management::<C> {
                                 http_client: client,
                                 user_agent: self.http_component.user_agent().to_string(),
-                                endpoint: endpoint.clone(),
+                                endpoint,
+                                canonical_endpoint,
                                 auth,
                                 tracing: self.tracing.clone(),
                             }
@@ -781,11 +814,13 @@ impl<C: Client> MgmtComponent<C> {
                         async |client: Arc<C>,
                                endpoint_id: String,
                                endpoint: String,
+                               canonical_endpoint: String,
                                auth: Auth| {
                             mgmtx::mgmt::Management::<C> {
                                 http_client: client,
                                 user_agent: self.http_component.user_agent().to_string(),
-                                endpoint: endpoint.clone(),
+                                endpoint,
+                                canonical_endpoint,
                                 auth,
                                 tracing: self.tracing.clone(),
                             }
@@ -815,11 +850,13 @@ impl<C: Client> MgmtComponent<C> {
                         async |client: Arc<C>,
                                endpoint_id: String,
                                endpoint: String,
+                               canonical_endpoint: String,
                                auth: Auth| {
                             mgmtx::mgmt::Management::<C> {
                                 http_client: client,
                                 user_agent: self.http_component.user_agent().to_string(),
-                                endpoint: endpoint.clone(),
+                                endpoint,
+                                canonical_endpoint,
                                 auth,
                                 tracing: self.tracing.clone(),
                             }
@@ -852,11 +889,13 @@ impl<C: Client> MgmtComponent<C> {
                         async |client: Arc<C>,
                                endpoint_id: String,
                                endpoint: String,
+                               canonical_endpoint: String,
                                auth: Auth| {
                             mgmtx::mgmt::Management::<C> {
                                 http_client: client,
                                 user_agent: self.http_component.user_agent().to_string(),
-                                endpoint: endpoint.clone(),
+                                endpoint,
+                                canonical_endpoint,
                                 auth,
                                 tracing: self.tracing.clone(),
                             }
@@ -886,11 +925,13 @@ impl<C: Client> MgmtComponent<C> {
                         async |client: Arc<C>,
                                endpoint_id: String,
                                endpoint: String,
+                               canonical_endpoint: String,
                                auth: Auth| {
                             mgmtx::mgmt::Management::<C> {
                                 http_client: client,
                                 user_agent: self.http_component.user_agent().to_string(),
-                                endpoint: endpoint.clone(),
+                                endpoint,
+                                canonical_endpoint,
                                 auth,
                                 tracing: self.tracing.clone(),
                             }
@@ -920,11 +961,13 @@ impl<C: Client> MgmtComponent<C> {
                         async |client: Arc<C>,
                                endpoint_id: String,
                                endpoint: String,
+                               canonical_endpoint: String,
                                auth: Auth| {
                             mgmtx::mgmt::Management::<C> {
                                 http_client: client,
                                 user_agent: self.http_component.user_agent().to_string(),
-                                endpoint: endpoint.clone(),
+                                endpoint,
+                                canonical_endpoint,
                                 auth,
                                 tracing: self.tracing.clone(),
                             }
@@ -954,11 +997,13 @@ impl<C: Client> MgmtComponent<C> {
                         async |client: Arc<C>,
                                endpoint_id: String,
                                endpoint: String,
+                               canonical_endpoint: String,
                                auth: Auth| {
                             mgmtx::mgmt::Management::<C> {
                                 http_client: client,
                                 user_agent: self.http_component.user_agent().to_string(),
-                                endpoint: endpoint.clone(),
+                                endpoint,
+                                canonical_endpoint,
                                 auth,
                                 tracing: self.tracing.clone(),
                             }
@@ -1042,11 +1087,13 @@ impl<C: Client> MgmtComponent<C> {
                         async |client: Arc<C>,
                                endpoint_id: String,
                                endpoint: String,
+                               canonical_endpoint: String,
                                auth: Auth| {
                             mgmtx::mgmt::Management::<C> {
                                 http_client: client,
                                 user_agent: self.http_component.user_agent().to_string(),
-                                endpoint: endpoint.clone(),
+                                endpoint,
+                                canonical_endpoint,
                                 auth,
                                 tracing: Default::default(),
                             }
@@ -1079,11 +1126,13 @@ impl<C: Client> MgmtComponent<C> {
                         async |client: Arc<C>,
                                endpoint_id: String,
                                endpoint: String,
+                               canonical_endpoint: String,
                                auth: Auth| {
                             mgmtx::mgmt::Management::<C> {
                                 http_client: client,
                                 user_agent: self.http_component.user_agent().to_string(),
-                                endpoint: endpoint.clone(),
+                                endpoint,
+                                canonical_endpoint,
                                 auth,
                                 tracing: Default::default(),
                             }
@@ -1116,11 +1165,13 @@ impl<C: Client> MgmtComponent<C> {
                         async |client: Arc<C>,
                                endpoint_id: String,
                                endpoint: String,
+                               canonical_endpoint: String,
                                auth: Auth| {
                             mgmtx::mgmt::Management::<C> {
                                 http_client: client,
                                 user_agent: self.http_component.user_agent().to_string(),
-                                endpoint: endpoint.clone(),
+                                endpoint,
+                                canonical_endpoint,
                                 auth,
                                 tracing: Default::default(),
                             }
@@ -1150,11 +1201,13 @@ impl<C: Client> MgmtComponent<C> {
                         async |client: Arc<C>,
                                endpoint_id: String,
                                endpoint: String,
+                               canonical_endpoint: String,
                                auth: Auth| {
                             mgmtx::mgmt::Management::<C> {
                                 http_client: client,
                                 user_agent: self.http_component.user_agent().to_string(),
-                                endpoint: endpoint.clone(),
+                                endpoint,
+                                canonical_endpoint,
                                 auth,
                                 tracing: Default::default(),
                             }
@@ -1187,11 +1240,13 @@ impl<C: Client> MgmtComponent<C> {
                         async |client: Arc<C>,
                                endpoint_id: String,
                                endpoint: String,
+                               canonical_endpoint: String,
                                auth: Auth| {
                             mgmtx::mgmt::Management::<C> {
                                 http_client: client,
                                 user_agent: self.http_component.user_agent().to_string(),
-                                endpoint: endpoint.clone(),
+                                endpoint,
+                                canonical_endpoint,
                                 auth,
                                 tracing: Default::default(),
                             }
@@ -1218,11 +1273,16 @@ impl<C: Client> MgmtComponent<C> {
             self.http_component
                 .orchestrate_endpoint(
                     None,
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
+                    async |client: Arc<C>,
+                           endpoint_id: String,
+                           endpoint: String,
+                           canonical_endpoint: String,
+                           auth: Auth| {
                         mgmtx::mgmt::Management::<C> {
                             http_client: client,
                             user_agent: self.http_component.user_agent().to_string(),
-                            endpoint: endpoint.clone(),
+                            endpoint,
+                            canonical_endpoint,
                             auth,
                             tracing: Default::default(),
                         }

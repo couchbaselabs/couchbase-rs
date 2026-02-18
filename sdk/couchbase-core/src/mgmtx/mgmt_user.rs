@@ -44,8 +44,9 @@ impl<C: Client> Management<C> {
         let resp = self
             .tracing
             .orchestrate_dispatch_span(
-                BeginDispatchFields::from_strings(
+                BeginDispatchFields::new(
                     get_host_port_tuple_from_uri(&self.endpoint).unwrap_or_default(),
+                    get_host_port_tuple_from_uri(&self.canonical_endpoint).unwrap_or_default(),
                     None,
                 ),
                 self.execute(
@@ -83,8 +84,9 @@ impl<C: Client> Management<C> {
         let resp = self
             .tracing
             .orchestrate_dispatch_span(
-                BeginDispatchFields::from_strings(
+                BeginDispatchFields::new(
                     get_host_port_tuple_from_uri(&self.endpoint).unwrap_or_default(),
+                    get_host_port_tuple_from_uri(&self.canonical_endpoint).unwrap_or_default(),
                     None,
                 ),
                 self.execute(
@@ -147,8 +149,9 @@ impl<C: Client> Management<C> {
         let resp = self
             .tracing
             .orchestrate_dispatch_span(
-                BeginDispatchFields::from_strings(
+                BeginDispatchFields::new(
                     get_host_port_tuple_from_uri(&self.endpoint).unwrap_or_default(),
+                    get_host_port_tuple_from_uri(&self.canonical_endpoint).unwrap_or_default(),
                     None,
                 ),
                 self.execute(
@@ -182,8 +185,9 @@ impl<C: Client> Management<C> {
         let resp = self
             .tracing
             .orchestrate_dispatch_span(
-                BeginDispatchFields::from_strings(
+                BeginDispatchFields::new(
                     get_host_port_tuple_from_uri(&self.endpoint).unwrap_or_default(),
+                    get_host_port_tuple_from_uri(&self.canonical_endpoint).unwrap_or_default(),
                     None,
                 ),
                 self.execute(
@@ -220,8 +224,9 @@ impl<C: Client> Management<C> {
         let resp = self
             .tracing
             .orchestrate_dispatch_span(
-                BeginDispatchFields::from_strings(
+                BeginDispatchFields::new(
                     get_host_port_tuple_from_uri(&self.endpoint).unwrap_or_default(),
+                    get_host_port_tuple_from_uri(&self.canonical_endpoint).unwrap_or_default(),
                     None,
                 ),
                 self.execute(
@@ -255,8 +260,9 @@ impl<C: Client> Management<C> {
         let resp = self
             .tracing
             .orchestrate_dispatch_span(
-                BeginDispatchFields::from_strings(
+                BeginDispatchFields::new(
                     get_host_port_tuple_from_uri(&self.endpoint).unwrap_or_default(),
+                    get_host_port_tuple_from_uri(&self.canonical_endpoint).unwrap_or_default(),
                     None,
                 ),
                 self.execute(
@@ -290,8 +296,9 @@ impl<C: Client> Management<C> {
         let resp = self
             .tracing
             .orchestrate_dispatch_span(
-                BeginDispatchFields::from_strings(
+                BeginDispatchFields::new(
                     get_host_port_tuple_from_uri(&self.endpoint).unwrap_or_default(),
+                    get_host_port_tuple_from_uri(&self.canonical_endpoint).unwrap_or_default(),
                     None,
                 ),
                 self.execute(
@@ -350,8 +357,9 @@ impl<C: Client> Management<C> {
         let resp = self
             .tracing
             .orchestrate_dispatch_span(
-                BeginDispatchFields::from_strings(
+                BeginDispatchFields::new(
                     get_host_port_tuple_from_uri(&self.endpoint).unwrap_or_default(),
+                    get_host_port_tuple_from_uri(&self.canonical_endpoint).unwrap_or_default(),
                     None,
                 ),
                 self.execute(
@@ -384,8 +392,9 @@ impl<C: Client> Management<C> {
         let resp = self
             .tracing
             .orchestrate_dispatch_span(
-                BeginDispatchFields::from_strings(
+                BeginDispatchFields::new(
                     get_host_port_tuple_from_uri(&self.endpoint).unwrap_or_default(),
+                    get_host_port_tuple_from_uri(&self.canonical_endpoint).unwrap_or_default(),
                     None,
                 ),
                 self.execute(
@@ -421,8 +430,9 @@ impl<C: Client> Management<C> {
         let resp = self
             .tracing
             .orchestrate_dispatch_span(
-                BeginDispatchFields::from_strings(
+                BeginDispatchFields::new(
                     get_host_port_tuple_from_uri(&self.endpoint).unwrap_or_default(),
+                    get_host_port_tuple_from_uri(&self.canonical_endpoint).unwrap_or_default(),
                     None,
                 ),
                 self.execute(

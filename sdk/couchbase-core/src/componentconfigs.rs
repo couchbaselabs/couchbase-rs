@@ -54,6 +54,16 @@ pub(crate) struct HttpClientConfig {
     pub tcp_keep_alive_time: Duration,
 }
 
+struct NetworkAndCanonicalAddress {
+    network_address: Address,
+    canonical_address: Address,
+}
+
+pub(crate) struct NetworkAndCanonicalEndpoint {
+    pub(crate) network_endpoint: String,
+    pub(crate) canonical_endpoint: String,
+}
+
 impl AgentComponentConfigs {
     pub fn gen_from_config(
         config: &ParsedConfig,
@@ -67,11 +77,11 @@ impl AgentComponentConfigs {
 
         let mut gcccp_node_ids = Vec::new();
         let mut kv_data_node_ids = Vec::new();
-        let mut kv_data_hosts: HashMap<String, Address> = HashMap::new();
-        let mut mgmt_endpoints: HashMap<String, String> = HashMap::new();
-        let mut analytics_endpoints: HashMap<String, String> = HashMap::new();
-        let mut query_endpoints: HashMap<String, String> = HashMap::new();
-        let mut search_endpoints: HashMap<String, String> = HashMap::new();
+        let mut kv_data_hosts: HashMap<String, NetworkAndCanonicalAddress> = HashMap::new();
+        let mut mgmt_endpoints: HashMap<String, NetworkAndCanonicalEndpoint> = HashMap::new();
+        let mut analytics_endpoints: HashMap<String, NetworkAndCanonicalEndpoint> = HashMap::new();
+        let mut query_endpoints: HashMap<String, NetworkAndCanonicalEndpoint> = HashMap::new();
+        let mut search_endpoints: HashMap<String, NetworkAndCanonicalEndpoint> = HashMap::new();
 
         for node in network_info.nodes {
             let kv_ep_id = format!("kv{}", node.node_id);
@@ -90,57 +100,149 @@ impl AgentComponentConfigs {
                 if let Some(p) = node.ssl_ports.kv {
                     kv_data_hosts.insert(
                         kv_ep_id,
-                        Address {
-                            host: node.hostname.clone(),
-                            port: p,
+                        NetworkAndCanonicalAddress {
+                            network_address: Address {
+                                host: node.hostname.clone(),
+                                port: p,
+                            },
+                            canonical_address: Address {
+                                host: node.canonical_node_info.hostname.clone(),
+                                port: node.canonical_node_info.ssl_ports.kv.unwrap_or(p),
+                            },
                         },
                     );
                 }
                 if let Some(p) = node.ssl_ports.mgmt {
-                    mgmt_endpoints.insert(mgmt_ep_id, format!("https://{}:{}", node.hostname, p));
+                    mgmt_endpoints.insert(
+                        mgmt_ep_id,
+                        NetworkAndCanonicalEndpoint {
+                            network_endpoint: format!("https://{}:{}", node.hostname, p),
+                            canonical_endpoint: format!(
+                                "https://{}:{}",
+                                node.canonical_node_info.hostname,
+                                node.canonical_node_info.ssl_ports.mgmt.unwrap_or(p),
+                            ),
+                        },
+                    );
                 }
                 if let Some(p) = node.ssl_ports.analytics {
-                    analytics_endpoints
-                        .insert(analytics_ep_id, format!("https://{}:{}", node.hostname, p));
+                    analytics_endpoints.insert(
+                        analytics_ep_id,
+                        NetworkAndCanonicalEndpoint {
+                            network_endpoint: format!("https://{}:{}", node.hostname, p),
+                            canonical_endpoint: format!(
+                                "https://{}:{}",
+                                node.canonical_node_info.hostname,
+                                node.canonical_node_info.ssl_ports.analytics.unwrap_or(p),
+                            ),
+                        },
+                    );
                 }
                 if let Some(p) = node.ssl_ports.query {
-                    query_endpoints.insert(query_ep_id, format!("https://{}:{}", node.hostname, p));
+                    query_endpoints.insert(
+                        query_ep_id,
+                        NetworkAndCanonicalEndpoint {
+                            network_endpoint: format!("https://{}:{}", node.hostname, p),
+                            canonical_endpoint: format!(
+                                "https://{}:{}",
+                                node.canonical_node_info.hostname,
+                                node.canonical_node_info.ssl_ports.query.unwrap_or(p),
+                            ),
+                        },
+                    );
                 }
                 if let Some(p) = node.ssl_ports.search {
-                    search_endpoints
-                        .insert(search_ep_id, format!("https://{}:{}", node.hostname, p));
+                    search_endpoints.insert(
+                        search_ep_id,
+                        NetworkAndCanonicalEndpoint {
+                            network_endpoint: format!("https://{}:{}", node.hostname, p),
+                            canonical_endpoint: format!(
+                                "https://{}:{}",
+                                node.canonical_node_info.hostname,
+                                node.canonical_node_info.ssl_ports.search.unwrap_or(p),
+                            ),
+                        },
+                    );
                 }
             } else {
                 if let Some(p) = node.non_ssl_ports.kv {
                     kv_data_hosts.insert(
                         kv_ep_id,
-                        Address {
-                            host: node.hostname.clone(),
-                            port: p,
+                        NetworkAndCanonicalAddress {
+                            network_address: Address {
+                                host: node.hostname.clone(),
+                                port: p,
+                            },
+                            canonical_address: Address {
+                                host: node.canonical_node_info.hostname.clone(),
+                                port: node.canonical_node_info.non_ssl_ports.kv.unwrap_or(p),
+                            },
                         },
                     );
                 }
                 if let Some(p) = node.non_ssl_ports.mgmt {
-                    mgmt_endpoints.insert(mgmt_ep_id, format!("http://{}:{}", node.hostname, p));
+                    mgmt_endpoints.insert(
+                        mgmt_ep_id,
+                        NetworkAndCanonicalEndpoint {
+                            network_endpoint: format!("http://{}:{}", node.hostname, p),
+                            canonical_endpoint: format!(
+                                "http://{}:{}",
+                                node.canonical_node_info.hostname,
+                                node.canonical_node_info.non_ssl_ports.mgmt.unwrap_or(p),
+                            ),
+                        },
+                    );
                 }
                 if let Some(p) = node.non_ssl_ports.analytics {
-                    analytics_endpoints
-                        .insert(analytics_ep_id, format!("http://{}:{}", node.hostname, p));
+                    analytics_endpoints.insert(
+                        analytics_ep_id,
+                        NetworkAndCanonicalEndpoint {
+                            network_endpoint: format!("http://{}:{}", node.hostname, p),
+                            canonical_endpoint: format!(
+                                "http://{}:{}",
+                                node.canonical_node_info.hostname,
+                                node.canonical_node_info
+                                    .non_ssl_ports
+                                    .analytics
+                                    .unwrap_or(p)
+                            ),
+                        },
+                    );
                 }
                 if let Some(p) = node.non_ssl_ports.query {
-                    query_endpoints.insert(query_ep_id, format!("http://{}:{}", node.hostname, p));
+                    query_endpoints.insert(
+                        query_ep_id,
+                        NetworkAndCanonicalEndpoint {
+                            network_endpoint: format!("http://{}:{}", node.hostname, p),
+                            canonical_endpoint: format!(
+                                "http://{}:{}",
+                                node.canonical_node_info.hostname,
+                                node.canonical_node_info.non_ssl_ports.query.unwrap_or(p),
+                            ),
+                        },
+                    );
                 }
                 if let Some(p) = node.non_ssl_ports.search {
-                    search_endpoints
-                        .insert(search_ep_id, format!("http://{}:{}", node.hostname, p));
+                    search_endpoints.insert(
+                        search_ep_id,
+                        NetworkAndCanonicalEndpoint {
+                            network_endpoint: format!("http://{}:{}", node.hostname, p),
+                            canonical_endpoint: format!(
+                                "http://{}:{}",
+                                node.canonical_node_info.hostname,
+                                node.canonical_node_info.non_ssl_ports.search.unwrap_or(p),
+                            ),
+                        },
+                    );
                 }
             }
         }
 
         let mut kv_targets = HashMap::new();
-        for (node_id, address) in kv_data_hosts {
+        for (node_id, addresses) in kv_data_hosts {
             let target = KvTarget {
-                address,
+                address: addresses.network_address,
+                canonical_address: addresses.canonical_address,
                 tls_config: tls_config.clone(),
             };
 

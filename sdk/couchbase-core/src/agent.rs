@@ -792,7 +792,8 @@ impl Agent {
             let config = mgmtx::mgmt::Management {
                 http_client,
                 user_agent,
-                endpoint,
+                endpoint: endpoint.clone(),
+                canonical_endpoint: endpoint.clone(),
                 auth,
                 tracing: Default::default(),
             }
@@ -808,7 +809,8 @@ impl Agent {
             let config = mgmtx::mgmt::Management {
                 http_client,
                 user_agent,
-                endpoint,
+                endpoint: endpoint.clone(),
+                canonical_endpoint: endpoint.clone(),
                 auth,
                 tracing: Default::default(),
             }
@@ -834,6 +836,7 @@ impl Agent {
             let target = KvTarget {
                 address: addr.clone(),
                 tls_config: state.tls_config.clone(),
+                canonical_address: addr.clone(),
             };
             clients.insert(node_id, target);
         }

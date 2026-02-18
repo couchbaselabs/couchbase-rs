@@ -17,6 +17,7 @@
  */
 
 use crate::authenticator::Authenticator;
+use crate::componentconfigs::NetworkAndCanonicalEndpoint;
 use crate::diagnosticscomponent::PingQueryReportOptions;
 use crate::error::ErrorKind;
 use crate::httpcomponent::{HttpComponent, HttpComponentState};
@@ -58,7 +59,7 @@ pub(crate) struct QueryComponent<C: Client> {
 }
 
 pub(crate) struct QueryComponentConfig {
-    pub endpoints: HashMap<String, String>,
+    pub endpoints: HashMap<String, NetworkAndCanonicalEndpoint>,
     pub authenticator: Authenticator,
 }
 
@@ -105,11 +106,16 @@ impl<C: Client + 'static> QueryComponent<C> {
             self.http_component
                 .orchestrate_endpoint(
                     endpoint.clone(),
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
+                    async |client: Arc<C>,
+                           endpoint_id: String,
+                           endpoint: String,
+                           canonical_endpoint: String,
+                           auth: Auth| {
                         let res = match (Query::<C> {
                             http_client: client,
                             user_agent: self.http_component.user_agent().to_string(),
                             endpoint: endpoint.clone(),
+                            canonical_endpoint,
                             auth,
                             tracing: self.tracing.clone(),
                         }
@@ -142,12 +148,17 @@ impl<C: Client + 'static> QueryComponent<C> {
             self.http_component
                 .orchestrate_endpoint(
                     endpoint.clone(),
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
+                    async |client: Arc<C>,
+                           endpoint_id: String,
+                           endpoint: String,
+                           canonical_endpoint: String,
+                           auth: Auth| {
                         let res = match (PreparedQuery {
                             executor: Query::<C> {
                                 http_client: client,
                                 user_agent: self.http_component.user_agent().to_string(),
                                 endpoint: endpoint.clone(),
+                                canonical_endpoint,
                                 auth,
                                 tracing: self.tracing.clone(),
                             },
@@ -185,11 +196,16 @@ impl<C: Client + 'static> QueryComponent<C> {
             self.http_component
                 .orchestrate_endpoint(
                     endpoint.clone(),
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
+                    async |client: Arc<C>,
+                           endpoint_id: String,
+                           endpoint: String,
+                           canonical_endpoint: String,
+                           auth: Auth| {
                         let res = match (Query::<C> {
                             http_client: client,
                             user_agent: self.http_component.user_agent().to_string(),
-                            endpoint: endpoint.clone(),
+                            endpoint,
+                            canonical_endpoint,
                             auth,
                             tracing: self.tracing.clone(),
                         }
@@ -391,8 +407,9 @@ impl<C: Client + 'static> QueryComponent<C> {
             let client = Query::<C> {
                 http_client: client.clone(),
                 user_agent,
-                endpoint: target.endpoint.clone(),
-                auth: target.auth.clone(),
+                endpoint: target.endpoint,
+                canonical_endpoint: target.canonical_endpoint,
+                auth: target.auth,
                 tracing: self.tracing.clone(),
             };
 
@@ -424,8 +441,9 @@ impl<C: Client + 'static> QueryComponent<C> {
             let client = Query::<C> {
                 http_client: client.clone(),
                 user_agent,
-                endpoint: target.endpoint.clone(),
-                auth: target.auth.clone(),
+                endpoint: target.endpoint,
+                canonical_endpoint: target.canonical_endpoint,
+                auth: target.auth,
                 tracing: self.tracing.clone(),
             };
 
@@ -503,11 +521,13 @@ impl<C: Client + 'static> QueryComponent<C> {
                         async |client: Arc<C>,
                                endpoint_id: String,
                                endpoint: String,
+                               canonical_endpoint: String,
                                auth: Auth| {
                             operation(Query::<C> {
                                 http_client: client,
                                 user_agent: self.http_component.user_agent().to_string(),
-                                endpoint: endpoint.clone(),
+                                endpoint,
+                                canonical_endpoint,
                                 auth,
                                 tracing: self.tracing.clone(),
                             })

@@ -113,6 +113,7 @@ pub(crate) trait KvClient: Sized + PartialEq + Send + Sync {
     fn remote_hostname(&self) -> &str;
     fn remote_addr(&self) -> SocketAddr;
     fn local_addr(&self) -> SocketAddr;
+    fn canonical_addr(&self) -> Address;
     fn last_activity(&self) -> DateTime<FixedOffset>;
     fn close(&self) -> impl Future<Output = Result<()>> + Send;
     fn id(&self) -> &str;
@@ -124,6 +125,7 @@ pub(crate) struct StdKvClient<D: Dispatcher> {
     local_addr: SocketAddr,
     remote_hostname: String,
     endpoint_id: String,
+    canonical_addr: Address,
 
     cli: D,
     closed: Arc<AtomicBool>,
@@ -366,6 +368,7 @@ where
             local_addr,
             remote_hostname,
             endpoint_id: opts.endpoint_id,
+            canonical_addr: opts.address.canonical_address,
             cli,
             closed,
             on_close_tx: opts.on_close_tx,
@@ -461,6 +464,10 @@ where
 
     fn local_addr(&self) -> SocketAddr {
         self.local_addr
+    }
+
+    fn canonical_addr(&self) -> Address {
+        self.canonical_addr.clone()
     }
 
     fn last_activity(&self) -> DateTime<FixedOffset> {

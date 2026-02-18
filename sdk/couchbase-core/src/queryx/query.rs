@@ -54,6 +54,7 @@ pub struct Query<C: Client> {
     pub http_client: Arc<C>,
     pub user_agent: String,
     pub endpoint: String,
+    pub canonical_endpoint: String,
     pub auth: Auth,
     pub(crate) tracing: Arc<TracingComponent>,
 }
@@ -149,8 +150,9 @@ impl<C: Client> Query<C> {
         let res = self
             .tracing
             .orchestrate_dispatch_span(
-                BeginDispatchFields::from_strings(
+                BeginDispatchFields::new(
                     get_host_port_tuple_from_uri(&self.endpoint).unwrap_or_default(),
+                    get_host_port_tuple_from_uri(&self.canonical_endpoint).unwrap_or_default(),
                     None,
                 ),
                 self.execute(
@@ -578,8 +580,9 @@ impl<C: Client> Query<C> {
         let res = match self
             .tracing
             .orchestrate_dispatch_span(
-                BeginDispatchFields::from_strings(
+                BeginDispatchFields::new(
                     get_host_port_tuple_from_uri(&self.endpoint).unwrap_or_default(),
+                    get_host_port_tuple_from_uri(&self.canonical_endpoint).unwrap_or_default(),
                     None,
                 ),
                 self.execute(
