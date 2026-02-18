@@ -16,17 +16,14 @@ jobs:
 
     strategy:
       matrix:
-        server: [ 8.0.0, 7.6.7, 7.2.7, 7.1.6, 7.0.4, community-8.0.0 ]
-        include:
-          - server: community-8.0.0
-            rcbserverVersion: 8.0.0-community
+        server: [ 8.0.0, 7.6.7, 7.2.7, 7.1.6, 7.0.4 ]
     
     runs-on: ubuntu-latest
     steps:
       - name: Install cbdinocluster
         run: |
           mkdir -p "$HOME/bin"
-          wget -nv -O $HOME/bin/cbdinocluster https://github.com/couchbaselabs/cbdinocluster/releases/download/v0.0.89/cbdinocluster-linux-amd64
+          wget -nv -O $HOME/bin/cbdinocluster https://github.com/couchbaselabs/cbdinocluster/releases/download/v0.0.100/cbdinocluster-linux-amd64
           chmod +x $HOME/bin/cbdinocluster
           echo "$HOME/bin" >> $GITHUB_PATH
 
@@ -80,13 +77,8 @@ jobs:
           CBDC_CONNSTR: # from above
           RCBDINOID: ${{ env.CBDC_ID }}
           RCBCONNSTR: ${{ env.CBDC_CONNSTR }}
+          RCBSERVER_VERSION: ${{ matrix.server }}
         run: |
-          if [[ -z "${{ matrix.rcbserverVersion }}" ]]; then
-            export RCBSERVER_VERSION=${{ matrix.server }}
-          else
-            export RCBSERVER_VERSION=${{ matrix.rcbserverVersion }}
-          fi
-          
           cargo test --color=always --no-fail-fast -- --nocapture
 
       - name: Run allocation tests
@@ -96,26 +88,6 @@ jobs:
           CBDC_CONNSTR: # from above
           RCBDINOID: ${{ env.CBDC_ID }}
           RCBCONNSTR: ${{ env.CBDC_CONNSTR }}
+          RCBSERVER_VERSION: ${{ matrix.server }}
         run: |
-          if [[ -z "${{ matrix.rcbserverVersion }}" ]]; then
-            export RCBSERVER_VERSION=${{ matrix.server }}
-          else
-            export RCBSERVER_VERSION=${{ matrix.rcbserverVersion }}
-          fi
-          
           cargo test --features dhat-heap --test allocations --color=always --no-fail-fast -- --nocapture
-
-#      - name: Collect couchbase logs
-#        timeout-minutes: 10
-#        if: failure()
-#        run: |
-#          mkdir -p ./logs
-#          cbdinocluster -v collect-logs $CBDC_ID ./logs
-#
-#      - name: Upload couchbase logs
-#        if: failure()
-#        uses: actions/upload-artifact@v3
-#        with:
-#          name: cbcollect-logs
-#          path: ./logs/*
-#          retention-days: 1
