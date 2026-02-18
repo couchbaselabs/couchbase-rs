@@ -16,6 +16,7 @@
  *
  */
 
+use crate::tracingcomponent::IntoDurabilityU8;
 use std::fmt::Display;
 use std::time::Duration;
 
@@ -70,6 +71,17 @@ impl From<u8> for DurabilityLevel {
             2 => DurabilityLevel::MAJORITY_AND_PERSIST_ACTIVE,
             3 => DurabilityLevel::PERSIST_TO_MAJORITY,
             _ => DurabilityLevel(InnerDurabilityLevel::Other(data)),
+        }
+    }
+}
+
+impl IntoDurabilityU8 for DurabilityLevel {
+    fn as_u8(&self) -> u8 {
+        match self.0 {
+            InnerDurabilityLevel::Majority => 1,
+            InnerDurabilityLevel::MajorityAndPersistActive => 2,
+            InnerDurabilityLevel::PersistToMajority => 3,
+            InnerDurabilityLevel::Other(val) => val,
         }
     }
 }

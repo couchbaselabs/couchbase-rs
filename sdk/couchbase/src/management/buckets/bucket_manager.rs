@@ -25,6 +25,7 @@ use crate::tracing::SpanBuilder;
 use crate::tracing::{
     SERVICE_VALUE_MANAGEMENT, SPAN_ATTRIB_DB_SYSTEM_VALUE, SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
 };
+use couchbase_core::create_span;
 use std::sync::Arc;
 
 #[derive(Clone)]

@@ -15,9 +15,10 @@
  *  * limitations under the License.
  *
  */
-use crate::agent::Agent;
+use crate::agent::{Agent, AgentInner};
 use crate::cbconfig::{CollectionManifest, FullBucketConfig, FullClusterConfig};
 use crate::clusterlabels::ClusterLabels;
+use crate::create_span;
 use crate::error::Result;
 use crate::features::BucketFeature;
 use crate::mgmtx::bucket_settings::BucketDef;
@@ -73,10 +74,50 @@ use crate::results::query::QueryResultStream;
 use crate::results::search::SearchResultStream;
 use crate::searchx;
 use crate::searchx::document_analysis::DocumentAnalysis;
+use crate::tracingcomponent::{
+    build_keyspace, record_metrics, Keyspace, SpanBuilder, SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
+    SPAN_ATTRIB_OTEL_KIND_KEY,
+};
+use futures::Future;
 use serde_json::value::RawValue;
 use std::collections::HashMap;
+use std::time::Instant;
+use tracing::Instrument;
 
 impl Agent {
+    async fn execute_observable_operation<Fut, T>(
+        &self,
+        service: Option<&'static str>,
+        keyspace: Keyspace,
+        mut span: SpanBuilder,
+        future: Fut,
+    ) -> Result<T>
+    where
+        Fut: Future<Output = Result<T>>,
+    {
+        let operation_name = span.name();
+        let cluster_labels = self.inner.tracing.get_cluster_labels();
+
+        let span = span
+            .with_cluster_labels(&cluster_labels)
+            .with_service(service)
+            .with_keyspace(&keyspace)
+            .build();
+
+        let start = Instant::now();
+        let result = future.instrument(span).await;
+        record_metrics(
+            operation_name,
+            service,
+            &keyspace,
+            cluster_labels,
+            start,
+            result.as_ref().err(),
+        );
+
+        result
+    }
+
     pub async fn bucket_features(&self) -> Result<Vec<BucketFeature>> {
         self.inner.bucket_features().await
     }
@@ -86,58 +127,255 @@ impl Agent {
     }
 
     pub async fn upsert(&self, opts: UpsertOptions<'_>) -> Result<UpsertResult> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_KV),
+                    build_keyspace(
+                        self.get_bucket_name().as_deref(),
+                        Some(opts.scope_name),
+                        Some(opts.collection_name),
+                    ),
+                    create_span!("upsert"),
+                    self.inner.crud.upsert(opts),
+                )
+                .await;
+        }
+
         self.inner.crud.upsert(opts).await
     }
 
     pub async fn get(&self, opts: GetOptions<'_>) -> Result<GetResult> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_KV),
+                    build_keyspace(
+                        self.get_bucket_name().as_deref(),
+                        Some(opts.scope_name),
+                        Some(opts.collection_name),
+                    ),
+                    create_span!("get"),
+                    self.inner.crud.get(opts),
+                )
+                .await;
+        }
         self.inner.crud.get(opts).await
     }
 
     pub async fn get_meta(&self, opts: GetMetaOptions<'_>) -> Result<GetMetaResult> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_KV),
+                    build_keyspace(
+                        self.get_bucket_name().as_deref(),
+                        Some(opts.scope_name),
+                        Some(opts.collection_name),
+                    ),
+                    create_span!("get_meta"),
+                    self.inner.crud.get_meta(opts),
+                )
+                .await;
+        }
         self.inner.crud.get_meta(opts).await
     }
 
     pub async fn delete(&self, opts: DeleteOptions<'_>) -> Result<DeleteResult> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_KV),
+                    build_keyspace(
+                        self.get_bucket_name().as_deref(),
+                        Some(opts.scope_name),
+                        Some(opts.collection_name),
+                    ),
+                    create_span!("delete").with_durability(opts.durability_level.as_ref()),
+                    self.inner.crud.delete(opts),
+                )
+                .await;
+        }
         self.inner.crud.delete(opts).await
     }
 
     pub async fn get_and_lock(&self, opts: GetAndLockOptions<'_>) -> Result<GetAndLockResult> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_KV),
+                    build_keyspace(
+                        self.get_bucket_name().as_deref(),
+                        Some(opts.scope_name),
+                        Some(opts.collection_name),
+                    ),
+                    create_span!("get_and_lock"),
+                    self.inner.crud.get_and_lock(opts),
+                )
+                .await;
+        }
         self.inner.crud.get_and_lock(opts).await
     }
 
     pub async fn get_and_touch(&self, opts: GetAndTouchOptions<'_>) -> Result<GetAndTouchResult> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_KV),
+                    build_keyspace(
+                        self.get_bucket_name().as_deref(),
+                        Some(opts.scope_name),
+                        Some(opts.collection_name),
+                    ),
+                    create_span!("get_and_touch"),
+                    self.inner.crud.get_and_touch(opts),
+                )
+                .await;
+        }
         self.inner.crud.get_and_touch(opts).await
     }
 
     pub async fn unlock(&self, opts: UnlockOptions<'_>) -> Result<UnlockResult> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_KV),
+                    build_keyspace(
+                        self.get_bucket_name().as_deref(),
+                        Some(opts.scope_name),
+                        Some(opts.collection_name),
+                    ),
+                    create_span!("unlock"),
+                    self.inner.crud.unlock(opts),
+                )
+                .await;
+        }
         self.inner.crud.unlock(opts).await
     }
 
     pub async fn touch(&self, opts: TouchOptions<'_>) -> Result<TouchResult> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_KV),
+                    build_keyspace(
+                        self.get_bucket_name().as_deref(),
+                        Some(opts.scope_name),
+                        Some(opts.collection_name),
+                    ),
+                    create_span!("touch"),
+                    self.inner.crud.touch(opts),
+                )
+                .await;
+        }
         self.inner.crud.touch(opts).await
     }
 
     pub async fn add(&self, opts: AddOptions<'_>) -> Result<AddResult> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_KV),
+                    build_keyspace(
+                        self.get_bucket_name().as_deref(),
+                        Some(opts.scope_name),
+                        Some(opts.collection_name),
+                    ),
+                    create_span!("add").with_durability(opts.durability_level.as_ref()),
+                    self.inner.crud.add(opts),
+                )
+                .await;
+        }
         self.inner.crud.add(opts).await
     }
 
     pub async fn replace(&self, opts: ReplaceOptions<'_>) -> Result<ReplaceResult> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_KV),
+                    build_keyspace(
+                        self.get_bucket_name().as_deref(),
+                        Some(opts.scope_name),
+                        Some(opts.collection_name),
+                    ),
+                    create_span!("replace").with_durability(opts.durability_level.as_ref()),
+                    self.inner.crud.replace(opts),
+                )
+                .await;
+        }
         self.inner.crud.replace(opts).await
     }
 
     pub async fn append(&self, opts: AppendOptions<'_>) -> Result<AppendResult> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_KV),
+                    build_keyspace(
+                        self.get_bucket_name().as_deref(),
+                        Some(opts.scope_name),
+                        Some(opts.collection_name),
+                    ),
+                    create_span!("append").with_durability(opts.durability_level.as_ref()),
+                    self.inner.crud.append(opts),
+                )
+                .await;
+        }
         self.inner.crud.append(opts).await
     }
 
     pub async fn prepend(&self, opts: PrependOptions<'_>) -> Result<PrependResult> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_KV),
+                    build_keyspace(
+                        self.get_bucket_name().as_deref(),
+                        Some(opts.scope_name),
+                        Some(opts.collection_name),
+                    ),
+                    create_span!("prepend").with_durability(opts.durability_level.as_ref()),
+                    self.inner.crud.prepend(opts),
+                )
+                .await;
+        }
         self.inner.crud.prepend(opts).await
     }
 
     pub async fn increment(&self, opts: IncrementOptions<'_>) -> Result<IncrementResult> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_KV),
+                    build_keyspace(
+                        self.get_bucket_name().as_deref(),
+                        Some(opts.scope_name),
+                        Some(opts.collection_name),
+                    ),
+                    create_span!("increment"),
+                    self.inner.crud.increment(opts),
+                )
+                .await;
+        }
         self.inner.crud.increment(opts).await
     }
 
     pub async fn decrement(&self, opts: DecrementOptions<'_>) -> Result<DecrementResult> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_KV),
+                    build_keyspace(
+                        self.get_bucket_name().as_deref(),
+                        Some(opts.scope_name),
+                        Some(opts.collection_name),
+                    ),
+                    create_span!("decrement"),
+                    self.inner.crud.decrement(opts),
+                )
+                .await;
+        }
         self.inner.crud.decrement(opts).await
     }
 
@@ -149,38 +387,156 @@ impl Agent {
     }
 
     pub async fn lookup_in(&self, opts: LookupInOptions<'_>) -> Result<LookupInResult> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_KV),
+                    build_keyspace(
+                        self.get_bucket_name().as_deref(),
+                        Some(opts.scope_name),
+                        Some(opts.collection_name),
+                    ),
+                    create_span!("lookup_in"),
+                    self.inner.crud.lookup_in(opts),
+                )
+                .await;
+        }
         self.inner.crud.lookup_in(opts).await
     }
 
     pub async fn mutate_in(&self, opts: MutateInOptions<'_>) -> Result<MutateInResult> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_KV),
+                    build_keyspace(
+                        self.get_bucket_name().as_deref(),
+                        Some(opts.scope_name),
+                        Some(opts.collection_name),
+                    ),
+                    create_span!("mutate_in").with_durability(opts.durability_level.as_ref()),
+                    self.inner.crud.mutate_in(opts),
+                )
+                .await;
+        }
         self.inner.crud.mutate_in(opts).await
     }
 
     pub async fn query(&self, opts: QueryOptions) -> Result<QueryResultStream> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_QUERY),
+                    Keyspace::Cluster,
+                    create_span!("query").with_statement(opts.statement.as_deref().unwrap_or("")),
+                    self.inner.query.query(opts),
+                )
+                .await;
+        }
         self.inner.query.query(opts).await
     }
 
     pub async fn prepared_query(&self, opts: QueryOptions) -> Result<QueryResultStream> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_QUERY),
+                    Keyspace::Cluster,
+                    create_span!("query").with_statement(opts.statement.as_deref().unwrap_or("")),
+                    self.inner.query.prepared_query(opts),
+                )
+                .await;
+        }
         self.inner.query.prepared_query(opts).await
     }
 
     pub async fn get_all_indexes(&self, opts: &GetAllIndexesOptions<'_>) -> Result<Vec<Index>> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_QUERY),
+                    build_keyspace(
+                        Some(opts.bucket_name),
+                        opts.scope_name,
+                        opts.collection_name,
+                    ),
+                    create_span!("manager_query_get_all_indexes"),
+                    self.inner.query.get_all_indexes(opts),
+                )
+                .await;
+        }
         self.inner.query.get_all_indexes(opts).await
     }
 
     pub async fn create_primary_index(&self, opts: &CreatePrimaryIndexOptions<'_>) -> Result<()> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_QUERY),
+                    build_keyspace(
+                        Some(opts.bucket_name),
+                        opts.scope_name,
+                        opts.collection_name,
+                    ),
+                    create_span!("manager_query_create_primary_index"),
+                    self.inner.query.create_primary_index(opts),
+                )
+                .await;
+        }
         self.inner.query.create_primary_index(opts).await
     }
 
     pub async fn create_index(&self, opts: &CreateIndexOptions<'_>) -> Result<()> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_QUERY),
+                    build_keyspace(
+                        Some(opts.bucket_name),
+                        opts.scope_name,
+                        opts.collection_name,
+                    ),
+                    create_span!("manager_query_create_index"),
+                    self.inner.query.create_index(opts),
+                )
+                .await;
+        }
         self.inner.query.create_index(opts).await
     }
 
     pub async fn drop_primary_index(&self, opts: &DropPrimaryIndexOptions<'_>) -> Result<()> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_QUERY),
+                    build_keyspace(
+                        Some(opts.bucket_name),
+                        opts.scope_name,
+                        opts.collection_name,
+                    ),
+                    create_span!("manager_query_drop_primary_index"),
+                    self.inner.query.drop_primary_index(opts),
+                )
+                .await;
+        }
         self.inner.query.drop_primary_index(opts).await
     }
 
     pub async fn drop_index(&self, opts: &DropIndexOptions<'_>) -> Result<()> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_QUERY),
+                    build_keyspace(
+                        Some(opts.bucket_name),
+                        opts.scope_name,
+                        opts.collection_name,
+                    ),
+                    create_span!("manager_query_drop_index"),
+                    self.inner.query.drop_index(opts),
+                )
+                .await;
+        }
         self.inner.query.drop_index(opts).await
     }
 
@@ -188,10 +544,38 @@ impl Agent {
         &self,
         opts: &BuildDeferredIndexesOptions<'_>,
     ) -> Result<()> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_QUERY),
+                    build_keyspace(
+                        Some(opts.bucket_name),
+                        opts.scope_name,
+                        opts.collection_name,
+                    ),
+                    create_span!("manager_query_build_deferred_indexes"),
+                    self.inner.query.build_deferred_indexes(opts),
+                )
+                .await;
+        }
         self.inner.query.build_deferred_indexes(opts).await
     }
 
     pub async fn watch_indexes(&self, opts: &WatchIndexesOptions<'_>) -> Result<()> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_QUERY),
+                    build_keyspace(
+                        Some(opts.bucket_name),
+                        opts.scope_name,
+                        opts.collection_name,
+                    ),
+                    create_span!("manager_query_watch_indexes"),
+                    self.inner.query.watch_indexes(opts),
+                )
+                .await;
+        }
         self.inner.query.watch_indexes(opts).await
     }
 
@@ -200,6 +584,20 @@ impl Agent {
     }
 
     pub async fn search(&self, opts: SearchOptions) -> Result<SearchResultStream> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_SEARCH),
+                    build_keyspace(
+                        opts.bucket_name.as_deref(),
+                        opts.scope_name.as_deref(),
+                        None,
+                    ),
+                    create_span!("search"),
+                    self.inner.search.query(opts),
+                )
+                .await;
+        }
         self.inner.search.query(opts).await
     }
 
@@ -207,14 +605,44 @@ impl Agent {
         &self,
         opts: &GetIndexOptions<'_>,
     ) -> Result<searchx::index::Index> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_SEARCH),
+                    build_keyspace(opts.bucket_name, opts.scope_name, None),
+                    create_span!("manager_search_get_index"),
+                    self.inner.search.get_index(opts),
+                )
+                .await;
+        }
         self.inner.search.get_index(opts).await
     }
 
     pub async fn upsert_search_index(&self, opts: &UpsertIndexOptions<'_>) -> Result<()> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_SEARCH),
+                    build_keyspace(opts.bucket_name, opts.scope_name, None),
+                    create_span!("manager_search_upsert_index"),
+                    self.inner.search.upsert_index(opts),
+                )
+                .await;
+        }
         self.inner.search.upsert_index(opts).await
     }
 
     pub async fn delete_search_index(&self, opts: &DeleteIndexOptions<'_>) -> Result<()> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_SEARCH),
+                    build_keyspace(opts.bucket_name, opts.scope_name, None),
+                    create_span!("manager_search_drop_index"),
+                    self.inner.search.delete_index(opts),
+                )
+                .await;
+        }
         self.inner.search.delete_index(opts).await
     }
 
@@ -222,6 +650,16 @@ impl Agent {
         &self,
         opts: &search_management::GetAllIndexesOptions<'_>,
     ) -> Result<Vec<searchx::index::Index>> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_SEARCH),
+                    build_keyspace(opts.bucket_name, opts.scope_name, None),
+                    create_span!("manager_search_get_all_indexes"),
+                    self.inner.search.get_all_indexes(opts),
+                )
+                .await;
+        }
         self.inner.search.get_all_indexes(opts).await
     }
 
@@ -229,6 +667,16 @@ impl Agent {
         &self,
         opts: &AnalyzeDocumentOptions<'_>,
     ) -> Result<DocumentAnalysis> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_SEARCH),
+                    build_keyspace(opts.bucket_name, opts.scope_name, None),
+                    create_span!("manager_search_analyze_document"),
+                    self.inner.search.analyze_document(opts),
+                )
+                .await;
+        }
         self.inner.search.analyze_document(opts).await
     }
 
@@ -236,18 +684,58 @@ impl Agent {
         &self,
         opts: &GetIndexedDocumentsCountOptions<'_>,
     ) -> Result<u64> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_SEARCH),
+                    build_keyspace(opts.bucket_name, opts.scope_name, None),
+                    create_span!("manager_search_get_indexed_documents_count"),
+                    self.inner.search.get_indexed_documents_count(opts),
+                )
+                .await;
+        }
         self.inner.search.get_indexed_documents_count(opts).await
     }
 
     pub async fn pause_search_index_ingest(&self, opts: &PauseIngestOptions<'_>) -> Result<()> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_SEARCH),
+                    build_keyspace(opts.bucket_name, opts.scope_name, None),
+                    create_span!("manager_search_pause_ingest"),
+                    self.inner.search.pause_ingest(opts),
+                )
+                .await;
+        }
         self.inner.search.pause_ingest(opts).await
     }
 
     pub async fn resume_search_index_ingest(&self, opts: &ResumeIngestOptions<'_>) -> Result<()> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_SEARCH),
+                    build_keyspace(opts.bucket_name, opts.scope_name, None),
+                    create_span!("manager_search_resume_ingest"),
+                    self.inner.search.resume_ingest(opts),
+                )
+                .await;
+        }
         self.inner.search.resume_ingest(opts).await
     }
 
     pub async fn allow_search_index_querying(&self, opts: &AllowQueryingOptions<'_>) -> Result<()> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_SEARCH),
+                    build_keyspace(opts.bucket_name, opts.scope_name, None),
+                    create_span!("manager_search_allow_querying"),
+                    self.inner.search.allow_querying(opts),
+                )
+                .await;
+        }
         self.inner.search.allow_querying(opts).await
     }
 
@@ -255,14 +743,44 @@ impl Agent {
         &self,
         opts: &DisallowQueryingOptions<'_>,
     ) -> Result<()> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_SEARCH),
+                    build_keyspace(opts.bucket_name, opts.scope_name, None),
+                    create_span!("manager_search_disallow_querying"),
+                    self.inner.search.disallow_querying(opts),
+                )
+                .await;
+        }
         self.inner.search.disallow_querying(opts).await
     }
 
     pub async fn freeze_search_index_plan(&self, opts: &FreezePlanOptions<'_>) -> Result<()> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_SEARCH),
+                    build_keyspace(opts.bucket_name, opts.scope_name, None),
+                    create_span!("manager_search_freeze_plan"),
+                    self.inner.search.freeze_plan(opts),
+                )
+                .await;
+        }
         self.inner.search.freeze_plan(opts).await
     }
 
     pub async fn unfreeze_search_index_plan(&self, opts: &UnfreezePlanOptions<'_>) -> Result<()> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_SEARCH),
+                    build_keyspace(opts.bucket_name, opts.scope_name, None),
+                    create_span!("manager_search_unfreeze_plan"),
+                    self.inner.search.unfreeze_plan(opts),
+                )
+                .await;
+        }
         self.inner.search.unfreeze_plan(opts).await
     }
 
@@ -274,10 +792,30 @@ impl Agent {
     }
 
     pub async fn create_scope(&self, opts: &CreateScopeOptions<'_>) -> Result<CreateScopeResponse> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
+                    build_keyspace(Some(opts.bucket_name), Some(opts.scope_name), None),
+                    create_span!("manager_collections_create_scope"),
+                    self.inner.mgmt.create_scope(opts),
+                )
+                .await;
+        }
         self.inner.mgmt.create_scope(opts).await
     }
 
     pub async fn delete_scope(&self, opts: &DeleteScopeOptions<'_>) -> Result<DeleteScopeResponse> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
+                    build_keyspace(Some(opts.bucket_name), Some(opts.scope_name), None),
+                    create_span!("manager_collections_drop_scope"),
+                    self.inner.mgmt.delete_scope(opts),
+                )
+                .await;
+        }
         self.inner.mgmt.delete_scope(opts).await
     }
 
@@ -285,6 +823,20 @@ impl Agent {
         &self,
         opts: &CreateCollectionOptions<'_>,
     ) -> Result<CreateCollectionResponse> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
+                    build_keyspace(
+                        Some(opts.bucket_name),
+                        Some(opts.scope_name),
+                        Some(opts.collection_name),
+                    ),
+                    create_span!("manager_collections_create_collection"),
+                    self.inner.mgmt.create_collection(opts),
+                )
+                .await;
+        }
         self.inner.mgmt.create_collection(opts).await
     }
 
@@ -292,6 +844,20 @@ impl Agent {
         &self,
         opts: &DeleteCollectionOptions<'_>,
     ) -> Result<DeleteCollectionResponse> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
+                    build_keyspace(
+                        Some(opts.bucket_name),
+                        Some(opts.scope_name),
+                        Some(opts.collection_name),
+                    ),
+                    create_span!("manager_collections_drop_collection"),
+                    self.inner.mgmt.delete_collection(opts),
+                )
+                .await;
+        }
         self.inner.mgmt.delete_collection(opts).await
     }
 
@@ -299,6 +865,20 @@ impl Agent {
         &self,
         opts: &UpdateCollectionOptions<'_>,
     ) -> Result<UpdateCollectionResponse> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
+                    build_keyspace(
+                        Some(opts.bucket_name),
+                        Some(opts.scope_name),
+                        Some(opts.collection_name),
+                    ),
+                    create_span!("manager_collections_update_collection"),
+                    self.inner.mgmt.update_collection(opts),
+                )
+                .await;
+        }
         self.inner.mgmt.update_collection(opts).await
     }
 
@@ -307,30 +887,100 @@ impl Agent {
     }
 
     pub async fn get_all_buckets(&self, opts: &GetAllBucketsOptions<'_>) -> Result<Vec<BucketDef>> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
+                    Keyspace::Cluster,
+                    create_span!("manager_buckets_get_all_buckets"),
+                    self.inner.mgmt.get_all_buckets(opts),
+                )
+                .await;
+        }
         self.inner.mgmt.get_all_buckets(opts).await
     }
 
     pub async fn get_bucket(&self, opts: &GetBucketOptions<'_>) -> Result<BucketDef> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
+                    build_keyspace(Some(opts.bucket_name), None, None),
+                    create_span!("manager_buckets_get_bucket"),
+                    self.inner.mgmt.get_bucket(opts),
+                )
+                .await;
+        }
         self.inner.mgmt.get_bucket(opts).await
     }
 
     pub async fn create_bucket(&self, opts: &CreateBucketOptions<'_>) -> Result<()> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
+                    build_keyspace(Some(opts.bucket_name), None, None),
+                    create_span!("manager_buckets_create_bucket"),
+                    self.inner.mgmt.create_bucket(opts),
+                )
+                .await;
+        }
         self.inner.mgmt.create_bucket(opts).await
     }
 
     pub async fn update_bucket(&self, opts: &UpdateBucketOptions<'_>) -> Result<()> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
+                    build_keyspace(Some(opts.bucket_name), None, None),
+                    create_span!("manager_buckets_update_bucket"),
+                    self.inner.mgmt.update_bucket(opts),
+                )
+                .await;
+        }
         self.inner.mgmt.update_bucket(opts).await
     }
 
     pub async fn delete_bucket(&self, opts: &DeleteBucketOptions<'_>) -> Result<()> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
+                    build_keyspace(Some(opts.bucket_name), None, None),
+                    create_span!("manager_buckets_drop_bucket"),
+                    self.inner.mgmt.delete_bucket(opts),
+                )
+                .await;
+        }
         self.inner.mgmt.delete_bucket(opts).await
     }
 
     pub async fn flush_bucket(&self, opts: &FlushBucketOptions<'_>) -> Result<()> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
+                    build_keyspace(Some(opts.bucket_name), None, None),
+                    create_span!("manager_buckets_flush_bucket"),
+                    self.inner.mgmt.flush_bucket(opts),
+                )
+                .await;
+        }
         self.inner.mgmt.flush_bucket(opts).await
     }
 
     pub async fn get_user(&self, opts: &GetUserOptions<'_>) -> Result<UserAndMetadata> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
+                    Keyspace::Cluster,
+                    create_span!("manager_users_get_user"),
+                    self.inner.mgmt.get_user(opts),
+                )
+                .await;
+        }
         self.inner.mgmt.get_user(opts).await
     }
 
@@ -338,42 +988,142 @@ impl Agent {
         &self,
         opts: &GetAllUsersOptions<'_>,
     ) -> Result<Vec<UserAndMetadata>> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
+                    Keyspace::Cluster,
+                    create_span!("manager_users_get_all_users"),
+                    self.inner.mgmt.get_all_users(opts),
+                )
+                .await;
+        }
         self.inner.mgmt.get_all_users(opts).await
     }
 
     pub async fn upsert_user(&self, opts: &UpsertUserOptions<'_>) -> Result<()> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
+                    Keyspace::Cluster,
+                    create_span!("manager_users_upsert_user"),
+                    self.inner.mgmt.upsert_user(opts),
+                )
+                .await;
+        }
         self.inner.mgmt.upsert_user(opts).await
     }
 
     pub async fn delete_user(&self, opts: &DeleteUserOptions<'_>) -> Result<()> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
+                    Keyspace::Cluster,
+                    create_span!("manager_users_drop_user"),
+                    self.inner.mgmt.delete_user(opts),
+                )
+                .await;
+        }
         self.inner.mgmt.delete_user(opts).await
     }
 
     pub async fn get_roles(&self, opts: &GetRolesOptions<'_>) -> Result<Vec<RoleAndDescription>> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
+                    Keyspace::Cluster,
+                    create_span!("manager_users_get_roles"),
+                    self.inner.mgmt.get_roles(opts),
+                )
+                .await;
+        }
         self.inner.mgmt.get_roles(opts).await
     }
 
     pub async fn get_group(&self, opts: &GetGroupOptions<'_>) -> Result<Group> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
+                    Keyspace::Cluster,
+                    create_span!("manager_users_get_group"),
+                    self.inner.mgmt.get_group(opts),
+                )
+                .await;
+        }
         self.inner.mgmt.get_group(opts).await
     }
 
     pub async fn get_all_groups(&self, opts: &GetAllGroupsOptions<'_>) -> Result<Vec<Group>> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
+                    Keyspace::Cluster,
+                    create_span!("manager_users_get_all_groups"),
+                    self.inner.mgmt.get_all_groups(opts),
+                )
+                .await;
+        }
         self.inner.mgmt.get_all_groups(opts).await
     }
 
     pub async fn upsert_group(&self, opts: &UpsertGroupOptions<'_>) -> Result<()> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
+                    Keyspace::Cluster,
+                    create_span!("manager_users_upsert_group"),
+                    self.inner.mgmt.upsert_group(opts),
+                )
+                .await;
+        }
         self.inner.mgmt.upsert_group(opts).await
     }
 
     pub async fn delete_group(&self, opts: &DeleteGroupOptions<'_>) -> Result<()> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
+                    Keyspace::Cluster,
+                    create_span!("manager_users_drop_group"),
+                    self.inner.mgmt.delete_group(opts),
+                )
+                .await;
+        }
         self.inner.mgmt.delete_group(opts).await
     }
 
     pub async fn change_password(&self, opts: &ChangePasswordOptions<'_>) -> Result<()> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
+                    Keyspace::Cluster,
+                    create_span!("manager_users_change_password"),
+                    self.inner.mgmt.change_password(opts),
+                )
+                .await;
+        }
         self.inner.mgmt.change_password(opts).await
     }
 
     pub async fn ping(&self, opts: &PingOptions) -> Result<PingReport> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
+                    Keyspace::Cluster,
+                    create_span!("ping"),
+                    self.inner.diagnostics.ping(opts),
+                )
+                .await;
+        }
         self.inner.diagnostics.ping(opts).await
     }
 
@@ -397,14 +1147,45 @@ impl Agent {
     }
 
     pub async fn wait_until_ready(&self, opts: &WaitUntilReadyOptions) -> Result<()> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
+                    Keyspace::Cluster,
+                    create_span!("wait_until_ready"),
+                    self.inner.diagnostics.wait_until_ready(opts),
+                )
+                .await;
+        }
         self.inner.diagnostics.wait_until_ready(opts).await
     }
 
     pub async fn diagnostics(&self, opts: &DiagnosticsOptions) -> Result<DiagnosticsResult> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
+                    Keyspace::Cluster,
+                    create_span!("diagnostics"),
+                    self.inner.diagnostics.diagnostics(opts),
+                )
+                .await;
+        }
         self.inner.diagnostics.diagnostics(opts).await
     }
 
     pub async fn analytics_query(&self, opts: AnalyticsOptions) -> Result<AnalyticsResultStream> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_ANALYTICS),
+                    Keyspace::Cluster,
+                    create_span!("analytics")
+                        .with_statement(opts.statement.as_deref().unwrap_or("")),
+                    self.inner.analytics.query(opts),
+                )
+                .await;
+        }
         self.inner.analytics.query(opts).await
     }
 
@@ -412,6 +1193,16 @@ impl Agent {
         &self,
         opts: &GetPendingMutationsOptions<'_>,
     ) -> Result<HashMap<String, HashMap<String, i64>>> {
+        if self.inner.tracing.core_observability_enabled() {
+            return self
+                .execute_observable_operation(
+                    Some(crate::tracingcomponent::SERVICE_VALUE_ANALYTICS),
+                    Keyspace::Cluster,
+                    create_span!("manager_analytics_get_pending_mutations"),
+                    self.inner.analytics.get_pending_mutations(opts),
+                )
+                .await;
+        }
         self.inner.analytics.get_pending_mutations(opts).await
     }
 

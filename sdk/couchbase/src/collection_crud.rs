@@ -25,6 +25,7 @@ use crate::tracing::{
     SpanBuilder, SERVICE_VALUE_KV, SPAN_ATTRIB_DB_SYSTEM_VALUE, SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
 };
 use crate::transcoding;
+use couchbase_core::create_span;
 use serde::Serialize;
 use std::time::Duration;
 
@@ -171,7 +172,7 @@ impl Collection {
         options: impl Into<Option<UpsertOptions>>,
     ) -> crate::error::Result<MutationResult> {
         let options = options.into().unwrap_or_default();
-        let span = create_span!("upsert").with_durability(&options.durability_level);
+        let span = create_span!("upsert").with_durability(options.durability_level.as_ref());
 
         self.tracing_client
             .execute_observable_operation(
@@ -200,7 +201,7 @@ impl Collection {
         options: impl Into<Option<UpsertOptions>>,
     ) -> crate::error::Result<MutationResult> {
         let options = options.into().unwrap_or_default();
-        let span = create_span!("upsert").with_durability(&options.durability_level);
+        let span = create_span!("upsert").with_durability(options.durability_level.as_ref());
 
         self.tracing_client
             .execute_observable_operation(
@@ -220,7 +221,7 @@ impl Collection {
         options: impl Into<Option<InsertOptions>>,
     ) -> crate::error::Result<MutationResult> {
         let options = options.into().unwrap_or_default();
-        let span = create_span!("insert").with_durability(&options.durability_level);
+        let span = create_span!("insert").with_durability(options.durability_level.as_ref());
 
         self.tracing_client
             .execute_observable_operation(
@@ -249,7 +250,7 @@ impl Collection {
         options: impl Into<Option<InsertOptions>>,
     ) -> crate::error::Result<MutationResult> {
         let options = options.into().unwrap_or_default();
-        let span = create_span!("insert").with_durability(&options.durability_level);
+        let span = create_span!("insert").with_durability(options.durability_level.as_ref());
 
         self.tracing_client
             .execute_observable_operation(
@@ -269,7 +270,7 @@ impl Collection {
         options: impl Into<Option<ReplaceOptions>>,
     ) -> crate::error::Result<MutationResult> {
         let options = options.into().unwrap_or_default();
-        let span = create_span!("replace").with_durability(&options.durability_level);
+        let span = create_span!("replace").with_durability(options.durability_level.as_ref());
 
         self.tracing_client
             .execute_observable_operation(
@@ -298,7 +299,7 @@ impl Collection {
         options: impl Into<Option<ReplaceOptions>>,
     ) -> crate::error::Result<MutationResult> {
         let options = options.into().unwrap_or_default();
-        let span = create_span!("replace").with_durability(&options.durability_level);
+        let span = create_span!("replace").with_durability(options.durability_level.as_ref());
 
         self.tracing_client
             .execute_observable_operation(

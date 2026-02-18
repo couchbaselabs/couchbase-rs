@@ -7,101 +7,11 @@ use crate::tracing::{
     SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE, SPAN_NAME_REQUEST_ENCODING,
 };
 use couchbase_core::clusterlabels::ClusterLabels;
-use couchbase_core::tracingcomponent::SERVICE_VALUE_KV;
+use couchbase_core::tracingcomponent::{record_metrics, SERVICE_VALUE_KV};
 use std::future::Future;
 use std::sync::Arc;
 use std::time::Instant;
 use tracing::{trace_span, Instrument, Level, Span};
-
-macro_rules! record_operation_metric_event {
-    (
-        $duration:expr,
-        $operation:expr,
-        $cluster_name:expr,
-        $cluster_uuid:expr,
-        $error:expr
-        $(, $($field:ident).+ = $value:expr )*
-    ) => {{
-        let cluster_name = $cluster_name;
-        let cluster_uuid = $cluster_uuid;
-        let error = $error;
-        if let Some(error) = error {
-            match (cluster_name, cluster_uuid) {
-                (Some(name), Some(uuid)) => tracing::event!(
-                    target: "couchbase.metrics",
-                    Level::TRACE,
-                    histogram.db.client.operation.duration = $duration,
-                    db.operation.name = $operation,
-                    $( $($field).+ = $value, )*
-                    couchbase.cluster.name = name,
-                    couchbase.cluster.uuid = uuid,
-                    error.type = error,
-                ),
-                (Some(name), None) => tracing::event!(
-                    target: "couchbase.metrics",
-                    Level::TRACE,
-                    histogram.db.client.operation.duration = $duration,
-                    db.operation.name = $operation,
-                    $( $($field).+ = $value, )*
-                    couchbase.cluster.name = name,
-                    error.type = error,
-                ),
-                (None, Some(uuid)) => tracing::event!(
-                    target: "couchbase.metrics",
-                    Level::TRACE,
-                    histogram.db.client.operation.duration = $duration,
-                    db.operation.name = $operation,
-                    $( $($field).+ = $value, )*
-                    couchbase.cluster.uuid = uuid,
-                    error.type = error,
-                ),
-                (None, None) => tracing::event!(
-                    target: "couchbase.metrics",
-                    Level::TRACE,
-                    histogram.db.client.operation.duration = $duration,
-                    db.operation.name = $operation,
-                    $( $($field).+ = $value, )*
-                    error.type = error,
-                ),
-            }
-        } else {
-            match (cluster_name, cluster_uuid) {
-                (Some(name), Some(uuid)) => tracing::event!(
-                    target: "couchbase.metrics",
-                    Level::TRACE,
-                    histogram.db.client.operation.duration = $duration,
-                    db.operation.name = $operation,
-                    $( $($field).+ = $value, )*
-                    couchbase.cluster.name = name,
-                    couchbase.cluster.uuid = uuid,
-                ),
-                (Some(name), None) => tracing::event!(
-                    target: "couchbase.metrics",
-                    Level::TRACE,
-                    histogram.db.client.operation.duration = $duration,
-                    db.operation.name = $operation,
-                    $( $($field).+ = $value, )*
-                    couchbase.cluster.name = name,
-                ),
-                (None, Some(uuid)) => tracing::event!(
-                    target: "couchbase.metrics",
-                    Level::TRACE,
-                    histogram.db.client.operation.duration = $duration,
-                    db.operation.name = $operation,
-                    $( $($field).+ = $value, )*
-                    couchbase.cluster.uuid = uuid,
-                ),
-                (None, None) => tracing::event!(
-                    target: "couchbase.metrics",
-                    Level::TRACE,
-                    histogram.db.client.operation.duration = $duration,
-                    db.operation.name = $operation,
-                    $( $($field).+ = $value, )*
-                ),
-            }
-        }
-    }};
-}
 
 #[derive(Clone)]
 pub(crate) struct TracingClient {
@@ -207,7 +117,7 @@ impl CouchbaseTracingClient {
 
         let start = Instant::now();
         let result = fut.instrument(span).await;
-        Self::record_metrics(
+        record_metrics(
             operation_name,
             service,
             keyspace,
@@ -217,124 +127,6 @@ impl CouchbaseTracingClient {
         );
 
         result
-    }
-
-    fn record_metrics(
-        operation_name: &str,
-        service: Option<&str>,
-        keyspace: &Keyspace,
-        cluster_labels: Option<ClusterLabels>,
-        start: Instant,
-        error: Option<&error::Error>,
-    ) {
-        let duration = start.elapsed().as_secs_f64();
-
-        let cluster_name = cluster_labels
-            .as_ref()
-            .and_then(|labels| labels.cluster_name.as_deref());
-        let cluster_uuid = cluster_labels
-            .as_ref()
-            .and_then(|labels| labels.cluster_uuid.as_deref());
-        let error_name = error.map(|err| err.kind().metrics_name());
-
-        match keyspace {
-            Keyspace::Cluster => {
-                if let Some(service) = service {
-                    record_operation_metric_event!(
-                        duration,
-                        operation_name,
-                        cluster_name,
-                        cluster_uuid,
-                        error_name,
-                        couchbase.service = service
-                    );
-                } else {
-                    record_operation_metric_event!(
-                        duration,
-                        operation_name,
-                        cluster_name,
-                        cluster_uuid,
-                        error_name
-                    );
-                }
-            }
-            Keyspace::Bucket { bucket } => {
-                if let Some(service) = service {
-                    record_operation_metric_event!(
-                        duration,
-                        operation_name,
-                        cluster_name,
-                        cluster_uuid,
-                        error_name,
-                        couchbase.service = service,
-                        db.namespace = bucket
-                    );
-                } else {
-                    record_operation_metric_event!(
-                        duration,
-                        operation_name,
-                        cluster_name,
-                        cluster_uuid,
-                        error_name,
-                        db.namespace = bucket
-                    );
-                }
-            }
-            Keyspace::Scope { bucket, scope } => {
-                if let Some(service) = service {
-                    record_operation_metric_event!(
-                        duration,
-                        operation_name,
-                        cluster_name,
-                        cluster_uuid,
-                        error_name,
-                        couchbase.service = service,
-                        db.namespace = bucket,
-                        couchbase.scope.name = scope
-                    );
-                } else {
-                    record_operation_metric_event!(
-                        duration,
-                        operation_name,
-                        cluster_name,
-                        cluster_uuid,
-                        error_name,
-                        db.namespace = bucket,
-                        couchbase.scope.name = scope
-                    );
-                }
-            }
-            Keyspace::Collection {
-                bucket,
-                scope,
-                collection,
-            } => {
-                if let Some(service) = service {
-                    record_operation_metric_event!(
-                        duration,
-                        operation_name,
-                        cluster_name,
-                        cluster_uuid,
-                        error_name,
-                        couchbase.service = service,
-                        db.namespace = bucket,
-                        couchbase.scope.name = scope,
-                        couchbase.collection.name = collection
-                    );
-                } else {
-                    record_operation_metric_event!(
-                        duration,
-                        operation_name,
-                        cluster_name,
-                        cluster_uuid,
-                        error_name,
-                        db.namespace = bucket,
-                        couchbase.scope.name = scope,
-                        couchbase.collection.name = collection
-                    );
-                }
-            }
-        }
     }
 }
 

@@ -28,6 +28,7 @@ use crate::scope::Scope;
 use crate::tracing::{
     Keyspace, SpanBuilder, SPAN_ATTRIB_DB_SYSTEM_VALUE, SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
 };
+use couchbase_core::create_span;
 use tracing::{instrument, Level};
 
 #[derive(Clone)]

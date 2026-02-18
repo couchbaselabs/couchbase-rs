@@ -15,7 +15,6 @@
  *  * limitations under the License.
  *
  */
-
 use crate::collection::BinaryCollection;
 use crate::options::kv_binary_options::*;
 use crate::results::kv_binary_results::CounterResult;
@@ -24,6 +23,7 @@ use crate::tracing::SpanBuilder;
 use crate::tracing::{
     SERVICE_VALUE_KV, SPAN_ATTRIB_DB_SYSTEM_VALUE, SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
 };
+use couchbase_core::create_span;
 
 impl BinaryCollection {
     pub async fn append(
@@ -67,7 +67,7 @@ impl BinaryCollection {
         options: impl Into<Option<AppendOptions>>,
     ) -> crate::error::Result<MutationResult> {
         let options = options.into().unwrap_or_default();
-        let span = create_span!("append").with_durability(&options.durability_level);
+        let span = create_span!("append").with_durability(options.durability_level.as_ref());
 
         self.tracing_client
             .execute_observable_operation(
@@ -86,7 +86,7 @@ impl BinaryCollection {
         options: impl Into<Option<PrependOptions>>,
     ) -> crate::error::Result<MutationResult> {
         let options = options.into().unwrap_or_default();
-        let span = create_span!("prepend").with_durability(&options.durability_level);
+        let span = create_span!("prepend").with_durability(options.durability_level.as_ref());
 
         self.tracing_client
             .execute_observable_operation(
@@ -104,7 +104,7 @@ impl BinaryCollection {
         options: impl Into<Option<IncrementOptions>>,
     ) -> crate::error::Result<CounterResult> {
         let options = options.into().unwrap_or_default();
-        let span = create_span!("increment").with_durability(&options.durability_level);
+        let span = create_span!("increment").with_durability(options.durability_level.as_ref());
 
         self.tracing_client
             .execute_observable_operation(
@@ -122,7 +122,7 @@ impl BinaryCollection {
         options: impl Into<Option<DecrementOptions>>,
     ) -> crate::error::Result<CounterResult> {
         let options = options.into().unwrap_or_default();
-        let span = create_span!("decrement").with_durability(&options.durability_level);
+        let span = create_span!("decrement").with_durability(options.durability_level.as_ref());
 
         self.tracing_client
             .execute_observable_operation(

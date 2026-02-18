@@ -36,6 +36,7 @@ use crate::tracing::{
     Keyspace, SpanBuilder, SERVICE_VALUE_QUERY, SPAN_ATTRIB_DB_SYSTEM_VALUE,
     SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
 };
+use couchbase_core::create_span;
 use log::info;
 use std::sync::Arc;
 use tracing::instrument;

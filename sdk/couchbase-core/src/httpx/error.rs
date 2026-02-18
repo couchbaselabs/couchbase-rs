@@ -16,6 +16,7 @@
  *
  */
 
+use crate::tracingcomponent::MetricsName;
 use std::error::Error as StdError;
 use std::fmt::{Display, Formatter};
 
@@ -104,6 +105,17 @@ impl Display for ErrorKind {
             Self::Decoding(msg) => write!(f, "decoding error: {msg}"),
             Self::Message(msg) => write!(f, "{msg}"),
             Self::SendRequest(msg) => write!(f, "send request failed error: {msg}"),
+        }
+    }
+}
+
+impl MetricsName for Error {
+    fn metrics_name(&self) -> &'static str {
+        match self.kind() {
+            ErrorKind::Connection { .. } => "httpx.Connection",
+            ErrorKind::Decoding(_) => "httpx.Decoding",
+            ErrorKind::Message(_) => "httpx._OTHER",
+            ErrorKind::SendRequest(_) => "httpx.SendRequest",
         }
     }
 }

@@ -29,6 +29,7 @@ use crate::tracing::{
     SpanBuilder, SERVICE_VALUE_SEARCH, SPAN_ATTRIB_DB_SYSTEM_VALUE,
     SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
 };
+use couchbase_core::create_span;
 use serde_json::Value;
 use std::sync::Arc;
 

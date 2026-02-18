@@ -15,7 +15,6 @@
  *  * limitations under the License.
  *
  */
-
 use crate::clients::collections_mgmt_client::CollectionsMgmtClient;
 use crate::error;
 pub use crate::management::collections::collection_settings::{
@@ -27,6 +26,7 @@ use crate::tracing::{
     Keyspace, SpanBuilder, SERVICE_VALUE_MANAGEMENT, SPAN_ATTRIB_DB_SYSTEM_VALUE,
     SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
 };
+use couchbase_core::create_span;
 
 #[derive(Clone)]
 pub struct CollectionManager {

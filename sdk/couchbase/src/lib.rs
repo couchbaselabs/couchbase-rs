@@ -17,9 +17,6 @@
  */
 
 extern crate core;
-
-#[macro_use]
-mod tracing;
 pub mod authenticator;
 pub mod bucket;
 mod capella_ca;
@@ -44,4 +41,5 @@ pub mod search;
 pub mod service_type;
 pub mod subdoc;
 pub mod threshold_log_tracer;
+mod tracing;
 pub mod transcoding;

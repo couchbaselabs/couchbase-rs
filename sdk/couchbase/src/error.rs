@@ -22,6 +22,7 @@ use crate::error_context::{
 };
 use crate::service_type::ServiceType;
 use couchbase_core::memdx::error::{ServerError, ServerErrorKind, SubdocError, SubdocErrorKind};
+use couchbase_core::tracingcomponent::MetricsName;
 use serde::ser::SerializeStruct;
 use std::error::Error as StdError;
 use std::fmt::{Display, Formatter};
@@ -338,8 +339,8 @@ impl Display for ErrorKind {
     }
 }
 
-impl ErrorKind {
-    pub(crate) fn metrics_name(&self) -> &'static str {
+impl MetricsName for ErrorKind {
+    fn metrics_name(&self) -> &'static str {
         match self {
             ErrorKind::ServerTimeout => "UnambiguousTimeout",
             ErrorKind::Disconnected => "Disconnected",
@@ -406,6 +407,12 @@ impl ErrorKind {
             ErrorKind::OtherFailure(_) => "_OTHER",
             _ => "_OTHER",
         }
+    }
+}
+
+impl MetricsName for Error {
+    fn metrics_name(&self) -> &'static str {
+        self.kind().metrics_name()
     }
 }
 

@@ -139,6 +139,7 @@ type AgentCollectionResolver = CollectionResolverCached<CollectionResolverMemd<A
 
 pub(crate) struct AgentInner {
     state: Arc<Mutex<AgentState>>,
+    bucket: Option<String>,
 
     cfg_manager: Arc<ConfigManagerMemd<AgentClientManager>>,
     conn_mgr: Arc<AgentClientManager>,
@@ -304,6 +305,10 @@ impl AgentInner {
         Err(ErrorKind::NoBucket.into())
     }
 
+    pub(crate) fn get_bucket_name(&self) -> Option<String> {
+        self.bucket.clone()
+    }
+
     pub async fn reconfigure(&self, opts: ReconfigureAgentOptions) {
         let mut state = self.state.lock().await;
         state.tls_config = opts.tls_config.clone();
@@ -390,6 +395,8 @@ impl Agent {
                 .unwrap_or_else(|| Duration::from_secs(60)),
         };
 
+        let bucket_name = opts.bucket_name.clone();
+
         let http_client = Arc::new(ReqwestClient::new(ClientConfig {
             tls_config: state.tls_config.clone(),
             idle_connection_timeout: state.http_idle_connection_timeout,
@@ -436,6 +443,7 @@ impl Agent {
 
         let tracing = Arc::new(TracingComponent::new(
             agent_component_configs.tracing_config,
+            opts.core_observability_enabled,
         ));
 
         let err_map_component_conn_mgr = err_map_component.clone();
@@ -562,6 +570,7 @@ impl Agent {
 
         let inner = Arc::new(AgentInner {
             state,
+            bucket: bucket_name,
             cfg_manager: cfg_manager.clone(),
             conn_mgr,
             vb_router,
@@ -877,6 +886,10 @@ impl Agent {
         }
 
         operation().await
+    }
+
+    pub(crate) fn get_bucket_name(&self) -> Option<String> {
+        self.inner.get_bucket_name()
     }
 }
 

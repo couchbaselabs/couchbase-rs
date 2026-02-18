@@ -33,6 +33,7 @@ use crate::tracing::{
     Keyspace, SpanBuilder, SERVICE_VALUE_QUERY, SERVICE_VALUE_SEARCH, SPAN_ATTRIB_DB_SYSTEM_VALUE,
     SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
 };
+use couchbase_core::create_span;
 use std::sync::Arc;
 use tracing::{instrument, Level};
 

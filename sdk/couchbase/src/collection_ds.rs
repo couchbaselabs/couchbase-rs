@@ -26,6 +26,7 @@ use crate::subdoc::mutate_in_specs::MutateInSpec;
 use crate::tracing::{
     SpanBuilder, SERVICE_VALUE_KV, SPAN_ATTRIB_DB_SYSTEM_VALUE, SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
 };
+use couchbase_core::create_span;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::collections::HashMap;
