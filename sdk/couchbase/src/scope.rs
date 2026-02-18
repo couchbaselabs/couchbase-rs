@@ -20,6 +20,7 @@ use crate::clients::query_client::QueryClient;
 use crate::clients::scope_client::ScopeClient;
 use crate::clients::search_client::SearchClient;
 use crate::clients::search_index_mgmt_client::SearchIndexMgmtClient;
+use crate::clients::tracing_client::TracingClient;
 use crate::collection::Collection;
 use crate::error;
 use crate::management::search::search_index_manager::SearchIndexManager;
@@ -28,7 +29,13 @@ use crate::options::search_options::SearchOptions;
 use crate::results::query_results::QueryResult;
 use crate::results::search_results::SearchResult;
 use crate::search::request::SearchRequest;
+use crate::tracing::{
+    Keyspace, SpanBuilder, SERVICE_VALUE_QUERY, SERVICE_VALUE_SEARCH, SPAN_ATTRIB_DB_SYSTEM_VALUE,
+    SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
+};
+use couchbase_core::create_span;
 use std::sync::Arc;
+use tracing::{instrument, Level};
 
 #[derive(Clone)]
 pub struct Scope {
@@ -36,6 +43,8 @@ pub struct Scope {
     query_client: Arc<QueryClient>,
     search_client: Arc<SearchClient>,
     search_index_client: Arc<SearchIndexMgmtClient>,
+    tracing_client: TracingClient,
+    keyspace: Keyspace,
 }
 
 impl Scope {
@@ -43,12 +52,19 @@ impl Scope {
         let query_client = Arc::new(client.query_client());
         let search_client = Arc::new(client.search_client());
         let search_index_client = Arc::new(client.search_index_management_client());
+        let tracing_client = client.tracing_client();
+        let keyspace = Keyspace::Scope {
+            bucket: client.bucket_name().to_string(),
+            scope: client.name().to_string(),
+        };
 
         Self {
             client,
             query_client,
             search_client,
             search_index_client,
+            tracing_client,
+            keyspace,
         }
     }
 
@@ -65,7 +81,7 @@ impl Scope {
         statement: impl Into<String>,
         opts: impl Into<Option<QueryOptions>>,
     ) -> error::Result<QueryResult> {
-        self.query_client.query(statement.into(), opts.into()).await
+        self.query_internal(statement.into(), opts).await
     }
 
     pub async fn search(
@@ -74,8 +90,39 @@ impl Scope {
         request: SearchRequest,
         opts: impl Into<Option<SearchOptions>>,
     ) -> error::Result<SearchResult> {
-        self.search_client
-            .search(index_name.into(), request, opts.into())
+        self.search_internal(index_name.into(), request, opts).await
+    }
+
+    async fn query_internal(
+        &self,
+        statement: String,
+        opts: impl Into<Option<QueryOptions>>,
+    ) -> error::Result<QueryResult> {
+        let span = create_span!("query").with_statement(&statement);
+
+        self.tracing_client
+            .execute_observable_operation(
+                Some(SERVICE_VALUE_QUERY),
+                &self.keyspace,
+                span,
+                self.query_client.query(statement, opts.into()),
+            )
+            .await
+    }
+
+    async fn search_internal(
+        &self,
+        index_name: String,
+        request: SearchRequest,
+        opts: impl Into<Option<SearchOptions>>,
+    ) -> error::Result<SearchResult> {
+        self.tracing_client
+            .execute_observable_operation(
+                Some(SERVICE_VALUE_SEARCH),
+                &self.keyspace,
+                create_span!("search"),
+                self.search_client.search(index_name, request, opts.into()),
+            )
             .await
     }
 

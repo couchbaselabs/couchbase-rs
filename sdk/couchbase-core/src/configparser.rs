@@ -19,6 +19,7 @@
 use std::collections::HashMap;
 
 use crate::cbconfig::{TerseConfig, TerseExtNodePorts, VBucketServerMap};
+use crate::clusterlabels::ClusterLabels;
 use crate::error;
 use crate::error::{ErrorKind, Result};
 use crate::parsedconfig::{
@@ -105,6 +106,15 @@ impl ConfigParser {
             }
         }
 
+        let cluster_labels = if config.cluster_name.is_some() || config.cluster_uuid.is_some() {
+            Some(ClusterLabels {
+                cluster_name: config.cluster_name,
+                cluster_uuid: config.cluster_uuid,
+            })
+        } else {
+            None
+        };
+
         Ok(ParsedConfig {
             rev_id,
             rev_epoch,
@@ -112,6 +122,7 @@ impl ConfigParser {
             nodes,
             features,
             source_hostname: source_hostname.to_string(),
+            cluster_labels,
         })
     }
 

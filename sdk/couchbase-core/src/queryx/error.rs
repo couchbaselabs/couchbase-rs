@@ -17,6 +17,7 @@
  */
 
 use crate::httpx;
+use crate::tracingcomponent::MetricsName;
 use http::StatusCode;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -865,5 +866,44 @@ impl Error {
                 ..
             })
         )
+    }
+}
+
+impl MetricsName for Error {
+    fn metrics_name(&self) -> &'static str {
+        match self.kind() {
+            ErrorKind::Server(e) => e.kind().metrics_name(),
+            ErrorKind::Resource(e) => e.cause().kind().metrics_name(),
+            ErrorKind::Http { error, .. } => error.metrics_name(),
+            ErrorKind::Message { .. } => "queryx._OTHER",
+            ErrorKind::InvalidArgument { .. } => "queryx.InvalidArgument",
+            ErrorKind::Encoding { .. } => "queryx.Encoding",
+        }
+    }
+}
+
+impl MetricsName for ServerErrorKind {
+    fn metrics_name(&self) -> &'static str {
+        match self {
+            ServerErrorKind::ParsingFailure => "queryx.ParsingFailure",
+            ServerErrorKind::Internal => "queryx.Internal",
+            ServerErrorKind::AuthenticationFailure => "queryx.AuthenticationFailure",
+            ServerErrorKind::CasMismatch => "queryx.CasMismatch",
+            ServerErrorKind::DocNotFound => "queryx.DocNotFound",
+            ServerErrorKind::DocExists => "queryx.DocExists",
+            ServerErrorKind::PlanningFailure => "queryx.PlanningFailure",
+            ServerErrorKind::IndexFailure => "queryx.IndexFailure",
+            ServerErrorKind::PreparedStatementFailure => "queryx.PreparedStatementFailure",
+            ServerErrorKind::DMLFailure => "queryx.DMLFailure",
+            ServerErrorKind::Timeout => "queryx.Timeout",
+            ServerErrorKind::IndexExists => "queryx.IndexExists",
+            ServerErrorKind::IndexNotFound => "queryx.IndexNotFound",
+            ServerErrorKind::WriteInReadOnlyMode => "queryx.WriteInReadOnlyMode",
+            ServerErrorKind::ScopeNotFound => "queryx.ScopeNotFound",
+            ServerErrorKind::CollectionNotFound => "queryx.CollectionNotFound",
+            ServerErrorKind::InvalidArgument { .. } => "queryx.InvalidArgument",
+            ServerErrorKind::BuildAlreadyInProgress => "queryx.BuildAlreadyInProgress",
+            ServerErrorKind::Unknown => "queryx._OTHER",
+        }
     }
 }

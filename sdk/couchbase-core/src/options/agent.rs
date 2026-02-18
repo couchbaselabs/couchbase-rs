@@ -43,6 +43,7 @@ pub struct AgentOptions {
     pub http_config: HttpConfig,
     pub tcp_keep_alive_time: Option<Duration>,
     pub orphan_response_handler: Option<OrphanResponseHandler>,
+    pub core_observability_enabled: bool,
 }
 
 impl Debug for AgentOptions {
@@ -58,6 +59,10 @@ impl Debug for AgentOptions {
             .field("kv_config", &self.kv_config)
             .field("http_config", &self.http_config)
             .field("tcp_keep_alive_time", &self.tcp_keep_alive_time)
+            .field(
+                "core_observability_enabled",
+                &self.core_observability_enabled,
+            )
             .finish()
     }
 }
@@ -77,7 +82,13 @@ impl AgentOptions {
             http_config: HttpConfig::default(),
             tcp_keep_alive_time: None,
             orphan_response_handler: None,
+            core_observability_enabled: false,
         }
+    }
+
+    pub fn core_observability_enabled(mut self, core_observability_enabled: bool) -> Self {
+        self.core_observability_enabled = core_observability_enabled;
+        self
     }
 
     pub fn seed_config(mut self, seed_config: SeedConfig) -> Self {
@@ -443,7 +454,7 @@ impl Display for AgentOptions {
 
         write!(
             f,
-            "{{ seed_config: {}, auth_mechanisms: {:?}, tls_config: {}, bucket_name: {:?}, network: {:?}, compression_config: {}, config_poller_config: {}, kv_config: {}, http_config: {}, tcp_keep_alive_time: {:?}, orphan_response_handler: {} }}",
+            "{{ seed_config: {}, auth_mechanisms: {:?}, tls_config: {}, bucket_name: {:?}, network: {:?}, compression_config: {}, config_poller_config: {}, kv_config: {}, http_config: {}, tcp_keep_alive_time: {:?}, orphan_response_handler: {}, core_observability_enabled: {} }}",
             self.seed_config,
             self.auth_mechanisms,
             tls_config,
@@ -454,7 +465,8 @@ impl Display for AgentOptions {
             self.kv_config,
             self.http_config,
             self.tcp_keep_alive_time,
-            if self.orphan_response_handler.is_some() { "Some" } else { "None" }
+            if self.orphan_response_handler.is_some() { "Some" } else { "None" },
+            self.core_observability_enabled
         )
     }
 }

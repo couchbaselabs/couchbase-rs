@@ -63,7 +63,9 @@ impl<'a> EnsureUserHelper<'a> {
             http_client: client,
             user_agent: self.user_agent.to_string(),
             endpoint: target.endpoint.to_string(),
+            canonical_endpoint: target.canonical_endpoint.to_string(),
             auth: target.auth.clone(),
+            tracing: Default::default(),
         }
         .get_user(&GetUserOptions {
             on_behalf_of_info: self.on_behalf_of_info,

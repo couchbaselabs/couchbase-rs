@@ -22,6 +22,7 @@ use crate::clients::bucket_mgmt_client::BucketMgmtClient;
 use crate::clients::cluster_client::ClusterClient;
 use crate::clients::diagnostics_client::DiagnosticsClient;
 use crate::clients::query_client::QueryClient;
+use crate::clients::tracing_client::TracingClient;
 use crate::clients::user_mgmt_client::UserMgmtClient;
 use crate::error;
 use crate::management::buckets::bucket_manager::BucketManager;
@@ -31,8 +32,15 @@ use crate::options::diagnostic_options::{DiagnosticsOptions, PingOptions, WaitUn
 use crate::options::query_options::QueryOptions;
 use crate::results::diagnostics::{DiagnosticsResult, PingReport};
 use crate::results::query_results::QueryResult;
+use crate::tracing::{
+    Keyspace, SpanBuilder, SERVICE_VALUE_QUERY, SPAN_ATTRIB_DB_SYSTEM_VALUE,
+    SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
+};
+use couchbase_core::create_span;
 use log::info;
 use std::sync::Arc;
+use tracing::instrument;
+use tracing::Level;
 
 #[derive(Clone)]
 pub struct Cluster {
@@ -41,6 +49,7 @@ pub struct Cluster {
     bucket_mgmt_client: Arc<BucketMgmtClient>,
     user_mgmt_client: Arc<UserMgmtClient>,
     diagnostics_client: Arc<DiagnosticsClient>,
+    tracing_client: Arc<TracingClient>,
 }
 
 impl Cluster {
@@ -56,6 +65,7 @@ impl Cluster {
         let bucket_mgmt_client = Arc::new(client.buckets_client());
         let user_mgmt_client = Arc::new(client.users_client());
         let diagnostics_client = Arc::new(client.diagnostics_client());
+        let tracing_client = Arc::new(client.tracing_client());
 
         Ok(Cluster {
             client,
@@ -63,6 +73,7 @@ impl Cluster {
             bucket_mgmt_client,
             user_mgmt_client,
             diagnostics_client,
+            tracing_client,
         })
     }
 
@@ -92,21 +103,18 @@ impl Cluster {
         &self,
         opts: impl Into<Option<DiagnosticsOptions>>,
     ) -> error::Result<DiagnosticsResult> {
-        let opts = opts.into().unwrap_or_default();
-        self.diagnostics_client.diagnostics(opts).await
+        self.diagnostics_internal(opts).await
     }
 
     pub async fn ping(&self, opts: impl Into<Option<PingOptions>>) -> error::Result<PingReport> {
-        let opts = opts.into().unwrap_or_default();
-        self.diagnostics_client.ping(opts).await
+        self.ping_internal(opts).await
     }
 
     pub async fn wait_until_ready(
         &self,
         opts: impl Into<Option<WaitUntilReadyOptions>>,
     ) -> error::Result<()> {
-        let opts = opts.into().unwrap_or_default();
-        self.diagnostics_client.wait_until_ready(opts).await
+        self.wait_until_ready_internal(opts).await
     }
 
     // Sets a new authenticator for the cluster.
@@ -117,6 +125,68 @@ impl Cluster {
     // are created.
     pub async fn set_authenticator(&self, authenticator: Authenticator) -> error::Result<()> {
         self.client.set_authenticator(authenticator).await
+    }
+
+    async fn query_internal(
+        &self,
+        statement: String,
+        opts: impl Into<Option<QueryOptions>>,
+    ) -> error::Result<QueryResult> {
+        let span = create_span!("query").with_statement(&statement);
+
+        self.tracing_client
+            .execute_observable_operation(
+                Some(SERVICE_VALUE_QUERY),
+                &Keyspace::Cluster,
+                span,
+                self.query_client.query(statement, opts.into()),
+            )
+            .await
+    }
+
+    async fn ping_internal(
+        &self,
+        opts: impl Into<Option<PingOptions>>,
+    ) -> error::Result<PingReport> {
+        self.tracing_client
+            .execute_observable_operation(
+                None,
+                &Keyspace::Cluster,
+                create_span!("ping"),
+                self.diagnostics_client
+                    .ping(opts.into().unwrap_or_default()),
+            )
+            .await
+    }
+
+    async fn diagnostics_internal(
+        &self,
+        opts: impl Into<Option<DiagnosticsOptions>>,
+    ) -> error::Result<DiagnosticsResult> {
+        self.tracing_client
+            .execute_observable_operation(
+                None,
+                &Keyspace::Cluster,
+                create_span!("diagnostics"),
+                self.diagnostics_client
+                    .diagnostics(opts.into().unwrap_or_default()),
+            )
+            .await
+    }
+
+    async fn wait_until_ready_internal(
+        &self,
+        opts: impl Into<Option<WaitUntilReadyOptions>>,
+    ) -> error::Result<()> {
+        self.tracing_client
+            .execute_observable_operation(
+                None,
+                &Keyspace::Cluster,
+                create_span!("wait_until_ready"),
+                self.diagnostics_client
+                    .wait_until_ready(opts.into().unwrap_or_default()),
+            )
+            .await
     }
 }
 

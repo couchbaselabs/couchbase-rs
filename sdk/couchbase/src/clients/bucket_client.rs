@@ -26,6 +26,7 @@ use crate::clients::diagnostics_client::{
 use crate::clients::scope_client::{
     Couchbase2ScopeClient, CouchbaseScopeClient, ScopeClient, ScopeClientBackend,
 };
+use crate::clients::tracing_client::{CouchbaseTracingClient, TracingClient, TracingClientBackend};
 use crate::retry::RetryStrategy;
 use std::sync::Arc;
 
@@ -79,6 +80,17 @@ impl BucketClient {
                     diagnostics_client,
                 ))
             }
+            BucketClientBackend::Couchbase2BucketBackend(_) => {
+                unimplemented!()
+            }
+        }
+    }
+
+    pub fn tracing_client(&self) -> TracingClient {
+        match &self.backend {
+            BucketClientBackend::CouchbaseBucketBackend(backend) => TracingClient::new(
+                TracingClientBackend::CouchbaseTracingClientBackend(backend.tracing_client()),
+            ),
             BucketClientBackend::Couchbase2BucketBackend(_) => {
                 unimplemented!()
             }
@@ -140,6 +152,10 @@ impl CouchbaseBucketClient {
             self.agent_provider.clone(),
             self.default_retry_strategy.clone(),
         )
+    }
+
+    pub fn tracing_client(&self) -> CouchbaseTracingClient {
+        CouchbaseTracingClient::new(self.agent_provider.clone())
     }
 }
 

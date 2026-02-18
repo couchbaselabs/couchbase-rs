@@ -17,6 +17,8 @@
  */
 
 use crate::clients::agent_provider::CouchbaseAgentProvider;
+use crate::clients::collections_mgmt_client::CollectionsMgmtClientBackend;
+use crate::clients::tracing_client::{CouchbaseTracingClient, TracingClient, TracingClientBackend};
 use crate::error;
 use crate::management::buckets::bucket_settings::BucketSettings;
 use crate::options::bucket_mgmt_options::{
@@ -121,6 +123,21 @@ impl BucketMgmtClient {
             }
             BucketMgmtClientBackend::Couchbase2BucketMgmtClientBackend(client) => {
                 client.flush_bucket(bucket_name, opts).await
+            }
+        }
+    }
+
+    pub fn tracing_client(&self) -> TracingClient {
+        match &self.backend {
+            BucketMgmtClientBackend::CouchbaseBucketMgmtClientBackend(client) => {
+                let tracing_client = client.tracing_client();
+
+                TracingClient::new(TracingClientBackend::CouchbaseTracingClientBackend(
+                    tracing_client,
+                ))
+            }
+            BucketMgmtClientBackend::Couchbase2BucketMgmtClientBackend(client) => {
+                unimplemented!()
             }
         }
     }
@@ -394,6 +411,10 @@ impl CouchbaseBucketMgmtClient {
             .await?;
 
         Ok(())
+    }
+
+    pub fn tracing_client(&self) -> CouchbaseTracingClient {
+        CouchbaseTracingClient::new(self.agent_provider.clone())
     }
 }
 

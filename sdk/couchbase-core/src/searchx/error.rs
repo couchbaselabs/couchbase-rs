@@ -17,6 +17,7 @@
  */
 
 use crate::httpx;
+use crate::tracingcomponent::MetricsName;
 use http::StatusCode;
 use std::error::Error as StdError;
 use std::fmt::{Display, Formatter};
@@ -264,6 +265,38 @@ impl Display for ServerErrorKind {
             ServerErrorKind::UnsupportedFeature => write!(f, "unsupported feature"),
             ServerErrorKind::RateLimitedFailure => write!(f, "rate limited failure"),
             ServerErrorKind::Unknown => write!(f, "unknown error"),
+        }
+    }
+}
+
+impl MetricsName for Error {
+    fn metrics_name(&self) -> &'static str {
+        match self.kind() {
+            ErrorKind::Server(e) => e.kind().metrics_name(),
+            ErrorKind::Http { error, .. } => error.metrics_name(),
+            ErrorKind::Message { .. } => "searchx._OTHER",
+            ErrorKind::InvalidArgument { .. } => "searchx.InvalidArgument",
+            ErrorKind::Encoding { .. } => "searchx.Encoding",
+            ErrorKind::UnsupportedFeature { .. } => "searchx.UnsupportedFeature",
+        }
+    }
+}
+
+impl MetricsName for ServerErrorKind {
+    fn metrics_name(&self) -> &'static str {
+        match self {
+            ServerErrorKind::Internal => "searchx.Internal",
+            ServerErrorKind::AuthenticationFailure => "searchx.AuthenticationFailure",
+            ServerErrorKind::IndexExists => "searchx.IndexExists",
+            ServerErrorKind::IndexNotFound => "searchx.IndexNotFound",
+            ServerErrorKind::UnknownIndexType => "searchx.UnknownIndexType",
+            ServerErrorKind::SourceTypeIncorrect => "searchx.SourceTypeIncorrect",
+            ServerErrorKind::SourceNotFound => "searchx.SourceNotFound",
+            ServerErrorKind::NoIndexPartitionsPlanned => "searchx.NoIndexPartitionsPlanned",
+            ServerErrorKind::NoIndexPartitionsFound => "searchx.NoIndexPartitionsFound",
+            ServerErrorKind::UnsupportedFeature => "searchx.UnsupportedFeature",
+            ServerErrorKind::RateLimitedFailure => "searchx.RateLimitedFailure",
+            ServerErrorKind::Unknown => "searchx._OTHER",
         }
     }
 }

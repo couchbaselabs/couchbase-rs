@@ -16,6 +16,7 @@
  *
  */
 
+use couchbase_core::tracingcomponent::IntoDurabilityU8;
 use std::fmt::Display;
 
 #[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
@@ -98,6 +99,18 @@ impl From<couchbase_core::mgmtx::bucket_settings::DurabilityLevel> for Durabilit
             couchbase_core::mgmtx::bucket_settings::DurabilityLevel::MAJORITY_AND_PERSIST_ACTIVE => DurabilityLevel::MAJORITY_AND_PERSIST_ACTIVE,
             couchbase_core::mgmtx::bucket_settings::DurabilityLevel::PERSIST_TO_MAJORITY => DurabilityLevel::PERSIST_TO_MAJORITY,
             _ => DurabilityLevel(InnerDurabilityLevel::Other(value.to_string())),
+        }
+    }
+}
+
+impl IntoDurabilityU8 for DurabilityLevel {
+    fn as_u8(&self) -> u8 {
+        match self.0 {
+            InnerDurabilityLevel::None => 0,
+            InnerDurabilityLevel::Majority => 1,
+            InnerDurabilityLevel::MajorityAndPersistActive => 2,
+            InnerDurabilityLevel::PersistToMajority => 3,
+            _ => unreachable!(),
         }
     }
 }

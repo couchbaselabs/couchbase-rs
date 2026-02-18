@@ -17,6 +17,7 @@
  */
 
 use crate::httpx;
+use crate::tracingcomponent::MetricsName;
 use http::StatusCode;
 use std::error::Error as StdError;
 use std::fmt::{Display, Formatter};
@@ -396,6 +397,42 @@ impl Display for ServerErrorKind {
             ServerErrorKind::LinkExists => write!(f, "link exists"),
             ServerErrorKind::LinkNotFound => write!(f, "link not found"),
             ServerErrorKind::JobQueueFull => write!(f, "job queue full"),
+        }
+    }
+}
+
+impl MetricsName for Error {
+    fn metrics_name(&self) -> &'static str {
+        match self.kind() {
+            ErrorKind::Server(e) => e.kind().metrics_name(),
+            ErrorKind::Http { error, .. } => error.metrics_name(),
+            ErrorKind::Message { .. } => "analyticsx._OTHER",
+            ErrorKind::InvalidArgument { .. } => "analyticsx.InvalidArgument",
+            ErrorKind::Encoding { .. } => "analyticsx.Encoding",
+        }
+    }
+}
+
+impl MetricsName for ServerErrorKind {
+    fn metrics_name(&self) -> &'static str {
+        match self {
+            ServerErrorKind::CompilationFailure => "analyticsx.CompilationFailure",
+            ServerErrorKind::Internal => "analyticsx.Internal",
+            ServerErrorKind::AuthenticationFailure => "analyticsx.AuthenticationFailure",
+            ServerErrorKind::ParsingFailure => "analyticsx.ParsingFailure",
+            ServerErrorKind::ScanWaitTimeout => "analyticsx.ScanWaitTimeout",
+            ServerErrorKind::InvalidArgument { .. } => "analyticsx.InvalidArgument",
+            ServerErrorKind::TemporaryFailure => "analyticsx.TemporaryFailure",
+            ServerErrorKind::JobQueueFull => "analyticsx.JobQueueFull",
+            ServerErrorKind::IndexNotFound => "analyticsx.IndexNotFound",
+            ServerErrorKind::IndexExists => "analyticsx.IndexExists",
+            ServerErrorKind::DatasetNotFound => "analyticsx.DatasetNotFound",
+            ServerErrorKind::DatasetExists => "analyticsx.DatasetExists",
+            ServerErrorKind::DataverseNotFound => "analyticsx.DataverseNotFound",
+            ServerErrorKind::DataverseExists => "analyticsx.DataverseExists",
+            ServerErrorKind::LinkNotFound => "analyticsx.LinkNotFound",
+            ServerErrorKind::LinkExists => "analyticsx.LinkExists",
+            ServerErrorKind::Unknown => "analyticsx._OTHER",
         }
     }
 }

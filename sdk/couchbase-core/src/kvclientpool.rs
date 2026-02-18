@@ -41,6 +41,7 @@ use crate::memdx::dispatcher::{Dispatcher, OrphanResponseHandler, UnsolicitedPac
 use crate::memdx::request::PingRequest;
 use crate::memdx::response::PingResponse;
 use crate::results::diagnostics::EndpointDiagnostics;
+use crate::tracingcomponent::TracingComponent;
 use arc_swap::ArcSwap;
 use futures::executor::block_on;
 use futures::future::join_all;
@@ -84,6 +85,7 @@ pub(crate) struct KvClientPoolOptions {
 
     pub unsolicited_packet_tx: Option<UnsolicitedPacketSender>,
     pub orphan_handler: Option<OrphanResponseHandler>,
+    pub tracing: Arc<TracingComponent>,
 }
 
 struct KvClientPoolFastMap<K> {
@@ -164,6 +166,7 @@ where
                     target: opts.target.clone(),
                     auth: opts.auth.clone(),
                     selected_bucket: opts.selected_bucket.clone(),
+                    tracing: opts.tracing.clone(),
                 });
 
                 babysitters_guard.insert(

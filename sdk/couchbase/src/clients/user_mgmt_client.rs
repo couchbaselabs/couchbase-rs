@@ -17,6 +17,7 @@
  */
 
 use crate::clients::agent_provider::CouchbaseAgentProvider;
+use crate::clients::tracing_client::{CouchbaseTracingClient, TracingClient, TracingClientBackend};
 use crate::error;
 use crate::management::users::user::{Group, RoleAndDescription, User, UserAndMetadata};
 use crate::options::user_mgmt_options::{
@@ -164,6 +165,15 @@ impl UserMgmtClient {
             UserMgmtClientBackend::Couchbase2UserMgmtClientBackend(client) => {
                 client.change_password(new_password, opts).await
             }
+        }
+    }
+
+    pub fn tracing_client(&self) -> TracingClient {
+        match &self.backend {
+            UserMgmtClientBackend::CouchbaseUserMgmtClientBackend(client) => TracingClient::new(
+                TracingClientBackend::CouchbaseTracingClientBackend(client.tracing_client()),
+            ),
+            UserMgmtClientBackend::Couchbase2UserMgmtClientBackend(_) => unimplemented!(),
         }
     }
 }
@@ -371,6 +381,10 @@ impl CouchbaseUserMgmtClient {
             .await?;
 
         Ok(())
+    }
+
+    pub fn tracing_client(&self) -> CouchbaseTracingClient {
+        CouchbaseTracingClient::new(self.agent_provider.clone())
     }
 }
 

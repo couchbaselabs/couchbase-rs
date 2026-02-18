@@ -23,6 +23,7 @@ use crate::clients::query_index_mgmt_client::{
     CouchbaseQueryIndexMgmtClient, QueryIndexKeyspace, QueryIndexMgmtClient,
     QueryIndexMgmtClientBackend,
 };
+use crate::clients::tracing_client::{CouchbaseTracingClient, TracingClient, TracingClientBackend};
 use crate::retry::RetryStrategy;
 use std::sync::Arc;
 
@@ -43,10 +44,43 @@ impl CollectionClient {
         }
     }
 
+    pub fn bucket_name(&self) -> &str {
+        match &self.backend {
+            CollectionClientBackend::CouchbaseCollectionBackend(client) => {
+                client.bucket_name.as_str()
+            }
+            CollectionClientBackend::Couchbase2CollectionBackend(client) => {
+                client.bucket_name.as_str()
+            }
+        }
+    }
+
+    pub fn scope_name(&self) -> &str {
+        match &self.backend {
+            CollectionClientBackend::CouchbaseCollectionBackend(client) => {
+                client.scope_name.as_str()
+            }
+            CollectionClientBackend::Couchbase2CollectionBackend(client) => {
+                client.scope_name.as_str()
+            }
+        }
+    }
+
     pub fn core_kv_client(&self) -> CoreKvClient {
         match &self.backend {
             CollectionClientBackend::CouchbaseCollectionBackend(client) => client.core_kv_client(),
             CollectionClientBackend::Couchbase2CollectionBackend(client) => client.core_kv_client(),
+        }
+    }
+
+    pub fn tracing_client(&self) -> TracingClient {
+        match &self.backend {
+            CollectionClientBackend::CouchbaseCollectionBackend(client) => TracingClient::new(
+                TracingClientBackend::CouchbaseTracingClientBackend(client.tracing_client()),
+            ),
+            CollectionClientBackend::Couchbase2CollectionBackend(_) => {
+                unimplemented!()
+            }
         }
     }
 
@@ -135,12 +169,16 @@ impl CouchbaseCollectionClient {
             self.default_retry_strategy.clone(),
         )
     }
+
+    pub fn tracing_client(&self) -> CouchbaseTracingClient {
+        CouchbaseTracingClient::new(self.agent_provider.clone())
+    }
 }
 
 #[derive(Clone)]
 pub(crate) struct Couchbase2CollectionClient {
-    // bucket_name: String,
-    // scope_name: String,
+    bucket_name: String,
+    scope_name: String,
     name: String,
 }
 

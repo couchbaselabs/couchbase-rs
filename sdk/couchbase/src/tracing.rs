@@ -16,30 +16,11 @@
  *
  */
 
-extern crate core;
-pub mod authenticator;
-pub mod bucket;
-mod capella_ca;
-mod clients;
-pub mod cluster;
-pub mod collection;
-pub mod collection_binary_crud;
-pub mod collection_crud;
-pub mod collection_ds;
-pub mod diagnostics;
-pub mod durability_level;
-pub mod error;
-pub mod error_context;
-pub mod logging_meter;
-pub mod management;
-pub mod mutation_state;
-pub mod options;
-pub mod results;
-pub mod retry;
-pub mod scope;
-pub mod search;
-pub mod service_type;
-pub mod subdoc;
-pub mod threshold_log_tracer;
-mod tracing;
-pub mod transcoding;
+pub(crate) use couchbase_core::tracingcomponent::{
+    Keyspace, SpanBuilder, SERVICE_VALUE_KV, SERVICE_VALUE_MANAGEMENT, SERVICE_VALUE_QUERY,
+    SERVICE_VALUE_SEARCH, SPAN_ATTRIB_CLUSTER_NAME_KEY, SPAN_ATTRIB_CLUSTER_UUID_KEY,
+    SPAN_ATTRIB_DB_DURABILITY, SPAN_ATTRIB_DB_SYSTEM_VALUE, SPAN_ATTRIB_LOCAL_ID_KEY,
+    SPAN_ATTRIB_NET_PEER_ADDRESS_KEY, SPAN_ATTRIB_NET_PEER_PORT_KEY, SPAN_ATTRIB_OPERATION_ID_KEY,
+    SPAN_ATTRIB_OPERATION_KEY, SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE, SPAN_ATTRIB_SERVER_DURATION_KEY,
+    SPAN_ATTRIB_SERVICE_KEY, SPAN_NAME_DISPATCH_TO_SERVER, SPAN_NAME_REQUEST_ENCODING,
+};

@@ -16,30 +16,17 @@
  *
  */
 
-extern crate core;
-pub mod authenticator;
-pub mod bucket;
-mod capella_ca;
-mod clients;
-pub mod cluster;
-pub mod collection;
-pub mod collection_binary_crud;
-pub mod collection_crud;
-pub mod collection_ds;
-pub mod diagnostics;
-pub mod durability_level;
-pub mod error;
-pub mod error_context;
-pub mod logging_meter;
-pub mod management;
-pub mod mutation_state;
-pub mod options;
-pub mod results;
-pub mod retry;
-pub mod scope;
-pub mod search;
-pub mod service_type;
-pub mod subdoc;
-pub mod threshold_log_tracer;
-mod tracing;
-pub mod transcoding;
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct ClusterLabels {
+    pub cluster_uuid: Option<String>,
+    pub cluster_name: Option<String>,
+}
+
+impl ClusterLabels {
+    pub fn new(cluster_uuid: Option<String>, cluster_name: Option<String>) -> Self {
+        Self {
+            cluster_uuid,
+            cluster_name,
+        }
+    }
+}

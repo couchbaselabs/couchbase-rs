@@ -27,6 +27,7 @@ use crate::mgmtx::options::{
     GetFullClusterConfigOptions, GetTerseBucketConfigOptions, GetTerseClusterConfigOptions,
     IndexStatusOptions, LoadSampleBucketOptions,
 };
+use crate::tracingcomponent::TracingComponent;
 use bytes::Bytes;
 use http::Method;
 use serde::de::DeserializeOwned;
@@ -57,7 +58,9 @@ pub struct Management<C: Client> {
     pub http_client: Arc<C>,
     pub user_agent: String,
     pub endpoint: String,
+    pub canonical_endpoint: String,
     pub auth: Auth,
+    pub(crate) tracing: Arc<TracingComponent>,
 }
 
 impl<C: Client> Management<C> {

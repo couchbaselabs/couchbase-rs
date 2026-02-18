@@ -41,6 +41,8 @@ pub struct OnDemandAgentManagerOptions {
     pub http_config: HttpConfig,
     pub tcp_keep_alive_time: Option<Duration>,
     pub orphan_response_handler: Option<OrphanResponseHandler>,
+
+    pub core_observability_enabled: bool,
 }
 
 impl OnDemandAgentManagerOptions {
@@ -57,7 +59,13 @@ impl OnDemandAgentManagerOptions {
             http_config: HttpConfig::default(),
             tcp_keep_alive_time: None,
             orphan_response_handler: None,
+            core_observability_enabled: false,
         }
+    }
+
+    pub fn core_observability_enabled(mut self, core_observability_enabled: bool) -> Self {
+        self.core_observability_enabled = core_observability_enabled;
+        self
     }
 
     pub fn seed_config(mut self, seed_config: SeedConfig) -> Self {
@@ -134,6 +142,7 @@ impl From<OnDemandAgentManagerOptions> for AgentOptions {
             http_config: opts.http_config,
             tcp_keep_alive_time: opts.tcp_keep_alive_time,
             orphan_response_handler: opts.orphan_response_handler,
+            core_observability_enabled: opts.core_observability_enabled,
         }
     }
 }
@@ -152,6 +161,7 @@ impl From<AgentOptions> for OnDemandAgentManagerOptions {
             http_config: opts.http_config,
             tcp_keep_alive_time: opts.tcp_keep_alive_time,
             orphan_response_handler: opts.orphan_response_handler,
+            core_observability_enabled: opts.core_observability_enabled,
         }
     }
 }

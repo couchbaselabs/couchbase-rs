@@ -32,6 +32,7 @@ use crate::orphan_reporter::OrphanContext;
 use crate::results::diagnostics::EndpointDiagnostics;
 use crate::service_type::ServiceType;
 use crate::tls_config::TlsConfig;
+use crate::tracingcomponent::TracingComponent;
 use crate::{authenticator, error, kvclient};
 use arc_swap::ArcSwap;
 use chrono::Utc;
@@ -54,6 +55,7 @@ use uuid::Uuid;
 #[derive(Clone, Debug)]
 pub(crate) struct KvTarget {
     pub address: Address,
+    pub canonical_address: Address,
     pub tls_config: Option<TlsConfig>,
 }
 
@@ -96,6 +98,7 @@ pub(crate) struct KvClientBabysitterOptions<K: KvClient> {
     pub target: KvTarget,
     pub auth: Authenticator,
     pub selected_bucket: Option<String>,
+    pub tracing: Arc<TracingComponent>,
 }
 
 #[derive(Debug, Clone)]
@@ -143,6 +146,7 @@ struct ClientThreadOptions<K: KvClient> {
     slow_state: Arc<Mutex<StdKvClientBabysitterState<K>>>,
 
     shutdown_token: CancellationToken,
+    tracing: Arc<TracingComponent>,
 }
 
 pub(crate) struct StdKvClientBabysitter<K: KvClient> {
@@ -161,6 +165,7 @@ pub(crate) struct StdKvClientBabysitter<K: KvClient> {
     on_client_connected_tx: watch::Sender<Option<Arc<K>>>,
 
     shutdown_token: CancellationToken,
+    tracing: Arc<TracingComponent>,
 }
 
 impl<K: KvClient + 'static> StdKvClientBabysitter<K> {
@@ -249,6 +254,7 @@ impl<K: KvClient + 'static> StdKvClientBabysitter<K> {
             on_close_tx: Some(on_close_tx),
             disable_decompression: client_opts.static_kv_client_options.disable_decompression,
             id: client_id.clone(),
+            tracing: client_opts.tracing.clone(),
         };
 
         tokio::spawn(async move {
@@ -484,6 +490,7 @@ impl<K: KvClient + KvClientOps + 'static> KvClientBabysitter for StdKvClientBaby
                 is_building: false,
             })),
             shutdown_token: CancellationToken::new(),
+            tracing: opts.tracing.clone(),
         };
 
         if !opts.on_demand_connect {
@@ -498,6 +505,7 @@ impl<K: KvClient + KvClientOps + 'static> KvClientBabysitter for StdKvClientBaby
                 fast_client: babysitter.fast_client.clone(),
                 slow_state: babysitter.slow_state.clone(),
                 shutdown_token: babysitter.shutdown_token.clone(),
+                tracing: babysitter.tracing.clone(),
             }));
         }
 
@@ -536,6 +544,7 @@ impl<K: KvClient + KvClientOps + 'static> KvClientBabysitter for StdKvClientBaby
             fast_client: self.fast_client.clone(),
             slow_state: self.slow_state.clone(),
             shutdown_token: self.shutdown_token.clone(),
+            tracing: self.tracing.clone(),
         }));
 
         if is_building {

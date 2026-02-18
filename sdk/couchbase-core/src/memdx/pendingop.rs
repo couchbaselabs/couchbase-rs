@@ -118,6 +118,10 @@ impl<T: TryFromClientResponse> StandardPendingOp<T> {
             _target: PhantomData,
         }
     }
+
+    pub(crate) fn opaque(&self) -> u32 {
+        self.wrapped.opaque
+    }
 }
 
 impl<T: TryFromClientResponse> StandardPendingOp<T> {
