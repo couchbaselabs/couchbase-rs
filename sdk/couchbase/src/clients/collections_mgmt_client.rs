@@ -18,12 +18,14 @@
 
 use crate::clients::agent_provider::CouchbaseAgentProvider;
 use crate::error;
+use crate::error::FeatureNotAvailableErrorKind;
 use crate::management::collections::collection_settings::{
     CreateCollectionSettings, MaxExpiryValue, UpdateCollectionSettings,
 };
 use crate::options::collection_mgmt_options::*;
 use crate::results::collections_mgmt_results::{CollectionSpec, ScopeSpec};
 use crate::retry::RetryStrategy;
+use couchbase_core::features::BucketFeature;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -219,11 +221,14 @@ impl CouchbaseCollectionsMgmtClient {
         opts: CreateCollectionOptions,
     ) -> error::Result<()> {
         let agent = self.agent_provider.get_agent().await;
+        let agent = CouchbaseAgentProvider::upgrade_agent(agent)?;
+
         let scope_name = scope_name.into();
         let collection_name = collection_name.into();
         let retry = opts
             .retry_strategy
             .unwrap_or_else(|| self.default_retry_strategy.clone());
+
         let mut core_opts = couchbase_core::options::management::CreateCollectionOptions::new(
             &self.bucket_name,
             scope_name.as_str(),
@@ -236,12 +241,23 @@ impl CouchbaseCollectionsMgmtClient {
         }
 
         if let Some(history_enabled) = settings.history {
+            if !agent
+                .bucket_features()
+                .await?
+                .contains(&BucketFeature::NonDedupedHistory)
+            {
+                return Err(
+                    error::Error::new(error::ErrorKind::FeatureNotAvailable(FeatureNotAvailableErrorKind {
+                        feature: "history retention".to_string(),
+                        msg: Some("history retention is not supported - note that both server 7.2+ and Magma storage engine must be used".to_string()),
+                    })),
+                );
+            }
+
             core_opts = core_opts.history_enabled(history_enabled);
         }
 
-        CouchbaseAgentProvider::upgrade_agent(agent)?
-            .create_collection(&core_opts)
-            .await?;
+        agent.create_collection(&core_opts).await?;
 
         Ok(())
     }
@@ -254,6 +270,8 @@ impl CouchbaseCollectionsMgmtClient {
         opts: UpdateCollectionOptions,
     ) -> error::Result<()> {
         let agent = self.agent_provider.get_agent().await;
+        let agent = CouchbaseAgentProvider::upgrade_agent(agent)?;
+
         let scope_name = scope_name.into();
         let collection_name = collection_name.into();
         let retry = opts
@@ -271,12 +289,23 @@ impl CouchbaseCollectionsMgmtClient {
         }
 
         if let Some(history_enabled) = settings.history {
+            if !agent
+                .bucket_features()
+                .await?
+                .contains(&BucketFeature::NonDedupedHistory)
+            {
+                return Err(
+                    error::Error::new(error::ErrorKind::FeatureNotAvailable(FeatureNotAvailableErrorKind {
+                        feature: "history retention".to_string(),
+                        msg: Some("history retention is not supported - note that both server 7.2+ and Magma storage engine must be used".to_string()),
+                    })),
+                );
+            }
+
             core_opts = core_opts.history_enabled(history_enabled);
         }
 
-        CouchbaseAgentProvider::upgrade_agent(agent)?
-            .update_collection(&core_opts)
-            .await?;
+        agent.update_collection(&core_opts).await?;
 
         Ok(())
     }
