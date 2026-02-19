@@ -69,7 +69,7 @@ impl<'a> EnsureGroupHelper<'a> {
         .await;
 
         match resp {
-            Ok(_) => Ok(true),
+            Ok(_) => Ok(!self.want_missing),
             Err(e) => {
                 if let error::ErrorKind::Server(e) = e.kind() {
                     if e.kind() == &error::ServerErrorKind::GroupNotFound {
