@@ -343,16 +343,15 @@ where
         let close_handle = tokio::spawn(async move {
             let _ = on_read_close_rx.await;
 
-            // There's not much to do when the connection closes so just mark us as closed.
-            if closed_clone.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-                != Ok(false)
-            {
-                return;
-            }
+            closed_clone.store(true, Ordering::SeqCst);
 
             if let Some(on_close) = on_close {
-                if let Err(e) = on_close.send(()).await {
-                    debug!("Failed to send on_close for kvclient {}: {}", &read_id, e);
+                // If we get here via the drop chain then this will probably be closed so don't
+                // send on it.
+                if !on_close.is_closed() {
+                    if let Err(e) = on_close.send(()).await {
+                        debug!("Failed to send on_close for kvclient {}: {}", &read_id, e);
+                    }
                 }
             }
         });
