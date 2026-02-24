@@ -20,6 +20,6 @@ use criterion::Criterion;
 pub fn configured_criterion() -> Criterion {
     Criterion::default()
         .sample_size(20000) // more than 100 samples
-        .measurement_time(std::time::Duration::from_secs(10)) // optional: longer time
+        .measurement_time(std::time::Duration::from_secs(60))
         .warm_up_time(std::time::Duration::from_secs(3)) // optional: warmup
 }
