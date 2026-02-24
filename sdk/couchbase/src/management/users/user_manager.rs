@@ -31,7 +31,7 @@ use crate::tracing::{
 };
 use couchbase_core::create_span;
 use std::sync::Arc;
-use tracing::{instrument, Level};
+use tracing::{instrument, Instrument, Level};
 
 #[derive(Clone)]
 pub struct UserManager {
@@ -124,19 +124,24 @@ impl UserManager {
         &self,
         opts: impl Into<Option<GetAllUsersOptions>>,
     ) -> error::Result<Vec<UserAndMetadata>> {
-        self.client
+        let ctx = self
+            .client
             .tracing_client()
-            .execute_observable_operation(
+            .begin_operation(
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &Keyspace::Cluster,
                 create_span!("manager_users_get_all_users"),
-                || async move {
-                    self.client
-                        .get_all_users(opts.into().unwrap_or_default())
-                        .await
-                },
             )
-            .await
+            .await;
+        let result = async {
+            self.client
+                .get_all_users(opts.into().unwrap_or_default())
+                .await
+        }
+        .instrument(ctx.span().clone())
+        .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn get_user_internal(
@@ -144,16 +149,22 @@ impl UserManager {
         username: impl Into<String>,
         opts: impl Into<Option<GetUserOptions>>,
     ) -> error::Result<UserAndMetadata> {
-        self.client
+        let ctx = self
+            .client
             .tracing_client()
-            .execute_observable_operation(
+            .begin_operation(
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &Keyspace::Cluster,
                 create_span!("manager_users_get_user"),
-                || self.client
-                    .get_user(username.into(), opts.into().unwrap_or_default()),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .get_user(username.into(), opts.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn upsert_user_internal(
@@ -161,16 +172,22 @@ impl UserManager {
         settings: User,
         opts: impl Into<Option<UpsertUserOptions>>,
     ) -> error::Result<()> {
-        self.client
+        let ctx = self
+            .client
             .tracing_client()
-            .execute_observable_operation(
+            .begin_operation(
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &Keyspace::Cluster,
                 create_span!("manager_users_upsert_user"),
-                || self.client
-                    .upsert_user(settings, opts.into().unwrap_or_default()),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .upsert_user(settings, opts.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn drop_user_internal(
@@ -178,31 +195,44 @@ impl UserManager {
         username: impl Into<String>,
         opts: impl Into<Option<DropUserOptions>>,
     ) -> error::Result<()> {
-        self.client
+        let ctx = self
+            .client
             .tracing_client()
-            .execute_observable_operation(
+            .begin_operation(
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &Keyspace::Cluster,
                 create_span!("manager_users_drop_user"),
-                || self.client
-                    .drop_user(username.into(), opts.into().unwrap_or_default()),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .drop_user(username.into(), opts.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn get_roles_internal(
         &self,
         opts: impl Into<Option<GetRolesOptions>>,
     ) -> error::Result<Vec<RoleAndDescription>> {
-        self.client
+        let ctx = self
+            .client
             .tracing_client()
-            .execute_observable_operation(
+            .begin_operation(
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &Keyspace::Cluster,
                 create_span!("manager_users_get_roles"),
-                || self.client.get_roles(opts.into().unwrap_or_default()),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .get_roles(opts.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn get_group_internal(
@@ -210,31 +240,44 @@ impl UserManager {
         group_name: impl Into<String>,
         opts: impl Into<Option<GetGroupOptions>>,
     ) -> error::Result<Group> {
-        self.client
+        let ctx = self
+            .client
             .tracing_client()
-            .execute_observable_operation(
+            .begin_operation(
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &Keyspace::Cluster,
                 create_span!("manager_users_get_group"),
-                || self.client
-                    .get_group(group_name.into(), opts.into().unwrap_or_default()),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .get_group(group_name.into(), opts.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn get_all_groups_internal(
         &self,
         opts: impl Into<Option<GetAllGroupsOptions>>,
     ) -> error::Result<Vec<Group>> {
-        self.client
+        let ctx = self
+            .client
             .tracing_client()
-            .execute_observable_operation(
+            .begin_operation(
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &Keyspace::Cluster,
                 create_span!("manager_users_get_all_groups"),
-                || self.client.get_all_groups(opts.into().unwrap_or_default()),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .get_all_groups(opts.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn upsert_group_internal(
@@ -242,16 +285,22 @@ impl UserManager {
         group: Group,
         opts: impl Into<Option<UpsertGroupOptions>>,
     ) -> error::Result<()> {
-        self.client
+        let ctx = self
+            .client
             .tracing_client()
-            .execute_observable_operation(
+            .begin_operation(
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &Keyspace::Cluster,
                 create_span!("manager_users_upsert_group"),
-                || self.client
-                    .upsert_group(group, opts.into().unwrap_or_default()),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .upsert_group(group, opts.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn drop_group_internal(
@@ -259,16 +308,22 @@ impl UserManager {
         group_name: impl Into<String>,
         opts: impl Into<Option<DropGroupOptions>>,
     ) -> error::Result<()> {
-        self.client
+        let ctx = self
+            .client
             .tracing_client()
-            .execute_observable_operation(
+            .begin_operation(
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &Keyspace::Cluster,
                 create_span!("manager_users_drop_group"),
-                || self.client
-                    .drop_group(group_name.into(), opts.into().unwrap_or_default()),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .drop_group(group_name.into(), opts.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn change_password_internal(
@@ -276,15 +331,21 @@ impl UserManager {
         password: impl Into<String>,
         opts: impl Into<Option<ChangePasswordOptions>>,
     ) -> error::Result<()> {
-        self.client
+        let ctx = self
+            .client
             .tracing_client()
-            .execute_observable_operation(
+            .begin_operation(
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &Keyspace::Cluster,
                 create_span!("manager_users_change_password"),
-                || self.client
-                    .change_password(password.into(), opts.into().unwrap_or_default()),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .change_password(password.into(), opts.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 }

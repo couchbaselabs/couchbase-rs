@@ -29,7 +29,7 @@ use crate::tracing::{
     Keyspace, SpanBuilder, SPAN_ATTRIB_DB_SYSTEM_VALUE, SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
 };
 use couchbase_core::create_span;
-use tracing::{instrument, Level};
+use tracing::{instrument, Instrument, Level};
 
 #[derive(Clone)]
 pub struct Bucket {
@@ -95,29 +95,33 @@ impl Bucket {
         &self,
         opts: impl Into<Option<PingOptions>>,
     ) -> error::Result<PingReport> {
-        self.tracing_client
-            .execute_observable_operation(
-                None,
-                &self.keyspace,
-                create_span!("ping"),
-                || self.diagnostics_client
-                    .ping(opts.into().unwrap_or_default()),
-            )
-            .await
+        let ctx = self
+            .tracing_client
+            .begin_operation(None, &self.keyspace, create_span!("ping"))
+            .await;
+        let result = self
+            .diagnostics_client
+            .ping(opts.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn wait_until_ready_internal(
         &self,
         opts: impl Into<Option<WaitUntilReadyOptions>>,
     ) -> error::Result<()> {
-        self.tracing_client
-            .execute_observable_operation(
-                None,
-                &self.keyspace,
-                create_span!("wait_until_ready"),
-                || self.diagnostics_client
-                    .wait_until_ready(opts.into().unwrap_or_default()),
-            )
-            .await
+        let ctx = self
+            .tracing_client
+            .begin_operation(None, &self.keyspace, create_span!("wait_until_ready"))
+            .await;
+        let result = self
+            .diagnostics_client
+            .wait_until_ready(opts.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 }

@@ -35,7 +35,7 @@ use crate::tracing::{
 };
 use couchbase_core::create_span;
 use std::sync::Arc;
-use tracing::{instrument, Level};
+use tracing::{instrument, Instrument, Level};
 
 #[derive(Clone)]
 pub struct Scope {
@@ -99,12 +99,15 @@ impl Scope {
         opts: impl Into<Option<QueryOptions>>,
     ) -> error::Result<QueryResult> {
         let span = create_span!("query").with_statement(&statement);
-
-        self.tracing_client
-            .execute_observable_operation(Some(SERVICE_VALUE_QUERY), &self.keyspace, span, || {
-                self.query_client.query(statement, opts.into())
-            })
-            .await
+        let ctx = self
+            .tracing_client
+            .begin_operation(Some(SERVICE_VALUE_QUERY), &self.keyspace, span)
+            .await;
+        let result = { self.query_client.query(statement, opts.into()) }
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn search_internal(
@@ -113,14 +116,21 @@ impl Scope {
         request: SearchRequest,
         opts: impl Into<Option<SearchOptions>>,
     ) -> error::Result<SearchResult> {
-        self.tracing_client
-            .execute_observable_operation(
+        let ctx = self
+            .tracing_client
+            .begin_operation(
                 Some(SERVICE_VALUE_SEARCH),
                 &self.keyspace,
                 create_span!("search"),
-                || self.search_client.search(index_name, request, opts.into()),
             )
-            .await
+            .await;
+        let result = self
+            .search_client
+            .search(index_name, request, opts.into())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     pub fn search_indexes(&self) -> SearchIndexManager {

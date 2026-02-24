@@ -27,6 +27,7 @@ use crate::tracing::{
     SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
 };
 use couchbase_core::create_span;
+use tracing::Instrument;
 
 #[derive(Clone)]
 pub struct CollectionManager {
@@ -98,17 +99,22 @@ impl CollectionManager {
             bucket: self.client.bucket_name().to_string(),
             scope: scope_name.clone(),
         };
-
-        self.client
+        let ctx = self
+            .client
             .tracing_client()
-            .execute_observable_operation(
+            .begin_operation(
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &keyspace,
                 create_span!("manager_collections_create_scope"),
-                || self.client
-                    .create_scope(scope_name, opts.into().unwrap_or_default()),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .create_scope(scope_name, opts.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn drop_scope_internal(
@@ -120,17 +126,22 @@ impl CollectionManager {
             bucket: self.client.bucket_name().to_string(),
             scope: scope_name.clone(),
         };
-
-        self.client
+        let ctx = self
+            .client
             .tracing_client()
-            .execute_observable_operation(
+            .begin_operation(
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &keyspace,
                 create_span!("manager_collections_drop_scope"),
-                || self.client
-                    .drop_scope(scope_name, opts.into().unwrap_or_default()),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .drop_scope(scope_name, opts.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn create_collection_internal(
@@ -145,21 +156,27 @@ impl CollectionManager {
             scope: scope_name.clone(),
             collection: collection_name.clone(),
         };
-
-        self.client
+        let ctx = self
+            .client
             .tracing_client()
-            .execute_observable_operation(
+            .begin_operation(
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &keyspace,
                 create_span!("manager_collections_create_collection"),
-                || self.client.create_collection(
-                    scope_name,
-                    collection_name,
-                    settings.into().unwrap_or_default(),
-                    opts.into().unwrap_or_default(),
-                ),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .create_collection(
+                scope_name,
+                collection_name,
+                settings.into().unwrap_or_default(),
+                opts.into().unwrap_or_default(),
+            )
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn update_collection_internal(
@@ -174,21 +191,27 @@ impl CollectionManager {
             scope: scope_name.clone(),
             collection: collection_name.clone(),
         };
-
-        self.client
+        let ctx = self
+            .client
             .tracing_client()
-            .execute_observable_operation(
+            .begin_operation(
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &keyspace,
                 create_span!("manager_collections_update_collection"),
-                || self.client.update_collection(
-                    scope_name,
-                    collection_name,
-                    settings.into(),
-                    opts.into().unwrap_or_default(),
-                ),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .update_collection(
+                scope_name,
+                collection_name,
+                settings.into(),
+                opts.into().unwrap_or_default(),
+            )
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn drop_collection_internal(
@@ -202,20 +225,22 @@ impl CollectionManager {
             scope: scope_name.clone(),
             collection: collection_name.clone(),
         };
-
-        self.client
+        let ctx = self
+            .client
             .tracing_client()
-            .execute_observable_operation(
+            .begin_operation(
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &keyspace,
                 create_span!("manager_collections_drop_collection"),
-                || self.client.drop_collection(
-                    scope_name,
-                    collection_name,
-                    opts.into().unwrap_or_default(),
-                ),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .drop_collection(scope_name, collection_name, opts.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn get_all_scopes_internal(
@@ -225,15 +250,21 @@ impl CollectionManager {
         let keyspace = Keyspace::Bucket {
             bucket: self.client.bucket_name().to_string(),
         };
-
-        self.client
+        let ctx = self
+            .client
             .tracing_client()
-            .execute_observable_operation(
+            .begin_operation(
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &keyspace,
                 create_span!("manager_collections_get_all_scopes"),
-                || self.client.get_all_scopes(opts.into().unwrap_or_default()),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .get_all_scopes(opts.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 }

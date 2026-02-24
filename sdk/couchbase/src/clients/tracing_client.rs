@@ -13,6 +13,39 @@ use std::sync::Arc;
 use std::time::Instant;
 use tracing::{trace_span, Instrument, Level, Span};
 
+pub(crate) struct OperationContext {
+    span: Span,
+    operation_name: &'static str,
+    service: Option<&'static str>,
+    keyspace: Keyspace,
+    cluster_labels: Option<ClusterLabels>,
+    start: Instant,
+}
+
+impl OperationContext {
+    pub fn span(&self) -> &Span {
+        &self.span
+    }
+
+    pub fn into_span(self) -> Span {
+        self.span
+    }
+
+    pub fn end_operation<E: couchbase_core::tracingcomponent::MetricsName>(
+        &self,
+        error: Option<&E>,
+    ) {
+        record_metrics(
+            self.operation_name,
+            self.service,
+            &self.keyspace,
+            self.cluster_labels.clone(),
+            self.start,
+            error,
+        );
+    }
+}
+
 #[derive(Clone)]
 pub(crate) struct TracingClient {
     backend: TracingClientBackend,
@@ -23,22 +56,15 @@ impl TracingClient {
         Self { backend }
     }
 
-    pub async fn execute_observable_operation<F, Fut, T>(
+    pub async fn begin_operation(
         &self,
         service: Option<&'static str>,
         keyspace: &Keyspace,
         span: SpanBuilder,
-        f: F,
-    ) -> crate::error::Result<T>
-    where
-        F: FnOnce() -> Fut,
-        Fut: Future<Output = crate::error::Result<T>>,
-    {
+    ) -> OperationContext {
         match &self.backend {
             TracingClientBackend::CouchbaseTracingClientBackend(client) => {
-                client
-                    .execute_observable_operation(service, keyspace, span, f)
-                    .await
+                client.begin_operation(service, keyspace, span).await
             }
             TracingClientBackend::Couchbase2TracingClientBackend(_) => unimplemented!(),
         }
@@ -98,39 +124,29 @@ impl CouchbaseTracingClient {
         span.in_scope(f)
     }
 
-    async fn execute_observable_operation<F, Fut, T>(
+    async fn begin_operation(
         &self,
         service: Option<&'static str>,
         keyspace: &Keyspace,
         mut span: SpanBuilder,
-        f: F,
-    ) -> crate::error::Result<T>
-    where
-        F: FnOnce() -> Fut,
-        Fut: Future<Output = crate::error::Result<T>>,
-    {
+    ) -> OperationContext {
         let operation_name = span.name();
         let cluster_labels = self.get_cluster_labels().await.unwrap_or_default();
-        let start = Instant::now();
-        let result = {
-            let span = span
-                .with_cluster_labels(&cluster_labels)
-                .with_service(service)
-                .with_keyspace(keyspace)
-                .build();
+        let keyspace = keyspace.clone();
+        let built_span = span
+            .with_cluster_labels(&cluster_labels)
+            .with_service(service)
+            .with_keyspace(&keyspace)
+            .build();
 
-            f().instrument(span).await
-        };
-        record_metrics(
+        OperationContext {
+            span: built_span,
             operation_name,
             service,
             keyspace,
             cluster_labels,
-            start,
-            result.as_ref().err(),
-        );
-
-        result
+            start: Instant::now(),
+        }
     }
 }
 

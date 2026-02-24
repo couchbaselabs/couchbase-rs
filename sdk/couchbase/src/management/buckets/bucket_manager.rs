@@ -27,6 +27,7 @@ use crate::tracing::{
 };
 use couchbase_core::create_span;
 use std::sync::Arc;
+use tracing::Instrument;
 
 #[derive(Clone)]
 pub struct BucketManager {
@@ -89,15 +90,22 @@ impl BucketManager {
         &self,
         opts: impl Into<Option<GetAllBucketsOptions>>,
     ) -> error::Result<Vec<BucketSettings>> {
-        self.client
+        let ctx = self
+            .client
             .tracing_client()
-            .execute_observable_operation(
+            .begin_operation(
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &Keyspace::Cluster,
                 create_span!("manager_buckets_get_all_buckets"),
-                || self.client.get_all_buckets(opts.into().unwrap_or_default()),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .get_all_buckets(opts.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn get_bucket_internal(
@@ -108,17 +116,22 @@ impl BucketManager {
         let keyspace = Keyspace::Bucket {
             bucket: bucket_name.clone(),
         };
-
-        self.client
+        let ctx = self
+            .client
             .tracing_client()
-            .execute_observable_operation(
+            .begin_operation(
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &keyspace,
                 create_span!("manager_buckets_get_bucket"),
-                || self.client
-                    .get_bucket(bucket_name, opts.into().unwrap_or_default()),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .get_bucket(bucket_name, opts.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn create_bucket_internal(
@@ -129,17 +142,22 @@ impl BucketManager {
         let keyspace = Keyspace::Bucket {
             bucket: settings.name.clone(),
         };
-
-        self.client
+        let ctx = self
+            .client
             .tracing_client()
-            .execute_observable_operation(
+            .begin_operation(
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &keyspace,
                 create_span!("manager_buckets_create_bucket"),
-                || self.client
-                    .create_bucket(settings, opts.into().unwrap_or_default()),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .create_bucket(settings, opts.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn update_bucket_internal(
@@ -150,17 +168,22 @@ impl BucketManager {
         let keyspace = Keyspace::Bucket {
             bucket: settings.name.clone(),
         };
-
-        self.client
+        let ctx = self
+            .client
             .tracing_client()
-            .execute_observable_operation(
+            .begin_operation(
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &keyspace,
                 create_span!("manager_buckets_update_bucket"),
-                || self.client
-                    .update_bucket(settings, opts.into().unwrap_or_default()),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .update_bucket(settings, opts.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn drop_bucket_internal(
@@ -171,17 +194,22 @@ impl BucketManager {
         let keyspace = Keyspace::Bucket {
             bucket: bucket_name.clone(),
         };
-
-        self.client
+        let ctx = self
+            .client
             .tracing_client()
-            .execute_observable_operation(
+            .begin_operation(
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &keyspace,
                 create_span!("manager_buckets_drop_bucket"),
-                || self.client
-                    .drop_bucket(bucket_name, opts.into().unwrap_or_default()),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .drop_bucket(bucket_name, opts.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn flush_bucket_internal(
@@ -192,16 +220,21 @@ impl BucketManager {
         let keyspace = Keyspace::Bucket {
             bucket: bucket_name.clone(),
         };
-
-        self.client
+        let ctx = self
+            .client
             .tracing_client()
-            .execute_observable_operation(
+            .begin_operation(
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &keyspace,
                 create_span!("manager_buckets_flush_bucket"),
-                || self.client
-                    .flush_bucket(bucket_name, opts.into().unwrap_or_default()),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .flush_bucket(bucket_name, opts.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 }

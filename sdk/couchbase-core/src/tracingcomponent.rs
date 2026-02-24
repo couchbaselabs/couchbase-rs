@@ -483,6 +483,49 @@ pub trait MetricsName {
     fn metrics_name(&self) -> &'static str;
 }
 
+pub struct OperationContext {
+    span: tracing::Span,
+    operation_name: &'static str,
+    service: Option<&'static str>,
+    keyspace: Keyspace,
+    cluster_labels: Option<ClusterLabels>,
+    start: Instant,
+}
+
+impl OperationContext {
+    pub fn new(
+        span: tracing::Span,
+        operation_name: &'static str,
+        service: Option<&'static str>,
+        keyspace: Keyspace,
+        cluster_labels: Option<ClusterLabels>,
+    ) -> Self {
+        Self {
+            span,
+            operation_name,
+            service,
+            keyspace,
+            cluster_labels,
+            start: Instant::now(),
+        }
+    }
+
+    pub fn span(&self) -> &tracing::Span {
+        &self.span
+    }
+
+    pub fn end_operation<E: MetricsName>(&self, error: Option<&E>) {
+        record_metrics(
+            self.operation_name,
+            self.service,
+            &self.keyspace,
+            self.cluster_labels.clone(),
+            self.start,
+            error,
+        );
+    }
+}
+
 pub fn record_metrics<E>(
     operation_name: &str,
     service: Option<&str>,

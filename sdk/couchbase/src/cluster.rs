@@ -39,8 +39,8 @@ use crate::tracing::{
 use couchbase_core::create_span;
 use log::info;
 use std::sync::Arc;
-use tracing::instrument;
 use tracing::Level;
+use tracing::{instrument, Instrument};
 
 #[derive(Clone)]
 pub struct Cluster {
@@ -133,61 +133,71 @@ impl Cluster {
         opts: impl Into<Option<QueryOptions>>,
     ) -> error::Result<QueryResult> {
         let span = create_span!("query").with_statement(&statement);
-
-        self.tracing_client
-            .execute_observable_operation(
-                Some(SERVICE_VALUE_QUERY),
-                &Keyspace::Cluster,
-                span,
-                || self.query_client.query(statement, opts.into()),
-            )
-            .await
+        let ctx = self
+            .tracing_client
+            .begin_operation(Some(SERVICE_VALUE_QUERY), &Keyspace::Cluster, span)
+            .await;
+        let result = self
+            .query_client
+            .query(statement, opts.into())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn ping_internal(
         &self,
         opts: impl Into<Option<PingOptions>>,
     ) -> error::Result<PingReport> {
-        self.tracing_client
-            .execute_observable_operation(None, &Keyspace::Cluster, create_span!("ping"), || {
-                self.diagnostics_client
-                    .ping(opts.into().unwrap_or_default())
-            })
-            .await
+        let ctx = self
+            .tracing_client
+            .begin_operation(None, &Keyspace::Cluster, create_span!("ping"))
+            .await;
+        let result = {
+            self.diagnostics_client
+                .ping(opts.into().unwrap_or_default())
+        }
+        .instrument(ctx.span().clone())
+        .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn diagnostics_internal(
         &self,
         opts: impl Into<Option<DiagnosticsOptions>>,
     ) -> error::Result<DiagnosticsResult> {
-        self.tracing_client
-            .execute_observable_operation(
-                None,
-                &Keyspace::Cluster,
-                create_span!("diagnostics"),
-                || {
-                    self.diagnostics_client
-                        .diagnostics(opts.into().unwrap_or_default())
-                },
-            )
-            .await
+        let ctx = self
+            .tracing_client
+            .begin_operation(None, &Keyspace::Cluster, create_span!("diagnostics"))
+            .await;
+        let result = {
+            self.diagnostics_client
+                .diagnostics(opts.into().unwrap_or_default())
+        }
+        .instrument(ctx.span().clone())
+        .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn wait_until_ready_internal(
         &self,
         opts: impl Into<Option<WaitUntilReadyOptions>>,
     ) -> error::Result<()> {
-        self.tracing_client
-            .execute_observable_operation(
-                None,
-                &Keyspace::Cluster,
-                create_span!("wait_until_ready"),
-                || {
-                    self.diagnostics_client
-                        .wait_until_ready(opts.into().unwrap_or_default())
-                },
-            )
-            .await
+        let ctx = self
+            .tracing_client
+            .begin_operation(None, &Keyspace::Cluster, create_span!("wait_until_ready"))
+            .await;
+        let result = {
+            self.diagnostics_client
+                .wait_until_ready(opts.into().unwrap_or_default())
+        }
+        .instrument(ctx.span().clone())
+        .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 }
 

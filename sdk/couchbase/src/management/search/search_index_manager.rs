@@ -32,6 +32,7 @@ use crate::tracing::{
 use couchbase_core::create_span;
 use serde_json::Value;
 use std::sync::Arc;
+use tracing::Instrument;
 
 #[derive(Clone)]
 pub struct SearchIndexManager {
@@ -142,30 +143,44 @@ impl SearchIndexManager {
         index_name: impl Into<String>,
         opts: impl Into<Option<GetSearchIndexOptions>>,
     ) -> error::Result<SearchIndex> {
-        self.client
+        let ctx = self
+            .client
             .tracing_client()
-            .execute_observable_operation(
+            .begin_operation(
                 Some(SERVICE_VALUE_SEARCH),
                 &self.client.keyspace(),
                 create_span!("manager_search_get_index"),
-                || self.client.get_index(index_name.into(), opts.into()),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .get_index(index_name.into(), opts.into())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn get_all_indexes_internal(
         &self,
         opts: impl Into<Option<GetAllSearchIndexesOptions>>,
     ) -> error::Result<Vec<SearchIndex>> {
-        self.client
+        let ctx = self
+            .client
             .tracing_client()
-            .execute_observable_operation(
+            .begin_operation(
                 Some(SERVICE_VALUE_SEARCH),
                 &self.client.keyspace(),
                 create_span!("manager_search_get_all_indexes"),
-                || self.client.get_all_indexes(opts.into()),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .get_all_indexes(opts.into())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn upsert_index_internal(
@@ -173,15 +188,22 @@ impl SearchIndexManager {
         index: SearchIndex,
         opts: impl Into<Option<UpsertSearchIndexOptions>>,
     ) -> error::Result<()> {
-        self.client
+        let ctx = self
+            .client
             .tracing_client()
-            .execute_observable_operation(
+            .begin_operation(
                 Some(SERVICE_VALUE_SEARCH),
                 &self.client.keyspace(),
                 create_span!("manager_search_upsert_index"),
-                || self.client.upsert_index(index, opts.into()),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .upsert_index(index, opts.into())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn drop_index_internal(
@@ -189,15 +211,22 @@ impl SearchIndexManager {
         index_name: impl Into<String>,
         opts: impl Into<Option<DropSearchIndexOptions>>,
     ) -> error::Result<()> {
-        self.client
+        let ctx = self
+            .client
             .tracing_client()
-            .execute_observable_operation(
+            .begin_operation(
                 Some(SERVICE_VALUE_SEARCH),
                 &self.client.keyspace(),
                 create_span!("manager_search_drop_index"),
-                || self.client.drop_index(index_name.into(), opts.into()),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .drop_index(index_name.into(), opts.into())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn analyze_document_internal(
@@ -206,16 +235,22 @@ impl SearchIndexManager {
         document: Value,
         opts: impl Into<Option<AnalyzeDocumentOptions>>,
     ) -> error::Result<Value> {
-        self.client
+        let ctx = self
+            .client
             .tracing_client()
-            .execute_observable_operation(
+            .begin_operation(
                 Some(SERVICE_VALUE_SEARCH),
                 &self.client.keyspace(),
                 create_span!("manager_search_analyze_document"),
-                || self.client
-                    .analyze_document(index_name.into(), document, opts.into()),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .analyze_document(index_name.into(), document, opts.into())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn get_indexed_documents_count_internal(
@@ -223,16 +258,22 @@ impl SearchIndexManager {
         index_name: impl Into<String>,
         opts: impl Into<Option<GetIndexedDocumentsCountOptions>>,
     ) -> error::Result<u64> {
-        self.client
+        let ctx = self
+            .client
             .tracing_client()
-            .execute_observable_operation(
+            .begin_operation(
                 Some(SERVICE_VALUE_SEARCH),
                 &self.client.keyspace(),
                 create_span!("manager_search_get_indexed_documents_count"),
-                || self.client
-                    .get_indexed_documents_count(index_name.into(), opts.into()),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .get_indexed_documents_count(index_name.into(), opts.into())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn pause_ingest_internal(
@@ -240,15 +281,22 @@ impl SearchIndexManager {
         index_name: impl Into<String>,
         opts: impl Into<Option<PauseIngestSearchIndexOptions>>,
     ) -> error::Result<()> {
-        self.client
+        let ctx = self
+            .client
             .tracing_client()
-            .execute_observable_operation(
+            .begin_operation(
                 Some(SERVICE_VALUE_SEARCH),
                 &self.client.keyspace(),
                 create_span!("manager_search_pause_ingest"),
-                || self.client.pause_ingest(index_name.into(), opts.into()),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .pause_ingest(index_name.into(), opts.into())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn resume_ingest_internal(
@@ -256,15 +304,22 @@ impl SearchIndexManager {
         index_name: impl Into<String>,
         opts: impl Into<Option<ResumeIngestSearchIndexOptions>>,
     ) -> error::Result<()> {
-        self.client
+        let ctx = self
+            .client
             .tracing_client()
-            .execute_observable_operation(
+            .begin_operation(
                 Some(SERVICE_VALUE_SEARCH),
                 &self.client.keyspace(),
                 create_span!("manager_search_resume_ingest"),
-                || self.client.resume_ingest(index_name.into(), opts.into()),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .resume_ingest(index_name.into(), opts.into())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn allow_querying_internal(
@@ -272,15 +327,22 @@ impl SearchIndexManager {
         index_name: impl Into<String>,
         opts: impl Into<Option<AllowQueryingSearchIndexOptions>>,
     ) -> error::Result<()> {
-        self.client
+        let ctx = self
+            .client
             .tracing_client()
-            .execute_observable_operation(
+            .begin_operation(
                 Some(SERVICE_VALUE_SEARCH),
                 &self.client.keyspace(),
                 create_span!("manager_search_allow_querying"),
-                || self.client.allow_querying(index_name.into(), opts.into()),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .allow_querying(index_name.into(), opts.into())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn disallow_querying_internal(
@@ -288,16 +350,22 @@ impl SearchIndexManager {
         index_name: impl Into<String>,
         opts: impl Into<Option<DisallowQueryingSearchIndexOptions>>,
     ) -> error::Result<()> {
-        self.client
+        let ctx = self
+            .client
             .tracing_client()
-            .execute_observable_operation(
+            .begin_operation(
                 Some(SERVICE_VALUE_SEARCH),
                 &self.client.keyspace(),
                 create_span!("manager_search_disallow_querying"),
-                || self.client
-                    .disallow_querying(index_name.into(), opts.into()),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .disallow_querying(index_name.into(), opts.into())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn freeze_plan_internal(
@@ -305,15 +373,22 @@ impl SearchIndexManager {
         index_name: impl Into<String>,
         opts: impl Into<Option<FreezePlanSearchIndexOptions>>,
     ) -> error::Result<()> {
-        self.client
+        let ctx = self
+            .client
             .tracing_client()
-            .execute_observable_operation(
+            .begin_operation(
                 Some(SERVICE_VALUE_SEARCH),
                 &self.client.keyspace(),
                 create_span!("manager_search_freeze_plan"),
-                || self.client.freeze_plan(index_name.into(), opts.into()),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .freeze_plan(index_name.into(), opts.into())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn unfreeze_plan_internal(
@@ -321,14 +396,21 @@ impl SearchIndexManager {
         index_name: impl Into<String>,
         opts: impl Into<Option<UnfreezePlanSearchIndexOptions>>,
     ) -> error::Result<()> {
-        self.client
+        let ctx = self
+            .client
             .tracing_client()
-            .execute_observable_operation(
+            .begin_operation(
                 Some(SERVICE_VALUE_SEARCH),
                 &self.client.keyspace(),
                 create_span!("manager_search_unfreeze_plan"),
-                || self.client.unfreeze_plan(index_name.into(), opts.into()),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .unfreeze_plan(index_name.into(), opts.into())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 }

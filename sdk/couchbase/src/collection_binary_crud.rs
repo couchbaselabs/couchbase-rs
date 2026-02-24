@@ -24,6 +24,7 @@ use crate::tracing::{
     SERVICE_VALUE_KV, SPAN_ATTRIB_DB_SYSTEM_VALUE, SPAN_ATTRIB_OTEL_KIND_CLIENT_VALUE,
 };
 use couchbase_core::create_span;
+use tracing::Instrument;
 
 impl BinaryCollection {
     pub async fn append(
@@ -68,15 +69,17 @@ impl BinaryCollection {
     ) -> crate::error::Result<MutationResult> {
         let options = options.into().unwrap_or_default();
         let span = create_span!("append").with_durability(options.durability_level.as_ref());
-
-        self.tracing_client
-            .execute_observable_operation(
-                Some(SERVICE_VALUE_KV),
-                &self.keyspace,
-                span,
-                || self.core_kv_client.append(id.as_ref(), value, options),
-            )
-            .await
+        let ctx = self
+            .tracing_client
+            .begin_operation(Some(SERVICE_VALUE_KV), &self.keyspace, span)
+            .await;
+        let result = self
+            .core_kv_client
+            .append(id.as_ref(), value, options)
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn prepend_internal(
@@ -87,15 +90,17 @@ impl BinaryCollection {
     ) -> crate::error::Result<MutationResult> {
         let options = options.into().unwrap_or_default();
         let span = create_span!("prepend").with_durability(options.durability_level.as_ref());
-
-        self.tracing_client
-            .execute_observable_operation(
-                Some(SERVICE_VALUE_KV),
-                &self.keyspace,
-                span,
-                || self.core_kv_client.prepend(id.as_ref(), value, options),
-            )
-            .await
+        let ctx = self
+            .tracing_client
+            .begin_operation(Some(SERVICE_VALUE_KV), &self.keyspace, span)
+            .await;
+        let result = self
+            .core_kv_client
+            .prepend(id.as_ref(), value, options)
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn increment_internal(
@@ -105,15 +110,17 @@ impl BinaryCollection {
     ) -> crate::error::Result<CounterResult> {
         let options = options.into().unwrap_or_default();
         let span = create_span!("increment").with_durability(options.durability_level.as_ref());
-
-        self.tracing_client
-            .execute_observable_operation(
-                Some(SERVICE_VALUE_KV),
-                &self.keyspace,
-                span,
-                || self.core_kv_client.increment(id.as_ref(), options),
-            )
-            .await
+        let ctx = self
+            .tracing_client
+            .begin_operation(Some(SERVICE_VALUE_KV), &self.keyspace, span)
+            .await;
+        let result = self
+            .core_kv_client
+            .increment(id.as_ref(), options)
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     async fn decrement_internal(
@@ -123,14 +130,16 @@ impl BinaryCollection {
     ) -> crate::error::Result<CounterResult> {
         let options = options.into().unwrap_or_default();
         let span = create_span!("decrement").with_durability(options.durability_level.as_ref());
-
-        self.tracing_client
-            .execute_observable_operation(
-                Some(SERVICE_VALUE_KV),
-                &self.keyspace,
-                span,
-                || self.core_kv_client.decrement(id.as_ref(), options),
-            )
-            .await
+        let ctx = self
+            .tracing_client
+            .begin_operation(Some(SERVICE_VALUE_KV), &self.keyspace, span)
+            .await;
+        let result = self
+            .core_kv_client
+            .decrement(id.as_ref(), options)
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 }
