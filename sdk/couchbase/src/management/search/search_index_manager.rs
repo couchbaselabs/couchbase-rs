@@ -148,7 +148,7 @@ impl SearchIndexManager {
                 Some(SERVICE_VALUE_SEARCH),
                 &self.client.keyspace(),
                 create_span!("manager_search_get_index"),
-                self.client.get_index(index_name.into(), opts.into()),
+                || self.client.get_index(index_name.into(), opts.into()),
             )
             .await
     }
@@ -163,7 +163,7 @@ impl SearchIndexManager {
                 Some(SERVICE_VALUE_SEARCH),
                 &self.client.keyspace(),
                 create_span!("manager_search_get_all_indexes"),
-                self.client.get_all_indexes(opts.into()),
+                || self.client.get_all_indexes(opts.into()),
             )
             .await
     }
@@ -179,7 +179,7 @@ impl SearchIndexManager {
                 Some(SERVICE_VALUE_SEARCH),
                 &self.client.keyspace(),
                 create_span!("manager_search_upsert_index"),
-                self.client.upsert_index(index, opts.into()),
+                || self.client.upsert_index(index, opts.into()),
             )
             .await
     }
@@ -195,7 +195,7 @@ impl SearchIndexManager {
                 Some(SERVICE_VALUE_SEARCH),
                 &self.client.keyspace(),
                 create_span!("manager_search_drop_index"),
-                self.client.drop_index(index_name.into(), opts.into()),
+                || self.client.drop_index(index_name.into(), opts.into()),
             )
             .await
     }
@@ -212,7 +212,7 @@ impl SearchIndexManager {
                 Some(SERVICE_VALUE_SEARCH),
                 &self.client.keyspace(),
                 create_span!("manager_search_analyze_document"),
-                self.client
+                || self.client
                     .analyze_document(index_name.into(), document, opts.into()),
             )
             .await
@@ -229,7 +229,7 @@ impl SearchIndexManager {
                 Some(SERVICE_VALUE_SEARCH),
                 &self.client.keyspace(),
                 create_span!("manager_search_get_indexed_documents_count"),
-                self.client
+                || self.client
                     .get_indexed_documents_count(index_name.into(), opts.into()),
             )
             .await
@@ -246,7 +246,7 @@ impl SearchIndexManager {
                 Some(SERVICE_VALUE_SEARCH),
                 &self.client.keyspace(),
                 create_span!("manager_search_pause_ingest"),
-                self.client.pause_ingest(index_name.into(), opts.into()),
+                || self.client.pause_ingest(index_name.into(), opts.into()),
             )
             .await
     }
@@ -262,7 +262,7 @@ impl SearchIndexManager {
                 Some(SERVICE_VALUE_SEARCH),
                 &self.client.keyspace(),
                 create_span!("manager_search_resume_ingest"),
-                self.client.resume_ingest(index_name.into(), opts.into()),
+                || self.client.resume_ingest(index_name.into(), opts.into()),
             )
             .await
     }
@@ -278,7 +278,7 @@ impl SearchIndexManager {
                 Some(SERVICE_VALUE_SEARCH),
                 &self.client.keyspace(),
                 create_span!("manager_search_allow_querying"),
-                self.client.allow_querying(index_name.into(), opts.into()),
+                || self.client.allow_querying(index_name.into(), opts.into()),
             )
             .await
     }
@@ -294,7 +294,7 @@ impl SearchIndexManager {
                 Some(SERVICE_VALUE_SEARCH),
                 &self.client.keyspace(),
                 create_span!("manager_search_disallow_querying"),
-                self.client
+                || self.client
                     .disallow_querying(index_name.into(), opts.into()),
             )
             .await
@@ -311,7 +311,7 @@ impl SearchIndexManager {
                 Some(SERVICE_VALUE_SEARCH),
                 &self.client.keyspace(),
                 create_span!("manager_search_freeze_plan"),
-                self.client.freeze_plan(index_name.into(), opts.into()),
+                || self.client.freeze_plan(index_name.into(), opts.into()),
             )
             .await
     }
@@ -327,7 +327,7 @@ impl SearchIndexManager {
                 Some(SERVICE_VALUE_SEARCH),
                 &self.client.keyspace(),
                 create_span!("manager_search_unfreeze_plan"),
-                self.client.unfreeze_plan(index_name.into(), opts.into()),
+                || self.client.unfreeze_plan(index_name.into(), opts.into()),
             )
             .await
     }

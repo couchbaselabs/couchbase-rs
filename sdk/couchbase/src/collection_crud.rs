@@ -179,7 +179,7 @@ impl Collection {
                 Some(SERVICE_VALUE_KV),
                 &self.keyspace,
                 span,
-                async move {
+                || async move {
                     let (value, flags) = self
                         .tracing_client
                         .with_request_encoding_span(|| transcoding::json::encode(value))
@@ -208,7 +208,7 @@ impl Collection {
                 Some(SERVICE_VALUE_KV),
                 &self.keyspace,
                 span,
-                self.core_kv_client
+                || self.core_kv_client
                     .upsert(id.as_ref(), value, flags, options),
             )
             .await
@@ -228,7 +228,7 @@ impl Collection {
                 Some(SERVICE_VALUE_KV),
                 &self.keyspace,
                 span,
-                async move {
+                || async move {
                     let (value, flags) = self
                         .tracing_client
                         .with_request_encoding_span(|| transcoding::json::encode(value))
@@ -257,7 +257,7 @@ impl Collection {
                 Some(SERVICE_VALUE_KV),
                 &self.keyspace,
                 span,
-                self.core_kv_client
+                || self.core_kv_client
                     .insert(id.as_ref(), value, flags, options),
             )
             .await
@@ -277,7 +277,7 @@ impl Collection {
                 Some(SERVICE_VALUE_KV),
                 &self.keyspace,
                 span,
-                async move {
+                || async move {
                     let (value, flags) = self
                         .tracing_client
                         .with_request_encoding_span(|| transcoding::json::encode(value))
@@ -306,7 +306,7 @@ impl Collection {
                 Some(SERVICE_VALUE_KV),
                 &self.keyspace,
                 span,
-                self.core_kv_client
+                || self.core_kv_client
                     .replace(id.as_ref(), value, flags, options),
             )
             .await
@@ -322,7 +322,7 @@ impl Collection {
                 Some(SERVICE_VALUE_KV),
                 &self.keyspace,
                 create_span!("get"),
-                self.core_kv_client
+                || self.core_kv_client
                     .get(id.as_ref(), options.into().unwrap_or_default()),
             )
             .await
@@ -338,7 +338,7 @@ impl Collection {
                 Some(SERVICE_VALUE_KV),
                 &self.keyspace,
                 create_span!("exists"),
-                self.core_kv_client
+                || self.core_kv_client
                     .exists(id.as_ref(), options.into().unwrap_or_default()),
             )
             .await
@@ -355,7 +355,7 @@ impl Collection {
                 Some(SERVICE_VALUE_KV),
                 &self.keyspace,
                 create_span!("get_and_touch"),
-                self.core_kv_client.get_and_touch(
+                || self.core_kv_client.get_and_touch(
                     id.as_ref(),
                     expiry,
                     options.into().unwrap_or_default(),
@@ -375,7 +375,7 @@ impl Collection {
                 Some(SERVICE_VALUE_KV),
                 &self.keyspace,
                 create_span!("get_and_lock"),
-                self.core_kv_client.get_and_lock(
+                || self.core_kv_client.get_and_lock(
                     id.as_ref(),
                     lock_time,
                     options.into().unwrap_or_default(),
@@ -395,7 +395,7 @@ impl Collection {
                 Some(SERVICE_VALUE_KV),
                 &self.keyspace,
                 create_span!("lookup_in"),
-                self.core_kv_client.lookup_in(
+                || self.core_kv_client.lookup_in(
                     id.as_ref(),
                     specs,
                     options.into().unwrap_or_default(),
@@ -415,7 +415,7 @@ impl Collection {
                 Some(SERVICE_VALUE_KV),
                 &self.keyspace,
                 create_span!("unlock"),
-                self.core_kv_client
+                || self.core_kv_client
                     .unlock(id.as_ref(), cas, options.into().unwrap_or_default()),
             )
             .await
@@ -432,7 +432,7 @@ impl Collection {
                 Some(SERVICE_VALUE_KV),
                 &self.keyspace,
                 create_span!("touch"),
-                self.core_kv_client
+                || self.core_kv_client
                     .touch(id.as_ref(), expiry, options.into().unwrap_or_default()),
             )
             .await
@@ -449,7 +449,7 @@ impl Collection {
                 Some(SERVICE_VALUE_KV),
                 &self.keyspace,
                 create_span!("mutate_in"),
-                self.core_kv_client.mutate_in(
+                || self.core_kv_client.mutate_in(
                     id.as_ref(),
                     specs,
                     options.into().unwrap_or_default(),
@@ -468,7 +468,7 @@ impl Collection {
                 Some(SERVICE_VALUE_KV),
                 &self.keyspace,
                 create_span!("remove"),
-                self.core_kv_client
+                || self.core_kv_client
                     .remove(id.as_ref(), options.into().unwrap_or_default()),
             )
             .await

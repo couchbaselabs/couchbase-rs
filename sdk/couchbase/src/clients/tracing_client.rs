@@ -23,20 +23,21 @@ impl TracingClient {
         Self { backend }
     }
 
-    pub async fn execute_observable_operation<Fut, T>(
+    pub async fn execute_observable_operation<F, Fut, T>(
         &self,
         service: Option<&'static str>,
         keyspace: &Keyspace,
         span: SpanBuilder,
-        fut: Fut,
+        f: F,
     ) -> crate::error::Result<T>
     where
+        F: FnOnce() -> Fut,
         Fut: Future<Output = crate::error::Result<T>>,
     {
         match &self.backend {
             TracingClientBackend::CouchbaseTracingClientBackend(client) => {
                 client
-                    .execute_observable_operation(service, keyspace, span, fut)
+                    .execute_observable_operation(service, keyspace, span, f)
                     .await
             }
             TracingClientBackend::Couchbase2TracingClientBackend(_) => unimplemented!(),
@@ -97,26 +98,29 @@ impl CouchbaseTracingClient {
         span.in_scope(f)
     }
 
-    async fn execute_observable_operation<Fut, T>(
+    async fn execute_observable_operation<F, Fut, T>(
         &self,
         service: Option<&'static str>,
         keyspace: &Keyspace,
         mut span: SpanBuilder,
-        fut: Fut,
+        f: F,
     ) -> crate::error::Result<T>
     where
+        F: FnOnce() -> Fut,
         Fut: Future<Output = crate::error::Result<T>>,
     {
         let operation_name = span.name();
         let cluster_labels = self.get_cluster_labels().await.unwrap_or_default();
-        let span = span
-            .with_cluster_labels(&cluster_labels)
-            .with_service(service)
-            .with_keyspace(keyspace)
-            .build();
-
         let start = Instant::now();
-        let result = fut.instrument(span).await;
+        let result = {
+            let span = span
+                .with_cluster_labels(&cluster_labels)
+                .with_service(service)
+                .with_keyspace(keyspace)
+                .build();
+
+            f().instrument(span).await
+        };
         record_metrics(
             operation_name,
             service,

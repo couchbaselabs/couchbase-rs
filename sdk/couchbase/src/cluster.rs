@@ -139,7 +139,7 @@ impl Cluster {
                 Some(SERVICE_VALUE_QUERY),
                 &Keyspace::Cluster,
                 span,
-                self.query_client.query(statement, opts.into()),
+                || self.query_client.query(statement, opts.into()),
             )
             .await
     }
@@ -149,13 +149,10 @@ impl Cluster {
         opts: impl Into<Option<PingOptions>>,
     ) -> error::Result<PingReport> {
         self.tracing_client
-            .execute_observable_operation(
-                None,
-                &Keyspace::Cluster,
-                create_span!("ping"),
+            .execute_observable_operation(None, &Keyspace::Cluster, create_span!("ping"), || {
                 self.diagnostics_client
-                    .ping(opts.into().unwrap_or_default()),
-            )
+                    .ping(opts.into().unwrap_or_default())
+            })
             .await
     }
 
@@ -168,8 +165,10 @@ impl Cluster {
                 None,
                 &Keyspace::Cluster,
                 create_span!("diagnostics"),
-                self.diagnostics_client
-                    .diagnostics(opts.into().unwrap_or_default()),
+                || {
+                    self.diagnostics_client
+                        .diagnostics(opts.into().unwrap_or_default())
+                },
             )
             .await
     }
@@ -183,8 +182,10 @@ impl Cluster {
                 None,
                 &Keyspace::Cluster,
                 create_span!("wait_until_ready"),
-                self.diagnostics_client
-                    .wait_until_ready(opts.into().unwrap_or_default()),
+                || {
+                    self.diagnostics_client
+                        .wait_until_ready(opts.into().unwrap_or_default())
+                },
             )
             .await
     }

@@ -74,7 +74,7 @@ impl BinaryCollection {
                 Some(SERVICE_VALUE_KV),
                 &self.keyspace,
                 span,
-                self.core_kv_client.append(id.as_ref(), value, options),
+                || self.core_kv_client.append(id.as_ref(), value, options),
             )
             .await
     }
@@ -93,7 +93,7 @@ impl BinaryCollection {
                 Some(SERVICE_VALUE_KV),
                 &self.keyspace,
                 span,
-                self.core_kv_client.prepend(id.as_ref(), value, options),
+                || self.core_kv_client.prepend(id.as_ref(), value, options),
             )
             .await
     }
@@ -111,7 +111,7 @@ impl BinaryCollection {
                 Some(SERVICE_VALUE_KV),
                 &self.keyspace,
                 span,
-                self.core_kv_client.increment(id.as_ref(), options),
+                || self.core_kv_client.increment(id.as_ref(), options),
             )
             .await
     }
@@ -129,7 +129,7 @@ impl BinaryCollection {
                 Some(SERVICE_VALUE_KV),
                 &self.keyspace,
                 span,
-                self.core_kv_client.decrement(id.as_ref(), options),
+                || self.core_kv_client.decrement(id.as_ref(), options),
             )
             .await
     }

@@ -95,7 +95,7 @@ impl BucketManager {
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &Keyspace::Cluster,
                 create_span!("manager_buckets_get_all_buckets"),
-                self.client.get_all_buckets(opts.into().unwrap_or_default()),
+                || self.client.get_all_buckets(opts.into().unwrap_or_default()),
             )
             .await
     }
@@ -115,7 +115,7 @@ impl BucketManager {
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &keyspace,
                 create_span!("manager_buckets_get_bucket"),
-                self.client
+                || self.client
                     .get_bucket(bucket_name, opts.into().unwrap_or_default()),
             )
             .await
@@ -136,7 +136,7 @@ impl BucketManager {
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &keyspace,
                 create_span!("manager_buckets_create_bucket"),
-                self.client
+                || self.client
                     .create_bucket(settings, opts.into().unwrap_or_default()),
             )
             .await
@@ -157,7 +157,7 @@ impl BucketManager {
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &keyspace,
                 create_span!("manager_buckets_update_bucket"),
-                self.client
+                || self.client
                     .update_bucket(settings, opts.into().unwrap_or_default()),
             )
             .await
@@ -178,7 +178,7 @@ impl BucketManager {
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &keyspace,
                 create_span!("manager_buckets_drop_bucket"),
-                self.client
+                || self.client
                     .drop_bucket(bucket_name, opts.into().unwrap_or_default()),
             )
             .await
@@ -199,7 +199,7 @@ impl BucketManager {
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &keyspace,
                 create_span!("manager_buckets_flush_bucket"),
-                self.client
+                || self.client
                     .flush_bucket(bucket_name, opts.into().unwrap_or_default()),
             )
             .await

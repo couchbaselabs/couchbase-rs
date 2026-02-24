@@ -130,7 +130,7 @@ impl UserManager {
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &Keyspace::Cluster,
                 create_span!("manager_users_get_all_users"),
-                async move {
+                || async move {
                     self.client
                         .get_all_users(opts.into().unwrap_or_default())
                         .await
@@ -150,7 +150,7 @@ impl UserManager {
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &Keyspace::Cluster,
                 create_span!("manager_users_get_user"),
-                self.client
+                || self.client
                     .get_user(username.into(), opts.into().unwrap_or_default()),
             )
             .await
@@ -167,7 +167,7 @@ impl UserManager {
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &Keyspace::Cluster,
                 create_span!("manager_users_upsert_user"),
-                self.client
+                || self.client
                     .upsert_user(settings, opts.into().unwrap_or_default()),
             )
             .await
@@ -184,7 +184,7 @@ impl UserManager {
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &Keyspace::Cluster,
                 create_span!("manager_users_drop_user"),
-                self.client
+                || self.client
                     .drop_user(username.into(), opts.into().unwrap_or_default()),
             )
             .await
@@ -200,7 +200,7 @@ impl UserManager {
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &Keyspace::Cluster,
                 create_span!("manager_users_get_roles"),
-                self.client.get_roles(opts.into().unwrap_or_default()),
+                || self.client.get_roles(opts.into().unwrap_or_default()),
             )
             .await
     }
@@ -216,7 +216,7 @@ impl UserManager {
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &Keyspace::Cluster,
                 create_span!("manager_users_get_group"),
-                self.client
+                || self.client
                     .get_group(group_name.into(), opts.into().unwrap_or_default()),
             )
             .await
@@ -232,7 +232,7 @@ impl UserManager {
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &Keyspace::Cluster,
                 create_span!("manager_users_get_all_groups"),
-                self.client.get_all_groups(opts.into().unwrap_or_default()),
+                || self.client.get_all_groups(opts.into().unwrap_or_default()),
             )
             .await
     }
@@ -248,7 +248,7 @@ impl UserManager {
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &Keyspace::Cluster,
                 create_span!("manager_users_upsert_group"),
-                self.client
+                || self.client
                     .upsert_group(group, opts.into().unwrap_or_default()),
             )
             .await
@@ -265,7 +265,7 @@ impl UserManager {
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &Keyspace::Cluster,
                 create_span!("manager_users_drop_group"),
-                self.client
+                || self.client
                     .drop_group(group_name.into(), opts.into().unwrap_or_default()),
             )
             .await
@@ -282,7 +282,7 @@ impl UserManager {
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &Keyspace::Cluster,
                 create_span!("manager_users_change_password"),
-                self.client
+                || self.client
                     .change_password(password.into(), opts.into().unwrap_or_default()),
             )
             .await

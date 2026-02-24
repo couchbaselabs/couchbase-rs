@@ -85,27 +85,31 @@ use std::time::Instant;
 use tracing::Instrument;
 
 impl Agent {
-    async fn execute_observable_operation<Fut, T>(
+    async fn execute_observable_operation<F, Fut, T>(
         &self,
         service: Option<&'static str>,
         keyspace: Keyspace,
         mut span: SpanBuilder,
-        future: Fut,
+        f: F,
     ) -> Result<T>
     where
+        F: FnOnce() -> Fut,
         Fut: Future<Output = Result<T>>,
     {
         let operation_name = span.name();
         let cluster_labels = self.inner.tracing.get_cluster_labels();
 
-        let span = span
-            .with_cluster_labels(&cluster_labels)
-            .with_service(service)
-            .with_keyspace(&keyspace)
-            .build();
-
         let start = Instant::now();
-        let result = future.instrument(span).await;
+        let result = {
+            let span = span
+                .with_cluster_labels(&cluster_labels)
+                .with_service(service)
+                .with_keyspace(&keyspace)
+                .build();
+
+            f().instrument(span).await
+        };
+
         record_metrics(
             operation_name,
             service,
@@ -137,7 +141,7 @@ impl Agent {
                         Some(opts.collection_name),
                     ),
                     create_span!("upsert"),
-                    self.inner.crud.upsert(opts),
+                    || self.inner.crud.upsert(opts),
                 )
                 .await;
         }
@@ -156,7 +160,7 @@ impl Agent {
                         Some(opts.collection_name),
                     ),
                     create_span!("get"),
-                    self.inner.crud.get(opts),
+                    || self.inner.crud.get(opts),
                 )
                 .await;
         }
@@ -174,7 +178,7 @@ impl Agent {
                         Some(opts.collection_name),
                     ),
                     create_span!("get_meta"),
-                    self.inner.crud.get_meta(opts),
+                    || self.inner.crud.get_meta(opts),
                 )
                 .await;
         }
@@ -192,7 +196,7 @@ impl Agent {
                         Some(opts.collection_name),
                     ),
                     create_span!("delete").with_durability(opts.durability_level.as_ref()),
-                    self.inner.crud.delete(opts),
+                    || self.inner.crud.delete(opts),
                 )
                 .await;
         }
@@ -210,7 +214,7 @@ impl Agent {
                         Some(opts.collection_name),
                     ),
                     create_span!("get_and_lock"),
-                    self.inner.crud.get_and_lock(opts),
+                    || self.inner.crud.get_and_lock(opts),
                 )
                 .await;
         }
@@ -228,7 +232,7 @@ impl Agent {
                         Some(opts.collection_name),
                     ),
                     create_span!("get_and_touch"),
-                    self.inner.crud.get_and_touch(opts),
+                    || self.inner.crud.get_and_touch(opts),
                 )
                 .await;
         }
@@ -246,7 +250,7 @@ impl Agent {
                         Some(opts.collection_name),
                     ),
                     create_span!("unlock"),
-                    self.inner.crud.unlock(opts),
+                    || self.inner.crud.unlock(opts),
                 )
                 .await;
         }
@@ -264,7 +268,7 @@ impl Agent {
                         Some(opts.collection_name),
                     ),
                     create_span!("touch"),
-                    self.inner.crud.touch(opts),
+                    || self.inner.crud.touch(opts),
                 )
                 .await;
         }
@@ -282,7 +286,7 @@ impl Agent {
                         Some(opts.collection_name),
                     ),
                     create_span!("add").with_durability(opts.durability_level.as_ref()),
-                    self.inner.crud.add(opts),
+                    || self.inner.crud.add(opts),
                 )
                 .await;
         }
@@ -300,7 +304,7 @@ impl Agent {
                         Some(opts.collection_name),
                     ),
                     create_span!("replace").with_durability(opts.durability_level.as_ref()),
-                    self.inner.crud.replace(opts),
+                    || self.inner.crud.replace(opts),
                 )
                 .await;
         }
@@ -318,7 +322,7 @@ impl Agent {
                         Some(opts.collection_name),
                     ),
                     create_span!("append").with_durability(opts.durability_level.as_ref()),
-                    self.inner.crud.append(opts),
+                    || self.inner.crud.append(opts),
                 )
                 .await;
         }
@@ -336,7 +340,7 @@ impl Agent {
                         Some(opts.collection_name),
                     ),
                     create_span!("prepend").with_durability(opts.durability_level.as_ref()),
-                    self.inner.crud.prepend(opts),
+                    || self.inner.crud.prepend(opts),
                 )
                 .await;
         }
@@ -354,7 +358,7 @@ impl Agent {
                         Some(opts.collection_name),
                     ),
                     create_span!("increment"),
-                    self.inner.crud.increment(opts),
+                    || self.inner.crud.increment(opts),
                 )
                 .await;
         }
@@ -372,7 +376,7 @@ impl Agent {
                         Some(opts.collection_name),
                     ),
                     create_span!("decrement"),
-                    self.inner.crud.decrement(opts),
+                    || self.inner.crud.decrement(opts),
                 )
                 .await;
         }
@@ -397,7 +401,7 @@ impl Agent {
                         Some(opts.collection_name),
                     ),
                     create_span!("lookup_in"),
-                    self.inner.crud.lookup_in(opts),
+                    || self.inner.crud.lookup_in(opts),
                 )
                 .await;
         }
@@ -415,7 +419,7 @@ impl Agent {
                         Some(opts.collection_name),
                     ),
                     create_span!("mutate_in").with_durability(opts.durability_level.as_ref()),
-                    self.inner.crud.mutate_in(opts),
+                    || self.inner.crud.mutate_in(opts),
                 )
                 .await;
         }
@@ -429,7 +433,7 @@ impl Agent {
                     Some(crate::tracingcomponent::SERVICE_VALUE_QUERY),
                     Keyspace::Cluster,
                     create_span!("query").with_statement(opts.statement.as_deref().unwrap_or("")),
-                    self.inner.query.query(opts),
+                    || self.inner.query.query(opts),
                 )
                 .await;
         }
@@ -443,7 +447,7 @@ impl Agent {
                     Some(crate::tracingcomponent::SERVICE_VALUE_QUERY),
                     Keyspace::Cluster,
                     create_span!("query").with_statement(opts.statement.as_deref().unwrap_or("")),
-                    self.inner.query.prepared_query(opts),
+                    || self.inner.query.prepared_query(opts),
                 )
                 .await;
         }
@@ -461,7 +465,7 @@ impl Agent {
                         opts.collection_name,
                     ),
                     create_span!("manager_query_get_all_indexes"),
-                    self.inner.query.get_all_indexes(opts),
+                    || self.inner.query.get_all_indexes(opts),
                 )
                 .await;
         }
@@ -479,7 +483,7 @@ impl Agent {
                         opts.collection_name,
                     ),
                     create_span!("manager_query_create_primary_index"),
-                    self.inner.query.create_primary_index(opts),
+                    || self.inner.query.create_primary_index(opts),
                 )
                 .await;
         }
@@ -497,7 +501,7 @@ impl Agent {
                         opts.collection_name,
                     ),
                     create_span!("manager_query_create_index"),
-                    self.inner.query.create_index(opts),
+                    || self.inner.query.create_index(opts),
                 )
                 .await;
         }
@@ -515,7 +519,7 @@ impl Agent {
                         opts.collection_name,
                     ),
                     create_span!("manager_query_drop_primary_index"),
-                    self.inner.query.drop_primary_index(opts),
+                    || self.inner.query.drop_primary_index(opts),
                 )
                 .await;
         }
@@ -533,7 +537,7 @@ impl Agent {
                         opts.collection_name,
                     ),
                     create_span!("manager_query_drop_index"),
-                    self.inner.query.drop_index(opts),
+                    || self.inner.query.drop_index(opts),
                 )
                 .await;
         }
@@ -554,7 +558,7 @@ impl Agent {
                         opts.collection_name,
                     ),
                     create_span!("manager_query_build_deferred_indexes"),
-                    self.inner.query.build_deferred_indexes(opts),
+                    || self.inner.query.build_deferred_indexes(opts),
                 )
                 .await;
         }
@@ -572,7 +576,7 @@ impl Agent {
                         opts.collection_name,
                     ),
                     create_span!("manager_query_watch_indexes"),
-                    self.inner.query.watch_indexes(opts),
+                    || self.inner.query.watch_indexes(opts),
                 )
                 .await;
         }
@@ -594,7 +598,7 @@ impl Agent {
                         None,
                     ),
                     create_span!("search"),
-                    self.inner.search.query(opts),
+                    || self.inner.search.query(opts),
                 )
                 .await;
         }
@@ -611,7 +615,7 @@ impl Agent {
                     Some(crate::tracingcomponent::SERVICE_VALUE_SEARCH),
                     build_keyspace(opts.bucket_name, opts.scope_name, None),
                     create_span!("manager_search_get_index"),
-                    self.inner.search.get_index(opts),
+                    || self.inner.search.get_index(opts),
                 )
                 .await;
         }
@@ -625,7 +629,7 @@ impl Agent {
                     Some(crate::tracingcomponent::SERVICE_VALUE_SEARCH),
                     build_keyspace(opts.bucket_name, opts.scope_name, None),
                     create_span!("manager_search_upsert_index"),
-                    self.inner.search.upsert_index(opts),
+                    || self.inner.search.upsert_index(opts),
                 )
                 .await;
         }
@@ -639,7 +643,7 @@ impl Agent {
                     Some(crate::tracingcomponent::SERVICE_VALUE_SEARCH),
                     build_keyspace(opts.bucket_name, opts.scope_name, None),
                     create_span!("manager_search_drop_index"),
-                    self.inner.search.delete_index(opts),
+                    || self.inner.search.delete_index(opts),
                 )
                 .await;
         }
@@ -656,7 +660,7 @@ impl Agent {
                     Some(crate::tracingcomponent::SERVICE_VALUE_SEARCH),
                     build_keyspace(opts.bucket_name, opts.scope_name, None),
                     create_span!("manager_search_get_all_indexes"),
-                    self.inner.search.get_all_indexes(opts),
+                    || self.inner.search.get_all_indexes(opts),
                 )
                 .await;
         }
@@ -673,7 +677,7 @@ impl Agent {
                     Some(crate::tracingcomponent::SERVICE_VALUE_SEARCH),
                     build_keyspace(opts.bucket_name, opts.scope_name, None),
                     create_span!("manager_search_analyze_document"),
-                    self.inner.search.analyze_document(opts),
+                    || self.inner.search.analyze_document(opts),
                 )
                 .await;
         }
@@ -690,7 +694,7 @@ impl Agent {
                     Some(crate::tracingcomponent::SERVICE_VALUE_SEARCH),
                     build_keyspace(opts.bucket_name, opts.scope_name, None),
                     create_span!("manager_search_get_indexed_documents_count"),
-                    self.inner.search.get_indexed_documents_count(opts),
+                    || self.inner.search.get_indexed_documents_count(opts),
                 )
                 .await;
         }
@@ -704,7 +708,7 @@ impl Agent {
                     Some(crate::tracingcomponent::SERVICE_VALUE_SEARCH),
                     build_keyspace(opts.bucket_name, opts.scope_name, None),
                     create_span!("manager_search_pause_ingest"),
-                    self.inner.search.pause_ingest(opts),
+                    || self.inner.search.pause_ingest(opts),
                 )
                 .await;
         }
@@ -718,7 +722,7 @@ impl Agent {
                     Some(crate::tracingcomponent::SERVICE_VALUE_SEARCH),
                     build_keyspace(opts.bucket_name, opts.scope_name, None),
                     create_span!("manager_search_resume_ingest"),
-                    self.inner.search.resume_ingest(opts),
+                    || self.inner.search.resume_ingest(opts),
                 )
                 .await;
         }
@@ -732,7 +736,7 @@ impl Agent {
                     Some(crate::tracingcomponent::SERVICE_VALUE_SEARCH),
                     build_keyspace(opts.bucket_name, opts.scope_name, None),
                     create_span!("manager_search_allow_querying"),
-                    self.inner.search.allow_querying(opts),
+                    || self.inner.search.allow_querying(opts),
                 )
                 .await;
         }
@@ -749,7 +753,7 @@ impl Agent {
                     Some(crate::tracingcomponent::SERVICE_VALUE_SEARCH),
                     build_keyspace(opts.bucket_name, opts.scope_name, None),
                     create_span!("manager_search_disallow_querying"),
-                    self.inner.search.disallow_querying(opts),
+                    || self.inner.search.disallow_querying(opts),
                 )
                 .await;
         }
@@ -763,7 +767,7 @@ impl Agent {
                     Some(crate::tracingcomponent::SERVICE_VALUE_SEARCH),
                     build_keyspace(opts.bucket_name, opts.scope_name, None),
                     create_span!("manager_search_freeze_plan"),
-                    self.inner.search.freeze_plan(opts),
+                    || self.inner.search.freeze_plan(opts),
                 )
                 .await;
         }
@@ -777,7 +781,7 @@ impl Agent {
                     Some(crate::tracingcomponent::SERVICE_VALUE_SEARCH),
                     build_keyspace(opts.bucket_name, opts.scope_name, None),
                     create_span!("manager_search_unfreeze_plan"),
-                    self.inner.search.unfreeze_plan(opts),
+                    || self.inner.search.unfreeze_plan(opts),
                 )
                 .await;
         }
@@ -798,7 +802,7 @@ impl Agent {
                     Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
                     build_keyspace(Some(opts.bucket_name), Some(opts.scope_name), None),
                     create_span!("manager_collections_create_scope"),
-                    self.inner.mgmt.create_scope(opts),
+                    || self.inner.mgmt.create_scope(opts),
                 )
                 .await;
         }
@@ -812,7 +816,7 @@ impl Agent {
                     Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
                     build_keyspace(Some(opts.bucket_name), Some(opts.scope_name), None),
                     create_span!("manager_collections_drop_scope"),
-                    self.inner.mgmt.delete_scope(opts),
+                    || self.inner.mgmt.delete_scope(opts),
                 )
                 .await;
         }
@@ -833,7 +837,7 @@ impl Agent {
                         Some(opts.collection_name),
                     ),
                     create_span!("manager_collections_create_collection"),
-                    self.inner.mgmt.create_collection(opts),
+                    || self.inner.mgmt.create_collection(opts),
                 )
                 .await;
         }
@@ -854,7 +858,7 @@ impl Agent {
                         Some(opts.collection_name),
                     ),
                     create_span!("manager_collections_drop_collection"),
-                    self.inner.mgmt.delete_collection(opts),
+                    || self.inner.mgmt.delete_collection(opts),
                 )
                 .await;
         }
@@ -875,7 +879,7 @@ impl Agent {
                         Some(opts.collection_name),
                     ),
                     create_span!("manager_collections_update_collection"),
-                    self.inner.mgmt.update_collection(opts),
+                    || self.inner.mgmt.update_collection(opts),
                 )
                 .await;
         }
@@ -893,7 +897,7 @@ impl Agent {
                     Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
                     Keyspace::Cluster,
                     create_span!("manager_buckets_get_all_buckets"),
-                    self.inner.mgmt.get_all_buckets(opts),
+                    || self.inner.mgmt.get_all_buckets(opts),
                 )
                 .await;
         }
@@ -907,7 +911,7 @@ impl Agent {
                     Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
                     build_keyspace(Some(opts.bucket_name), None, None),
                     create_span!("manager_buckets_get_bucket"),
-                    self.inner.mgmt.get_bucket(opts),
+                    || self.inner.mgmt.get_bucket(opts),
                 )
                 .await;
         }
@@ -921,7 +925,7 @@ impl Agent {
                     Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
                     build_keyspace(Some(opts.bucket_name), None, None),
                     create_span!("manager_buckets_create_bucket"),
-                    self.inner.mgmt.create_bucket(opts),
+                    || self.inner.mgmt.create_bucket(opts),
                 )
                 .await;
         }
@@ -935,7 +939,7 @@ impl Agent {
                     Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
                     build_keyspace(Some(opts.bucket_name), None, None),
                     create_span!("manager_buckets_update_bucket"),
-                    self.inner.mgmt.update_bucket(opts),
+                    || self.inner.mgmt.update_bucket(opts),
                 )
                 .await;
         }
@@ -949,7 +953,7 @@ impl Agent {
                     Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
                     build_keyspace(Some(opts.bucket_name), None, None),
                     create_span!("manager_buckets_drop_bucket"),
-                    self.inner.mgmt.delete_bucket(opts),
+                    || self.inner.mgmt.delete_bucket(opts),
                 )
                 .await;
         }
@@ -963,7 +967,7 @@ impl Agent {
                     Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
                     build_keyspace(Some(opts.bucket_name), None, None),
                     create_span!("manager_buckets_flush_bucket"),
-                    self.inner.mgmt.flush_bucket(opts),
+                    || self.inner.mgmt.flush_bucket(opts),
                 )
                 .await;
         }
@@ -977,7 +981,7 @@ impl Agent {
                     Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
                     Keyspace::Cluster,
                     create_span!("manager_users_get_user"),
-                    self.inner.mgmt.get_user(opts),
+                    || self.inner.mgmt.get_user(opts),
                 )
                 .await;
         }
@@ -994,7 +998,7 @@ impl Agent {
                     Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
                     Keyspace::Cluster,
                     create_span!("manager_users_get_all_users"),
-                    self.inner.mgmt.get_all_users(opts),
+                    || self.inner.mgmt.get_all_users(opts),
                 )
                 .await;
         }
@@ -1008,7 +1012,7 @@ impl Agent {
                     Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
                     Keyspace::Cluster,
                     create_span!("manager_users_upsert_user"),
-                    self.inner.mgmt.upsert_user(opts),
+                    || self.inner.mgmt.upsert_user(opts),
                 )
                 .await;
         }
@@ -1022,7 +1026,7 @@ impl Agent {
                     Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
                     Keyspace::Cluster,
                     create_span!("manager_users_drop_user"),
-                    self.inner.mgmt.delete_user(opts),
+                    || self.inner.mgmt.delete_user(opts),
                 )
                 .await;
         }
@@ -1036,7 +1040,7 @@ impl Agent {
                     Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
                     Keyspace::Cluster,
                     create_span!("manager_users_get_roles"),
-                    self.inner.mgmt.get_roles(opts),
+                    || self.inner.mgmt.get_roles(opts),
                 )
                 .await;
         }
@@ -1050,7 +1054,7 @@ impl Agent {
                     Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
                     Keyspace::Cluster,
                     create_span!("manager_users_get_group"),
-                    self.inner.mgmt.get_group(opts),
+                    || self.inner.mgmt.get_group(opts),
                 )
                 .await;
         }
@@ -1064,7 +1068,7 @@ impl Agent {
                     Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
                     Keyspace::Cluster,
                     create_span!("manager_users_get_all_groups"),
-                    self.inner.mgmt.get_all_groups(opts),
+                    || self.inner.mgmt.get_all_groups(opts),
                 )
                 .await;
         }
@@ -1078,7 +1082,7 @@ impl Agent {
                     Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
                     Keyspace::Cluster,
                     create_span!("manager_users_upsert_group"),
-                    self.inner.mgmt.upsert_group(opts),
+                    || self.inner.mgmt.upsert_group(opts),
                 )
                 .await;
         }
@@ -1092,7 +1096,7 @@ impl Agent {
                     Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
                     Keyspace::Cluster,
                     create_span!("manager_users_drop_group"),
-                    self.inner.mgmt.delete_group(opts),
+                    || self.inner.mgmt.delete_group(opts),
                 )
                 .await;
         }
@@ -1106,7 +1110,7 @@ impl Agent {
                     Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
                     Keyspace::Cluster,
                     create_span!("manager_users_change_password"),
-                    self.inner.mgmt.change_password(opts),
+                    || self.inner.mgmt.change_password(opts),
                 )
                 .await;
         }
@@ -1120,7 +1124,7 @@ impl Agent {
                     Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
                     Keyspace::Cluster,
                     create_span!("ping"),
-                    self.inner.diagnostics.ping(opts),
+                    || self.inner.diagnostics.ping(opts),
                 )
                 .await;
         }
@@ -1153,7 +1157,7 @@ impl Agent {
                     Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
                     Keyspace::Cluster,
                     create_span!("wait_until_ready"),
-                    self.inner.diagnostics.wait_until_ready(opts),
+                    || self.inner.diagnostics.wait_until_ready(opts),
                 )
                 .await;
         }
@@ -1167,7 +1171,7 @@ impl Agent {
                     Some(crate::tracingcomponent::SERVICE_VALUE_MANAGEMENT),
                     Keyspace::Cluster,
                     create_span!("diagnostics"),
-                    self.inner.diagnostics.diagnostics(opts),
+                    || self.inner.diagnostics.diagnostics(opts),
                 )
                 .await;
         }
@@ -1182,7 +1186,7 @@ impl Agent {
                     Keyspace::Cluster,
                     create_span!("analytics")
                         .with_statement(opts.statement.as_deref().unwrap_or("")),
-                    self.inner.analytics.query(opts),
+                    || self.inner.analytics.query(opts),
                 )
                 .await;
         }
@@ -1199,7 +1203,7 @@ impl Agent {
                     Some(crate::tracingcomponent::SERVICE_VALUE_ANALYTICS),
                     Keyspace::Cluster,
                     create_span!("manager_analytics_get_pending_mutations"),
-                    self.inner.analytics.get_pending_mutations(opts),
+                    || self.inner.analytics.get_pending_mutations(opts),
                 )
                 .await;
         }

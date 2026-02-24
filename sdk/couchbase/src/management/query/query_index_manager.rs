@@ -100,7 +100,7 @@ impl QueryIndexManager {
                 Some(SERVICE_VALUE_QUERY),
                 &self.client.keyspace(),
                 create_span!("manager_query_get_all_indexes"),
-                self.client.get_all_indexes(opts.into()),
+                || self.client.get_all_indexes(opts.into()),
             )
             .await
     }
@@ -117,7 +117,7 @@ impl QueryIndexManager {
                 Some(SERVICE_VALUE_QUERY),
                 &self.client.keyspace(),
                 create_span!("manager_query_create_index"),
-                self.client
+                || self.client
                     .create_index(index_name.into(), fields.into(), opts.into()),
             )
             .await
@@ -133,7 +133,7 @@ impl QueryIndexManager {
                 Some(SERVICE_VALUE_QUERY),
                 &self.client.keyspace(),
                 create_span!("manager_query_create_primary_index"),
-                self.client.create_primary_index(opts.into()),
+                || self.client.create_primary_index(opts.into()),
             )
             .await
     }
@@ -149,7 +149,7 @@ impl QueryIndexManager {
                 Some(SERVICE_VALUE_QUERY),
                 &self.client.keyspace(),
                 create_span!("manager_query_drop_index"),
-                self.client.drop_index(index_name.into(), opts.into()),
+                || self.client.drop_index(index_name.into(), opts.into()),
             )
             .await
     }
@@ -164,7 +164,7 @@ impl QueryIndexManager {
                 Some(SERVICE_VALUE_QUERY),
                 &self.client.keyspace(),
                 create_span!("manager_query_drop_primary_index"),
-                self.client.drop_primary_index(opts.into()),
+                || self.client.drop_primary_index(opts.into()),
             )
             .await
     }
@@ -180,7 +180,7 @@ impl QueryIndexManager {
                 Some(SERVICE_VALUE_QUERY),
                 &self.client.keyspace(),
                 create_span!("manager_query_watch_indexes"),
-                self.client.watch_indexes(index_names.into(), opts.into()),
+                || self.client.watch_indexes(index_names.into(), opts.into()),
             )
             .await
     }
@@ -195,7 +195,7 @@ impl QueryIndexManager {
                 Some(SERVICE_VALUE_QUERY),
                 &self.client.keyspace(),
                 create_span!("manager_query_build_deferred_indexes"),
-                self.client.build_deferred_indexes(opts.into()),
+                || self.client.build_deferred_indexes(opts.into()),
             )
             .await
     }

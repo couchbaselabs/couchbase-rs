@@ -105,7 +105,7 @@ impl CollectionManager {
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &keyspace,
                 create_span!("manager_collections_create_scope"),
-                self.client
+                || self.client
                     .create_scope(scope_name, opts.into().unwrap_or_default()),
             )
             .await
@@ -127,7 +127,7 @@ impl CollectionManager {
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &keyspace,
                 create_span!("manager_collections_drop_scope"),
-                self.client
+                || self.client
                     .drop_scope(scope_name, opts.into().unwrap_or_default()),
             )
             .await
@@ -152,7 +152,7 @@ impl CollectionManager {
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &keyspace,
                 create_span!("manager_collections_create_collection"),
-                self.client.create_collection(
+                || self.client.create_collection(
                     scope_name,
                     collection_name,
                     settings.into().unwrap_or_default(),
@@ -181,7 +181,7 @@ impl CollectionManager {
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &keyspace,
                 create_span!("manager_collections_update_collection"),
-                self.client.update_collection(
+                || self.client.update_collection(
                     scope_name,
                     collection_name,
                     settings.into(),
@@ -209,7 +209,7 @@ impl CollectionManager {
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &keyspace,
                 create_span!("manager_collections_drop_collection"),
-                self.client.drop_collection(
+                || self.client.drop_collection(
                     scope_name,
                     collection_name,
                     opts.into().unwrap_or_default(),
@@ -232,7 +232,7 @@ impl CollectionManager {
                 Some(SERVICE_VALUE_MANAGEMENT),
                 &keyspace,
                 create_span!("manager_collections_get_all_scopes"),
-                self.client.get_all_scopes(opts.into().unwrap_or_default()),
+                || self.client.get_all_scopes(opts.into().unwrap_or_default()),
             )
             .await
     }

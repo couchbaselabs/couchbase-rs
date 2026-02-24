@@ -101,12 +101,9 @@ impl Scope {
         let span = create_span!("query").with_statement(&statement);
 
         self.tracing_client
-            .execute_observable_operation(
-                Some(SERVICE_VALUE_QUERY),
-                &self.keyspace,
-                span,
-                self.query_client.query(statement, opts.into()),
-            )
+            .execute_observable_operation(Some(SERVICE_VALUE_QUERY), &self.keyspace, span, || {
+                self.query_client.query(statement, opts.into())
+            })
             .await
     }
 
@@ -121,7 +118,7 @@ impl Scope {
                 Some(SERVICE_VALUE_SEARCH),
                 &self.keyspace,
                 create_span!("search"),
-                self.search_client.search(index_name, request, opts.into()),
+                || self.search_client.search(index_name, request, opts.into()),
             )
             .await
     }

@@ -100,7 +100,7 @@ impl Bucket {
                 None,
                 &self.keyspace,
                 create_span!("ping"),
-                self.diagnostics_client
+                || self.diagnostics_client
                     .ping(opts.into().unwrap_or_default()),
             )
             .await
@@ -115,7 +115,7 @@ impl Bucket {
                 None,
                 &self.keyspace,
                 create_span!("wait_until_ready"),
-                self.diagnostics_client
+                || self.diagnostics_client
                     .wait_until_ready(opts.into().unwrap_or_default()),
             )
             .await
