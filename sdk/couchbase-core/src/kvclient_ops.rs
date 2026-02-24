@@ -43,7 +43,7 @@ use crate::memdx::response::{
     TouchResponse, UnlockResponse,
 };
 use chrono::Utc;
-use log::info;
+use log::{debug, info};
 use std::future::Future;
 use std::ops::Add;
 use std::sync::atomic::Ordering;
@@ -365,7 +365,7 @@ where
             Ok(v) => Ok(v),
             Err(e) => {
                 if let memdx::error::ErrorKind::Dispatch { .. } = e.kind() {
-                    info!("Client {} closing due to dispatch error", &self.id);
+                    debug!("Client {} closing due to dispatch error", &self.id);
                     let _ = self.close().await;
                 }
 
