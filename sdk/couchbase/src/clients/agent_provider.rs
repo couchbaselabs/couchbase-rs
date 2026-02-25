@@ -92,7 +92,7 @@ impl CouchbaseAgentProvider {
     pub(crate) fn upgrade_agent(agent: Weak<Agent>) -> error::Result<Arc<Agent>> {
         match agent.upgrade() {
             Some(agent) => Ok(agent),
-            None => Err(error::Error::new(ErrorKind::Disconnected)),
+            None => Err(error::Error::new(ErrorKind::ClusterDropped)),
         }
     }
 }

@@ -60,7 +60,7 @@ fn test_collection_use_after_cluster_drop() {
                     Err(e) => e,
                 };
 
-                if &ErrorKind::Disconnected == err.kind() {
+                if &ErrorKind::ClusterDropped == err.kind() {
                     return Ok(Some(()));
                 }
 
@@ -101,7 +101,7 @@ fn test_collection_level_mgr_use_after_cluster_drop() {
                     Err(e) => e,
                 };
 
-                if &ErrorKind::Disconnected == err.kind() {
+                if &ErrorKind::ClusterDropped == err.kind() {
                     return Ok(Some(()));
                 }
 
@@ -137,7 +137,7 @@ fn test_scope_use_after_cluster_drop() {
                     Err(e) => e,
                 };
 
-                if &ErrorKind::Disconnected == err.kind() {
+                if &ErrorKind::ClusterDropped == err.kind() {
                     return Ok(Some(()));
                 }
 
@@ -175,7 +175,7 @@ fn test_scope_level_mgr_use_after_cluster_drop() {
                     Err(e) => e,
                 };
 
-                if &ErrorKind::Disconnected == err.kind() {
+                if &ErrorKind::ClusterDropped == err.kind() {
                     return Ok(Some(()));
                 }
 
@@ -211,7 +211,7 @@ fn test_bucket_level_mgr_use_after_cluster_drop() {
                     Err(e) => e,
                 };
 
-                if &ErrorKind::Disconnected == err.kind() {
+                if &ErrorKind::ClusterDropped == err.kind() {
                     return Ok(Some(()));
                 }
 
@@ -246,7 +246,7 @@ fn test_cluster_level_mgr_use_after_cluster_drop() {
                     Err(e) => e,
                 };
 
-                if &ErrorKind::Disconnected == err.kind() {
+                if &ErrorKind::ClusterDropped == err.kind() {
                     return Ok(Some(()));
                 }
 
