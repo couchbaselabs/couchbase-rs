@@ -19,7 +19,6 @@ use crate::common::new_key;
 use crate::common::test_config::get_bucket;
 use couchbase::transcoding;
 use criterion::{criterion_group, criterion_main, Criterion};
-use std::io::Write;
 use std::time::Duration;
 
 #[path = "./util.rs"]
@@ -330,29 +329,6 @@ fn decrement(c: &mut Criterion) {
     });
 }
 
-fn upsert_and_get(c: &mut Criterion) {
-    let rt = tokio::runtime::Runtime::new().unwrap();
-
-    let (cluster, bucket) = get_bucket(&rt);
-
-    let collection = bucket
-        .scope(cluster.default_scope())
-        .collection(cluster.default_collection());
-
-    let key = new_key();
-    let (value, flags) = transcoding::json::encode("test").unwrap();
-
-    c.bench_function("upsert_and_get", |b| {
-        b.to_async(&rt).iter(|| async {
-            collection
-                .upsert_raw(&key, &value, flags, None)
-                .await
-                .unwrap();
-            collection.get(&key, None).await.unwrap();
-        })
-    });
-}
-
 criterion_group!(
     name = benches;
     config = util::configured_criterion();
@@ -369,7 +345,6 @@ criterion_group!(
     append,
     prepend,
     increment,
-    decrement,
-    upsert_and_get
+    decrement
 );
 criterion_main!(benches);
