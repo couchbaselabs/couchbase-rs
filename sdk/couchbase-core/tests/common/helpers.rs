@@ -148,6 +148,39 @@ pub async fn delete_collection_and_wait_for_kv(
     timeout_at(deadline, fut()).await.unwrap();
 }
 
+pub async fn delete_scope_and_wait_for_kv(
+    agent: &Agent,
+    bucket_name: &str,
+    scope_name: &str,
+    collection_name: &str,
+    deadline: Instant,
+) {
+    agent
+        .delete_scope(&DeleteScopeOptions::new(bucket_name, scope_name))
+        .await
+        .unwrap();
+
+    let fut = || async {
+        loop {
+            let resp = agent
+                .get_collection_id(GetCollectionIdOptions::new(scope_name, collection_name))
+                .await;
+            if let Some(e) = resp.err() {
+                if is_memdx_error(&e)
+                    .unwrap()
+                    .is_server_error_kind(ServerErrorKind::UnknownScopeName)
+                {
+                    break;
+                }
+            }
+
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    };
+
+    timeout_at(deadline, fut()).await.unwrap();
+}
+
 pub fn is_memdx_error(e: &Error) -> Option<&memdx::error::Error> {
     match e.kind() {
         ErrorKind::Memdx(err, ..) => Some(err),

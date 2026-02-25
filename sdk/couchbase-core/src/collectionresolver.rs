@@ -82,6 +82,7 @@ where
     if let Some(memdx_err) = err.is_memdx_error() {
         if memdx_err.is_server_error_kind(ServerErrorKind::UnknownCollectionID)
             || memdx_err.is_server_error_kind(ServerErrorKind::UnknownCollectionName)
+            || memdx_err.is_server_error_kind(ServerErrorKind::UnknownScopeName)
         {
             resolver
                 .invalidate_collection_id(scope_name, collection_name)
