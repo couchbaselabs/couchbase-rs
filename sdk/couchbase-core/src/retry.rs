@@ -354,6 +354,9 @@ fn server_error_to_retry_reason(rs: &Arc<RetryManager>, e: &ServerError) -> Opti
         ServerErrorKind::UnknownCollectionName => {
             return Some(RetryReason::KvCollectionOutdated);
         }
+        ServerErrorKind::UnknownScopeName => {
+            return Some(RetryReason::KvCollectionOutdated);
+        }
         ServerErrorKind::Locked => {
             return Some(RetryReason::KvLocked);
         }

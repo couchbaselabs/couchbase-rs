@@ -22,7 +22,7 @@ use crate::common::default_agent_options::{create_default_options, create_option
 use crate::common::helpers::try_until;
 use crate::common::helpers::{
     create_collection_and_wait_for_kv, delete_collection_and_wait_for_kv, generate_bytes_value,
-    generate_key, is_memdx_error,
+    generate_key, generate_string_key, is_memdx_error,
 };
 use crate::common::test_config::{run_test, setup_test};
 use couchbase_core::agent::Agent;
@@ -776,5 +776,48 @@ fn test_changed_collection_id() {
 
         assert_ne!(0, upsert_result.cas);
         assert!(upsert_result.mutation_token.is_some());
+    });
+}
+
+#[test]
+fn test_unknown_scope() {
+    setup_test(async |config| {
+        let agent_opts = create_default_options(config.clone()).await;
+        let scope_name = generate_string_key();
+        let collection_name = generate_string_key();
+
+        let mut agent = Agent::new(agent_opts).await.unwrap();
+
+        let strat = Arc::new(BestEffortRetryStrategy::default());
+
+        let key = generate_key();
+        let value = generate_bytes_value(32);
+
+        let upsert_opts = UpsertOptions::new(
+            key.as_slice(),
+            &scope_name,
+            &collection_name,
+            value.as_slice(),
+        )
+        .retry_strategy(strat);
+
+        try_until(
+            Instant::now().add(Duration::from_secs(30)),
+            Duration::from_millis(100),
+            "upsert didn't fail with timeout in allowed time",
+            || async {
+                let upsert_result = timeout_at(
+                    Instant::now().add(Duration::from_millis(2500)),
+                    agent.upsert(upsert_opts.clone()),
+                )
+                .await;
+
+                match upsert_result {
+                    Ok(_) => Ok(None),
+                    Err(_e) => Ok(Some(())),
+                }
+            },
+        )
+        .await;
     });
 }

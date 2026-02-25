@@ -954,7 +954,9 @@ impl<
             };
 
             if let Some(memdx_err) = err.is_memdx_error() {
-                if memdx_err.is_server_error_kind(ServerErrorKind::UnknownCollectionName) {
+                if memdx_err.is_server_error_kind(ServerErrorKind::UnknownCollectionName)
+                    || memdx_err.is_server_error_kind(ServerErrorKind::UnknownScopeName)
+                {
                     return Err(err);
                 }
             }
