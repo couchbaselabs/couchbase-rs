@@ -59,10 +59,6 @@ jobs:
           
           echo "CBDC_CONNSTR=$CBDC_CONNSTR" >> "$GITHUB_ENV"
 
-      - name: Create fts index
-        run: |
-          curl -XPUT -H "Content-Type: application/json" -u Administrator:password http://${{ env.CBDC_IP }}:8094/api/index/basic_search_index -d '{"type": "fulltext-index","name": "basic_search_index","sourceType": "gocbcore","sourceName": "default","planParams": {"maxPartitionsPerPIndex": 1024,"indexPartitions": 1},"params": {"doc_config": {"docid_prefix_delim": "","docid_regexp": "","mode": "type_field","type_field": "type"},"mapping": {"analysis": {},"default_analyzer": "standard","default_datetime_parser": "dateTimeOptional","default_field": "_all","default_mapping": {"dynamic": true,"enabled": true},"default_type": "_default","docvalues_dynamic": true,"index_dynamic": true,"store_dynamic": true,"type_field": "_type"},"store": {"indexType": "scorch","segmentVersion": 15}},"sourceParams": {}}' 
-
       - uses: actions/checkout@v4
 
       - name: Setup Rust toolchain and cache
