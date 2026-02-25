@@ -28,6 +28,7 @@ use couchbase::management::buckets::bucket_manager::BucketManager;
 use couchbase::management::buckets::bucket_settings::BucketSettings;
 use couchbase::management::collections::collection_settings::CreateCollectionSettings;
 use couchbase::management::search::index::SearchIndex;
+use couchbase::mutation_state::MutationState;
 use couchbase::options::search_options::SearchOptions;
 use couchbase::results::search_results::{SearchFacetResultType, SearchResult, SearchRow};
 use couchbase::scope::Scope;
@@ -101,6 +102,14 @@ fn test_search_basic() {
         )
         .await;
         let import_results = import_sample_beer_dataset("search", &collection).await;
+        let num_results = import_results.len();
+
+        let tokens = import_results
+            .into_values()
+            .map(|r| r.mutation_result.mutation_token().unwrap().clone())
+            .collect::<Vec<_>>();
+
+        let state = MutationState::from(tokens);
 
         let query = TermQuery::new("search").field("service".to_string());
 
@@ -144,7 +153,8 @@ fn test_search_basic() {
                         .server_timeout(Duration::from_secs(10))
                         .facets(facets.clone())
                         .sort(vec![sort.clone()])
-                        .fields(vec!["city".to_string()]),
+                        .fields(vec!["city".to_string()])
+                        .consistent_with(state.clone()),
                 )
                 .await
             {
@@ -163,7 +173,7 @@ fn test_search_basic() {
                 this_rows.push(row.unwrap());
             }
 
-            if this_rows.len() == import_results.len() {
+            if this_rows.len() == num_results {
                 rows = this_rows.clone();
                 res = this_res;
                 break;
@@ -172,7 +182,7 @@ fn test_search_basic() {
             error!(
                 "search returned {} rows, expected {}",
                 this_rows.len(),
-                import_results.len()
+                num_results
             );
 
             let sleep = time::sleep(Duration::from_secs(1));

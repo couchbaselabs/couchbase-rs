@@ -136,8 +136,8 @@ impl MutationResult {
         self.cas
     }
 
-    pub fn mutation_token(&self) -> &Option<MutationToken> {
-        &self.mutation_token
+    pub fn mutation_token(&self) -> Option<&MutationToken> {
+        self.mutation_token.as_ref()
     }
 }
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -233,8 +233,8 @@ impl MutateInResult {
         self.cas
     }
 
-    pub fn mutation_token(&self) -> &Option<MutationToken> {
-        &self.mutation_token
+    pub fn mutation_token(&self) -> Option<&MutationToken> {
+        self.mutation_token.as_ref()
     }
 
     pub fn content_as<V: DeserializeOwned>(&self, mutate_index: usize) -> error::Result<V> {

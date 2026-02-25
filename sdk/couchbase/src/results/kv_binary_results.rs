@@ -30,8 +30,8 @@ impl CounterResult {
         self.cas
     }
 
-    pub fn mutation_token(&self) -> &Option<MutationToken> {
-        &self.mutation_token
+    pub fn mutation_token(&self) -> Option<&MutationToken> {
+        self.mutation_token.as_ref()
     }
 
     pub fn content(&self) -> u64 {
