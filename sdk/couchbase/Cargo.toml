@@ -72,5 +72,5 @@ name = "collection_crud"
 harness = false
 
 [[bench]]
-name = "query"
+name = "ci"
 harness = false

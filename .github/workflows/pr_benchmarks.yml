@@ -49,7 +49,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: bencherdev/bencher@main
 
-      - name: Track upsert_and_get benchmark
+      - name: Track CI benchmarks
         env:
           BENCHER_PROJECT: couchbase-rs
           BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
@@ -58,15 +58,4 @@ jobs:
           RCBSERVER_VERSION: "8.0.0"
         run: |
           unique=${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}
-          bencher run --project couchbase-rs --token '${{ secrets.BENCHER_API_TOKEN }}' --branch "${{ github.event.pull_request.head.ref }}-$unique" --start-point "${{ github.event.pull_request.base.ref }}" --threshold-measure latency --threshold-test percentage --threshold-upper-boundary 0.15 --start-point-hash '${{ github.event.pull_request.base.sha }}' --start-point-clone-thresholds --start-point-reset --testbed ubuntu-latest --err --github-actions '${{ secrets.GITHUB_TOKEN }}' --adapter rust_criterion "cargo bench --bench collection_crud -- upsert_and_get"
-
-      - name: Track query benchmark
-        env:
-          BENCHER_PROJECT: couchbase-rs
-          BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
-          RCBDINOID: ${{ env.CBDC_ID }}
-          RCBCONNSTR: ${{ env.CBDC_CONNSTR }}
-          RCBSERVER_VERSION: "8.0.0"
-        run: |
-          unique=${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}
-          bencher run --project couchbase-rs --token '${{ secrets.BENCHER_API_TOKEN }}' --branch "${{ github.event.pull_request.head.ref }}-$unique" --start-point "${{ github.event.pull_request.base.ref }}" --threshold-measure latency --threshold-test percentage --threshold-upper-boundary 0.15 --start-point-hash '${{ github.event.pull_request.base.sha }}' --start-point-clone-thresholds --start-point-reset --testbed ubuntu-latest --err --github-actions '${{ secrets.GITHUB_TOKEN }}' --adapter rust_criterion "cargo bench --bench query"
+          bencher run --project couchbase-rs --token '${{ secrets.BENCHER_API_TOKEN }}' --branch "${{ github.event.pull_request.head.ref }}-$unique" --start-point "${{ github.event.pull_request.base.ref }}" --threshold-measure latency --threshold-test percentage --threshold-upper-boundary 0.15 --start-point-hash '${{ github.event.pull_request.base.sha }}' --start-point-clone-thresholds --start-point-reset --testbed ubuntu-latest --err --github-actions '${{ secrets.GITHUB_TOKEN }}' --adapter rust_criterion "cargo bench --bench ci"
