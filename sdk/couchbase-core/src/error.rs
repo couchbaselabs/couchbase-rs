@@ -24,6 +24,7 @@ use crate::queryx::error::Error as QueryError;
 use crate::retry::RetryRequest;
 use crate::searchx::error::Error as SearchError;
 use crate::service_type::ServiceType;
+use crate::tracingcomponent::MetricsName;
 use std::error::Error as StdError;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
@@ -242,6 +243,48 @@ impl Display for ErrorKind {
             ),
             ErrorKind::Compression { msg } => write!(f, "compression error: {msg}"),
         }
+    }
+}
+
+impl MetricsName for Error {
+    fn metrics_name(&self) -> &'static str {
+        self.kind().metrics_name()
+    }
+}
+
+impl MetricsName for ErrorKind {
+    fn metrics_name(&self) -> &'static str {
+        match self {
+            ErrorKind::Memdx(err) => err.metrics_name(),
+            ErrorKind::Analytics(err) => err.metrics_name(),
+            ErrorKind::Query(err) => err.metrics_name(),
+            ErrorKind::Search(err) => err.metrics_name(),
+            ErrorKind::Http(err) => err.metrics_name(),
+            ErrorKind::Mgmt(err) => err.metrics_name(),
+            ErrorKind::InvalidArgument { .. } => "InvalidArgument",
+            ErrorKind::ServiceNotAvailable { .. } => "ServiceNotAvailable",
+            ErrorKind::FeatureNotAvailable { .. } => "FeatureNotAvailable",
+            ErrorKind::VbucketMapOutdated => "VBucketMapOutdated",
+            ErrorKind::EndpointNotKnown { .. } => "EndpointNotKnown",
+            ErrorKind::InvalidVbucket { .. } => "InvalidVbucket",
+            ErrorKind::InvalidReplica { .. } => "InvalidReplica",
+            ErrorKind::NoEndpointsAvailable => "NoEndpointsAvailable",
+            ErrorKind::Shutdown => "Shutdown",
+            ErrorKind::NoBucket => "NoBucket",
+            ErrorKind::IllegalState { .. } => "IllegalState",
+            ErrorKind::NoVbucketMap => "NoVbucketMap",
+            ErrorKind::NoServerAssigned { .. } => "NoServerAssigned",
+            ErrorKind::CollectionManifestOutdated { .. } => "CollectionManifestOutdated",
+            ErrorKind::Message { .. } => "_OTHER",
+            ErrorKind::Compression { .. } => "Compression",
+            ErrorKind::Internal { .. } => "_OTHER",
+        }
+    }
+}
+
+impl MetricsName for MemdxError {
+    fn metrics_name(&self) -> &'static str {
+        self.inner.source.metrics_name()
     }
 }
 

@@ -18,6 +18,7 @@
 
 use crate::analyticsx::analytics::Query;
 use crate::authenticator::Authenticator;
+use crate::componentconfigs::NetworkAndCanonicalEndpoint;
 use crate::error;
 use crate::error::ErrorKind;
 use crate::httpcomponent::{HttpComponent, HttpComponentState};
@@ -37,7 +38,7 @@ pub(crate) struct AnalyticsComponent<C: Client> {
 }
 
 pub(crate) struct AnalyticsComponentConfig {
-    pub endpoints: HashMap<String, String>,
+    pub endpoints: HashMap<String, NetworkAndCanonicalEndpoint>,
     pub authenticator: Authenticator,
 }
 
@@ -81,11 +82,16 @@ impl<C: Client + 'static> AnalyticsComponent<C> {
             self.http_component
                 .orchestrate_endpoint(
                     endpoint.clone(),
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
+                    async |client: Arc<C>,
+                           endpoint_id: String,
+                           endpoint: String,
+                           canonical_endpoint: String,
+                           auth: Auth| {
                         let res = match (Query::<C> {
                             http_client: client,
                             user_agent: self.http_component.user_agent().to_string(),
                             endpoint: endpoint.clone(),
+                            canonical_endpoint,
                             auth,
                         }
                         .query(&copts)
@@ -120,11 +126,16 @@ impl<C: Client + 'static> AnalyticsComponent<C> {
             self.http_component
                 .orchestrate_endpoint(
                     endpoint.clone(),
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
+                    async |client: Arc<C>,
+                           endpoint_id: String,
+                           endpoint: String,
+                           canonical_endpoint: String,
+                           auth: Auth| {
                         let res = match (Query::<C> {
                             http_client: client,
                             user_agent: self.http_component.user_agent().to_string(),
-                            endpoint: endpoint.clone(),
+                            endpoint,
+                            canonical_endpoint,
                             auth,
                         }
                         .get_pending_mutations(&copts)

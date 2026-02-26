@@ -39,6 +39,10 @@ pub trait TryFromClientResponse: Sized {
     fn try_from(resp: ClientResponse) -> Result<Self, Error>;
 }
 
+pub trait TraceAttributes {
+    fn server_duration(&self) -> Option<Duration>;
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct HelloResponse {
     pub enabled_features: Vec<HelloFeature>,
@@ -308,6 +312,12 @@ impl TryFromClientResponse for SetResponse {
     }
 }
 
+impl TraceAttributes for SetResponse {
+    fn server_duration(&self) -> Option<Duration> {
+        self.server_duration
+    }
+}
+
 fn parse_flags(extras: &Option<Bytes>) -> Result<u32, Error> {
     if let Some(extras) = &extras {
         if extras.len() != 4 {
@@ -363,6 +373,12 @@ impl TryFromClientResponse for GetResponse {
             datatype: packet.datatype,
             server_duration,
         })
+    }
+}
+
+impl TraceAttributes for GetResponse {
+    fn server_duration(&self) -> Option<Duration> {
+        self.server_duration
     }
 }
 
@@ -479,6 +495,12 @@ impl TryFromClientResponse for DeleteResponse {
     }
 }
 
+impl TraceAttributes for DeleteResponse {
+    fn server_duration(&self) -> Option<Duration> {
+        self.server_duration
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct GetAndLockResponse {
     pub cas: u64,
@@ -530,6 +552,12 @@ impl TryFromClientResponse for GetAndLockResponse {
             datatype: packet.datatype,
             server_duration,
         })
+    }
+}
+
+impl TraceAttributes for GetAndLockResponse {
+    fn server_duration(&self) -> Option<Duration> {
+        self.server_duration
     }
 }
 
@@ -587,6 +615,12 @@ impl TryFromClientResponse for GetAndTouchResponse {
     }
 }
 
+impl TraceAttributes for GetAndTouchResponse {
+    fn server_duration(&self) -> Option<Duration> {
+        self.server_duration
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct UnlockResponse {
     pub server_duration: Option<Duration>,
@@ -632,6 +666,12 @@ impl TryFromClientResponse for UnlockResponse {
         };
 
         Ok(UnlockResponse { server_duration })
+    }
+}
+
+impl TraceAttributes for UnlockResponse {
+    fn server_duration(&self) -> Option<Duration> {
+        self.server_duration
     }
 }
 
@@ -685,6 +725,12 @@ impl TryFromClientResponse for TouchResponse {
     }
 }
 
+impl TraceAttributes for TouchResponse {
+    fn server_duration(&self) -> Option<Duration> {
+        self.server_duration
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct AddResponse {
     pub cas: u64,
@@ -730,6 +776,12 @@ impl TryFromClientResponse for AddResponse {
             mutation_token,
             server_duration,
         })
+    }
+}
+
+impl TraceAttributes for AddResponse {
+    fn server_duration(&self) -> Option<Duration> {
+        self.server_duration
     }
 }
 
@@ -780,6 +832,12 @@ impl TryFromClientResponse for ReplaceResponse {
             mutation_token,
             server_duration,
         })
+    }
+}
+
+impl TraceAttributes for ReplaceResponse {
+    fn server_duration(&self) -> Option<Duration> {
+        self.server_duration
     }
 }
 
@@ -839,6 +897,12 @@ impl TryFromClientResponse for AppendResponse {
     }
 }
 
+impl TraceAttributes for AppendResponse {
+    fn server_duration(&self) -> Option<Duration> {
+        self.server_duration
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct PrependResponse {
     pub cas: u64,
@@ -892,6 +956,12 @@ impl TryFromClientResponse for PrependResponse {
             mutation_token,
             server_duration,
         })
+    }
+}
+
+impl TraceAttributes for PrependResponse {
+    fn server_duration(&self) -> Option<Duration> {
+        self.server_duration
     }
 }
 
@@ -957,6 +1027,12 @@ impl TryFromClientResponse for IncrementResponse {
     }
 }
 
+impl TraceAttributes for IncrementResponse {
+    fn server_duration(&self) -> Option<Duration> {
+        self.server_duration
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct DecrementResponse {
     pub cas: u64,
@@ -1016,6 +1092,12 @@ impl TryFromClientResponse for DecrementResponse {
             mutation_token,
             server_duration,
         })
+    }
+}
+
+impl TraceAttributes for DecrementResponse {
+    fn server_duration(&self) -> Option<Duration> {
+        self.server_duration
     }
 }
 
@@ -1175,6 +1257,12 @@ impl TryFromClientResponse for LookupInResponse {
             doc_is_deleted,
             server_duration,
         })
+    }
+}
+
+impl TraceAttributes for LookupInResponse {
+    fn server_duration(&self) -> Option<Duration> {
+        self.server_duration
     }
 }
 
@@ -1380,6 +1468,12 @@ impl TryFromClientResponse for MutateInResponse {
     }
 }
 
+impl TraceAttributes for MutateInResponse {
+    fn server_duration(&self) -> Option<Duration> {
+        self.server_duration
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct GetCollectionIdResponse {
     pub manifest_rev: u64,
@@ -1464,5 +1558,11 @@ impl TryFromClientResponse for PingResponse {
         }
 
         Ok(PingResponse {})
+    }
+}
+
+impl TraceAttributes for PingResponse {
+    fn server_duration(&self) -> Option<Duration> {
+        None
     }
 }

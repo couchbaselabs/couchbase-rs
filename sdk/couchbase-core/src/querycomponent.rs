@@ -17,6 +17,7 @@
  */
 
 use crate::authenticator::Authenticator;
+use crate::componentconfigs::NetworkAndCanonicalEndpoint;
 use crate::diagnosticscomponent::PingQueryReportOptions;
 use crate::error::ErrorKind;
 use crate::httpcomponent::{HttpComponent, HttpComponentState};
@@ -38,6 +39,7 @@ use crate::results::query::QueryResultStream;
 use crate::retry::{orchestrate_retries, RetryManager, RetryRequest, RetryStrategy};
 use crate::retrybesteffort::ExponentialBackoffCalculator;
 use crate::service_type::ServiceType;
+use crate::tracingcomponent::TracingComponent;
 use crate::{error, httpx};
 use futures::future::join_all;
 use futures::StreamExt;
@@ -50,13 +52,14 @@ use tokio::select;
 
 pub(crate) struct QueryComponent<C: Client> {
     http_component: HttpComponent<C>,
+    tracing: Arc<TracingComponent>,
 
     retry_manager: Arc<RetryManager>,
     prepared_cache: Arc<Mutex<PreparedStatementCache>>,
 }
 
 pub(crate) struct QueryComponentConfig {
-    pub endpoints: HashMap<String, String>,
+    pub endpoints: HashMap<String, NetworkAndCanonicalEndpoint>,
     pub authenticator: Authenticator,
 }
 
@@ -68,6 +71,7 @@ impl<C: Client + 'static> QueryComponent<C> {
     pub fn new(
         retry_manager: Arc<RetryManager>,
         http_client: Arc<C>,
+        tracing: Arc<TracingComponent>,
         config: QueryComponentConfig,
         opts: QueryComponentOptions,
     ) -> Self {
@@ -78,6 +82,7 @@ impl<C: Client + 'static> QueryComponent<C> {
                 http_client,
                 HttpComponentState::new(config.endpoints, config.authenticator),
             ),
+            tracing,
             retry_manager,
             prepared_cache: Arc::new(Mutex::new(PreparedStatementCache::default())),
         }
@@ -101,12 +106,18 @@ impl<C: Client + 'static> QueryComponent<C> {
             self.http_component
                 .orchestrate_endpoint(
                     endpoint.clone(),
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
+                    async |client: Arc<C>,
+                           endpoint_id: String,
+                           endpoint: String,
+                           canonical_endpoint: String,
+                           auth: Auth| {
                         let res = match (Query::<C> {
                             http_client: client,
                             user_agent: self.http_component.user_agent().to_string(),
                             endpoint: endpoint.clone(),
+                            canonical_endpoint,
                             auth,
+                            tracing: self.tracing.clone(),
                         }
                         .query(&copts)
                         .await)
@@ -137,13 +148,19 @@ impl<C: Client + 'static> QueryComponent<C> {
             self.http_component
                 .orchestrate_endpoint(
                     endpoint.clone(),
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
+                    async |client: Arc<C>,
+                           endpoint_id: String,
+                           endpoint: String,
+                           canonical_endpoint: String,
+                           auth: Auth| {
                         let res = match (PreparedQuery {
                             executor: Query::<C> {
                                 http_client: client,
                                 user_agent: self.http_component.user_agent().to_string(),
                                 endpoint: endpoint.clone(),
+                                canonical_endpoint,
                                 auth,
+                                tracing: self.tracing.clone(),
                             },
                             cache: self.prepared_cache.clone(),
                         }
@@ -179,12 +196,18 @@ impl<C: Client + 'static> QueryComponent<C> {
             self.http_component
                 .orchestrate_endpoint(
                     endpoint.clone(),
-                    async |client: Arc<C>, endpoint_id: String, endpoint: String, auth: Auth| {
+                    async |client: Arc<C>,
+                           endpoint_id: String,
+                           endpoint: String,
+                           canonical_endpoint: String,
+                           auth: Auth| {
                         let res = match (Query::<C> {
                             http_client: client,
                             user_agent: self.http_component.user_agent().to_string(),
-                            endpoint: endpoint.clone(),
+                            endpoint,
+                            canonical_endpoint,
                             auth,
+                            tracing: self.tracing.clone(),
                         }
                         .get_all_indexes(&copts)
                         .await)
@@ -384,8 +407,10 @@ impl<C: Client + 'static> QueryComponent<C> {
             let client = Query::<C> {
                 http_client: client.clone(),
                 user_agent,
-                endpoint: target.endpoint.clone(),
-                auth: target.auth.clone(),
+                endpoint: target.endpoint,
+                canonical_endpoint: target.canonical_endpoint,
+                auth: target.auth,
+                tracing: self.tracing.clone(),
             };
 
             let handle = self.ping_one(client, copts.clone());
@@ -416,8 +441,10 @@ impl<C: Client + 'static> QueryComponent<C> {
             let client = Query::<C> {
                 http_client: client.clone(),
                 user_agent,
-                endpoint: target.endpoint.clone(),
-                auth: target.auth.clone(),
+                endpoint: target.endpoint,
+                canonical_endpoint: target.canonical_endpoint,
+                auth: target.auth,
+                tracing: self.tracing.clone(),
             };
 
             let handle = self.create_one_report(client, timeout, copts.clone());
@@ -494,12 +521,15 @@ impl<C: Client + 'static> QueryComponent<C> {
                         async |client: Arc<C>,
                                endpoint_id: String,
                                endpoint: String,
+                               canonical_endpoint: String,
                                auth: Auth| {
                             operation(Query::<C> {
                                 http_client: client,
                                 user_agent: self.http_component.user_agent().to_string(),
-                                endpoint: endpoint.clone(),
+                                endpoint,
+                                canonical_endpoint,
                                 auth,
+                                tracing: self.tracing.clone(),
                             })
                             .await
                         },

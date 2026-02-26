@@ -26,6 +26,8 @@ use crate::mgmtx::options::{
 };
 use crate::mgmtx::user::{Group, Role, RoleAndDescription, UserAndMetadata};
 use crate::mgmtx::user_json::{GroupJson, RoleAndDescriptionJson, UserAndMetadataJson};
+use crate::tracingcomponent::{BeginDispatchFields, EndDispatchFields};
+use crate::util::get_host_port_tuple_from_uri;
 use bytes::Bytes;
 use http::Method;
 
@@ -39,14 +41,26 @@ impl<C: Client> Management<C> {
         )
         .to_string();
 
+        let peer_addr = get_host_port_tuple_from_uri(&self.endpoint).unwrap_or_default();
+        let canonical_addr =
+            get_host_port_tuple_from_uri(&self.canonical_endpoint).unwrap_or_default();
         let resp = self
-            .execute(
-                method.clone(),
-                &path,
-                "",
-                opts.on_behalf_of_info.cloned(),
-                None,
-                None,
+            .tracing
+            .orchestrate_dispatch_span(
+                BeginDispatchFields::new(
+                    (&peer_addr.0, &peer_addr.1),
+                    (&canonical_addr.0, &canonical_addr.1),
+                    None,
+                ),
+                self.execute(
+                    method.clone(),
+                    &path,
+                    "",
+                    opts.on_behalf_of_info.cloned(),
+                    None,
+                    None,
+                ),
+                |_| EndDispatchFields::new(None, None),
             )
             .await?;
 
@@ -70,14 +84,26 @@ impl<C: Client> Management<C> {
         )
         .to_string();
 
+        let peer_addr = get_host_port_tuple_from_uri(&self.endpoint).unwrap_or_default();
+        let canonical_addr =
+            get_host_port_tuple_from_uri(&self.canonical_endpoint).unwrap_or_default();
         let resp = self
-            .execute(
-                method.clone(),
-                &path,
-                "",
-                opts.on_behalf_of_info.cloned(),
-                None,
-                None,
+            .tracing
+            .orchestrate_dispatch_span(
+                BeginDispatchFields::new(
+                    (&peer_addr.0, &peer_addr.1),
+                    (&canonical_addr.0, &canonical_addr.1),
+                    None,
+                ),
+                self.execute(
+                    method.clone(),
+                    &path,
+                    "",
+                    opts.on_behalf_of_info.cloned(),
+                    None,
+                    None,
+                ),
+                |_| EndDispatchFields::new(None, None),
             )
             .await?;
 
@@ -126,14 +152,26 @@ impl<C: Client> Management<C> {
             urlencoding::encode(&opts.user.username),
         );
 
+        let peer_addr = get_host_port_tuple_from_uri(&self.endpoint).unwrap_or_default();
+        let canonical_addr =
+            get_host_port_tuple_from_uri(&self.canonical_endpoint).unwrap_or_default();
         let resp = self
-            .execute(
-                method.clone(),
-                &path,
-                "application/x-www-form-urlencoded",
-                opts.on_behalf_of_info.cloned(),
-                None,
-                Some(body),
+            .tracing
+            .orchestrate_dispatch_span(
+                BeginDispatchFields::new(
+                    (&peer_addr.0, &peer_addr.1),
+                    (&canonical_addr.0, &canonical_addr.1),
+                    None,
+                ),
+                self.execute(
+                    method.clone(),
+                    &path,
+                    "application/x-www-form-urlencoded",
+                    opts.on_behalf_of_info.cloned(),
+                    None,
+                    Some(body),
+                ),
+                |_| EndDispatchFields::new(None, None),
             )
             .await?;
 
@@ -153,14 +191,26 @@ impl<C: Client> Management<C> {
         )
         .to_string();
 
+        let peer_addr = get_host_port_tuple_from_uri(&self.endpoint).unwrap_or_default();
+        let canonical_addr =
+            get_host_port_tuple_from_uri(&self.canonical_endpoint).unwrap_or_default();
         let resp = self
-            .execute(
-                method.clone(),
-                &path,
-                "",
-                opts.on_behalf_of_info.cloned(),
-                None,
-                None,
+            .tracing
+            .orchestrate_dispatch_span(
+                BeginDispatchFields::new(
+                    (&peer_addr.0, &peer_addr.1),
+                    (&canonical_addr.0, &canonical_addr.1),
+                    None,
+                ),
+                self.execute(
+                    method.clone(),
+                    &path,
+                    "",
+                    opts.on_behalf_of_info.cloned(),
+                    None,
+                    None,
+                ),
+                |_| EndDispatchFields::new(None, None),
             )
             .await?;
 
@@ -183,14 +233,26 @@ impl<C: Client> Management<C> {
             "settings/rbac/roles".to_string()
         };
 
+        let peer_addr = get_host_port_tuple_from_uri(&self.endpoint).unwrap_or_default();
+        let canonical_addr =
+            get_host_port_tuple_from_uri(&self.canonical_endpoint).unwrap_or_default();
         let resp = self
-            .execute(
-                method.clone(),
-                &path,
-                "",
-                opts.on_behalf_of_info.cloned(),
-                None,
-                None,
+            .tracing
+            .orchestrate_dispatch_span(
+                BeginDispatchFields::new(
+                    (&peer_addr.0, &peer_addr.1),
+                    (&canonical_addr.0, &canonical_addr.1),
+                    None,
+                ),
+                self.execute(
+                    method.clone(),
+                    &path,
+                    "",
+                    opts.on_behalf_of_info.cloned(),
+                    None,
+                    None,
+                ),
+                |_| EndDispatchFields::new(None, None),
             )
             .await?;
 
@@ -210,14 +272,26 @@ impl<C: Client> Management<C> {
         let method = Method::GET;
         let path = format!("settings/rbac/groups/{}", opts.group_name).to_string();
 
+        let peer_addr = get_host_port_tuple_from_uri(&self.endpoint).unwrap_or_default();
+        let canonical_addr =
+            get_host_port_tuple_from_uri(&self.canonical_endpoint).unwrap_or_default();
         let resp = self
-            .execute(
-                method.clone(),
-                &path,
-                "",
-                opts.on_behalf_of_info.cloned(),
-                None,
-                None,
+            .tracing
+            .orchestrate_dispatch_span(
+                BeginDispatchFields::new(
+                    (&peer_addr.0, &peer_addr.1),
+                    (&canonical_addr.0, &canonical_addr.1),
+                    None,
+                ),
+                self.execute(
+                    method.clone(),
+                    &path,
+                    "",
+                    opts.on_behalf_of_info.cloned(),
+                    None,
+                    None,
+                ),
+                |_| EndDispatchFields::new(None, None),
             )
             .await?;
 
@@ -237,14 +311,26 @@ impl<C: Client> Management<C> {
         let method = Method::GET;
         let path = "settings/rbac/groups".to_string();
 
+        let peer_addr = get_host_port_tuple_from_uri(&self.endpoint).unwrap_or_default();
+        let canonical_addr =
+            get_host_port_tuple_from_uri(&self.canonical_endpoint).unwrap_or_default();
         let resp = self
-            .execute(
-                method.clone(),
-                &path,
-                "",
-                opts.on_behalf_of_info.cloned(),
-                None,
-                None,
+            .tracing
+            .orchestrate_dispatch_span(
+                BeginDispatchFields::new(
+                    (&peer_addr.0, &peer_addr.1),
+                    (&canonical_addr.0, &canonical_addr.1),
+                    None,
+                ),
+                self.execute(
+                    method.clone(),
+                    &path,
+                    "",
+                    opts.on_behalf_of_info.cloned(),
+                    None,
+                    None,
+                ),
+                |_| EndDispatchFields::new(None, None),
             )
             .await?;
 
@@ -289,14 +375,26 @@ impl<C: Client> Management<C> {
             Bytes::from(form.finish())
         };
 
+        let peer_addr = get_host_port_tuple_from_uri(&self.endpoint).unwrap_or_default();
+        let canonical_addr =
+            get_host_port_tuple_from_uri(&self.canonical_endpoint).unwrap_or_default();
         let resp = self
-            .execute(
-                method.clone(),
-                &path,
-                "application/x-www-form-urlencoded",
-                opts.on_behalf_of_info.cloned(),
-                None,
-                Some(body),
+            .tracing
+            .orchestrate_dispatch_span(
+                BeginDispatchFields::new(
+                    (&peer_addr.0, &peer_addr.1),
+                    (&canonical_addr.0, &canonical_addr.1),
+                    None,
+                ),
+                self.execute(
+                    method.clone(),
+                    &path,
+                    "application/x-www-form-urlencoded",
+                    opts.on_behalf_of_info.cloned(),
+                    None,
+                    Some(body),
+                ),
+                |_| EndDispatchFields::new(None, None),
             )
             .await?;
 
@@ -315,14 +413,26 @@ impl<C: Client> Management<C> {
         )
         .to_string();
 
+        let peer_addr = get_host_port_tuple_from_uri(&self.endpoint).unwrap_or_default();
+        let canonical_addr =
+            get_host_port_tuple_from_uri(&self.canonical_endpoint).unwrap_or_default();
         let resp = self
-            .execute(
-                method.clone(),
-                &path,
-                "",
-                opts.on_behalf_of_info.cloned(),
-                None,
-                None,
+            .tracing
+            .orchestrate_dispatch_span(
+                BeginDispatchFields::new(
+                    (&peer_addr.0, &peer_addr.1),
+                    (&canonical_addr.0, &canonical_addr.1),
+                    None,
+                ),
+                self.execute(
+                    method.clone(),
+                    &path,
+                    "",
+                    opts.on_behalf_of_info.cloned(),
+                    None,
+                    None,
+                ),
+                |_| EndDispatchFields::new(None, None),
             )
             .await?;
 
@@ -344,14 +454,26 @@ impl<C: Client> Management<C> {
             Bytes::from(form.finish())
         };
 
+        let peer_addr = get_host_port_tuple_from_uri(&self.endpoint).unwrap_or_default();
+        let canonical_addr =
+            get_host_port_tuple_from_uri(&self.canonical_endpoint).unwrap_or_default();
         let resp = self
-            .execute(
-                method.clone(),
-                &path,
-                "application/x-www-form-urlencoded",
-                opts.on_behalf_of_info.cloned(),
-                None,
-                Some(body),
+            .tracing
+            .orchestrate_dispatch_span(
+                BeginDispatchFields::new(
+                    (&peer_addr.0, &peer_addr.1),
+                    (&canonical_addr.0, &canonical_addr.1),
+                    None,
+                ),
+                self.execute(
+                    method.clone(),
+                    &path,
+                    "application/x-www-form-urlencoded",
+                    opts.on_behalf_of_info.cloned(),
+                    None,
+                    Some(body),
+                ),
+                |_| EndDispatchFields::new(None, None),
             )
             .await?;
 

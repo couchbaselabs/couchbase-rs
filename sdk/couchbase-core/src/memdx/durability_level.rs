@@ -74,6 +74,17 @@ impl From<u8> for DurabilityLevel {
     }
 }
 
+impl From<&DurabilityLevel> for u8 {
+    fn from(value: &DurabilityLevel) -> u8 {
+        match value.0 {
+            InnerDurabilityLevel::Majority => 1,
+            InnerDurabilityLevel::MajorityAndPersistActive => 2,
+            InnerDurabilityLevel::PersistToMajority => 3,
+            InnerDurabilityLevel::Other(val) => val,
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
 pub struct DurabilityLevelSettings {
     pub durability_level: DurabilityLevel,

@@ -454,7 +454,7 @@ impl Display for AgentOptions {
             self.kv_config,
             self.http_config,
             self.tcp_keep_alive_time,
-            if self.orphan_response_handler.is_some() { "Some" } else { "None" }
+            if self.orphan_response_handler.is_some() { "Some" } else { "None" },
         )
     }
 }
