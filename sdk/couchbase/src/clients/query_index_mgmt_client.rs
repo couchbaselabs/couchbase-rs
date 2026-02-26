@@ -17,6 +17,7 @@
  */
 
 use crate::clients::agent_provider::CouchbaseAgentProvider;
+use crate::clients::tracing_client::{CouchbaseTracingClient, TracingClient, TracingClientBackend};
 use crate::error;
 use crate::options::query_index_mgmt_options::{
     BuildQueryIndexOptions, CreatePrimaryQueryIndexOptions, CreateQueryIndexOptions,
@@ -25,6 +26,7 @@ use crate::options::query_index_mgmt_options::{
 };
 use crate::results::query_index_mgmt_results::QueryIndex;
 use crate::retry::RetryStrategy;
+use crate::tracing::Keyspace;
 use std::sync::Arc;
 
 pub(crate) struct QueryIndexMgmtClient {
@@ -137,6 +139,65 @@ impl QueryIndexMgmtClient {
             }
         }
     }
+
+    pub fn tracing_client(&self) -> TracingClient {
+        match &self.backend {
+            QueryIndexMgmtClientBackend::CouchbaseQueryIndexMgmtClientBackend(backend) => {
+                let tracing_client = backend.tracing_client();
+
+                TracingClient::new(TracingClientBackend::CouchbaseTracingClientBackend(
+                    tracing_client,
+                ))
+            }
+            QueryIndexMgmtClientBackend::Couchbase2QueryIndexMgmtClientBackend(_) => {
+                unimplemented!()
+            }
+        }
+    }
+
+    pub fn bucket_name(&self) -> &str {
+        match &self.backend {
+            QueryIndexMgmtClientBackend::CouchbaseQueryIndexMgmtClientBackend(backend) => {
+                backend.bucket_name()
+            }
+            QueryIndexMgmtClientBackend::Couchbase2QueryIndexMgmtClientBackend(_) => {
+                unimplemented!()
+            }
+        }
+    }
+
+    pub fn scope_name(&self) -> &str {
+        match &self.backend {
+            QueryIndexMgmtClientBackend::CouchbaseQueryIndexMgmtClientBackend(backend) => {
+                backend.scope_name()
+            }
+            QueryIndexMgmtClientBackend::Couchbase2QueryIndexMgmtClientBackend(_) => {
+                unimplemented!()
+            }
+        }
+    }
+
+    pub fn collection_name(&self) -> &str {
+        match &self.backend {
+            QueryIndexMgmtClientBackend::CouchbaseQueryIndexMgmtClientBackend(backend) => {
+                backend.collection_name()
+            }
+            QueryIndexMgmtClientBackend::Couchbase2QueryIndexMgmtClientBackend(_) => {
+                unimplemented!()
+            }
+        }
+    }
+
+    pub fn keyspace(&self) -> Keyspace<'_> {
+        match &self.backend {
+            QueryIndexMgmtClientBackend::CouchbaseQueryIndexMgmtClientBackend(backend) => {
+                (&backend.keyspace).into()
+            }
+            QueryIndexMgmtClientBackend::Couchbase2QueryIndexMgmtClientBackend(_) => {
+                unimplemented!()
+            }
+        }
+    }
 }
 
 pub(crate) enum QueryIndexMgmtClientBackend {
@@ -144,10 +205,35 @@ pub(crate) enum QueryIndexMgmtClientBackend {
     Couchbase2QueryIndexMgmtClientBackend(Couchbase2QueryIndexMgmtClient),
 }
 
+#[derive(Clone, Debug)]
 pub(crate) struct QueryIndexKeyspace {
     pub bucket_name: String,
     pub scope_name: String,
     pub collection_name: String,
+}
+
+impl QueryIndexKeyspace {
+    pub(crate) fn bucket_name(&self) -> &str {
+        self.bucket_name.as_str()
+    }
+
+    pub(crate) fn scope_name(&self) -> &str {
+        self.scope_name.as_str()
+    }
+
+    pub(crate) fn collection_name(&self) -> &str {
+        self.collection_name.as_str()
+    }
+}
+
+impl<'a> From<&'a QueryIndexKeyspace> for Keyspace<'a> {
+    fn from(keyspace: &'a QueryIndexKeyspace) -> Self {
+        Keyspace::Collection {
+            bucket: &keyspace.bucket_name,
+            scope: &keyspace.scope_name,
+            collection: &keyspace.collection_name,
+        }
+    }
 }
 
 pub(crate) struct CouchbaseQueryIndexMgmtClient {
@@ -393,6 +479,22 @@ impl CouchbaseQueryIndexMgmtClient {
             .await?;
 
         Ok(())
+    }
+
+    fn tracing_client(&self) -> CouchbaseTracingClient {
+        CouchbaseTracingClient::new(self.agent_provider.clone())
+    }
+
+    fn bucket_name(&self) -> &str {
+        self.keyspace.bucket_name()
+    }
+
+    fn scope_name(&self) -> &str {
+        self.keyspace.scope_name()
+    }
+
+    fn collection_name(&self) -> &str {
+        self.keyspace.collection_name()
     }
 }
 

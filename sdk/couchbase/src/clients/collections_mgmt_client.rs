@@ -17,6 +17,7 @@
  */
 
 use crate::clients::agent_provider::CouchbaseAgentProvider;
+use crate::clients::tracing_client::{CouchbaseTracingClient, TracingClient, TracingClientBackend};
 use crate::error;
 use crate::error::FeatureNotAvailableErrorKind;
 use crate::management::collections::collection_settings::{
@@ -137,6 +138,32 @@ impl CollectionsMgmtClient {
             }
             CollectionsMgmtClientBackend::Couchbase2CollectionsMgmtClientBackend(client) => {
                 client.get_all_scopes(opts).await
+            }
+        }
+    }
+
+    pub fn bucket_name(&self) -> &str {
+        match &self.backend {
+            CollectionsMgmtClientBackend::CouchbaseCollectionsMgmtClientBackend(client) => {
+                client.bucket_name()
+            }
+            CollectionsMgmtClientBackend::Couchbase2CollectionsMgmtClientBackend(_) => {
+                unimplemented!()
+            }
+        }
+    }
+
+    pub fn tracing_client(&self) -> TracingClient {
+        match &self.backend {
+            CollectionsMgmtClientBackend::CouchbaseCollectionsMgmtClientBackend(client) => {
+                let tracing_client = client.tracing_client();
+
+                TracingClient::new(TracingClientBackend::CouchbaseTracingClientBackend(
+                    tracing_client,
+                ))
+            }
+            CollectionsMgmtClientBackend::Couchbase2CollectionsMgmtClientBackend(_) => {
+                unimplemented!()
             }
         }
     }
@@ -370,6 +397,14 @@ impl CouchbaseCollectionsMgmtClient {
         }
 
         Ok(scopes)
+    }
+
+    pub fn bucket_name(&self) -> &str {
+        &self.bucket_name
+    }
+
+    pub fn tracing_client(&self) -> CouchbaseTracingClient {
+        CouchbaseTracingClient::new(self.agent_provider.clone())
     }
 }
 

@@ -31,6 +31,7 @@ use crate::clients::search_index_mgmt_client::{
     CouchbaseSearchIndexMgmtClient, SearchIndexKeyspace, SearchIndexMgmtClient,
     SearchIndexMgmtClientBackend,
 };
+use crate::clients::tracing_client::{CouchbaseTracingClient, TracingClient, TracingClientBackend};
 use crate::retry::RetryStrategy;
 use std::sync::Arc;
 
@@ -53,6 +54,13 @@ impl ScopeClient {
         }
     }
 
+    pub fn bucket_name(&self) -> &str {
+        match &self.backend {
+            ScopeClientBackend::CouchbaseScopeBackend(client) => client.bucket_name(),
+            ScopeClientBackend::Couchbase2ScopeBackend(client) => client.bucket_name(),
+        }
+    }
+
     pub fn query_client(&self) -> QueryClient {
         match &self.backend {
             ScopeClientBackend::CouchbaseScopeBackend(backend) => {
@@ -62,6 +70,17 @@ impl ScopeClient {
                     query_client,
                 ))
             }
+            ScopeClientBackend::Couchbase2ScopeBackend(_) => {
+                unimplemented!()
+            }
+        }
+    }
+
+    pub fn tracing_client(&self) -> TracingClient {
+        match &self.backend {
+            ScopeClientBackend::CouchbaseScopeBackend(client) => TracingClient::new(
+                TracingClientBackend::CouchbaseTracingClientBackend(client.tracing_client()),
+            ),
             ScopeClientBackend::Couchbase2ScopeBackend(_) => {
                 unimplemented!()
             }
@@ -187,6 +206,10 @@ impl CouchbaseScopeClient {
             self.default_retry_strategy.clone(),
         )
     }
+
+    pub fn tracing_client(&self) -> CouchbaseTracingClient {
+        CouchbaseTracingClient::new(self.agent_provider.clone())
+    }
 }
 
 #[derive(Clone)]
@@ -202,6 +225,10 @@ impl Couchbase2ScopeClient {
 
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    pub fn bucket_name(&self) -> &str {
+        &self.bucket_name
     }
 
     pub fn collection(&self, _name: String) -> CollectionClient {

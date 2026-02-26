@@ -22,6 +22,7 @@ use crate::error_context::{
 };
 use crate::service_type::ServiceType;
 use couchbase_core::memdx::error::{ServerError, ServerErrorKind, SubdocError, SubdocErrorKind};
+use couchbase_core::tracingcomponent::MetricsName;
 use serde::ser::SerializeStruct;
 use std::error::Error as StdError;
 use std::fmt::{Display, Formatter};
@@ -192,6 +193,7 @@ pub enum ErrorKind {
     IndexExists,
     RateLimitedFailure,
     QuotaLimitedFailure,
+    RequestCanceled,
 
     // Key Value Error Definitions RFC#58@16
     DocumentNotFound,
@@ -289,6 +291,7 @@ impl Display for ErrorKind {
             ErrorKind::IndexExists => "index exists",
             ErrorKind::RateLimitedFailure => "rate limited failure",
             ErrorKind::QuotaLimitedFailure => "quota limited failure",
+            ErrorKind::RequestCanceled => "request canceled",
             ErrorKind::DocumentNotFound => "document not found",
             ErrorKind::DocumentUnretrievable => "document unretrievable",
             ErrorKind::DocumentLocked => "document locked",
@@ -335,6 +338,84 @@ impl Display for ErrorKind {
         };
 
         write!(f, "{msg}")
+    }
+}
+
+impl MetricsName for ErrorKind {
+    fn metrics_name(&self) -> &'static str {
+        match self {
+            ErrorKind::ServerTimeout => "ServerTimeout",
+            ErrorKind::ClusterDropped => "ClusterDropped",
+            ErrorKind::InvalidArgument(_) => "InvalidArgument",
+            ErrorKind::ServiceNotAvailable(_) => "ServiceNotAvailable",
+            ErrorKind::FeatureNotAvailable(_) => "FeatureNotAvailable",
+            ErrorKind::InternalServerFailure => "InternalServerFailure",
+            ErrorKind::AuthenticationFailure => "AuthenticationFailure",
+            ErrorKind::TemporaryFailure => "TemporaryFailure",
+            ErrorKind::ParsingFailure => "ParsingFailure",
+            ErrorKind::CasMismatch => "CasMismatch",
+            ErrorKind::BucketNotFound => "BucketNotFound",
+            ErrorKind::CollectionNotFound => "CollectionNotFound",
+            ErrorKind::ScopeNotFound => "ScopeNotFound",
+            ErrorKind::EncodingFailure(_) => "EncodingFailure",
+            ErrorKind::DecodingFailure(_) => "DecodingFailure",
+            ErrorKind::UnsupportedOperation => "UnsupportedOperation",
+            ErrorKind::IndexNotFound => "IndexNotFound",
+            ErrorKind::IndexExists => "IndexExists",
+            ErrorKind::RateLimitedFailure => "RateLimited",
+            ErrorKind::QuotaLimitedFailure => "QuotaLimited",
+            ErrorKind::RequestCanceled => "RequestCanceled",
+            ErrorKind::DocumentNotFound => "DocumentNotFound",
+            ErrorKind::DocumentUnretrievable => "DocumentUnretrievable",
+            ErrorKind::DocumentLocked => "DocumentLocked",
+            ErrorKind::ValueTooLarge => "ValueTooLarge",
+            ErrorKind::DocumentExists => "DocumentExists",
+            ErrorKind::DurabilityLevelNotAvailable => "DurabilityLevelNotAvailable",
+            ErrorKind::DurabilityImpossible => "DurabilityImpossible",
+            ErrorKind::DurabilityAmbiguous => "DurabilityAmbiguous",
+            ErrorKind::DurabilityWriteInProgress => "DurableWriteInProgress",
+            ErrorKind::DurableWriteRecommitInProgress => "DurableWriteRecommitInProgress",
+            ErrorKind::PathNotFound => "PathNotFound",
+            ErrorKind::PathMismatch => "PathMismatch",
+            ErrorKind::PathInvalid => "PathInvalid",
+            ErrorKind::PathTooBig => "PathTooBig",
+            ErrorKind::PathTooDeep => "PathTooDeep",
+            ErrorKind::ValueTooDeep => "ValueTooDeep",
+            ErrorKind::ValueInvalid => "ValueInvalid",
+            ErrorKind::DocumentNotJSON => "DocumentNotJson",
+            ErrorKind::NumberTooBig => "NumberTooBig",
+            ErrorKind::DeltaInvalid => "DeltaInvalid",
+            ErrorKind::PathExists => "PathExists",
+            ErrorKind::XattrUnknownMacro => "XattrUnknownMacro",
+            ErrorKind::XattrInvalidKeyCombo => "XattrInvalidKeyCombo",
+            ErrorKind::XattrUnknownVirtualAttribute => "XattrUnknownVirtualAttribute",
+            ErrorKind::XattrCannotModifyVirtualAttribute => "XattrCannotModifyVirtualAttribute",
+            ErrorKind::XattrNoAccess => "XattrNoAccess",
+            ErrorKind::XattrInvalidOrder => "XattrInvalidOrder",
+            ErrorKind::XattrInvalidFlagCombo => "XattrInvalidFlagCombo",
+            ErrorKind::MutationTokenOutdated => "MutationTokenOutdated",
+            ErrorKind::DocumentNotLocked => "DocumentNotLocked",
+            ErrorKind::PlanningFailure => "PlanningFailure",
+            ErrorKind::IndexFailure => "IndexFailure",
+            ErrorKind::PreparedStatementFailure => "PreparedStatementFailure",
+            ErrorKind::DMLFailure => "DmlFailure",
+            ErrorKind::CollectionExists => "CollectionExists",
+            ErrorKind::ScopeExists => "ScopeExists",
+            ErrorKind::UserNotFound => "UserNotFound",
+            ErrorKind::GroupNotFound => "GroupNotFound",
+            ErrorKind::BucketExists => "BucketExists",
+            ErrorKind::UserExists => "UserExists",
+            ErrorKind::GroupExists => "GroupExists",
+            ErrorKind::BucketNotFlushable => "BucketNotFlushable",
+            ErrorKind::OtherFailure(_) => "_OTHER",
+            _ => "_OTHER",
+        }
+    }
+}
+
+impl MetricsName for Error {
+    fn metrics_name(&self) -> &'static str {
+        self.kind().metrics_name()
     }
 }
 

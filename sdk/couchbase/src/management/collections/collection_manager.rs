@@ -15,7 +15,6 @@
  *  * limitations under the License.
  *
  */
-
 use crate::clients::collections_mgmt_client::CollectionsMgmtClient;
 use crate::error;
 pub use crate::management::collections::collection_settings::{
@@ -23,6 +22,9 @@ pub use crate::management::collections::collection_settings::{
 };
 use crate::options::collection_mgmt_options::*;
 use crate::results::collections_mgmt_results::ScopeSpec;
+use crate::tracing::{Keyspace, SERVICE_VALUE_MANAGEMENT};
+use couchbase_core::create_span;
+use tracing::Instrument;
 
 #[derive(Clone)]
 pub struct CollectionManager {
@@ -35,12 +37,27 @@ impl CollectionManager {
         scope_name: impl Into<String>,
         opts: impl Into<Option<CreateScopeOptions>>,
     ) -> error::Result<()> {
-        self.client
-            .create_scope(
-                scope_name,
-                opts.into().unwrap_or(CreateScopeOptions::default()),
+        let scope_name: String = scope_name.into();
+        let keyspace = Keyspace::Scope {
+            bucket: self.client.bucket_name(),
+            scope: &scope_name,
+        };
+        let ctx = self
+            .client
+            .tracing_client()
+            .begin_operation(
+                Some(SERVICE_VALUE_MANAGEMENT),
+                keyspace,
+                create_span!("manager_collections_create_scope"),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .create_scope(scope_name.clone(), opts.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     pub async fn drop_scope(
@@ -48,12 +65,27 @@ impl CollectionManager {
         scope_name: impl Into<String>,
         opts: impl Into<Option<DropScopeOptions>>,
     ) -> error::Result<()> {
-        self.client
-            .drop_scope(
-                scope_name,
-                opts.into().unwrap_or(DropScopeOptions::default()),
+        let scope_name: String = scope_name.into();
+        let keyspace = Keyspace::Scope {
+            bucket: self.client.bucket_name(),
+            scope: &scope_name,
+        };
+        let ctx = self
+            .client
+            .tracing_client()
+            .begin_operation(
+                Some(SERVICE_VALUE_MANAGEMENT),
+                keyspace,
+                create_span!("manager_collections_drop_scope"),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .drop_scope(scope_name.clone(), opts.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     pub async fn create_collection(
@@ -63,16 +95,34 @@ impl CollectionManager {
         settings: impl Into<Option<CreateCollectionSettings>>,
         opts: impl Into<Option<CreateCollectionOptions>>,
     ) -> error::Result<()> {
-        self.client
-            .create_collection(
-                scope_name,
-                collection_name,
-                settings
-                    .into()
-                    .unwrap_or(CreateCollectionSettings::default()),
-                opts.into().unwrap_or(CreateCollectionOptions::default()),
+        let scope_name: String = scope_name.into();
+        let collection_name: String = collection_name.into();
+        let keyspace = Keyspace::Collection {
+            bucket: self.client.bucket_name(),
+            scope: &scope_name,
+            collection: &collection_name,
+        };
+        let ctx = self
+            .client
+            .tracing_client()
+            .begin_operation(
+                Some(SERVICE_VALUE_MANAGEMENT),
+                keyspace,
+                create_span!("manager_collections_create_collection"),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .create_collection(
+                scope_name.clone(),
+                collection_name.clone(),
+                settings.into().unwrap_or_default(),
+                opts.into().unwrap_or_default(),
+            )
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     pub async fn update_collection(
@@ -82,14 +132,34 @@ impl CollectionManager {
         settings: UpdateCollectionSettings,
         opts: impl Into<Option<UpdateCollectionOptions>>,
     ) -> error::Result<()> {
-        self.client
-            .update_collection(
-                scope_name,
-                collection_name,
-                settings,
-                opts.into().unwrap_or(UpdateCollectionOptions::default()),
+        let scope_name: String = scope_name.into();
+        let collection_name: String = collection_name.into();
+        let keyspace = Keyspace::Collection {
+            bucket: self.client.bucket_name(),
+            scope: &scope_name,
+            collection: &collection_name,
+        };
+        let ctx = self
+            .client
+            .tracing_client()
+            .begin_operation(
+                Some(SERVICE_VALUE_MANAGEMENT),
+                keyspace,
+                create_span!("manager_collections_update_collection"),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .update_collection(
+                scope_name.clone(),
+                collection_name.clone(),
+                settings,
+                opts.into().unwrap_or_default(),
+            )
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     pub async fn drop_collection(
@@ -98,21 +168,57 @@ impl CollectionManager {
         collection_name: impl Into<String>,
         opts: impl Into<Option<DropCollectionOptions>>,
     ) -> error::Result<()> {
-        self.client
-            .drop_collection(
-                scope_name,
-                collection_name,
-                opts.into().unwrap_or(DropCollectionOptions::default()),
+        let scope_name: String = scope_name.into();
+        let collection_name: String = collection_name.into();
+        let keyspace = Keyspace::Collection {
+            bucket: self.client.bucket_name(),
+            scope: &scope_name,
+            collection: &collection_name,
+        };
+        let ctx = self
+            .client
+            .tracing_client()
+            .begin_operation(
+                Some(SERVICE_VALUE_MANAGEMENT),
+                keyspace,
+                create_span!("manager_collections_drop_collection"),
             )
-            .await
+            .await;
+        let result = self
+            .client
+            .drop_collection(
+                scope_name.clone(),
+                collection_name.clone(),
+                opts.into().unwrap_or_default(),
+            )
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     pub async fn get_all_scopes(
         &self,
         opts: impl Into<Option<GetAllScopesOptions>>,
     ) -> error::Result<Vec<ScopeSpec>> {
-        self.client
-            .get_all_scopes(opts.into().unwrap_or(GetAllScopesOptions::default()))
-            .await
+        let keyspace = Keyspace::Bucket {
+            bucket: self.client.bucket_name(),
+        };
+        let ctx = self
+            .client
+            .tracing_client()
+            .begin_operation(
+                Some(SERVICE_VALUE_MANAGEMENT),
+                keyspace,
+                create_span!("manager_collections_get_all_scopes"),
+            )
+            .await;
+        let result = self
+            .client
+            .get_all_scopes(opts.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 }
