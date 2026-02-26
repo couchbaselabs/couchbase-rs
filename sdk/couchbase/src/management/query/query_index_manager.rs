@@ -24,7 +24,10 @@ use crate::options::query_index_mgmt_options::{
     WatchQueryIndexOptions,
 };
 use crate::results::query_index_mgmt_results::QueryIndex;
+use crate::tracing::SERVICE_VALUE_QUERY;
+use couchbase_core::create_span;
 use std::sync::Arc;
+use tracing::Instrument;
 
 #[derive(Clone)]
 pub struct QueryIndexManager {
@@ -36,7 +39,22 @@ impl QueryIndexManager {
         &self,
         opts: impl Into<Option<GetAllQueryIndexesOptions>>,
     ) -> error::Result<Vec<QueryIndex>> {
-        self.client.get_all_indexes(opts.into()).await
+        let ctx = self
+            .client
+            .tracing_client()
+            .begin_operation(
+                Some(SERVICE_VALUE_QUERY),
+                self.client.keyspace(),
+                create_span!("manager_query_get_all_indexes"),
+            )
+            .await;
+        let result = self
+            .client
+            .get_all_indexes(opts.into())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     pub async fn create_index(
@@ -45,16 +63,44 @@ impl QueryIndexManager {
         fields: impl Into<Vec<String>>,
         opts: impl Into<Option<CreateQueryIndexOptions>>,
     ) -> error::Result<()> {
-        self.client
+        let ctx = self
+            .client
+            .tracing_client()
+            .begin_operation(
+                Some(SERVICE_VALUE_QUERY),
+                self.client.keyspace(),
+                create_span!("manager_query_create_index"),
+            )
+            .await;
+        let result = self
+            .client
             .create_index(index_name.into(), fields.into(), opts.into())
-            .await
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     pub async fn create_primary_index(
         &self,
         opts: impl Into<Option<CreatePrimaryQueryIndexOptions>>,
     ) -> error::Result<()> {
-        self.client.create_primary_index(opts.into()).await
+        let ctx = self
+            .client
+            .tracing_client()
+            .begin_operation(
+                Some(SERVICE_VALUE_QUERY),
+                self.client.keyspace(),
+                create_span!("manager_query_create_primary_index"),
+            )
+            .await;
+        let result = self
+            .client
+            .create_primary_index(opts.into())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     pub async fn drop_index(
@@ -62,14 +108,44 @@ impl QueryIndexManager {
         index_name: impl Into<String>,
         opts: impl Into<Option<DropQueryIndexOptions>>,
     ) -> error::Result<()> {
-        self.client.drop_index(index_name.into(), opts.into()).await
+        let ctx = self
+            .client
+            .tracing_client()
+            .begin_operation(
+                Some(SERVICE_VALUE_QUERY),
+                self.client.keyspace(),
+                create_span!("manager_query_drop_index"),
+            )
+            .await;
+        let result = self
+            .client
+            .drop_index(index_name.into(), opts.into())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     pub async fn drop_primary_index(
         &self,
         opts: impl Into<Option<DropPrimaryQueryIndexOptions>>,
     ) -> error::Result<()> {
-        self.client.drop_primary_index(opts.into()).await
+        let ctx = self
+            .client
+            .tracing_client()
+            .begin_operation(
+                Some(SERVICE_VALUE_QUERY),
+                self.client.keyspace(),
+                create_span!("manager_query_drop_primary_index"),
+            )
+            .await;
+        let result = self
+            .client
+            .drop_primary_index(opts.into())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     pub async fn watch_indexes(
@@ -77,15 +153,43 @@ impl QueryIndexManager {
         index_names: impl Into<Vec<String>>,
         opts: impl Into<Option<WatchQueryIndexOptions>>,
     ) -> error::Result<()> {
-        self.client
+        let ctx = self
+            .client
+            .tracing_client()
+            .begin_operation(
+                Some(SERVICE_VALUE_QUERY),
+                self.client.keyspace(),
+                create_span!("manager_query_watch_indexes"),
+            )
+            .await;
+        let result = self
+            .client
             .watch_indexes(index_names.into(), opts.into())
-            .await
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     pub async fn build_deferred_indexes(
         &self,
         opts: impl Into<Option<BuildQueryIndexOptions>>,
     ) -> error::Result<()> {
-        self.client.build_deferred_indexes(opts.into()).await
+        let ctx = self
+            .client
+            .tracing_client()
+            .begin_operation(
+                Some(SERVICE_VALUE_QUERY),
+                self.client.keyspace(),
+                create_span!("manager_query_build_deferred_indexes"),
+            )
+            .await;
+        let result = self
+            .client
+            .build_deferred_indexes(opts.into())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 }

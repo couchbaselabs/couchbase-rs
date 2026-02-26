@@ -21,9 +21,12 @@ use crate::options::kv_options::*;
 use crate::results::kv_results::*;
 use crate::subdoc::lookup_in_specs::LookupInSpec;
 use crate::subdoc::mutate_in_specs::MutateInSpec;
+use crate::tracing::SERVICE_VALUE_KV;
 use crate::transcoding;
+use couchbase_core::create_span;
 use serde::Serialize;
 use std::time::Duration;
+use tracing::Instrument;
 
 impl Collection {
     pub async fn upsert<V: Serialize>(
@@ -32,8 +35,31 @@ impl Collection {
         value: V,
         options: impl Into<Option<UpsertOptions>>,
     ) -> crate::error::Result<MutationResult> {
-        let (value, flags) = transcoding::json::encode(value)?;
-        self.upsert_raw(id, &value, flags, options).await
+        let options = options.into().unwrap_or_default();
+        let span = create_span!("upsert").with_durability(options.durability_level.as_ref());
+        let ctx = self
+            .tracing_client
+            .begin_operation(Some(SERVICE_VALUE_KV), self.keyspace(), span)
+            .await;
+        let (value, flags) = match self
+            .tracing_client
+            .with_request_encoding_span(|| transcoding::json::encode(value))
+            .instrument(ctx.span().clone())
+            .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                ctx.end_operation(Some(&e));
+                return Err(e);
+            }
+        };
+        let result = self
+            .core_kv_client
+            .upsert(id.as_ref(), &value, flags, options)
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     pub async fn upsert_raw(
@@ -44,9 +70,18 @@ impl Collection {
         options: impl Into<Option<UpsertOptions>>,
     ) -> crate::error::Result<MutationResult> {
         let options = options.into().unwrap_or_default();
-        self.core_kv_client
+        let span = create_span!("upsert").with_durability(options.durability_level.as_ref());
+        let ctx = self
+            .tracing_client
+            .begin_operation(Some(SERVICE_VALUE_KV), self.keyspace(), span)
+            .await;
+        let result = self
+            .core_kv_client
             .upsert(id.as_ref(), value, flags, options)
-            .await
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     pub async fn insert<V: Serialize>(
@@ -55,8 +90,31 @@ impl Collection {
         value: V,
         options: impl Into<Option<InsertOptions>>,
     ) -> crate::error::Result<MutationResult> {
-        let (value, flags) = transcoding::json::encode(value)?;
-        self.insert_raw(id, &value, flags, options).await
+        let options = options.into().unwrap_or_default();
+        let span = create_span!("insert").with_durability(options.durability_level.as_ref());
+        let ctx = self
+            .tracing_client
+            .begin_operation(Some(SERVICE_VALUE_KV), self.keyspace(), span)
+            .await;
+        let (value, flags) = match self
+            .tracing_client
+            .with_request_encoding_span(|| transcoding::json::encode(value))
+            .instrument(ctx.span().clone())
+            .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                ctx.end_operation(Some(&e));
+                return Err(e);
+            }
+        };
+        let result = self
+            .core_kv_client
+            .insert(id.as_ref(), &value, flags, options)
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     pub async fn insert_raw(
@@ -67,9 +125,18 @@ impl Collection {
         options: impl Into<Option<InsertOptions>>,
     ) -> crate::error::Result<MutationResult> {
         let options = options.into().unwrap_or_default();
-        self.core_kv_client
+        let span = create_span!("insert").with_durability(options.durability_level.as_ref());
+        let ctx = self
+            .tracing_client
+            .begin_operation(Some(SERVICE_VALUE_KV), self.keyspace(), span)
+            .await;
+        let result = self
+            .core_kv_client
             .insert(id.as_ref(), value, flags, options)
-            .await
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     pub async fn replace<V: Serialize>(
@@ -78,8 +145,31 @@ impl Collection {
         value: V,
         options: impl Into<Option<ReplaceOptions>>,
     ) -> crate::error::Result<MutationResult> {
-        let (value, flags) = transcoding::json::encode(value)?;
-        self.replace_raw(id, &value, flags, options).await
+        let options = options.into().unwrap_or_default();
+        let span = create_span!("replace").with_durability(options.durability_level.as_ref());
+        let ctx = self
+            .tracing_client
+            .begin_operation(Some(SERVICE_VALUE_KV), self.keyspace(), span)
+            .await;
+        let (value, flags) = match self
+            .tracing_client
+            .with_request_encoding_span(|| transcoding::json::encode(value))
+            .instrument(ctx.span().clone())
+            .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                ctx.end_operation(Some(&e));
+                return Err(e);
+            }
+        };
+        let result = self
+            .core_kv_client
+            .replace(id.as_ref(), &value, flags, options)
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     pub async fn replace_raw(
@@ -90,9 +180,18 @@ impl Collection {
         options: impl Into<Option<ReplaceOptions>>,
     ) -> crate::error::Result<MutationResult> {
         let options = options.into().unwrap_or_default();
-        self.core_kv_client
+        let span = create_span!("replace").with_durability(options.durability_level.as_ref());
+        let ctx = self
+            .tracing_client
+            .begin_operation(Some(SERVICE_VALUE_KV), self.keyspace(), span)
+            .await;
+        let result = self
+            .core_kv_client
             .replace(id.as_ref(), value, flags, options)
-            .await
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     pub async fn remove(
@@ -100,8 +199,21 @@ impl Collection {
         id: impl AsRef<str>,
         options: impl Into<Option<RemoveOptions>>,
     ) -> crate::error::Result<MutationResult> {
-        let options = options.into().unwrap_or_default();
-        self.core_kv_client.remove(id.as_ref(), options).await
+        let ctx = self
+            .tracing_client
+            .begin_operation(
+                Some(SERVICE_VALUE_KV),
+                self.keyspace(),
+                create_span!("remove"),
+            )
+            .await;
+        let result = self
+            .core_kv_client
+            .remove(id.as_ref(), options.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     pub async fn get(
@@ -109,8 +221,17 @@ impl Collection {
         id: impl AsRef<str>,
         options: impl Into<Option<GetOptions>>,
     ) -> crate::error::Result<GetResult> {
-        let options = options.into().unwrap_or_default();
-        self.core_kv_client.get(id.as_ref(), options).await
+        let ctx = self
+            .tracing_client
+            .begin_operation(Some(SERVICE_VALUE_KV), self.keyspace(), create_span!("get"))
+            .await;
+        let result = self
+            .core_kv_client
+            .get(id.as_ref(), options.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     pub async fn exists(
@@ -118,8 +239,21 @@ impl Collection {
         id: impl AsRef<str>,
         options: impl Into<Option<ExistsOptions>>,
     ) -> crate::error::Result<ExistsResult> {
-        let options = options.into().unwrap_or_default();
-        self.core_kv_client.exists(id.as_ref(), options).await
+        let ctx = self
+            .tracing_client
+            .begin_operation(
+                Some(SERVICE_VALUE_KV),
+                self.keyspace(),
+                create_span!("exists"),
+            )
+            .await;
+        let result = self
+            .core_kv_client
+            .exists(id.as_ref(), options.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     pub async fn get_and_touch(
@@ -128,10 +262,21 @@ impl Collection {
         expiry: Duration,
         options: impl Into<Option<GetAndTouchOptions>>,
     ) -> crate::error::Result<GetResult> {
-        let options = options.into().unwrap_or_default();
-        self.core_kv_client
-            .get_and_touch(id.as_ref(), expiry, options)
-            .await
+        let ctx = self
+            .tracing_client
+            .begin_operation(
+                Some(SERVICE_VALUE_KV),
+                self.keyspace(),
+                create_span!("get_and_touch"),
+            )
+            .await;
+        let result = self
+            .core_kv_client
+            .get_and_touch(id.as_ref(), expiry, options.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     pub async fn get_and_lock(
@@ -140,10 +285,21 @@ impl Collection {
         lock_time: Duration,
         options: impl Into<Option<GetAndLockOptions>>,
     ) -> crate::error::Result<GetResult> {
-        let options = options.into().unwrap_or_default();
-        self.core_kv_client
-            .get_and_lock(id.as_ref(), lock_time, options)
-            .await
+        let ctx = self
+            .tracing_client
+            .begin_operation(
+                Some(SERVICE_VALUE_KV),
+                self.keyspace(),
+                create_span!("get_and_lock"),
+            )
+            .await;
+        let result = self
+            .core_kv_client
+            .get_and_lock(id.as_ref(), lock_time, options.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     pub async fn unlock(
@@ -152,8 +308,21 @@ impl Collection {
         cas: u64,
         options: impl Into<Option<UnlockOptions>>,
     ) -> crate::error::Result<()> {
-        let options = options.into().unwrap_or_default();
-        self.core_kv_client.unlock(id.as_ref(), cas, options).await
+        let ctx = self
+            .tracing_client
+            .begin_operation(
+                Some(SERVICE_VALUE_KV),
+                self.keyspace(),
+                create_span!("unlock"),
+            )
+            .await;
+        let result = self
+            .core_kv_client
+            .unlock(id.as_ref(), cas, options.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     pub async fn touch(
@@ -162,10 +331,21 @@ impl Collection {
         expiry: Duration,
         options: impl Into<Option<TouchOptions>>,
     ) -> crate::error::Result<TouchResult> {
-        let options = options.into().unwrap_or_default();
-        self.core_kv_client
-            .touch(id.as_ref(), expiry, options)
-            .await
+        let ctx = self
+            .tracing_client
+            .begin_operation(
+                Some(SERVICE_VALUE_KV),
+                self.keyspace(),
+                create_span!("touch"),
+            )
+            .await;
+        let result = self
+            .core_kv_client
+            .touch(id.as_ref(), expiry, options.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     pub async fn lookup_in(
@@ -174,10 +354,21 @@ impl Collection {
         specs: &[LookupInSpec],
         options: impl Into<Option<LookupInOptions>>,
     ) -> crate::error::Result<LookupInResult> {
-        let options = options.into().unwrap_or_default();
-        self.core_kv_client
-            .lookup_in(id.as_ref(), specs, options)
-            .await
+        let ctx = self
+            .tracing_client
+            .begin_operation(
+                Some(SERVICE_VALUE_KV),
+                self.keyspace(),
+                create_span!("lookup_in"),
+            )
+            .await;
+        let result = self
+            .core_kv_client
+            .lookup_in(id.as_ref(), specs, options.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     pub async fn mutate_in(
@@ -186,9 +377,20 @@ impl Collection {
         specs: &[MutateInSpec],
         options: impl Into<Option<MutateInOptions>>,
     ) -> crate::error::Result<MutateInResult> {
-        let options = options.into().unwrap_or_default();
-        self.core_kv_client
-            .mutate_in(id.as_ref(), specs, options)
-            .await
+        let ctx = self
+            .tracing_client
+            .begin_operation(
+                Some(SERVICE_VALUE_KV),
+                self.keyspace(),
+                create_span!("mutate_in"),
+            )
+            .await;
+        let result = self
+            .core_kv_client
+            .mutate_in(id.as_ref(), specs, options.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 }

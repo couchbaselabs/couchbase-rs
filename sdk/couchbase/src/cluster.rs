@@ -22,6 +22,7 @@ use crate::clients::bucket_mgmt_client::BucketMgmtClient;
 use crate::clients::cluster_client::ClusterClient;
 use crate::clients::diagnostics_client::DiagnosticsClient;
 use crate::clients::query_client::QueryClient;
+use crate::clients::tracing_client::TracingClient;
 use crate::clients::user_mgmt_client::UserMgmtClient;
 use crate::error;
 use crate::management::buckets::bucket_manager::BucketManager;
@@ -31,8 +32,11 @@ use crate::options::diagnostic_options::{DiagnosticsOptions, PingOptions, WaitUn
 use crate::options::query_options::QueryOptions;
 use crate::results::diagnostics::{DiagnosticsResult, PingReport};
 use crate::results::query_results::QueryResult;
+use crate::tracing::{Keyspace, SERVICE_VALUE_QUERY};
+use couchbase_core::create_span;
 use log::info;
 use std::sync::Arc;
+use tracing::Instrument;
 
 #[derive(Clone)]
 pub struct Cluster {
@@ -41,6 +45,7 @@ pub struct Cluster {
     bucket_mgmt_client: Arc<BucketMgmtClient>,
     user_mgmt_client: Arc<UserMgmtClient>,
     diagnostics_client: Arc<DiagnosticsClient>,
+    tracing_client: Arc<TracingClient>,
 }
 
 impl Cluster {
@@ -56,6 +61,7 @@ impl Cluster {
         let bucket_mgmt_client = Arc::new(client.buckets_client());
         let user_mgmt_client = Arc::new(client.users_client());
         let diagnostics_client = Arc::new(client.diagnostics_client());
+        let tracing_client = Arc::new(client.tracing_client());
 
         Ok(Cluster {
             client,
@@ -63,6 +69,7 @@ impl Cluster {
             bucket_mgmt_client,
             user_mgmt_client,
             diagnostics_client,
+            tracing_client,
         })
     }
 
@@ -77,7 +84,19 @@ impl Cluster {
         statement: impl Into<String>,
         opts: impl Into<Option<QueryOptions>>,
     ) -> error::Result<QueryResult> {
-        self.query_client.query(statement.into(), opts.into()).await
+        let statement: String = statement.into();
+        let span = create_span!("query").with_statement(&statement);
+        let ctx = self
+            .tracing_client
+            .begin_operation(Some(SERVICE_VALUE_QUERY), Keyspace::Cluster, span)
+            .await;
+        let result = self
+            .query_client
+            .query(statement, opts.into())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     pub fn buckets(&self) -> BucketManager {
@@ -92,21 +111,48 @@ impl Cluster {
         &self,
         opts: impl Into<Option<DiagnosticsOptions>>,
     ) -> error::Result<DiagnosticsResult> {
-        let opts = opts.into().unwrap_or_default();
-        self.diagnostics_client.diagnostics(opts).await
+        let ctx = self
+            .tracing_client
+            .begin_operation(None, Keyspace::Cluster, create_span!("diagnostics"))
+            .await;
+        let result = self
+            .diagnostics_client
+            .diagnostics(opts.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     pub async fn ping(&self, opts: impl Into<Option<PingOptions>>) -> error::Result<PingReport> {
-        let opts = opts.into().unwrap_or_default();
-        self.diagnostics_client.ping(opts).await
+        let ctx = self
+            .tracing_client
+            .begin_operation(None, Keyspace::Cluster, create_span!("ping"))
+            .await;
+        let result = self
+            .diagnostics_client
+            .ping(opts.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     pub async fn wait_until_ready(
         &self,
         opts: impl Into<Option<WaitUntilReadyOptions>>,
     ) -> error::Result<()> {
-        let opts = opts.into().unwrap_or_default();
-        self.diagnostics_client.wait_until_ready(opts).await
+        let ctx = self
+            .tracing_client
+            .begin_operation(None, Keyspace::Cluster, create_span!("wait_until_ready"))
+            .await;
+        let result = self
+            .diagnostics_client
+            .wait_until_ready(opts.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     // Sets a new authenticator for the cluster.

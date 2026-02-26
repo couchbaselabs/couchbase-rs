@@ -101,3 +101,15 @@ impl From<couchbase_core::mgmtx::bucket_settings::DurabilityLevel> for Durabilit
         }
     }
 }
+
+impl From<&DurabilityLevel> for u8 {
+    fn from(value: &DurabilityLevel) -> u8 {
+        match value.0 {
+            InnerDurabilityLevel::None => 0,
+            InnerDurabilityLevel::Majority => 1,
+            InnerDurabilityLevel::MajorityAndPersistActive => 2,
+            InnerDurabilityLevel::PersistToMajority => 3,
+            _ => unreachable!(),
+        }
+    }
+}

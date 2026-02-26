@@ -15,33 +15,45 @@
  *  * limitations under the License.
  *
  */
-
 use crate::clients::bucket_client::BucketClient;
 use crate::clients::collections_mgmt_client::CollectionsMgmtClient;
 use crate::clients::diagnostics_client::DiagnosticsClient;
+use crate::clients::tracing_client::TracingClient;
 use crate::collection::Collection;
 use crate::error;
 use crate::management::collections::collection_manager::CollectionManager;
 use crate::options::diagnostic_options::{PingOptions, WaitUntilReadyOptions};
 use crate::results::diagnostics::PingReport;
 use crate::scope::Scope;
+use crate::tracing::Keyspace;
+use couchbase_core::create_span;
+use tracing::Instrument;
 
 #[derive(Clone)]
 pub struct Bucket {
     client: BucketClient,
     collections_mgmt_client: CollectionsMgmtClient,
     diagnostics_client: DiagnosticsClient,
+    tracing_client: TracingClient,
 }
 
 impl Bucket {
     pub(crate) fn new(client: BucketClient) -> Self {
         let collections_mgmt_client = client.collections_management_client();
         let diagnostics_client = client.diagnostics_client();
+        let tracing_client = client.tracing_client();
 
         Self {
             client,
             collections_mgmt_client,
             diagnostics_client,
+            tracing_client,
+        }
+    }
+
+    fn keyspace(&self) -> Keyspace<'_> {
+        Keyspace::Bucket {
+            bucket: self.client.name(),
         }
     }
 
@@ -68,15 +80,35 @@ impl Bucket {
     }
 
     pub async fn ping(&self, opts: impl Into<Option<PingOptions>>) -> error::Result<PingReport> {
-        let opts = opts.into().unwrap_or_default();
-        self.diagnostics_client.ping(opts).await
+        let keyspace = self.keyspace();
+        let ctx = self
+            .tracing_client
+            .begin_operation(None, keyspace, create_span!("ping"))
+            .await;
+        let result = self
+            .diagnostics_client
+            .ping(opts.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 
     pub async fn wait_until_ready(
         &self,
         opts: impl Into<Option<WaitUntilReadyOptions>>,
     ) -> error::Result<()> {
-        let opts = opts.into().unwrap_or_default();
-        self.diagnostics_client.wait_until_ready(opts).await
+        let keyspace = self.keyspace();
+        let ctx = self
+            .tracing_client
+            .begin_operation(None, keyspace, create_span!("wait_until_ready"))
+            .await;
+        let result = self
+            .diagnostics_client
+            .wait_until_ready(opts.into().unwrap_or_default())
+            .instrument(ctx.span().clone())
+            .await;
+        ctx.end_operation(result.as_ref().err());
+        result
     }
 }

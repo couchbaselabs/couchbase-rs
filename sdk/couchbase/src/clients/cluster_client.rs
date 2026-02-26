@@ -46,6 +46,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::authenticator::Authenticator;
+use crate::clients::tracing_client::{CouchbaseTracingClient, TracingClient, TracingClientBackend};
 #[cfg(feature = "unstable-dns-options")]
 use std::mem::take;
 
@@ -95,6 +96,21 @@ impl ClusterClient {
         };
 
         Ok(ClusterClient { backend })
+    }
+
+    pub fn tracing_client(&self) -> TracingClient {
+        match &self.backend {
+            ClusterClientBackend::CouchbaseClusterBackend(backend) => {
+                let tracing_client = backend.tracing_client();
+
+                TracingClient::new(TracingClientBackend::CouchbaseTracingClientBackend(
+                    tracing_client,
+                ))
+            }
+            ClusterClientBackend::Couchbase2ClusterBackend(_) => {
+                unimplemented!()
+            }
+        }
     }
 
     pub fn bucket_client(&self, name: String) -> BucketClient {
@@ -351,6 +367,12 @@ impl CouchbaseClusterBackend {
             CouchbaseAgentProvider::with_agent(agent.clone()),
             self.default_retry_strategy.clone(),
         )
+    }
+
+    fn tracing_client(&self) -> CouchbaseTracingClient {
+        let agent = self.agent_manager.get_cluster_agent();
+
+        CouchbaseTracingClient::new(CouchbaseAgentProvider::with_agent(agent.clone()))
     }
 
     pub async fn set_authenticator(&self, authenticator: Authenticator) -> error::Result<()> {
