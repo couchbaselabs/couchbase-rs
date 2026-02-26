@@ -226,16 +226,12 @@ impl<K: KvClient + 'static> StdKvClientBabysitter<K> {
 
     fn begin_client_build(client_opts: Arc<ClientThreadOptions<K>>) {
         let state = client_opts.slow_state.clone();
-        let client_id = Uuid::new_v4().to_string();
 
         let desired_config = {
             let guard = state.lock().unwrap();
 
             guard.desired_config.clone()
         };
-
-        let on_close_opts = client_opts.clone();
-        let (on_close_tx, mut on_close_rx) = mpsc::channel(1);
 
         let opts = KvClientOptions {
             address: desired_config.target.clone(),
@@ -251,54 +247,11 @@ impl<K: KvClient + 'static> StdKvClientBabysitter<K> {
                 .unsolicited_packet_tx
                 .clone(),
             orphan_handler: client_opts.static_kv_client_options.orphan_handler.clone(),
-            on_close_tx: Some(on_close_tx),
+            on_close_tx: None,
             disable_decompression: client_opts.static_kv_client_options.disable_decompression,
-            id: client_id.clone(),
             tracing: client_opts.tracing.clone(),
+            id: String::new(),
         };
-
-        tokio::spawn(async move {
-            select! {
-                _ = on_close_opts.shutdown_token.cancelled() => {
-                    debug!("Client babysitter {} shutdown during on_close wait", &on_close_opts.id);
-                    return;
-                }
-                _ = on_close_rx.recv() => {
-                    debug!("Client babysitter {} detected client {} closed", &on_close_opts.id, &client_id);
-                }
-            };
-
-            {
-                let mut guard = on_close_opts.slow_state.lock().unwrap();
-                guard.is_building = false;
-                if let Some(cli) = &guard.client {
-                    if cli.id() != client_id {
-                        return;
-                    }
-                } else {
-                    return;
-                }
-
-                guard.client = None;
-                on_close_opts
-                    .fast_client
-                    .store(Arc::new(StdKvClientBabysitterClientState { client: None }));
-            }
-
-            if let Err(e) = on_close_opts
-                .state_change_handler
-                .send((on_close_opts.id.clone(), None))
-            {
-                debug!(
-                    "Client babysitter {} failed to notify of closed client {}: {}",
-                    &on_close_opts.id, &client_id, e
-                );
-            }
-
-            if !on_close_opts.on_demand_connect {
-                Self::maybe_begin_client(on_close_opts.clone());
-            }
-        });
 
         tokio::spawn(async move {
             loop {
@@ -322,6 +275,9 @@ impl<K: KvClient + 'static> StdKvClientBabysitter<K> {
                     return;
                 };
 
+                let client_id = Uuid::new_v4().to_string();
+                let (on_close_tx, mut on_close_rx) = mpsc::channel(1);
+
                 let opts = {
                     let mut guard = state.lock().unwrap();
                     guard.current_state = ConnectionState::Connecting;
@@ -330,6 +286,8 @@ impl<K: KvClient + 'static> StdKvClientBabysitter<K> {
                     opts.authenticator = guard.desired_config.auth.clone();
                     opts.address = guard.desired_config.target.clone();
                     opts.selected_bucket = guard.desired_config.selected_bucket.clone();
+                    opts.on_close_tx = Some(on_close_tx);
+                    opts.id = client_id.clone();
 
                     opts
                 };
@@ -382,6 +340,53 @@ impl<K: KvClient + 'static> StdKvClientBabysitter<K> {
                                 &client_opts.id, e
                             );
                         }
+
+                        // Spawn the close-watcher only after a successful connection.
+                        // This prevents failed bootstrap attempts from prematurely
+                        // consuming the close signal and killing the watcher.
+                        let on_close_opts = client_opts.clone();
+                        tokio::spawn(async move {
+                            select! {
+                                _ = on_close_opts.shutdown_token.cancelled() => {
+                                    debug!("Client babysitter {} shutdown during on_close wait", &on_close_opts.id);
+                                    return;
+                                }
+                                _ = on_close_rx.recv() => {
+                                    debug!("Client babysitter {} detected client {} closed", &on_close_opts.id, &client_id);
+                                }
+                            };
+
+                            {
+                                let mut guard = on_close_opts.slow_state.lock().unwrap();
+                                guard.is_building = false;
+                                if let Some(cli) = &guard.client {
+                                    if cli.id() != client_id {
+                                        return;
+                                    }
+                                } else {
+                                    return;
+                                }
+
+                                guard.client = None;
+                                on_close_opts.fast_client.store(Arc::new(
+                                    StdKvClientBabysitterClientState { client: None },
+                                ));
+                            }
+
+                            if let Err(e) = on_close_opts
+                                .state_change_handler
+                                .send((on_close_opts.id.clone(), None))
+                            {
+                                debug!(
+                                    "Client babysitter {} failed to notify of closed client {}: {}",
+                                    &on_close_opts.id, &client_id, e
+                                );
+                            }
+
+                            if !on_close_opts.on_demand_connect {
+                                Self::maybe_begin_client(on_close_opts.clone());
+                            }
+                        });
 
                         return;
                     }
