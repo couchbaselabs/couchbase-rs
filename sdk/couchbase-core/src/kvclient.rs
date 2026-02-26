@@ -34,6 +34,7 @@ use crate::memdx::packet::ResponsePacket;
 use crate::memdx::request::{GetErrorMapRequest, HelloRequest, SelectBucketRequest};
 use crate::service_type::ServiceType;
 use crate::tls_config::TlsConfig;
+use crate::tracingcomponent::TracingComponent;
 use crate::util::hostname_from_addr_str;
 use crate::{error, memdx};
 use arc_swap::ArcSwap;
@@ -90,6 +91,7 @@ pub(crate) struct KvClientOptions {
     pub on_close_tx: Option<OnKvClientCloseHandler>,
     pub disable_decompression: bool,
     pub id: String,
+    pub tracing: Arc<TracingComponent>,
 }
 
 pub(crate) type OnKvClientCloseHandler = mpsc::Sender<()>;
@@ -111,6 +113,7 @@ pub(crate) trait KvClient: Sized + PartialEq + Send + Sync {
     fn remote_hostname(&self) -> &str;
     fn remote_addr(&self) -> SocketAddr;
     fn local_addr(&self) -> SocketAddr;
+    fn canonical_addr(&self) -> &Address;
     fn last_activity(&self) -> DateTime<FixedOffset>;
     fn close(&self) -> impl Future<Output = Result<()>> + Send;
     fn id(&self) -> &str;
@@ -122,6 +125,13 @@ pub(crate) struct StdKvClient<D: Dispatcher> {
     local_addr: SocketAddr,
     remote_hostname: String,
     endpoint_id: String,
+    canonical_addr: Address,
+
+    // Pre-formatted address strings cached at construction to avoid
+    // per-operation allocations in tracing dispatch spans.
+    pub(crate) remote_ip_str: String,
+    pub(crate) remote_port_str: String,
+    pub(crate) canonical_port_str: String,
 
     cli: D,
     closed: Arc<AtomicBool>,
@@ -135,6 +145,8 @@ pub(crate) struct StdKvClient<D: Dispatcher> {
     pub(crate) last_activity_timestamp_micros: AtomicI64,
 
     pub(crate) id: String,
+
+    pub(crate) tracing: Arc<TracingComponent>,
 }
 
 impl<D> StdKvClient<D>
@@ -356,11 +368,20 @@ where
             }
         });
 
+        let canonical_addr = opts.address.canonical_address;
+        let remote_ip_str = remote_addr.ip().to_string();
+        let remote_port_str = remote_addr.port().to_string();
+        let canonical_port_str = canonical_addr.port.to_string();
+
         let mut kv_cli = StdKvClient {
             remote_addr,
             local_addr,
             remote_hostname,
             endpoint_id: opts.endpoint_id,
+            canonical_addr,
+            remote_ip_str,
+            remote_port_str,
+            canonical_port_str,
             cli,
             closed,
             on_close_tx: opts.on_close_tx,
@@ -369,6 +390,7 @@ where
             id: id.clone(),
             last_activity_timestamp_micros: AtomicI64::new(Utc::now().timestamp_micros()),
             client_close_handle: close_handle,
+            tracing: opts.tracing,
         };
 
         if should_bootstrap {
@@ -455,6 +477,10 @@ where
 
     fn local_addr(&self) -> SocketAddr {
         self.local_addr
+    }
+
+    fn canonical_addr(&self) -> &Address {
+        &self.canonical_addr
     }
 
     fn last_activity(&self) -> DateTime<FixedOffset> {

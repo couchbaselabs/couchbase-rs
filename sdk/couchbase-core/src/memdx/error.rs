@@ -23,6 +23,7 @@ use std::io;
 
 use crate::memdx::opcode::OpCode;
 use crate::memdx::status::Status;
+use crate::tracingcomponent::MetricsName;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -731,4 +732,109 @@ struct ServerErrorContextJson {
     error: ServerErrorContextJsonContext,
     #[serde(alias = "manifest_uid")]
     pub manifest_rev: Option<String>,
+}
+
+impl MetricsName for Error {
+    fn metrics_name(&self) -> &'static str {
+        self.kind().metrics_name()
+    }
+}
+
+impl MetricsName for ErrorKind {
+    fn metrics_name(&self) -> &'static str {
+        match self {
+            ErrorKind::Server(err) => err.kind().metrics_name(),
+            ErrorKind::Resource(err) => err.cause().kind().metrics_name(),
+            ErrorKind::Dispatch { .. } => "memdx.Dispatch",
+            ErrorKind::Close { .. } => "memdx.Close",
+            ErrorKind::Protocol { .. } => "memdx.Protocol",
+            ErrorKind::Cancelled(_) => "memdx.Cancelled",
+            ErrorKind::ConnectionFailed { .. } => "memdx.ConnectionFailed",
+            ErrorKind::Io => "memdx.Io",
+            ErrorKind::InvalidArgument { .. } => "memdx.InvalidArgument",
+            ErrorKind::Decompression => "memdx.Decompression",
+            ErrorKind::Message(_) => "memdx._OTHER",
+        }
+    }
+}
+
+impl MetricsName for ServerErrorKind {
+    fn metrics_name(&self) -> &'static str {
+        match self {
+            ServerErrorKind::KeyNotFound => "memdx.KeyNotFound",
+            ServerErrorKind::KeyExists => "memdx.KeyExists",
+            ServerErrorKind::TooBig => "memdx.TooBig",
+            ServerErrorKind::NotStored => "memdx.NotStored",
+            ServerErrorKind::BadDelta => "memdx.BadDelta",
+            ServerErrorKind::NotMyVbucket => "memdx.NotMyVbucket",
+            ServerErrorKind::NoBucket => "memdx.NoBucket",
+            ServerErrorKind::Locked => "memdx.Locked",
+            ServerErrorKind::NotLocked => "memdx.NotLocked",
+            ServerErrorKind::Auth { .. } => "memdx.Auth",
+            ServerErrorKind::RangeError => "memdx.RangeError",
+            ServerErrorKind::Access => "memdx.Access",
+            ServerErrorKind::RateLimitedNetworkIngress => "memdx.RateLimitedNetworkIngress",
+            ServerErrorKind::RateLimitedNetworkEgress => "memdx.RateLimitedNetworkEgress",
+            ServerErrorKind::RateLimitedMaxConnections => "memdx.RateLimitedMaxConnections",
+            ServerErrorKind::RateLimitedMaxCommands => "memdx.RateLimitedMaxCommands",
+            ServerErrorKind::RateLimitedScopeSizeLimitExceeded => {
+                "memdx.RateLimitedScopeSizeLimitExceeded"
+            }
+            ServerErrorKind::UnknownCommand => "memdx.UnknownCommand",
+            ServerErrorKind::NotSupported => "memdx.NotSupported",
+            ServerErrorKind::InternalError => "memdx.InternalError",
+            ServerErrorKind::Busy => "memdx.Busy",
+            ServerErrorKind::TmpFail => "memdx.TmpFail",
+            ServerErrorKind::UnknownCollectionID => "memdx.UnknownCollectionID",
+            ServerErrorKind::UnknownScopeName => "memdx.UnknownScopeName",
+            ServerErrorKind::UnknownCollectionName => "memdx.UnknownCollectionName",
+            ServerErrorKind::DurabilityInvalid => "memdx.DurabilityInvalid",
+            ServerErrorKind::DurabilityImpossible => "memdx.DurabilityImpossible",
+            ServerErrorKind::SyncWriteInProgress => "memdx.SyncWriteInProgress",
+            ServerErrorKind::SyncWriteAmbiguous => "memdx.SyncWriteAmbiguous",
+            ServerErrorKind::SyncWriteRecommitInProgress => "memdx.SyncWriteRecommitInProgress",
+            ServerErrorKind::RangeScanCancelled => "memdx.RangeScanCancelled",
+            ServerErrorKind::RangeScanVBUUIDNotEqual => "memdx.RangeScanVBUUIDNotEqual",
+            ServerErrorKind::InvalidArgs => "memdx.InvalidArgs",
+            ServerErrorKind::AuthStale => "memdx.AuthStale",
+            ServerErrorKind::ConfigNotSet => "memdx.ConfigNotSet",
+            ServerErrorKind::UnknownBucketName => "memdx.UnknownBucketName",
+            ServerErrorKind::CasMismatch => "memdx.CasMismatch",
+            ServerErrorKind::Subdoc { error } => error.kind().metrics_name(),
+            ServerErrorKind::UnknownStatus { .. } => "memdx._OTHER",
+        }
+    }
+}
+
+impl MetricsName for SubdocErrorKind {
+    fn metrics_name(&self) -> &'static str {
+        match self {
+            SubdocErrorKind::PathNotFound => "memdx.subdoc.PathNotFound",
+            SubdocErrorKind::PathMismatch => "memdx.subdoc.PathMismatch",
+            SubdocErrorKind::PathInvalid => "memdx.subdoc.PathInvalid",
+            SubdocErrorKind::PathTooBig => "memdx.subdoc.PathTooBig",
+            SubdocErrorKind::DocTooDeep => "memdx.subdoc.DocTooDeep",
+            SubdocErrorKind::CantInsert => "memdx.subdoc.CantInsert",
+            SubdocErrorKind::NotJSON => "memdx.subdoc.NotJSON",
+            SubdocErrorKind::BadRange => "memdx.subdoc.BadRange",
+            SubdocErrorKind::BadDelta => "memdx.subdoc.BadDelta",
+            SubdocErrorKind::PathExists => "memdx.subdoc.PathExists",
+            SubdocErrorKind::ValueTooDeep => "memdx.subdoc.ValueTooDeep",
+            SubdocErrorKind::InvalidCombo => "memdx.subdoc.InvalidCombo",
+            SubdocErrorKind::XattrInvalidFlagCombo => "memdx.subdoc.XattrInvalidFlagCombo",
+            SubdocErrorKind::XattrInvalidKeyCombo => "memdx.subdoc.XattrInvalidKeyCombo",
+            SubdocErrorKind::XattrUnknownMacro => "memdx.subdoc.XattrUnknownMacro",
+            SubdocErrorKind::XattrUnknownVAttr => "memdx.subdoc.XattrUnknownVAttr",
+            SubdocErrorKind::XattrCannotModifyVAttr => "memdx.subdoc.XattrCannotModifyVAttr",
+            SubdocErrorKind::InvalidXattrOrder => "memdx.subdoc.InvalidXattrOrder",
+            SubdocErrorKind::XattrUnknownVattrMacro => "memdx.subdoc.XattrUnknownVattrMacro",
+            SubdocErrorKind::CanOnlyReviveDeletedDocuments => {
+                "memdx.subdoc.CanOnlyReviveDeletedDocuments"
+            }
+            SubdocErrorKind::DeletedDocumentCantHaveValue => {
+                "memdx.subdoc.DeletedDocumentCantHaveValue"
+            }
+            SubdocErrorKind::UnknownStatus { .. } => "memdx.subdoc._OTHER",
+        }
+    }
 }

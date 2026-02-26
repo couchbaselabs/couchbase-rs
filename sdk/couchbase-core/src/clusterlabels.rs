@@ -15,21 +15,18 @@
  *  * limitations under the License.
  *
  */
-use crate::httpx::request::Auth;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct NodeTarget {
-    pub endpoint: String,
-    pub canonical_endpoint: String,
-    pub auth: Auth,
+pub struct ClusterLabels {
+    pub cluster_uuid: Option<String>,
+    pub cluster_name: Option<String>,
 }
 
-impl crate::httpcomponent::NodeTarget for NodeTarget {
-    fn new(endpoint: String, canonical_endpoint: String, auth: Auth) -> Self {
+impl ClusterLabels {
+    pub fn new(cluster_uuid: Option<String>, cluster_name: Option<String>) -> Self {
         Self {
-            endpoint,
-            canonical_endpoint,
-            auth,
+            cluster_uuid,
+            cluster_name,
         }
     }
 }

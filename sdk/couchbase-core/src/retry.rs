@@ -27,6 +27,7 @@ use crate::error::{Error, ErrorKind};
 use crate::memdx::error::ErrorKind::{Cancelled, Dispatch, Resource, Server};
 use crate::memdx::error::{CancellationErrorKind, ServerError, ServerErrorKind};
 use crate::retryfailfast::FailFastRetryStrategy;
+use crate::tracingcomponent::SPAN_ATTRIB_RETRIES;
 use crate::{analyticsx, error, httpx, mgmtx, queryx, searchx};
 use async_trait::async_trait;
 use log::{debug, info};
@@ -154,6 +155,7 @@ impl RetryRequest {
 
     pub(crate) fn add_retry_attempt(&mut self, reason: RetryReason) {
         self.retry_attempts += 1;
+        tracing::Span::current().record(SPAN_ATTRIB_RETRIES, self.retry_attempts);
         self.retry_reasons.insert(reason);
     }
 

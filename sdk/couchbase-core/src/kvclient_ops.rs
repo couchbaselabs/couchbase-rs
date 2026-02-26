@@ -40,8 +40,9 @@ use crate::memdx::response::{
     GetAndLockResponse, GetAndTouchResponse, GetClusterConfigResponse, GetCollectionIdResponse,
     GetMetaResponse, GetResponse, IncrementResponse, LookupInResponse, MutateInResponse,
     PingResponse, PrependResponse, ReplaceResponse, SelectBucketResponse, SetResponse,
-    TouchResponse, UnlockResponse,
+    TouchResponse, TraceAttributes, UnlockResponse,
 };
+use crate::tracingcomponent::{BeginDispatchFields, EndDispatchFields, OperationId};
 use chrono::Utc;
 use log::{debug, info};
 use std::future::Future;
@@ -129,22 +130,30 @@ where
 
     async fn set(&self, req: SetRequest<'_>) -> KvResult<SetResponse> {
         self.update_last_activity();
-        let mut op = self
-            .handle_dispatch_side_result(self.ops_crud().set(self.client(), req).await)
-            .await?;
+        self.with_dispatch_span(req, |req| async move {
+            let mut op = self
+                .handle_dispatch_side_result(self.ops_crud().set(self.client(), req).await)
+                .await?;
+            let opaque = op.opaque();
 
-        let res = self.handle_response_side_result(op.recv().await).await?;
-        Ok(res)
+            let res = self.handle_response_side_result(op.recv().await).await?;
+            Ok((res, opaque))
+        })
+        .await
     }
 
     async fn get(&self, req: GetRequest<'_>) -> KvResult<GetResponse> {
         self.update_last_activity();
-        let mut op = self
-            .handle_dispatch_side_result(self.ops_crud().get(self.client(), req).await)
-            .await?;
+        self.with_dispatch_span(req, |req| async move {
+            let mut op = self
+                .handle_dispatch_side_result(self.ops_crud().get(self.client(), req).await)
+                .await?;
+            let opaque = op.opaque();
 
-        let res = self.handle_response_side_result(op.recv().await).await?;
-        Ok(res)
+            let res = self.handle_response_side_result(op.recv().await).await?;
+            Ok((res, opaque))
+        })
+        .await
     }
 
     async fn get_meta(&self, req: GetMetaRequest<'_>) -> KvResult<GetMetaResponse> {
@@ -159,132 +168,187 @@ where
 
     async fn delete(&self, req: DeleteRequest<'_>) -> KvResult<DeleteResponse> {
         self.update_last_activity();
-        let mut op = self
-            .handle_dispatch_side_result(self.ops_crud().delete(self.client(), req).await)
-            .await?;
 
-        let res = self.handle_response_side_result(op.recv().await).await?;
-        Ok(res)
+        self.with_dispatch_span(req, |req| async move {
+            let mut op = self
+                .handle_dispatch_side_result(self.ops_crud().delete(self.client(), req).await)
+                .await?;
+            let opaque = op.opaque();
+
+            let res = self.handle_response_side_result(op.recv().await).await?;
+            Ok((res, opaque))
+        })
+        .await
     }
 
     async fn get_and_lock(&self, req: GetAndLockRequest<'_>) -> KvResult<GetAndLockResponse> {
         self.update_last_activity();
-        let mut op = self
-            .handle_dispatch_side_result(self.ops_crud().get_and_lock(self.client(), req).await)
-            .await?;
+        self.with_dispatch_span(req, |req| async move {
+            let mut op = self
+                .handle_dispatch_side_result(self.ops_crud().get_and_lock(self.client(), req).await)
+                .await?;
+            let opaque = op.opaque();
 
-        let res = self.handle_response_side_result(op.recv().await).await?;
-        Ok(res)
+            let res = self.handle_response_side_result(op.recv().await).await?;
+            Ok((res, opaque))
+        })
+        .await
     }
 
     async fn get_and_touch(&self, req: GetAndTouchRequest<'_>) -> KvResult<GetAndTouchResponse> {
         self.update_last_activity();
-        let mut op = self
-            .handle_dispatch_side_result(self.ops_crud().get_and_touch(self.client(), req).await)
-            .await?;
+        self.with_dispatch_span(req, |req| async move {
+            let mut op = self
+                .handle_dispatch_side_result(
+                    self.ops_crud().get_and_touch(self.client(), req).await,
+                )
+                .await?;
+            let opaque = op.opaque();
 
-        let res = self.handle_response_side_result(op.recv().await).await?;
-        Ok(res)
+            let res = self.handle_response_side_result(op.recv().await).await?;
+            Ok((res, opaque))
+        })
+        .await
     }
 
     async fn unlock(&self, req: UnlockRequest<'_>) -> KvResult<UnlockResponse> {
         self.update_last_activity();
-        let mut op = self
-            .handle_dispatch_side_result(self.ops_crud().unlock(self.client(), req).await)
-            .await?;
+        self.with_dispatch_span(req, |req| async move {
+            let mut op = self
+                .handle_dispatch_side_result(self.ops_crud().unlock(self.client(), req).await)
+                .await?;
+            let opaque = op.opaque();
 
-        let res = self.handle_response_side_result(op.recv().await).await?;
-        Ok(res)
+            let res = self.handle_response_side_result(op.recv().await).await?;
+            Ok((res, opaque))
+        })
+        .await
     }
 
     async fn touch(&self, req: TouchRequest<'_>) -> KvResult<TouchResponse> {
         self.update_last_activity();
-        let mut op = self
-            .handle_dispatch_side_result(self.ops_crud().touch(self.client(), req).await)
-            .await?;
+        self.with_dispatch_span(req, |req| async move {
+            let mut op = self
+                .handle_dispatch_side_result(self.ops_crud().touch(self.client(), req).await)
+                .await?;
+            let opaque = op.opaque();
 
-        let res = self.handle_response_side_result(op.recv().await).await?;
-        Ok(res)
+            let res = self.handle_response_side_result(op.recv().await).await?;
+            Ok((res, opaque))
+        })
+        .await
     }
 
     async fn add(&self, req: AddRequest<'_>) -> KvResult<AddResponse> {
         self.update_last_activity();
-        let mut op = self
-            .handle_dispatch_side_result(self.ops_crud().add(self.client(), req).await)
-            .await?;
+        self.with_dispatch_span(req, |req| async move {
+            let mut op = self
+                .handle_dispatch_side_result(self.ops_crud().add(self.client(), req).await)
+                .await?;
+            let opaque = op.opaque();
 
-        let res = self.handle_response_side_result(op.recv().await).await?;
-        Ok(res)
+            let res = self.handle_response_side_result(op.recv().await).await?;
+            Ok((res, opaque))
+        })
+        .await
     }
 
     async fn replace(&self, req: ReplaceRequest<'_>) -> KvResult<ReplaceResponse> {
         self.update_last_activity();
-        let mut op = self
-            .handle_dispatch_side_result(self.ops_crud().replace(self.client(), req).await)
-            .await?;
+        self.with_dispatch_span(req, |req| async move {
+            let mut op = self
+                .handle_dispatch_side_result(self.ops_crud().replace(self.client(), req).await)
+                .await?;
+            let opaque = op.opaque();
 
-        let res = self.handle_response_side_result(op.recv().await).await?;
-        Ok(res)
+            let res = self.handle_response_side_result(op.recv().await).await?;
+            Ok((res, opaque))
+        })
+        .await
     }
 
     async fn append(&self, req: AppendRequest<'_>) -> KvResult<AppendResponse> {
         self.update_last_activity();
-        let mut op = self
-            .handle_dispatch_side_result(self.ops_crud().append(self.client(), req).await)
-            .await?;
+        self.with_dispatch_span(req, |req| async move {
+            let mut op = self
+                .handle_dispatch_side_result(self.ops_crud().append(self.client(), req).await)
+                .await?;
+            let opaque = op.opaque();
 
-        let res = self.handle_response_side_result(op.recv().await).await?;
-        Ok(res)
+            let res = self.handle_response_side_result(op.recv().await).await?;
+            Ok((res, opaque))
+        })
+        .await
     }
 
     async fn prepend(&self, req: PrependRequest<'_>) -> KvResult<PrependResponse> {
         self.update_last_activity();
-        let mut op = self
-            .handle_dispatch_side_result(self.ops_crud().prepend(self.client(), req).await)
-            .await?;
+        self.with_dispatch_span(req, |req| async move {
+            let mut op = self
+                .handle_dispatch_side_result(self.ops_crud().prepend(self.client(), req).await)
+                .await?;
+            let opaque = op.opaque();
 
-        let res = self.handle_response_side_result(op.recv().await).await?;
-        Ok(res)
+            let res = self.handle_response_side_result(op.recv().await).await?;
+            Ok((res, opaque))
+        })
+        .await
     }
 
     async fn increment(&self, req: IncrementRequest<'_>) -> KvResult<IncrementResponse> {
         self.update_last_activity();
-        let mut op = self
-            .handle_dispatch_side_result(self.ops_crud().increment(self.client(), req).await)
-            .await?;
+        self.with_dispatch_span(req, |req| async move {
+            let mut op = self
+                .handle_dispatch_side_result(self.ops_crud().increment(self.client(), req).await)
+                .await?;
+            let opaque = op.opaque();
 
-        let res = self.handle_response_side_result(op.recv().await).await?;
-        Ok(res)
+            let res = self.handle_response_side_result(op.recv().await).await?;
+            Ok((res, opaque))
+        })
+        .await
     }
 
     async fn decrement(&self, req: DecrementRequest<'_>) -> KvResult<DecrementResponse> {
         self.update_last_activity();
-        let mut op = self
-            .handle_dispatch_side_result(self.ops_crud().decrement(self.client(), req).await)
-            .await?;
+        self.with_dispatch_span(req, |req| async move {
+            let mut op = self
+                .handle_dispatch_side_result(self.ops_crud().decrement(self.client(), req).await)
+                .await?;
+            let opaque = op.opaque();
 
-        let res = self.handle_response_side_result(op.recv().await).await?;
-        Ok(res)
+            let res = self.handle_response_side_result(op.recv().await).await?;
+            Ok((res, opaque))
+        })
+        .await
     }
 
     async fn lookup_in(&self, req: LookupInRequest<'_>) -> KvResult<LookupInResponse> {
         self.update_last_activity();
-        let mut op = self
-            .handle_dispatch_side_result(self.ops_crud().lookup_in(self.client(), req).await)
-            .await?;
+        self.with_dispatch_span(req, |req| async move {
+            let mut op = self
+                .handle_dispatch_side_result(self.ops_crud().lookup_in(self.client(), req).await)
+                .await?;
+            let opaque = op.opaque();
 
-        let res = self.handle_response_side_result(op.recv().await).await?;
-        Ok(res)
+            let res = self.handle_response_side_result(op.recv().await).await?;
+            Ok((res, opaque))
+        })
+        .await
     }
 
     async fn mutate_in(&self, req: MutateInRequest<'_>) -> KvResult<MutateInResponse> {
         self.update_last_activity();
-        let mut op = self
-            .handle_dispatch_side_result(self.ops_crud().mutate_in(self.client(), req).await)
-            .await?;
+        self.with_dispatch_span(req, |req| async move {
+            let mut op = self
+                .handle_dispatch_side_result(self.ops_crud().mutate_in(self.client(), req).await)
+                .await?;
+            let opaque = op.opaque();
 
-        let res = self.handle_response_side_result(op.recv().await).await?;
-        Ok(res)
+            let res = self.handle_response_side_result(op.recv().await).await?;
+            Ok((res, opaque))
+        })
+        .await
     }
 
     async fn get_cluster_config(
@@ -315,12 +379,16 @@ where
 
     async fn ping(&self, req: PingRequest<'_>) -> KvResult<PingResponse> {
         self.update_last_activity();
-        let mut op = self
-            .handle_dispatch_side_result(OpsUtil {}.ping(self.client(), req).await)
-            .await?;
+        self.with_dispatch_span(req, |req| async move {
+            let mut op = self
+                .handle_dispatch_side_result(OpsUtil {}.ping(self.client(), req).await)
+                .await?;
+            let opaque = op.opaque();
 
-        let res = self.handle_response_side_result(op.recv().await).await?;
-        Ok(res)
+            let res = self.handle_response_side_result(op.recv().await).await?;
+            Ok((res, opaque))
+        })
+        .await
     }
 
     async fn reconfigure_authenticator(
@@ -355,6 +423,41 @@ impl<D> StdKvClient<D>
 where
     D: Dispatcher,
 {
+    async fn with_dispatch_span<Req, Resp, F, Fut>(&self, req: Req, op_fn: F) -> KvResult<Resp>
+    where
+        F: FnOnce(Req) -> Fut + Send,
+        Fut: Future<Output = KvResult<(Resp, u32)>> + Send,
+        Resp: TraceAttributes,
+    {
+        // Fast path: skip tracing overhead when no subscriber is listening
+        if !tracing::span_enabled!(tracing::Level::TRACE) {
+            return op_fn(req).await.map(|(resp, _)| resp);
+        }
+
+        let result = self
+            .tracing
+            .orchestrate_dispatch_span(
+                BeginDispatchFields::new(
+                    (&self.remote_ip_str, &self.remote_port_str),
+                    (&self.canonical_addr().host, &self.canonical_port_str),
+                    Some(&self.id),
+                ),
+                op_fn(req),
+                |res| match res {
+                    Ok((resp, opaque)) => EndDispatchFields::new(
+                        resp.server_duration(),
+                        Some(OperationId::from_u32(*opaque)),
+                    ),
+                    Err(e) => {
+                        EndDispatchFields::new(None, e.has_opaque().map(OperationId::from_u32))
+                    }
+                },
+            )
+            .await;
+
+        result.map(|(resp, _)| resp)
+    }
+
     fn update_last_activity(&self) {
         self.last_activity_timestamp_micros
             .store(Utc::now().timestamp_micros(), Ordering::SeqCst);

@@ -17,6 +17,7 @@
  */
 
 use crate::httpx;
+use crate::tracingcomponent::MetricsName;
 use http::{Method, StatusCode};
 use std::error::Error as StdError;
 use std::fmt::{Display, Formatter};
@@ -316,6 +317,42 @@ impl From<httpx::error::Error> for Error {
             inner: Box::new(ErrorImpl {
                 kind: ErrorKind::Http(value),
             }),
+        }
+    }
+}
+
+impl MetricsName for Error {
+    fn metrics_name(&self) -> &'static str {
+        match self.kind() {
+            ErrorKind::Server(e) => e.kind().metrics_name(),
+            ErrorKind::Resource(e) => e.cause().kind().metrics_name(),
+            ErrorKind::InvalidArgument { .. } => "mgmtx.InvalidArgument",
+            ErrorKind::Message(_) => "mgmtx._OTHER",
+            ErrorKind::Http(e) => e.metrics_name(),
+        }
+    }
+}
+
+impl MetricsName for ServerErrorKind {
+    fn metrics_name(&self) -> &'static str {
+        match self {
+            ServerErrorKind::AccessDenied => "mgmtx.AccessDenied",
+            ServerErrorKind::UnsupportedFeature { .. } => "mgmtx.UnsupportedFeature",
+            ServerErrorKind::ScopeExists => "mgmtx.ScopeExists",
+            ServerErrorKind::ScopeNotFound => "mgmtx.ScopeNotFound",
+            ServerErrorKind::CollectionExists => "mgmtx.CollectionExists",
+            ServerErrorKind::CollectionNotFound => "mgmtx.CollectionNotFound",
+            ServerErrorKind::BucketExists => "mgmtx.BucketExists",
+            ServerErrorKind::BucketNotFound => "mgmtx.BucketNotFound",
+            ServerErrorKind::FlushDisabled => "mgmtx.FlushDisabled",
+            ServerErrorKind::ServerInvalidArg { .. } => "mgmtx.ServerInvalidArg",
+            ServerErrorKind::SampleAlreadyLoaded => "mgmtx.SampleAlreadyLoaded",
+            ServerErrorKind::InvalidSampleBucket => "mgmtx.InvalidSampleBucket",
+            ServerErrorKind::BucketUuidMismatch => "mgmtx.BucketUuidMismatch",
+            ServerErrorKind::UserNotFound => "mgmtx.UserNotFound",
+            ServerErrorKind::GroupNotFound => "mgmtx.GroupNotFound",
+            ServerErrorKind::OperationDelayed => "mgmtx.OperationDelayed",
+            ServerErrorKind::Unknown => "mgmtx._OTHER",
         }
     }
 }

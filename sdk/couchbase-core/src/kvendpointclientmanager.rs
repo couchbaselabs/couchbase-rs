@@ -25,6 +25,7 @@ use crate::memdx::dispatcher::OrphanResponseHandler;
 use crate::memdx::request::PingRequest;
 use crate::memdx::response::PingResponse;
 use crate::results::diagnostics::EndpointDiagnostics;
+use crate::tracingcomponent::TracingComponent;
 use arc_swap::ArcSwap;
 use futures::future::join_all;
 use futures::AsyncWriteExt;
@@ -76,6 +77,7 @@ pub(crate) struct KvEndpointClientManagerOptions {
     pub bootstrap_options: KvClientBootstrapOptions,
     pub unsolicited_packet_tx: Option<UnsolicitedPacketSender>,
     pub orphan_handler: Option<OrphanResponseHandler>,
+    pub tracing: Arc<TracingComponent>,
 
     pub endpoints: HashMap<String, KvTarget>,
     pub authenticator: Authenticator,
@@ -116,6 +118,7 @@ where
     bootstrap_options: KvClientBootstrapOptions,
     unsolicited_packet_tx: Option<UnsolicitedPacketSender>,
     orphan_handler: Option<OrphanResponseHandler>,
+    tracing: Arc<TracingComponent>,
 
     slow_state: Arc<Mutex<KvEndpointClientManagerSlowState<P, K>>>,
     fast_state: ArcSwap<KvEndpointClientManagerFastState<P, K>>,
@@ -149,6 +152,7 @@ where
             bootstrap_options: opts.bootstrap_options,
             unsolicited_packet_tx: opts.unsolicited_packet_tx,
             orphan_handler: opts.orphan_handler,
+            tracing: opts.tracing,
 
             slow_state: Arc::new(Mutex::new(slow_state)),
             fast_state: ArcSwap::from_pointee(fast_state),
@@ -222,6 +226,7 @@ where
                     selected_bucket: slow_state.selected_bucket.clone(),
                     unsolicited_packet_tx: self.unsolicited_packet_tx.clone(),
                     orphan_handler: self.orphan_handler.clone(),
+                    tracing: self.tracing.clone(),
                 })
                 .await;
 
