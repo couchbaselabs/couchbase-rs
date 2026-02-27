@@ -28,10 +28,10 @@ use couchbase_core::options::management::{
     UpsertGroupOptions, UpsertUserOptions,
 };
 use couchbase_core::{error, mgmtx};
-use log::error;
 use std::ops::Add;
 use std::time::Duration;
 use tokio::time::{sleep, timeout_at, Instant};
+use tracing::error;
 
 mod common;
 

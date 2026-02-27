@@ -41,12 +41,12 @@ use couchbase::search::sort::{Sort, SortId};
 use couchbase::search::vector::{VectorQuery, VectorSearch};
 use futures::executor::block_on;
 use futures::StreamExt;
-use log::{error, warn};
 use std::collections::HashMap;
 use std::ops::{Add, Deref};
 use std::time::Duration;
 use tokio::time;
 use tokio::time::{timeout_at, Instant};
+use tracing::{error, warn};
 
 mod common;
 

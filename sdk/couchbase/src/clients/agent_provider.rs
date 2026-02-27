@@ -57,7 +57,7 @@ impl CouchbaseAgentProvider {
                 let agent = match agent_manager.get_bucket_agent(bucket_name.clone()).await {
                     Ok(agent) => agent,
                     Err(e) => {
-                        log::error!("failed to get agent for bucket {bucket_name}: {e}");
+                        tracing::error!("failed to get agent for bucket {bucket_name}: {e}");
                         continue;
                     }
                 };

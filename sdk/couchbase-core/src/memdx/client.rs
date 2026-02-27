@@ -19,7 +19,6 @@
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{SinkExt, TryFutureExt};
-use log::{debug, error, info, trace, warn};
 use snap::raw::Decoder;
 use std::backtrace::Backtrace;
 use std::cell::RefCell;
@@ -40,6 +39,7 @@ use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use tokio_util::codec::{FramedRead, FramedWrite};
 use tokio_util::sync::{CancellationToken, DropGuard};
+use tracing::{debug, error, info, trace, warn};
 use uuid::Uuid;
 
 use crate::memdx::client_response::ClientResponse;

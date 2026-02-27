@@ -24,9 +24,9 @@ use crate::memdx::response::TryFromClientResponse;
 use crate::nmvbhandler::NotMyVbucketConfigHandler;
 use crate::vbucketmap::VbucketMap;
 use arc_swap::{ArcSwap, Guard};
-use log::debug;
 use std::future::Future;
 use std::sync::Arc;
+use tracing::debug;
 
 pub(crate) trait VbucketRouter: Send + Sync {
     fn update_vbucket_info(&self, info: VbucketRoutingInfo);

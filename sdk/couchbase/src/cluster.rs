@@ -34,8 +34,8 @@ use crate::results::diagnostics::{DiagnosticsResult, PingReport};
 use crate::results::query_results::QueryResult;
 use crate::tracing::{Keyspace, SERVICE_VALUE_QUERY};
 use couchbase_core::create_span;
-use log::info;
 use std::sync::Arc;
+use tracing::info;
 use tracing::Instrument;
 
 #[derive(Clone)]

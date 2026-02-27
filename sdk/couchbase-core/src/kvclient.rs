@@ -40,7 +40,6 @@ use crate::{error, memdx};
 use arc_swap::ArcSwap;
 use chrono::{DateTime, FixedOffset, Local, NaiveDateTime, Utc};
 use futures::future::BoxFuture;
-use log::{debug, info, warn};
 use std::future::Future;
 use std::net::SocketAddr;
 use std::ops::{Add, Deref};
@@ -52,6 +51,7 @@ use tokio::select;
 use tokio::sync::{mpsc, oneshot, Mutex};
 use tokio::time::Instant;
 use tokio_util::sync::CancellationToken;
+use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 #[derive(Clone)]

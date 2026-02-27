@@ -28,9 +28,9 @@ use bytes::Bytes;
 use futures::future::err;
 use futures::{FutureExt, Stream, StreamExt, TryStreamExt};
 use http::StatusCode;
-use log::debug;
 use regex::Regex;
 use tokio::sync::Mutex;
+use tracing::debug;
 
 use crate::helpers::durations::parse_duration_from_golang_string;
 use crate::httpx;

@@ -15,8 +15,8 @@ authors = [
 [dependencies]
 form_urlencoded = "1.2.2"
 hickory-resolver = { version = "0.24.4", features = ["tokio-runtime", "system-config"], default-features = false }
-log = "0.4.28"
 regex = "1.11.3"
+tracing = "0.1.44"
 url = "2.5.7"
 
 [dev-dependencies]

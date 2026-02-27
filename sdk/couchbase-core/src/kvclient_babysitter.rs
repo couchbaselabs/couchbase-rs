@@ -37,7 +37,6 @@ use crate::{authenticator, error, kvclient};
 use arc_swap::ArcSwap;
 use chrono::Utc;
 use futures_core::future::BoxFuture;
-use log::{debug, info, warn};
 use std::error::Error as stdError;
 use std::future::Future;
 use std::mem::take;
@@ -50,6 +49,7 @@ use tokio::sync::mpsc::{Sender, UnboundedReceiver, UnboundedSender};
 use tokio::sync::{mpsc, oneshot, watch, MutexGuard};
 use tokio::time::{sleep, Instant};
 use tokio_util::sync::CancellationToken;
+use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 #[derive(Clone, Debug)]

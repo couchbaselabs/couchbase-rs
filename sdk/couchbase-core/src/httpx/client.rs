@@ -26,11 +26,11 @@ use async_trait::async_trait;
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 use http::header::{CONTENT_TYPE, USER_AGENT};
-use log::{debug, trace};
 use reqwest::redirect::Policy;
 use std::error::Error as StdError;
 use std::sync::Arc;
 use std::time::Duration;
+use tracing::{debug, trace};
 use uuid::Uuid;
 
 #[async_trait]
