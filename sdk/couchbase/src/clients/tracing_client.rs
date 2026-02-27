@@ -128,6 +128,11 @@ impl CouchbaseTracingClient {
         &self,
         f: impl FnOnce() -> crate::error::Result<T>,
     ) -> crate::error::Result<T> {
+        // Fast path: skip tracing overhead when no subscriber is listening
+        if !tracing::span_enabled!(Level::TRACE) {
+            return f();
+        }
+
         let span = trace_span!(
             target: "couchbase::tracing",
             SPAN_NAME_REQUEST_ENCODING,
@@ -152,8 +157,8 @@ impl CouchbaseTracingClient {
     ) -> OperationContext<'a> {
         let operation_name = span.name();
 
-        // Fast-path: if tracing is not enabled, avoid fetching the cluster labels.
-        let tracing_enabled = tracing::enabled!(Level::TRACE);
+        // Fast path: skip tracing overhead when no subscriber is listening
+        let tracing_enabled = tracing::span_enabled!(Level::TRACE);
 
         let cluster_labels: Option<ClusterLabels> = if tracing_enabled {
             self.get_cluster_labels().await.unwrap_or_default()
