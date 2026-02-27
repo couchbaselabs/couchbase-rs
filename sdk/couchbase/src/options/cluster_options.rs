@@ -19,12 +19,12 @@
 use crate::authenticator::Authenticator;
 use crate::capella_ca::CAPELLA_CERT;
 use crate::error;
-use log::debug;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::io::Cursor;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
+use tracing::debug;
 
 #[cfg(feature = "native-tls")]
 use tokio_native_tls::native_tls::Identity;

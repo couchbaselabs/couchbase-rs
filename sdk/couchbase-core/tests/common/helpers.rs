@@ -281,7 +281,7 @@ where
         }
 
         if let Err(e) = res {
-            log::error!("{e}");
+            tracing::error!("{e}");
         }
 
         tokio::time::sleep(sleep).await;

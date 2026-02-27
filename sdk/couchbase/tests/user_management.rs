@@ -26,10 +26,10 @@ use couchbase::options::user_mgmt_options::{
     DropUserOptions, GetAllGroupsOptions, GetAllUsersOptions, GetGroupOptions, GetRolesOptions,
     GetUserOptions, UpsertUserOptions,
 };
-use log::warn;
 use std::ops::Add;
 use std::time::Duration;
 use tokio::time::Instant;
+use tracing::warn;
 
 mod common;
 

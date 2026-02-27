@@ -19,9 +19,9 @@
 use crate::errmap::{parse_error_map, ErrMap};
 use crate::memdx::status::Status;
 use arc_swap::{ArcSwapOption, AsRaw};
-use log::debug;
 use std::ptr;
 use std::sync::Arc;
+use tracing::debug;
 
 #[derive(Debug)]
 pub struct ErrMapComponent {
@@ -76,7 +76,7 @@ impl ErrMapComponent {
                 }
             }
             Err(e) => {
-                log::info!("Failed to parse error map: {e}");
+                tracing::info!("Failed to parse error map: {e}");
             }
         }
     }

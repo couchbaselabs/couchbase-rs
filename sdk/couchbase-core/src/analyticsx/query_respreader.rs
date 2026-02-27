@@ -38,7 +38,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{FutureExt, Stream, StreamExt, TryStreamExt};
 use http::StatusCode;
-use log::debug;
+use tracing::debug;
 
 pub struct QueryRespReader {
     endpoint: String,

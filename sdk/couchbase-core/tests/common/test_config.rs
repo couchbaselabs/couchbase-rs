@@ -25,10 +25,7 @@ use couchbase_core::agent::Agent;
 use couchbase_core::options::waituntilready::WaitUntilReadyOptions;
 use envconfig::Envconfig;
 use lazy_static::lazy_static;
-use log::LevelFilter;
-use std::env;
 use std::future::Future;
-use std::io::Write;
 use std::ops::{Add, Deref};
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::SeqCst;
@@ -107,26 +104,22 @@ where
         }
 
         if LOGGER_INITIATED.compare_exchange(false, true, SeqCst, SeqCst) == Ok(false) {
-            env_logger::Builder::new()
-                .format(|buf, record| {
-                    writeln!(
-                        buf,
-                        "{}:{} {} [{}] - {}",
-                        record.file().unwrap_or("unknown"),
-                        record.line().unwrap_or(0),
-                        chrono::Local::now().format("%Y-%m-%dT%H:%M:%S%.3f"),
-                        record.level(),
-                        record.args()
-                    )
-                })
-                .filter(Some("rustls"), LevelFilter::Warn)
-                .filter_level(
-                    env::var("RUST_LOG")
-                        .unwrap_or("TRACE".to_string())
-                        .parse()
-                        .unwrap(),
-                )
-                .init();
+            let filter =
+                tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+                    tracing_subscriber::EnvFilter::new("off")
+                        .add_directive("couchbase_core=trace".parse().unwrap())
+                        .add_directive("couchbase_connstr=trace".parse().unwrap())
+                        .add_directive("rustls=warn".parse().unwrap())
+                });
+
+            tracing_subscriber::fmt()
+                .with_file(true)
+                .with_line_number(true)
+                .with_target(false)
+                .with_thread_ids(true)
+                .with_env_filter(filter)
+                .try_init()
+                .ok();
         }
 
         let test_agent = timeout_at(
@@ -155,26 +148,22 @@ where
 {
     RUNTIME.block_on(async {
         if LOGGER_INITIATED.compare_exchange(false, true, SeqCst, SeqCst) == Ok(false) {
-            env_logger::Builder::new()
-                .format(|buf, record| {
-                    writeln!(
-                        buf,
-                        "{}:{} {} [{}] - {}",
-                        record.file().unwrap_or("unknown"),
-                        record.line().unwrap_or(0),
-                        chrono::Local::now().format("%Y-%m-%dT%H:%M:%S%.3f"),
-                        record.level(),
-                        record.args()
-                    )
-                })
-                .filter(Some("rustls"), LevelFilter::Warn)
-                .filter_level(
-                    env::var("RUST_LOG")
-                        .unwrap_or("TRACE".to_string())
-                        .parse()
-                        .unwrap(),
-                )
-                .init();
+            let filter =
+                tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+                    tracing_subscriber::EnvFilter::new("off")
+                        .add_directive("couchbase_core=trace".parse().unwrap())
+                        .add_directive("couchbase_connstr=trace".parse().unwrap())
+                        .add_directive("rustls=warn".parse().unwrap())
+                });
+
+            tracing_subscriber::fmt()
+                .with_file(true)
+                .with_line_number(true)
+                .with_target(false)
+                .with_thread_ids(true)
+                .with_env_filter(filter)
+                .try_init()
+                .ok();
         }
 
         let test_config = EnvTestConfig::init_from_env().unwrap();

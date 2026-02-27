@@ -16,9 +16,9 @@
  *
  */
 
-use log::warn;
 use tokio::select;
 use tokio::time::{sleep, Instant};
+use tracing::warn;
 
 use crate::memdx::dispatcher::Dispatcher;
 use crate::memdx::error::CancellationErrorKind;
