@@ -429,11 +429,6 @@ where
         Fut: Future<Output = KvResult<(Resp, u32)>> + Send,
         Resp: TraceAttributes,
     {
-        // Fast path: skip tracing overhead when no subscriber is listening
-        if !tracing::span_enabled!(tracing::Level::TRACE) {
-            return op_fn(req).await.map(|(resp, _)| resp);
-        }
-
         let result = self
             .tracing
             .orchestrate_dispatch_span(

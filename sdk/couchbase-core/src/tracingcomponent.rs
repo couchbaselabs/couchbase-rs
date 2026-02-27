@@ -287,6 +287,11 @@ impl TracingComponent {
         Fut: Future<Output = T> + Send,
         F: FnOnce(&T) -> EndDispatchFields + Send,
     {
+        // Fast path: skip tracing overhead when no subscriber is listening
+        if !tracing::span_enabled!(tracing::Level::TRACE) {
+            return operation.await;
+        }
+
         let span = self.create_dispatch_span(&begin_fields);
         let result = operation.instrument(span.clone()).await;
         let end_fields = end_fields_provider(&result);
