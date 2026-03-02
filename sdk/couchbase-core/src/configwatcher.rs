@@ -29,7 +29,6 @@ use crate::memdx::hello_feature::HelloFeature;
 use crate::memdx::request::{GetClusterConfigKnownVersion, GetClusterConfigRequest};
 use crate::parsedconfig::ParsedConfig;
 use futures::future::err;
-use log::{debug, error, trace};
 use std::cmp::Ordering;
 use std::future::Future;
 use std::ops::Deref;
@@ -40,6 +39,7 @@ use tokio::select;
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::sync::{broadcast, watch, Notify};
 use tokio::time::sleep;
+use tracing::{debug, error, trace};
 
 #[derive(Debug, Clone)]
 pub(crate) struct ConfigWatcherMemdConfig {

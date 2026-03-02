@@ -16,7 +16,7 @@
  *
  */
 
-use log::error;
+use tracing::error;
 use uuid::Uuid;
 
 pub mod consistency_utils;

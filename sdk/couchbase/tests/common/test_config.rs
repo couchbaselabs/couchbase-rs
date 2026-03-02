@@ -16,9 +16,7 @@
  *
  */
 
-use std::env;
 use std::future::Future;
-use std::io::Write;
 use std::ops::Deref;
 use std::sync::LazyLock;
 
@@ -32,7 +30,6 @@ use couchbase::service_type::ServiceType;
 use couchbase_connstr::ResolvedConnSpec;
 use envconfig::Envconfig;
 use lazy_static::lazy_static;
-use log::LevelFilter;
 use tokio::runtime::Runtime;
 use tokio::sync::RwLock;
 
@@ -104,26 +101,23 @@ where
             return;
         }
 
-        env_logger::Builder::new()
-            .format(|buf, record| {
-                writeln!(
-                    buf,
-                    "{}:{} {} [{}] - {}",
-                    record.file().unwrap_or("unknown"),
-                    record.line().unwrap_or(0),
-                    chrono::Local::now().format("%Y-%m-%dT%H:%M:%S"),
-                    record.level(),
-                    record.args()
-                )
-            })
-            .filter(Some("rustls"), LevelFilter::Warn)
-            .filter_level(
-                env::var("RUST_LOG")
-                    .unwrap_or("TRACE".to_string())
-                    .parse()
-                    .unwrap(),
-            )
-            .init();
+        let filter = tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+            tracing_subscriber::EnvFilter::new("off")
+                .add_directive("couchbase::metrics=off".parse().unwrap())
+                .add_directive("couchbase=trace".parse().unwrap())
+                .add_directive("couchbase_core=trace".parse().unwrap())
+                .add_directive("couchbase_connstr=trace".parse().unwrap())
+                .add_directive("rustls=warn".parse().unwrap())
+        });
+
+        tracing_subscriber::fmt()
+            .with_file(true)
+            .with_line_number(true)
+            .with_target(false)
+            .with_thread_ids(true)
+            .with_env_filter(filter)
+            .try_init()
+            .ok();
 
         let test_cluster = create_test_cluster().await;
 

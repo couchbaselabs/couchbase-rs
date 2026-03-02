@@ -22,13 +22,13 @@ use error::ErrorKind;
 use hickory_resolver::config::*;
 use hickory_resolver::system_conf::read_system_conf;
 use hickory_resolver::TokioAsyncResolver;
-use log::debug;
 use regex::Regex;
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::net::SocketAddr;
 use std::time::Duration;
+use tracing::debug;
 use url::form_urlencoded;
 
 pub const DEFAULT_LEGACY_HTTP_PORT: u16 = 8091;

@@ -64,7 +64,7 @@ use crate::{httpx, mgmtx};
 
 use byteorder::BigEndian;
 use futures::executor::block_on;
-use log::{debug, error, info, warn};
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 use crate::analyticscomponent::{AnalyticsComponent, AnalyticsComponentOptions};

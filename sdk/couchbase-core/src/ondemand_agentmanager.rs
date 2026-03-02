@@ -22,8 +22,8 @@ use std::time::Duration;
 
 use arc_swap::ArcSwap;
 use futures::executor::block_on;
-use log::{debug, info};
 use tokio::sync::{Mutex, Notify};
+use tracing::{debug, info};
 
 use crate::agent::Agent;
 use crate::auth_mechanism::AuthMechanism;
