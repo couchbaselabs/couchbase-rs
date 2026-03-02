@@ -16,6 +16,13 @@
  *
  */
 
+//! Mutation state tracking for scan consistency.
+//!
+//! A [`MutationState`] aggregates [`MutationToken`]s from mutation results so that
+//! subsequent queries or scans can wait for those mutations to be indexed.
+//! Pass it via [`QueryOptions::scan_consistency`](crate::options::query_options::QueryOptions::scan_consistency)
+//! with [`ScanConsistency::AtPlus`](crate::options::query_options::ScanConsistency::AtPlus).
+
 use couchbase_core::queryx::query_options::{ScanVectorEntry, SparseScanVectors};
 use serde::de::{MapAccess, Visitor};
 use serde::ser::{SerializeMap, SerializeStruct};
@@ -24,6 +31,11 @@ use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Write;
 
+/// A token representing a specific mutation on a specific vBucket.
+///
+/// Obtained from [`MutationResult::mutation_token`](crate::results::kv_results::MutationResult::mutation_token)
+/// after a successful mutation. Used to build a [`MutationState`] for scan consistency
+/// in operations like query.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct MutationToken {
     pub(crate) token: couchbase_core::mutationtoken::MutationToken,
@@ -46,23 +58,53 @@ impl MutationToken {
         }
     }
 
+    /// Returns the vBucket partition ID.
     pub fn partition_id(&self) -> u16 {
         self.token.vbid()
     }
 
+    /// Returns the vBucket UUID.
     pub fn partition_uuid(&self) -> u64 {
         self.token.vbuuid()
     }
 
+    /// Returns the sequence number of this mutation.
     pub fn sequence_number(&self) -> u64 {
         self.token.seqno()
     }
 
+    /// Returns the name of the bucket this token belongs to.
     pub fn bucket_name(&self) -> &str {
         &self.bucket_name
     }
 }
 
+/// Aggregates [`MutationToken`]s to achieve read-your-own-writes scan consistency
+/// in operations like SQL++ query.
+///
+/// Build a `MutationState` by pushing tokens from mutation results, then pass it to
+/// [`ScanConsistency::AtPlus`](crate::options::query_options::ScanConsistency::AtPlus).
+///
+/// # Example
+///
+/// ```rust,no_run
+/// # use couchbase::collection::Collection;
+/// # use couchbase::mutation_state::MutationState;
+/// # use couchbase::options::query_options::{QueryOptions, ScanConsistency};
+/// # async fn example(collection: Collection, cluster: couchbase::cluster::Cluster) -> couchbase::error::Result<()> {
+/// let result = collection.upsert("key", &serde_json::json!({"x": 1}), None).await?;
+///
+/// let mut state = MutationState::new();
+/// if let Some(token) = result.mutation_token() {
+///     state = state.push_token(token.clone());
+/// }
+///
+/// let opts = QueryOptions::new()
+///     .scan_consistency(ScanConsistency::AtPlus(state));
+/// let mut rows = cluster.query("SELECT * FROM `bucket` WHERE x = 1", opts).await?;
+/// # Ok(())
+/// # }
+/// ```
 #[derive(Default, Clone, Debug, Eq, PartialEq)]
 pub struct MutationState {
     // There's a bit of duplication between key and value here but that allows us to recreate
@@ -88,12 +130,17 @@ impl Serialize for MutationStateKey {
 }
 
 impl MutationState {
+    /// Creates a new empty `MutationState`.
     pub fn new() -> Self {
         Self {
             tokens: HashMap::default(),
         }
     }
 
+    /// Adds a mutation token to this state. If a token for the same vBucket already
+    /// exists, only the one with the higher sequence number is kept.
+    ///
+    /// Returns `self` for chaining.
     pub fn push_token(mut self, token: MutationToken) -> Self {
         let key = MutationStateKey {
             bucket_name: token.bucket_name,
@@ -111,6 +158,7 @@ impl MutationState {
         self
     }
 
+    /// Returns all tokens in this mutation state.
     pub fn tokens(&self) -> Vec<MutationToken> {
         self.tokens
             .iter()

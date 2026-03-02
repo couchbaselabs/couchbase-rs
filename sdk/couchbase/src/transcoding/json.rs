@@ -16,9 +16,15 @@
  *
  */
 
+//! JSON transcoding using `serde_json`.
+//!
+//! This is the default transcoder used by [`Collection::upsert`](crate::collection::Collection),
+//! [`Collection::insert`](crate::collection::Collection), etc.
+
 use crate::transcoding::{decode_common_flags, encode_common_flags, DataType};
 use serde::Serialize;
 
+/// Encodes a value to JSON bytes with the appropriate common flags.
 pub fn encode<T: Serialize>(value: T) -> crate::error::Result<(Vec<u8>, u32)> {
     let content = serde_json::to_vec(&value)
         .map_err(|e| crate::error::Error::other_failure(e.to_string()))?;
@@ -27,6 +33,7 @@ pub fn encode<T: Serialize>(value: T) -> crate::error::Result<(Vec<u8>, u32)> {
     Ok((content, flags))
 }
 
+/// Decodes JSON bytes into the requested type, verifying the common flags indicate JSON.
 pub fn decode<T: serde::de::DeserializeOwned>(value: &[u8], flags: u32) -> crate::error::Result<T> {
     let datatype = decode_common_flags(flags);
     if datatype != DataType::Json {

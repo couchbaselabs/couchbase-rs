@@ -16,6 +16,19 @@
  *
  */
 
+//! Data structure operations on a [`Collection`].
+//!
+//! Provides high-level data structure abstractions backed by sub-document operations:
+//!
+//! - [`CouchbaseList`] — a list (JSON array).
+//! - [`CouchbaseMap`] — a key-value map (JSON object).
+//! - [`CouchbaseSet`] — an unordered set of unique values.
+//! - [`CouchbaseQueue`] — a FIFO queue.
+//!
+//! Create data structures using the methods on [`Collection`]:
+//! [`list`](Collection::list), [`map`](Collection::map),
+//! [`set`](Collection::set), [`queue`](Collection::queue).
+
 use crate::collection::Collection;
 use crate::options::collection_ds_options::{
     CouchbaseListOptions, CouchbaseMapOptions, CouchbaseQueueOptions, CouchbaseSetOptions,
@@ -30,6 +43,23 @@ use serde::Serialize;
 use std::collections::HashMap;
 use tracing::Instrument;
 
+/// A list (JSON array) data structure backed by a document in a collection.
+///
+/// Supports get, append, prepend, remove, size, clear, and iteration.
+///
+/// # Example
+///
+/// ```rust,no_run
+/// # use couchbase::collection::Collection;
+/// # async fn example(collection: Collection) -> couchbase::error::Result<()> {
+/// let list = collection.list("my-list", None);
+/// list.append("hello").await?;
+/// list.append("world").await?;
+/// let size = list.len().await?;
+/// assert_eq!(size, 2);
+/// # Ok(())
+/// # }
+/// ```
 #[derive(Clone)]
 pub struct CouchbaseList<'a> {
     pub collection: &'a Collection,
@@ -38,6 +68,7 @@ pub struct CouchbaseList<'a> {
 }
 
 impl Collection {
+    /// Creates a [`CouchbaseList`] backed by the document with the given ID.
     pub fn list(
         &self,
         id: impl Into<String>,
@@ -50,6 +81,7 @@ impl Collection {
         }
     }
 
+    /// Creates a [`CouchbaseMap`] backed by the document with the given ID.
     pub fn map(
         &self,
         id: impl Into<String>,
@@ -62,6 +94,7 @@ impl Collection {
         }
     }
 
+    /// Creates a [`CouchbaseSet`] backed by the document with the given ID.
     pub fn set(
         &self,
         id: impl Into<String>,
@@ -74,6 +107,7 @@ impl Collection {
         }
     }
 
+    /// Creates a [`CouchbaseQueue`] backed by the document with the given ID.
     pub fn queue(
         &self,
         id: impl Into<String>,
@@ -88,6 +122,7 @@ impl Collection {
 }
 
 impl CouchbaseList<'_> {
+    /// Returns an iterator over all elements in the list.
     pub async fn iter<T: DeserializeOwned>(&self) -> crate::error::Result<impl Iterator<Item = T>> {
         let ctx = self
             .collection
@@ -109,6 +144,7 @@ impl CouchbaseList<'_> {
         result
     }
 
+    /// Gets the element at the given index.
     pub async fn get<V: DeserializeOwned>(&self, index: usize) -> crate::error::Result<V> {
         let collection = self.collection;
         let id = &self.id;
@@ -133,6 +169,7 @@ impl CouchbaseList<'_> {
         result
     }
 
+    /// Removes the element at the given index.
     pub async fn remove(&self, index: usize) -> crate::error::Result<()> {
         let ctx = self
             .collection
@@ -159,6 +196,7 @@ impl CouchbaseList<'_> {
         result
     }
 
+    /// Appends a value to the end of the list. Creates the list if it doesn't exist.
     pub async fn append<V: Serialize>(&self, value: V) -> crate::error::Result<()> {
         let ctx = self
             .collection
@@ -185,6 +223,7 @@ impl CouchbaseList<'_> {
         result
     }
 
+    /// Prepends a value to the beginning of the list. Creates the list if it doesn't exist.
     pub async fn prepend<V: Serialize>(&self, value: V) -> crate::error::Result<()> {
         let ctx = self
             .collection
@@ -211,6 +250,7 @@ impl CouchbaseList<'_> {
         result
     }
 
+    /// Returns the index of the first occurrence of the given value, or `-1` if not found.
     pub async fn position<V: PartialEq + DeserializeOwned>(
         &self,
         value: V,
@@ -240,6 +280,7 @@ impl CouchbaseList<'_> {
         result
     }
 
+    /// Returns the number of elements in the list.
     pub async fn len(&self) -> crate::error::Result<usize> {
         let ctx = self
             .collection
@@ -263,6 +304,7 @@ impl CouchbaseList<'_> {
         result
     }
 
+    /// Removes all elements from the list by deleting the backing document.
     pub async fn clear(&self) -> crate::error::Result<()> {
         let ctx = self
             .collection
@@ -284,6 +326,9 @@ impl CouchbaseList<'_> {
     }
 }
 
+/// A map (JSON object) data structure backed by a document in a collection.
+///
+/// Supports get, insert, remove, keys, values, exists, size, clear, and iteration.
 #[derive(Clone)]
 pub struct CouchbaseMap<'a> {
     pub collection: &'a Collection,
@@ -292,6 +337,7 @@ pub struct CouchbaseMap<'a> {
 }
 
 impl CouchbaseMap<'_> {
+    /// Returns an iterator over all key-value pairs in the map.
     pub async fn iter<T: DeserializeOwned>(
         &self,
     ) -> crate::error::Result<impl Iterator<Item = (String, T)>> {
@@ -315,6 +361,7 @@ impl CouchbaseMap<'_> {
         result
     }
 
+    /// Gets the value associated with the given key.
     pub async fn get<V: DeserializeOwned>(&self, id: impl Into<String>) -> crate::error::Result<V> {
         let ctx = self
             .collection
@@ -338,6 +385,7 @@ impl CouchbaseMap<'_> {
         result
     }
 
+    /// Inserts or updates a key-value pair in the map. Creates the map if it doesn't exist.
     pub async fn insert<V: Serialize>(
         &self,
         id: impl Into<String>,
@@ -368,6 +416,7 @@ impl CouchbaseMap<'_> {
         result
     }
 
+    /// Removes the entry with the given key from the map.
     pub async fn remove(&self, id: impl Into<String>) -> crate::error::Result<()> {
         let ctx = self
             .collection
@@ -390,6 +439,7 @@ impl CouchbaseMap<'_> {
         result
     }
 
+    /// Returns `true` if the map contains the given key.
     pub async fn contains_key(&self, id: impl Into<String>) -> crate::error::Result<bool> {
         let ctx = self
             .collection
@@ -413,6 +463,7 @@ impl CouchbaseMap<'_> {
         result
     }
 
+    /// Returns the number of entries in the map.
     pub async fn len(&self) -> crate::error::Result<usize> {
         let ctx = self
             .collection
@@ -436,6 +487,7 @@ impl CouchbaseMap<'_> {
         result
     }
 
+    /// Returns all keys in the map.
     pub async fn keys(&self) -> crate::error::Result<Vec<String>> {
         let ctx = self
             .collection
@@ -457,6 +509,7 @@ impl CouchbaseMap<'_> {
         result
     }
 
+    /// Returns all values in the map.
     pub async fn values<T: DeserializeOwned>(&self) -> crate::error::Result<Vec<T>> {
         let ctx = self
             .collection
@@ -478,6 +531,7 @@ impl CouchbaseMap<'_> {
         result
     }
 
+    /// Removes all entries from the map by deleting the backing document.
     pub async fn clear(&self) -> crate::error::Result<()> {
         let ctx = self
             .collection
@@ -499,6 +553,10 @@ impl CouchbaseMap<'_> {
     }
 }
 
+/// An unordered set of unique values backed by a document in a collection.
+///
+/// Supports add, contains, remove, size, clear, and iteration.
+/// Duplicate values are silently ignored.
 #[derive(Clone)]
 pub struct CouchbaseSet<'a> {
     pub collection: &'a Collection,
@@ -507,6 +565,7 @@ pub struct CouchbaseSet<'a> {
 }
 
 impl CouchbaseSet<'_> {
+    /// Returns an iterator over all elements in the set.
     pub async fn iter<T: DeserializeOwned>(&self) -> crate::error::Result<impl Iterator<Item = T>> {
         let ctx = self
             .collection
@@ -528,6 +587,9 @@ impl CouchbaseSet<'_> {
         result
     }
 
+    /// Adds a value to the set. Creates the set if it doesn't exist.
+    ///
+    /// Returns `true` if the value was added, or `false` if it was already present.
     pub async fn insert<V: Serialize>(&self, value: V) -> crate::error::Result<bool> {
         let ctx = self
             .collection
@@ -563,6 +625,9 @@ impl CouchbaseSet<'_> {
         result
     }
 
+    /// Removes a value from the set.
+    ///
+    /// Uses an optimistic CAS loop to handle concurrent modifications, retrying up to 16 times.
     pub async fn remove<T: DeserializeOwned + PartialEq>(
         &self,
         value: T,
@@ -619,6 +684,7 @@ impl CouchbaseSet<'_> {
         result
     }
 
+    /// Returns all values in the set.
     pub async fn values<T: DeserializeOwned>(&self) -> crate::error::Result<Vec<T>> {
         let ctx = self
             .collection
@@ -640,6 +706,7 @@ impl CouchbaseSet<'_> {
         result
     }
 
+    /// Returns `true` if the set contains the given value.
     pub async fn contains<T: PartialEq + DeserializeOwned>(
         &self,
         value: T,
@@ -669,6 +736,7 @@ impl CouchbaseSet<'_> {
         result
     }
 
+    /// Returns the number of elements in the set.
     pub async fn len(&self) -> crate::error::Result<usize> {
         let ctx = self
             .collection
@@ -692,6 +760,7 @@ impl CouchbaseSet<'_> {
         result
     }
 
+    /// Removes all elements from the set by deleting the backing document.
     pub async fn clear(&self) -> crate::error::Result<()> {
         let ctx = self
             .collection
@@ -713,6 +782,9 @@ impl CouchbaseSet<'_> {
     }
 }
 
+/// A FIFO (first-in, first-out) queue backed by a document in a collection.
+///
+/// Supports push, pop, size, clear, and iteration.
 #[derive(Clone)]
 pub struct CouchbaseQueue<'a> {
     pub collection: &'a Collection,
@@ -721,6 +793,7 @@ pub struct CouchbaseQueue<'a> {
 }
 
 impl CouchbaseQueue<'_> {
+    /// Returns an iterator over all elements in the queue (front-to-back order).
     pub async fn iter<T: DeserializeOwned>(&self) -> crate::error::Result<impl Iterator<Item = T>> {
         let ctx = self
             .collection
@@ -743,6 +816,7 @@ impl CouchbaseQueue<'_> {
         result
     }
 
+    /// Pushes a value onto the back of the queue. Creates the queue if it doesn't exist.
     pub async fn push<V: Serialize>(&self, value: V) -> crate::error::Result<()> {
         let ctx = self
             .collection
@@ -769,6 +843,9 @@ impl CouchbaseQueue<'_> {
         result
     }
 
+    /// Pops a value from the front of the queue.
+    ///
+    /// Uses an optimistic CAS loop to handle concurrent modifications, retrying up to 16 times.
     pub async fn pop<T: DeserializeOwned>(&self) -> crate::error::Result<T> {
         let ctx = self
             .collection
@@ -816,6 +893,7 @@ impl CouchbaseQueue<'_> {
         result
     }
 
+    /// Returns the number of elements in the queue.
     pub async fn len(&self) -> crate::error::Result<usize> {
         let ctx = self
             .collection
@@ -839,6 +917,7 @@ impl CouchbaseQueue<'_> {
         result
     }
 
+    /// Removes all elements from the queue by deleting the backing document.
     pub async fn clear(&self) -> crate::error::Result<()> {
         let ctx = self
             .collection

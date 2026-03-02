@@ -27,13 +27,45 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
+/// The result of a SQL++ (N1QL) query.
+///
+/// Use [`rows`](QueryResult::rows) to stream result rows, and
+/// [`metadata`](QueryResult::metadata) to access query metadata (status, metrics, warnings).
+///
+/// # Example
+///
+/// ```rust,no_run
+/// # use couchbase::cluster::Cluster;
+/// # use couchbase::authenticator::PasswordAuthenticator;
+/// # use couchbase::options::cluster_options::ClusterOptions;
+/// use futures::TryStreamExt;
+/// use serde_json::Value;
+///
+/// # async fn example() -> couchbase::error::Result<()> {
+/// # let cluster = Cluster::connect("couchbase://localhost",
+/// #     ClusterOptions::new(PasswordAuthenticator::new("u", "p").into())).await?;
+/// let mut result = cluster.query("SELECT 1 AS num", None).await?;
+///
+/// // Stream rows
+/// let rows: Vec<Value> = result.rows().try_collect().await?;
+///
+/// // Access metadata
+/// let meta = result.metadata()?;
+/// println!("Status: {:?}", meta.status);
+/// # Ok(())
+/// # }
+/// ```
 pub struct QueryResult {
     wrapped: QueryResultStream,
 }
 
+/// A warning returned by the query engine (non-fatal).
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
+#[non_exhaustive]
 pub struct QueryWarning {
+    /// The warning code.
     pub code: u32,
+    /// A human-readable warning message.
     pub message: String,
 }
 
@@ -46,6 +78,7 @@ impl From<queryx::query_result::Warning> for QueryWarning {
     }
 }
 
+/// The execution status of a SQL++ query.
 #[derive(Debug, Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Hash)]
 #[non_exhaustive]
 pub enum QueryStatus {
@@ -78,15 +111,28 @@ impl From<queryx::query_result::Status> for QueryStatus {
     }
 }
 
+/// Performance metrics for a completed SQL++ query.
+///
+/// Available when [`QueryOptions::metrics`](crate::options::query_options::QueryOptions::metrics)
+/// is set to `true`.
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
+#[non_exhaustive]
 pub struct QueryMetrics {
+    /// Total time from query submission to completion.
     pub elapsed_time: Duration,
+    /// Time spent actually executing the query.
     pub execution_time: Duration,
+    /// Number of result rows returned.
     pub result_count: u64,
+    /// Total size of all result rows in bytes.
     pub result_size: u64,
+    /// Number of mutations performed by the query.
     pub mutation_count: u64,
+    /// Number of rows sorted.
     pub sort_count: u64,
+    /// Number of errors encountered.
     pub error_count: u64,
+    /// Number of warnings generated.
     pub warning_count: u64,
 }
 
@@ -105,14 +151,25 @@ impl From<&queryx::query_result::Metrics> for QueryMetrics {
     }
 }
 
+/// Metadata associated with a SQL++ query result.
+///
+/// Includes the request ID, status, optional metrics, warnings, and profile information.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct QueryMetaData<'a> {
+    /// The server-assigned request ID for this query.
     pub request_id: &'a str,
+    /// The client-provided context ID, if any.
     pub client_context_id: &'a str,
+    /// The execution status of the query.
     pub status: QueryStatus,
+    /// Query performance metrics (present when metrics were requested).
     pub metrics: Option<QueryMetrics>,
+    /// The query result signature (schema of result rows), if available.
     pub signature: Option<&'a RawValue>,
+    /// Warnings generated during query execution.
     pub warnings: Vec<QueryWarning>,
+    /// Query profiling information (present when profiling was requested).
     pub profile: Option<&'a RawValue>,
 }
 
@@ -164,10 +221,34 @@ impl<V: DeserializeOwned> Stream for QueryRows<'_, V> {
 }
 
 impl QueryResult {
+    /// Returns the metadata for this query result.
+    ///
+    /// Metadata includes the query status, metrics, warnings, and profile information.
+    /// This method may only be called after all rows have been consumed, or on a result
+    /// where you don't need the rows.
     pub fn metadata(&self) -> error::Result<QueryMetaData<'_>> {
         Ok(self.wrapped.metadata()?.into())
     }
 
+    /// Returns a [`Stream`] of deserialized result rows.
+    ///
+    /// Each row is deserialized from JSON into the requested type `V`.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use couchbase::results::query_results::QueryResult;
+    /// use futures::TryStreamExt;
+    /// use serde::Deserialize;
+    ///
+    /// #[derive(Deserialize)]
+    /// struct Row { name: String }
+    ///
+    /// # async fn example(mut result: QueryResult) -> couchbase::error::Result<()> {
+    /// let rows: Vec<Row> = result.rows().try_collect().await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn rows<'a, V: DeserializeOwned + 'a>(
         &'a mut self,
     ) -> impl Stream<Item = error::Result<V>> + 'a {

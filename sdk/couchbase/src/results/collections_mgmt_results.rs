@@ -18,6 +18,7 @@
 
 use crate::management::collections::collection_settings::MaxExpiryValue;
 
+/// Describes a scope and its collections, returned by collection management operations.
 #[derive(Default, Debug, Clone)]
 pub struct ScopeSpec {
     pub(crate) name: String,
@@ -25,15 +26,18 @@ pub struct ScopeSpec {
 }
 
 impl ScopeSpec {
+    /// Returns the name of the scope.
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// Returns the collections within this scope.
     pub fn collections(&self) -> &[CollectionSpec] {
         &self.collections
     }
 }
 
+/// Describes a collection within a scope.
 #[derive(Debug, Clone)]
 pub struct CollectionSpec {
     pub(crate) name: String,
@@ -43,18 +47,22 @@ pub struct CollectionSpec {
 }
 
 impl CollectionSpec {
+    /// Returns the name of the collection.
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// Returns the name of the scope this collection belongs to.
     pub fn scope_name(&self) -> &str {
         &self.scope_name
     }
 
+    /// Returns the maximum expiry setting for documents in this collection.
     pub fn max_expiry(&self) -> MaxExpiryValue {
         self.max_expiry
     }
 
+    /// Returns whether history retention is enabled for this collection.
     pub fn history(&self) -> bool {
         self.history
     }

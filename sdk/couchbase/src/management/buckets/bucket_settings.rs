@@ -18,31 +18,51 @@
 
 use crate::durability_level::DurabilityLevel;
 use couchbase_core::mgmtx::bucket_settings::BucketDef;
-use std::fmt::Display;
 use std::time::Duration;
 
+/// Settings for a Couchbase bucket.
+///
+/// Used with [`BucketManager::create_bucket`](super::bucket_manager::BucketManager::create_bucket)
+/// and [`BucketManager::update_bucket`](super::bucket_manager::BucketManager::update_bucket).
 #[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
 #[non_exhaustive]
 pub struct BucketSettings {
+    /// The name of the bucket.
     pub name: String,
+    /// RAM quota in megabytes.
     pub ram_quota_mb: Option<u64>,
+    /// Whether flush is enabled.
     pub flush_enabled: Option<bool>,
+    /// Number of replicas.
     pub num_replicas: Option<u32>,
+    /// The eviction policy for the bucket.
     pub eviction_policy: Option<EvictionPolicyType>,
+    /// Maximum expiry (TTL) for documents.
     pub max_expiry: Option<Duration>,
+    /// Compression mode.
     pub compression_mode: Option<CompressionMode>,
+    /// Minimum durability level for writes.
     pub minimum_durability_level: Option<DurabilityLevel>,
+    /// Whether history retention is enabled by default for new collections.
     pub history_retention_collection_default: Option<bool>,
+    /// History retention size limit in bytes.
     pub history_retention_bytes: Option<u64>,
+    /// History retention time limit.
     pub history_retention_duration: Option<Duration>,
+    /// Conflict resolution strategy.
     pub conflict_resolution_type: Option<ConflictResolutionType>,
+    /// Whether replica indexes are enabled.
     pub replica_indexes: Option<bool>,
+    /// The type of the bucket.
     pub bucket_type: Option<BucketType>,
+    /// The storage backend.
     pub storage_backend: Option<StorageBackend>,
+    /// Number of vBuckets.
     pub num_vbuckets: Option<u16>,
 }
 
 impl BucketSettings {
+    /// Creates a new `BucketSettings` with the given name and default values.
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -64,36 +84,43 @@ impl BucketSettings {
         }
     }
 
+    /// Enables or disables flush.
     pub fn flush_enabled(mut self, flush_enabled: bool) -> Self {
         self.flush_enabled = Some(flush_enabled);
         self
     }
 
+    /// Sets the RAM quota in megabytes.
     pub fn ram_quota_mb(mut self, ram_quota_mb: u64) -> Self {
         self.ram_quota_mb = Some(ram_quota_mb);
         self
     }
 
+    /// Sets the number of replicas.
     pub fn num_replicas(mut self, replica_number: u32) -> Self {
         self.num_replicas = Some(replica_number);
         self
     }
 
+    /// Sets the eviction policy.
     pub fn eviction_policy(mut self, eviction_policy: impl Into<EvictionPolicyType>) -> Self {
         self.eviction_policy = Some(eviction_policy.into());
         self
     }
 
+    /// Sets the maximum document expiry.
     pub fn max_expiry(mut self, max_expiry: Duration) -> Self {
         self.max_expiry = Some(max_expiry);
         self
     }
 
+    /// Sets the compression mode.
     pub fn compression_mode(mut self, compression_mode: impl Into<CompressionMode>) -> Self {
         self.compression_mode = Some(compression_mode.into());
         self
     }
 
+    /// Sets the minimum durability level for writes.
     pub fn minimum_durability_level(
         mut self,
         durability_min_level: impl Into<DurabilityLevel>,
@@ -102,6 +129,7 @@ impl BucketSettings {
         self
     }
 
+    /// Sets whether history retention is enabled by default for new collections.
     pub fn history_retention_collection_default(
         mut self,
         history_retention_collection_default: bool,
@@ -110,16 +138,19 @@ impl BucketSettings {
         self
     }
 
+    /// Sets the history retention size limit in bytes.
     pub fn history_retention_bytes(mut self, history_retention_bytes: u64) -> Self {
         self.history_retention_bytes = Some(history_retention_bytes);
         self
     }
 
+    /// Sets the history retention time limit.
     pub fn history_retention_duration(mut self, history_retention_duration: Duration) -> Self {
         self.history_retention_duration = Some(history_retention_duration);
         self
     }
 
+    /// Sets the conflict resolution type.
     pub fn conflict_resolution_type(
         mut self,
         conflict_resolution_type: impl Into<ConflictResolutionType>,
@@ -128,34 +159,45 @@ impl BucketSettings {
         self
     }
 
+    /// Enables or disables replica indexes.
     pub fn replica_indexes(mut self, replica_indexes: bool) -> Self {
         self.replica_indexes = Some(replica_indexes);
         self
     }
 
+    /// Sets the bucket type.
     pub fn bucket_type(mut self, bucket_type: impl Into<BucketType>) -> Self {
         self.bucket_type = Some(bucket_type.into());
         self
     }
 
+    /// Sets the storage backend.
     pub fn storage_backend(mut self, storage_backend: impl Into<StorageBackend>) -> Self {
         self.storage_backend = Some(storage_backend.into());
         self
     }
 
+    /// Sets the number of vBuckets.
     pub fn num_vbuckets(mut self, num_vbuckets: u16) -> Self {
         self.num_vbuckets = Some(num_vbuckets);
         self
     }
 }
 
+/// The type of a Couchbase bucket.
+///
+/// | Constant | Description |
+/// |----------|-------------|
+/// | [`COUCHBASE`](BucketType::COUCHBASE) | Persistent bucket with disk storage |
+/// | [`EPHEMERAL`](BucketType::EPHEMERAL) | In-memory only bucket |
 #[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
 #[non_exhaustive]
 pub struct BucketType(InnerBucketType);
 
 impl BucketType {
+    /// Persistent bucket with disk storage.
     pub const COUCHBASE: BucketType = BucketType(InnerBucketType::Couchbase);
-
+    /// In-memory only bucket (no disk persistence).
     pub const EPHEMERAL: BucketType = BucketType(InnerBucketType::Ephemeral);
 }
 
@@ -166,19 +208,28 @@ pub(crate) enum InnerBucketType {
     Unknown(String),
 }
 
+/// The eviction policy for a bucket.
+///
+/// | Constant | Description |
+/// |----------|-------------|
+/// | [`VALUE_ONLY`](EvictionPolicyType::VALUE_ONLY) | Only values are evicted (keys kept in memory) |
+/// | [`FULL`](EvictionPolicyType::FULL) | Both keys and values can be evicted |
+/// | [`NOT_RECENTLY_USED`](EvictionPolicyType::NOT_RECENTLY_USED) | NRU eviction (ephemeral buckets) |
+/// | [`NO_EVICTION`](EvictionPolicyType::NO_EVICTION) | No eviction — operations fail when memory is full (ephemeral buckets) |
 #[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
 #[non_exhaustive]
 pub struct EvictionPolicyType(InnerEvictionPolicyType);
 
 impl EvictionPolicyType {
+    /// Only values are evicted; keys are kept in memory.
     pub const VALUE_ONLY: EvictionPolicyType =
         EvictionPolicyType(InnerEvictionPolicyType::ValueOnly);
-
+    /// Both keys and values can be evicted.
     pub const FULL: EvictionPolicyType = EvictionPolicyType(InnerEvictionPolicyType::Full);
-
+    /// Not-recently-used eviction (for ephemeral buckets).
     pub const NOT_RECENTLY_USED: EvictionPolicyType =
         EvictionPolicyType(InnerEvictionPolicyType::NotRecentlyUsed);
-
+    /// No eviction; operations fail when memory is full (for ephemeral buckets).
     pub const NO_EVICTION: EvictionPolicyType =
         EvictionPolicyType(InnerEvictionPolicyType::NoEviction);
 }
@@ -192,15 +243,23 @@ pub(crate) enum InnerEvictionPolicyType {
     Unknown(String),
 }
 
+/// The compression mode for a bucket.
+///
+/// | Constant | Description |
+/// |----------|-------------|
+/// | [`OFF`](CompressionMode::OFF) | Compression disabled |
+/// | [`PASSIVE`](CompressionMode::PASSIVE) | Compressed data is stored as-is, uncompressed data is not compressed |
+/// | [`ACTIVE`](CompressionMode::ACTIVE) | The server actively compresses data |
 #[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
 #[non_exhaustive]
 pub struct CompressionMode(InnerCompressionMode);
 
 impl CompressionMode {
+    /// Compression disabled.
     pub const OFF: CompressionMode = CompressionMode(InnerCompressionMode::Off);
-
+    /// Compressed data is stored as-is; uncompressed data is not compressed.
     pub const PASSIVE: CompressionMode = CompressionMode(InnerCompressionMode::Passive);
-
+    /// The server actively compresses data.
     pub const ACTIVE: CompressionMode = CompressionMode(InnerCompressionMode::Active);
 }
 
@@ -212,17 +271,25 @@ pub(crate) enum InnerCompressionMode {
     Unknown(String),
 }
 
+/// The conflict resolution type for a bucket.
+///
+/// | Constant | Description |
+/// |----------|-------------|
+/// | [`SEQUENCE_NUMBER`](ConflictResolutionType::SEQUENCE_NUMBER) | Highest sequence number wins |
+/// | [`TIMESTAMP`](ConflictResolutionType::TIMESTAMP) | Highest timestamp wins |
+/// | [`CUSTOM`](ConflictResolutionType::CUSTOM) | Custom conflict resolution |
 #[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
 #[non_exhaustive]
 pub struct ConflictResolutionType(InnerConflictResolutionType);
 
 impl ConflictResolutionType {
+    /// Resolve conflicts using the highest sequence number.
     pub const SEQUENCE_NUMBER: ConflictResolutionType =
         ConflictResolutionType(InnerConflictResolutionType::SequenceNumber);
-
+    /// Resolve conflicts using the highest timestamp.
     pub const TIMESTAMP: ConflictResolutionType =
         ConflictResolutionType(InnerConflictResolutionType::Timestamp);
-
+    /// Custom conflict resolution.
     pub const CUSTOM: ConflictResolutionType =
         ConflictResolutionType(InnerConflictResolutionType::Custom);
 }
@@ -235,13 +302,20 @@ pub(crate) enum InnerConflictResolutionType {
     Unknown(String),
 }
 
+/// The storage backend for a bucket.
+///
+/// | Constant | Description |
+/// |----------|-------------|
+/// | [`COUCHSTORE`](StorageBackend::COUCHSTORE) | Couchstore storage engine |
+/// | [`MAGMA`](StorageBackend::MAGMA) | Magma storage engine (for large datasets) |
 #[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
 #[non_exhaustive]
 pub struct StorageBackend(InnerStorageBackend);
 
 impl StorageBackend {
+    /// Couchstore storage engine.
     pub const COUCHSTORE: StorageBackend = StorageBackend(InnerStorageBackend::Couchstore);
-
+    /// Magma storage engine (optimized for large datasets).
     pub const MAGMA: StorageBackend = StorageBackend(InnerStorageBackend::Magma);
 }
 

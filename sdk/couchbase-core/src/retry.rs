@@ -38,28 +38,53 @@ lazy_static! {
         Arc::new(FailFastRetryStrategy::default());
 }
 
+/// The reason an operation is being retried.
+///
+/// Each variant identifies a specific transient failure condition that triggered
+/// a retry. The SDK passes this to [`RetryStrategy::retry_after`] so the strategy
+/// can decide whether (and how long) to wait before retrying.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum RetryReason {
+    /// The server indicated the vBucket is not owned by this node.
     KvNotMyVbucket,
+    /// The vBucket map is invalid and must be refreshed.
     KvInvalidVbucketMap,
+    /// A temporary failure occurred on the KV engine.
     KvTemporaryFailure,
+    /// The collection ID is outdated and must be re-resolved.
     KvCollectionOutdated,
+    /// The server error map indicated the operation should be retried.
     KvErrorMapRetryIndicated,
+    /// The document is locked by another operation.
     KvLocked,
+    /// A sync-write (durable operation) is already in progress on this key.
     KvSyncWriteInProgress,
+    /// A sync-write recommit is in progress on this key.
     KvSyncWriteRecommitInProgress,
+    /// The required service is temporarily unavailable.
     ServiceNotAvailable,
+    /// The connection was closed while the request was in flight.
     SocketClosedWhileInFlight,
+    /// No connection is currently available.
     SocketNotAvailable,
+    /// A prepared statement for the query was invalidated.
     QueryPreparedStatementFailure,
+    /// The query index was not found (may still be building).
     QueryIndexNotFound,
+    /// The search service is rejecting requests due to rate limiting.
     SearchTooManyRequests,
+    /// An HTTP request failed to send.
     HttpSendRequestFailed,
+    /// The SDK is not yet ready to perform the operation.
     NotReady,
 }
 
 impl RetryReason {
+    /// Returns `true` if this reason allows retrying non-idempotent operations.
+    ///
+    /// Most retry reasons are safe for non-idempotent retries because the
+    /// server never processed the original request.
     pub fn allows_non_idempotent_retry(&self) -> bool {
         matches!(
             self,
@@ -81,6 +106,8 @@ impl RetryReason {
         )
     }
 
+    /// Returns `true` if the SDK should always retry for this reason,
+    /// regardless of the retry strategy's decision.
     pub fn always_retry(&self) -> bool {
         matches!(
             self,
@@ -118,26 +145,70 @@ impl Display for RetryReason {
     }
 }
 
+/// The action a [`RetryStrategy`] returns to indicate when to retry.
+///
+/// Contains the [`Duration`] to wait before the next retry attempt.
 #[derive(Clone, Debug)]
 pub struct RetryAction {
+    /// How long to wait before retrying.
     pub duration: Duration,
 }
 
 impl RetryAction {
+    /// Creates a new `RetryAction` with the given backoff duration.
     pub fn new(duration: Duration) -> Self {
         Self { duration }
     }
 }
 
+/// A strategy that decides whether and when to retry a failed operation.
+///
+/// Implement this trait to provide custom retry behavior. The SDK calls
+/// [`retry_after`](RetryStrategy::retry_after) each time a retryable failure
+/// occurs, passing the request metadata and the reason for the failure.
+///
+/// Return `Some(RetryAction)` to retry after the specified duration,
+/// or `None` to stop retrying and propagate the error.
+///
+/// # Example
+///
+/// ```rust
+/// use couchbase_core::retry::{RetryStrategy, RetryAction, RetryRequest, RetryReason};
+/// use std::fmt::Debug;
+/// use std::time::Duration;
+///
+/// #[derive(Debug)]
+/// struct FixedDelayRetry(Duration);
+///
+/// impl RetryStrategy for FixedDelayRetry {
+///     fn retry_after(&self, request: &RetryRequest, reason: &RetryReason) -> Option<RetryAction> {
+///         if request.retry_attempts < 3 {
+///             Some(RetryAction::new(self.0))
+///         } else {
+///             None // give up after 3 attempts
+///         }
+///     }
+/// }
+/// ```
 pub trait RetryStrategy: Debug + Send + Sync {
+    /// Decides whether to retry an operation and how long to wait.
+    ///
+    /// * `request` — Metadata about the in-flight request (attempt count, idempotency, etc.).
+    /// * `reason` — Why the operation failed.
+    ///
+    /// Return `Some(RetryAction)` to retry, or `None` to stop.
     fn retry_after(&self, request: &RetryRequest, reason: &RetryReason) -> Option<RetryAction>;
 }
 
+/// Metadata about a request that is being considered for retry.
 #[derive(Clone, Debug)]
 pub struct RetryRequest {
     pub(crate) operation: &'static str,
+    /// Whether the operation is idempotent (safe to retry without side effects).
     pub is_idempotent: bool,
+    /// The number of retry attempts that have already been made.
     pub retry_attempts: u32,
+    /// The set of reasons this request has been retried so far.
     pub retry_reasons: HashSet<RetryReason>,
     pub(crate) unique_id: Option<String>,
 }

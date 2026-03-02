@@ -16,6 +16,30 @@
  *
  */
 
+//! Specifications for sub-document mutation operations.
+//!
+//! Use [`MutateInSpec`] to build individual mutation specs, then pass a `Vec<MutateInSpec>` to
+//! [`Collection::mutate_in`](crate::collection::Collection).
+//!
+//! # Example
+//!
+//! ```rust,no_run
+//! use couchbase::subdoc::mutate_in_specs::MutateInSpec;
+//!
+//! # async fn example(collection: couchbase::collection::Collection) -> couchbase::error::Result<()> {
+//! let specs = vec![
+//!     MutateInSpec::upsert("name", "Alice", None)?,
+//!     MutateInSpec::array_append("tags", &["rust", "sdk"], None)?,
+//!     MutateInSpec::increment("login_count", 1, None)?,
+//!     MutateInSpec::remove("temp_field", None),
+//! ];
+//!
+//! let result = collection.mutate_in("doc-id", &specs, None).await?;
+//! println!("New CAS: {}", result.cas());
+//! # Ok(())
+//! # }
+//! ```
+
 use crate::error;
 use crate::error::Error;
 use crate::subdoc::macros::MUTATE_IN_MACROS;
@@ -26,15 +50,40 @@ use couchbase_core::memdx::subdoc::MutateInOpType::{
 use couchbase_core::memdx::subdoc::{MutateInOp, SubdocOp, SubdocOpFlag};
 use serde::Serialize;
 
+/// A sub-document mutation specification, used with
+/// [`Collection::mutate_in`](crate::collection::Collection).
+///
+/// Create specs using the static constructors such as [`insert`](MutateInSpec::insert),
+/// [`upsert`](MutateInSpec::upsert), [`replace`](MutateInSpec::replace),
+/// [`remove`](MutateInSpec::remove), [`array_append`](MutateInSpec::array_append),
+/// [`array_prepend`](MutateInSpec::array_prepend), [`array_insert`](MutateInSpec::array_insert),
+/// [`array_add_unique`](MutateInSpec::array_add_unique),
+/// [`increment`](MutateInSpec::increment), and [`decrement`](MutateInSpec::decrement).
+///
+/// # Example
+///
+/// ```rust
+/// use couchbase::subdoc::mutate_in_specs::MutateInSpec;
+///
+/// let specs = vec![
+///     MutateInSpec::upsert("name", "Alice", None).unwrap(),
+///     MutateInSpec::remove("temp", None),
+/// ];
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
-// TODO: Should this be an enum?
 pub struct MutateInSpec {
+    /// The type of mutation operation.
     pub op: MutateInOpType,
+    /// The JSON path to mutate.
     pub path: String,
+    /// The serialized value to write (empty for remove operations).
     pub value: Vec<u8>,
+    /// Whether to create intermediate path elements if they don't exist.
     pub create_path: bool,
+    /// Whether this operation targets an extended attribute (xattr).
     pub is_xattr: bool,
+    /// Whether server-side macro expansion should be applied.
     pub expand_macros: bool,
 }
 
@@ -44,232 +93,298 @@ impl SubdocOp for MutateInSpec {
     }
 }
 
+/// The type of a sub-document mutation operation.
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum MutateInOpType {
+    /// Insert a value at the path (fails if the path already exists).
     Insert,
+    /// Set the value at the path (creates or overwrites).
     Upsert,
+    /// Replace the value at the path (fails if the path does not exist).
     Replace,
+    /// Remove the value at the path.
     Remove,
+    /// Append value(s) to an array at the path.
     ArrayAppend,
+    /// Prepend value(s) to an array at the path.
     ArrayPrepend,
+    /// Insert a value at a specific array index.
     ArrayInsert,
+    /// Add a value to an array only if it doesn't already exist.
     ArrayAddUnique,
+    /// Increment or decrement a numeric value at the path.
     Counter,
 }
 
+/// Options for a [`MutateInSpec::insert`] operation.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct InsertSpecOptions {
+    /// If `true`, create intermediate path elements if they don't exist.
     pub create_path: Option<bool>,
+    /// If `true`, target an extended attribute (xattr) instead of the document body.
     pub is_xattr: Option<bool>,
 }
 
 impl InsertSpecOptions {
+    /// Creates a new `InsertSpecOptions` with default values.
     pub fn new() -> Self {
         Default::default()
     }
 
+    /// Sets whether this operation targets an extended attribute (xattr).
     pub fn xattr(mut self, is_xattr: bool) -> Self {
         self.is_xattr = Some(is_xattr);
         self
     }
 
+    /// Sets whether to create intermediate path elements.
     pub fn create_path(mut self, create_path: bool) -> Self {
         self.create_path = Some(create_path);
         self
     }
 }
 
+/// Options for a [`MutateInSpec::upsert`] operation.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct UpsertSpecOptions {
+    /// If `true`, create intermediate path elements if they don't exist.
     pub create_path: Option<bool>,
+    /// If `true`, target an extended attribute (xattr) instead of the document body.
     pub is_xattr: Option<bool>,
 }
 
 impl UpsertSpecOptions {
+    /// Creates a new `UpsertSpecOptions` with default values.
     pub fn new() -> Self {
         Default::default()
     }
 
+    /// Sets whether this operation targets an extended attribute (xattr).
     pub fn xattr(mut self, is_xattr: bool) -> Self {
         self.is_xattr = Some(is_xattr);
         self
     }
 
+    /// Sets whether to create intermediate path elements.
     pub fn create_path(mut self, create_path: bool) -> Self {
         self.create_path = Some(create_path);
         self
     }
 }
 
+/// Options for a [`MutateInSpec::replace`] operation.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct ReplaceSpecOptions {
+    /// If `true`, target an extended attribute (xattr) instead of the document body.
     pub is_xattr: Option<bool>,
 }
 
 impl ReplaceSpecOptions {
+    /// Creates a new `ReplaceSpecOptions` with default values.
     pub fn new() -> Self {
         Default::default()
     }
 
+    /// Sets whether this operation targets an extended attribute (xattr).
     pub fn xattr(mut self, is_xattr: bool) -> Self {
         self.is_xattr = Some(is_xattr);
         self
     }
 }
 
+/// Options for a [`MutateInSpec::remove`] operation.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct RemoveSpecOptions {
+    /// If `true`, target an extended attribute (xattr) instead of the document body.
     pub is_xattr: Option<bool>,
 }
 
 impl RemoveSpecOptions {
+    /// Creates a new `RemoveSpecOptions` with default values.
     pub fn new() -> Self {
         Default::default()
     }
 
+    /// Sets whether this operation targets an extended attribute (xattr).
     pub fn xattr(mut self, is_xattr: bool) -> Self {
         self.is_xattr = Some(is_xattr);
         self
     }
 }
 
+/// Options for a [`MutateInSpec::array_append`] operation.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct ArrayAppendSpecOptions {
+    /// If `true`, create intermediate path elements if they don't exist.
     pub create_path: Option<bool>,
+    /// If `true`, target an extended attribute (xattr) instead of the document body.
     pub is_xattr: Option<bool>,
 }
 
 impl ArrayAppendSpecOptions {
+    /// Creates a new `ArrayAppendSpecOptions` with default values.
     pub fn new() -> Self {
         Default::default()
     }
 
+    /// Sets whether this operation targets an extended attribute (xattr).
     pub fn xattr(mut self, is_xattr: bool) -> Self {
         self.is_xattr = Some(is_xattr);
         self
     }
 
+    /// Sets whether to create intermediate path elements.
     pub fn create_path(mut self, create_path: bool) -> Self {
         self.create_path = Some(create_path);
         self
     }
 }
 
+/// Options for a [`MutateInSpec::array_prepend`] operation.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct ArrayPrependSpecOptions {
+    /// If `true`, create intermediate path elements if they don't exist.
     pub create_path: Option<bool>,
+    /// If `true`, target an extended attribute (xattr) instead of the document body.
     pub is_xattr: Option<bool>,
 }
 
 impl ArrayPrependSpecOptions {
+    /// Creates a new `ArrayPrependSpecOptions` with default values.
     pub fn new() -> Self {
         Default::default()
     }
 
+    /// Sets whether this operation targets an extended attribute (xattr).
     pub fn xattr(mut self, is_xattr: bool) -> Self {
         self.is_xattr = Some(is_xattr);
         self
     }
 
+    /// Sets whether to create intermediate path elements.
     pub fn create_path(mut self, create_path: bool) -> Self {
         self.create_path = Some(create_path);
         self
     }
 }
 
+/// Options for a [`MutateInSpec::array_insert`] operation.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct ArrayInsertSpecOptions {
+    /// If `true`, create intermediate path elements if they don't exist.
     pub create_path: Option<bool>,
+    /// If `true`, target an extended attribute (xattr) instead of the document body.
     pub is_xattr: Option<bool>,
 }
 
 impl ArrayInsertSpecOptions {
+    /// Creates a new `ArrayInsertSpecOptions` with default values.
     pub fn new() -> Self {
         Default::default()
     }
 
+    /// Sets whether this operation targets an extended attribute (xattr).
     pub fn xattr(mut self, is_xattr: bool) -> Self {
         self.is_xattr = Some(is_xattr);
         self
     }
 
+    /// Sets whether to create intermediate path elements.
     pub fn create_path(mut self, create_path: bool) -> Self {
         self.create_path = Some(create_path);
         self
     }
 }
 
+/// Options for a [`MutateInSpec::array_add_unique`] operation.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct ArrayAddUniqueSpecOptions {
+    /// If `true`, create intermediate path elements if they don't exist.
     pub create_path: Option<bool>,
+    /// If `true`, target an extended attribute (xattr) instead of the document body.
     pub is_xattr: Option<bool>,
 }
 
 impl ArrayAddUniqueSpecOptions {
+    /// Creates a new `ArrayAddUniqueSpecOptions` with default values.
     pub fn new() -> Self {
         Default::default()
     }
 
+    /// Sets whether this operation targets an extended attribute (xattr).
     pub fn xattr(mut self, is_xattr: bool) -> Self {
         self.is_xattr = Some(is_xattr);
         self
     }
 
+    /// Sets whether to create intermediate path elements.
     pub fn create_path(mut self, create_path: bool) -> Self {
         self.create_path = Some(create_path);
         self
     }
 }
 
+/// Options for a [`MutateInSpec::increment`] operation.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct IncrementSpecOptions {
+    /// If `true`, create intermediate path elements if they don't exist.
     pub create_path: Option<bool>,
+    /// If `true`, target an extended attribute (xattr) instead of the document body.
     pub is_xattr: Option<bool>,
 }
 
 impl IncrementSpecOptions {
+    /// Creates a new `IncrementSpecOptions` with default values.
     pub fn new() -> Self {
         Default::default()
     }
 
+    /// Sets whether this operation targets an extended attribute (xattr).
     pub fn xattr(mut self, is_xattr: bool) -> Self {
         self.is_xattr = Some(is_xattr);
         self
     }
 
+    /// Sets whether to create intermediate path elements.
     pub fn create_path(mut self, create_path: bool) -> Self {
         self.create_path = Some(create_path);
         self
     }
 }
 
+/// Options for a [`MutateInSpec::decrement`] operation.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct DecrementSpecOptions {
+    /// If `true`, create intermediate path elements if they don't exist.
     pub create_path: Option<bool>,
+    /// If `true`, target an extended attribute (xattr) instead of the document body.
     pub is_xattr: Option<bool>,
 }
 
 impl DecrementSpecOptions {
+    /// Creates a new `DecrementSpecOptions` with default values.
     pub fn new() -> Self {
         Default::default()
     }
 
+    /// Sets whether this operation targets an extended attribute (xattr).
     pub fn xattr(mut self, is_xattr: bool) -> Self {
         self.is_xattr = Some(is_xattr);
         self
     }
 
+    /// Sets whether to create intermediate path elements.
     pub fn create_path(mut self, create_path: bool) -> Self {
         self.create_path = Some(create_path);
         self
@@ -277,6 +392,9 @@ impl DecrementSpecOptions {
 }
 
 impl MutateInSpec {
+    /// Creates an `insert` mutation spec that inserts a value at the given path.
+    ///
+    /// Fails if the path already exists. The value is serialized to JSON via `serde`.
     pub fn insert<V: Serialize>(
         path: impl Into<String>,
         value: V,
@@ -289,6 +407,7 @@ impl MutateInSpec {
         ))
     }
 
+    /// Creates an `insert` mutation spec with pre-encoded raw bytes.
     pub fn insert_raw(
         path: impl Into<String>,
         value: Vec<u8>,
@@ -307,6 +426,8 @@ impl MutateInSpec {
         }
     }
 
+    /// Creates an `upsert` mutation spec that sets the value at the given path,
+    /// creating or overwriting it.
     pub fn upsert<V: Serialize>(
         path: impl Into<String>,
         value: V,
@@ -319,6 +440,7 @@ impl MutateInSpec {
         ))
     }
 
+    /// Creates an `upsert` mutation spec with pre-encoded raw bytes.
     pub fn upsert_raw(
         path: impl Into<String>,
         value: Vec<u8>,
@@ -337,6 +459,9 @@ impl MutateInSpec {
         }
     }
 
+    /// Creates a `replace` mutation spec that replaces the value at the given path.
+    ///
+    /// Fails if the path does not exist.
     pub fn replace<V: Serialize>(
         path: impl Into<String>,
         value: V,
@@ -349,6 +474,7 @@ impl MutateInSpec {
         ))
     }
 
+    /// Creates a `replace` mutation spec with pre-encoded raw bytes.
     pub fn replace_raw(
         path: impl Into<String>,
         value: Vec<u8>,
@@ -367,6 +493,7 @@ impl MutateInSpec {
         }
     }
 
+    /// Creates a `remove` mutation spec that removes the value at the given path.
     pub fn remove(path: impl Into<String>, opts: impl Into<Option<RemoveSpecOptions>>) -> Self {
         let opts = opts.into().unwrap_or_default();
 
@@ -380,6 +507,7 @@ impl MutateInSpec {
         }
     }
 
+    /// Appends one or more values to the end of an array at the given path.
     pub fn array_append<V: Serialize>(
         path: impl Into<String>,
         value: &[V],
@@ -396,6 +524,7 @@ impl MutateInSpec {
         Ok(Self::array_append_raw(path, value, opts))
     }
 
+    /// Appends raw bytes to the end of an array at the given path.
     pub fn array_append_raw(
         path: impl Into<String>,
         value: Vec<u8>,
@@ -413,6 +542,7 @@ impl MutateInSpec {
         }
     }
 
+    /// Prepends one or more values to the beginning of an array at the given path.
     pub fn array_prepend<V: Serialize>(
         path: impl Into<String>,
         value: &[V],
@@ -429,6 +559,7 @@ impl MutateInSpec {
         Ok(Self::array_prepend_raw(path, value, opts))
     }
 
+    /// Prepends raw bytes to the beginning of an array at the given path.
     pub fn array_prepend_raw(
         path: impl Into<String>,
         value: Vec<u8>,
@@ -446,6 +577,9 @@ impl MutateInSpec {
         }
     }
 
+    /// Inserts one or more values at a specific position in an array.
+    ///
+    /// The path must include the array index, e.g. `"tags[2]"`.
     pub fn array_insert<V: Serialize>(
         path: impl Into<String>,
         value: &[V],
@@ -462,6 +596,7 @@ impl MutateInSpec {
         Ok(Self::array_insert_raw(path, value, opts))
     }
 
+    /// Inserts raw bytes at a specific position in an array.
     pub fn array_insert_raw(
         path: impl Into<String>,
         value: Vec<u8>,
@@ -479,6 +614,7 @@ impl MutateInSpec {
         }
     }
 
+    /// Adds a unique value to an array at the given path (no-op if it already exists).
     pub fn array_add_unique<V: Serialize>(
         path: impl Into<String>,
         value: V,
@@ -491,6 +627,7 @@ impl MutateInSpec {
         ))
     }
 
+    /// Adds raw bytes as a unique value to an array at the given path.
     pub fn array_add_unique_raw(
         path: impl Into<String>,
         value: Vec<u8>,
@@ -509,6 +646,9 @@ impl MutateInSpec {
         }
     }
 
+    /// Increments a numeric value at the given path by the specified positive delta.
+    ///
+    /// Returns an error if `delta` is negative.
     pub fn increment(
         path: impl Into<String>,
         delta: i64,
@@ -534,6 +674,9 @@ impl MutateInSpec {
         })
     }
 
+    /// Decrements a numeric value at the given path by the specified positive delta.
+    ///
+    /// Returns an error if `delta` is negative.
     pub fn decrement(
         path: impl Into<String>,
         delta: i64,

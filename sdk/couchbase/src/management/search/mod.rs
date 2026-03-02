@@ -16,5 +16,7 @@
  *
  */
 
+//! Search index management types.
+
 pub mod index;
 pub mod search_index_manager;

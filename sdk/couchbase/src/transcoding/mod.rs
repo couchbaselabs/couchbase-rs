@@ -16,6 +16,23 @@
  *
  */
 
+//! Transcoding utilities for encoding and decoding document content.
+//!
+//! The SDK uses "common flags" to identify the data type of stored documents. This module
+//! provides sub-modules for different encoding formats:
+//!
+//! | Module | Data Type | Description |
+//! |--------|-----------|-------------|
+//! | [`json`] | JSON | Serialize/deserialize via `serde_json` (default for most operations) |
+//! | [`raw_binary`] | Binary | Store/retrieve raw binary data |
+//! | [`raw_json`] | JSON | Store/retrieve pre-encoded JSON bytes |
+//! | [`raw_string`] | String | Store/retrieve UTF-8 string data |
+//!
+//! Most users will not need to interact with this module directly — the standard
+//! `Collection` methods handle JSON transcoding automatically. Use the `*_raw` method
+//! variants (e.g. [`Collection::upsert_raw`](crate::collection::Collection)) when you
+//! need custom transcoding.
+
 pub mod json;
 pub mod raw_binary;
 pub mod raw_json;
@@ -24,12 +41,17 @@ pub mod raw_string;
 use serde::de::DeserializeOwned;
 use serde::{Serialize, Serializer};
 
+/// Identifies the data type of a document's content based on common flags.
 #[derive(Debug, PartialEq, Clone, Hash, Ord, PartialOrd, Eq)]
 #[non_exhaustive]
 pub enum DataType {
+    /// The data type is unknown or unrecognized.
     Unknown,
+    /// JSON-encoded data.
     Json,
+    /// Raw binary data.
     Binary,
+    /// UTF-8 string data.
     String,
 }
 

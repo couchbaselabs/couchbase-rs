@@ -29,6 +29,9 @@ use couchbase_core::create_span;
 use std::sync::Arc;
 use tracing::Instrument;
 
+/// Manages users and groups on a Couchbase cluster.
+///
+/// Obtain via [`Cluster::users`](crate::cluster::Cluster::users).
 #[derive(Clone)]
 pub struct UserManager {
     client: Arc<UserMgmtClient>,
@@ -39,6 +42,7 @@ impl UserManager {
         Self { client }
     }
 
+    /// Lists all users.
     pub async fn get_all_users(
         &self,
         opts: impl Into<Option<GetAllUsersOptions>>,
@@ -61,6 +65,7 @@ impl UserManager {
         result
     }
 
+    /// Retrieves a single user by username.
     pub async fn get_user(
         &self,
         username: impl Into<String>,
@@ -84,6 +89,7 @@ impl UserManager {
         result
     }
 
+    /// Creates or updates a user.
     pub async fn upsert_user(
         &self,
         settings: User,
@@ -107,6 +113,7 @@ impl UserManager {
         result
     }
 
+    /// Drops a user by username.
     pub async fn drop_user(
         &self,
         username: impl Into<String>,
@@ -130,6 +137,7 @@ impl UserManager {
         result
     }
 
+    /// Lists all available roles on the cluster.
     pub async fn get_roles(
         &self,
         opts: impl Into<Option<GetRolesOptions>>,
@@ -152,6 +160,7 @@ impl UserManager {
         result
     }
 
+    /// Retrieves a single group by name.
     pub async fn get_group(
         &self,
         group_name: impl Into<String>,
@@ -175,6 +184,7 @@ impl UserManager {
         result
     }
 
+    /// Lists all groups.
     pub async fn get_all_groups(
         &self,
         opts: impl Into<Option<GetAllGroupsOptions>>,
@@ -197,6 +207,7 @@ impl UserManager {
         result
     }
 
+    /// Creates or updates a group.
     pub async fn upsert_group(
         &self,
         group: Group,
@@ -220,6 +231,7 @@ impl UserManager {
         result
     }
 
+    /// Drops a group by name.
     pub async fn drop_group(
         &self,
         group_name: impl Into<String>,
@@ -243,6 +255,7 @@ impl UserManager {
         result
     }
 
+    /// Changes the password of the currently authenticated user.
     pub async fn change_password(
         &self,
         password: impl Into<String>,

@@ -16,6 +16,13 @@
  *
  */
 
+//! Authentication types for connecting to a Couchbase cluster.
+//!
+//! An [`Authenticator`] must be provided when creating
+//! [`ClusterOptions`](crate::options::cluster_options::ClusterOptions). The most common
+//! choice is [`PasswordAuthenticator`] for RBAC username/password credentials.
+//! [`CertificateAuthenticator`] is available for client-certificate (mTLS) authentication.
+
 use std::fmt::{Debug, Display};
 
 #[cfg(feature = "native-tls")]
@@ -24,10 +31,27 @@ use tokio_native_tls::native_tls::Identity;
 #[cfg(all(feature = "rustls-tls", not(feature = "native-tls")))]
 use tokio_rustls::rustls::pki_types::{CertificateDer, PrivateKeyDer};
 
+/// Specifies the authentication method used to connect to a Couchbase cluster.
+///
+/// # Variants
+///
+/// - [`PasswordAuthenticator`] — RBAC username/password authentication (most common).
+/// - [`CertificateAuthenticator`] — Client certificate (mTLS) authentication.
+/// - [`JwtAuthenticator`] — JWT token authentication (**Uncommitted**).
+///
+/// # Example
+///
+/// ```rust
+/// use couchbase::authenticator::{Authenticator, PasswordAuthenticator};
+///
+/// let auth: Authenticator = PasswordAuthenticator::new("user", "pass").into();
+/// ```
 #[derive(Clone)]
 #[non_exhaustive]
 pub enum Authenticator {
+    /// RBAC username/password authentication.
     PasswordAuthenticator(PasswordAuthenticator),
+    /// Client certificate (mTLS) authentication.
     CertificateAuthenticator(CertificateAuthenticator),
     /// **Stability: Uncommitted** This API may change in the future.
     JwtAuthenticator(JwtAuthenticator),
@@ -59,13 +83,28 @@ impl Display for Authenticator {
     }
 }
 
+/// Authenticates to Couchbase using RBAC username and password credentials.
+///
+/// This is the most common authentication method. It can be converted into an
+/// [`Authenticator`] with `.into()`.
+///
+/// # Example
+///
+/// ```rust
+/// use couchbase::authenticator::PasswordAuthenticator;
+///
+/// let auth = PasswordAuthenticator::new("Administrator", "password");
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PasswordAuthenticator {
+    /// The RBAC username.
     pub username: String,
+    /// The RBAC password.
     pub password: String,
 }
 
 impl PasswordAuthenticator {
+    /// Creates a new `PasswordAuthenticator` with the given username and password.
     pub fn new(username: impl Into<String>, password: impl Into<String>) -> Self {
         Self {
             username: username.into(),
@@ -107,10 +146,38 @@ impl From<Authenticator> for couchbase_core::authenticator::Authenticator {
     }
 }
 
+/// Authenticates to Couchbase using a client TLS certificate (mTLS).
+///
+/// This variant is available when the `rustls-tls` feature is enabled (and `native-tls` is not).
+/// Provide a certificate chain and private key to establish mutual TLS with the cluster.
+///
+/// Can be converted into an [`Authenticator`] with `.into()`.
+///
+/// # Example
+///
+/// ```rust,no_run
+/// use couchbase::authenticator::CertificateAuthenticator;
+/// use std::fs;
+///
+/// // Load PEM-encoded certificate chain and private key from disk.
+/// let cert_pem = fs::read("client.crt").expect("read cert");
+/// let key_pem = fs::read("client.key").expect("read key");
+///
+/// let certs: Vec<_> = rustls_pemfile::certs(&mut &cert_pem[..])
+///     .collect::<Result<_, _>>()
+///     .expect("parse certs");
+/// let key = rustls_pemfile::private_key(&mut &key_pem[..])
+///     .expect("parse key")
+///     .expect("no key found");
+///
+/// let auth = CertificateAuthenticator::new(certs, key);
+/// ```
 #[cfg(all(feature = "rustls-tls", not(feature = "native-tls")))]
 #[derive(Debug, PartialEq, Eq)]
 pub struct CertificateAuthenticator {
+    /// The client certificate chain (leaf first).
     pub cert_chain: Vec<CertificateDer<'static>>,
+    /// The client private key.
     pub private_key: PrivateKeyDer<'static>,
 }
 
@@ -126,6 +193,7 @@ impl Clone for CertificateAuthenticator {
 
 #[cfg(all(feature = "rustls-tls", not(feature = "native-tls")))]
 impl CertificateAuthenticator {
+    /// Creates a new `CertificateAuthenticator` from a certificate chain and private key.
     pub fn new(
         cert_chain: Vec<CertificateDer<'static>>,
         private_key: PrivateKeyDer<'static>,
@@ -144,14 +212,36 @@ impl From<CertificateAuthenticator> for Authenticator {
     }
 }
 
+/// Authenticates to Couchbase using a client TLS certificate (mTLS).
+///
+/// This variant is available when the `native-tls` feature is enabled.
+/// Provide a PKCS#12 [`Identity`] to establish mutual TLS with the cluster.
+///
+/// Can be converted into an [`Authenticator`] with `.into()`.
+///
+/// # Example
+///
+/// ```rust,no_run
+/// use couchbase::authenticator::CertificateAuthenticator;
+/// use tokio_native_tls::native_tls::Identity;
+/// use std::fs;
+///
+/// // Load a PKCS#12 (.pfx / .p12) file containing both cert and key.
+/// let pfx = fs::read("client.pfx").expect("read pfx");
+/// let identity = Identity::from_pkcs12(&pfx, "password").expect("parse identity");
+///
+/// let auth = CertificateAuthenticator::new(identity);
+/// ```
 #[cfg(feature = "native-tls")]
 #[derive(Clone)]
 pub struct CertificateAuthenticator {
+    /// The PKCS#12 client identity (certificate + private key).
     pub identity: Identity,
 }
 
 #[cfg(feature = "native-tls")]
 impl CertificateAuthenticator {
+    /// Creates a new `CertificateAuthenticator` from a PKCS#12 identity.
     pub fn new(identity: Identity) -> Self {
         Self { identity }
     }
@@ -164,20 +254,34 @@ impl From<CertificateAuthenticator> for Authenticator {
     }
 }
 
-/// JwtAuthenticator uses a JWT token to authenticate with the server.
+/// JwtAuthenticator uses a JWT token to authenticate with the server **Uncommitted**.
 ///
-/// **Stability: Uncommitted**
+/// **Stability: Uncommitted** — This API may change in the future.
 ///
-/// This API may change in the future.
+/// # Example
+///
+/// ```rust
+/// use couchbase::authenticator::JwtAuthenticator;
+///
+/// let auth = JwtAuthenticator::new("eyJhbGciOiJIUzI1NiIs...");
+/// ```
 #[derive(Debug, Clone, PartialEq, Hash)]
 pub struct JwtAuthenticator {
+    /// The JWT token string.
     pub token: String,
 }
 
 impl JwtAuthenticator {
+    /// Creates a new `JwtAuthenticator` with the given token.
     pub fn new(token: impl Into<String>) -> Self {
         Self {
             token: token.into(),
         }
+    }
+}
+
+impl From<JwtAuthenticator> for Authenticator {
+    fn from(value: JwtAuthenticator) -> Self {
+        Authenticator::JwtAuthenticator(value)
     }
 }

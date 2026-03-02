@@ -16,12 +16,18 @@
  *
  */
 
+//! Raw JSON transcoding — stores and retrieves pre-encoded JSON bytes with JSON common flags.
+//!
+//! Use this when you already have JSON bytes and don't want the SDK to re-encode them.
+
 use crate::transcoding::{decode_common_flags, encode_common_flags, DataType};
 
+/// Encodes pre-encoded JSON bytes with JSON common flags.
 pub fn encode<T: AsRef<[u8]>>(value: &T) -> crate::error::Result<(&[u8], u32)> {
     Ok((value.as_ref(), encode_common_flags(DataType::Json)))
 }
 
+/// Decodes raw JSON bytes, verifying the common flags indicate JSON.
 pub fn decode(bytes: &[u8], flags: u32) -> crate::error::Result<&[u8]> {
     let datatype = decode_common_flags(flags);
     if datatype != DataType::Json {

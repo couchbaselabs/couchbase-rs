@@ -31,12 +31,16 @@ use serde_json::Value;
 use std::sync::Arc;
 use tracing::Instrument;
 
+/// Manages Full-Text Search indexes.
+///
+/// Obtain via [`Scope::search_indexes`](crate::scope::Scope::search_indexes).
 #[derive(Clone)]
 pub struct SearchIndexManager {
     pub(crate) client: Arc<SearchIndexMgmtClient>,
 }
 
 impl SearchIndexManager {
+    /// Retrieves a search index by name.
     pub async fn get_index(
         &self,
         index_name: impl Into<String>,
@@ -60,6 +64,7 @@ impl SearchIndexManager {
         result
     }
 
+    /// Lists all search indexes.
     pub async fn get_all_indexes(
         &self,
         opts: impl Into<Option<GetAllSearchIndexesOptions>>,
@@ -82,6 +87,7 @@ impl SearchIndexManager {
         result
     }
 
+    /// Creates or updates a search index.
     pub async fn upsert_index(
         &self,
         index: SearchIndex,
@@ -105,6 +111,7 @@ impl SearchIndexManager {
         result
     }
 
+    /// Drops a search index by name.
     pub async fn drop_index(
         &self,
         index_name: impl Into<String>,
@@ -128,6 +135,7 @@ impl SearchIndexManager {
         result
     }
 
+    /// Analyzes a document against a search index, returning the tokens produced.
     pub async fn analyze_document(
         &self,
         index_name: impl Into<String>,
@@ -152,6 +160,7 @@ impl SearchIndexManager {
         result
     }
 
+    /// Returns the number of documents indexed by the given search index.
     pub async fn get_indexed_documents_count(
         &self,
         index_name: impl Into<String>,
@@ -175,6 +184,7 @@ impl SearchIndexManager {
         result
     }
 
+    /// Pauses document ingestion for a search index.
     pub async fn pause_ingest(
         &self,
         index_name: impl Into<String>,
@@ -198,6 +208,7 @@ impl SearchIndexManager {
         result
     }
 
+    /// Resumes document ingestion for a search index.
     pub async fn resume_ingest(
         &self,
         index_name: impl Into<String>,
@@ -221,6 +232,7 @@ impl SearchIndexManager {
         result
     }
 
+    /// Allows querying on a search index.
     pub async fn allow_querying(
         &self,
         index_name: impl Into<String>,
@@ -244,6 +256,7 @@ impl SearchIndexManager {
         result
     }
 
+    /// Disallows querying on a search index.
     pub async fn disallow_querying(
         &self,
         index_name: impl Into<String>,
@@ -267,6 +280,7 @@ impl SearchIndexManager {
         result
     }
 
+    /// Freezes the assignment plan of a search index.
     pub async fn freeze_plan(
         &self,
         index_name: impl Into<String>,
@@ -290,6 +304,7 @@ impl SearchIndexManager {
         result
     }
 
+    /// Unfreezes the assignment plan of a search index.
     pub async fn unfreeze_plan(
         &self,
         index_name: impl Into<String>,

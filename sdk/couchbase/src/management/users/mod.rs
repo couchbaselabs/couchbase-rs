@@ -16,5 +16,7 @@
  *
  */
 
+//! User and group management types.
+
 pub mod user;
 pub mod user_manager;

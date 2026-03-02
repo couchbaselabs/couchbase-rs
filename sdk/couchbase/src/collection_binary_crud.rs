@@ -15,6 +15,11 @@
  *  * limitations under the License.
  *
  */
+//! Binary (non-JSON) operations on a [`BinaryCollection`].
+//!
+//! These operations work with raw byte data and integer counters rather than JSON documents.
+//! Access a `BinaryCollection` via [`Collection::binary`](crate::collection::Collection::binary).
+
 use crate::collection::BinaryCollection;
 use crate::options::kv_binary_options::*;
 use crate::results::kv_binary_results::CounterResult;
@@ -24,6 +29,16 @@ use couchbase_core::create_span;
 use tracing::Instrument;
 
 impl BinaryCollection {
+    /// Appends binary content to the end of an existing document.
+    ///
+    /// The document must already exist. This operation does not perform JSON encoding;
+    /// the raw bytes are appended directly.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` — The document key.
+    /// * `value` — The bytes to append.
+    /// * `options` — Optional [`AppendOptions`].
     pub async fn append(
         &self,
         id: impl AsRef<str>,
@@ -45,6 +60,16 @@ impl BinaryCollection {
         result
     }
 
+    /// Prepends binary content to the beginning of an existing document.
+    ///
+    /// The document must already exist. This operation does not perform JSON encoding;
+    /// the raw bytes are prepended directly.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` — The document key.
+    /// * `value` — The bytes to prepend.
+    /// * `options` — Optional [`PrependOptions`].
     pub async fn prepend(
         &self,
         id: impl AsRef<str>,
@@ -66,6 +91,17 @@ impl BinaryCollection {
         result
     }
 
+    /// Increments a binary counter document by a configurable delta.
+    ///
+    /// If the document does not exist, it can be created with an initial value
+    /// (see [`IncrementOptions::initial`]).
+    ///
+    /// Returns a [`CounterResult`] containing the new counter value.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` — The document key.
+    /// * `options` — Optional [`IncrementOptions`] (delta, initial value, expiry, durability).
     pub async fn increment(
         &self,
         id: impl AsRef<str>,
@@ -86,6 +122,18 @@ impl BinaryCollection {
         result
     }
 
+    /// Decrements a binary counter document by a configurable delta.
+    ///
+    /// If the document does not exist, it can be created with an initial value
+    /// (see [`DecrementOptions::initial`]).
+    ///
+    /// Returns a [`CounterResult`] containing the new counter value.
+    /// The counter will not go below zero.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` — The document key.
+    /// * `options` — Optional [`DecrementOptions`] (delta, initial value, expiry, durability).
     pub async fn decrement(
         &self,
         id: impl AsRef<str>,

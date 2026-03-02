@@ -493,9 +493,9 @@ fn test_mutate_in() {
 
         let result = collection.mutate_in(&key, &ops, None).await.unwrap();
 
-        assert_eq!(result.entries.len(), 6);
-        assert!(result.mutation_token.is_some());
-        assert_ne!(result.cas, 0);
+        assert_eq!(result.entries().len(), 6);
+        assert!(result.mutation_token().is_some());
+        assert_ne!(result.cas(), 0);
         assert_eq!(result.content_as::<u32>(0).unwrap(), 1);
         assert_eq!(result.content_as::<u32>(1).unwrap(), 3);
 

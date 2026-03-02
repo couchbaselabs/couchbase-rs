@@ -16,6 +16,12 @@
  *
  */
 
+//! Options for configuring a connection to a Couchbase cluster.
+//!
+//! The primary type is [`ClusterOptions`], which holds authentication credentials, TLS settings,
+//! compression, timeouts, and other connection-level configuration. Pass it to
+//! [`Cluster::connect`](crate::cluster::Cluster::connect) to establish a connection.
+
 use crate::authenticator::Authenticator;
 use crate::capella_ca::CAPELLA_CERT;
 use crate::error;
@@ -40,22 +46,48 @@ use {
     webpki_roots::TLS_SERVER_ROOTS,
 };
 
+/// Configuration options for connecting to a Couchbase cluster.
+///
+/// Pass a `ClusterOptions` instance to [`Cluster::connect`](crate::cluster::Cluster::connect).
+/// The only required field is the [`authenticator`](ClusterOptions::authenticator).
+///
+/// # Example
+///
+/// ```rust
+/// use couchbase::authenticator::PasswordAuthenticator;
+/// use couchbase::options::cluster_options::{ClusterOptions, CompressionMode};
+/// use std::time::Duration;
+///
+/// let opts = ClusterOptions::new(
+///     PasswordAuthenticator::new("user", "pass").into(),
+/// )
+/// .compression_mode(CompressionMode::Enabled { min_size: 32, min_ratio: 0.83 })
+/// .tcp_keep_alive_time(Duration::from_secs(30));
+/// ```
 #[derive(Clone)]
 #[non_exhaustive]
 pub struct ClusterOptions {
-    // authenticator specifies the authenticator to use with the cluster.
+    /// The authenticator to use when connecting to the cluster.
     pub authenticator: Authenticator,
-    // timeout_options specifies various operation timeouts.
-    // compression_mode specifies compression related configuration options.
+    /// Compression mode for KV operations.
     pub compression_mode: Option<CompressionMode>,
+    /// TLS configuration. Set this when using `couchbases://` connections.
     pub tls_options: Option<TlsOptions>,
+    /// TCP keep-alive interval.
     pub tcp_keep_alive_time: Option<Duration>,
+    /// Configuration for the cluster map poller.
     pub poller_options: PollerOptions,
+    /// Configuration for the HTTP client used by query, search, and management services.
     pub http_options: HttpOptions,
+    /// Configuration for the key-value (memcached) connections.
     pub kv_options: KvOptions,
+    /// DNS configuration. Only available with the `unstable-dns-options` feature.
     #[cfg(feature = "unstable-dns-options")]
     pub dns_options: Option<DnsOptions>,
+    /// Configuration for the orphan response reporter.
     pub orphan_reporter_options: OrphanReporterOptions,
+    /// The default retry strategy for all operations. Individual operations can override
+    /// this with their own per-operation retry strategy option.
     pub default_retry_strategy: Option<Arc<dyn crate::retry::RetryStrategy>>,
 }
 
@@ -75,6 +107,7 @@ impl Debug for ClusterOptions {
 }
 
 impl ClusterOptions {
+    /// Creates a new `ClusterOptions` with the given authenticator and default settings.
     pub fn new(authenticator: Authenticator) -> Self {
         Self {
             authenticator,
@@ -91,42 +124,52 @@ impl ClusterOptions {
         }
     }
 
+    /// Sets the compression mode for KV operations.
     pub fn compression_mode(mut self, compression_mode: CompressionMode) -> Self {
         self.compression_mode = Some(compression_mode);
         self
     }
 
+    /// Sets the TLS configuration.
     pub fn tls_options(mut self, tls_options: TlsOptions) -> Self {
         self.tls_options = Some(tls_options);
         self
     }
 
+    /// Sets the TCP keep-alive interval.
     pub fn tcp_keep_alive_time(mut self, val: Duration) -> Self {
         self.tcp_keep_alive_time = Some(val);
         self
     }
 
+    /// Sets the cluster map poller configuration.
     pub fn poller_options(mut self, poller_options: PollerOptions) -> Self {
         self.poller_options = poller_options;
         self
     }
 
+    /// Sets the HTTP client configuration.
     pub fn http_options(mut self, http_options: HttpOptions) -> Self {
         self.http_options = http_options;
         self
     }
 
+    /// Sets the key-value connection configuration.
     pub fn kv_options(mut self, kv_options: KvOptions) -> Self {
         self.kv_options = kv_options;
         self
     }
 
+    /// Sets the DNS configuration.
+    ///
+    /// Only available with the `unstable-dns-options` feature.
     #[cfg(feature = "unstable-dns-options")]
     pub fn dns_options(mut self, dns_options: DnsOptions) -> Self {
         self.dns_options = Some(dns_options);
         self
     }
 
+    /// Sets the orphan response reporter configuration.
     pub fn orphan_reporter_options(
         mut self,
         orphan_reporter_options: OrphanReporterOptions,
@@ -135,6 +178,9 @@ impl ClusterOptions {
         self
     }
 
+    /// Sets the default retry strategy for all operations.
+    ///
+    /// Individual operations can override this with their own per-operation retry strategy.
     pub fn default_retry_strategy(
         mut self,
         retry_strategy: Arc<dyn crate::retry::RetryStrategy>,
@@ -144,10 +190,25 @@ impl ClusterOptions {
     }
 }
 
+/// Controls whether the SDK compresses KV request/response bodies.
+///
+/// When enabled, values above `min_size` bytes are compressed using Snappy if the
+/// compressed size is at most `min_ratio` of the original size.
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum CompressionMode {
-    Enabled { min_size: usize, min_ratio: f64 },
+    /// Enable Snappy compression for KV bodies.
+    ///
+    /// * `min_size` — minimum body size in bytes before compression is attempted.
+    /// * `min_ratio` — maximum compressed-to-original ratio (e.g. `0.83`).
+    Enabled {
+        /// Minimum body size in bytes before compression is attempted.
+        min_size: usize,
+        /// Maximum compressed-to-original size ratio. Values that do not compress
+        /// below this ratio are sent uncompressed.
+        min_ratio: f64,
+    },
+    /// Disable compression entirely.
     Disabled,
 }
 
@@ -180,17 +241,24 @@ impl Display for CompressionMode {
     }
 }
 
+/// Configuration for the cluster map configuration poller.
+///
+/// The SDK periodically polls the server for an updated cluster map so it can
+/// route operations to the correct nodes.
 #[derive(Default, Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub struct PollerOptions {
+    /// How often to poll for a new cluster map configuration.
     pub config_poll_interval: Option<Duration>,
 }
 
 impl PollerOptions {
+    /// Creates a new `PollerOptions` with default values.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Sets the interval between cluster map configuration polls.
     pub fn config_poll_interval(mut self, interval: Duration) -> Self {
         self.config_poll_interval = Some(interval);
         self
@@ -218,23 +286,29 @@ impl Display for PollerOptions {
     }
 }
 
+/// Configuration for the HTTP client used by query, search, analytics, and management services.
 #[derive(Default, Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub struct HttpOptions {
+    /// Maximum number of idle HTTP connections to keep open per host.
     pub max_idle_connections_per_host: Option<usize>,
+    /// How long an idle HTTP connection may remain open before being closed.
     pub idle_connection_timeout: Option<Duration>,
 }
 
 impl HttpOptions {
+    /// Creates a new `HttpOptions` with default values.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Sets the maximum number of idle connections to keep open per host.
     pub fn max_idle_connections_per_host(mut self, max: usize) -> Self {
         self.max_idle_connections_per_host = Some(max);
         self
     }
 
+    /// Sets how long an idle connection may remain open before being closed.
     pub fn idle_connection_timeout(mut self, timeout: Duration) -> Self {
         self.idle_connection_timeout = Some(timeout);
         self
@@ -266,41 +340,57 @@ impl Display for HttpOptions {
     }
 }
 
+/// Configuration for key-value (memcached protocol) connections.
 #[derive(Default, Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub struct KvOptions {
+    /// Whether to request mutation tokens from the server. Mutation tokens are required
+    /// for [`MutationState`](crate::mutation_state::MutationState)-based query consistency.
     pub enable_mutation_tokens: Option<bool>,
+    /// Whether to request server-side operation duration metrics.
     pub enable_server_durations: Option<bool>,
+    /// The number of KV connections to open per node.
     pub num_connections: Option<usize>,
+    /// Timeout for establishing a single KV connection.
     pub connect_timeout: Option<Duration>,
+    /// Throttle timeout applied when many connections are being opened concurrently.
     pub connect_throttle_timeout: Option<Duration>,
 }
 
 impl KvOptions {
+    /// Creates a new `KvOptions` with default values.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Enables or disables mutation tokens.
+    ///
+    /// Mutation tokens are required for
+    /// [`MutationState`](crate::mutation_state::MutationState)-based query consistency.
     pub fn enable_mutation_tokens(mut self, enable: bool) -> Self {
         self.enable_mutation_tokens = Some(enable);
         self
     }
 
+    /// Enables or disables server-side operation duration metrics.
     pub fn enable_server_durations(mut self, enable: bool) -> Self {
         self.enable_server_durations = Some(enable);
         self
     }
 
+    /// Sets the number of KV connections to open per node.
     pub fn num_connections(mut self, num: usize) -> Self {
         self.num_connections = Some(num);
         self
     }
 
+    /// Sets the timeout for establishing a single KV connection.
     pub fn connect_timeout(mut self, timeout: Duration) -> Self {
         self.connect_timeout = Some(timeout);
         self
     }
 
+    /// Sets the throttle timeout for concurrent connection establishment.
     pub fn connect_throttle_timeout(mut self, timeout: Duration) -> Self {
         self.connect_throttle_timeout = Some(timeout);
         self
@@ -349,37 +439,69 @@ impl Display for KvOptions {
     }
 }
 
+/// TLS configuration for secure connections.
+///
+/// By default the SDK trusts the system root CAs plus the Couchbase Capella root CA.
+/// Use [`add_ca_certificate`](TlsOptions::add_ca_certificate) to add custom CAs
+/// (e.g. for self-signed certificates).
+///
+/// # Safety
+///
+/// Setting [`danger_accept_invalid_certs`](TlsOptions::danger_accept_invalid_certs) to
+/// `true` disables all certificate verification. **Do not use in production.**
 #[derive(Clone, Default)]
 #[non_exhaustive]
 pub struct TlsOptions {
+    /// If `true`, skip server certificate verification entirely.
+    ///
+    /// # Warning
+    ///
+    /// This is **insecure** and should only be used for development or testing.
     pub danger_accept_invalid_certs: Option<bool>,
 
+    /// Custom CA certificates to trust. When set, only these CAs (plus the system
+    /// roots) are trusted. Overrides the default Capella CA.
     #[cfg(all(feature = "rustls-tls", not(feature = "native-tls")))]
     pub ca_certificates: Option<Vec<CertificateDer<'static>>>,
 
+    /// Custom CA certificates to trust. When set, only these CAs (plus the system
+    /// roots) are trusted. Overrides the default Capella CA.
     #[cfg(feature = "native-tls")]
     pub ca_certificates: Option<Vec<tokio_native_tls::native_tls::Certificate>>,
 
+    /// If `true`, skip hostname verification. Only available with the `native-tls` feature.
+    ///
+    /// # Warning
+    ///
+    /// This is **insecure** and should only be used for development or testing.
     #[cfg(feature = "native-tls")]
     pub danger_accept_invalid_hostnames: Option<bool>,
 }
 
 impl TlsOptions {
+    /// Creates a new `TlsOptions` with default values.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Disables server certificate verification when set to `true`.
+    ///
+    /// # Warning
+    ///
+    /// This is **insecure** and should only be used for development or testing.
     pub fn danger_accept_invalid_certs(mut self, danger: bool) -> Self {
         self.danger_accept_invalid_certs = Some(danger);
         self
     }
 
+    /// Adds a single CA certificate to the trust store.
     #[cfg(all(feature = "rustls-tls", not(feature = "native-tls")))]
     pub fn add_ca_certificate(mut self, cert: CertificateDer<'static>) -> Self {
         self.ca_certificates.get_or_insert_with(Vec::new).push(cert);
         self
     }
 
+    /// Adds multiple CA certificates to the trust store.
     #[cfg(all(feature = "rustls-tls", not(feature = "native-tls")))]
     pub fn add_ca_certificates<T: IntoIterator<Item = CertificateDer<'static>>>(
         mut self,
@@ -391,12 +513,14 @@ impl TlsOptions {
         self
     }
 
+    /// Adds a single CA certificate to the trust store.
     #[cfg(feature = "native-tls")]
     pub fn add_ca_certificate(mut self, cert: tokio_native_tls::native_tls::Certificate) -> Self {
         self.ca_certificates.get_or_insert_with(Vec::new).push(cert);
         self
     }
 
+    /// Adds multiple CA certificates to the trust store.
     #[cfg(feature = "native-tls")]
     pub fn add_ca_certificates<
         T: IntoIterator<Item = tokio_native_tls::native_tls::Certificate>,
@@ -410,6 +534,12 @@ impl TlsOptions {
         self
     }
 
+    /// Disables hostname verification when set to `true`. Only available with the
+    /// `native-tls` feature.
+    ///
+    /// # Warning
+    ///
+    /// This is **insecure** and should only be used for development or testing.
     #[cfg(feature = "native-tls")]
     pub fn danger_accept_invalid_hostnames(mut self, danger: bool) -> Self {
         self.danger_accept_invalid_hostnames = Some(danger);
@@ -555,15 +685,21 @@ impl Display for TlsOptions {
     }
 }
 
+/// Custom DNS resolver configuration.
+///
+/// Only available with the `unstable-dns-options` feature.
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 #[cfg(feature = "unstable-dns-options")]
 pub struct DnsOptions {
+    /// The DNS server address to use for SRV and A/AAAA lookups.
     pub namespace: SocketAddr,
+    /// Timeout for DNS resolution.
     pub timeout: Option<Duration>,
 }
 #[cfg(feature = "unstable-dns-options")]
 impl DnsOptions {
+    /// Creates a new `DnsOptions` with the given DNS server address.
     pub fn new(namespace: SocketAddr) -> Self {
         Self {
             namespace,
@@ -571,6 +707,7 @@ impl DnsOptions {
         }
     }
 
+    /// Sets the DNS resolution timeout.
     pub fn timeout(mut self, timeout: Duration) -> Self {
         self.timeout = Some(timeout);
         self
@@ -586,29 +723,40 @@ impl From<DnsOptions> for couchbase_connstr::DnsConfig {
     }
 }
 
+/// Configuration for the orphan response reporter.
+///
+/// The orphan reporter periodically logs operations whose responses arrived after the
+/// client-side already dropped the request future.
 #[derive(Default, Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub struct OrphanReporterOptions {
+    /// Whether the orphan reporter is enabled.
     pub enabled: Option<bool>,
+    /// How often the reporter emits a summary of orphaned responses.
     pub reporter_interval: Option<Duration>,
+    /// Maximum number of orphaned responses to keep per reporting interval.
     pub sample_size: Option<usize>,
 }
 
 impl OrphanReporterOptions {
+    /// Creates a new `OrphanReporterOptions` with default values.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Enables or disables the orphan reporter.
     pub fn enabled(mut self, enabled: bool) -> Self {
         self.enabled = Some(enabled);
         self
     }
 
+    /// Sets how often the reporter emits a summary of orphaned responses.
     pub fn reporter_interval(mut self, reporter_interval: Duration) -> Self {
         self.reporter_interval = Some(reporter_interval);
         self
     }
 
+    /// Sets the maximum number of orphaned responses to keep per reporting interval.
     pub fn sample_size(mut self, sample_size: usize) -> Self {
         self.sample_size = Some(sample_size);
         self

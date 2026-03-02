@@ -16,6 +16,12 @@
  *
  */
 
+//! A [`Scope`] within a Couchbase [`Bucket`](crate::bucket::Bucket).
+//!
+//! A `Scope` is a namespace that groups related [`Collection`]s.
+//! It also provides scope-level SQL++ queries
+//! ([`Scope::query`]) and Full-Text Search ([`Scope::search`]).
+
 use crate::clients::query_client::QueryClient;
 use crate::clients::scope_client::ScopeClient;
 use crate::clients::search_client::SearchClient;
@@ -34,6 +40,14 @@ use couchbase_core::create_span;
 use std::sync::Arc;
 use tracing::Instrument;
 
+/// Represents a scope within a Couchbase [`Bucket`](crate::bucket::Bucket).
+///
+/// A `Scope` is a namespace that groups related [`Collection`]s.
+/// It also provides access to scope-level SQL++ queries and Full-Text Search.
+///
+/// Obtain a `Scope` by calling [`Bucket::scope`](crate::bucket::Bucket::scope).
+///
+/// `Scope` is cheaply cloneable.
 #[derive(Clone)]
 pub struct Scope {
     client: ScopeClient,
@@ -66,14 +80,30 @@ impl Scope {
         }
     }
 
+    /// Returns the name of this scope.
     pub fn name(&self) -> &str {
         self.client.name()
     }
 
+    /// Returns a [`Collection`] with the given name
+    /// within this scope.
     pub fn collection(&self, name: impl Into<String>) -> Collection {
         Collection::new(self.client.collection_client(name.into()))
     }
 
+    /// Executes a scope-level SQL++ (N1QL) query.
+    ///
+    /// The query is automatically scoped to this scope's bucket and scope name,
+    /// so table references in the query resolve relative to this scope.
+    ///
+    /// # Arguments
+    ///
+    /// * `statement` — The SQL++ query string.
+    /// * `opts` — Optional [`QueryOptions`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the query fails.
     pub async fn query(
         &self,
         statement: impl Into<String>,
@@ -95,6 +125,14 @@ impl Scope {
         result
     }
 
+    /// Executes a Full-Text Search (FTS) query against a named index in this scope.
+    ///
+    /// # Arguments
+    ///
+    /// * `index_name` — The name of the search index.
+    /// * `request` — A [`SearchRequest`] containing
+    ///   the search query and/or vector search.
+    /// * `opts` — Optional [`SearchOptions`].
     pub async fn search(
         &self,
         index_name: impl Into<String>,
@@ -118,6 +156,8 @@ impl Scope {
         result
     }
 
+    /// Returns a [`SearchIndexManager`]
+    /// for managing Full-Text Search indexes in this scope.
     pub fn search_indexes(&self) -> SearchIndexManager {
         SearchIndexManager {
             client: self.search_index_client.clone(),

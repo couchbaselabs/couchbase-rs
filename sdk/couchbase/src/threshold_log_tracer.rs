@@ -16,6 +16,12 @@
  *
  */
 
+//! Slow-operation threshold logging via a [`tracing`] layer.
+//!
+//! [`ThresholdLoggingLayer`] tracks completed operations and periodically emits a JSON
+//! report of the slowest operations that exceeded configurable per-service thresholds.
+//! Register it as a layer on a `tracing_subscriber::Registry` to enable threshold logging.
+
 use crate::tracing::{
     SPAN_ATTRIB_LOCAL_ID_KEY, SPAN_ATTRIB_NET_PEER_ADDRESS_KEY, SPAN_ATTRIB_NET_PEER_PORT_KEY,
     SPAN_ATTRIB_OPERATION_ID_KEY, SPAN_ATTRIB_OPERATION_KEY, SPAN_ATTRIB_SERVER_DURATION_KEY,
@@ -180,6 +186,34 @@ impl SpanInfo {
     }
 }
 
+/// A `tracing` [`Layer`] that tracks operations exceeding
+/// configurable latency thresholds and periodically logs the slowest operations.
+///
+/// This is useful for identifying slow operations in production. The layer collects
+/// the top N slowest operations per service and emits them at a configurable interval.
+///
+/// If no other tracers are enabled then it is **strongly** advised that you enable this by default
+/// to aid with debugging.
+///
+/// **Stability: Uncommitted** — This API may change in the future.
+/// As the `tracing` crate itself is unstable this API is subject to changes.
+///
+/// # Example
+///
+/// ```rust,no_run
+/// use couchbase::threshold_log_tracer::{ThresholdLoggingLayer, ThresholdLoggingOptions};
+/// use tracing_subscriber::layer::SubscriberExt;
+/// use std::time::Duration;
+///
+/// # fn example() {
+/// let tracer = ThresholdLoggingLayer::new(
+///     Some(ThresholdLoggingOptions::new()
+///         .kv_threshold(Duration::from_millis(250))
+///         .emit_interval(Duration::from_secs(30)))
+/// );
+/// let subscriber = tracing_subscriber::registry().with(tracer);
+/// # }
+/// ```
 pub struct ThresholdLoggingLayer {
     thresholds: LoggingThresholds,
     sample_size: usize,
@@ -188,6 +222,9 @@ pub struct ThresholdLoggingLayer {
 }
 
 impl ThresholdLoggingLayer {
+    /// Creates a new `ThresholdLoggingLayer` with the given options.
+    ///
+    /// Must be called within a Tokio runtime (panics otherwise).
     pub fn new(options: Option<ThresholdLoggingOptions>) -> Self {
         let options = options.unwrap_or_default();
 
@@ -451,14 +488,21 @@ struct LoggingThresholds {
     management_threshold_us: u64,
 }
 
+/// Configuration options for [`ThresholdLoggingLayer`].
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct ThresholdLoggingOptions {
+    /// How often to emit threshold logs. Defaults to 10 seconds.
     pub(crate) emit_interval: Option<Duration>,
+    /// KV operations slower than this are logged. Defaults to 500ms.
     pub(crate) kv_threshold: Option<Duration>,
+    /// Query operations slower than this are logged. Defaults to 1s.
     pub(crate) query_threshold: Option<Duration>,
+    /// Search operations slower than this are logged. Defaults to 1s.
     pub(crate) search_threshold: Option<Duration>,
+    /// Management operations slower than this are logged. Defaults to 1s.
     pub(crate) management_threshold: Option<Duration>,
+    /// Maximum number of operations to log per service per interval. Defaults to 10.
     pub(crate) sample_size: Option<usize>,
 }
 

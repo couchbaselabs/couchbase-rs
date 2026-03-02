@@ -16,22 +16,38 @@
  *
  */
 
+#![doc = "Geo-location types used by geospatial search queries and geo-distance sorting."]
+
+/// A geographic coordinate defined by latitude and longitude.
+///
+/// # Example
+///
+/// ```rust
+/// use couchbase::search::location::Location;
+///
+/// let loc = Location::new(37.7749, -122.4194); // San Francisco
+/// ```
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct Location {
+    /// Latitude in degrees.
     pub lat: f64,
+    /// Longitude in degrees.
     pub lon: f64,
 }
 
 impl Location {
+    /// Creates a new `Location` from the given latitude and longitude.
     pub fn new(lat: f64, lon: f64) -> Self {
         Self { lat, lon }
     }
 
+    /// Returns the latitude.
     pub fn lat(&self) -> f64 {
         self.lat
     }
 
+    /// Returns the longitude.
     pub fn lon(&self) -> f64 {
         self.lon
     }

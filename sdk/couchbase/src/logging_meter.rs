@@ -16,6 +16,12 @@
  *
  */
 
+//! Periodic operation-metrics logging via a [`tracing`] layer.
+//!
+//! [`LoggingMeterLayer`] collects operation latency histograms and emits a JSON summary
+//! at a configurable interval. Register it as a layer on a `tracing_subscriber::Registry`
+//! to enable metrics logging.
+
 use hdrhistogram::Histogram;
 use serde_json::json;
 use std::collections::HashMap;
@@ -90,11 +96,41 @@ struct MetricEvent {
     duration_us: u64,
 }
 
+/// A `tracing` [`Layer`] that collects operation duration metrics
+/// and periodically emits them as a JSON log message with percentile information.
+///
+/// Enable this layer by adding it to your `tracing_subscriber` stack. Metrics are emitted
+/// at a configurable interval (default: 600 seconds).
+///
+/// If no other meters are enabled then it is **strongly** advised that you enable this by default
+/// to aid with debugging.
+///
+/// **Stability: Uncommitted** — This API may change in the future.
+/// As the `tracing` crate itself is unstable this API is subject to changes.
+///
+/// # Example
+///
+/// ```rust,no_run
+/// use couchbase::logging_meter::{LoggingMeterLayer, LoggingMeterOptions};
+/// use tracing_subscriber::layer::SubscriberExt;
+/// use std::time::Duration;
+///
+/// # fn example() {
+/// let meter = LoggingMeterLayer::new(
+///     Some(LoggingMeterOptions::new().emit_interval(Duration::from_secs(300)))
+/// );
+/// let subscriber = tracing_subscriber::registry().with(meter);
+/// // tracing::subscriber::set_global_default(subscriber).unwrap();
+/// # }
+/// ```
 pub struct LoggingMeterLayer {
     sender: UnboundedSender<MetricEvent>,
 }
 
 impl LoggingMeterLayer {
+    /// Creates a new `LoggingMeterLayer` with the given options.
+    ///
+    /// Must be called within a Tokio runtime (panics otherwise).
     pub fn new(options: Option<LoggingMeterOptions>) -> Self {
         let options = options.unwrap_or_default();
         let emit_interval = options.emit_interval.unwrap_or(Duration::from_secs(600));
@@ -203,9 +239,11 @@ where
     }
 }
 
+/// Configuration options for [`LoggingMeterLayer`].
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct LoggingMeterOptions {
+    /// How often to emit metrics. Defaults to 600 seconds (10 minutes).
     pub emit_interval: Option<Duration>,
 }
 
