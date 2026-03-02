@@ -267,7 +267,7 @@ async fn create_collection(manager: &CollectionManager) -> (String, String) {
     verify_scope_created(manager, &scope_name).await;
 
     let settings =
-        couchbase::management::collections::collection_manager::CreateCollectionSettings::new();
+        couchbase::management::collections::collection_settings::CreateCollectionSettings::new();
     manager
         .create_collection(&scope_name, &collection_name, settings, None)
         .await

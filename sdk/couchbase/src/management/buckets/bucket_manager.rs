@@ -25,6 +25,28 @@ use couchbase_core::create_span;
 use std::sync::Arc;
 use tracing::Instrument;
 
+/// Manages buckets on a Couchbase cluster.
+///
+/// Obtain via [`Cluster::buckets`](crate::cluster::Cluster::buckets).
+///
+/// # Example
+///
+/// ```rust,no_run
+/// # use couchbase::cluster::Cluster;
+/// # use couchbase::authenticator::PasswordAuthenticator;
+/// # use couchbase::options::cluster_options::ClusterOptions;
+/// # async fn example() -> couchbase::error::Result<()> {
+/// # let authenticator = PasswordAuthenticator::new("user", "pass");
+/// # let options = ClusterOptions::new(authenticator.into());
+/// # let cluster = Cluster::connect("couchbase://localhost", options).await?;
+/// let manager = cluster.buckets();
+/// let buckets = manager.get_all_buckets(None).await?;
+/// for b in &buckets {
+///     println!("Bucket: {}", b.name);
+/// }
+/// # Ok(())
+/// # }
+/// ```
 #[derive(Clone)]
 pub struct BucketManager {
     client: Arc<BucketMgmtClient>,
@@ -35,6 +57,7 @@ impl BucketManager {
         Self { client }
     }
 
+    /// Lists all buckets on the cluster.
     pub async fn get_all_buckets(
         &self,
         opts: impl Into<Option<GetAllBucketsOptions>>,
@@ -57,6 +80,7 @@ impl BucketManager {
         result
     }
 
+    /// Retrieves the settings for a single bucket.
     pub async fn get_bucket(
         &self,
         bucket_name: impl Into<String>,
@@ -84,6 +108,7 @@ impl BucketManager {
         result
     }
 
+    /// Creates a new bucket with the given settings.
     pub async fn create_bucket(
         &self,
         settings: BucketSettings,
@@ -110,6 +135,7 @@ impl BucketManager {
         result
     }
 
+    /// Updates the settings of an existing bucket.
     pub async fn update_bucket(
         &self,
         settings: BucketSettings,
@@ -136,6 +162,7 @@ impl BucketManager {
         result
     }
 
+    /// Drops (deletes) a bucket by name.
     pub async fn drop_bucket(
         &self,
         bucket_name: impl Into<String>,
@@ -163,6 +190,9 @@ impl BucketManager {
         result
     }
 
+    /// Flushes (removes all documents from) a bucket.
+    ///
+    /// The bucket must have flush enabled in its settings.
     pub async fn flush_bucket(
         &self,
         bucket_name: impl Into<String>,

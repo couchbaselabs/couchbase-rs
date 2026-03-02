@@ -18,6 +18,7 @@
 
 use couchbase_core::queryx;
 
+/// Describes a query (SQL++) index on the cluster.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct QueryIndex {
@@ -35,55 +36,71 @@ pub struct QueryIndex {
 }
 
 impl QueryIndex {
+    /// Returns the name of the index.
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// Returns whether this is a primary index.
     pub fn is_primary(&self) -> bool {
         self.is_primary
     }
 
+    /// Returns the type of the index (GSI or View).
     pub fn index_type(&self) -> &QueryIndexType {
         &self.index_type
     }
 
+    /// Returns the current state of the index (e.g. "online", "deferred", "building").
     pub fn state(&self) -> &str {
         &self.state
     }
 
+    /// Returns the keyspace (bucket.scope.collection) the index covers.
     pub fn keyspace(&self) -> &str {
         &self.keyspace
     }
 
+    /// Returns the index key expressions.
     pub fn index_key(&self) -> &[String] {
         &self.index_key
     }
 
+    /// Returns the WHERE clause condition, if any.
     pub fn condition(&self) -> Option<&String> {
         self.condition.as_ref()
     }
 
+    /// Returns the partition expression, if any.
     pub fn partition(&self) -> Option<&String> {
         self.partition.as_ref()
     }
 
+    /// Returns the bucket name the index belongs to.
     pub fn bucket_name(&self) -> &str {
         &self.bucket_name
     }
 
+    /// Returns the scope name, if applicable.
     pub fn scope_name(&self) -> Option<&String> {
         self.scope_name.as_ref()
     }
 
+    /// Returns the collection name, if applicable.
     pub fn collection_name(&self) -> Option<&String> {
         self.collection_name.as_ref()
     }
 }
 
+/// The type of a query index.
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
+#[non_exhaustive]
 pub enum QueryIndexType {
+    /// Unknown or unrecognized index type.
     Unknown,
+    /// A View-based index.
     View,
+    /// A Global Secondary Index.
     Gsi,
 }
 

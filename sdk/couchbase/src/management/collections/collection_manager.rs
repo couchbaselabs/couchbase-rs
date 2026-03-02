@@ -17,7 +17,7 @@
  */
 use crate::clients::collections_mgmt_client::CollectionsMgmtClient;
 use crate::error;
-pub use crate::management::collections::collection_settings::{
+use crate::management::collections::collection_settings::{
     CreateCollectionSettings, UpdateCollectionSettings,
 };
 use crate::options::collection_mgmt_options::*;
@@ -26,12 +26,16 @@ use crate::tracing::{Keyspace, SERVICE_VALUE_MANAGEMENT};
 use couchbase_core::create_span;
 use tracing::Instrument;
 
+/// Manages scopes and collections within a bucket.
+///
+/// Obtain via [`Bucket::collections`](crate::bucket::Bucket::collections).
 #[derive(Clone)]
 pub struct CollectionManager {
     pub(crate) client: CollectionsMgmtClient,
 }
 
 impl CollectionManager {
+    /// Creates a new scope in the bucket.
     pub async fn create_scope(
         &self,
         scope_name: impl Into<String>,
@@ -60,6 +64,7 @@ impl CollectionManager {
         result
     }
 
+    /// Drops a scope from the bucket.
     pub async fn drop_scope(
         &self,
         scope_name: impl Into<String>,
@@ -88,6 +93,7 @@ impl CollectionManager {
         result
     }
 
+    /// Creates a new collection in the given scope.
     pub async fn create_collection(
         &self,
         scope_name: impl Into<String>,
@@ -125,6 +131,7 @@ impl CollectionManager {
         result
     }
 
+    /// Updates the settings of an existing collection.
     pub async fn update_collection(
         &self,
         scope_name: impl Into<String>,
@@ -162,6 +169,7 @@ impl CollectionManager {
         result
     }
 
+    /// Drops a collection from the given scope.
     pub async fn drop_collection(
         &self,
         scope_name: impl Into<String>,
@@ -197,6 +205,7 @@ impl CollectionManager {
         result
     }
 
+    /// Lists all scopes and their collections in the bucket.
     pub async fn get_all_scopes(
         &self,
         opts: impl Into<Option<GetAllScopesOptions>>,

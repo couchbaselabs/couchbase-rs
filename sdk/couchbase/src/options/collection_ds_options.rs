@@ -16,71 +16,92 @@
  *
  */
 
+//! Options for data structure operations (list, map, set, queue).
+//!
+//! Each data structure type has a corresponding options struct that can be used to
+//! customize behavior such as retry strategies.
+
 use crate::retry::RetryStrategy;
 use std::sync::Arc;
 
+/// Options for [`CouchbaseList`](crate::collection_ds::CouchbaseList) operations.
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct CouchbaseListOptions {
+    /// The retry strategy to use for operations.
     pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl CouchbaseListOptions {
+    /// Creates a new instance of `CouchbaseListOptions`.
     pub fn new() -> Self {
         Default::default()
     }
 
+    /// Sets the retry strategy.
     pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
         self.retry_strategy = Some(retry_strategy);
         self
     }
 }
 
+/// Options for [`CouchbaseMap`](crate::collection_ds::CouchbaseMap) operations.
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct CouchbaseMapOptions {
+    /// The retry strategy to use for operations.
     pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl CouchbaseMapOptions {
+    /// Creates a new instance of `CouchbaseMapOptions`.
     pub fn new() -> Self {
         Default::default()
     }
 
+    /// Sets the retry strategy.
     pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
         self.retry_strategy = Some(retry_strategy);
         self
     }
 }
 
+/// Options for [`CouchbaseSet`](crate::collection_ds::CouchbaseSet) operations.
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct CouchbaseSetOptions {
+    /// The retry strategy to use for operations.
     pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl CouchbaseSetOptions {
+    /// Creates a new instance of `CouchbaseSetOptions`.
     pub fn new() -> Self {
         Default::default()
     }
 
+    /// Sets the retry strategy.
     pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
         self.retry_strategy = Some(retry_strategy);
         self
     }
 }
 
+/// Options for [`CouchbaseQueue`](crate::collection_ds::CouchbaseQueue) operations.
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct CouchbaseQueueOptions {
+    /// The retry strategy to use for operations.
     pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl CouchbaseQueueOptions {
+    /// Creates a new instance of `CouchbaseQueueOptions`.
     pub fn new() -> Self {
         Default::default()
     }
 
+    /// Sets the retry strategy.
     pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
         self.retry_strategy = Some(retry_strategy);
         self

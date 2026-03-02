@@ -16,14 +16,27 @@
  *
  */
 
+//! Diagnostics types for inspecting connection state.
+//!
+//! Contains the [`ConnectionState`] enum used in diagnostic results such as
+//! [`DiagnosticsResult`](crate::results::diagnostics::DiagnosticsResult).
+
 use serde::Serialize;
 use std::fmt::Display;
 
+/// The state of a connection to a Couchbase node.
+///
+/// Reported in diagnostics results (see [`DiagnosticsResult`](crate::results::diagnostics::DiagnosticsResult)).
 #[derive(Copy, Debug, Clone, PartialEq, Eq, Serialize)]
+#[non_exhaustive]
 pub enum ConnectionState {
+    /// The connection is established and active.
     Connected,
+    /// The connection is not established.
     Disconnected,
+    /// The connection is in the process of being established.
     Connecting,
+    /// The connection is being shut down.
     Disconnecting,
 }
 

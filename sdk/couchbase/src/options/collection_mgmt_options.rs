@@ -16,99 +16,128 @@
  *
  */
 
+//! Options for scope and collection management operations.
+//!
+//! Each management operation has a corresponding options struct for customizing behavior
+//! such as retry strategies.
+
 use crate::retry::RetryStrategy;
 use std::sync::Arc;
 
+/// Options for listing all scopes in a bucket.
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct GetAllScopesOptions {
+    /// Retry strategy for the operation.
     pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl GetAllScopesOptions {
+    /// Creates a new instance of `GetAllScopesOptions`.
     pub fn new() -> Self {
         Default::default()
     }
+    /// Sets the retry strategy for the operation.
     pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
         self.retry_strategy = Some(retry_strategy);
         self
     }
 }
 
+/// Options for creating a scope.
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct CreateScopeOptions {
+    /// Retry strategy for the operation.
     pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl CreateScopeOptions {
+    /// Creates a new instance of `CreateScopeOptions`.
     pub fn new() -> Self {
         Default::default()
     }
+    /// Sets the retry strategy for the operation.
     pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
         self.retry_strategy = Some(retry_strategy);
         self
     }
 }
 
+/// Options for dropping a scope.
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct DropScopeOptions {
+    /// Retry strategy for the operation.
     pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl DropScopeOptions {
+    /// Creates a new instance of `DropScopeOptions`.
     pub fn new() -> Self {
         Default::default()
     }
+    /// Sets the retry strategy for the operation.
     pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
         self.retry_strategy = Some(retry_strategy);
         self
     }
 }
 
+/// Options for creating a collection.
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct CreateCollectionOptions {
+    /// Retry strategy for the operation.
     pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl CreateCollectionOptions {
+    /// Creates a new instance of `CreateCollectionOptions`.
     pub fn new() -> Self {
         Default::default()
     }
+    /// Sets the retry strategy for the operation.
     pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
         self.retry_strategy = Some(retry_strategy);
         self
     }
 }
 
+/// Options for updating a collection's settings.
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct UpdateCollectionOptions {
+    /// Retry strategy for the operation.
     pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl UpdateCollectionOptions {
+    /// Creates a new instance of `UpdateCollectionOptions`.
     pub fn new() -> Self {
         Default::default()
     }
+    /// Sets the retry strategy for the operation.
     pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
         self.retry_strategy = Some(retry_strategy);
         self
     }
 }
 
+/// Options for dropping a collection.
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct DropCollectionOptions {
+    /// Retry strategy for the operation.
     pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl DropCollectionOptions {
+    /// Creates a new instance of `DropCollectionOptions`.
     pub fn new() -> Self {
         Default::default()
     }
+    /// Sets the retry strategy for the operation.
     pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
         self.retry_strategy = Some(retry_strategy);
         self

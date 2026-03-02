@@ -16,12 +16,16 @@
  *
  */
 
+//! Raw binary transcoding — stores and retrieves byte slices with binary common flags.
+
 use crate::transcoding::{decode_common_flags, encode_common_flags, DataType};
 
+/// Encodes raw binary data with binary common flags.
 pub fn encode(value: &[u8]) -> crate::error::Result<(&[u8], u32)> {
     Ok((value, encode_common_flags(DataType::Binary)))
 }
 
+/// Decodes raw binary data, verifying the common flags indicate binary.
 pub fn decode(value: &[u8], flags: u32) -> crate::error::Result<&[u8]> {
     let datatype = decode_common_flags(flags);
     if datatype != DataType::Binary {

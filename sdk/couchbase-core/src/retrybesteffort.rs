@@ -21,6 +21,26 @@ use std::time::Duration;
 
 use crate::retry::{RetryAction, RetryReason, RetryRequest, RetryStrategy};
 
+/// A retry strategy that retries all eligible operations using a configurable
+/// backoff calculator.
+///
+/// This is the default retry strategy used by the SDK. It retries idempotent
+/// operations unconditionally, and non-idempotent operations only when the
+/// [`RetryReason`] indicates it is safe to do so.
+///
+/// The backoff duration between retries is determined by the [`BackoffCalculator`]
+/// provided at construction time. If none is specified, an
+/// [`ExponentialBackoffCalculator`] with sensible defaults is used.
+///
+/// # Example
+///
+/// ```rust
+/// use couchbase_core::retrybesteffort::BestEffortRetryStrategy;
+/// use std::sync::Arc;
+///
+/// // Use the default exponential backoff:
+/// let strategy = Arc::new(BestEffortRetryStrategy::default());
+/// ```
 #[derive(Debug, Clone)]
 pub struct BestEffortRetryStrategy<Calc> {
     backoff_calc: Calc,
@@ -30,6 +50,7 @@ impl<Calc> BestEffortRetryStrategy<Calc>
 where
     Calc: BackoffCalculator,
 {
+    /// Creates a new `BestEffortRetryStrategy` with the given backoff calculator.
     pub fn new(calc: Calc) -> Self {
         Self { backoff_calc: calc }
     }
@@ -56,10 +77,48 @@ where
     }
 }
 
+/// A calculator that determines the backoff duration between retry attempts.
+///
+/// Implement this trait to provide custom backoff logic. The SDK ships with
+/// [`ExponentialBackoffCalculator`] as the default implementation.
 pub trait BackoffCalculator: Debug + Send + Sync {
+    /// Returns the duration to wait before the given retry attempt number.
+    ///
+    /// `retry_attempts` starts at 0 for the first retry.
     fn backoff(&self, retry_attempts: u32) -> Duration;
 }
 
+/// An exponential backoff calculator that increases the delay between retries
+/// exponentially, clamped between a minimum and maximum duration.
+///
+/// The backoff for attempt `n` is calculated as:
+///
+/// ```text
+/// clamp(min * backoff_factor ^ n, min, max)
+/// ```
+///
+/// # Defaults
+///
+/// | Parameter | Default |
+/// |-----------|---------|
+/// | `min` | 1 ms |
+/// | `max` | 1000 ms |
+/// | `backoff_factor` | 2.0 |
+///
+/// # Example
+///
+/// ```rust
+/// use couchbase_core::retrybesteffort::{BestEffortRetryStrategy, ExponentialBackoffCalculator};
+/// use std::time::Duration;
+/// use std::sync::Arc;
+///
+/// let calc = ExponentialBackoffCalculator::new(
+///     Duration::from_millis(5),   // min
+///     Duration::from_millis(500), // max
+///     2.0,                        // backoff_factor
+/// );
+/// let strategy = Arc::new(BestEffortRetryStrategy::new(calc));
+/// ```
 #[derive(Clone, Debug)]
 pub struct ExponentialBackoffCalculator {
     min: Duration,
@@ -68,6 +127,11 @@ pub struct ExponentialBackoffCalculator {
 }
 
 impl ExponentialBackoffCalculator {
+    /// Creates a new `ExponentialBackoffCalculator`.
+    ///
+    /// * `min` — Minimum backoff duration (floor).
+    /// * `max` — Maximum backoff duration (ceiling).
+    /// * `backoff_factor` — Multiplier applied per retry attempt (typically `2.0`).
     pub fn new(min: Duration, max: Duration, backoff_factor: f64) -> Self {
         Self {
             min,

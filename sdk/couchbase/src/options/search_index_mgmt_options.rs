@@ -16,207 +16,257 @@
  *
  */
 
+//! Options for search index management operations.
+
 use crate::retry::RetryStrategy;
 use std::sync::Arc;
 
+/// Options for retrieving a single search index by name.
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct GetSearchIndexOptions {
+    /// Retry strategy for the operation.
     pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl GetSearchIndexOptions {
+    /// Creates a new instance of `GetSearchIndexOptions`.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Sets the retry strategy for the operation.
     pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
         self.retry_strategy = Some(retry_strategy);
         self
     }
 }
 
+/// Options for listing all search indexes.
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct GetAllSearchIndexesOptions {
+    /// Retry strategy for the operation.
     pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl GetAllSearchIndexesOptions {
+    /// Creates a new instance of `GetAllSearchIndexesOptions`.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Sets the retry strategy for the operation.
     pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
         self.retry_strategy = Some(retry_strategy);
         self
     }
 }
 
+/// Options for creating or updating a search index.
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct UpsertSearchIndexOptions {
+    /// Retry strategy for the operation.
     pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl UpsertSearchIndexOptions {
+    /// Creates a new instance of `UpsertSearchIndexOptions`.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Sets the retry strategy for the operation.
     pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
         self.retry_strategy = Some(retry_strategy);
         self
     }
 }
 
+/// Options for dropping a search index.
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct DropSearchIndexOptions {
+    /// Retry strategy for the operation.
     pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl DropSearchIndexOptions {
+    /// Creates a new instance of `DropSearchIndexOptions`.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Sets the retry strategy for the operation.
     pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
         self.retry_strategy = Some(retry_strategy);
         self
     }
 }
 
+/// Options for analyzing a document against a search index.
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct AnalyzeDocumentOptions {
+    /// Retry strategy for the operation.
     pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl AnalyzeDocumentOptions {
+    /// Creates a new instance of `AnalyzeDocumentOptions`.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Sets the retry strategy for the operation.
     pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
         self.retry_strategy = Some(retry_strategy);
         self
     }
 }
 
+/// Options for retrieving the count of indexed documents in a search index.
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct GetIndexedDocumentsCountOptions {
+    /// Retry strategy for the operation.
     pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl GetIndexedDocumentsCountOptions {
+    /// Creates a new instance of `GetIndexedDocumentsCountOptions`.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Sets the retry strategy for the operation.
     pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
         self.retry_strategy = Some(retry_strategy);
         self
     }
 }
 
+/// Options for pausing document ingestion on a search index.
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct PauseIngestSearchIndexOptions {
+    /// Retry strategy for the operation.
     pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl PauseIngestSearchIndexOptions {
+    /// Creates a new instance of `PauseIngestSearchIndexOptions`.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Sets the retry strategy for the operation.
     pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
         self.retry_strategy = Some(retry_strategy);
         self
     }
 }
 
+/// Options for resuming document ingestion on a search index.
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct ResumeIngestSearchIndexOptions {
+    /// Retry strategy for the operation.
     pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl ResumeIngestSearchIndexOptions {
+    /// Creates a new instance of `ResumeIngestSearchIndexOptions`.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Sets the retry strategy for the operation.
     pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
         self.retry_strategy = Some(retry_strategy);
         self
     }
 }
 
+/// Options for allowing querying on a search index.
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct AllowQueryingSearchIndexOptions {
+    /// Retry strategy for the operation.
     pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl AllowQueryingSearchIndexOptions {
+    /// Creates a new instance of `AllowQueryingSearchIndexOptions`.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Sets the retry strategy for the operation.
     pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
         self.retry_strategy = Some(retry_strategy);
         self
     }
 }
 
+/// Options for disallowing querying on a search index.
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct DisallowQueryingSearchIndexOptions {
+    /// Retry strategy for the operation.
     pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl DisallowQueryingSearchIndexOptions {
+    /// Creates a new instance of `DisallowQueryingSearchIndexOptions`.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Sets the retry strategy for the operation.
     pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
         self.retry_strategy = Some(retry_strategy);
         self
     }
 }
 
+/// Options for freezing the plan of a search index (preventing it from being reassigned).
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct FreezePlanSearchIndexOptions {
+    /// Retry strategy for the operation.
     pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl FreezePlanSearchIndexOptions {
+    /// Creates a new instance of `FreezePlanSearchIndexOptions`.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Sets the retry strategy for the operation.
     pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
         self.retry_strategy = Some(retry_strategy);
         self
     }
 }
 
+/// Options for unfreezing the plan of a search index (allowing reassignment).
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct UnfreezePlanSearchIndexOptions {
+    /// Retry strategy for the operation.
     pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl UnfreezePlanSearchIndexOptions {
+    /// Creates a new instance of `UnfreezePlanSearchIndexOptions`.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Sets the retry strategy for the operation.
     pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
         self.retry_strategy = Some(retry_strategy);
         self

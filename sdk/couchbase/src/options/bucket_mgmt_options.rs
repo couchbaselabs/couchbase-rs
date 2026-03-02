@@ -16,105 +16,136 @@
  *
  */
 
+//! Options for bucket management operations.
+//!
+//! This module provides structures and implementations for options used in
+//! various bucket management operations, such as creating, updating, and
+//! deleting buckets. Each operation has an associated options struct that
+//! can be used to customize the behavior of the operation, including
+//! specifying a retry strategy in case of transient failures.
 use crate::retry::RetryStrategy;
 use std::sync::Arc;
 
+/// Options for [`BucketManager::get_all_buckets`](crate::management::buckets::bucket_manager::BucketManager::get_all_buckets).
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct GetAllBucketsOptions {
+    /// The retry strategy to use in case of transient failures.
     pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl GetAllBucketsOptions {
+    /// Creates a new instance of [`GetAllBucketsOptions`].
     pub fn new() -> Self {
         Default::default()
     }
 
+    /// Sets the retry strategy.
     pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
         self.retry_strategy = Some(retry_strategy);
         self
     }
 }
 
+/// Options for [`BucketManager::get_bucket`](crate::management::buckets::bucket_manager::BucketManager::get_bucket).
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct GetBucketOptions {
+    /// The retry strategy to use in case of transient failures.
     pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl GetBucketOptions {
+    /// Creates a new instance of [`GetBucketOptions`].
     pub fn new() -> Self {
         Default::default()
     }
 
+    /// Sets the retry strategy.
     pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
         self.retry_strategy = Some(retry_strategy);
         self
     }
 }
 
+/// Options for [`BucketManager::create_bucket`](crate::management::buckets::bucket_manager::BucketManager::create_bucket).
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct CreateBucketOptions {
+    /// The retry strategy to use in case of transient failures.
     pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl CreateBucketOptions {
+    /// Creates a new instance of [`CreateBucketOptions`].
     pub fn new() -> Self {
         Default::default()
     }
 
+    /// Sets the retry strategy.
     pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
         self.retry_strategy = Some(retry_strategy);
         self
     }
 }
 
+/// Options for [`BucketManager::update_bucket`](crate::management::buckets::bucket_manager::BucketManager::update_bucket).
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct UpdateBucketOptions {
+    /// The retry strategy to use in case of transient failures.
     pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl UpdateBucketOptions {
+    /// Creates a new instance of [`UpdateBucketOptions`].
     pub fn new() -> Self {
         Default::default()
     }
 
+    /// Sets the retry strategy.
     pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
         self.retry_strategy = Some(retry_strategy);
         self
     }
 }
 
+/// Options for [`BucketManager::drop_bucket`](crate::management::buckets::bucket_manager::BucketManager::drop_bucket).
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct DropBucketOptions {
+    /// The retry strategy to use in case of transient failures.
     pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl DropBucketOptions {
+    /// Creates a new instance of [`DropBucketOptions`].
     pub fn new() -> Self {
         Default::default()
     }
 
+    /// Sets the retry strategy.
     pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
         self.retry_strategy = Some(retry_strategy);
         self
     }
 }
 
+/// Options for [`BucketManager::flush_bucket`](crate::management::buckets::bucket_manager::BucketManager::flush_bucket).
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct FlushBucketOptions {
+    /// The retry strategy to use in case of transient failures.
     pub retry_strategy: Option<Arc<dyn RetryStrategy>>,
 }
 
 impl FlushBucketOptions {
+    /// Creates a new instance of [`FlushBucketOptions`].
     pub fn new() -> Self {
         Default::default()
     }
 
+    /// Sets the retry strategy.
     pub fn retry_strategy(mut self, retry_strategy: Arc<dyn RetryStrategy>) -> Self {
         self.retry_strategy = Some(retry_strategy);
         self

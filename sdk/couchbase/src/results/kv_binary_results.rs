@@ -18,6 +18,8 @@
 
 use crate::mutation_state::MutationToken;
 
+/// The result of an [`increment`](crate::collection::BinaryCollection) or
+/// [`decrement`](crate::collection::BinaryCollection) operation.
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct CounterResult {
     pub(crate) cas: u64,
@@ -26,14 +28,17 @@ pub struct CounterResult {
 }
 
 impl CounterResult {
+    /// Returns the CAS value of the document after the counter operation.
     pub fn cas(&self) -> u64 {
         self.cas
     }
 
+    /// Returns the mutation token for use with scan consistency.
     pub fn mutation_token(&self) -> Option<&MutationToken> {
         self.mutation_token.as_ref()
     }
 
+    /// Returns the new value of the counter.
     pub fn content(&self) -> u64 {
         self.content
     }

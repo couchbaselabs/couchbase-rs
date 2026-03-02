@@ -16,6 +16,21 @@
  *
  */
 
+//! Cluster management APIs.
+//!
+//! These modules provide managers for administering various cluster resources:
+//!
+//! - [`buckets`] — Create, update, drop, list, and flush buckets
+//!   ([`BucketManager`](buckets::bucket_manager::BucketManager))
+//! - [`collections`] — Create, drop, and list scopes and collections
+//!   ([`CollectionManager`](collections::collection_manager::CollectionManager))
+//! - [`users`] — Create, update, drop, and list users and groups
+//!   ([`UserManager`](users::user_manager::UserManager))
+//! - [`query`] — Create, drop, list, and build query indexes
+//!   ([`QueryIndexManager`](query::query_index_manager::QueryIndexManager))
+//! - [`search`] — Create, update, drop, and list search indexes
+//!   ([`SearchIndexManager`](search::search_index_manager::SearchIndexManager))
+
 pub mod buckets;
 pub mod collections;
 pub mod query;

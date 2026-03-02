@@ -16,20 +16,55 @@
  *
  */
 
+//! Durability level constants for mutation operations.
+//!
+//! [`DurabilityLevel`] controls how many replicas must acknowledge for a write before the
+//! SDK considers it successful. Pass a durability level via the operation's options
+//! (e.g. [`UpsertOptions::durability_level`](crate::options::kv_options::UpsertOptions::durability_level)).
+
 use std::fmt::Display;
 
+/// Specifies the level of synchronous replication durability required for a mutation.
+///
+/// Durability levels control how many replicas must acknowledge a write before the
+/// SDK considers it successful.
+///
+/// # Constants
+///
+/// | Level | Description |
+/// |-------|-------------|
+/// | [`NONE`](DurabilityLevel::NONE) | No durability requirement (default) |
+/// | [`MAJORITY`](DurabilityLevel::MAJORITY) | Mutation is replicated to a majority of nodes |
+/// | [`MAJORITY_AND_PERSIST_ACTIVE`](DurabilityLevel::MAJORITY_AND_PERSIST_ACTIVE) | Majority + persisted on active node |
+/// | [`PERSIST_TO_MAJORITY`](DurabilityLevel::PERSIST_TO_MAJORITY) | Mutation is persisted to a majority of nodes |
+///
+/// # Example
+///
+/// ```rust
+/// use couchbase::options::kv_options::UpsertOptions;
+/// use couchbase::durability_level::DurabilityLevel;
+///
+/// let opts = UpsertOptions::new()
+///     .durability_level(DurabilityLevel::MAJORITY);
+/// ```
 #[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
 #[non_exhaustive]
 pub struct DurabilityLevel(InnerDurabilityLevel);
 
 impl DurabilityLevel {
+    /// No durability requirement. The mutation is acknowledged as soon as it is in memory
+    /// on the active node.
     pub const NONE: DurabilityLevel = DurabilityLevel(InnerDurabilityLevel::None);
 
+    /// The mutation must be replicated to a majority of the data service nodes.
     pub const MAJORITY: DurabilityLevel = DurabilityLevel(InnerDurabilityLevel::Majority);
 
+    /// The mutation must be replicated to a majority of nodes and also persisted to disk
+    /// on the active node.
     pub const MAJORITY_AND_PERSIST_ACTIVE: DurabilityLevel =
         DurabilityLevel(InnerDurabilityLevel::MajorityAndPersistActive);
 
+    /// The mutation must be persisted to disk on a majority of the data service nodes.
     pub const PERSIST_TO_MAJORITY: DurabilityLevel =
         DurabilityLevel(InnerDurabilityLevel::PersistToMajority);
 }

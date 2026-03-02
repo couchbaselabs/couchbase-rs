@@ -16,6 +16,19 @@
  *
  */
 
+//! Sub-document operation specifications.
+//!
+//! Sub-document operations allow you to read or mutate specific paths within a JSON document
+//! without transferring the entire document. This is more efficient for large documents when
+//! you only need to access a few fields.
+//!
+//! # Modules
+//!
+//! - [`lookup_in_specs`] — Specifications for sub-document lookups (get, exists, count).
+//! - [`mutate_in_specs`] — Specifications for sub-document mutations (insert, upsert, replace,
+//!   remove, array operations, counters).
+//! - [`macros`] — Server-side macro constants for extended attributes (xattrs).
+
 pub mod lookup_in_specs;
 pub mod macros;
 pub mod mutate_in_specs;

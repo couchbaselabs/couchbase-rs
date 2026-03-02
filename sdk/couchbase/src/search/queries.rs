@@ -16,13 +16,37 @@
  *
  */
 
+//! Full-Text Search query types.
+//!
+//! This module provides the various search query types that can be used with
+//! [`SearchRequest`](crate::search::request::SearchRequest). All query types
+//! are constructed via the [`Query`] builder enum.
+//!
+//! # Common Query Types
+//!
+//! | Type | Description |
+//! |------|-------------|
+//! | [`MatchQuery`] | Analyzes input text and matches it against an index |
+//! | [`MatchPhraseQuery`] | Matches an exact phrase in the index |
+//! | [`TermQuery`] | Matches a specific term without analysis |
+//! | [`PrefixQuery`] | Matches terms with a given prefix |
+//! | [`RegexpQuery`] | Matches terms against a regular expression |
+//! | [`WildcardQuery`] | Matches terms using wildcards (`*`, `?`) |
+//! | [`BooleanQuery`] | Combines queries with must/should/must-not logic |
+//! | [`QueryStringQuery`] | Parses a human-readable query string |
+//! | [`MatchAllQuery`] | Matches all documents |
+//! | [`MatchNoneQuery`] | Matches no documents |
+
 use crate::search::location::Location;
 use std::fmt::Display;
 
+/// The boolean operator for combining match query terms.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum MatchOperator {
+    /// Any term may match (default).
     Or,
+    /// All terms must match.
     And,
 }
 
@@ -60,19 +84,28 @@ impl Display for MatchOperator {
     }
 }
 
+/// A full-text match query that analyzes input text and matches it against the index.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct MatchQuery {
+    /// The analyzer to use for this query.
     pub analyzer: Option<String>,
+    /// The boost value for this query.
     pub boost: Option<f32>,
+    /// The field to query.
     pub field: Option<String>,
+    /// The fuzziness level for the query.
     pub fuzziness: Option<u64>,
+    /// The input text to match.
     pub match_input: String,
+    /// The boolean operator for combining terms in the query.
     pub operator: Option<MatchOperator>,
+    /// The prefix length for the query.
     pub prefix_length: Option<u64>,
 }
 
 impl MatchQuery {
+    /// Creates a new `MatchQuery` with the given input text.
     pub fn new(match_input: impl Into<String>) -> Self {
         Self {
             analyzer: None,
@@ -85,47 +118,59 @@ impl MatchQuery {
         }
     }
 
+    /// Sets the analyzer for the query.
     pub fn analyzer(mut self, analyzer: impl Into<String>) -> Self {
         self.analyzer = Some(analyzer.into());
         self
     }
 
+    /// Sets the boost value for the query.
     pub fn boost(mut self, boost: f32) -> Self {
         self.boost = Some(boost);
         self
     }
 
+    /// Sets the field to query.
     pub fn field(mut self, field: impl Into<String>) -> Self {
         self.field = Some(field.into());
         self
     }
 
+    /// Sets the fuzziness level for the query.
     pub fn fuzziness(mut self, fuzziness: u64) -> Self {
         self.fuzziness = Some(fuzziness);
         self
     }
 
+    /// Sets the boolean operator for combining terms in the query.
     pub fn operator(mut self, operator: impl Into<MatchOperator>) -> Self {
         self.operator = Some(operator.into());
         self
     }
 
+    /// Sets the prefix length for the query.
     pub fn prefix_length(mut self, prefix_length: u64) -> Self {
         self.prefix_length = Some(prefix_length);
         self
     }
 }
 
+/// A full-text match phrase query that matches an exact phrase in the index.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct MatchPhraseQuery {
+    /// The analyzer to use for this query.
     pub analyzer: Option<String>,
+    /// The boost value for this query.
     pub boost: Option<f32>,
+    /// The field to query.
     pub field: Option<String>,
+    /// The exact phrase to match.
     pub match_phrase: String,
 }
 
 impl MatchPhraseQuery {
+    /// Creates a new `MatchPhraseQuery` with the given phrase.
     pub fn new(match_phrase: impl Into<String>) -> Self {
         Self {
             analyzer: None,
@@ -135,31 +180,39 @@ impl MatchPhraseQuery {
         }
     }
 
+    /// Sets the analyzer for the query.
     pub fn analyzer(mut self, analyzer: impl Into<String>) -> Self {
         self.analyzer = Some(analyzer.into());
         self
     }
 
+    /// Sets the boost value for the query.
     pub fn boost(mut self, boost: f32) -> Self {
         self.boost = Some(boost);
         self
     }
 
+    /// Sets the field to query.
     pub fn field(mut self, field: impl Into<String>) -> Self {
         self.field = Some(field.into());
         self
     }
 }
 
+/// A regular expression query that matches terms against a regular expression.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct RegexpQuery {
+    /// The boost value for this query.
     pub boost: Option<f32>,
+    /// The field to query.
     pub field: Option<String>,
+    /// The regular expression to match.
     pub regexp: String,
 }
 
 impl RegexpQuery {
+    /// Creates a new `RegexpQuery` with the given regular expression.
     pub fn new(regexp: impl Into<String>) -> Self {
         Self {
             boost: None,
@@ -168,25 +221,31 @@ impl RegexpQuery {
         }
     }
 
+    /// Sets the boost value for the query.
     pub fn boost(mut self, boost: f32) -> Self {
         self.boost = Some(boost);
         self
     }
 
+    /// Sets the field to query.
     pub fn field(mut self, field: impl Into<String>) -> Self {
         self.field = Some(field.into());
         self
     }
 }
 
+/// A query that parses a human-readable query string.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct QueryStringQuery {
+    /// The boost value for this query.
     pub boost: Option<f32>,
+    /// The query string to parse.
     pub query: String,
 }
 
 impl QueryStringQuery {
+    /// Creates a new `QueryStringQuery` with the given query string.
     pub fn new(query: impl Into<String>) -> Self {
         Self {
             boost: None,
@@ -194,173 +253,222 @@ impl QueryStringQuery {
         }
     }
 
+    /// Sets the boost value for the query.
     pub fn boost(mut self, boost: f32) -> Self {
         self.boost = Some(boost);
         self
     }
 }
 
+/// A numeric range query that matches documents with numeric values within a specified range.
 #[derive(Debug, Default, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct NumericRangeQuery {
+    /// The boost value for this query.
     pub boost: Option<f32>,
+    /// The field to query.
     pub field: Option<String>,
+    /// Whether the minimum value is inclusive.
     pub inclusive_min: Option<bool>,
+    /// Whether the maximum value is inclusive.
     pub inclusive_max: Option<bool>,
+    /// The minimum value of the range.
     pub min: Option<f32>,
+    /// The maximum value of the range.
     pub max: Option<f32>,
 }
 
 impl NumericRangeQuery {
+    /// Creates a new `NumericRangeQuery`.
     pub fn new() -> Self {
         Default::default()
     }
 
+    /// Sets the boost value for the query.
     pub fn boost(mut self, boost: f32) -> Self {
         self.boost = Some(boost);
         self
     }
 
+    /// Sets the field to query.
     pub fn field(mut self, field: impl Into<String>) -> Self {
         self.field = Some(field.into());
         self
     }
 
+    /// Sets the minimum value of the range.
     pub fn inclusive_min(mut self, min: f32, inclusive_min: bool) -> Self {
         self.min = Some(min);
         self.inclusive_min = Some(inclusive_min);
         self
     }
 
+    /// Sets the maximum value of the range.
     pub fn inclusive_max(mut self, max: f32, inclusive_max: bool) -> Self {
         self.max = Some(max);
         self.inclusive_max = Some(inclusive_max);
         self
     }
 
+    /// Sets the minimum value of the range.
     pub fn min(mut self, min: f32) -> Self {
         self.min = Some(min);
         self
     }
 
+    /// Sets the maximum value of the range.
     pub fn max(mut self, max: f32) -> Self {
         self.max = Some(max);
         self
     }
 }
 
+/// A date range query that matches documents with date values within a specified range.
 #[derive(Debug, Default, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct DateRangeQuery {
+    /// The boost value for this query.
     pub boost: Option<f32>,
+    /// The field to query.
     pub field: Option<String>,
+    /// The date/time parser to use.
     pub datetime_parser: Option<String>,
+    /// The end date/time of the range.
     pub end: Option<String>,
+    /// Whether the start date/time is inclusive.
     pub inclusive_start: Option<bool>,
+    /// Whether the end date/time is inclusive.
     pub inclusive_end: Option<bool>,
+    /// The start date/time of the range.
     pub start: Option<String>,
 }
 
 impl DateRangeQuery {
+    /// Creates a new `DateRangeQuery`.
     pub fn new() -> Self {
         Default::default()
     }
 
+    /// Sets the boost value for the query.
     pub fn boost(mut self, boost: f32) -> Self {
         self.boost = Some(boost);
         self
     }
 
+    /// Sets the field to query.
     pub fn field(mut self, field: impl Into<String>) -> Self {
         self.field = Some(field.into());
         self
     }
 
+    /// Sets the date/time parser to use.
     pub fn datetime_parser(mut self, datetime_parser: impl Into<String>) -> Self {
         self.datetime_parser = Some(datetime_parser.into());
         self
     }
 
+    /// Sets the start date/time of the range.
     pub fn inclusive_start(mut self, start: impl Into<String>, inclusive_start: bool) -> Self {
         self.start = Some(start.into());
         self.inclusive_start = Some(inclusive_start);
         self
     }
 
+    /// Sets the end date/time of the range.
     pub fn inclusive_end(mut self, end: impl Into<String>, inclusive_end: bool) -> Self {
         self.end = Some(end.into());
         self.inclusive_end = Some(inclusive_end);
         self
     }
 
+    /// Sets the end date/time of the range.
     pub fn end(mut self, end: impl Into<String>) -> Self {
         self.end = Some(end.into());
         self
     }
 
+    /// Sets the start date/time of the range.
     pub fn start(mut self, start: impl Into<String>) -> Self {
         self.start = Some(start.into());
         self
     }
 }
 
+/// A term range query that matches documents with terms within a specified range.
 #[derive(Debug, Default, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct TermRangeQuery {
+    /// The boost value for this query.
     pub boost: Option<f32>,
+    /// The field to query.
     pub field: Option<String>,
+    /// Whether the minimum term is inclusive.
     pub inclusive_min: Option<bool>,
+    /// Whether the maximum term is inclusive.
     pub inclusive_max: Option<bool>,
+    /// The maximum term of the range.
     pub max: Option<String>,
+    /// The minimum term of the range.
     pub min: Option<String>,
 }
 
 impl TermRangeQuery {
+    /// Creates a new `TermRangeQuery`.
     pub fn new() -> Self {
         Default::default()
     }
 
+    /// Sets the boost value for the query.
     pub fn boost(mut self, boost: f32) -> Self {
         self.boost = Some(boost);
         self
     }
 
+    /// Sets the field to query.
     pub fn field(mut self, field: impl Into<String>) -> Self {
         self.field = Some(field.into());
         self
     }
 
+    /// Sets the minimum term of the range.
     pub fn inclusive_min(mut self, min: impl Into<String>, inclusive_min: bool) -> Self {
         self.min = Some(min.into());
         self.inclusive_min = Some(inclusive_min);
         self
     }
 
+    /// Sets the maximum term of the range.
     pub fn inclusive_max(mut self, max: impl Into<String>, inclusive_max: bool) -> Self {
         self.max = Some(max.into());
         self.inclusive_max = Some(inclusive_max);
         self
     }
 
+    /// Sets the maximum term of the range.
     pub fn max(mut self, max: impl Into<String>) -> Self {
         self.max = Some(max.into());
         self
     }
 
+    /// Sets the minimum term of the range.
     pub fn min(mut self, min: impl Into<String>) -> Self {
         self.min = Some(min.into());
         self
     }
 }
 
+/// A conjunction query that matches documents matching all of the conjuncts.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct ConjunctionQuery {
+    /// The boost value for this query.
     pub boost: Option<f32>,
+    /// The conjuncts of the query.
     pub conjuncts: Vec<Query>,
 }
 
 impl ConjunctionQuery {
+    /// Creates a new `ConjunctionQuery` with the given conjuncts.
     pub fn new(conjuncts: Vec<Query>) -> Self {
         Self {
             boost: None,
@@ -368,26 +476,33 @@ impl ConjunctionQuery {
         }
     }
 
+    /// Adds a conjunct to the query.
     pub fn and(mut self, query: Query) -> Self {
         self.conjuncts.push(query);
         self
     }
 
+    /// Sets the boost value for the query.
     pub fn boost(mut self, boost: f32) -> Self {
         self.boost = Some(boost);
         self
     }
 }
 
+/// A disjunction query that matches documents matching any of the disjuncts.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct DisjunctionQuery {
+    /// The boost value for this query.
     pub boost: Option<f32>,
+    /// The disjuncts of the query.
     pub disjuncts: Vec<Query>,
+    /// The minimum number of disjuncts that must match.
     pub min: Option<u32>,
 }
 
 impl DisjunctionQuery {
+    /// Creates a new `DisjunctionQuery` with the given disjuncts.
     pub fn new(disjuncts: Vec<Query>) -> Self {
         Self {
             boost: None,
@@ -396,66 +511,84 @@ impl DisjunctionQuery {
         }
     }
 
+    /// Adds a disjunct to the query.
     pub fn or(mut self, query: Query) -> Self {
         self.disjuncts.push(query);
         self
     }
 
+    /// Sets the minimum number of disjuncts that must match.
     pub fn min(mut self, min: u32) -> Self {
         self.min = Some(min);
         self
     }
 
+    /// Sets the boost value for the query.
     pub fn boost(mut self, boost: f32) -> Self {
         self.boost = Some(boost);
         self
     }
 }
 
+/// A boolean query that combines multiple queries with must/should/must-not logic.
 #[derive(Debug, Default, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct BooleanQuery {
+    /// The boost value for this query.
     pub boost: Option<f32>,
+    /// The conjunction query for mandatory clauses.
     pub must: Option<ConjunctionQuery>,
+    /// The disjunction query for prohibited clauses.
     pub must_not: Option<DisjunctionQuery>,
+    /// The disjunction query for optional clauses.
     pub should: Option<DisjunctionQuery>,
 }
 
 impl BooleanQuery {
+    /// Creates a new `BooleanQuery`.
     pub fn new() -> Self {
         Default::default()
     }
 
+    /// Sets the boost value for the query.
     pub fn boost(mut self, boost: f32) -> Self {
         self.boost = Some(boost);
         self
     }
 
+    /// Sets the conjunction query for mandatory clauses.
     pub fn must(mut self, must: ConjunctionQuery) -> Self {
         self.must = Some(must);
         self
     }
 
+    /// Sets the disjunction query for prohibited clauses.
     pub fn must_not(mut self, must_not: DisjunctionQuery) -> Self {
         self.must_not = Some(must_not);
         self
     }
 
+    /// Sets the disjunction query for optional clauses.
     pub fn should(mut self, should: DisjunctionQuery) -> Self {
         self.should = Some(should);
         self
     }
 }
 
+/// A wildcard query that matches terms using wildcards (`*`, `?`).
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct WildcardQuery {
+    /// The boost value for this query.
     pub boost: Option<f32>,
+    /// The field to query.
     pub field: Option<String>,
+    /// The wildcard pattern to match.
     pub wildcard: String,
 }
 
 impl WildcardQuery {
+    /// Creates a new `WildcardQuery` with the given wildcard pattern.
     pub fn new(wildcard: impl Into<String>) -> Self {
         Self {
             boost: None,
@@ -464,44 +597,56 @@ impl WildcardQuery {
         }
     }
 
+    /// Sets the boost value for the query.
     pub fn boost(mut self, boost: f32) -> Self {
         self.boost = Some(boost);
         self
     }
 
+    /// Sets the field to query.
     pub fn field(mut self, field: impl Into<String>) -> Self {
         self.field = Some(field.into());
         self
     }
 }
 
+/// A query that matches documents by their document IDs.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct DocIDQuery {
+    /// The boost value for this query.
     pub boost: Option<f32>,
+    /// The document IDs to match.
     pub ids: Vec<String>,
 }
 
 impl DocIDQuery {
+    /// Creates a new `DocIDQuery` with the given document IDs.
     pub fn new(ids: Vec<String>) -> Self {
         Self { boost: None, ids }
     }
 
+    /// Sets the boost value for the query.
     pub fn boost(mut self, boost: f32) -> Self {
         self.boost = Some(boost);
         self
     }
 }
 
+/// A boolean field query that matches documents with a specific boolean value.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct BooleanFieldQuery {
+    /// The boolean value to match.
     pub bool_value: bool,
+    /// The boost value for this query.
     pub boost: Option<f32>,
+    /// The field to query.
     pub field: Option<String>,
 }
 
 impl BooleanFieldQuery {
+    /// Creates a new `BooleanFieldQuery` with the given boolean value.
     pub fn new(bool_value: bool) -> Self {
         Self {
             bool_value,
@@ -510,28 +655,37 @@ impl BooleanFieldQuery {
         }
     }
 
+    /// Sets the boost value for the query.
     pub fn boost(mut self, boost: f32) -> Self {
         self.boost = Some(boost);
         self
     }
 
+    /// Sets the field to query.
     pub fn field(mut self, field: impl Into<String>) -> Self {
         self.field = Some(field.into());
         self
     }
 }
 
+/// A term query that matches documents with a specific term.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct TermQuery {
+    /// The boost value for this query.
     pub boost: Option<f32>,
+    /// The field to query.
     pub field: Option<String>,
+    /// The fuzziness level for the query.
     pub fuzziness: Option<u32>,
+    /// The prefix length for the query.
     pub prefix_length: Option<u32>,
+    /// The term to match.
     pub term: String,
 }
 
 impl TermQuery {
+    /// Creates a new `TermQuery` with the given term.
     pub fn new(term: impl Into<String>) -> Self {
         Self {
             boost: None,
@@ -542,36 +696,45 @@ impl TermQuery {
         }
     }
 
+    /// Sets the boost value for the query.
     pub fn boost(mut self, boost: f32) -> Self {
         self.boost = Some(boost);
         self
     }
 
+    /// Sets the field to query.
     pub fn field(mut self, field: impl Into<String>) -> Self {
         self.field = Some(field.into());
         self
     }
 
+    /// Sets the fuzziness level for the query.
     pub fn fuzziness(mut self, fuzziness: u32) -> Self {
         self.fuzziness = Some(fuzziness);
         self
     }
 
+    /// Sets the prefix length for the query.
     pub fn prefix_length(mut self, prefix_length: u32) -> Self {
         self.prefix_length = Some(prefix_length);
         self
     }
 }
 
+/// A phrase query that matches documents containing the specified sequence of terms.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct PhraseQuery {
+    /// The boost value for this query.
     pub boost: Option<f32>,
+    /// The field to query.
     pub field: Option<String>,
+    /// The terms that must appear in the specified order.
     pub terms: Vec<String>,
 }
 
 impl PhraseQuery {
+    /// Creates a new `PhraseQuery` with the given terms.
     pub fn new(terms: Vec<String>) -> Self {
         Self {
             boost: None,
@@ -580,26 +743,33 @@ impl PhraseQuery {
         }
     }
 
+    /// Sets the boost value for the query.
     pub fn boost(mut self, boost: f32) -> Self {
         self.boost = Some(boost);
         self
     }
 
+    /// Sets the field to query.
     pub fn field(mut self, field: impl Into<String>) -> Self {
         self.field = Some(field.into());
         self
     }
 }
 
+/// A prefix query that matches documents with terms that have the specified prefix.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct PrefixQuery {
+    /// The boost value for this query.
     pub boost: Option<f32>,
+    /// The field to query.
     pub field: Option<String>,
+    /// The prefix to match.
     pub prefix: String,
 }
 
 impl PrefixQuery {
+    /// Creates a new `PrefixQuery` with the given prefix.
     pub fn new(prefix: impl Into<String>) -> Self {
         Self {
             boost: None,
@@ -608,47 +778,59 @@ impl PrefixQuery {
         }
     }
 
+    /// Sets the boost value for the query.
     pub fn boost(mut self, boost: f32) -> Self {
         self.boost = Some(boost);
         self
     }
 
+    /// Sets the field to query.
     pub fn field(mut self, field: impl Into<String>) -> Self {
         self.field = Some(field.into());
         self
     }
 }
 
+/// A query that matches all documents.
 #[derive(Debug, Default, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct MatchAllQuery {}
 
 impl MatchAllQuery {
+    /// Creates a new `MatchAllQuery`.
     pub fn new() -> Self {
         Default::default()
     }
 }
 
+/// A query that matches no documents.
 #[derive(Debug, Default, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct MatchNoneQuery {}
 
 impl MatchNoneQuery {
+    /// Creates a new `MatchNoneQuery`.
     pub fn new() -> Self {
         Default::default()
     }
 }
 
+/// A geo distance query that matches documents within a specified distance from a location.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct GeoDistanceQuery {
+    /// The distance from the location.
     pub distance: String,
+    /// The boost value for this query.
     pub boost: Option<f32>,
+    /// The field to query.
     pub field: Option<String>,
+    /// The location to match.
     pub location: Location,
 }
 
 impl GeoDistanceQuery {
+    /// Creates a new `GeoDistanceQuery` with the given distance and location.
     pub fn new(distance: impl Into<String>, location: Location) -> Self {
         Self {
             distance: distance.into(),
@@ -658,27 +840,35 @@ impl GeoDistanceQuery {
         }
     }
 
+    /// Sets the boost value for the query.
     pub fn boost(mut self, boost: f32) -> Self {
         self.boost = Some(boost);
         self
     }
 
+    /// Sets the field to query.
     pub fn field(mut self, field: impl Into<String>) -> Self {
         self.field = Some(field.into());
         self
     }
 }
 
+/// A geo bounding box query that matches documents within a specified bounding box.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct GeoBoundingBoxQuery {
+    /// The bottom right location of the bounding box.
     pub bottom_right: Location,
+    /// The boost value for this query.
     pub boost: Option<f32>,
+    /// The field to query.
     pub field: Option<String>,
+    /// The top left location of the bounding box.
     pub top_left: Location,
 }
 
 impl GeoBoundingBoxQuery {
+    /// Creates a new `GeoBoundingBoxQuery` with the given top left and bottom right locations.
     pub fn new(bottom_right: Location, top_left: Location) -> Self {
         Self {
             bottom_right,
@@ -688,26 +878,33 @@ impl GeoBoundingBoxQuery {
         }
     }
 
+    /// Sets the boost value for the query.
     pub fn boost(mut self, boost: f32) -> Self {
         self.boost = Some(boost);
         self
     }
 
+    /// Sets the field to query.
     pub fn field(mut self, field: impl Into<String>) -> Self {
         self.field = Some(field.into());
         self
     }
 }
 
+/// A geo polygon query that matches documents within a specified polygon.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct GeoPolygonQuery {
+    /// The boost value for this query.
     pub boost: Option<f32>,
+    /// The field to query.
     pub field: Option<String>,
+    /// The points that define the polygon.
     pub polygon_points: Vec<Location>,
 }
 
 impl GeoPolygonQuery {
+    /// Creates a new `GeoPolygonQuery` with the given polygon points.
     pub fn new(polygon_points: Vec<Location>) -> Self {
         Self {
             boost: None,
@@ -716,41 +913,89 @@ impl GeoPolygonQuery {
         }
     }
 
+    /// Sets the boost value for the query.
     pub fn boost(mut self, boost: f32) -> Self {
         self.boost = Some(boost);
         self
     }
 
+    /// Sets the field to query.
     pub fn field(mut self, field: impl Into<String>) -> Self {
         self.field = Some(field.into());
         self
     }
 }
 
+/// The query builder enum for constructing search queries.
+///
+/// Each variant wraps a specific query type. Use this enum when passing a query to
+/// [`SearchRequest::with_search_query`](crate::search::request::SearchRequest::with_search_query)
+/// or combining queries inside [`BooleanQuery`], [`ConjunctionQuery`], or [`DisjunctionQuery`].
+///
+/// # Example
+///
+/// ```rust
+/// use couchbase::search::queries::{Query, MatchQuery, BooleanQuery, ConjunctionQuery, DisjunctionQuery};
+///
+/// // Simple match query
+/// let q = Query::Match(MatchQuery::new("airport").field("type"));
+///
+/// // Boolean combination
+/// let bool_q = Query::Boolean(
+///     BooleanQuery::new()
+///         .must(ConjunctionQuery::new(vec![
+///             Query::Match(MatchQuery::new("hotel").field("type")),
+///         ]))
+///         .should(DisjunctionQuery::new(vec![
+///             Query::Match(MatchQuery::new("pool").field("description")),
+///         ])),
+/// );
+/// ```
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum Query {
+    /// A full-text match query. See [`MatchQuery`].
     Match(MatchQuery),
+    /// A full-text match phrase query. See [`MatchPhraseQuery`].
     MatchPhrase(MatchPhraseQuery),
+    /// A regular expression query. See [`RegexpQuery`].
     Regexp(RegexpQuery),
+    /// A human-readable query string query. See [`QueryStringQuery`].
     #[allow(clippy::enum_variant_names)]
     QueryString(QueryStringQuery),
+    /// A numeric range query. See [`NumericRangeQuery`].
     NumericRange(NumericRangeQuery),
+    /// A date range query. See [`DateRangeQuery`].
     DateRange(DateRangeQuery),
+    /// A term range query. See [`TermRangeQuery`].
     TermRange(TermRangeQuery),
+    /// A conjunction (AND) query. See [`ConjunctionQuery`].
     Conjunction(ConjunctionQuery),
+    /// A disjunction (OR) query. See [`DisjunctionQuery`].
     Disjunction(DisjunctionQuery),
+    /// A boolean must/should/must-not query. See [`BooleanQuery`].
     Boolean(BooleanQuery),
+    /// A wildcard query. See [`WildcardQuery`].
     Wildcard(WildcardQuery),
+    /// A document ID query. See [`DocIDQuery`].
     DocID(DocIDQuery),
+    /// A boolean field query. See [`BooleanFieldQuery`].
     BooleanField(BooleanFieldQuery),
+    /// An exact term query. See [`TermQuery`].
     Term(TermQuery),
+    /// An exact phrase query. See [`PhraseQuery`].
     Phrase(PhraseQuery),
+    /// A prefix query. See [`PrefixQuery`].
     Prefix(PrefixQuery),
+    /// Matches all documents. See [`MatchAllQuery`].
     MatchAll(MatchAllQuery),
+    /// Matches no documents. See [`MatchNoneQuery`].
     MatchNone(MatchNoneQuery),
+    /// A geo-distance query. See [`GeoDistanceQuery`].
     GeoDistance(GeoDistanceQuery),
+    /// A geo bounding box query. See [`GeoBoundingBoxQuery`].
     GeoBoundingBox(GeoBoundingBoxQuery),
+    /// A geo polygon query. See [`GeoPolygonQuery`].
     GeoPolygon(GeoPolygonQuery),
 }
 

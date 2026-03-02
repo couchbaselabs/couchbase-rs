@@ -16,6 +16,11 @@
  *
  */
 
+//! Error types for all Couchbase SDK operations.
+//!
+//! Every fallible operation returns [`Result<T>`], which wraps [`Error`].
+//! Use [`Error::kind()`] to inspect the [`ErrorKind`] and determine the failure category.
+
 use crate::error_context::{
     ErrorContext, ExtendedErrorContext, HttpErrorContext, KeyValueErrorContext, QueryErrorContext,
     QueryErrorDesc, SearchErrorContext,
@@ -28,8 +33,32 @@ use std::error::Error as StdError;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 
+/// A type alias for `std::result::Result<T, Error>` used throughout the SDK.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// The error type for all Couchbase SDK operations.
+///
+/// An `Error` contains an [`ErrorKind`] that describes what went wrong, and an optional
+/// error context with additional diagnostic information
+/// (e.g. document ID, opcode, server status code, dispatched-to address).
+///
+/// # Inspecting Errors
+///
+/// Use [`kind()`](Error::kind) to determine the category of error:
+///
+/// ```rust,no_run
+/// use couchbase::error::{Error, ErrorKind};
+///
+/// fn handle_error(err: &Error) {
+///     match err.kind() {
+///         ErrorKind::DocumentNotFound => println!("Not found!"),
+///         ErrorKind::DocumentExists => println!("Already exists!"),
+///         ErrorKind::CasMismatch => println!("Concurrent modification!"),
+///         ErrorKind::ServerTimeout => println!("Timed out!"),
+///         _ => println!("Other error: {err}"),
+///     }
+/// }
+/// ```
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Error {
     kind: Box<ErrorKind>,
@@ -47,6 +76,7 @@ impl Error {
         Self::new_internal(kind)
     }
 
+    /// Returns the [`ErrorKind`] describing the category of this error.
     pub fn kind(&self) -> &ErrorKind {
         &self.kind
     }
@@ -167,80 +197,160 @@ impl Display for Error {
 
 impl StdError for Error {}
 
+/// Categorizes the type of error that occurred.
+///
+/// Match on `ErrorKind` variants to handle specific error conditions. The variants
+/// cover shared errors (timeouts, authentication, argument validation), key-value errors
+/// (document not found, CAS mismatch, durability), query errors, and management errors.
+///
+/// # Common Variants
+///
+/// | Variant | When it occurs |
+/// |---------|---------------|
+/// | [`DocumentNotFound`](ErrorKind::DocumentNotFound) | `get`, `replace`, `remove` on a missing document |
+/// | [`DocumentExists`](ErrorKind::DocumentExists) | `insert` when the document already exists |
+/// | [`CasMismatch`](ErrorKind::CasMismatch) | CAS-guarded operation with a stale CAS value |
+/// | [`ServerTimeout`](ErrorKind::ServerTimeout) | Operation timed out on the server |
+/// | [`InvalidArgument`](ErrorKind::InvalidArgument) | Bad argument passed to an operation |
+/// | [`DocumentLocked`](ErrorKind::DocumentLocked) | Attempting to mutate a locked document |
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[non_exhaustive]
 pub enum ErrorKind {
+    /// An unclassified error with a descriptive message.
     OtherFailure(String),
+    /// The operation timed out on the server side.
     ServerTimeout,
+    /// The [`Cluster`](crate::cluster::Cluster) has been dropped and is no longer usable.
     ClusterDropped,
 
     // Shared Error Definitions RFC#58@16
+    /// An invalid argument was passed to an operation.
     InvalidArgument(InvalidArgumentErrorKind),
+    /// The requested service is not available on the cluster.
     ServiceNotAvailable(ServiceType),
+    /// A feature required by this operation is not available.
     FeatureNotAvailable(FeatureNotAvailableErrorKind),
+    /// An internal server error occurred.
     InternalServerFailure,
+    /// Authentication failed (invalid credentials).
     AuthenticationFailure,
+    /// A temporary/transient failure occurred; the operation may be retried.
     TemporaryFailure,
+    /// A failure occurred on the server while parsing a request.
     ParsingFailure,
+    /// The CAS value provided does not match the current document CAS.
     CasMismatch,
+    /// The requested bucket was not found on the cluster.
     BucketNotFound,
+    /// The requested collection was not found.
     CollectionNotFound,
+    /// The requested scope was not found.
     ScopeNotFound,
+    /// Failed to encode a value (e.g. JSON serialization failure).
     EncodingFailure(String),
+    /// Failed to decode a value (e.g. JSON deserialization failure).
     DecodingFailure(String),
+    /// The operation is not supported by the server.
     UnsupportedOperation,
+    /// The requested index was not found.
     IndexNotFound,
+    /// An index with the given name already exists.
     IndexExists,
+    /// The operation was rejected because the rate limit was exceeded.
     RateLimitedFailure,
+    /// The operation was rejected because the quota limit was exceeded.
     QuotaLimitedFailure,
+    /// The request was canceled before completion.
     RequestCanceled,
 
     // Key Value Error Definitions RFC#58@16
+    /// The document was not found in the collection.
     DocumentNotFound,
+    /// The document exists but could not be retrieved (e.g. all replicas failed).
     DocumentUnretrievable,
+    /// The document is locked by another operation.
     DocumentLocked,
+    /// The value is too large for the server to store.
     ValueTooLarge,
+    /// A document with the same key already exists (insert conflict).
     DocumentExists,
+    /// The requested durability level is not available on this cluster.
     DurabilityLevelNotAvailable,
+    /// The requested durability requirements are impossible to satisfy.
     DurabilityImpossible,
+    /// The durability outcome is ambiguous (the write may or may not have been durable).
     DurabilityAmbiguous,
+    /// A durable write is already in progress for this document.
     DurabilityWriteInProgress,
+    /// A previous durable write is being recommitted.
     DurableWriteRecommitInProgress,
+    /// A sub-document path was not found in the document.
     PathNotFound,
+    /// A sub-document path type mismatch (e.g. accessing an array element on an object).
     PathMismatch,
+    /// A sub-document path is syntactically invalid.
     PathInvalid,
+    /// A sub-document path is too long.
     PathTooBig,
+    /// A sub-document path has too many levels of nesting.
     PathTooDeep,
+    /// The value being inserted has too many levels of nesting.
     ValueTooDeep,
+    /// The value for a sub-document operation is invalid.
     ValueInvalid,
+    /// The existing document is not valid JSON.
     DocumentNotJSON,
+    /// A numeric value in the document is too large.
     NumberTooBig,
+    /// The delta value for an increment/decrement is invalid.
     DeltaInvalid,
+    /// The sub-document path already exists (insert conflict).
     PathExists,
+    /// An unknown macro was referenced in a sub-document operation.
     XattrUnknownMacro,
+    /// An invalid combination of xattr keys was used.
     XattrInvalidKeyCombo,
+    /// An unknown virtual attribute was referenced.
     XattrUnknownVirtualAttribute,
+    /// Cannot modify a virtual attribute.
     XattrCannotModifyVirtualAttribute,
+    /// Access denied to extended attributes.
     XattrNoAccess,
+    /// Extended attributes must be accessed before regular attributes.
     XattrInvalidOrder,
+    /// An invalid combination of xattr flags was used.
     XattrInvalidFlagCombo,
+    /// The mutation token is outdated and cannot be used for consistency.
     MutationTokenOutdated,
+    /// The document is not locked (unlock was called without a prior lock).
     DocumentNotLocked,
 
     // Query Error Definitions RFC#58@16
+    /// A query planning failure occurred.
     PlanningFailure,
+    /// A query index failure occurred.
     IndexFailure,
+    /// A prepared statement failure occurred.
     PreparedStatementFailure,
+    /// A DML (Data Manipulation Language) failure occurred.
     DMLFailure,
 
     // Management Error Definitions RFC#58@16
+    /// A collection with the given name already exists.
     CollectionExists,
+    /// A scope with the given name already exists.
     ScopeExists,
+    /// The requested user was not found.
     UserNotFound,
+    /// The requested group was not found.
     GroupNotFound,
+    /// A bucket with the given name already exists.
     BucketExists,
+    /// The user already exists.
     UserExists,
+    /// The group already exists.
     GroupExists,
+    /// The bucket does not have flush enabled.
     BucketNotFlushable,
 }
 
@@ -419,13 +529,33 @@ impl MetricsName for Error {
     }
 }
 
+/// Details about an [`ErrorKind::InvalidArgument`] error.
+///
+/// Contains the name of the offending argument (when known) and a message
+/// describing why the value was rejected.
+///
+/// Use [`arg()`](InvalidArgumentErrorKind::arg) to get the argument name and
+/// [`msg()`](InvalidArgumentErrorKind::msg) for the human-readable description.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct InvalidArgumentErrorKind {
     pub(crate) msg: String,
-    pub arg: Option<String>,
+    pub(crate) arg: Option<String>,
 }
 
 impl InvalidArgumentErrorKind {
+    /// Returns the name of the argument that was invalid, when available.
+    pub fn arg(&self) -> Option<&str> {
+        self.arg.as_deref()
+    }
+
+    /// Returns the human-readable description of why the argument was invalid.
+    pub fn msg(&self) -> &str {
+        &self.msg
+    }
+
+    /// Creates a new `InvalidArgumentErrorKind`.
+    ///
+    /// Only available with the `unstable-error-construction` feature.
     #[cfg(feature = "unstable-error-construction")]
     pub fn new(arg: impl Into<Option<String>>, msg: impl Into<String>) -> Self {
         Self {
@@ -435,13 +565,33 @@ impl InvalidArgumentErrorKind {
     }
 }
 
+/// Details about an [`ErrorKind::FeatureNotAvailable`] error.
+///
+/// Identifies which feature is missing and optionally provides an explanatory
+/// message from the server or SDK.
+///
+/// Use [`feature()`](FeatureNotAvailableErrorKind::feature) to get the feature name
+/// and [`msg()`](FeatureNotAvailableErrorKind::msg) for the optional description.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct FeatureNotAvailableErrorKind {
-    pub feature: String,
+    pub(crate) feature: String,
     pub(crate) msg: Option<String>,
 }
 
 impl FeatureNotAvailableErrorKind {
+    /// Returns the name of the feature that is not available.
+    pub fn feature(&self) -> &str {
+        &self.feature
+    }
+
+    /// Returns the optional explanatory message from the server or SDK.
+    pub fn msg(&self) -> Option<&str> {
+        self.msg.as_deref()
+    }
+
+    /// Creates a new `FeatureNotAvailableErrorKind`.
+    ///
+    /// Only available with the `unstable-error-construction` feature.
     #[cfg(feature = "unstable-error-construction")]
     pub fn new(feature: impl Into<String>, msg: impl Into<Option<String>>) -> Self {
         Self {

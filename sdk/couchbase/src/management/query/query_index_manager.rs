@@ -29,12 +29,16 @@ use couchbase_core::create_span;
 use std::sync::Arc;
 use tracing::Instrument;
 
+/// Manages query (SQL++) indexes.
+///
+/// Obtain via [`Collection::query_indexes`](crate::collection::Collection::query_indexes).
 #[derive(Clone)]
 pub struct QueryIndexManager {
     pub(crate) client: Arc<QueryIndexMgmtClient>,
 }
 
 impl QueryIndexManager {
+    /// Lists all query indexes.
     pub async fn get_all_indexes(
         &self,
         opts: impl Into<Option<GetAllQueryIndexesOptions>>,
@@ -57,6 +61,7 @@ impl QueryIndexManager {
         result
     }
 
+    /// Creates a secondary query index on the given fields.
     pub async fn create_index(
         &self,
         index_name: impl Into<String>,
@@ -81,6 +86,7 @@ impl QueryIndexManager {
         result
     }
 
+    /// Creates a primary query index.
     pub async fn create_primary_index(
         &self,
         opts: impl Into<Option<CreatePrimaryQueryIndexOptions>>,
@@ -103,6 +109,7 @@ impl QueryIndexManager {
         result
     }
 
+    /// Drops a secondary query index by name.
     pub async fn drop_index(
         &self,
         index_name: impl Into<String>,
@@ -126,6 +133,7 @@ impl QueryIndexManager {
         result
     }
 
+    /// Drops the primary query index.
     pub async fn drop_primary_index(
         &self,
         opts: impl Into<Option<DropPrimaryQueryIndexOptions>>,
@@ -148,6 +156,7 @@ impl QueryIndexManager {
         result
     }
 
+    /// Watches indexes until they come online.
     pub async fn watch_indexes(
         &self,
         index_names: impl Into<Vec<String>>,
@@ -171,6 +180,7 @@ impl QueryIndexManager {
         result
     }
 
+    /// Triggers a build of all deferred indexes.
     pub async fn build_deferred_indexes(
         &self,
         opts: impl Into<Option<BuildQueryIndexOptions>>,

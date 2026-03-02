@@ -18,10 +18,15 @@
 
 use std::time::Duration;
 
+/// Controls the maximum document expiry for a collection.
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum MaxExpiryValue {
+    /// Documents never expire.
     Never,
+    /// Inherit the expiry setting from the parent bucket.
     InheritFromBucket,
+    /// Documents expire after the given duration.
     Seconds(Duration),
 }
 
@@ -45,46 +50,58 @@ impl From<i32> for MaxExpiryValue {
     }
 }
 
+/// Settings for creating a new collection.
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct CreateCollectionSettings {
+    /// Maximum document expiry for the collection.
     pub max_expiry: Option<MaxExpiryValue>,
+    /// Whether to enable history retention.
     pub history: Option<bool>,
 }
 
 impl CreateCollectionSettings {
+    /// Creates a new `CreateCollectionSettings` with default values.
     pub fn new() -> Self {
         Default::default()
     }
 
+    /// Sets the maximum document expiry.
     pub fn max_expiry(mut self, max_expiry: MaxExpiryValue) -> Self {
         self.max_expiry = Some(max_expiry);
         self
     }
 
+    /// Enables or disables history retention.
     pub fn history(mut self, history: bool) -> Self {
         self.history = Some(history);
         self
     }
 }
 
+/// Settings for updating an existing collection.
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct UpdateCollectionSettings {
+    /// Maximum document expiry for the collection.
     pub max_expiry: Option<MaxExpiryValue>,
+    /// Whether to enable history retention.
     pub history: Option<bool>,
 }
 
 impl UpdateCollectionSettings {
+    /// Creates a new `UpdateCollectionSettings` with default values.
     pub fn new() -> Self {
         Default::default()
     }
 
+    /// Sets the maximum document expiry.
     pub fn max_expiry(mut self, max_expiry: MaxExpiryValue) -> Self {
         self.max_expiry = Some(max_expiry);
         self
     }
 
+    /// Enables or disables history retention.
     pub fn history(mut self, history: bool) -> Self {
         self.history = Some(history);
         self

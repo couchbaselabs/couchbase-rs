@@ -16,12 +16,16 @@
  *
  */
 
+//! Raw string transcoding — stores and retrieves UTF-8 strings with string common flags.
+
 use crate::transcoding::{decode_common_flags, encode_common_flags, DataType};
 
+/// Encodes a UTF-8 string with string common flags.
 pub fn encode(value: &str) -> crate::error::Result<(&[u8], u32)> {
     Ok((value.as_bytes(), encode_common_flags(DataType::String)))
 }
 
+/// Decodes bytes into a UTF-8 string, verifying the common flags indicate string.
 pub fn decode(value: &[u8], flags: u32) -> crate::error::Result<&str> {
     let datatype = decode_common_flags(flags);
     if datatype != DataType::String {

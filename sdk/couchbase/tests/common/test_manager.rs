@@ -20,6 +20,9 @@ use couchbase::error;
 use couchbase::management::buckets::bucket_manager::BucketManager;
 use couchbase::management::buckets::bucket_settings::*;
 use couchbase::management::collections::collection_manager::*;
+use couchbase::management::collections::collection_settings::{
+    CreateCollectionSettings, UpdateCollectionSettings,
+};
 use couchbase::management::users::user::*;
 use couchbase::management::users::user_manager::UserManager;
 use couchbase::options::bucket_mgmt_options::*;

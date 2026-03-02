@@ -16,4 +16,6 @@
  *
  */
 
+//! Query index management types.
+
 pub mod query_index_manager;

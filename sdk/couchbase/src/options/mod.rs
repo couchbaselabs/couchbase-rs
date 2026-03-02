@@ -16,6 +16,29 @@
  *
  */
 
+//! Configuration options for all SDK operations.
+//!
+//! Every SDK operation accepts an optional options struct that configures its behavior.
+//! All options structs implement `Default` and provide a builder-style API. Pass `None`
+//! to any operation to use the defaults.
+//!
+//! # Modules
+//!
+//! | Module | Description |
+//! |--------|-------------|
+//! | [`cluster_options`] | [`ClusterOptions`](cluster_options::ClusterOptions) — connection and cluster configuration |
+//! | [`kv_options`] | Options for KV CRUD operations (get, upsert, insert, replace, remove, etc.) |
+//! | [`kv_binary_options`] | Options for binary operations (append, prepend, increment, decrement) |
+//! | [`query_options`] | [`QueryOptions`](query_options::QueryOptions) — query parameters and consistency |
+//! | [`search_options`] | Options for Full-Text Search |
+//! | [`diagnostic_options`] | Options for ping, diagnostics, and wait_until_ready |
+//! | [`bucket_mgmt_options`] | Options for bucket management |
+//! | [`collection_mgmt_options`] | Options for collection/scope management |
+//! | [`user_mgmt_options`] | Options for user management |
+//! | [`query_index_mgmt_options`] | Options for query index management |
+//! | [`search_index_mgmt_options`] | Options for search index management |
+//! | [`collection_ds_options`] | Options for data structure operations (list, map, set, queue) |
+
 pub mod bucket_mgmt_options;
 pub mod cluster_options;
 pub mod collection_ds_options;

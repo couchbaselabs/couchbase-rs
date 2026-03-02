@@ -16,6 +16,14 @@
  *
  */
 
+//! Key-value CRUD operations on a [`Collection`].
+//!
+//! This module implements the core document operations: get, upsert, insert, replace, remove,
+//! exists, touch, get-and-touch, get-and-lock, unlock, and sub-document lookup_in/mutate_in.
+//!
+//! All methods accept an optional options struct (pass `None` for defaults) and return
+//! a `Result` with the appropriate result type.
+
 use crate::collection::Collection;
 use crate::options::kv_options::*;
 use crate::results::kv_results::*;
@@ -29,6 +37,32 @@ use std::time::Duration;
 use tracing::Instrument;
 
 impl Collection {
+    /// Upserts (inserts or replaces) a JSON document in the collection.
+    ///
+    /// The value is automatically serialized to JSON using `serde`. To store raw bytes
+    /// with custom flags, use [`upsert_raw`](Collection::upsert_raw).
+    ///
+    /// # Arguments
+    ///
+    /// * `id` — The document key.
+    /// * `value` — A value that implements `Serialize`.
+    /// * `options` — Optional [`UpsertOptions`] (expiry, durability, etc.). Pass `None` for defaults.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error on encoding failure, timeout, or server-side errors.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use couchbase::collection::Collection;
+    /// # async fn example(collection: Collection) -> couchbase::error::Result<()> {
+    /// use serde_json::json;
+    /// let result = collection.upsert("doc::1", &json!({"key": "value"}), None).await?;
+    /// println!("CAS: {}", result.cas());
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn upsert<V: Serialize>(
         &self,
         id: impl AsRef<str>,
@@ -62,6 +96,38 @@ impl Collection {
         result
     }
 
+    /// Upserts a document with raw bytes and explicit flags.
+    ///
+    /// Unlike [`upsert`](Collection::upsert), no automatic JSON encoding is performed.
+    /// The caller is responsible for encoding the value and providing the correct
+    /// [common flags](crate::transcoding).
+    ///
+    /// # Arguments
+    ///
+    /// * `id` — The document key.
+    /// * `value` — The raw byte content of the document.
+    /// * `flags` — Common flags indicating the content type (see the [`transcoding`] module).
+    /// * `options` — Optional [`UpsertOptions`].
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use couchbase::collection::Collection;
+    /// # async fn example(collection: &Collection) -> couchbase::error::Result<()> {
+    /// use couchbase::transcoding;
+    ///
+    /// // Store pre-encoded JSON bytes with JSON flags.
+    /// let json = br#"{"greeting": "hello"}"#;
+    /// let (content, flags) = transcoding::raw_json::encode(json)?;
+    /// collection.upsert_raw("doc-key", &content, flags, None).await?;
+    ///
+    /// // Store arbitrary binary data with binary flags.
+    /// let binary_data: &[u8] = &[0xDE, 0xAD, 0xBE, 0xEF];
+    /// let (content, flags) = transcoding::raw_binary::encode(binary_data)?;
+    /// collection.upsert_raw("bin-key", &content, flags, None).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn upsert_raw(
         &self,
         id: impl AsRef<str>,
@@ -84,6 +150,16 @@ impl Collection {
         result
     }
 
+    /// Inserts a new JSON document into the collection.
+    ///
+    /// Fails with [`ErrorKind::DocumentExists`](crate::error::ErrorKind::DocumentExists)
+    /// if a document with the same key already exists.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` — The document key.
+    /// * `value` — A value that implements `Serialize`.
+    /// * `options` — Optional [`InsertOptions`].
     pub async fn insert<V: Serialize>(
         &self,
         id: impl AsRef<str>,
@@ -117,6 +193,9 @@ impl Collection {
         result
     }
 
+    /// Inserts a document with raw bytes and explicit flags.
+    ///
+    /// See [`insert`](Collection::insert) for the JSON variant.
     pub async fn insert_raw(
         &self,
         id: impl AsRef<str>,
@@ -139,6 +218,16 @@ impl Collection {
         result
     }
 
+    /// Replaces an existing JSON document in the collection.
+    ///
+    /// Fails with [`ErrorKind::DocumentNotFound`](crate::error::ErrorKind::DocumentNotFound)
+    /// if the document does not exist. Use [`ReplaceOptions::cas`] for optimistic concurrency.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` — The document key.
+    /// * `value` — A value that implements `Serialize`.
+    /// * `options` — Optional [`ReplaceOptions`].
     pub async fn replace<V: Serialize>(
         &self,
         id: impl AsRef<str>,
@@ -172,6 +261,9 @@ impl Collection {
         result
     }
 
+    /// Replaces a document with raw bytes and explicit flags.
+    ///
+    /// See [`replace`](Collection::replace) for the JSON variant.
     pub async fn replace_raw(
         &self,
         id: impl AsRef<str>,
@@ -194,6 +286,15 @@ impl Collection {
         result
     }
 
+    /// Removes (deletes) a document from the collection.
+    ///
+    /// Fails with [`ErrorKind::DocumentNotFound`](crate::error::ErrorKind::DocumentNotFound)
+    /// if the document does not exist. Use [`RemoveOptions::cas`] for optimistic concurrency.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` — The document key.
+    /// * `options` — Optional [`RemoveOptions`].
     pub async fn remove(
         &self,
         id: impl AsRef<str>,
@@ -216,6 +317,29 @@ impl Collection {
         result
     }
 
+    /// Retrieves a document from the collection.
+    ///
+    /// Returns a [`GetResult`] which can be deserialized into a concrete type via
+    /// [`GetResult::content_as`].
+    ///
+    /// Fails with [`ErrorKind::DocumentNotFound`](crate::error::ErrorKind::DocumentNotFound)
+    /// if the document does not exist.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` — The document key.
+    /// * `options` — Optional [`GetOptions`] (projections, expiry, etc.).
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use couchbase::collection::Collection;
+    /// # async fn example(collection: Collection) -> couchbase::error::Result<()> {
+    /// let result = collection.get("user::1", None).await?;
+    /// let user: serde_json::Value = result.content_as()?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn get(
         &self,
         id: impl AsRef<str>,
@@ -234,6 +358,10 @@ impl Collection {
         result
     }
 
+    /// Checks whether a document exists in the collection without retrieving its content.
+    ///
+    /// Returns an [`ExistsResult`] with an `exists()` method that returns `true` if the
+    /// document is present.
     pub async fn exists(
         &self,
         id: impl AsRef<str>,
@@ -256,6 +384,13 @@ impl Collection {
         result
     }
 
+    /// Retrieves a document and simultaneously updates its expiry time.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` — The document key.
+    /// * `expiry` — The new expiry duration from now. Use `Duration::ZERO` to remove expiry.
+    /// * `options` — Optional [`GetAndTouchOptions`].
     pub async fn get_and_touch(
         &self,
         id: impl AsRef<str>,
@@ -279,6 +414,17 @@ impl Collection {
         result
     }
 
+    /// Retrieves a document and locks it for the specified duration.
+    ///
+    /// While locked, only the holder of the CAS value can modify the document.
+    /// Use [`unlock`](Collection::unlock) to release the lock before expiry,
+    /// or let it expire automatically.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` — The document key.
+    /// * `lock_time` — How long to lock the document (max 30 seconds).
+    /// * `options` — Optional [`GetAndLockOptions`].
     pub async fn get_and_lock(
         &self,
         id: impl AsRef<str>,
@@ -302,6 +448,13 @@ impl Collection {
         result
     }
 
+    /// Unlocks a document that was previously locked with [`get_and_lock`](Collection::get_and_lock).
+    ///
+    /// # Arguments
+    ///
+    /// * `id` — The document key.
+    /// * `cas` — The CAS value from the [`GetResult`] returned by `get_and_lock`.
+    /// * `options` — Optional [`UnlockOptions`].
     pub async fn unlock(
         &self,
         id: impl AsRef<str>,
@@ -325,6 +478,13 @@ impl Collection {
         result
     }
 
+    /// Updates the expiry time of a document without retrieving its content.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` — The document key.
+    /// * `expiry` — The new expiry duration from now.
+    /// * `options` — Optional [`TouchOptions`].
     pub async fn touch(
         &self,
         id: impl AsRef<str>,
@@ -348,6 +508,36 @@ impl Collection {
         result
     }
 
+    /// Performs one or more sub-document lookup operations on a document.
+    ///
+    /// Sub-document lookups allow you to retrieve or check specific paths within a JSON
+    /// document without fetching the entire document.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` — The document key.
+    /// * `specs` — A slice of [`LookupInSpec`]s describing the paths to look up.
+    /// * `options` — Optional [`LookupInOptions`].
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use couchbase::collection::Collection;
+    /// use couchbase::subdoc::lookup_in_specs::LookupInSpec;
+    ///
+    /// # async fn example(collection: Collection) -> couchbase::error::Result<()> {
+    /// let result = collection.lookup_in("user::1", &[
+    ///     LookupInSpec::get("name", None),
+    ///     LookupInSpec::exists("email", None),
+    ///     LookupInSpec::count("addresses", None),
+    /// ], None).await?;
+    ///
+    /// let name: String = result.content_as(0)?;
+    /// let has_email: bool = result.exists(1)?;
+    /// let addr_count: u64 = result.content_as(2)?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn lookup_in(
         &self,
         id: impl AsRef<str>,
@@ -371,6 +561,32 @@ impl Collection {
         result
     }
 
+    /// Performs one or more sub-document mutation operations on a document.
+    ///
+    /// Sub-document mutations allow you to modify specific paths within a JSON document
+    /// atomically without replacing the entire document.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` — The document key.
+    /// * `specs` — A slice of [`MutateInSpec`]s describing the mutations.
+    /// * `options` — Optional [`MutateInOptions`] (CAS, expiry, store semantics, etc.).
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use couchbase::collection::Collection;
+    /// use couchbase::subdoc::mutate_in_specs::MutateInSpec;
+    ///
+    /// # async fn example(collection: Collection) -> couchbase::error::Result<()> {
+    /// let result = collection.mutate_in("user::1", &[
+    ///     MutateInSpec::upsert("name", "Bob", None)?,
+    ///     MutateInSpec::remove("temporary_field", None),
+    /// ], None).await?;
+    /// println!("CAS after mutation: {}", result.cas());
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn mutate_in(
         &self,
         id: impl AsRef<str>,

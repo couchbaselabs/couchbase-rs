@@ -20,6 +20,22 @@ use crate::error;
 use crate::search::queries::Query;
 use crate::search::vector::VectorSearch;
 
+/// A Full-Text Search request that may contain a search query, a vector search, or both.
+///
+/// Create a request using [`with_search_query`](SearchRequest::with_search_query)
+/// or [`with_vector_search`](SearchRequest::with_vector_search), then optionally
+/// combine them using the builder methods.
+///
+/// # Example
+///
+/// ```rust
+/// use couchbase::search::request::SearchRequest;
+/// use couchbase::search::queries::{Query, MatchQuery};
+///
+/// let request = SearchRequest::with_search_query(
+///     Query::Match(MatchQuery::new("airport"))
+/// );
+/// ```
 #[derive(Debug, Clone)]
 pub struct SearchRequest {
     pub(crate) search_query: Option<Query>,
@@ -27,6 +43,7 @@ pub struct SearchRequest {
 }
 
 impl SearchRequest {
+    /// Creates a `SearchRequest` containing only a text search query.
     pub fn with_search_query(search_query: Query) -> Self {
         Self {
             search_query: Some(search_query),
@@ -34,6 +51,7 @@ impl SearchRequest {
         }
     }
 
+    /// Creates a `SearchRequest` containing only a vector search.
     pub fn with_vector_search(vector_search: VectorSearch) -> Self {
         Self {
             search_query: None,
@@ -41,6 +59,9 @@ impl SearchRequest {
         }
     }
 
+    /// Adds a vector search to this request.
+    ///
+    /// Returns an error if a vector search has already been set.
     pub fn vector_search(mut self, vector_search: VectorSearch) -> error::Result<Self> {
         if self.vector_search.is_some() {
             return Err(error::Error::invalid_argument(
@@ -52,6 +73,9 @@ impl SearchRequest {
         Ok(self)
     }
 
+    /// Adds a text search query to this request.
+    ///
+    /// Returns an error if a search query has already been set.
     pub fn search_query(mut self, search_query: Query) -> error::Result<Self> {
         if self.search_query.is_some() {
             return Err(error::Error::invalid_argument(

@@ -16,9 +16,27 @@
  *
  */
 
+//! Couchbase service type identifiers.
+//!
+//! [`ServiceType`] constants identify the various Couchbase services (KV, Query, Search, etc.)
+//! and are used to filter diagnostics operations and in error context reporting.
+
 use serde::Serialize;
 use std::fmt::{Display, Formatter};
 
+/// Identifies a Couchbase service type.
+///
+/// Used to filter operations in diagnostics (ping, wait_until_ready) and in error reporting.
+///
+/// # Constants
+///
+/// | Constant | Description |
+/// |----------|-------------|
+/// | [`KV`](ServiceType::KV) | Key-Value (data) service |
+/// | [`QUERY`](ServiceType::QUERY) | SQL++ (N1QL) query service |
+/// | [`SEARCH`](ServiceType::SEARCH) | Full-Text Search service |
+/// | [`MGMT`](ServiceType::MGMT) | Management (REST) service |
+/// | [`EVENTING`](ServiceType::EVENTING) | Eventing service |
 #[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Serialize)]
 #[non_exhaustive]
 pub struct ServiceType(InnerServiceType);

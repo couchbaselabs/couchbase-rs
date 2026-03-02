@@ -24,8 +24,14 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 
+/// Additional context information attached to an [`Error`](crate::error::Error).
+///
+/// Provides diagnostic details such as the last dispatched-to address, dispatched-from address,
+/// and extended context specific to the service type (KV, query, search, HTTP).
+///
+/// For diagnostic purposes only, not programmatically accessible.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct ErrorContext {
+pub(crate) struct ErrorContext {
     // retry_reasons: Vec<RetryReason>,
     // retry_attempts: u32,
     last_dispatched_from: Option<String>,
@@ -61,10 +67,12 @@ impl ErrorContext {
         self
     }
 
+    /// Returns the last address that the operation was dispatched to, if available.
     pub fn last_dispatched_to(&self) -> Option<&String> {
         self.last_dispatched_to.as_ref()
     }
 
+    /// Returns the local address that the operation was dispatched from, if available.
     pub fn last_dispatched_from(&self) -> Option<&String> {
         self.last_dispatched_from.as_ref()
     }

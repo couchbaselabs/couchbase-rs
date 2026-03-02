@@ -25,21 +25,34 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::time::Duration;
 
+/// The state of a single endpoint after a ping operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum PingState {
+    /// The ping succeeded.
     Ok,
+    /// The ping timed out.
     Timeout,
+    /// The ping failed with an error.
     Error,
 }
 
+/// Detailed ping result for a single endpoint.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct EndpointPingReport {
+    /// The remote address of the endpoint.
     pub remote: String,
+    /// The error, if the ping failed.
     pub error: Option<Error>,
+    /// The round-trip latency of the ping.
     pub latency: Duration,
+    /// The endpoint's connection ID.
     pub id: Option<String>,
+    /// The bucket namespace, if applicable.
     pub namespace: Option<String>,
+    /// Whether the ping succeeded, timed out, or errored.
     pub state: PingState,
 }
 
@@ -65,7 +78,13 @@ impl Serialize for EndpointPingReport {
     }
 }
 
+/// The result of a [`Cluster::ping`](crate::cluster::Cluster::ping) or
+/// [`Bucket::ping`](crate::bucket::Bucket::ping) operation, containing
+/// latency data for each pinged endpoint grouped by service type.
+///
+/// Can be serialized to JSON via `Display` or `Serialize`.
 #[derive(Debug, Clone, Serialize)]
+#[non_exhaustive]
 pub struct PingReport {
     pub version: u16,
     pub id: String,
@@ -82,13 +101,21 @@ impl Display for PingReport {
     }
 }
 
+/// Diagnostic information about a single endpoint connection.
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct EndpointDiagnostics {
+    /// The service type of this endpoint.
     pub service_type: ServiceType,
+    /// The connection ID.
     pub id: String,
+    /// The local address of the connection.
     pub local_address: Option<String>,
+    /// The remote address of the endpoint.
     pub remote_address: String,
+    /// Microseconds since the last activity on this connection.
     pub last_activity: Option<i64>,
+    /// The current connection state.
     pub state: ConnectionState,
 }
 
@@ -112,7 +139,12 @@ impl Serialize for EndpointDiagnostics {
     }
 }
 
+/// The result of a [`Cluster::diagnostics`](crate::cluster::Cluster::diagnostics) call,
+/// containing the current state of all SDK connections grouped by service type.
+///
+/// Can be serialized to JSON via `Display` or `Serialize`.
 #[derive(Clone, Debug, Serialize)]
+#[non_exhaustive]
 pub struct DiagnosticsResult {
     pub version: u32,
     pub config_rev: i64,

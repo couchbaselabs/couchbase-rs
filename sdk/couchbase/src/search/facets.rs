@@ -16,16 +16,31 @@
  *
  */
 
+//! Facet definitions for aggregating Full-Text Search results.
+//!
+//! Facets allow you to aggregate search results into categories. There are three types:
+//!
+//! - [`TermFacet`] — groups results by distinct terms in a field.
+//! - [`NumericRangeFacet`] — groups results by numeric ranges.
+//! - [`DateRangeFacet`] — groups results by date ranges.
+//!
+//! Use the [`Facet`] enum to pass facets to
+//! [`SearchOptions::facets`](crate::options::search_options::SearchOptions::facets).
+
 use chrono::{DateTime, FixedOffset};
 
+/// A term facet that groups search results by distinct terms in a field.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct TermFacet {
+    /// The field to aggregate.
     pub field: String,
+    /// Maximum number of term buckets to return.
     pub size: Option<u64>,
 }
 
 impl TermFacet {
+    /// Creates a new `TermFacet` for the given field.
     pub fn new(field: impl Into<String>) -> Self {
         Self {
             field: field.into(),
@@ -33,6 +48,7 @@ impl TermFacet {
         }
     }
 
+    /// Sets the maximum number of term buckets to return.
     pub fn size(mut self, size: impl Into<Option<u64>>) -> Self {
         self.size = size.into();
         self
@@ -45,15 +61,20 @@ impl From<TermFacet> for couchbase_core::searchx::facets::TermFacet {
     }
 }
 
+/// A named numeric range used in a [`NumericRangeFacet`].
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct NumericRange {
+    /// The name of this range bucket.
     pub name: String,
+    /// The minimum value (inclusive) of the range.
     pub min: Option<f64>,
+    /// The maximum value (exclusive) of the range.
     pub max: Option<f64>,
 }
 
 impl NumericRange {
+    /// Creates a new `NumericRange` with the given name.
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -62,11 +83,13 @@ impl NumericRange {
         }
     }
 
+    /// Sets the minimum value of the range.
     pub fn min(mut self, min: impl Into<Option<f64>>) -> Self {
         self.min = min.into();
         self
     }
 
+    /// Sets the maximum value of the range.
     pub fn max(mut self, max: impl Into<Option<f64>>) -> Self {
         self.max = max.into();
         self
@@ -81,15 +104,20 @@ impl From<NumericRange> for couchbase_core::searchx::facets::NumericRange {
     }
 }
 
+/// A numeric range facet that groups search results by numeric value ranges.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct NumericRangeFacet {
+    /// The field to aggregate.
     pub field: String,
+    /// Maximum number of range buckets to return.
     pub size: Option<u64>,
+    /// The numeric ranges to group by.
     pub numeric_ranges: Vec<NumericRange>,
 }
 
 impl NumericRangeFacet {
+    /// Creates a new empty `NumericRangeFacet` for the given field.
     pub fn new(field: impl Into<String>) -> Self {
         Self {
             field: field.into(),
@@ -98,6 +126,7 @@ impl NumericRangeFacet {
         }
     }
 
+    /// Creates a `NumericRangeFacet` with pre-defined ranges.
     pub fn with_numeric_ranges(
         field: impl Into<String>,
         numeric_ranges: impl Into<Vec<NumericRange>>,
@@ -109,11 +138,13 @@ impl NumericRangeFacet {
         }
     }
 
+    /// Sets the maximum number of range buckets to return.
     pub fn size(mut self, size: impl Into<Option<u64>>) -> Self {
         self.size = size.into();
         self
     }
 
+    /// Adds a numeric range to this facet.
     pub fn add_numeric_range(mut self, range: NumericRange) -> Self {
         self.numeric_ranges.push(range);
         self
@@ -134,15 +165,20 @@ impl From<NumericRangeFacet> for couchbase_core::searchx::facets::NumericRangeFa
     }
 }
 
+/// A named date range used in a [`DateRangeFacet`].
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct DateRange {
+    /// The name of this range bucket.
     pub name: String,
+    /// The start date/time (inclusive) of the range.
     pub start: Option<DateTime<FixedOffset>>,
+    /// The end date/time (exclusive) of the range.
     pub end: Option<DateTime<FixedOffset>>,
 }
 
 impl DateRange {
+    /// Creates a new `DateRange` with the given name.
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -151,11 +187,13 @@ impl DateRange {
         }
     }
 
+    /// Sets the start date/time of the range.
     pub fn start(mut self, start: impl Into<Option<DateTime<FixedOffset>>>) -> Self {
         self.start = start.into();
         self
     }
 
+    /// Sets the end date/time of the range.
     pub fn end(mut self, end: impl Into<Option<DateTime<FixedOffset>>>) -> Self {
         self.end = end.into();
         self
@@ -170,15 +208,20 @@ impl From<DateRange> for couchbase_core::searchx::facets::DateRange {
     }
 }
 
+/// A date range facet that groups search results by date/time ranges.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct DateRangeFacet {
+    /// The field to aggregate.
     pub field: String,
+    /// Maximum number of range buckets to return.
     pub size: Option<u64>,
+    /// The date ranges to group by.
     pub date_ranges: Vec<DateRange>,
 }
 
 impl DateRangeFacet {
+    /// Creates a new empty `DateRangeFacet` for the given field.
     pub fn new(field: impl Into<String>) -> Self {
         Self {
             field: field.into(),
@@ -187,6 +230,7 @@ impl DateRangeFacet {
         }
     }
 
+    /// Creates a `DateRangeFacet` with pre-defined date ranges.
     pub fn with_date_ranges(
         field: impl Into<String>,
         date_ranges: impl Into<Vec<DateRange>>,
@@ -198,11 +242,13 @@ impl DateRangeFacet {
         }
     }
 
+    /// Sets the maximum number of range buckets to return.
     pub fn size(mut self, size: impl Into<Option<u64>>) -> Self {
         self.size = size.into();
         self
     }
 
+    /// Adds a date range to this facet.
     pub fn add_date_range(mut self, range: DateRange) -> Self {
         self.date_ranges.push(range);
         self
@@ -223,11 +269,17 @@ impl From<DateRangeFacet> for couchbase_core::searchx::facets::DateRangeFacet {
     }
 }
 
+/// A search facet for aggregating search results.
+///
+/// Use with [`SearchOptions::facets`](crate::options::search_options::SearchOptions::facets).
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum Facet {
+    /// A term facet.
     Term(TermFacet),
+    /// A numeric range facet.
     NumericRange(NumericRangeFacet),
+    /// A date range facet.
     DateRange(DateRangeFacet),
 }
 
