@@ -30,8 +30,8 @@ use crate::retryfailfast::FailFastRetryStrategy;
 use crate::tracingcomponent::SPAN_ATTRIB_RETRIES;
 use crate::{analyticsx, error, httpx, mgmtx, queryx, searchx};
 use async_trait::async_trait;
-use log::{debug, info};
 use tokio::time::sleep;
+use tracing::{debug, info};
 
 lazy_static! {
     pub(crate) static ref DEFAULT_RETRY_STRATEGY: Arc<dyn RetryStrategy> =

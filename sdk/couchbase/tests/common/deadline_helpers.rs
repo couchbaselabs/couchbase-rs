@@ -17,7 +17,7 @@
  */
 
 use couchbase::error::Error;
-use log::error;
+use tracing::error;
 use std::ops::Add;
 use std::time::Duration;
 use tokio::time::{timeout_at, Instant};

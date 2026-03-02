@@ -19,9 +19,9 @@
 use crate::error;
 use crate::results::kv_results::{LookupInResult, LookupInResultEntry};
 use crate::subdoc::lookup_in_specs::LookupInSpec;
-use log::{error, warn};
 use serde_json::value::Map;
 use serde_json::{from_slice, to_vec, Value};
+use tracing::{error, warn};
 
 pub(crate) fn build_from_subdoc_entries(
     specs: &[LookupInSpec],

@@ -38,7 +38,6 @@ use crate::util::get_host_port_tuple_from_uri;
 use bytes::Bytes;
 use futures::StreamExt;
 use http::{Method, StatusCode};
-use log::debug;
 use serde::Deserialize;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -46,6 +45,7 @@ use std::fmt::format;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
+use tracing::debug;
 use tracing::{instrument, Instrument, Level, Span};
 use uuid::Uuid;
 

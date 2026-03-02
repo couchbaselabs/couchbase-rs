@@ -29,13 +29,13 @@ use crate::tracingcomponent::TracingComponent;
 use arc_swap::ArcSwap;
 use futures::future::join_all;
 use futures::AsyncWriteExt;
-use log::{debug, error, info, trace};
 use std::collections::HashMap;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
+use tracing::{debug, error, info, trace};
 use uuid::Uuid;
 
 pub(crate) trait KvEndpointClientManager: Sized + Send + Sync {

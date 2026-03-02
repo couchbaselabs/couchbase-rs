@@ -27,12 +27,12 @@ use crate::searchx::{error, search_json};
 use bytes::Bytes;
 use futures::{FutureExt, Stream, StreamExt};
 use http::StatusCode;
-use log::debug;
 use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
+use tracing::debug;
 
 pub struct SearchRespReader {
     endpoint: String,

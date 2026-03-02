@@ -28,11 +28,11 @@ use crate::kvendpointclientmanager::KvEndpointClientManager;
 use crate::memdx::hello_feature::HelloFeature;
 use crate::memdx::request::{GetClusterConfigKnownVersion, GetClusterConfigRequest};
 use crate::parsedconfig::ParsedConfig;
-use log::{debug, trace};
 use std::env;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::{timeout, timeout_at};
+use tracing::{debug, trace};
 
 #[derive(Clone)]
 pub(crate) struct ConfigFetcherMemd<M: KvEndpointClientManager> {

@@ -19,7 +19,6 @@
 use crate::memdx::extframe::decode_res_ext_frames;
 use crate::memdx::packet::ResponsePacket;
 use crate::options::orphan_reporter::{OrphanReporterConfig, OrphanSinkFn};
-use log::{debug, trace, warn};
 use serde_json::json;
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
@@ -31,6 +30,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tokio::time::{interval_at, Instant, MissedTickBehavior};
+use tracing::{debug, trace, warn};
 
 #[derive(Debug, Clone)]
 pub struct OrphanContext {

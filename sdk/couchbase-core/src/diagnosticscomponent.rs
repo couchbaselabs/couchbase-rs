@@ -41,7 +41,6 @@ use futures::future::join_all;
 use futures::stream::FuturesUnordered;
 use futures::{FutureExt, StreamExt};
 use futures_core::future::BoxFuture;
-use log::debug;
 use serde::ser::SerializeStruct;
 use std::collections::HashMap;
 use std::fmt::Display;
@@ -54,6 +53,7 @@ use tokio::select;
 use tokio::sync::watch;
 use tokio::sync::watch::{Receiver, Sender};
 use tokio::time::sleep;
+use tracing::debug;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Default)]

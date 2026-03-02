@@ -59,8 +59,8 @@ use crate::retry::{
 };
 use crate::vbucketrouter::{orchestrate_memd_routing, VbucketRouter};
 use futures::{FutureExt, TryFutureExt};
-use log::debug;
 use tokio::time::sleep;
+use tracing::debug;
 
 pub(crate) struct CrudComponent<
     M: KvEndpointClientManager,

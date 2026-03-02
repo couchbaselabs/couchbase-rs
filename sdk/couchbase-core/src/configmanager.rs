@@ -24,7 +24,6 @@ use crate::configwatcher::{ConfigWatcherMemd, ConfigWatcherMemdConfig, ConfigWat
 use crate::kvendpointclientmanager::KvEndpointClientManager;
 use crate::nmvbhandler::ConfigUpdater;
 use crate::parsedconfig::{ParsedConfig, ParsedConfigBucket};
-use log::{debug, warn};
 use std::cmp::Ordering;
 use std::future::Future;
 use std::ops::Deref;
@@ -33,6 +32,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
 use tokio::sync::broadcast::error::RecvError;
 use tokio::sync::{broadcast, watch, Notify};
+use tracing::{debug, warn};
 
 pub(crate) trait ConfigManager: Sized + Send + Sync {
     fn watch(&self) -> watch::Receiver<ParsedConfig>;

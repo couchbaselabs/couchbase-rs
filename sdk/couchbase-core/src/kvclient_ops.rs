@@ -44,12 +44,12 @@ use crate::memdx::response::{
 };
 use crate::tracingcomponent::{BeginDispatchFields, EndDispatchFields, OperationId};
 use chrono::Utc;
-use log::{debug, info};
 use std::future::Future;
 use std::ops::Add;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 use tokio::time::Instant;
+use tracing::{debug, info};
 
 #[derive(Debug, Clone)]
 pub(crate) struct ReconfigureAuthenticatorRequest {

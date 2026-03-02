@@ -45,12 +45,12 @@ use crate::tracingcomponent::TracingComponent;
 use arc_swap::ArcSwap;
 use futures::executor::block_on;
 use futures::future::join_all;
-use log::{debug, error, info, warn};
 use tokio::select;
 use tokio::sync::mpsc::{Sender, UnboundedReceiver};
 use tokio::sync::{broadcast, Mutex, MutexGuard, Notify};
 use tokio::time::{sleep, Instant};
 use tokio_util::sync::CancellationToken;
+use tracing::{debug, error, info, warn};
 use urlencoding::decode_binary;
 use uuid::Uuid;
 
