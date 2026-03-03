@@ -34,8 +34,8 @@ fn test_list() {
         list.append("test2").await.unwrap();
         list.prepend("test1").await.unwrap();
 
-        let index = list.position("test2".to_string()).await.unwrap();
-        assert_eq!(index, 1);
+        let index = list.position(&"test2".to_string()).await.unwrap();
+        assert_eq!(index, Some(1));
 
         let size = list.len().await.unwrap();
         assert_eq!(size, 2);
@@ -54,6 +54,49 @@ fn test_list() {
 
         let res = collection.exists(key, None).await.unwrap();
         assert!(!res.exists());
+    })
+}
+
+#[test]
+fn test_list_is_empty() {
+    run_test(async |cluster, bucket| {
+        let collection = bucket
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection());
+        let key = new_key();
+
+        let list = collection.list(&key, None);
+
+        list.append("item").await.unwrap();
+
+        let res = list.is_empty().await.unwrap();
+        assert!(!res);
+
+        list.remove(0).await.unwrap();
+
+        let res = list.is_empty().await.unwrap();
+        assert!(res);
+
+        list.clear().await.unwrap();
+    })
+}
+
+#[test]
+fn test_list_position_not_found() {
+    run_test(async |cluster, bucket| {
+        let collection = bucket
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection());
+        let key = new_key();
+
+        let list = collection.list(&key, None);
+
+        list.append("a").await.unwrap();
+
+        let res = list.position(&"z".to_string()).await.unwrap();
+        assert_eq!(res, None);
+
+        list.clear().await.unwrap();
     })
 }
 
@@ -112,6 +155,30 @@ fn test_map() {
 }
 
 #[test]
+fn test_map_is_empty() {
+    run_test(async |cluster, bucket| {
+        let collection = bucket
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection());
+        let key = new_key();
+
+        let map = collection.map(&key, None);
+
+        map.insert("k", "v").await.unwrap();
+
+        let res = map.is_empty().await.unwrap();
+        assert!(!res);
+
+        map.remove("k").await.unwrap();
+
+        let res = map.is_empty().await.unwrap();
+        assert!(res);
+
+        map.clear().await.unwrap();
+    })
+}
+
+#[test]
 fn test_set() {
     run_test(async |cluster, bucket| {
         let collection = bucket
@@ -131,7 +198,7 @@ fn test_set() {
         let res: Vec<String> = set.values().await.unwrap();
         assert_eq!(res, vec!["test1", "test2"]);
 
-        let res = set.contains("test1".to_string()).await.unwrap();
+        let res = set.contains(&"test1".to_string()).await.unwrap();
         assert!(res);
 
         let mut iter = set.iter::<String>().await.unwrap();
@@ -141,13 +208,37 @@ fn test_set() {
 
         set.remove("test1".to_string()).await.unwrap();
 
-        let res = set.contains("test1".to_string()).await.unwrap();
+        let res = set.contains(&"test1".to_string()).await.unwrap();
         assert!(!res);
 
         set.clear().await.unwrap();
 
         let res = collection.exists(key, None).await.unwrap();
         assert!(!res.exists());
+    })
+}
+
+#[test]
+fn test_set_is_empty() {
+    run_test(async |cluster, bucket| {
+        let collection = bucket
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection());
+        let key = new_key();
+
+        let set = collection.set(&key, None);
+
+        set.insert("only").await.unwrap();
+
+        let res = set.is_empty().await.unwrap();
+        assert!(!res);
+
+        set.remove("only".to_string()).await.unwrap();
+
+        let res = set.is_empty().await.unwrap();
+        assert!(res);
+
+        set.clear().await.unwrap();
     })
 }
 
@@ -179,5 +270,29 @@ fn test_queue() {
 
         let res = collection.exists(key, None).await.unwrap();
         assert!(!res.exists());
+    })
+}
+
+#[test]
+fn test_queue_is_empty() {
+    run_test(async |cluster, bucket| {
+        let collection = bucket
+            .scope(cluster.default_scope())
+            .collection(cluster.default_collection());
+        let key = new_key();
+
+        let queue = collection.queue(&key, None);
+
+        queue.push("item").await.unwrap();
+
+        let res = queue.is_empty().await.unwrap();
+        assert!(!res);
+
+        let _: String = queue.pop().await.unwrap();
+
+        let res = queue.is_empty().await.unwrap();
+        assert!(res);
+
+        queue.clear().await.unwrap();
     })
 }

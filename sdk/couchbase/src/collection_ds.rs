@@ -62,9 +62,9 @@ use tracing::Instrument;
 /// ```
 #[derive(Clone)]
 pub struct CouchbaseList<'a> {
-    pub collection: &'a Collection,
-    pub id: String,
-    pub options: CouchbaseListOptions,
+    collection: &'a Collection,
+    id: String,
+    options: CouchbaseListOptions,
 }
 
 impl Collection {
@@ -250,11 +250,11 @@ impl CouchbaseList<'_> {
         result
     }
 
-    /// Returns the index of the first occurrence of the given value, or `-1` if not found.
+    /// Returns the index of the first occurrence of the given value, or `None` if not found.
     pub async fn position<V: PartialEq + DeserializeOwned>(
         &self,
-        value: V,
-    ) -> crate::error::Result<isize> {
+        value: &V,
+    ) -> crate::error::Result<Option<usize>> {
         let ctx = self
             .collection
             .tracing_client
@@ -267,12 +267,7 @@ impl CouchbaseList<'_> {
         let result = async {
             let get_res = self.collection.get(&self.id, None).await?;
             let list_contents: Vec<V> = get_res.content_as()?;
-            for (i, item) in list_contents.iter().enumerate() {
-                if *item == value {
-                    return Ok(i as isize);
-                }
-            }
-            Ok(-1)
+            Ok(list_contents.iter().position(|item| item == value))
         }
         .instrument(ctx.span().clone())
         .await;
@@ -304,6 +299,11 @@ impl CouchbaseList<'_> {
         result
     }
 
+    /// Returns `true` if the list contains no elements.
+    pub async fn is_empty(&self) -> crate::error::Result<bool> {
+        Ok(self.len().await? == 0)
+    }
+
     /// Removes all elements from the list by deleting the backing document.
     pub async fn clear(&self) -> crate::error::Result<()> {
         let ctx = self
@@ -331,9 +331,9 @@ impl CouchbaseList<'_> {
 /// Supports get, insert, remove, keys, values, exists, size, clear, and iteration.
 #[derive(Clone)]
 pub struct CouchbaseMap<'a> {
-    pub collection: &'a Collection,
-    pub id: String,
-    pub options: CouchbaseMapOptions,
+    collection: &'a Collection,
+    id: String,
+    options: CouchbaseMapOptions,
 }
 
 impl CouchbaseMap<'_> {
@@ -487,6 +487,11 @@ impl CouchbaseMap<'_> {
         result
     }
 
+    /// Returns `true` if the map contains no entries.
+    pub async fn is_empty(&self) -> crate::error::Result<bool> {
+        Ok(self.len().await? == 0)
+    }
+
     /// Returns all keys in the map.
     pub async fn keys(&self) -> crate::error::Result<Vec<String>> {
         let ctx = self
@@ -559,9 +564,9 @@ impl CouchbaseMap<'_> {
 /// Duplicate values are silently ignored.
 #[derive(Clone)]
 pub struct CouchbaseSet<'a> {
-    pub collection: &'a Collection,
-    pub id: String,
-    pub options: CouchbaseSetOptions,
+    collection: &'a Collection,
+    id: String,
+    options: CouchbaseSetOptions,
 }
 
 impl CouchbaseSet<'_> {
@@ -709,7 +714,7 @@ impl CouchbaseSet<'_> {
     /// Returns `true` if the set contains the given value.
     pub async fn contains<T: PartialEq + DeserializeOwned>(
         &self,
-        value: T,
+        value: &T,
     ) -> crate::error::Result<bool> {
         let ctx = self
             .collection
@@ -723,12 +728,7 @@ impl CouchbaseSet<'_> {
         let result = async {
             let res = self.collection.get(&self.id, None).await?;
             let set_contents: Vec<T> = res.content_as()?;
-            for item in set_contents {
-                if item == value {
-                    return Ok(true);
-                }
-            }
-            Ok(false)
+            Ok(set_contents.iter().any(|item| item == value))
         }
         .instrument(ctx.span().clone())
         .await;
@@ -760,6 +760,11 @@ impl CouchbaseSet<'_> {
         result
     }
 
+    /// Returns `true` if the set contains no elements.
+    pub async fn is_empty(&self) -> crate::error::Result<bool> {
+        Ok(self.len().await? == 0)
+    }
+
     /// Removes all elements from the set by deleting the backing document.
     pub async fn clear(&self) -> crate::error::Result<()> {
         let ctx = self
@@ -787,9 +792,9 @@ impl CouchbaseSet<'_> {
 /// Supports push, pop, size, clear, and iteration.
 #[derive(Clone)]
 pub struct CouchbaseQueue<'a> {
-    pub collection: &'a Collection,
-    pub id: String,
-    pub options: CouchbaseQueueOptions,
+    collection: &'a Collection,
+    id: String,
+    options: CouchbaseQueueOptions,
 }
 
 impl CouchbaseQueue<'_> {
@@ -915,6 +920,11 @@ impl CouchbaseQueue<'_> {
         .await;
         ctx.end_operation(result.as_ref().err());
         result
+    }
+
+    /// Returns `true` if the queue contains no elements.
+    pub async fn is_empty(&self) -> crate::error::Result<bool> {
+        Ok(self.len().await? == 0)
     }
 
     /// Removes all elements from the queue by deleting the backing document.
