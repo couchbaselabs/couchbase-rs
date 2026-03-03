@@ -22,7 +22,7 @@ use crate::common::consistency_utils::{
 use crate::common::doc_generation::{import_color_sample, import_sample_beer_dataset};
 use crate::common::features::TestFeatureCode;
 use crate::common::test_config::{create_test_cluster, run_test};
-use crate::common::{generate_string_value, new_key, try_until};
+use crate::common::{generate_key_with_letter_prefix, generate_string_value, new_key, try_until};
 use chrono::DateTime;
 use couchbase::management::buckets::bucket_manager::BucketManager;
 use couchbase::management::buckets::bucket_settings::BucketSettings;
@@ -58,7 +58,7 @@ fn test_search_basic() {
         }
 
         let cluster = create_test_cluster().await;
-        let bucket_name = generate_string_value(10);
+        let bucket_name = generate_key_with_letter_prefix();
         let bucket_mgr = cluster.buckets();
         bucket_mgr
             .create_bucket(BucketSettings::new(&bucket_name).ram_quota_mb(600), None)
@@ -90,7 +90,7 @@ fn test_search_basic() {
         let scope = bucket.scope(&scope_name);
         let collection = scope.collection(&collection_name);
 
-        let index_name = index_name();
+        let index_name = generate_key_with_letter_prefix();
 
         import_search_index(
             "tests/testdata/basic_scoped_search_index.json",
@@ -346,7 +346,7 @@ fn test_search_vector() {
         let scope = bucket.scope(&scope_name);
         let collection = scope.collection(&collection_name);
 
-        let index_name = index_name();
+        let index_name = generate_key_with_letter_prefix();
 
         import_search_index(
             "tests/testdata/scoped_vector_index.json",
@@ -472,17 +472,4 @@ async fn import_search_index(
         },
     )
     .await;
-}
-
-fn index_name() -> String {
-    let mut name = new_key();
-    loop {
-        if name.as_bytes()[0].is_ascii_digit() {
-            name = name[1..].to_string();
-        } else {
-            break;
-        }
-    }
-
-    name
 }

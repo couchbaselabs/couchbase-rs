@@ -43,6 +43,19 @@ pub fn new_key() -> String {
     Uuid::new_v4().to_string()
 }
 
+pub fn generate_key_with_letter_prefix() -> String {
+    let mut name = new_key();
+    loop {
+        if !name.as_bytes()[0].is_ascii_alphabetic() {
+            name = name[1..].to_string();
+        } else {
+            break;
+        }
+    }
+
+    name
+}
+
 pub fn generate_string_value(len: usize) -> String {
     rng()
         .sample_iter(&Alphanumeric)
