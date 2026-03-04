@@ -27,7 +27,6 @@ use serde_json::json;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
-use tokio::time;
 use tokio::time::{Duration, Instant};
 
 struct OpHistogram {
@@ -146,22 +145,26 @@ impl LoggingMeterLayer {
 
     async fn logger_task(mut receiver: UnboundedReceiver<MetricEvent>, emit_interval: Duration) {
         let mut metrics: MetricsMap = HashMap::new();
+        let mut deadline = Instant::now() + emit_interval;
 
-        let start = Instant::now() + emit_interval;
-        let mut interval = time::interval_at(start, emit_interval);
-
+        // Wait for events until the deadline. When the deadline elapses, emit
+        // the collected metrics and reset. Using timeout_at rather than select!
+        // avoids a race where both the timer and recv are ready simultaneously
+        // and the timer branch could discard buffered events.
         loop {
-            tokio::select! {
-                _ = interval.tick() => {
-                    Self::emit(&metrics, emit_interval);
-                    metrics.clear();
-                }
-                Some(event) = receiver.recv() => {
+            match tokio::time::timeout_at(deadline, receiver.recv()).await {
+                Ok(Some(event)) => {
                     let svc = metrics.entry(event.service).or_default();
                     let op = svc.entry(event.operation).or_insert_with(OpHistogram::new);
                     op.record(event.duration_us);
                 }
-                else => break,
+                Ok(None) => break, // Channel closed, shut down.
+                Err(_) => {
+                    // Deadline elapsed — emit and start a new window.
+                    Self::emit(&metrics, emit_interval);
+                    metrics.clear();
+                    deadline = Instant::now() + emit_interval;
+                }
             }
         }
     }

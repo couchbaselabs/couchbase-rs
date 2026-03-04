@@ -37,7 +37,6 @@ use std::collections::{BinaryHeap, HashMap};
 use std::fmt::{Debug, Display};
 use std::fs::metadata;
 use tokio::sync::mpsc::{unbounded_channel, Receiver, UnboundedReceiver, UnboundedSender};
-use tokio::time;
 use tokio::time::{Duration, Instant};
 use tracing::field::{Field, Visit};
 use tracing::span::{Attributes, Record};
@@ -271,29 +270,30 @@ impl ThresholdLoggingLayer {
         emit_interval: Duration,
         sample_size: usize,
     ) {
-        let start = Instant::now() + emit_interval;
-        let mut interval = time::interval_at(start, emit_interval);
         let mut groups: HashMap<String, BinaryHeap<SpanInfo>> = HashMap::with_capacity(5);
+        let mut deadline = Instant::now() + emit_interval;
 
+        // Wait for events until the deadline. When the deadline elapses, emit
+        // the collected data and reset. Using timeout_at rather than select!
+        // avoids a race where both the timer and recv are ready simultaneously
+        // and the timer branch could discard buffered events.
         loop {
-            tokio::select! {
-                _ = interval.tick() => {
+            match tokio::time::timeout_at(deadline, receiver.recv()).await {
+                Ok(Some(span_info)) => {
+                    if let Some(service_name) = &span_info.service_name {
+                        groups
+                            .entry(service_name.to_string())
+                            .or_default()
+                            .push(span_info);
+                    }
+                }
+                Ok(None) => break, // Channel closed, shut down.
+                Err(_) => {
+                    // Deadline elapsed — emit and start a new window.
                     let log_data = Self::collect_log_data(&mut groups, sample_size);
                     Self::process_and_emit_logs(log_data);
                     groups.clear();
-                },
-                event = receiver.recv() => {
-                    match event {
-                        Some(span_info) => {
-                            if let Some(service_name) = &span_info.service_name {
-                                groups
-                                    .entry(service_name.to_string())
-                                    .or_default()
-                                    .push(span_info);
-                            }
-                        },
-                        None => break,
-                    }
+                    deadline = Instant::now() + emit_interval;
                 }
             }
         }
