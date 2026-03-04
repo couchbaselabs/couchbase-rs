@@ -39,6 +39,7 @@ use tokio::select;
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::sync::{broadcast, watch, Notify};
 use tokio::time::sleep;
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, trace};
 
 #[derive(Debug, Clone)]
@@ -79,7 +80,7 @@ impl<M: KvEndpointClientManager> ConfigWatcherMemdInner<M> {
 
     pub async fn watch(
         &self,
-        mut on_shutdown_rx: Receiver<()>,
+        on_shutdown: CancellationToken,
         on_new_config_tx: Sender<ParsedConfig>,
     ) {
         let mut recent_endpoints = vec![];
@@ -90,7 +91,7 @@ impl<M: KvEndpointClientManager> ConfigWatcherMemdInner<M> {
 
             if endpoints.is_empty() {
                 select! {
-                    _ = on_shutdown_rx.recv() => {
+                    _ = on_shutdown.cancelled() => {
                         return;
                     },
                     _ = sleep(self.polling_period) => {
@@ -109,7 +110,7 @@ impl<M: KvEndpointClientManager> ConfigWatcherMemdInner<M> {
             let endpoint = if remaining_endpoints.is_empty() {
                 if all_endpoints_failed {
                     select! {
-                        _ = on_shutdown_rx.recv() => {
+                        _ = on_shutdown.cancelled() => {
                             return;
                         },
                         _ = sleep(self.polling_period) => {}
@@ -150,7 +151,7 @@ impl<M: KvEndpointClientManager> ConfigWatcherMemdInner<M> {
                 Ok(c) => c,
                 Err(e) => {
                     select! {
-                        _ = on_shutdown_rx.recv() => {
+                        _ = on_shutdown.cancelled() => {
                             return;
                         },
                         _ = sleep(self.polling_period) => {}
@@ -169,7 +170,7 @@ impl<M: KvEndpointClientManager> ConfigWatcherMemdInner<M> {
             }
 
             select! {
-                _ = on_shutdown_rx.recv() => {
+                _ = on_shutdown.cancelled() => {
                     return;
                 },
                 _ = sleep(self.polling_period) => {}
@@ -198,12 +199,12 @@ where
         }
     }
 
-    pub fn watch(&self, on_shutdown_rx: Receiver<()>) -> Receiver<ParsedConfig> {
+    pub fn watch(&self, on_shutdown: CancellationToken) -> Receiver<ParsedConfig> {
         let (on_new_config_tx, on_new_config_rx) = broadcast::channel::<ParsedConfig>(1);
 
         let inner = self.inner.clone();
         tokio::spawn(async move {
-            inner.watch(on_shutdown_rx, on_new_config_tx).await;
+            inner.watch(on_shutdown, on_new_config_tx).await;
             debug!("Config poller exited")
         });
 
