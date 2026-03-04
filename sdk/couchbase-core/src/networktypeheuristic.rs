@@ -37,7 +37,7 @@ impl NetworkTypeHeuristic {
                 return true;
             }
         }
-        if let Some(p) = node.ssl_ports.kv {
+        if let Some(p) = node.ssl_ports.mgmt {
             if format!("{}:{}", node.hostname, p) == addr {
                 return true;
             }
@@ -45,19 +45,32 @@ impl NetworkTypeHeuristic {
         false
     }
 
-    pub fn identify(config: &ParsedConfig) -> String {
+    pub fn identify(config: &ParsedConfig, host_port: &str) -> String {
         for node in &config.nodes {
-            if Self::node_contains_address(&node.addresses, &config.source_hostname) {
+            if Self::node_contains_address(&node.addresses, host_port) {
                 return "default".to_string();
             }
         }
 
         for node in &config.nodes {
             for (network_type, alt_addrs) in &node.alt_addresses {
-                if Self::node_contains_address(alt_addrs, &config.source_hostname) {
+                if Self::node_contains_address(alt_addrs, host_port) {
                     return network_type.clone();
                 }
             }
+        }
+
+        let mut nodes_with_external = 0;
+        for node in &config.nodes {
+            for network_type in node.alt_addresses.keys() {
+                if network_type == "external" {
+                    nodes_with_external += 1;
+                }
+            }
+        }
+
+        if config.nodes.len() == nodes_with_external {
+            return "external".to_string();
         }
 
         "default".to_string()
