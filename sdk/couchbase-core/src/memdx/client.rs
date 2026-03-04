@@ -286,6 +286,37 @@ impl Client {
     }
 }
 
+/// A guard that removes an opaque entry from the map when dropped, unless disarmed.
+/// This prevents opaque map leaks if the dispatch future is cancelled/dropped at an
+/// `.await` point before a `ClientPendingOp` is created to take over cleanup.
+struct DispatchOpaqueGuard {
+    opaque: u32,
+    opaque_map: Option<Arc<std::sync::Mutex<OpaqueMap>>>,
+}
+
+impl DispatchOpaqueGuard {
+    fn new(opaque: u32, opaque_map: Arc<std::sync::Mutex<OpaqueMap>>) -> Self {
+        Self {
+            opaque,
+            opaque_map: Some(opaque_map),
+        }
+    }
+
+    /// Disarm the guard so that dropping it will not remove the opaque entry.
+    fn disarm(&mut self) {
+        self.opaque_map = None;
+    }
+}
+
+impl Drop for DispatchOpaqueGuard {
+    fn drop(&mut self) {
+        if let Some(opaque_map) = self.opaque_map.take() {
+            let mut map = opaque_map.lock().unwrap();
+            map.remove(&self.opaque);
+        }
+    }
+}
+
 #[async_trait]
 impl Dispatcher for Client {
     fn new(conn: ConnectionType, opts: DispatcherOptions) -> Self {
@@ -357,6 +388,11 @@ impl Dispatcher for Client {
         packet.opaque = Some(opaque);
         let op_code = packet.op_code;
 
+        // Create a guard that will remove the opaque entry from the map if the future is
+        // dropped before we successfully construct a ClientPendingOp (which takes over
+        // cleanup responsibility via its own Drop impl).
+        let mut opaque_guard = DispatchOpaqueGuard::new(opaque, self.opaque_map.clone());
+
         trace!(
             "Writing request on {}. Opcode={}. Opaque={}",
             &self.client_id,
@@ -366,23 +402,23 @@ impl Dispatcher for Client {
 
         let mut writer = self.writer.lock().await;
         match writer.send(packet).await {
-            Ok(_) => Ok(ClientPendingOp::new(
-                opaque,
-                self.opaque_map.clone(),
-                response_rx,
-                is_persistent,
-            )),
+            Ok(_) => {
+                // Disarm the guard — the ClientPendingOp now owns cleanup responsibility.
+                opaque_guard.disarm();
+                Ok(ClientPendingOp::new(
+                    opaque,
+                    self.opaque_map.clone(),
+                    response_rx,
+                    is_persistent,
+                ))
+            }
             Err(e) => {
                 debug!(
                     "{} failed to write packet {} {} {}",
                     self.client_id, opaque, op_code, e
                 );
 
-                let requests: Arc<std::sync::Mutex<OpaqueMap>> = Arc::clone(&self.opaque_map);
-                {
-                    let mut map = requests.lock().unwrap();
-                    map.remove(&opaque);
-                }
+                // opaque_guard will remove the entry from the opaque map when dropped.
 
                 Err(Error::new_dispatch_error(opaque, op_code, Box::new(e)))
             }
