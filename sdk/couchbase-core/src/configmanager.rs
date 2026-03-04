@@ -31,7 +31,8 @@ use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
 use tokio::sync::broadcast::error::RecvError;
-use tokio::sync::{broadcast, watch, Notify};
+use tokio::sync::{watch, Notify};
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, warn};
 
 pub(crate) trait ConfigManager: Sized + Send + Sync {
@@ -80,7 +81,8 @@ pub(crate) struct ConfigManagerMemdInner<M: KvEndpointClientManager> {
 
     on_new_config_tx: watch::Sender<ParsedConfig>,
 
-    watcher_shutdown_tx: broadcast::Sender<()>,
+    // When this gets dropped it cancels the wrapped CancellationToken.
+    watcher_shutdown_guard: tokio_util::sync::DropGuard,
 }
 
 impl<M: KvEndpointClientManager + 'static> ConfigManagerMemdInner<M> {
@@ -208,12 +210,6 @@ impl<M: KvEndpointClientManager + 'static> ConfigManagerMemdInner<M> {
         None
     }
 
-    fn shutdown(&self) {
-        if let Err(e) = self.watcher_shutdown_tx.send(()) {
-            debug!("Failed to send shutdown signal to watcher: {e}");
-        }
-    }
-
     fn bucket_type_changed(a: &Option<ParsedConfigBucket>, b: &Option<ParsedConfigBucket>) -> bool {
         match (a, b) {
             (None, None) => false,
@@ -244,8 +240,8 @@ impl<M: KvEndpointClientManager + 'static> ConfigManagerMemdInner<M> {
         false
     }
 
-    pub fn start_watcher(&self, watcher_shutdown_rx: broadcast::Receiver<()>) {
-        let mut rx = self.watcher.watch(watcher_shutdown_rx);
+    pub fn start_watcher(&self, watcher_shutdown: CancellationToken) {
+        let mut rx = self.watcher.watch(watcher_shutdown);
         let latest_version_tx = self.latest_version_tx.clone();
         let guard = self.latest_config.clone();
         let new_config_tx = self.on_new_config_tx.clone();
@@ -303,7 +299,8 @@ impl<M: KvEndpointClientManager + 'static> ConfigManagerMemd<M> {
             },
         ));
 
-        let (watcher_shutdown_tx, watcher_shutdown_rx) = broadcast::channel(1);
+        let watcher_shutdown = CancellationToken::new();
+        let watcher_shutdown_guard = watcher_shutdown.clone().drop_guard();
         let bucket = opts.first_config.bucket.clone();
 
         let (on_new_config_tx, _on_new_config_rx) =
@@ -322,10 +319,10 @@ impl<M: KvEndpointClientManager + 'static> ConfigManagerMemd<M> {
 
             on_new_config_tx,
 
-            watcher_shutdown_tx,
+            watcher_shutdown_guard,
         });
 
-        inner.start_watcher(watcher_shutdown_rx);
+        inner.start_watcher(watcher_shutdown);
 
         ConfigManagerMemd { inner }
     }
