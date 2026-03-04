@@ -58,7 +58,11 @@ pub struct DnsConfig {
 
 impl Display for Address {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{}", self.host, self.port)
+        if self.host.contains(':') && !self.host.starts_with('[') {
+            write!(f, "[{}]:{}", self.host, self.port)
+        } else {
+            write!(f, "{}:{}", self.host, self.port)
+        }
     }
 }
 
@@ -115,7 +119,11 @@ impl Display for ConnSpec {
             .iter()
             .map(|host| {
                 if let Some(port) = &host.port {
-                    format!("{}:{}", host.host, port)
+                    if host.host.contains(':') && !host.host.starts_with('[') {
+                        format!("[{}]:{}", host.host, port)
+                    } else {
+                        format!("{}:{}", host.host, port)
+                    }
                 } else {
                     host.host.clone()
                 }

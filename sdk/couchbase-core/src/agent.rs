@@ -415,7 +415,7 @@ impl Agent {
             &opts.seed_config.http_addrs,
             &state,
         );
-        let first_config = Self::get_first_config(
+        let (first_config, cfg_source_host_port) = Self::get_first_config(
             user_agent.clone(),
             first_kv_client_configs,
             &state,
@@ -430,13 +430,14 @@ impl Agent {
 
         let network_type = if let Some(network) = opts.network {
             if network == "auto" || network.is_empty() {
-                NetworkTypeHeuristic::identify(&state.latest_config)
+                NetworkTypeHeuristic::identify(&state.latest_config, &cfg_source_host_port)
             } else {
                 network
             }
         } else {
-            NetworkTypeHeuristic::identify(&state.latest_config)
+            NetworkTypeHeuristic::identify(&state.latest_config, &cfg_source_host_port)
         };
+        info!("Identified network type: {network_type}");
         state.network_type = network_type;
 
         let agent_component_configs = AgentInner::gen_agent_component_configs_locked(&state);
@@ -661,7 +662,7 @@ impl Agent {
         http_client: Arc<C>,
         err_map_component: Arc<ErrMapComponent>,
         connect_timeout: Duration,
-    ) -> Result<ParsedConfig> {
+    ) -> Result<(ParsedConfig, String)> {
         loop {
             for target in kv_targets.values() {
                 let host = &target.address;
@@ -728,7 +729,7 @@ impl Agent {
 
                 match ConfigParser::parse_terse_config(config, host.host.as_str()) {
                     Ok(c) => {
-                        return Ok(c);
+                        return Ok((c, format!("{}:{}", host.host, host.port)));
                     }
                     Err(_e) => continue,
                 };
@@ -737,10 +738,11 @@ impl Agent {
             info!("Failed to fetch config over kv, attempting http");
             for endpoint_config in http_configs.values() {
                 let endpoint = endpoint_config.endpoint.clone();
-                let host = get_host_port_from_uri(&endpoint)?;
+                let host_port = get_host_port_from_uri(&endpoint)?;
                 let auth = match &endpoint_config.authenticator {
                     Authenticator::PasswordAuthenticator(authenticator) => {
-                        let user_pass = authenticator.get_credentials(&ServiceType::MGMT, host)?;
+                        let user_pass =
+                            authenticator.get_credentials(&ServiceType::MGMT, host_port.clone())?;
                         Auth::BasicAuth(BasicAuth::new(user_pass.username, user_pass.password))
                     }
                     Authenticator::CertificateAuthenticator(_authenticator) => {
@@ -761,7 +763,7 @@ impl Agent {
                 .await
                 {
                     Ok(c) => {
-                        return Ok(c);
+                        return Ok((c, host_port));
                     }
                     Err(_e) => {}
                 };
