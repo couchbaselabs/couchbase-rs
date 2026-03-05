@@ -18,7 +18,7 @@
 
 //! Periodic operation-metrics logging via a [`tracing`] layer.
 //!
-//! [`LoggingMeterLayer`] collects operation latency histograms and emits a JSON summary
+//! [`LoggingMeter`] collects operation latency histograms and emits a JSON summary
 //! at a configurable interval. Register it as a layer on a `tracing_subscriber::Registry`
 //! to enable metrics logging.
 
@@ -110,24 +110,24 @@ struct MetricEvent {
 /// # Example
 ///
 /// ```rust,no_run
-/// use couchbase::logging_meter::{LoggingMeterLayer, LoggingMeterOptions};
+/// use couchbase::logging_meter::{LoggingMeter, LoggingMeterOptions};
 /// use tracing_subscriber::layer::SubscriberExt;
 /// use std::time::Duration;
 ///
 /// # fn example() {
-/// let meter = LoggingMeterLayer::new(
+/// let meter = LoggingMeter::new(
 ///     Some(LoggingMeterOptions::new().emit_interval(Duration::from_secs(300)))
 /// );
 /// let subscriber = tracing_subscriber::registry().with(meter);
 /// // tracing::subscriber::set_global_default(subscriber).unwrap();
 /// # }
 /// ```
-pub struct LoggingMeterLayer {
+pub struct LoggingMeter {
     sender: UnboundedSender<MetricEvent>,
 }
 
-impl LoggingMeterLayer {
-    /// Creates a new `LoggingMeterLayer` with the given options.
+impl LoggingMeter {
+    /// Creates a new `LoggingMeter` with the given options.
     ///
     /// Must be called within a Tokio runtime (panics otherwise).
     pub fn new(options: Option<LoggingMeterOptions>) -> Self {
@@ -137,7 +137,7 @@ impl LoggingMeterLayer {
         let (tx, rx) = unbounded_channel();
 
         tokio::runtime::Handle::try_current()
-            .expect("LoggingMeterLayer::new must be called within a Tokio runtime.")
+            .expect("LoggingMeter::new must be called within a Tokio runtime.")
             .spawn(Self::logger_task(rx, emit_interval));
 
         Self { sender: tx }
@@ -216,7 +216,7 @@ impl LoggingMeterLayer {
     }
 }
 
-impl<S> Layer<S> for LoggingMeterLayer
+impl<S> Layer<S> for LoggingMeter
 where
     S: Subscriber,
 {
@@ -242,7 +242,7 @@ where
     }
 }
 
-/// Configuration options for [`LoggingMeterLayer`].
+/// Configuration options for [`LoggingMeter`].
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct LoggingMeterOptions {
@@ -262,7 +262,7 @@ impl LoggingMeterOptions {
 }
 
 #[cfg(test)]
-impl LoggingMeterLayer {
+impl LoggingMeter {
     /// Creates a layer that writes directly to `sender`, bypassing the background
     /// logger task so tests can `try_recv` and assert on the `MetricEvent` produced.
     fn new_with_sender(sender: UnboundedSender<MetricEvent>) -> Self {
@@ -324,7 +324,7 @@ mod tests {
             .finish();
 
         tracing::subscriber::with_default(subscriber, || {
-            LoggingMeterLayer::emit(&metrics, Duration::from_secs(600));
+            LoggingMeter::emit(&metrics, Duration::from_secs(600));
         });
 
         let output = String::from_utf8(writer.0.lock().unwrap().clone()).unwrap();
@@ -370,7 +370,7 @@ mod tests {
             .finish();
 
         tracing::subscriber::with_default(subscriber, || {
-            LoggingMeterLayer::emit(&metrics, Duration::from_secs(600));
+            LoggingMeter::emit(&metrics, Duration::from_secs(600));
         });
 
         let output = String::from_utf8(writer.0.lock().unwrap().clone()).unwrap();
@@ -383,7 +383,7 @@ mod tests {
     #[tokio::test]
     async fn layer_sends_correct_metric_event_fields() {
         let (tx, mut rx) = unbounded_channel::<MetricEvent>();
-        let layer = LoggingMeterLayer::new_with_sender(tx);
+        let layer = LoggingMeter::new_with_sender(tx);
         let subscriber = tracing_subscriber::registry().with(layer);
 
         tracing::subscriber::with_default(subscriber, || {
@@ -410,7 +410,7 @@ mod tests {
     #[tokio::test]
     async fn layer_converts_seconds_to_microseconds_correctly() {
         let (tx, mut rx) = unbounded_channel::<MetricEvent>();
-        let layer = LoggingMeterLayer::new_with_sender(tx);
+        let layer = LoggingMeter::new_with_sender(tx);
         let subscriber = tracing_subscriber::registry().with(layer);
 
         tracing::subscriber::with_default(subscriber, || {
@@ -435,7 +435,7 @@ mod tests {
     #[tokio::test]
     async fn layer_ignores_events_with_wrong_target() {
         let (tx, mut rx) = unbounded_channel::<MetricEvent>();
-        let layer = LoggingMeterLayer::new_with_sender(tx);
+        let layer = LoggingMeter::new_with_sender(tx);
         let subscriber = tracing_subscriber::registry().with(layer);
 
         tracing::subscriber::with_default(subscriber, || {
@@ -457,7 +457,7 @@ mod tests {
     #[tokio::test]
     async fn layer_ignores_event_with_missing_duration() {
         let (tx, mut rx) = unbounded_channel::<MetricEvent>();
-        let layer = LoggingMeterLayer::new_with_sender(tx);
+        let layer = LoggingMeter::new_with_sender(tx);
         let subscriber = tracing_subscriber::registry().with(layer);
 
         tracing::subscriber::with_default(subscriber, || {
@@ -478,7 +478,7 @@ mod tests {
     #[tokio::test]
     async fn layer_ignores_event_with_missing_service() {
         let (tx, mut rx) = unbounded_channel::<MetricEvent>();
-        let layer = LoggingMeterLayer::new_with_sender(tx);
+        let layer = LoggingMeter::new_with_sender(tx);
         let subscriber = tracing_subscriber::registry().with(layer);
 
         tracing::subscriber::with_default(subscriber, || {
@@ -499,7 +499,7 @@ mod tests {
     #[tokio::test]
     async fn layer_processes_multiple_services_and_operations() {
         let (tx, mut rx) = unbounded_channel::<MetricEvent>();
-        let layer = LoggingMeterLayer::new_with_sender(tx);
+        let layer = LoggingMeter::new_with_sender(tx);
         let subscriber = tracing_subscriber::registry().with(layer);
 
         tracing::subscriber::with_default(subscriber, || {
@@ -547,7 +547,7 @@ mod tests {
     #[tokio::test]
     async fn layer_ignores_negative_duration() {
         let (tx, mut rx) = unbounded_channel::<MetricEvent>();
-        let layer = LoggingMeterLayer::new_with_sender(tx);
+        let layer = LoggingMeter::new_with_sender(tx);
         let subscriber = tracing_subscriber::registry().with(layer);
 
         tracing::subscriber::with_default(subscriber, || {
@@ -567,8 +567,8 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "LoggingMeterLayer::new must be called within a Tokio runtime")]
+    #[should_panic(expected = "LoggingMeter::new must be called within a Tokio runtime")]
     fn new_outside_tokio_runtime_panics() {
-        LoggingMeterLayer::new(None);
+        LoggingMeter::new(None);
     }
 }

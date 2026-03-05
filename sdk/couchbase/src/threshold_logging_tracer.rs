@@ -18,7 +18,7 @@
 
 //! Slow-operation threshold logging via a [`tracing`] layer.
 //!
-//! [`ThresholdLoggingLayer`] tracks completed operations and periodically emits a JSON
+//! [`ThresholdLoggingTracer`] tracks completed operations and periodically emits a JSON
 //! report of the slowest operations that exceeded configurable per-service thresholds.
 //! Register it as a layer on a `tracing_subscriber::Registry` to enable threshold logging.
 
@@ -200,12 +200,12 @@ impl SpanInfo {
 /// # Example
 ///
 /// ```rust,no_run
-/// use couchbase::threshold_log_tracer::{ThresholdLoggingLayer, ThresholdLoggingOptions};
+/// use couchbase::threshold_logging_tracer::{ThresholdLoggingTracer, ThresholdLoggingOptions};
 /// use tracing_subscriber::layer::SubscriberExt;
 /// use std::time::Duration;
 ///
 /// # fn example() {
-/// let tracer = ThresholdLoggingLayer::new(
+/// let tracer = ThresholdLoggingTracer::new(
 ///     Some(ThresholdLoggingOptions::new()
 ///         .kv_threshold(Duration::from_millis(250))
 ///         .emit_interval(Duration::from_secs(30)))
@@ -213,15 +213,15 @@ impl SpanInfo {
 /// let subscriber = tracing_subscriber::registry().with(tracer);
 /// # }
 /// ```
-pub struct ThresholdLoggingLayer {
+pub struct ThresholdLoggingTracer {
     thresholds: LoggingThresholds,
     sample_size: usize,
 
     sender: UnboundedSender<SpanInfo>,
 }
 
-impl ThresholdLoggingLayer {
-    /// Creates a new `ThresholdLoggingLayer` with the given options.
+impl ThresholdLoggingTracer {
+    /// Creates a new `ThresholdLoggingTracer` with the given options.
     ///
     /// Must be called within a Tokio runtime (panics otherwise).
     pub fn new(options: Option<ThresholdLoggingOptions>) -> Self {
@@ -255,7 +255,7 @@ impl ThresholdLoggingLayer {
         };
 
         tokio::runtime::Handle::try_current()
-            .expect("ThresholdLoggingLayer::new must be called within a Tokio runtime.")
+            .expect("ThresholdLoggingTracer::new must be called within a Tokio runtime.")
             .spawn(Self::logger_task(
                 receiver,
                 options.emit_interval.unwrap_or(Duration::from_secs(10)),
@@ -369,14 +369,14 @@ impl ThresholdLoggingLayer {
     }
 }
 
-impl<S> Layer<S> for ThresholdLoggingLayer
+impl<S> Layer<S> for ThresholdLoggingTracer
 where
     S: Subscriber + for<'a> LookupSpan<'a>,
 {
     fn on_new_span(&self, attrs: &Attributes<'_>, id: &Id, ctx: Context<'_, S>) {
         let now = Instant::now();
         if let Some(span) = ctx.span(id) {
-            if !ThresholdLoggingLayer::span_is_couchbase(span.metadata().target()) {
+            if !ThresholdLoggingTracer::span_is_couchbase(span.metadata().target()) {
                 return;
             }
 
@@ -488,7 +488,7 @@ struct LoggingThresholds {
     management_threshold_us: u64,
 }
 
-/// Configuration options for [`ThresholdLoggingLayer`].
+/// Configuration options for [`ThresholdLoggingTracer`].
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct ThresholdLoggingOptions {
@@ -543,7 +543,7 @@ impl ThresholdLoggingOptions {
 }
 
 #[cfg(test)]
-impl ThresholdLoggingLayer {
+impl ThresholdLoggingTracer {
     fn new_with_sender(thresholds: LoggingThresholds, sender: UnboundedSender<SpanInfo>) -> Self {
         Self {
             thresholds,
@@ -689,7 +689,7 @@ mod tests {
             .finish();
 
         tracing::subscriber::with_default(subscriber, || {
-            ThresholdLoggingLayer::process_and_emit_logs(log_data);
+            ThresholdLoggingTracer::process_and_emit_logs(log_data);
         });
 
         let output = String::from_utf8(writer.0.lock().unwrap().clone()).unwrap();
@@ -729,7 +729,7 @@ mod tests {
             .finish();
 
         tracing::subscriber::with_default(subscriber, || {
-            ThresholdLoggingLayer::process_and_emit_logs(HashMap::new());
+            ThresholdLoggingTracer::process_and_emit_logs(HashMap::new());
         });
 
         let output = String::from_utf8(writer.0.lock().unwrap().clone()).unwrap();
@@ -750,7 +750,7 @@ mod tests {
             heap.push(s);
         }
 
-        let result = ThresholdLoggingLayer::collect_log_data(&mut groups, 10);
+        let result = ThresholdLoggingTracer::collect_log_data(&mut groups, 10);
         let (total_count, top) = result.get("kv").unwrap();
 
         assert_eq!(*total_count, 15);
@@ -768,7 +768,7 @@ mod tests {
             heap.push(s);
         }
 
-        let result = ThresholdLoggingLayer::collect_log_data(&mut groups, 10);
+        let result = ThresholdLoggingTracer::collect_log_data(&mut groups, 10);
         let (total_count, top) = result.get("query").unwrap();
 
         assert_eq!(*total_count, 3);
@@ -777,23 +777,23 @@ mod tests {
 
     #[test]
     fn span_is_couchbase_accepts_couchbase_tracing_prefix() {
-        assert!(ThresholdLoggingLayer::span_is_couchbase(
+        assert!(ThresholdLoggingTracer::span_is_couchbase(
             "couchbase::tracing"
         ));
     }
 
     #[test]
     fn span_is_couchbase_rejects_non_couchbase_tracing_prefix() {
-        assert!(!ThresholdLoggingLayer::span_is_couchbase(
+        assert!(!ThresholdLoggingTracer::span_is_couchbase(
             "couchbase::cluster"
         ));
     }
 
     #[test]
     fn span_is_couchbase_rejects_other_crates() {
-        assert!(!ThresholdLoggingLayer::span_is_couchbase("tracing::span"));
-        assert!(!ThresholdLoggingLayer::span_is_couchbase("tokio::task"));
-        assert!(!ThresholdLoggingLayer::span_is_couchbase(
+        assert!(!ThresholdLoggingTracer::span_is_couchbase("tracing::span"));
+        assert!(!ThresholdLoggingTracer::span_is_couchbase("tokio::task"));
+        assert!(!ThresholdLoggingTracer::span_is_couchbase(
             "my_app::couchbase_wrapper"
         ));
     }
@@ -810,7 +810,7 @@ mod tests {
     #[tokio::test]
     async fn layer_records_service_set_via_span_record_after_creation() {
         let (tx, mut rx) = unbounded_channel::<SpanInfo>();
-        let layer = ThresholdLoggingLayer::new_with_sender(zero_thresholds(), tx);
+        let layer = ThresholdLoggingTracer::new_with_sender(zero_thresholds(), tx);
         let subscriber = tracing_subscriber::registry().with(layer);
 
         tracing::subscriber::with_default(subscriber, || {
@@ -837,7 +837,7 @@ mod tests {
     #[tokio::test]
     async fn layer_records_root_span_service_and_operation() {
         let (tx, mut rx) = unbounded_channel::<SpanInfo>();
-        let layer = ThresholdLoggingLayer::new_with_sender(zero_thresholds(), tx);
+        let layer = ThresholdLoggingTracer::new_with_sender(zero_thresholds(), tx);
         let subscriber = tracing_subscriber::registry().with(layer);
 
         tracing::subscriber::with_default(subscriber, || {
@@ -864,7 +864,7 @@ mod tests {
     #[tokio::test]
     async fn layer_records_fields_from_span_attributes() {
         let (tx, mut rx) = unbounded_channel::<SpanInfo>();
-        let layer = ThresholdLoggingLayer::new_with_sender(zero_thresholds(), tx);
+        let layer = ThresholdLoggingTracer::new_with_sender(zero_thresholds(), tx);
         let subscriber = tracing_subscriber::registry().with(layer);
 
         tracing::subscriber::with_default(subscriber, || {
@@ -896,7 +896,7 @@ mod tests {
     #[tokio::test]
     async fn layer_records_encoding_sub_span_duration() {
         let (tx, mut rx) = unbounded_channel::<SpanInfo>();
-        let layer = ThresholdLoggingLayer::new_with_sender(zero_thresholds(), tx);
+        let layer = ThresholdLoggingTracer::new_with_sender(zero_thresholds(), tx);
         let subscriber = tracing_subscriber::registry().with(layer);
 
         tracing::subscriber::with_default(subscriber, || {
@@ -929,7 +929,7 @@ mod tests {
     #[tokio::test]
     async fn layer_records_dispatch_sub_span_duration_and_server_duration() {
         let (tx, mut rx) = unbounded_channel::<SpanInfo>();
-        let layer = ThresholdLoggingLayer::new_with_sender(zero_thresholds(), tx);
+        let layer = ThresholdLoggingTracer::new_with_sender(zero_thresholds(), tx);
         let subscriber = tracing_subscriber::registry().with(layer);
 
         tracing::subscriber::with_default(subscriber, || {
@@ -974,7 +974,7 @@ mod tests {
     #[tokio::test]
     async fn layer_accumulates_multiple_dispatch_and_server_durations() {
         let (tx, mut rx) = unbounded_channel::<SpanInfo>();
-        let layer = ThresholdLoggingLayer::new_with_sender(zero_thresholds(), tx);
+        let layer = ThresholdLoggingTracer::new_with_sender(zero_thresholds(), tx);
         let subscriber = tracing_subscriber::registry().with(layer);
 
         tracing::subscriber::with_default(subscriber, || {
@@ -1022,8 +1022,8 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "ThresholdLoggingLayer::new must be called within a Tokio runtime")]
+    #[should_panic(expected = "ThresholdLoggingTracer::new must be called within a Tokio runtime")]
     fn new_outside_tokio_runtime_panics() {
-        ThresholdLoggingLayer::new(None);
+        ThresholdLoggingTracer::new(None);
     }
 }
