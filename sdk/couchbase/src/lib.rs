@@ -229,8 +229,8 @@
 //! | [`retry`] | Retry strategies ([`BestEffortRetryStrategy`](retry::BestEffortRetryStrategy)) |
 //! | [`diagnostics`] | Connection state types |
 //! | [`service_type`] | [`ServiceType`](service_type::ServiceType) constants |
-//! | [`logging_meter`] | [`LoggingMeterLayer`](logging_meter::LoggingMeterLayer) for operation metrics |
-//! | [`threshold_log_tracer`] | [`ThresholdLoggingLayer`](threshold_log_tracer::ThresholdLoggingLayer) for slow-operation logging |
+//! | [`logging_meter`] | [`LoggingMeter`](logging_meter::LoggingMeter) for operation metrics |
+//! | [`threshold_logging_tracer`] | [`ThresholdLoggingTracer`](threshold_logging_tracer::ThresholdLoggingTracer) for slow-operation logging |
 //!
 //! # Feature Flags
 //!
@@ -269,6 +269,6 @@ pub mod scope;
 pub mod search;
 pub mod service_type;
 pub mod subdoc;
-pub mod threshold_log_tracer;
+pub mod threshold_logging_tracer;
 mod tracing;
 pub mod transcoding;
