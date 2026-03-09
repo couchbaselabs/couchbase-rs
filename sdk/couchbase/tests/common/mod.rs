@@ -36,7 +36,7 @@ pub mod test_scope;
 pub mod test_search_index_manager;
 
 use rand::distr::Alphanumeric;
-use rand::{rng, Rng};
+use rand::{rng, Rng, RngExt};
 use tokio::time::Instant;
 
 pub fn new_key() -> String {

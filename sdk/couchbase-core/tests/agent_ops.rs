@@ -37,7 +37,7 @@ use couchbase_core::options::crud::{
 use couchbase_core::retrybesteffort::{BestEffortRetryStrategy, ExponentialBackoffCalculator};
 use couchbase_core::retryfailfast::FailFastRetryStrategy;
 use rand::distr::Alphanumeric;
-use rand::{rng, Rng};
+use rand::{rng, Rng, RngExt};
 use serde::Serialize;
 use std::ops::{Add, Deref};
 use std::sync::Arc;

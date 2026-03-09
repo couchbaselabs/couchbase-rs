@@ -38,7 +38,7 @@ pub enum ErrorKind {
     Parse(String),
     InvalidArgument { msg: String, arg: String },
     Io(io::Error),
-    Resolve(hickory_resolver::error::ResolveError),
+    Resolve(hickory_resolver::ResolveError),
 }
 
 impl Clone for ErrorKind {
@@ -57,7 +57,7 @@ impl Clone for ErrorKind {
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(&self.kind, f)
+        Display::fmt(&self.kind, f)
     }
 }
 
@@ -82,8 +82,8 @@ impl From<io::Error> for Error {
     }
 }
 
-impl From<hickory_resolver::error::ResolveError> for Error {
-    fn from(e: hickory_resolver::error::ResolveError) -> Self {
+impl From<hickory_resolver::ResolveError> for Error {
+    fn from(e: hickory_resolver::ResolveError) -> Self {
         Self {
             kind: ErrorKind::Resolve(e),
         }

@@ -20,7 +20,7 @@ use base64::engine::general_purpose;
 use base64::Engine;
 use hmac::digest::KeyInit;
 use hmac::Mac;
-use rand::RngCore;
+use rand::Rng;
 use sha2::Digest;
 use std::error::Error;
 use std::marker::PhantomData;
