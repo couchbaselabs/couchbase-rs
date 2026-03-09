@@ -609,7 +609,7 @@ impl From<couchbase_core::error::Error> for Error {
             couchbase_core::error::ErrorKind::Search(e) => e.into(),
             couchbase_core::error::ErrorKind::Http(e) => {
                 let kind = match e.kind() {
-                    couchbase_core::httpx::error::ErrorKind::Connection { msg, .. } => {
+                    couchbase_core::httpx::error::ErrorKind::Connect { msg, .. } => {
                         ErrorKind::OtherFailure(msg.clone())
                     }
                     couchbase_core::httpx::error::ErrorKind::Decoding(msg) => {

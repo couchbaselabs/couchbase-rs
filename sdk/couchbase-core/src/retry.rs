@@ -76,6 +76,8 @@ pub enum RetryReason {
     SearchTooManyRequests,
     /// An HTTP request failed to send.
     HttpSendRequestFailed,
+    /// An HTTP connection failed to be established.
+    HttpConnectFailed,
     /// The SDK is not yet ready to perform the operation.
     NotReady,
 }
@@ -102,6 +104,7 @@ impl RetryReason {
                 | RetryReason::QueryIndexNotFound
                 | RetryReason::SearchTooManyRequests
                 | RetryReason::HttpSendRequestFailed
+                | RetryReason::HttpConnectFailed
                 | RetryReason::NotReady
         )
     }
@@ -141,6 +144,7 @@ impl Display for RetryReason {
             RetryReason::SearchTooManyRequests => write!(f, "SEARCH_TOO_MANY_REQUESTS"),
             RetryReason::NotReady => write!(f, "NOT_READY"),
             RetryReason::HttpSendRequestFailed => write!(f, "HTTP_SEND_REQUEST_FAILED"),
+            RetryReason::HttpConnectFailed => write!(f, "HTTP_CONNECT_FAILED"),
         }
     }
 }
@@ -373,11 +377,15 @@ pub(crate) fn error_to_retry_reason(
                 }
                 _ => {}
             },
-            queryx::error::ErrorKind::Http { error, .. } => {
-                if let httpx::error::ErrorKind::SendRequest(_) = error.kind() {
+            queryx::error::ErrorKind::Http { error, .. } => match error.kind() {
+                httpx::error::ErrorKind::SendRequest(_) => {
                     return Some(RetryReason::HttpSendRequestFailed);
                 }
-            }
+                httpx::error::ErrorKind::Connect { .. } => {
+                    return Some(RetryReason::HttpConnectFailed);
+                }
+                _ => {}
+            },
             _ => {}
         },
         ErrorKind::Search(e) => match e.kind() {
@@ -386,24 +394,40 @@ pub(crate) fn error_to_retry_reason(
                     return Some(RetryReason::SearchTooManyRequests);
                 }
             }
-            searchx::error::ErrorKind::Http { error, .. } => {
-                if let httpx::error::ErrorKind::SendRequest(_) = error.kind() {
+            searchx::error::ErrorKind::Http { error, .. } => match error.kind() {
+                httpx::error::ErrorKind::SendRequest(_) => {
                     return Some(RetryReason::HttpSendRequestFailed);
                 }
-            }
+                httpx::error::ErrorKind::Connect { .. } => {
+                    return Some(RetryReason::HttpConnectFailed);
+                }
+                _ => {}
+            },
             _ => {}
         },
         ErrorKind::Analytics(e) => {
             if let analyticsx::error::ErrorKind::Http { error, .. } = e.kind() {
-                if let httpx::error::ErrorKind::SendRequest(_) = error.kind() {
-                    return Some(RetryReason::HttpSendRequestFailed);
+                match error.kind() {
+                    httpx::error::ErrorKind::SendRequest(_) => {
+                        return Some(RetryReason::HttpSendRequestFailed);
+                    }
+                    httpx::error::ErrorKind::Connect { .. } => {
+                        return Some(RetryReason::HttpConnectFailed);
+                    }
+                    _ => {}
                 }
             }
         }
         ErrorKind::Mgmt(e) => {
             if let mgmtx::error::ErrorKind::Http(error) = e.kind() {
-                if let httpx::error::ErrorKind::SendRequest(_) = error.kind() {
-                    return Some(RetryReason::HttpSendRequestFailed);
+                match error.kind() {
+                    httpx::error::ErrorKind::SendRequest(_) => {
+                        return Some(RetryReason::HttpSendRequestFailed);
+                    }
+                    httpx::error::ErrorKind::Connect { .. } => {
+                        return Some(RetryReason::HttpConnectFailed);
+                    }
+                    _ => {}
                 }
             }
         }

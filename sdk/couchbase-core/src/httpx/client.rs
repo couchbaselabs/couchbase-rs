@@ -16,7 +16,7 @@
  *
  */
 
-use crate::httpx::error::ErrorKind::Connection;
+use crate::httpx::error::ErrorKind::Connect;
 use crate::httpx::error::{Error, Result as HttpxResult};
 use crate::httpx::request::{Auth, OboPasswordOrDomain, Request};
 use crate::httpx::response::Response;
@@ -248,7 +248,7 @@ impl Client for ReqwestClient {
                 trace!("{msg}");
 
                 if err.is_connect() {
-                    Err(Error::new_connection_error(err.to_string()))
+                    Err(Error::new_connect_error(err.to_string()))
                 } else if err.is_request() {
                     Err(Error::new_request_error(err.to_string()))
                 } else {
