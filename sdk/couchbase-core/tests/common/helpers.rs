@@ -32,7 +32,7 @@ use couchbase_core::options::management::{
 };
 use couchbase_core::{error, memdx};
 use rand::distr::Alphanumeric;
-use rand::{rng, Rng};
+use rand::{rng, Rng, RngExt};
 use std::ops::Add;
 use std::time::Duration;
 use tokio::time::{timeout_at, Instant};

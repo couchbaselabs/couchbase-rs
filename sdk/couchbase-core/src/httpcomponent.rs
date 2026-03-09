@@ -25,7 +25,7 @@ use crate::httpx::request::{Auth, BasicAuth, BearerAuth};
 use crate::retrybesteffort::BackoffCalculator;
 use crate::service_type::ServiceType;
 use crate::util::get_host_port_from_uri;
-use rand::Rng;
+use rand::{Rng, RngExt};
 use std::collections::HashMap;
 use std::future::Future;
 use std::hash::Hash;

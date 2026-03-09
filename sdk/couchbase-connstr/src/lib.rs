@@ -20,8 +20,10 @@ pub mod error;
 
 use error::ErrorKind;
 use hickory_resolver::config::*;
+use hickory_resolver::name_server::TokioConnectionProvider;
+use hickory_resolver::proto::xfer::Protocol;
 use hickory_resolver::system_conf::read_system_conf;
-use hickory_resolver::TokioAsyncResolver;
+use hickory_resolver::TokioResolver;
 use regex::Regex;
 use std::collections::HashMap;
 use std::fmt;
@@ -410,7 +412,10 @@ async fn lookup_srv(
         None => read_system_conf().map_err(ErrorKind::Resolve)?,
     };
 
-    let resolver = TokioAsyncResolver::tokio(resolver_config, resolver_opts);
+    let resolver =
+        TokioResolver::builder_with_config(resolver_config, TokioConnectionProvider::default())
+            .with_options(resolver_opts)
+            .build();
 
     let name = format!("_{scheme}._{proto}.{host}");
     let response = resolver.srv_lookup(name).await?;
