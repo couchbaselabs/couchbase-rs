@@ -923,6 +923,7 @@ impl From<&couchbase_core::queryx::error::Error> for Error {
                 endpoint,
                 statement,
                 client_context_id,
+                error,
                 ..
             } => {
                 let context = ErrorContext::new()
@@ -939,7 +940,7 @@ impl From<&couchbase_core::queryx::error::Error> for Error {
                 let msg = if let Some(source) = value.source() {
                     source.to_string()
                 } else {
-                    "unknown http error".to_string()
+                    error.to_string()
                 };
 
                 Error {
@@ -1083,13 +1084,15 @@ impl From<&couchbase_core::searchx::error::Error> for Error {
                     context: Box::new(Some(context)),
                 }
             }
-            couchbase_core::searchx::error::ErrorKind::Http { endpoint, .. } => {
+            couchbase_core::searchx::error::ErrorKind::Http {
+                endpoint, error, ..
+            } => {
                 let context = ErrorContext::new().with_dispatched_to(endpoint.clone());
 
                 let msg = if let Some(source) = value.source() {
                     source.to_string()
                 } else {
-                    "unknown http error".to_string()
+                    error.to_string()
                 };
 
                 Error {
