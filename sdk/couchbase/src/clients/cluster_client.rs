@@ -47,7 +47,6 @@ use std::time::Duration;
 
 use crate::authenticator::Authenticator;
 use crate::clients::tracing_client::{CouchbaseTracingClient, TracingClient, TracingClientBackend};
-#[cfg(feature = "unstable-dns-options")]
 use std::mem::take;
 
 pub(crate) struct ClusterClient {
@@ -70,10 +69,7 @@ impl ClusterClient {
         // the dns options out for resolve.
         // We could create a new type to pass into the backend connect functions but it just
         // seems unnecessary.
-        #[cfg(feature = "unstable-dns-options")]
         let dns_options = take(&mut opts.dns_options).map(couchbase_connstr::DnsConfig::from);
-        #[cfg(not(feature = "unstable-dns-options"))]
-        let dns_options = None;
 
         let resolved_conn_spec = resolve(conn_spec, dns_options).await?;
 

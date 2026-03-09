@@ -50,14 +50,8 @@ default = ["default-tls"]
 default-tls = ["rustls-tls"]
 rustls-tls = ["dep:tokio-rustls", "couchbase-core/rustls-tls", "dep:rustls-pemfile"]
 native-tls = ["dep:tokio-native-tls", "couchbase-core/native-tls"]
-
-# Volatile: This feature is subject to change at any time
-# Enables options for DNS-SRV bootstrap.
-unstable-dns-options = []
-
-# Uncomitted: This feature may change in the future
-# Allows explicit construction of the Error type e.g. for mocking purposes.
-unstable-error-construction = []
+# Note that we do not use feature flags to indicate API stability level.
+# Instead, unstable features are marked with comments indicating uncommitted or volatile stability levels.
 
 internal = []
 

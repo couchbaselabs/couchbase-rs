@@ -81,8 +81,7 @@ pub struct ClusterOptions {
     pub http_options: HttpOptions,
     /// Configuration for the key-value (memcached) connections.
     pub kv_options: KvOptions,
-    /// DNS configuration. Only available with the `unstable-dns-options` feature.
-    #[cfg(feature = "unstable-dns-options")]
+    /// DNS configuration. **Volatile: This feature is subject to change at any time**.
     pub dns_options: Option<DnsOptions>,
     /// Configuration for the orphan response reporter.
     pub orphan_reporter_options: OrphanReporterOptions,
@@ -117,7 +116,6 @@ impl ClusterOptions {
             poller_options: PollerOptions::new(),
             http_options: HttpOptions::new(),
             kv_options: KvOptions::new(),
-            #[cfg(feature = "unstable-dns-options")]
             dns_options: None,
             orphan_reporter_options: OrphanReporterOptions::new(),
             default_retry_strategy: None,
@@ -160,10 +158,7 @@ impl ClusterOptions {
         self
     }
 
-    /// Sets the DNS configuration.
-    ///
-    /// Only available with the `unstable-dns-options` feature.
-    #[cfg(feature = "unstable-dns-options")]
+    /// Sets the DNS configuration. **Volatile: This feature is subject to change at any time**.
     pub fn dns_options(mut self, dns_options: DnsOptions) -> Self {
         self.dns_options = Some(dns_options);
         self
@@ -685,19 +680,16 @@ impl Display for TlsOptions {
     }
 }
 
-/// Custom DNS resolver configuration.
-///
-/// Only available with the `unstable-dns-options` feature.
+/// Custom DNS resolver configuration.  **Volatile: This feature is subject to change at any time**.
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
-#[cfg(feature = "unstable-dns-options")]
 pub struct DnsOptions {
     /// The DNS server address to use for SRV and A/AAAA lookups.
     pub namespace: SocketAddr,
     /// Timeout for DNS resolution.
     pub timeout: Option<Duration>,
 }
-#[cfg(feature = "unstable-dns-options")]
+
 impl DnsOptions {
     /// Creates a new `DnsOptions` with the given DNS server address.
     pub fn new(namespace: SocketAddr) -> Self {
@@ -713,7 +705,6 @@ impl DnsOptions {
         self
     }
 }
-#[cfg(feature = "unstable-dns-options")]
 impl From<DnsOptions> for couchbase_connstr::DnsConfig {
     fn from(opts: DnsOptions) -> Self {
         couchbase_connstr::DnsConfig {
