@@ -18,7 +18,7 @@
 
 use crate::memdx::extframe::decode_res_ext_frames;
 use crate::memdx::packet::ResponsePacket;
-use crate::options::orphan_reporter::{OrphanReporterConfig, OrphanSinkFn};
+use crate::options::orphan_reporter::OrphanReporterConfig;
 use serde_json::json;
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
@@ -30,7 +30,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tokio::time::{interval_at, Instant, MissedTickBehavior};
-use tracing::{debug, trace, warn};
+use tracing::{trace, warn};
 
 #[derive(Debug, Clone)]
 pub struct OrphanContext {
@@ -119,7 +119,6 @@ pub struct OrphanReporter {
     heap: Arc<RwLock<BinaryHeap<Reverse<OrphanLogItem>>>>,
     sample_size: usize,
     reporter_interval: Duration,
-    log_sink: Option<Arc<OrphanSinkFn>>,
 }
 
 impl OrphanReporter {
@@ -127,7 +126,6 @@ impl OrphanReporter {
         let heap = Arc::new(RwLock::new(BinaryHeap::with_capacity(config.sample_size)));
         let total_count = Arc::new(AtomicU64::new(0));
 
-        let log_sink = config.log_sink.clone();
         let heap_clone = heap.clone();
         let total_count_clone = total_count.clone();
 
@@ -150,12 +148,7 @@ impl OrphanReporter {
                         }
                         let mut write_guard = heap_clone.write().unwrap();
                         let obj = Self::create_log_object("kv".to_string(), mem::take(&mut write_guard), count);
-                        let msg = format!("Orphaned responses observed: {}", obj);
-                        if let Some(ref sink) = log_sink {
-                            sink(&msg);
-                        } else {
-                            debug!("{}", msg);
-                        }
+                        warn!("Orphaned responses observed: {}", obj);
                     }
                 }
             }
@@ -165,7 +158,6 @@ impl OrphanReporter {
             heap,
             sample_size: config.sample_size,
             reporter_interval: config.reporter_interval,
-            log_sink: config.log_sink,
         }
     }
 
@@ -249,10 +241,5 @@ impl OrphanReporter {
         let mut services = HashMap::new();
         services.insert(service, entry);
         OrphanLogService(services)
-    }
-
-    pub fn with_sink_fn(mut self, sink: Arc<OrphanSinkFn>) -> Self {
-        self.log_sink = Some(sink);
-        self
     }
 }
