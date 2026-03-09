@@ -20,7 +20,7 @@ futures = "0.3.32"
 hdrhistogram = "7.5"
 http = "1.4"
 lazy_static = "1.5"
-rustls-pemfile = { version = "2.2", optional = true }
+rustls-pki-types = { version = "1.14", optional = true }
 serde = "1.0"
 serde_json = { version = "1.0", features = ["preserve_order"] }
 uuid = { version = "1.22", features = ["v4"] }
@@ -48,7 +48,7 @@ tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 [features]
 default = ["default-tls"]
 default-tls = ["rustls-tls"]
-rustls-tls = ["dep:tokio-rustls", "couchbase-core/rustls-tls", "dep:rustls-pemfile"]
+rustls-tls = ["dep:tokio-rustls", "couchbase-core/rustls-tls", "dep:rustls-pki-types"]
 native-tls = ["dep:tokio-native-tls", "couchbase-core/native-tls"]
 # Note that we do not use feature flags to indicate API stability level.
 # Instead, unstable features are marked with comments indicating uncommitted or volatile stability levels.

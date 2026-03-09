@@ -26,7 +26,6 @@ use crate::authenticator::Authenticator;
 use crate::capella_ca::CAPELLA_CERT;
 use crate::error;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
-use std::io::Cursor;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -38,7 +37,6 @@ use tokio_native_tls::native_tls::Identity;
 #[cfg(all(feature = "rustls-tls", not(feature = "native-tls")))]
 use {
     couchbase_core::insecure_certverfier::InsecureCertVerifier,
-    rustls_pemfile::read_all,
     tokio_rustls::rustls::crypto::aws_lc_rs::default_provider,
     tokio_rustls::rustls::pki_types::pem::{PemObject, SectionKind},
     tokio_rustls::rustls::pki_types::{CertificateDer, PrivateKeyDer},
@@ -568,16 +566,16 @@ impl TlsOptions {
                 };
 
                 debug!("Adding Capella root CA to trust store");
-                let mut cursor = Cursor::new(CAPELLA_CERT);
-                let certs = rustls_pemfile::certs(&mut cursor)
-                    .map(|item| {
-                        item.map_err(|e| {
-                            error::Error::other_failure(format!("failed to add capella cert: {e}"))
-                        })
-                    })
-                    .collect::<error::Result<Vec<CertificateDer>>>()?;
+                let certs =
+                    CertificateDer::from_pem_slice(CAPELLA_CERT.as_bytes()).map_err(|e| {
+                        error::Error::other_failure(format!("failed to parse capella cert: {e}"))
+                    })?;
 
-                store.add_parsable_certificates(certs);
+                store.add(certs).map_err(|e| {
+                    error::Error::other_failure(format!(
+                        "failed to add capella cert to root store: {e}"
+                    ))
+                })?;
                 store
             }
         };

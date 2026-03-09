@@ -158,17 +158,18 @@ impl From<Authenticator> for couchbase_core::authenticator::Authenticator {
 /// ```rust,no_run
 /// use couchbase::authenticator::CertificateAuthenticator;
 /// use std::fs;
+/// use rustls_pki_types::{CertificateDer, PrivateKeyDer};
+/// use rustls_pki_types::pem::PemObject;
 ///
 /// // Load PEM-encoded certificate chain and private key from disk.
 /// let cert_pem = fs::read("client.crt").expect("read cert");
 /// let key_pem = fs::read("client.key").expect("read key");
 ///
-/// let certs: Vec<_> = rustls_pemfile::certs(&mut &cert_pem[..])
+/// let certs: Vec<_> = CertificateDer::pem_reader_iter(&mut &cert_pem[..])
 ///     .collect::<Result<_, _>>()
 ///     .expect("parse certs");
-/// let key = rustls_pemfile::private_key(&mut &key_pem[..])
-///     .expect("parse key")
-///     .expect("no key found");
+/// let key = PrivateKeyDer::from_pem_slice(&mut &key_pem[..])
+///     .expect("parse key");
 ///
 /// let auth = CertificateAuthenticator::new(certs, key);
 /// ```
