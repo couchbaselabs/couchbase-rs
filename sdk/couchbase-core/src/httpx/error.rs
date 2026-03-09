@@ -44,10 +44,10 @@ impl Error {
         }
     }
 
-    pub(crate) fn new_connection_error(msg: impl Into<String>) -> Self {
+    pub(crate) fn new_connect_error(msg: impl Into<String>) -> Self {
         Self {
             inner: Box::new(ErrorImpl {
-                kind: ErrorKind::Connection { msg: msg.into() },
+                kind: ErrorKind::Connect { msg: msg.into() },
             }),
         }
     }
@@ -68,8 +68,8 @@ impl Error {
         }
     }
 
-    pub fn is_connection_error(&self) -> bool {
-        matches!(self.inner.kind, ErrorKind::Connection { .. })
+    pub fn is_connect_error(&self) -> bool {
+        matches!(self.inner.kind, ErrorKind::Connect { .. })
     }
 
     pub fn is_decoding_error(&self) -> bool {
@@ -90,7 +90,7 @@ pub struct ErrorImpl {
 #[non_exhaustive]
 pub enum ErrorKind {
     #[non_exhaustive]
-    Connection {
+    Connect {
         msg: String,
     },
     Decoding(String),
@@ -101,7 +101,7 @@ pub enum ErrorKind {
 impl Display for ErrorKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Connection { msg } => write!(f, "connection error {msg}"),
+            Self::Connect { msg } => write!(f, "connect error {msg}"),
             Self::Decoding(msg) => write!(f, "decoding error: {msg}"),
             Self::Message(msg) => write!(f, "{msg}"),
             Self::SendRequest(msg) => write!(f, "send request failed error: {msg}"),
@@ -112,7 +112,7 @@ impl Display for ErrorKind {
 impl MetricsName for Error {
     fn metrics_name(&self) -> &'static str {
         match self.kind() {
-            ErrorKind::Connection { .. } => "httpx.Connection",
+            ErrorKind::Connect { .. } => "httpx.Connect",
             ErrorKind::Decoding(_) => "httpx.Decoding",
             ErrorKind::Message(_) => "httpx._OTHER",
             ErrorKind::SendRequest(_) => "httpx.SendRequest",
