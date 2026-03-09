@@ -29,6 +29,7 @@
 //! [`list`](Collection::list), [`map`](Collection::map),
 //! [`set`](Collection::set), [`queue`](Collection::queue).
 
+use crate::clients::tracing_client::OperationContext;
 use crate::collection::Collection;
 use crate::options::collection_ds_options::{
     CouchbaseListOptions, CouchbaseMapOptions, CouchbaseQueueOptions, CouchbaseSetOptions,
@@ -133,13 +134,16 @@ impl CouchbaseList<'_> {
                 create_span!("list_iter"),
             )
             .await;
-        let result = async {
-            let res = self.collection.get(&self.id, None).await?;
-            let list_contents: Vec<T> = res.content_as()?;
-            Ok(list_contents.into_iter())
-        }
-        .instrument(ctx.span().clone())
-        .await;
+        let result = self
+            .collection
+            .get(&self.id, None)
+            .instrument(ctx.span().clone())
+            .await
+            .and_then(|res| {
+                let list_contents: Vec<T> = res.content_as()?;
+                Ok(list_contents.into_iter())
+            });
+
         ctx.end_operation(result.as_ref().err());
         result
     }
@@ -157,14 +161,13 @@ impl CouchbaseList<'_> {
                 create_span!("list_get"),
             )
             .await;
-        let result = async move {
-            let res = collection
-                .lookup_in(id, &[LookupInSpec::get(format!("[{index}]"), None)], None)
-                .await?;
-            res.content_as(0)
-        }
-        .instrument(ctx.span().clone())
-        .await;
+
+        let result = collection
+            .lookup_in(id, &[LookupInSpec::get(format!("[{index}]"), None)], None)
+            .instrument(ctx.span().clone())
+            .await
+            .and_then(|lookup_res| lookup_res.content_as(0));
+
         ctx.end_operation(result.as_ref().err());
         result
     }
@@ -180,18 +183,16 @@ impl CouchbaseList<'_> {
                 create_span!("list_remove"),
             )
             .await;
-        let result = async {
-            self.collection
-                .mutate_in(
-                    &self.id,
-                    &[MutateInSpec::remove(format!("[{index}]"), None)],
-                    None,
-                )
-                .await?;
-            Ok(())
-        }
-        .instrument(ctx.span().clone())
-        .await;
+        let result = self
+            .collection
+            .mutate_in(
+                &self.id,
+                &[MutateInSpec::remove(format!("[{index}]"), None)],
+                None,
+            )
+            .instrument(ctx.span().clone())
+            .await
+            .map(|_| ());
         ctx.end_operation(result.as_ref().err());
         result
     }
@@ -207,18 +208,23 @@ impl CouchbaseList<'_> {
                 create_span!("list_append"),
             )
             .await;
-        let result = async {
-            self.collection
-                .mutate_in(
-                    &self.id,
-                    &[MutateInSpec::array_append("", &[value], None)?],
-                    MutateInOptions::new().store_semantics(StoreSemantics::Upsert),
-                )
-                .await?;
-            Ok(())
-        }
-        .instrument(ctx.span().clone())
-        .await;
+        let spec = match MutateInSpec::array_append("", &[value], None) {
+            Ok(spec) => spec,
+            Err(e) => {
+                ctx.end_operation(Some(&e));
+                return Err(e);
+            }
+        };
+        let result = self
+            .collection
+            .mutate_in(
+                &self.id,
+                &[spec],
+                MutateInOptions::new().store_semantics(StoreSemantics::Upsert),
+            )
+            .instrument(ctx.span().clone())
+            .await
+            .map(|_| ());
         ctx.end_operation(result.as_ref().err());
         result
     }
@@ -234,18 +240,23 @@ impl CouchbaseList<'_> {
                 create_span!("list_prepend"),
             )
             .await;
-        let result = async {
-            self.collection
-                .mutate_in(
-                    &self.id,
-                    &[MutateInSpec::array_prepend("", &[value], None)?],
-                    MutateInOptions::new().store_semantics(StoreSemantics::Upsert),
-                )
-                .await?;
-            Ok(())
-        }
-        .instrument(ctx.span().clone())
-        .await;
+        let spec = match MutateInSpec::array_prepend("", &[value], None) {
+            Ok(spec) => spec,
+            Err(e) => {
+                ctx.end_operation(Some(&e));
+                return Err(e);
+            }
+        };
+        let result = self
+            .collection
+            .mutate_in(
+                &self.id,
+                &[spec],
+                MutateInOptions::new().store_semantics(StoreSemantics::Upsert),
+            )
+            .instrument(ctx.span().clone())
+            .await
+            .map(|_| ());
         ctx.end_operation(result.as_ref().err());
         result
     }
@@ -264,13 +275,15 @@ impl CouchbaseList<'_> {
                 create_span!("list_position"),
             )
             .await;
-        let result = async {
-            let get_res = self.collection.get(&self.id, None).await?;
-            let list_contents: Vec<V> = get_res.content_as()?;
-            Ok(list_contents.iter().position(|item| item == value))
-        }
-        .instrument(ctx.span().clone())
-        .await;
+        let result = self
+            .collection
+            .get(&self.id, None)
+            .instrument(ctx.span().clone())
+            .await
+            .and_then(|get_res| {
+                let list_contents: Vec<V> = get_res.content_as()?;
+                Ok(list_contents.iter().position(|item| item == value))
+            });
         ctx.end_operation(result.as_ref().err());
         result
     }
@@ -286,15 +299,12 @@ impl CouchbaseList<'_> {
                 create_span!("list_len"),
             )
             .await;
-        let result = async {
-            let res = self
-                .collection
-                .lookup_in(&self.id, &[LookupInSpec::count("", None)], None)
-                .await?;
-            res.content_as(0)
-        }
-        .instrument(ctx.span().clone())
-        .await;
+        let result = self
+            .collection
+            .lookup_in(&self.id, &[LookupInSpec::count("", None)], None)
+            .instrument(ctx.span().clone())
+            .await
+            .and_then(|res| res.content_as(0));
         ctx.end_operation(result.as_ref().err());
         result
     }
@@ -315,12 +325,12 @@ impl CouchbaseList<'_> {
                 create_span!("list_clear"),
             )
             .await;
-        let result = async {
-            self.collection.remove(&self.id, None).await?;
-            Ok(())
-        }
-        .instrument(ctx.span().clone())
-        .await;
+        let result = self
+            .collection
+            .remove(&self.id, None)
+            .instrument(ctx.span().clone())
+            .await
+            .map(|_| ());
         ctx.end_operation(result.as_ref().err());
         result
     }
@@ -350,13 +360,15 @@ impl CouchbaseMap<'_> {
                 create_span!("map_iter"),
             )
             .await;
-        let result = async {
-            let res = self.collection.get(&self.id, None).await?;
-            let list_contents: HashMap<String, T> = res.content_as()?;
-            Ok(list_contents.into_iter())
-        }
-        .instrument(ctx.span().clone())
-        .await;
+        let result = self
+            .collection
+            .get(&self.id, None)
+            .instrument(ctx.span().clone())
+            .await
+            .and_then(|res| {
+                let list_contents: HashMap<String, T> = res.content_as()?;
+                Ok(list_contents.into_iter())
+            });
         ctx.end_operation(result.as_ref().err());
         result
     }
@@ -372,15 +384,13 @@ impl CouchbaseMap<'_> {
                 create_span!("map_get"),
             )
             .await;
-        let result = async {
-            let res = self
-                .collection
-                .lookup_in(&self.id, &[LookupInSpec::get(id, None)], None)
-                .await?;
-            res.content_as(0)
-        }
-        .instrument(ctx.span().clone())
-        .await;
+        let id = id.into();
+        let result = self
+            .collection
+            .lookup_in(&self.id, &[LookupInSpec::get(&id, None)], None)
+            .instrument(ctx.span().clone())
+            .await
+            .and_then(|res| res.content_as(0));
         ctx.end_operation(result.as_ref().err());
         result
     }
@@ -400,18 +410,24 @@ impl CouchbaseMap<'_> {
                 create_span!("map_insert"),
             )
             .await;
-        let result = async {
-            self.collection
-                .mutate_in(
-                    &self.id,
-                    &[MutateInSpec::upsert(id, value, None)?],
-                    MutateInOptions::new().store_semantics(StoreSemantics::Upsert),
-                )
-                .await?;
-            Ok(())
-        }
-        .instrument(ctx.span().clone())
-        .await;
+        let id = id.into();
+        let spec = match MutateInSpec::upsert(&id, value, None) {
+            Ok(spec) => spec,
+            Err(e) => {
+                ctx.end_operation(Some(&e));
+                return Err(e);
+            }
+        };
+        let result = self
+            .collection
+            .mutate_in(
+                &self.id,
+                &[spec],
+                MutateInOptions::new().store_semantics(StoreSemantics::Upsert),
+            )
+            .instrument(ctx.span().clone())
+            .await
+            .map(|_| ());
         ctx.end_operation(result.as_ref().err());
         result
     }
@@ -427,14 +443,13 @@ impl CouchbaseMap<'_> {
                 create_span!("map_remove"),
             )
             .await;
-        let result = async {
-            self.collection
-                .mutate_in(&self.id, &[MutateInSpec::remove(id, None)], None)
-                .await?;
-            Ok(())
-        }
-        .instrument(ctx.span().clone())
-        .await;
+        let id = id.into();
+        let result = self
+            .collection
+            .mutate_in(&self.id, &[MutateInSpec::remove(&id, None)], None)
+            .instrument(ctx.span().clone())
+            .await
+            .map(|_| ());
         ctx.end_operation(result.as_ref().err());
         result
     }
@@ -450,15 +465,13 @@ impl CouchbaseMap<'_> {
                 create_span!("map_contains_key"),
             )
             .await;
-        let result = async {
-            let res = self
-                .collection
-                .lookup_in(&self.id, &[LookupInSpec::exists(id, None)], None)
-                .await?;
-            res.exists(0)
-        }
-        .instrument(ctx.span().clone())
-        .await;
+        let id = id.into();
+        let result = self
+            .collection
+            .lookup_in(&self.id, &[LookupInSpec::exists(&id, None)], None)
+            .instrument(ctx.span().clone())
+            .await
+            .and_then(|res| res.exists(0));
         ctx.end_operation(result.as_ref().err());
         result
     }
@@ -474,15 +487,12 @@ impl CouchbaseMap<'_> {
                 create_span!("map_len"),
             )
             .await;
-        let result = async {
-            let res = self
-                .collection
-                .lookup_in(&self.id, &[LookupInSpec::count("", None)], None)
-                .await?;
-            res.content_as(0)
-        }
-        .instrument(ctx.span().clone())
-        .await;
+        let result = self
+            .collection
+            .lookup_in(&self.id, &[LookupInSpec::count("", None)], None)
+            .instrument(ctx.span().clone())
+            .await
+            .and_then(|res| res.content_as(0));
         ctx.end_operation(result.as_ref().err());
         result
     }
@@ -503,13 +513,15 @@ impl CouchbaseMap<'_> {
                 create_span!("map_keys"),
             )
             .await;
-        let result = async {
-            let res = self.collection.get(&self.id, None).await?;
-            let map_contents: HashMap<String, serde_json::Value> = res.content_as()?;
-            Ok(map_contents.keys().cloned().collect())
-        }
-        .instrument(ctx.span().clone())
-        .await;
+        let result = self
+            .collection
+            .get(&self.id, None)
+            .instrument(ctx.span().clone())
+            .await
+            .and_then(|res| {
+                let map_contents: HashMap<String, serde_json::Value> = res.content_as()?;
+                Ok(map_contents.keys().cloned().collect())
+            });
         ctx.end_operation(result.as_ref().err());
         result
     }
@@ -525,13 +537,15 @@ impl CouchbaseMap<'_> {
                 create_span!("map_values"),
             )
             .await;
-        let result = async {
-            let res = self.collection.get(&self.id, None).await?;
-            let map_contents: HashMap<String, T> = res.content_as()?;
-            Ok(map_contents.into_values().collect())
-        }
-        .instrument(ctx.span().clone())
-        .await;
+        let result = self
+            .collection
+            .get(&self.id, None)
+            .instrument(ctx.span().clone())
+            .await
+            .and_then(|res| {
+                let map_contents: HashMap<String, T> = res.content_as()?;
+                Ok(map_contents.into_values().collect())
+            });
         ctx.end_operation(result.as_ref().err());
         result
     }
@@ -547,12 +561,12 @@ impl CouchbaseMap<'_> {
                 create_span!("map_clear"),
             )
             .await;
-        let result = async {
-            self.collection.remove(&self.id, None).await?;
-            Ok(())
-        }
-        .instrument(ctx.span().clone())
-        .await;
+        let result = self
+            .collection
+            .remove(&self.id, None)
+            .instrument(ctx.span().clone())
+            .await
+            .map(|_| ());
         ctx.end_operation(result.as_ref().err());
         result
     }
@@ -581,13 +595,15 @@ impl CouchbaseSet<'_> {
                 create_span!("set_iter"),
             )
             .await;
-        let result = async {
-            let res = self.collection.get(&self.id, None).await?;
-            let list_contents: Vec<T> = res.content_as()?;
-            Ok(list_contents.into_iter())
-        }
-        .instrument(ctx.span().clone())
-        .await;
+        let result = self
+            .collection
+            .get(&self.id, None)
+            .instrument(ctx.span().clone())
+            .await
+            .and_then(|res| {
+                let list_contents: Vec<T> = res.content_as()?;
+                Ok(list_contents.into_iter())
+            });
         ctx.end_operation(result.as_ref().err());
         result
     }
@@ -605,27 +621,29 @@ impl CouchbaseSet<'_> {
                 create_span!("set_insert"),
             )
             .await;
-        let result = async {
-            let res = self
-                .collection
-                .mutate_in(
-                    &self.id,
-                    &[MutateInSpec::array_add_unique("", value, None)?],
-                    MutateInOptions::new().store_semantics(StoreSemantics::Upsert),
-                )
-                .await;
-
-            if let Err(e) = res {
-                return match e.kind() {
-                    crate::error::ErrorKind::PathExists => Ok(false),
-                    _ => Err(e),
-                };
+        let spec = match MutateInSpec::array_add_unique("", value, None) {
+            Ok(spec) => spec,
+            Err(e) => {
+                ctx.end_operation(Some(&e));
+                return Err(e);
             }
-
-            Ok(true)
-        }
-        .instrument(ctx.span().clone())
-        .await;
+        };
+        let res = self
+            .collection
+            .mutate_in(
+                &self.id,
+                &[spec],
+                MutateInOptions::new().store_semantics(StoreSemantics::Upsert),
+            )
+            .instrument(ctx.span().clone())
+            .await;
+        let result = match res {
+            Ok(_) => Ok(true),
+            Err(e) => match e.kind() {
+                crate::error::ErrorKind::PathExists => Ok(false),
+                _ => Err(e),
+            },
+        };
         ctx.end_operation(result.as_ref().err());
         result
     }
@@ -646,47 +664,58 @@ impl CouchbaseSet<'_> {
                 create_span!("set_remove"),
             )
             .await;
-        let result = async {
-            for _ in 0..16 {
-                let items = self.collection.get(&self.id, None).await?;
-                let cas = items.cas();
 
-                let set_contents: Vec<T> = items.content_as()?;
+        let result = self.remove_loop(&ctx, value).await;
 
-                let mut index_to_remove: Option<usize> = None;
-                for (i, item) in set_contents.iter().enumerate() {
-                    if *item == value {
-                        index_to_remove = Some(i);
-                    }
-                }
-                if let Some(index) = index_to_remove {
-                    let res = self
-                        .collection
-                        .mutate_in(
-                            &self.id,
-                            &[MutateInSpec::remove(format!("[{index}]"), None)],
-                            MutateInOptions::new().cas(cas),
-                        )
-                        .await;
-                    if let Err(e) = res {
-                        match e.kind() {
-                            crate::error::ErrorKind::DocumentExists => continue,
-                            crate::error::ErrorKind::CasMismatch => continue,
-                            _ => return Err(e),
-                        };
-                    }
-                }
-                return Ok(());
-            }
-
-            Err(crate::error::Error::other_failure(
-                "failed to perform operation after 16 retries",
-            ))
-        }
-        .instrument(ctx.span().clone())
-        .await;
         ctx.end_operation(result.as_ref().err());
         result
+    }
+
+    async fn remove_loop<T: DeserializeOwned + PartialEq>(
+        &self,
+        ctx: &OperationContext<'_>,
+        value: T,
+    ) -> crate::error::Result<()> {
+        for _ in 0..16 {
+            let items = self
+                .collection
+                .get(&self.id, None)
+                .instrument(ctx.span().clone())
+                .await?;
+            let cas = items.cas();
+
+            let set_contents: Vec<T> = items.content_as()?;
+
+            let mut index_to_remove: Option<usize> = None;
+            for (i, item) in set_contents.iter().enumerate() {
+                if *item == value {
+                    index_to_remove = Some(i);
+                }
+            }
+            if let Some(index) = index_to_remove {
+                let res = self
+                    .collection
+                    .mutate_in(
+                        &self.id,
+                        &[MutateInSpec::remove(format!("[{index}]"), None)],
+                        MutateInOptions::new().cas(cas),
+                    )
+                    .instrument(ctx.span().clone())
+                    .await;
+                if let Err(e) = res {
+                    match e.kind() {
+                        crate::error::ErrorKind::DocumentExists => continue,
+                        crate::error::ErrorKind::CasMismatch => continue,
+                        _ => return Err(e),
+                    };
+                }
+            }
+            return Ok(());
+        }
+
+        Err(crate::error::Error::other_failure(
+            "failed to perform operation after 16 retries",
+        ))
     }
 
     /// Returns all values in the set.
@@ -700,13 +729,15 @@ impl CouchbaseSet<'_> {
                 create_span!("set_values"),
             )
             .await;
-        let result = async {
-            let res = self.collection.get(&self.id, None).await?;
-            let set_contents: Vec<T> = res.content_as()?;
-            Ok(set_contents)
-        }
-        .instrument(ctx.span().clone())
-        .await;
+        let result = self
+            .collection
+            .get(&self.id, None)
+            .instrument(ctx.span().clone())
+            .await
+            .and_then(|res| {
+                let set_contents: Vec<T> = res.content_as()?;
+                Ok(set_contents)
+            });
         ctx.end_operation(result.as_ref().err());
         result
     }
@@ -725,13 +756,15 @@ impl CouchbaseSet<'_> {
                 create_span!("set_contains"),
             )
             .await;
-        let result = async {
-            let res = self.collection.get(&self.id, None).await?;
-            let set_contents: Vec<T> = res.content_as()?;
-            Ok(set_contents.iter().any(|item| item == value))
-        }
-        .instrument(ctx.span().clone())
-        .await;
+        let result = self
+            .collection
+            .get(&self.id, None)
+            .instrument(ctx.span().clone())
+            .await
+            .and_then(|res| {
+                let set_contents: Vec<T> = res.content_as()?;
+                Ok(set_contents.iter().any(|item| item == value))
+            });
         ctx.end_operation(result.as_ref().err());
         result
     }
@@ -747,15 +780,12 @@ impl CouchbaseSet<'_> {
                 create_span!("set_len"),
             )
             .await;
-        let result = async {
-            let res = self
-                .collection
-                .lookup_in(&self.id, &[LookupInSpec::count("", None)], None)
-                .await?;
-            res.content_as(0)
-        }
-        .instrument(ctx.span().clone())
-        .await;
+        let result = self
+            .collection
+            .lookup_in(&self.id, &[LookupInSpec::count("", None)], None)
+            .instrument(ctx.span().clone())
+            .await
+            .and_then(|res| res.content_as(0));
         ctx.end_operation(result.as_ref().err());
         result
     }
@@ -776,12 +806,12 @@ impl CouchbaseSet<'_> {
                 create_span!("set_clear"),
             )
             .await;
-        let result = async {
-            self.collection.remove(&self.id, None).await?;
-            Ok(())
-        }
-        .instrument(ctx.span().clone())
-        .await;
+        let result = self
+            .collection
+            .remove(&self.id, None)
+            .instrument(ctx.span().clone())
+            .await
+            .map(|_| ());
         ctx.end_operation(result.as_ref().err());
         result
     }
@@ -809,14 +839,16 @@ impl CouchbaseQueue<'_> {
                 create_span!("queue_iter"),
             )
             .await;
-        let result = async {
-            let res = self.collection.get(&self.id, None).await?;
-            let mut list_contents: Vec<T> = res.content_as()?;
-            list_contents.reverse();
-            Ok(list_contents.into_iter())
-        }
-        .instrument(ctx.span().clone())
-        .await;
+        let result = self
+            .collection
+            .get(&self.id, None)
+            .instrument(ctx.span().clone())
+            .await
+            .and_then(|res| {
+                let mut list_contents: Vec<T> = res.content_as()?;
+                list_contents.reverse();
+                Ok(list_contents.into_iter())
+            });
         ctx.end_operation(result.as_ref().err());
         result
     }
@@ -832,18 +864,23 @@ impl CouchbaseQueue<'_> {
                 create_span!("queue_push"),
             )
             .await;
-        let result = async {
-            self.collection
-                .mutate_in(
-                    &self.id,
-                    &[MutateInSpec::array_prepend("", &[value], None)?],
-                    MutateInOptions::new().store_semantics(StoreSemantics::Upsert),
-                )
-                .await?;
-            Ok(())
-        }
-        .instrument(ctx.span().clone())
-        .await;
+        let spec = match MutateInSpec::array_prepend("", &[value], None) {
+            Ok(spec) => spec,
+            Err(e) => {
+                ctx.end_operation(Some(&e));
+                return Err(e);
+            }
+        };
+        let result = self
+            .collection
+            .mutate_in(
+                &self.id,
+                &[spec],
+                MutateInOptions::new().store_semantics(StoreSemantics::Upsert),
+            )
+            .instrument(ctx.span().clone())
+            .await
+            .map(|_| ());
         ctx.end_operation(result.as_ref().err());
         result
     }
@@ -861,41 +898,48 @@ impl CouchbaseQueue<'_> {
                 create_span!("queue_pop"),
             )
             .await;
-        let result = async {
-            for _ in 0..16 {
-                let res = self
-                    .collection
-                    .lookup_in(&self.id, &[LookupInSpec::get("[-1]", None)], None)
-                    .await?;
-                let cas = res.cas();
-                let value: T = res.content_as(0)?;
 
-                let res = self
-                    .collection
-                    .mutate_in(
-                        &self.id,
-                        &[MutateInSpec::remove("[-1]", None)],
-                        MutateInOptions::new().cas(cas),
-                    )
-                    .await;
-                if let Err(e) = res {
-                    match e.kind() {
-                        crate::error::ErrorKind::DocumentExists => continue,
-                        crate::error::ErrorKind::CasMismatch => continue,
-                        _ => return Err(e),
-                    };
-                }
-                return Ok(value);
-            }
+        let result = self.pop_loop(&ctx).await;
 
-            Err(crate::error::Error::other_failure(
-                "failed to perform operation after 16 retries",
-            ))
-        }
-        .instrument(ctx.span().clone())
-        .await;
         ctx.end_operation(result.as_ref().err());
         result
+    }
+
+    async fn pop_loop<T: DeserializeOwned>(
+        &self,
+        ctx: &OperationContext<'_>,
+    ) -> crate::error::Result<T> {
+        for _ in 0..16 {
+            let res = self
+                .collection
+                .lookup_in(&self.id, &[LookupInSpec::get("[-1]", None)], None)
+                .instrument(ctx.span().clone())
+                .await?;
+            let cas = res.cas();
+            let value: T = res.content_as(0)?;
+
+            let res = self
+                .collection
+                .mutate_in(
+                    &self.id,
+                    &[MutateInSpec::remove("[-1]", None)],
+                    MutateInOptions::new().cas(cas),
+                )
+                .instrument(ctx.span().clone())
+                .await;
+            if let Err(e) = res {
+                match e.kind() {
+                    crate::error::ErrorKind::DocumentExists => continue,
+                    crate::error::ErrorKind::CasMismatch => continue,
+                    _ => return Err(e),
+                };
+            }
+            return Ok(value);
+        }
+
+        Err(crate::error::Error::other_failure(
+            "failed to perform operation after 16 retries",
+        ))
     }
 
     /// Returns the number of elements in the queue.
@@ -909,15 +953,12 @@ impl CouchbaseQueue<'_> {
                 create_span!("queue_len"),
             )
             .await;
-        let result = async {
-            let res = self
-                .collection
-                .lookup_in(&self.id, &[LookupInSpec::count("", None)], None)
-                .await?;
-            res.content_as(0)
-        }
-        .instrument(ctx.span().clone())
-        .await;
+        let result = self
+            .collection
+            .lookup_in(&self.id, &[LookupInSpec::count("", None)], None)
+            .instrument(ctx.span().clone())
+            .await
+            .and_then(|res| res.content_as(0));
         ctx.end_operation(result.as_ref().err());
         result
     }
@@ -938,12 +979,12 @@ impl CouchbaseQueue<'_> {
                 create_span!("queue_clear"),
             )
             .await;
-        let result = async {
-            self.collection.remove(&self.id, None).await?;
-            Ok(())
-        }
-        .instrument(ctx.span().clone())
-        .await;
+        let result = self
+            .collection
+            .remove(&self.id, None)
+            .instrument(ctx.span().clone())
+            .await
+            .map(|_| ());
         ctx.end_operation(result.as_ref().err());
         result
     }
