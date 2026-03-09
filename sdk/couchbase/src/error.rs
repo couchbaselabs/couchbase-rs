@@ -66,13 +66,9 @@ pub struct Error {
 }
 
 impl Error {
-    #[cfg(feature = "unstable-error-construction")]
+    /// Allows explicit construction of the Error type e.g. for mocking purposes.
+    /// **Uncommitted: This feature may change in the future**.
     pub fn new(kind: ErrorKind) -> Self {
-        Self::new_internal(kind)
-    }
-
-    #[cfg(not(feature = "unstable-error-construction"))]
-    pub(crate) fn new(kind: ErrorKind) -> Self {
         Self::new_internal(kind)
     }
 
@@ -553,10 +549,7 @@ impl InvalidArgumentErrorKind {
         &self.msg
     }
 
-    /// Creates a new `InvalidArgumentErrorKind`.
-    ///
-    /// Only available with the `unstable-error-construction` feature.
-    #[cfg(feature = "unstable-error-construction")]
+    /// Creates a new `InvalidArgumentErrorKind`. **Uncommitted: This feature may change in the future**.
     pub fn new(arg: impl Into<Option<String>>, msg: impl Into<String>) -> Self {
         Self {
             msg: msg.into(),
@@ -589,10 +582,7 @@ impl FeatureNotAvailableErrorKind {
         self.msg.as_deref()
     }
 
-    /// Creates a new `FeatureNotAvailableErrorKind`.
-    ///
-    /// Only available with the `unstable-error-construction` feature.
-    #[cfg(feature = "unstable-error-construction")]
+    /// Creates a new `FeatureNotAvailableErrorKind`. **Uncommitted: This feature may change in the future**.
     pub fn new(feature: impl Into<String>, msg: impl Into<Option<String>>) -> Self {
         Self {
             feature: feature.into(),
