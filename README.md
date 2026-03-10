@@ -3,7 +3,6 @@
 [![license](https://img.shields.io/github/license/couchbase/couchbase-jvm-clients?color=brightgreen)](https://opensource.org/licenses/Apache-2.0)
 
 This repository contains the Couchbase Rust SDK.
-This project is currently in development and not yet production ready.
 
 ## Project Structure
 
@@ -75,7 +74,8 @@ Instead of committing directly to a maintenance branch, first commit to `main` a
 
 ## Documentation
 
-Coming soon.
+[Couchbase documentation site](https://docs.couchbase.com/rust-sdk/current/hello-world/overview.html)
+[API reference documentation](https://docs.rs/couchbase/latest/couchbase/)
 
 ## Contributing
 

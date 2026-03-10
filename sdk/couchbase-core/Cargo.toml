@@ -1,6 +1,6 @@
 [package]
 name = "couchbase-core"
-version = "1.0.0-beta.1"
+version = "1.0.0"
 edition = "2021"
 description = "Couchbase SDK core networking and protocol implementation, not intended for direct use"
 license = "Apache-2.0"
