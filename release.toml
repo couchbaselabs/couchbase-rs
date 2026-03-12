@@ -3,7 +3,7 @@
 # Publishes crates in dependency order, skipping already-published versions.
 
 # Don't publish protostellar to crates.io
-[[packages]]
+[packages]
 name = "protostellar"
 release = false
 
