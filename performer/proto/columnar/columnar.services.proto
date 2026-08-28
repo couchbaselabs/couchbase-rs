@@ -4,9 +4,7 @@ import "columnar.caps.proto";
 import "columnar.query.proto";
 import "columnar.cluster_management.proto";
 import "columnar.result.proto";
-import "columnar.errors.proto";
 import "shared.echo.proto";
-import "columnar.serialization.proto";
 
 package fit.columnar;
 option java_package = "fit.columnar";

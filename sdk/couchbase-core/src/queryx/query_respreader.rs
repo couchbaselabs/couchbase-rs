@@ -471,7 +471,7 @@ impl QueryRespReader {
             ServerErrorKind::Timeout
         } else if err_code == 3000 {
             ServerErrorKind::ParsingFailure
-        } else if err_code == 13014 {
+        } else if err_code == 13014 || err_code == 2120 {
             ServerErrorKind::AuthenticationFailure
         } else {
             ServerErrorKind::Unknown

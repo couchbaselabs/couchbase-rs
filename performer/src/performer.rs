@@ -97,6 +97,7 @@ impl PerformerService for Performer {
             sdk::Caps::SdkObservabilityClusterLabels,
             sdk::Caps::SdkStableOtelSemanticConventions,
             sdk::Caps::SdkStableOtelSemanticConventionsEmittedByDefault,
+            sdk::Caps::SdkQuery2120,
         ]
         .into_iter()
         .map(|c| c.into())
