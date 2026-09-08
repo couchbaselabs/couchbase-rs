@@ -42,7 +42,7 @@ pub enum ErrorKind {
     },
     Io(io::Error),
     #[cfg(feature = "dns-srv")]
-    Resolve(hickory_resolver::ResolveError),
+    Resolve(hickory_resolver::net::NetError),
 }
 
 impl Clone for ErrorKind {
@@ -89,8 +89,8 @@ impl From<io::Error> for Error {
 }
 
 #[cfg(feature = "dns-srv")]
-impl From<hickory_resolver::ResolveError> for Error {
-    fn from(e: hickory_resolver::ResolveError) -> Self {
+impl From<hickory_resolver::net::NetError> for Error {
+    fn from(e: hickory_resolver::net::NetError) -> Self {
         Self {
             kind: ErrorKind::Resolve(e),
         }
